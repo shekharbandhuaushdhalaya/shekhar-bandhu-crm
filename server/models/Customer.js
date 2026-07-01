@@ -1,0 +1,38 @@
+const mongoose = require('mongoose');
+
+const customerSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  company: { type: String, default: '', trim: true },
+  email: { type: String, default: '', trim: true, lowercase: true },
+  phone: { type: String, default: '' },
+  pakkaBalance: { type: Number, default: 0 },
+  kachhaBalance: { type: Number, default: 0 },
+  outstandingInvoices: { type: Number, default: 0 },
+  salesVolume: { type: Number, default: 0 },
+  gstin: { type: String, default: '', trim: true },
+  state: { type: String, default: 'Maharashtra', trim: true },
+  contactPerson: { type: String, default: '', trim: true },
+  pan: { type: String, default: '', trim: true },
+  placeOfSupply: { type: String, default: '', trim: true },
+  paymentTerms: { type: String, default: 'Net 30', trim: true },
+  billingAddress: {
+    street: { type: String, default: '', trim: true },
+    pin: { type: String, default: '', trim: true },
+    city: { type: String, default: '', trim: true },
+    state: { type: String, default: '', trim: true }
+  },
+  shippingAddress: {
+    street: { type: String, default: '', trim: true },
+    pin: { type: String, default: '', trim: true },
+    city: { type: String, default: '', trim: true },
+    state: { type: String, default: '', trim: true }
+  },
+  shippingSameAsBilling: { type: Boolean, default: false },
+  customerType: { type: String, enum: ['gst', 'cash'], default: 'gst' },
+  recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' }
+}, { timestamps: true });
+
+customerSchema.index({ name: 'text', company: 'text', email: 'text' });
+customerSchema.index({ createdAt: -1 });
+
+module.exports = mongoose.model('Customer', customerSchema);

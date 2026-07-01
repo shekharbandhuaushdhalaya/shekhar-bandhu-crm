@@ -1,0 +1,2001 @@
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Spacing, Radius, LightColors } from '../constants/theme';
+import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product } from '../utils/api';
+import { useAuth } from '../utils/auth';
+import { useTheme, useStyles } from '../utils/themeContext';
+
+// Helper to format strings to Upper Camel Case (Title Case)
+const toTitleCase = (str?: string) => {
+  if (!str) return '';
+  return str
+    .split(' ')
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+};
+
+// Formatter for size with no spaces, capitalized unit suffix, and a trailing dot
+const formatSize = (size?: string) => {
+  if (!size) return '';
+  // Remove all spaces and dots to normalize, convert to uppercase
+  const cleaned = size.replace(/[\s.]+/g, '').toUpperCase();
+  return cleaned ? `${cleaned}.` : '';
+};
+
+// Formatter for weight with no spaces, normalized suffix, and lowercase 'g' (e.g. 12.50 gms -> 12.50g)
+const formatWeight = (weight?: string) => {
+  if (!weight) return '';
+  let w = weight.replace(/\s+/g, '').toLowerCase();
+  if (w.endsWith('gms')) {
+    w = w.slice(0, -3) + 'g';
+  } else if (w.endsWith('gm')) {
+    w = w.slice(0, -2) + 'g';
+  } else if (!w.endsWith('g')) {
+    if (/^\d+(\.\d+)?$/.test(w)) {
+      w += 'g';
+    }
+  }
+  return w;
+};
+
+// Helper to compare sizes for sorting in increasing order
+const compareSizes = (aSize?: string, bSize?: string) => {
+  if (!aSize && !bSize) return 0;
+  if (!aSize) return 1; // Put empty/missing sizes at the end
+  if (!bSize) return -1;
+
+  // Extract numeric parts to compare them as numbers (natural sort)
+  // E.g. "19MM" -> 19, "25MM" -> 25, "9.5" -> 9.5
+  const aNum = parseFloat(aSize.replace(/[^\d.]/g, ''));
+  const bNum = parseFloat(bSize.replace(/[^\d.]/g, ''));
+
+  if (!isNaN(aNum) && !isNaN(bNum)) {
+    if (aNum !== bNum) {
+      return aNum - bNum;
+    }
+  }
+
+  // Fallback to alphabetical comparison
+  return aSize.localeCompare(bSize, undefined, { numeric: true, sensitivity: 'base' });
+};
+
+// Formatter for full item name in Title Case
+const getDisplayName = (item: { productType?: string; size?: string; colour?: string; shape?: string; weight?: string; name?: string; itemName?: string; productId?: string }, products: Product[] = []) => {
+  const p = products.find(prod => prod._id === item.productId);
+  if (p && p.name) {
+    const sizeStr = p.size ? ` (${p.size})` : '';
+    return `${p.name}${sizeStr}`;
+  }
+  const name = item.name || item.itemName;
+  if (name) {
+    const sizeStr = item.size ? ` (${item.size})` : '';
+    return `${name}${sizeStr}`;
+  }
+  const parts = [
+    item.size,
+    item.shape,
+    item.colour,
+    item.weight
+  ];
+  const combined = parts.filter(Boolean).join(' ');
+  return combined || item.productType || 'Unnamed Product';
+};
+
+const getProductSelectorDisplayName = (item: { size?: string; shape?: string; colour?: string; weight?: string; name?: string }) => {
+  if (item.name) {
+    const sizeStr = item.size ? ` (${item.size})` : '';
+    return `${item.name}${sizeStr}`;
+  }
+  const parts = [
+    item.size,
+    item.shape,
+    item.colour,
+    item.weight
+  ];
+  const combined = parts.filter(Boolean).join(' ');
+  return combined || 'Unnamed Product';
+};
+
+
+// 1. Add Warehouse Modal Component
+function AddWarehouseModal({ visible, onClose, onSaved, warehouse }: { visible: boolean; onClose: () => void; onSaved: () => void; warehouse?: Warehouse | null }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+
+  const [name, setName] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (visible) {
+      setName(warehouse?.name || '');
+      setAddressLine1(warehouse?.addressLine1 || '');
+      setAddressLine2(warehouse?.addressLine2 || '');
+      setCity(warehouse?.city || '');
+      setState(warehouse?.state || '');
+      setPincode(warehouse?.pincode || '');
+      setContactPerson(warehouse?.contactPerson || '');
+      setPhone(warehouse?.phone || '');
+      setError('');
+    }
+  }, [visible, warehouse]);
+
+  const handlePinChange = async (val: string) => {
+    setPincode(val);
+    if (val.length === 6 && /^\d+$/.test(val)) {
+      try {
+        const res = await fetch(`https://api.postalpincode.in/pincode/${val}`);
+        const data = await res.json();
+        if (data && data[0] && data[0].Status === 'Success') {
+          const postOffice = data[0].PostOffice[0];
+          setCity(postOffice.District || postOffice.Name || '');
+          setState(postOffice.State || '');
+        }
+      } catch (err) {
+        console.log('PIN fetch error:', err);
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setError('Warehouse Name is required');
+      return;
+    }
+    if (!addressLine1.trim() || !city.trim() || !state.trim() || !pincode.trim()) {
+      setError('Full address (Address line 1, City, State, Pincode) is required');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const payload = {
+        name: name.trim(),
+        addressLine1: addressLine1.trim(),
+        addressLine2: addressLine2.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        pincode: pincode.trim(),
+        contactPerson: contactPerson.trim(),
+        phone: phone.trim()
+      };
+      
+      if (warehouse && warehouse._id) {
+        await api.updateWarehouse(warehouse._id, payload);
+      } else {
+        await api.createWarehouse(payload);
+      }
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create warehouse');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!warehouse || !warehouse._id) return;
+    if (!window.confirm(`Are you sure you want to delete ${warehouse.name}?`)) return;
+    
+    setLoading(true);
+    setError('');
+    try {
+      await api.deleteWarehouse(warehouse._id);
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete warehouse');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.dialogSheet}>
+          <Pressable style={styles.dialogContainer}>
+            <View style={styles.dialogHeader}>
+              <Text style={styles.dialogTitle}>{warehouse ? 'Edit Warehouse' : 'Add New Warehouse'}</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={24} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 400, marginVertical: Spacing.sm }} showsVerticalScrollIndicator={true}>
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Warehouse Name *</Text>
+                <TextInput style={styles.formInput} placeholder="e.g. Gotham Depot A" placeholderTextColor={colors.text.muted} value={name} onChangeText={setName} />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Address Line 1 *</Text>
+                <TextInput style={styles.formInput} placeholder="Street address, P.O. box" placeholderTextColor={colors.text.muted} value={addressLine1} onChangeText={setAddressLine1} />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Address Line 2 (Optional)</Text>
+                <TextInput style={styles.formInput} placeholder="Apartment, suite, unit, building" placeholderTextColor={colors.text.muted} value={addressLine2} onChangeText={setAddressLine2} />
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>City *</Text>
+                  <TextInput style={styles.formInput} placeholder="City" placeholderTextColor={colors.text.muted} value={city} onChangeText={setCity} />
+                </View>
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 10 }]}>
+                  <Text style={styles.formLabel}>State *</Text>
+                  <TextInput style={styles.formInput} placeholder="State" placeholderTextColor={colors.text.muted} value={state} onChangeText={setState} />
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>Pincode *</Text>
+                  <TextInput style={styles.formInput} placeholder="Pincode" placeholderTextColor={colors.text.muted} keyboardType="numeric" value={pincode} onChangeText={handlePinChange} />
+                </View>
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 10 }]}>
+                  <Text style={styles.formLabel}>Contact Person</Text>
+                  <TextInput style={styles.formInput} placeholder="Name" placeholderTextColor={colors.text.muted} value={contactPerson} onChangeText={setContactPerson} />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Phone Number</Text>
+                <TextInput style={styles.formInput} placeholder="Phone" placeholderTextColor={colors.text.muted} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+              </View>
+            </ScrollView>
+
+            <View style={styles.dialogActions}>
+              {warehouse && warehouse._id ? (
+                <TouchableOpacity style={[styles.dialogCancel, { borderColor: colors.danger, marginRight: 'auto' }]} onPress={handleDelete} disabled={loading}>
+                  <Text style={{ color: colors.danger }}>Delete</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={styles.dialogCancel} onPress={onClose} disabled={loading}>
+                <Text style={{ color: colors.text.secondary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.dialogSave, loading && { opacity: 0.7 }]} onPress={handleSave} disabled={loading}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{loading ? 'Saving...' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// 2. Add Stock (IN Transaction) Modal Component
+function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses, products, vendors }: { visible: boolean; initialProductId?: string; onClose: () => void; onSaved: () => void; warehouses: Warehouse[]; products: Product[]; vendors: any[] }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const { user } = useAuth();
+
+  const [warehouseId, setWarehouseId] = useState('');
+  const [productId, setProductId] = useState('');
+  const [qtyBoxes, setQtyBoxes] = useState('');
+  const [reference, setReference] = useState('');
+  const [note, setNote] = useState('');
+  const [vendorId, setVendorId] = useState('');
+  const [vendorName, setVendorName] = useState('');
+  const [packing, setPacking] = useState('100');
+  const [date, setDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Auto-suggest products & vendors as the user searches
+  const [productSearch, setProductSearch] = useState('');
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
+  const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setWarehouseId(warehouses[0]?._id || '');
+      setProductId(initialProductId || '');
+      setProductSearch('');
+      setQtyBoxes('');
+      setReference('');
+      setNote('');
+      setVendorId('');
+      setVendorName('');
+      setVendorSearch('');
+      setPacking('100');
+      setDate(new Date().toISOString().split('T')[0]);
+      setError('');
+      setShowProductDropdown(false);
+      setShowWarehouseDropdown(false);
+      setShowVendorDropdown(false);
+    }
+  }, [visible, warehouses]);
+
+  const filteredProducts = productSearch
+    ? products.filter(p => getProductSelectorDisplayName(p).toLowerCase().includes(productSearch.toLowerCase()) || p.sku.toLowerCase().includes(productSearch.toLowerCase()))
+    : products;
+
+  const filteredVendors = vendorSearch
+    ? vendors.filter(v => (v.displayName || v.name || '').toLowerCase().includes(vendorSearch.toLowerCase()) || (v.company || '').toLowerCase().includes(vendorSearch.toLowerCase()))
+    : vendors;
+
+  const handleSave = async () => {
+    if (!warehouseId) {
+      setError('Please select a warehouse');
+      return;
+    }
+    if (!productId) {
+      setError('Please select a product');
+      return;
+    }
+    const qty = parseFloat(qtyBoxes);
+    if (isNaN(qty) || qty <= 0) {
+      setError('Please enter a valid positive number of boxes');
+      return;
+    }
+    const packVal = parseInt(packing);
+    if (isNaN(packVal) || packVal <= 0) {
+      setError('Please enter a valid positive packing size (pcs/box)');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await api.addStock({
+        warehouseId,
+        productId,
+        qtyBoxes: qty,
+        reference: reference.trim(),
+        note: note.trim(),
+        createdBy: user?.name || '',
+        vendorId,
+        vendorName: vendorName.trim(),
+        packing: packVal,
+        createdAt: date ? new Date(date).toISOString() : undefined
+      });
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to add stock');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedProductObj = products.find(p => p._id === productId);
+  const selectedWarehouseObj = warehouses.find(w => w._id === warehouseId);
+
+  return (
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.dialogSheet}>
+          <Pressable style={styles.dialogContainer}>
+            {(showWarehouseDropdown || showProductDropdown || showVendorDropdown) && (
+              <Pressable
+                style={[
+                  StyleSheet.absoluteFill,
+                  { 
+                    zIndex: showWarehouseDropdown ? 1009 : (showProductDropdown ? 999 : 899),
+                    ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {})
+                  }
+                ]}
+                onPress={() => {
+                  setShowWarehouseDropdown(false);
+                  setShowProductDropdown(false);
+                  setShowVendorDropdown(false);
+                }}
+              />
+            )}
+            <View style={styles.dialogHeader}>
+              <Text style={styles.dialogTitle}>Add Stock (IN)</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={24} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginVertical: Spacing.sm, zIndex: 50 }}>
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              {/* Warehouse Dropdown */}
+              <View style={[styles.formGroup, { zIndex: 1010 }]}>
+                <Text style={styles.formLabel}>Destination Warehouse *</Text>
+                <TouchableOpacity style={styles.customSelectTrigger} onPress={() => { setShowWarehouseDropdown(!showWarehouseDropdown); setShowProductDropdown(false); setShowVendorDropdown(false); }}>
+                  <Text style={{ color: selectedWarehouseObj ? colors.text.primary : colors.text.muted }}>
+                    {selectedWarehouseObj ? selectedWarehouseObj.name : 'Select Warehouse'}
+                  </Text>
+                  <Ionicons name={showWarehouseDropdown ? 'chevron-up' : 'chevron-down'} size={16} color={colors.text.muted} />
+                </TouchableOpacity>
+
+                {showWarehouseDropdown && (
+                  <View style={styles.customSelectPanel}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
+                      {warehouses.map(w => (
+                        <TouchableOpacity
+                          key={w._id}
+                          style={styles.customSelectItem}
+                          onPress={() => {
+                            setWarehouseId(w._id);
+                            setShowWarehouseDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.customSelectItemText}>{w.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              {/* Product Selection with Instant Search */}
+              <View style={[styles.formGroup, { zIndex: 1000 }]}>
+                <Text style={styles.formLabel}>Select Product *</Text>
+                <View style={styles.customSearchSelectContainer}>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Search by name, type, SKU..."
+                    placeholderTextColor={colors.text.muted}
+                    value={productSearch || (selectedProductObj ? getProductSelectorDisplayName(selectedProductObj) : '')}
+                    onChangeText={(val) => {
+                      setProductSearch(val);
+                      setShowProductDropdown(true);
+                      setShowWarehouseDropdown(false);
+                      setShowVendorDropdown(false);
+                      if (productId) setProductId(''); // Clear selected if typing
+                    }}
+                    onFocus={() => {
+                      setShowProductDropdown(true);
+                      setShowWarehouseDropdown(false);
+                      setShowVendorDropdown(false);
+                    }}
+                  />
+                  {productId ? (
+                    <TouchableOpacity style={styles.clearProductSelection} onPress={() => { setProductId(''); setProductSearch(''); setVendorId(''); setVendorName(''); }}>
+                      <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {showProductDropdown && (
+                  <View style={styles.customSelectPanel}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
+                      {filteredProducts.map(p => (
+                        <TouchableOpacity
+                          key={p._id}
+                          style={styles.customSelectItem}
+                          onPress={() => {
+                            setProductId(p._id);
+                            setProductSearch(getProductSelectorDisplayName(p));
+                            if (p.vendorId) setVendorId(p.vendorId);
+                            if (p.vendorName) setVendorName(p.vendorName);
+                            setVendorSearch('');
+                            setShowProductDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.customSelectItemText}>{getProductSelectorDisplayName(p)}</Text>
+                          <Text style={styles.customSelectItemSubtext}>SKU: {p.sku} | Default Vendor: {toTitleCase(p.vendorName) || 'None'}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      {filteredProducts.length === 0 && (
+                        <View style={{ padding: 12 }}>
+                          <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>No products found</Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              {/* Vendor Selection with Instant Search */}
+              <View style={[styles.formGroup, { zIndex: 990 }]}>
+                <Text style={styles.formLabel}>Select Vendor</Text>
+                <View style={styles.customSearchSelectContainer}>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Search vendor or type custom..."
+                    placeholderTextColor={colors.text.muted}
+                    value={vendorSearch || toTitleCase(vendorName)}
+                    onChangeText={(val) => {
+                      setVendorSearch(val);
+                      setVendorName(val); // Allow entering text directly
+                      setShowVendorDropdown(true);
+                      setShowProductDropdown(false);
+                      setShowWarehouseDropdown(false);
+                      if (vendorId) setVendorId(''); // Clear selected if typing
+                    }}
+                    onFocus={() => {
+                      setShowVendorDropdown(true);
+                      setShowProductDropdown(false);
+                      setShowWarehouseDropdown(false);
+                    }}
+                  />
+                  {vendorId || vendorName ? (
+                    <TouchableOpacity style={styles.clearProductSelection} onPress={() => { setVendorId(''); setVendorName(''); setVendorSearch(''); }}>
+                      <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {showVendorDropdown && (
+                  <View style={styles.customSelectPanel}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
+                      {filteredVendors.map(v => (
+                        <TouchableOpacity
+                          key={v._id}
+                          style={styles.customSelectItem}
+                          onPress={() => {
+                            setVendorId(v._id);
+                            setVendorName(v.displayName || v.name || '');
+                            setVendorSearch('');
+                            setShowVendorDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.customSelectItemText}>{v.displayName || v.name}</Text>
+                          {v.company ? <Text style={styles.customSelectItemSubtext}>{v.company}</Text> : null}
+                        </TouchableOpacity>
+                      ))}
+                      {filteredVendors.length === 0 && (
+                        <View style={{ padding: 12 }}>
+                          <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>No vendors found</Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>Quantity (Boxes) *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. 50"
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="numeric"
+                    value={qtyBoxes}
+                    onChangeText={setQtyBoxes}
+                  />
+                </View>
+
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>Packing (Pcs/Box) *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. 100"
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="numeric"
+                    value={packing}
+                    onChangeText={setPacking}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Date (Optional backdating)</Text>
+                {Platform.OS === 'web' ? (
+                  React.createElement('input', {
+                    type: 'date',
+                    value: date,
+                    onChange: (e: any) => setDate(e.target.value),
+                    style: { padding: 8, borderRadius: 6, border: '1px solid #ccc', fontSize: 14 }
+                  })
+                ) : (
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.text.muted}
+                    value={date}
+                    onChangeText={setDate}
+                  />
+                )}
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Reference (Challan # / Invoice #)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. DC-2026-88"
+                  placeholderTextColor={colors.text.muted}
+                  value={reference}
+                  onChangeText={setReference}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Note</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Additional transaction info"
+                  placeholderTextColor={colors.text.muted}
+                  value={note}
+                  onChangeText={setNote}
+                />
+              </View>
+            </View>
+
+            <View style={[styles.dialogActions, { marginTop: 16 }]}>
+              <TouchableOpacity style={styles.dialogCancel} onPress={onClose} disabled={loading}>
+                <Text style={{ color: colors.text.secondary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.dialogSave, loading && { opacity: 0.7 }]} onPress={handleSave} disabled={loading}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{loading ? 'Adding...' : 'Add Stock'}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// 3. Adjust Stock Modal Component (for Adjusting particular Warehouse Entry)
+function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visible: boolean; entry: InventoryEntry | null; onClose: () => void; onSaved: () => void; products: Product[] }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const { user } = useAuth();
+
+  const [type, setType] = useState<'IN' | 'OUT' | 'ADJUSTMENT'>('ADJUSTMENT');
+  const [qtyBoxes, setQtyBoxes] = useState('');
+  const [reference, setReference] = useState('');
+  const [note, setNote] = useState('');
+  const [date, setDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (visible && entry) {
+      setType('ADJUSTMENT');
+      setQtyBoxes(entry.qtyBoxes.toString());
+      setReference('');
+      setNote('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setError('');
+    }
+  }, [visible, entry]);
+
+  if (!entry) return null;
+
+  const handleSave = async () => {
+    const qty = parseFloat(qtyBoxes);
+    if (isNaN(qty) || qty < 0) {
+      setError('Please enter a valid non-negative number of boxes');
+      return;
+    }
+    if (type === 'OUT' && qty > entry.qtyBoxes) {
+      setError(`Cannot deduct more than current stock (${entry.qtyBoxes} boxes)`);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await api.adjustStock(entry._id, {
+        qtyBoxes: qty,
+        type,
+        reference: reference.trim(),
+        note: note.trim(),
+        createdBy: user?.name || '',
+        createdAt: date ? new Date(date).toISOString() : undefined
+      });
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to adjust stock');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.dialogSheet}>
+          <Pressable style={styles.dialogContainer}>
+            <View style={styles.dialogHeader}>
+              <View>
+                <Text style={styles.dialogTitle}>Adjust Stock Level</Text>
+                <Text style={{ fontSize: 11, color: colors.text.muted }}>{entry.warehouseName} | {getDisplayName(entry, products)} (Packing: {entry.packing} Pcs/Box)</Text>
+              </View>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={24} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginVertical: Spacing.sm }}>
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              {/* Adjustment Type Selector */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Adjustment Type</Text>
+                <View style={styles.adjustmentTypeContainer}>
+                  <TouchableOpacity
+                    style={[styles.adjustmentTypeBtn, type === 'IN' && { backgroundColor: colors.success + '20', borderColor: colors.success }]}
+                    onPress={() => { setType('IN'); setQtyBoxes(''); }}
+                  >
+                    <Ionicons name="add-circle" size={16} color={type === 'IN' ? colors.success : colors.text.muted} />
+                    <Text style={[styles.adjustmentTypeBtnText, type === 'IN' && { color: colors.success }]}>Add (IN)</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.adjustmentTypeBtn, type === 'OUT' && { backgroundColor: colors.danger + '20', borderColor: colors.danger }]}
+                    onPress={() => { setType('OUT'); setQtyBoxes(''); }}
+                  >
+                    <Ionicons name="remove-circle" size={16} color={type === 'OUT' ? colors.danger : colors.text.muted} />
+                    <Text style={[styles.adjustmentTypeBtnText, type === 'OUT' && { color: colors.danger }]}>Deduct (OUT)</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.adjustmentTypeBtn, type === 'ADJUSTMENT' && { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
+                    onPress={() => { setType('ADJUSTMENT'); setQtyBoxes(entry.qtyBoxes.toString()); }}
+                  >
+                    <Ionicons name="options" size={16} color={type === 'ADJUSTMENT' ? colors.primary : colors.text.muted} />
+                    <Text style={[styles.adjustmentTypeBtnText, type === 'ADJUSTMENT' && { color: colors.primary }]}>Set Total</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  {type === 'IN' && 'Boxes to Add'}
+                  {type === 'OUT' && 'Boxes to Deduct'}
+                  {type === 'ADJUSTMENT' && 'Set Total Stock (Boxes)'} *
+                </Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder={type === 'ADJUSTMENT' ? entry.qtyBoxes.toString() : 'Quantity'}
+                  placeholderTextColor={colors.text.muted}
+                  keyboardType="numeric"
+                  value={qtyBoxes}
+                  onChangeText={setQtyBoxes}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Date (Optional backdating)</Text>
+                {Platform.OS === 'web' ? (
+                  React.createElement('input', {
+                    type: 'date',
+                    value: date,
+                    onChange: (e: any) => setDate(e.target.value),
+                    style: { padding: 8, borderRadius: 6, border: '1px solid #ccc', fontSize: 14 }
+                  })
+                ) : (
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.text.muted}
+                    value={date}
+                    onChangeText={setDate}
+                  />
+                )}
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Reference</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. Audit, Damage, Correction"
+                  placeholderTextColor={colors.text.muted}
+                  value={reference}
+                  onChangeText={setReference}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Reason / Note</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Explanation for stock level change"
+                  placeholderTextColor={colors.text.muted}
+                  value={note}
+                  onChangeText={setNote}
+                />
+              </View>
+            </View>
+
+            <View style={styles.dialogActions}>
+              <TouchableOpacity style={styles.dialogCancel} onPress={onClose} disabled={loading}>
+                <Text style={{ color: colors.text.secondary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.dialogSave, loading && { opacity: 0.7 }]} onPress={handleSave} disabled={loading}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{loading ? 'Updating...' : 'Apply'}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// 4. Stock Ledger (Transaction Log) Modal Component
+function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visible: boolean; productInfo: { id: string; name: string; packing?: number; vendorId?: string } | null; warehouseId?: string; onClose: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const [ledger, setLedger] = useState<StockLedger[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const loadLedger = useCallback(async () => {
+    if (!productInfo) return;
+    setLoading(true);
+    try {
+      const history = await api.getStockLedger(productInfo.id, warehouseId === 'all' ? undefined : warehouseId, productInfo.packing, productInfo.vendorId, startDate, endDate);
+      setLedger(history);
+    } catch (err) {
+      console.error('Error fetching ledger:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [productInfo, warehouseId, startDate, endDate]);
+
+  useEffect(() => {
+    if (visible && productInfo) {
+      loadLedger();
+    }
+  }, [visible, productInfo, loadLedger]);
+
+  if (!productInfo) return null;
+
+  return (
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={styles.ledgerSheet}>
+          <View style={styles.dialogHeader}>
+            <View>
+              <Text style={styles.dialogTitle}>Stock Ledger</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary, marginTop: 2 }}>{productInfo.name}</Text>
+              {warehouseId && warehouseId !== 'all' ? (
+                <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>Godown Filter: Active</Text>
+              ) : null}
+            </View>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={colors.text.muted} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.primary, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, height: 32 }}>
+              <Text style={{ fontSize: 12, color: colors.text.muted, marginRight: 6 }}>From:</Text>
+              {Platform.OS === 'web' ? (
+                React.createElement('input', {
+                  type: 'date',
+                  value: startDate,
+                  onChange: (e: any) => setStartDate(e.target.value),
+                  style: { border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: colors.text.primary, fontFamily: 'inherit' }
+                })
+              ) : (
+                <TextInput
+                  style={{ fontSize: 12, color: colors.text.primary, minWidth: 90 }}
+                  placeholder="YYYY-MM-DD"
+                  value={startDate}
+                  onChangeText={setStartDate}
+                />
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.primary, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, height: 32 }}>
+              <Text style={{ fontSize: 12, color: colors.text.muted, marginRight: 6 }}>To:</Text>
+              {Platform.OS === 'web' ? (
+                React.createElement('input', {
+                  type: 'date',
+                  value: endDate,
+                  onChange: (e: any) => setEndDate(e.target.value),
+                  style: { border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: colors.text.primary, fontFamily: 'inherit' }
+                })
+              ) : (
+                <TextInput
+                  style={{ fontSize: 12, color: colors.text.primary, minWidth: 90 }}
+                  placeholder="YYYY-MM-DD"
+                  value={endDate}
+                  onChangeText={setEndDate}
+                />
+              )}
+            </View>
+            {(startDate || endDate) && (
+              <TouchableOpacity onPress={() => { setStartDate(''); setEndDate(''); }} style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 12, color: colors.text.secondary }}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView style={{ flex: 1, marginVertical: Spacing.md }} showsVerticalScrollIndicator={true}>
+            {loading ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <Text style={{ color: colors.text.muted }}>Loading ledger logs...</Text>
+              </View>
+            ) : (
+              <View style={styles.ledgerTable}>
+                {/* Headers */}
+                <View style={styles.ledgerHeaderRow}>
+                  <Text style={[styles.ledgerHeaderCell, { width: 100 }]}>Date & Time</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 110 }]}>Godown</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 80 }]}>Tx Type</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 80, textAlign: 'center' }]}>Packing</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 70, textAlign: 'right' }]}>Qty Change</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 70, textAlign: 'right' }]}>Balance</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 140 }]}>Ref / Note</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 90 }]}>User</Text>
+                </View>
+
+                {/* Rows */}
+                {ledger.map((log) => {
+                  const txDate = new Date(log.createdAt).toLocaleString('en-IN', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+
+                  let badgeBg = colors.bg.secondary;
+                  let badgeText = colors.text.muted;
+                  if (log.type === 'IN') {
+                    badgeBg = colors.success + '15';
+                    badgeText = colors.success;
+                  } else if (log.type === 'OUT') {
+                    badgeBg = colors.danger + '15';
+                    badgeText = colors.danger;
+                  } else {
+                    badgeBg = colors.primary + '15';
+                    badgeText = colors.primary;
+                  }
+
+                  const qtyChangeStr = log.qtyBoxes > 0 ? `+${log.qtyBoxes}` : `${log.qtyBoxes}`;
+
+                  return (
+                    <View key={log._id} style={styles.ledgerBodyRow}>
+                      <Text style={[styles.ledgerCell, { width: 100, fontSize: 11 }]}>{txDate}</Text>
+                      <Text style={[styles.ledgerCell, { width: 110 }]} numberOfLines={1}>{log.warehouseName}</Text>
+                      <View style={[styles.ledgerCell, { width: 80 }]}>
+                        <View style={[styles.typeBadge, { backgroundColor: badgeBg }]}>
+                          <Text style={[styles.typeBadgeText, { color: badgeText }]}>{log.type}</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.ledgerCell, { width: 80, textAlign: 'center', color: colors.text.secondary }]}>
+                        {log.packing || 0} Pcs
+                      </Text>
+                      <Text style={[styles.ledgerCell, { width: 70, textAlign: 'right', fontWeight: '700', color: log.type === 'IN' ? colors.success : log.type === 'OUT' ? colors.danger : colors.text.primary }]}>
+                        {qtyChangeStr}
+                      </Text>
+                      <Text style={[styles.ledgerCell, { width: 70, textAlign: 'right', fontWeight: '700' }]}>{log.balanceBoxes}</Text>
+                      <View style={[styles.ledgerCell, { width: 140 }]}>
+                        {log.reference ? <Text style={styles.ledgerRefText}>Ref: {log.reference}</Text> : null}
+                        {log.note ? <Text style={styles.ledgerNoteText}>{log.note}</Text> : null}
+                        {!log.reference && !log.note ? <Text style={{ color: colors.text.muted, fontSize: 11 }}>—</Text> : null}
+                      </View>
+                      <Text style={[styles.ledgerCell, { width: 90 }]} numberOfLines={1}>{log.createdBy || 'System'}</Text>
+                    </View>
+                  );
+                })}
+
+                {ledger.length === 0 && (
+                  <View style={{ padding: 40, alignItems: 'center' }}>
+                    <Ionicons name="clipboard-outline" size={24} color={colors.text.muted} />
+                    <Text style={{ color: colors.text.muted, fontSize: 12, marginTop: 6 }}>No ledger actions recorded yet</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.dialogActions}>
+            <TouchableOpacity style={[styles.dialogCancel, { borderColor: colors.border }]} onPress={onClose}>
+              <Text style={{ color: colors.text.secondary }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// MAIN INVENTORIES SCREEN COMPONENT
+export default function InventoriesScreen() {
+  const { colors } = useTheme();
+  const { user } = useAuth();
+  const styles = useStyles(createStyles);
+
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  const getDisplayName = (item: any) => {
+    const p = products.find(prod => prod._id === item.productId);
+    if (p && p.name) {
+      const sizeStr = p.size ? ` (${p.size})` : '';
+      return `${p.name}${sizeStr}`;
+    }
+    const name = item.name || item.itemName;
+    if (name) {
+      const sizeStr = item.size ? ` (${item.size})` : '';
+      return `${name}${sizeStr}`;
+    }
+    const parts = [
+      item.size,
+      item.shape,
+      item.colour,
+      item.weight
+    ];
+    const combined = parts.filter(Boolean).join(' ');
+    return combined || item.productType || 'Unnamed Product';
+  };
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState('all');
+  const [consolidatedItems, setConsolidatedItems] = useState<ConsolidatedInventory[]>([]);
+  const [warehouseEntries, setWarehouseEntries] = useState<InventoryEntry[]>([]);
+  
+  const [search, setSearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Modals Visibility
+  const [addWarehouseVisible, setAddWarehouseVisible] = useState(false);
+  const [addStockVisible, setAddStockVisible] = useState(false);
+  const [addStockInitialProductId, setAddStockInitialProductId] = useState('');
+  const [adjustStockVisible, setAdjustStockVisible] = useState(false);
+  const [ledgerVisible, setLedgerVisible] = useState(false);
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
+
+  // Selected for modals
+  const [selectedEntry, setSelectedEntry] = useState<InventoryEntry | null>(null);
+  const [selectedLedgerProduct, setSelectedLedgerProduct] = useState<{ id: string; name: string; packing?: number; vendorId?: string } | null>(null);
+
+  // Selector Dropdowns visibility
+  const [showWarehouseFilterDropdown, setShowWarehouseFilterDropdown] = useState(false);
+
+  // Visual Mode and Filters
+  const [selectedVendorId, setSelectedVendorId] = useState('all');
+  const [showVendorFilterDropdown, setShowVendorFilterDropdown] = useState(false);
+  const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
+  const [showZero, setShowZero] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      // 1. Fetch Warehouses, Products, and Vendors
+      const [ws, prods, vends] = await Promise.all([
+        api.getWarehouses(),
+        api.getProducts(),
+        api.getVendors()
+      ]);
+      setWarehouses(ws);
+      setProducts(prods);
+      setVendors(vends);
+
+      // 2. Fetch inventory based on selected godown
+      if (selectedWarehouseId === 'all') {
+        const cons = await api.getConsolidatedInventory(search);
+        setConsolidatedItems(cons);
+      } else {
+        const entries = await api.getInventoryEntries(selectedWarehouseId, search);
+        setWarehouseEntries(entries);
+      }
+    } catch (err) {
+      console.error('Error fetching inventories details:', err);
+    }
+  }, [selectedWarehouseId, search]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  // Grouping consolidatedItems or warehouseEntries by product specifications (unique by size, shape, colour, weight, productType)
+  const processedItems = useMemo(() => {
+    // 1. Grouping Consolidated view
+    if (selectedWarehouseId === 'all') {
+      const map: Record<string, {
+        productId: string;
+        productType: string;
+        size?: string;
+        colour: string;
+        shape: string;
+        weight: string;
+        hsnCode: string;
+        totalBoxes: number;
+        vendorName: string;
+        warehouses: { warehouseId: string; warehouseName: string; qtyBoxes: number }[];
+        vendorDetails: {
+          vendorId: string;
+          vendorName: string;
+          packing: number;
+          qtyBoxes: number;
+          warehouses: { warehouseId: string; warehouseName: string; qtyBoxes: number }[];
+        }[];
+      }> = {};
+
+      consolidatedItems.forEach(item => {
+        if (selectedVendorId !== 'all' && item.vendorId !== selectedVendorId) {
+          return;
+        }
+        const key = item.productId;
+        if (!map[key]) {
+          map[key] = {
+            productId: item.productId,
+            productType: item.productType,
+            size: item.size,
+            colour: item.colour,
+            shape: item.shape,
+            weight: item.weight,
+            hsnCode: item.hsnCode,
+            totalBoxes: 0,
+            vendorName: '',
+            warehouses: [],
+            vendorDetails: []
+          };
+        }
+        const g = map[key];
+        g.totalBoxes += item.totalBoxes;
+        
+        // Merge warehouses
+        (item.warehouses || []).forEach(w => {
+          const existingW = g.warehouses.find(x => x.warehouseId === w.warehouseId);
+          if (existingW) {
+            existingW.qtyBoxes += w.qtyBoxes;
+          } else {
+            g.warehouses.push({ ...w });
+          }
+        });
+
+        // Add vendor details
+        g.vendorDetails.push({
+          vendorId: item.vendorId,
+          vendorName: item.vendorName,
+          packing: item.packing,
+          qtyBoxes: item.totalBoxes,
+          warehouses: item.warehouses
+        });
+      });
+
+      // Merge all products if showZero is true to include items that never had stock
+      if (showZero) {
+        products.forEach(p => {
+          if (!map[p._id]) {
+            map[p._id] = {
+              productId: p._id,
+              productType: p.productType || '',
+              size: p.size || '',
+              colour: p.colour || '',
+              shape: p.shape || '',
+              weight: p.weight || '',
+              hsnCode: p.hsnCode || '',
+              totalBoxes: 0,
+              vendorName: '',
+              warehouses: [],
+              vendorDetails: []
+            };
+          }
+        });
+      }
+
+      const consolidatedResult = Object.values(map);
+      const filtered = showZero
+        ? consolidatedResult.filter(item => (item as any).totalBoxes === 0)
+        : consolidatedResult.filter(item => (item as any).totalBoxes > 0);
+      return filtered.sort((a, b) => compareSizes(a.size, b.size));
+    } 
+    
+    // 2. Grouping single godown entries
+    else {
+      const map: Record<string, {
+        productId: string;
+        productType: string;
+        size?: string;
+        colour: string;
+        shape: string;
+        weight: string;
+        hsnCode: string;
+        totalBoxes: number;
+        vendorName: string;
+        warehouses: { warehouseId: string; warehouseName: string; qtyBoxes: number }[];
+        vendorDetails: {
+          vendorId: string;
+          vendorName: string;
+          packing: number;
+          qtyBoxes: number;
+          warehouses: { warehouseId: string; warehouseName: string; qtyBoxes: number }[];
+          _id: string;
+        }[];
+      }> = {};
+
+      warehouseEntries.forEach(entry => {
+        if (selectedVendorId !== 'all' && entry.vendorId !== selectedVendorId) {
+          return;
+        }
+        const key = entry.productId;
+        if (!map[key]) {
+          map[key] = {
+            productId: entry.productId,
+            productType: entry.productType,
+            size: entry.size,
+            colour: entry.colour,
+            shape: entry.shape,
+            weight: entry.weight,
+            hsnCode: entry.hsnCode,
+            totalBoxes: 0,
+            vendorName: '',
+            warehouses: [],
+            vendorDetails: []
+          };
+        }
+        const g = map[key];
+        g.totalBoxes += entry.qtyBoxes;
+        
+        const existingW = g.warehouses.find(x => x.warehouseId === entry.warehouseId);
+        if (existingW) {
+          existingW.qtyBoxes += entry.qtyBoxes;
+        } else {
+          g.warehouses.push({ warehouseId: entry.warehouseId, warehouseName: entry.warehouseName, qtyBoxes: entry.qtyBoxes });
+        }
+
+        g.vendorDetails.push({
+          vendorId: entry.vendorId || '',
+          vendorName: entry.vendorName,
+          packing: entry.packing,
+          qtyBoxes: entry.qtyBoxes,
+          warehouses: [{ warehouseId: entry.warehouseId, warehouseName: entry.warehouseName, qtyBoxes: entry.qtyBoxes }],
+          _id: entry._id
+        });
+      });
+
+      // Merge all products if showZero is true to include items that never had stock
+      if (showZero) {
+        products.forEach(p => {
+          if (!map[p._id]) {
+            map[p._id] = {
+              productId: p._id,
+              productType: p.productType || '',
+              size: p.size || '',
+              colour: p.colour || '',
+              shape: p.shape || '',
+              weight: p.weight || '',
+              hsnCode: p.hsnCode || '',
+              totalBoxes: 0,
+              vendorName: '',
+              warehouses: [],
+              vendorDetails: []
+            };
+          }
+        });
+      }
+
+      const result = Object.values(map);
+      const filtered = showZero
+        ? result.filter(item => (item as any).totalBoxes === 0)
+        : result.filter(item => (item as any).totalBoxes > 0);
+      return filtered.sort((a, b) => compareSizes(a.size, b.size));
+    }
+  }, [consolidatedItems, warehouseEntries, selectedWarehouseId, selectedVendorId, showZero, products]);
+
+  // Compute Metrics Summaries
+  const totalWarehouses = warehouses.length;
+  
+  const totalStockBoxes = selectedWarehouseId === 'all'
+    ? consolidatedItems
+        .filter(item => selectedVendorId === 'all' || item.vendorId === selectedVendorId)
+        .reduce((sum, item) => sum + item.totalBoxes, 0)
+    : warehouseEntries
+        .filter(item => selectedVendorId === 'all' || item.vendorId === selectedVendorId)
+        .reduce((sum, item) => sum + item.qtyBoxes, 0);
+
+  const uniqueItemsCount = processedItems.length;
+
+  const currentWarehouseName = selectedWarehouseId === 'all'
+    ? 'All Warehouses'
+    : warehouses.find(w => w._id === selectedWarehouseId)?.name || 'Particular Godown';
+
+  const currentVendorName = selectedVendorId === 'all'
+    ? 'All Vendors'
+    : vendors.find(v => v._id === selectedVendorId)?.displayName || vendors.find(v => v._id === selectedVendorId)?.name || 'Selected Vendor';
+
+  return (
+    <View style={styles.screen}>
+      <View style={styles.innerContainer}>
+        {/* Metrics Cards Bar */}
+        <View style={styles.summaryBar}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Total Warehouses</Text>
+            <Text style={styles.summaryValue}>{totalWarehouses}</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Active Stock</Text>
+            <Text style={[styles.summaryValue, { color: colors.success }]}>
+              {totalStockBoxes} Box{totalStockBoxes !== 1 ? 'es' : ''}
+            </Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Unique Items</Text>
+            <Text style={styles.summaryValue}>{uniqueItemsCount}</Text>
+          </View>
+        </View>
+
+        {/* Controls Action & Filter Bar */}
+        <View style={{ zIndex: 1100, position: 'relative' }}>
+          {(showWarehouseFilterDropdown || showVendorFilterDropdown) && (
+            <Pressable
+              style={[
+                StyleSheet.absoluteFill,
+                { 
+                  zIndex: 900,
+                  ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {})
+                }
+              ]}
+              onPress={() => {
+                setShowWarehouseFilterDropdown(false);
+                setShowVendorFilterDropdown(false);
+              }}
+            />
+          )}
+          <View style={[styles.controlsBar, { flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' }]}>
+            
+            {/* Search Bar */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, flex: 1, minWidth: 250, height: 40 }}>
+              <Ionicons name="search" size={16} color={colors.text.muted} />
+              <TextInput
+                style={{ flex: 1, height: '100%', color: colors.text.primary, fontSize: 13 }}
+                placeholder="Search items..."
+                placeholderTextColor={colors.text.muted}
+                value={search}
+                onChangeText={setSearch}
+              />
+            </View>
+
+            {/* Filter Dropdowns */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {/* Vendor Filter Button */}
+              <View style={{ position: 'relative', zIndex: showVendorFilterDropdown ? 1000 : 1 }}>
+                <TouchableOpacity
+                  style={styles.filterDropdownButton}
+                  onPress={() => {
+                    setShowVendorFilterDropdown(!showVendorFilterDropdown);
+                    setShowWarehouseFilterDropdown(false);
+                  }}
+                >
+                  <Ionicons name="business-outline" size={14} color={colors.success} />
+                  <Text style={styles.filterDropdownButtonText}>
+                    {currentVendorName}
+                  </Text>
+                  <Ionicons name={showVendorFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
+                </TouchableOpacity>
+
+                {/* Vendor Dropdown Panel */}
+                {showVendorFilterDropdown && (
+                  <View style={[styles.vendorDropdownPanel, { top: 42, right: 0 }]}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
+                      <TouchableOpacity
+                        style={[styles.filterDropdownItem, selectedVendorId === 'all' && styles.filterDropdownItemActive]}
+                        onPress={() => {
+                          setSelectedVendorId('all');
+                          setShowVendorFilterDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.filterDropdownItemText, selectedVendorId === 'all' && { fontWeight: '700', color: colors.primary }]}>
+                          All Vendors
+                        </Text>
+                      </TouchableOpacity>
+
+                      {vendors.map(v => (
+                        <TouchableOpacity
+                          key={v._id}
+                          style={[styles.filterDropdownItem, selectedVendorId === v._id && styles.filterDropdownItemActive]}
+                          onPress={() => {
+                            setSelectedVendorId(v._id);
+                            setShowVendorFilterDropdown(false);
+                          }}
+                        >
+                          <Text style={[styles.filterDropdownItemText, selectedVendorId === v._id && { fontWeight: '700', color: colors.primary }]}>
+                            {toTitleCase(v.displayName || v.name)}
+                          </Text>
+                          {v.company ? <Text style={{ fontSize: 10, color: colors.text.muted }}>{v.company}</Text> : null}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              {/* Warehouse Filter Button */}
+              <View style={{ position: 'relative', zIndex: showWarehouseFilterDropdown ? 1000 : 1 }}>
+                <TouchableOpacity
+                  style={styles.filterDropdownButton}
+                  onPress={() => {
+                    setShowWarehouseFilterDropdown(!showWarehouseFilterDropdown);
+                    setShowVendorFilterDropdown(false);
+                  }}
+                >
+                  <Ionicons name="location" size={14} color={colors.primary} />
+                  <Text style={styles.filterDropdownButtonText}>
+                    {currentWarehouseName}
+                  </Text>
+                  <Ionicons name={showWarehouseFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
+                </TouchableOpacity>
+
+                {/* Warehouse Dropdown Panel */}
+                {showWarehouseFilterDropdown && (
+                  <View style={[styles.filterDropdownPanel, { top: 42, right: 0 }]}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
+                      <TouchableOpacity
+                        style={[styles.filterDropdownItem, selectedWarehouseId === 'all' && styles.filterDropdownItemActive]}
+                        onPress={() => {
+                          setSelectedWarehouseId('all');
+                          setShowWarehouseFilterDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.filterDropdownItemText, selectedWarehouseId === 'all' && { fontWeight: '700', color: colors.primary }]}>
+                          All Warehouses (Consolidated)
+                        </Text>
+                      </TouchableOpacity>
+
+                      {warehouses.map(w => (
+                        <View key={w._id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <TouchableOpacity
+                            style={[styles.filterDropdownItem, { flex: 1, borderBottomWidth: 0 }, selectedWarehouseId === w._id && styles.filterDropdownItemActive]}
+                            onPress={() => {
+                              setSelectedWarehouseId(w._id);
+                              setShowWarehouseFilterDropdown(false);
+                            }}
+                          >
+                            <Text style={[styles.filterDropdownItemText, selectedWarehouseId === w._id && { fontWeight: '700', color: colors.primary }]}>
+                              {w.name}
+                            </Text>
+                            <Text style={{ fontSize: 10, color: colors.text.muted }}>{w.city}, {w.state}</Text>
+                          </TouchableOpacity>
+                          {user?.role !== 'agent' && (
+                            <TouchableOpacity
+                              style={{ padding: 10, paddingRight: 16 }}
+                              onPress={() => {
+                                setEditingWarehouse(w);
+                                setAddWarehouseVisible(true);
+                                setShowWarehouseFilterDropdown(false);
+                              }}
+                            >
+                              <Ionicons name="pencil" size={16} color={colors.primary} />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {user?.role !== 'agent' && (
+                <TouchableOpacity style={styles.headerBtnPrimary} onPress={() => setAddWarehouseVisible(true)}>
+                  <Ionicons name="business" size={16} color="#fff" />
+                  <Text style={styles.headerBtnText}>Add Warehouse</Text>
+                </TouchableOpacity>
+              )}
+              {user?.role !== 'agent' && (
+                <TouchableOpacity style={styles.headerBtnPrimary} onPress={() => { setAddStockInitialProductId(''); setAddStockVisible(true); }}>
+                  <Ionicons name="cube-outline" size={16} color="#fff" />
+                  <Text style={styles.headerBtnText}>Add Stock</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.headerBtnPrimary, {
+                  backgroundColor: showZero ? colors.warning : colors.bg.card,
+                  borderWidth: 1,
+                  borderColor: showZero ? colors.warning : colors.border,
+                }]}
+                onPress={() => setShowZero(p => !p)}
+              >
+                <Ionicons name={showZero ? "eye" : "eye-off-outline"} size={16} color={showZero ? '#fff' : colors.text.secondary} />
+                <Text style={[styles.headerBtnText, { color: showZero ? '#fff' : colors.text.secondary }]}>Zero Stock</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Inventory List / Table */}
+        <ScrollView
+          style={{ flex: 1 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={true}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg, flexGrow: 1 }}
+          >
+            <View style={styles.table}>
+              {selectedWarehouseId === 'all' ? (
+                // --- CONSOLIDATED VIEW TABLE ---
+                <>
+                  <View style={styles.tableHeaderRow}>
+                    <View style={[styles.tableHeaderCellContainer, { width: 40 }]}><Text style={styles.tableHeaderCell}> </Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 2.5 }]}><Text style={styles.tableHeaderCell}>Item Name</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.8 }]}><Text style={styles.tableHeaderCell}>Vendors</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 2.2 }]}><Text style={styles.tableHeaderCell}>Godowns</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Total Stock</Text></View>
+                  </View>
+
+                  {processedItems.map((item: any) => {
+                    const isExpanded = !!expandedProducts[item.productId];
+                    const uniqueVendors = Array.from(new Set(item.vendorDetails.map((v: any) => v.vendorName))) as string[];
+                    
+                    return (
+                      <View key={item.productId} style={styles.expandableGroupContainer}>
+                        <Pressable
+                          style={({ pressed }) => [styles.tableBodyRow, pressed && { backgroundColor: colors.bg.secondary }]}
+                          onPress={() => {
+                            setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }));
+                          }}
+                        >
+                          <View style={[styles.tableCellContainer, { width: 40, alignItems: 'center', justifyContent: 'center' }]}>
+                            <Ionicons 
+                              name={isExpanded ? 'chevron-down-circle' : 'chevron-forward-circle'} 
+                              size={18} 
+                              color={colors.primary} 
+                            />
+                          </View>
+
+                          <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
+                            <Text style={styles.primaryText}>{getDisplayName(item)}</Text>
+                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>HSN: {item.hsnCode}</Text>
+                          </View>
+
+                          <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
+                            <Text style={styles.tableCell} numberOfLines={1}>
+                              {uniqueVendors.map(v => toTitleCase(v)).join(', ') || 'No Vendor'}
+                            </Text>
+                          </View>
+
+                          <View style={[styles.tableCellContainer, { flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }]}>
+                            {item.warehouses.map((w: any, idx: number) => (
+                              <View key={idx} style={styles.warehouseBadge}>
+                                <Text style={styles.warehouseBadgeText}>
+                                  {w.warehouseName}: {w.qtyBoxes}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+
+                          <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]}>
+                            <Text style={{ fontWeight: '700', color: colors.success }}>
+                              {item.totalBoxes} Box{item.totalBoxes !== 1 ? 'es' : ''}
+                            </Text>
+                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
+                              across {item.vendorDetails.length} batch{item.vendorDetails.length !== 1 ? 'es' : ''}
+                            </Text>
+                          </View>
+                        </Pressable>
+
+                        {isExpanded && (
+                          <View style={styles.expandedBreakdownArea}>
+                            {item.vendorDetails.length === 0 ? (
+                              <View style={styles.expandedBreakdownRow}>
+                                <View style={{ width: 40 }} />
+                                <Pressable
+                                  style={{ flex: 2.5, paddingLeft: 10 }}
+                                  onPress={() => {
+                                    setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item), vendorId: '' });
+                                    setLedgerVisible(true);
+                                  }}
+                                >
+                                  <Text style={styles.breakdownVendorText}>↳ No Stock History</Text>
+                                </Pressable>
+                                <View style={{ flex: 1.8 }} />
+                                <View style={{ flex: 2.2 }} />
+                                <Pressable
+                                  style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 8 }}
+                                  onPress={() => {
+                                    setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item), vendorId: '' });
+                                    setLedgerVisible(true);
+                                  }}
+                                >
+                                  <View>
+                                    <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>0 Boxes</Text>
+                                  </View>
+                                  <View style={styles.breakdownActionBadge}>
+                                    <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
+                                    <Text style={styles.breakdownActionText}>Ledger</Text>
+                                  </View>
+                                </Pressable>
+                              </View>
+                            ) : (
+                              item.vendorDetails.map((vd: any, idx: number) => (
+                                <View
+                                  key={idx}
+                                  style={[
+                                    styles.expandedBreakdownRow,
+                                    idx !== item.vendorDetails.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border + '30' }
+                                  ]}
+                                >
+                                  <View style={{ width: 40 }} />
+
+                                  {/* Align under Item Name (Vendor + Packing + Ledger action trigger) */}
+                                  <Pressable
+                                    style={{ flex: 2.5, paddingLeft: 10 }}
+                                    onPress={() => {
+                                      setSelectedLedgerProduct({ id: item.productId, name: `${getDisplayName(item)} (${vd.vendorName})`, packing: vd.packing, vendorId: vd.vendorId });
+                                      setLedgerVisible(true);
+                                    }}
+                                  >
+                                    <Text style={styles.breakdownVendorText}>↳ {toTitleCase(vd.vendorName) || 'Unknown Vendor'}</Text>
+                                    <Text style={styles.breakdownPackingText}>Packing: {vd.packing} Pcs/Box</Text>
+                                  </Pressable>
+
+                                  {/* Align under Vendors (Empty space) */}
+                                  <View style={{ flex: 1.8 }} />
+
+                                  {/* Align under Godowns */}
+                                  <View style={{ flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                    {vd.warehouses.map((w: any, wIdx: number) => (
+                                      <View key={wIdx} style={[styles.warehouseBadge, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
+                                        <Text style={[styles.warehouseBadgeText, { color: colors.primary }]}>
+                                          {w.warehouseName}: {w.qtyBoxes}
+                                        </Text>
+                                      </View>
+                                    ))}
+                                  </View>
+
+                                  {/* Align under Total Stock (Ledger shortcut) */}
+                                  <Pressable
+                                    style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 8 }}
+                                    onPress={() => {
+                                      setSelectedLedgerProduct({ id: item.productId, name: `${getDisplayName(item)} (${vd.vendorName})`, packing: vd.packing, vendorId: vd.vendorId });
+                                      setLedgerVisible(true);
+                                    }}
+                                  >
+                                    <View>
+                                      <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>
+                                        {vd.qtyBoxes} Box{vd.qtyBoxes !== 1 ? 'es' : ''}
+                                      </Text>
+                                      <Text style={{ fontSize: 9, color: colors.text.muted }}>Subtotal</Text>
+                                    </View>
+                                    <View style={styles.breakdownActionBadge}>
+                                      <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
+                                      <Text style={styles.breakdownActionText}>Ledger</Text>
+                                    </View>
+                                  </Pressable>
+                                </View>
+                              ))
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+
+                  {processedItems.length === 0 && (
+                    <View style={styles.emptyTableContainer}>
+                      <Ionicons name="cube-outline" size={36} color={colors.text.muted} />
+                      <Text style={styles.emptyText}>No consolidated inventory items found</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                // --- SINGLE GODOWN FILTERED TABLE ---
+                <>
+                  <View style={styles.tableHeaderRow}>
+                    <View style={[styles.tableHeaderCellContainer, { width: 40 }]}><Text style={styles.tableHeaderCell}> </Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 2.5 }]}><Text style={styles.tableHeaderCell}>Item Name</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.8 }]}><Text style={styles.tableHeaderCell}>Vendors</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 2.2 }]}><Text style={styles.tableHeaderCell}>Godowns</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Total Stock</Text></View>
+                  </View>
+
+                  {processedItems.map((item: any) => {
+                    const isExpanded = !!expandedProducts[item.productId];
+                    const uniqueVendors = Array.from(new Set(item.vendorDetails.map((v: any) => v.vendorName))) as string[];
+                    
+                    return (
+                      <View key={item.productId} style={styles.expandableGroupContainer}>
+                        <Pressable
+                          style={({ pressed }) => [styles.tableBodyRow, pressed && { backgroundColor: colors.bg.secondary }]}
+                          onPress={() => {
+                            setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }));
+                          }}
+                        >
+                          <View style={[styles.tableCellContainer, { width: 40, alignItems: 'center', justifyContent: 'center' }]}>
+                            <Ionicons 
+                              name={isExpanded ? 'chevron-down-circle' : 'chevron-forward-circle'} 
+                              size={18} 
+                              color={colors.primary} 
+                            />
+                          </View>
+
+                          <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
+                            <Text style={styles.primaryText}>{getDisplayName(item)}</Text>
+                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>HSN: {item.hsnCode}</Text>
+                          </View>
+
+                          <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
+                            <Text style={styles.tableCell} numberOfLines={1}>
+                              {uniqueVendors.map(v => toTitleCase(v)).join(', ') || 'No Vendor'}
+                            </Text>
+                          </View>
+
+                          <View style={[styles.tableCellContainer, { flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }]}>
+                            <View style={styles.warehouseBadge}>
+                              <Text style={styles.warehouseBadgeText}>
+                                {currentWarehouseName}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]}>
+                            <Text style={{ fontWeight: '700', color: colors.success }}>
+                              {item.totalBoxes} Box{item.totalBoxes !== 1 ? 'es' : ''}
+                            </Text>
+                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
+                              across {item.vendorDetails.length} batch{item.vendorDetails.length !== 1 ? 'es' : ''}
+                            </Text>
+                          </View>
+                        </Pressable>
+
+                        {isExpanded && (
+                          <View style={styles.expandedBreakdownArea}>
+                            {item.vendorDetails.length === 0 ? (
+                              <View style={styles.expandedBreakdownRow}>
+                                <View style={{ width: 40 }} />
+                                <Pressable
+                                  style={{ flex: 2.5, paddingLeft: 10 }}
+                                  onPress={() => {
+                                    setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item), vendorId: '' });
+                                    setLedgerVisible(true);
+                                  }}
+                                >
+                                  <Text style={styles.breakdownVendorText}>↳ No Stock History</Text>
+                                </Pressable>
+                                <View style={{ flex: 1.8 }} />
+                                <View style={{ flex: 2.2, justifyContent: 'center', alignItems: 'flex-start' }}>
+                                  {user?.role !== 'agent' && (
+                                    <TouchableOpacity
+                                      style={styles.actionBtnSecondary}
+                                      onPress={() => {
+                                        setAddStockInitialProductId(item.productId);
+                                        setAddStockVisible(true);
+                                      }}
+                                    >
+                                      <Ionicons name="options-outline" size={14} color={colors.primary} />
+                                      <Text style={styles.actionBtnSecondaryText}>Adjust Stock</Text>
+                                    </TouchableOpacity>
+                                  )}
+                                </View>
+                                <Pressable
+                                  style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 8 }}
+                                  onPress={() => {
+                                    setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item), vendorId: '' });
+                                    setLedgerVisible(true);
+                                  }}
+                                >
+                                  <View>
+                                    <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>0 Boxes</Text>
+                                  </View>
+                                  <View style={styles.breakdownActionBadge}>
+                                    <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
+                                    <Text style={styles.breakdownActionText}>Ledger</Text>
+                                  </View>
+                                </Pressable>
+                              </View>
+                            ) : (
+                              item.vendorDetails.map((vd: any, idx: number) => (
+                                <View
+                                  key={idx}
+                                  style={[
+                                    styles.expandedBreakdownRow,
+                                    idx !== item.vendorDetails.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border + '30' }
+                                  ]}
+                                >
+                                  <View style={{ width: 40 }} />
+
+                                  {/* Align under Item Name (Vendor + Packing + Ledger action trigger) */}
+                                  <Pressable
+                                    style={{ flex: 2.5, paddingLeft: 10 }}
+                                    onPress={() => {
+                                      setSelectedLedgerProduct({ id: item.productId, name: `${getDisplayName(item)} (${vd.vendorName})`, packing: vd.packing, vendorId: vd.vendorId });
+                                      setLedgerVisible(true);
+                                    }}
+                                  >
+                                    <Text style={styles.breakdownVendorText}>↳ {toTitleCase(vd.vendorName) || 'Unknown Vendor'}</Text>
+                                    <Text style={styles.breakdownPackingText}>Packing: {vd.packing} Pcs/Box</Text>
+                                  </Pressable>
+
+                                  {/* Align under Vendors (Empty space) */}
+                                  <View style={{ flex: 1.8 }} />
+
+                                  {/* Align under Godowns (Adjust Stock Button) */}
+                                  <View style={{ flex: 2.2, justifyContent: 'center', alignItems: 'flex-start' }}>
+                                    {user?.role !== 'agent' && (
+                                      <TouchableOpacity
+                                        style={styles.actionBtnSecondary}
+                                        onPress={() => {
+                                          const entry = warehouseEntries.find(e => e._id === vd._id);
+                                          if (entry) {
+                                            setSelectedEntry(entry);
+                                            setAdjustStockVisible(true);
+                                          }
+                                        }}
+                                      >
+                                        <Ionicons name="options-outline" size={14} color={colors.primary} />
+                                        <Text style={styles.actionBtnSecondaryText}>Adjust Stock</Text>
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
+
+                                  {/* Align under Total Stock */}
+                                  <View style={{ flex: 1.2 }}>
+                                    <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>
+                                      {vd.qtyBoxes} Box{vd.qtyBoxes !== 1 ? 'es' : ''}
+                                    </Text>
+                                    <Text style={{ fontSize: 9, color: colors.text.muted }}>Subtotal</Text>
+                                  </View>
+                                </View>
+                              ))
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+
+                  {processedItems.length === 0 && (
+                    <View style={styles.emptyTableContainer}>
+                      <Ionicons name="cube-outline" size={36} color={colors.text.muted} />
+                      <Text style={styles.emptyText}>No stock logs in this Godown</Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </ScrollView>
+      </View>
+
+      {/* MODAL WRAPPERS */}
+      <AddWarehouseModal
+        visible={addWarehouseVisible}
+        onClose={() => { setAddWarehouseVisible(false); setEditingWarehouse(null); }}
+        onSaved={loadData}
+        warehouse={editingWarehouse}
+      />
+
+      <AddStockModal
+        visible={addStockVisible}
+        initialProductId={addStockInitialProductId}
+        onClose={() => setAddStockVisible(false)}
+        onSaved={loadData}
+        warehouses={warehouses}
+        products={products}
+        vendors={vendors}
+      />
+
+      <AdjustStockModal
+        visible={adjustStockVisible}
+        entry={selectedEntry}
+        onClose={() => { setSelectedEntry(null); setAdjustStockVisible(false); }}
+        onSaved={loadData}
+        products={products}
+      />
+
+      <StockLedgerModal
+        visible={ledgerVisible}
+        productInfo={selectedLedgerProduct}
+        warehouseId={selectedWarehouseId}
+        onClose={() => { setSelectedLedgerProduct(null); setLedgerVisible(false); loadData(); }}
+      />
+    </View>
+  );
+}
+
+// Styling creator
+const createStyles = (colors: typeof LightColors) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg.primary },
+  innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
+  
+  topHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+  topHeaderTitle: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
+  headerBtnPrimary: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, borderRadius: Radius.md, paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  headerBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
+  summaryBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginTop: Spacing.lg, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg },
+  summaryItem: { alignItems: 'center' },
+  summaryLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.5, marginBottom: 4 },
+  summaryValue: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+  summaryDivider: { width: 1, height: 26, backgroundColor: colors.border },
+  
+  controlsBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginVertical: Spacing.md, paddingHorizontal: 14, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, zIndex: 1100 },
+  searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+
+  filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
+  filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  filterDropdownPanel: { position: 'absolute', top: 52, right: Spacing.lg, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 280, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 12 },
+  filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
+  filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
+
+  // Control sub bar & vendor filter
+  controlSubBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: Spacing.lg, marginBottom: Spacing.md, gap: 12, zIndex: 1050 },
+  vendorDropdownPanel: { position: 'absolute', top: 52, right: 180, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 12 },
+
+  table: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden', flex: 1 },
+  tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, alignItems: 'center' },
+  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
+  tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
+  tableCell: { fontSize: 13, color: colors.text.primary },
+  tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
+  primaryText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+  emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 10, fontSize: 13 },
+  emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center', width: '100%' },
+
+  warehouseBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border },
+  warehouseBadgeText: { fontSize: 11, color: colors.text.secondary, fontWeight: '600' },
+
+  actionBtnSecondary: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 5, gap: 4, backgroundColor: colors.primary + '08' },
+  actionBtnSecondaryText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+
+  // Grouped and Expandable sub-rows
+  expandableGroupContainer: { borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.card },
+  expandedBreakdownArea: { backgroundColor: colors.bg.primary + '30', borderLeftWidth: 3, borderLeftColor: colors.primary, paddingVertical: 4 },
+  expandedBreakdownRow: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center' },
+  breakdownVendorText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+  breakdownPackingText: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
+  breakdownActionBadge: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, backgroundColor: colors.bg.secondary, gap: 4 },
+  breakdownActionText: { fontSize: 10, fontWeight: '700', color: colors.text.secondary },
+
+  // Modals Styling
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  dialogSheet: { width: '90%', maxWidth: 500, backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 10 },
+  dialogContainer: { width: '100%' },
+  dialogHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, marginBottom: 8 },
+  dialogTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+  
+  formGroup: { marginBottom: 14 },
+  formRow: { flexDirection: 'row' },
+  formLabel: { fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 4, textTransform: 'uppercase' },
+  formInput: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 42, color: colors.text.primary, fontSize: 14 },
+  errorText: { color: colors.danger, fontSize: 12, fontWeight: '700', marginBottom: 12, backgroundColor: colors.danger + '10', padding: 8, borderRadius: Radius.sm, borderLeftWidth: 3, borderLeftColor: colors.danger },
+
+  dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
+  dialogCancel: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  dialogSave: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: Radius.sm, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+
+  // Custom Selector Dropdowns inside Modals
+  customSelectTrigger: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 42 },
+  customSearchSelectContainer: { flexDirection: 'row', alignItems: 'center', position: 'relative' },
+  clearProductSelection: { position: 'absolute', right: 12 },
+  customSelectPanel: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginTop: 4, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5 },
+  customSelectItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  customSelectItemText: { fontSize: 13, color: colors.text.primary, fontWeight: '700' },
+  customSelectItemSubtext: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
+
+  // Adjustment Type
+  adjustmentTypeContainer: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  adjustmentTypeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 8, gap: 4 },
+  adjustmentTypeBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
+
+  // Ledger sheets (Wider modal for ledger logs)
+  ledgerSheet: { width: '95%', maxWidth: 750, height: '80%', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 10 },
+  ledgerTable: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
+  ledgerHeaderCell: { fontSize: 10, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  ledgerBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
+  ledgerCell: { fontSize: 12, color: colors.text.primary, paddingRight: 6 },
+  
+  typeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
+  typeBadgeText: { fontSize: 9, fontWeight: '800' },
+  
+  ledgerRefText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
+  ledgerNoteText: { fontSize: 10, color: colors.text.muted, marginTop: 1 }
+});

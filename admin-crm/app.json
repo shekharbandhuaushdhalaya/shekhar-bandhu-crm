@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "VP-CRM",
+    "slug": "vp-crm",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "vp-crm",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#090a0f"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.apexcrm.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#090a0f"
+      },
+      "package": "com.apexcrm.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/logo.png"
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+# Ignore website inside this repo (pushed separately)
+sba-website/
+website/
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Expo / Next / Vite
+.expo/
+.next/
+.vite/
+dist/
+build/
+web-build/
+
+# Local env files (contain DB passwords/secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System Files
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
