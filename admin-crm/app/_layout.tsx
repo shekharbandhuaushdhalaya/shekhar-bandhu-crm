@@ -72,12 +72,24 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
               <Ionicons name="menu-outline" size={24} color={colors.text.primary} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => router.push('/')} activeOpacity={0.7}>
+          <TouchableOpacity 
+            onPress={() => router.push('/')} 
+            activeOpacity={0.7}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+          >
             <Image 
               source={require('../assets/logo.png')} 
-              style={[styles.logoImage, { width: isDesktop ? 140 : 60, height: isDesktop ? 40 : 28 }]}
+              style={{ width: 36, height: 36, borderRadius: 4 }}
               resizeMode="contain"
             />
+            <View style={{ flexDirection: 'column', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, letterSpacing: 0.5, lineHeight: 15 }}>
+                SHEKHAR BANDHU
+              </Text>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, letterSpacing: 0.8, marginTop: 1 }}>
+                AUSHADHALAYA
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
 
