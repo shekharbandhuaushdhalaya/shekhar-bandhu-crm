@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, TextInput, ActivityIndicator, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
 import { api, Order } from '../utils/api';
@@ -11,6 +11,14 @@ export default function OrdersScreen() {
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'processing' | 'shipped' | 'delivered'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Edit Order States
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
@@ -44,6 +52,39 @@ export default function OrdersScreen() {
       Alert.alert('Error', 'Failed to update order status: ' + err.message);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleOpenEdit = (order: Order) => {
+    setEditingOrder(order);
+    setEditName(order.name);
+    setEditEmail(order.email);
+    setEditPhone(order.phone);
+    setEditAddress(order.shippingAddress);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingOrder) return;
+    if (!editName.trim() || !editEmail.trim() || !editPhone.trim() || !editAddress.trim()) {
+      Alert.alert('Validation Error', 'All customer detail fields are required.');
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      await (api as any).updateOrderDetails(editingOrder._id, {
+        name: editName,
+        email: editEmail,
+        phone: editPhone,
+        shippingAddress: editAddress
+      });
+      setEditingOrder(null);
+      await load();
+      Alert.alert('✅ Success', 'Order details updated successfully.');
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to save order details: ' + err.message);
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -139,7 +180,13 @@ export default function OrdersScreen() {
 
             {/* Customer Information */}
             <View style={styles.customerBox}>
-              <Text style={styles.boxTitle}>Customer Details:</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={styles.boxTitle}>Customer Details:</Text>
+                <TouchableOpacity style={styles.editBtn} onPress={() => handleOpenEdit(o)}>
+                  <Ionicons name="pencil-outline" size={13} color={colors.primary} />
+                  <Text style={styles.editBtnText}>Edit Info</Text>
+                </TouchableOpacity>
+              </View>
               <Text style={styles.customerName}>{o.name}</Text>
               <Text style={styles.customerContact}>📞 {o.phone}  |  ✉️ {o.email}</Text>
               <Text style={styles.customerAddress}>📍 {o.shippingAddress}</Text>
@@ -217,6 +264,95 @@ export default function OrdersScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Edit Customer Details Modal */}
+      <Modal
+        visible={editingOrder !== null}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setEditingOrder(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Order Details</Text>
+              <TouchableOpacity onPress={() => setEditingOrder(null)}>
+                <Ionicons name="close" size={20} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalBody}>
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Customer Name</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Customer Name"
+                  placeholderTextColor={colors.text.muted}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editPhone}
+                  onChangeText={setEditPhone}
+                  placeholder="Phone Number"
+                  placeholderTextColor={colors.text.muted}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Email Address</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editEmail}
+                  onChangeText={setEditEmail}
+                  placeholder="Email"
+                  placeholderTextColor={colors.text.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Shipping Address</Text>
+                <TextInput
+                  style={[styles.textInput, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
+                  value={editAddress}
+                  onChangeText={setEditAddress}
+                  placeholder="Shipping Address"
+                  placeholderTextColor={colors.text.muted}
+                  multiline
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.cancelBtn]} 
+                onPress={() => setEditingOrder(null)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.saveBtn]} 
+                onPress={handleSaveEdit}
+                disabled={savingEdit}
+              >
+                {savingEdit ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -240,7 +376,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   statusBadge: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
   statusBadgeText: { fontSize: 9, fontWeight: '800' },
   customerBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 12 },
-  boxTitle: { fontSize: 11, fontWeight: '700', color: colors.text.muted, marginBottom: 6, textTransform: 'uppercase' },
+  boxTitle: { fontSize: 11, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  editBtnText: { fontSize: 11, fontWeight: '700', color: colors.primary },
   customerName: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
   customerContact: { fontSize: 12, color: colors.text.secondary, marginVertical: 3 },
   customerAddress: { fontSize: 12, color: colors.text.secondary },
@@ -259,4 +397,20 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   emptyContainer: { alignItems: 'center', paddingVertical: 80, gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
   emptySubtitle: { fontSize: 13, color: colors.text.muted, textAlign: 'center', paddingHorizontal: 20 },
+
+  // Edit Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  modalContent: { backgroundColor: colors.bg.card, width: '100%', maxWidth: 460, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.hover },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
+  modalBody: { padding: Spacing.lg, gap: Spacing.md },
+  formGroup: { gap: 6 },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary },
+  textInput: { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 44, color: colors.text.primary, fontSize: 14 },
+  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.primary + '30' },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
+  cancelBtn: { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border },
+  cancelBtnText: { color: colors.text.secondary, fontWeight: '700', fontSize: 13 },
+  saveBtn: { backgroundColor: colors.primary },
+  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });

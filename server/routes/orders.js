@@ -34,6 +34,37 @@ router.patch('/:id/status', async (req, res) => {
   }
 });
 
+// PUT /api/orders/:id — Update full order details (Authenticated)
+router.put('/:id', async (req, res) => {
+  try {
+    const { name, email, phone, shippingAddress, status, totalAmount } = req.body;
+    
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name.trim();
+    if (email !== undefined) updateFields.email = email.trim().toLowerCase();
+    if (phone !== undefined) updateFields.phone = phone.trim();
+    if (shippingAddress !== undefined) updateFields.shippingAddress = shippingAddress.trim();
+    if (status !== undefined) {
+      if (!['pending', 'processing', 'shipped', 'delivered'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status value' });
+      }
+      updateFields.status = status;
+    }
+    if (totalAmount !== undefined) updateFields.totalAmount = Number(totalAmount);
+
+    const updated = await Order.findByIdAndUpdate(
+      req.params.id,
+      updateFields,
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Order not found' });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // POST /api/orders/public/create — Create an order from public website storefront (Unauthenticated)
 router.post('/public/create', async (req, res) => {
   try {
@@ -57,15 +88,18 @@ router.post('/public/create', async (req, res) => {
         return res.status(400).json({ error: `Invalid quantity for item: ${dbProd.name}` });
       }
 
-      // Track price from DB to avoid price manipulation from frontend
-      const price = dbProd.price;
+      // Track price from DB to avoid price manipulation from frontend. Apply discount if active.
+      const hasDiscount = dbProd.discount > 0;
+      const price = hasDiscount 
+        ? dbProd.price * (1 - dbProd.discount / 100)
+        : dbProd.price;
       totalAmount += price * qty;
 
       validatedItems.push({
         productId: dbProd._id,
         name: dbProd.name,
         qty: qty,
-        price: price,
+        price: Number(price.toFixed(2)),
         size: dbProd.size || 'Standard'
       });
 

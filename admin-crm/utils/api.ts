@@ -910,6 +910,13 @@ class ApiClient {
     });
     return res.json();
   }
+  async updateOrderDetails(id: string, data: { name?: string; email?: string; phone?: string; shippingAddress?: string; status?: string; totalAmount?: number }): Promise<Order> {
+    const res = await this.request(`${API_BASE}/orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  }
 }
 
 export type OrderItem = {
