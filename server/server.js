@@ -515,6 +515,37 @@ mongoose
       }
     });
 
+    app.post('/api/public/products/:id/rate', async (req, res) => {
+      try {
+        const { rating } = req.body;
+        const val = Number(rating);
+        if (isNaN(val) || val < 1 || val > 5) {
+          return res.status(400).json({ error: 'Rating must be a number between 1 and 5' });
+        }
+
+        const Product = require('./models/Product');
+        const product = await Product.findById(req.params.id);
+        if (!product) {
+          return res.status(404).json({ error: 'Product not found' });
+        }
+
+        // Calculate new running average rating
+        const currentCount = product.ratingCount || 0;
+        const currentAvg = product.rating || 0;
+        const newCount = currentCount + 1;
+        const newAvg = ((currentAvg * currentCount) + val) / newCount;
+
+        product.rating = Math.round(newAvg * 10) / 10; // round to 1 decimal place
+        product.ratingCount = newCount;
+        await product.save();
+
+        res.json({ rating: product.rating, ratingCount: product.ratingCount });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+
     app.use('/api/contacts', authenticateJWT, contactRoutes);
     app.use('/api/tasks', authenticateJWT, taskRoutes);
     app.use('/api/dashboard', authenticateJWT, dashboardRoutes);

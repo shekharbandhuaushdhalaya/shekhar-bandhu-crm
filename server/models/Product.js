@@ -22,7 +22,9 @@ const productSchema = new mongoose.Schema({
   image: { type: String, default: '' },
   description: { type: String, default: '' },
   disease: { type: String, default: '' },
-  ingredients: { type: String, default: '' }
+  ingredients: { type: String, default: '' },
+  rating: { type: Number, default: 0 },
+  ratingCount: { type: Number, default: 0 }
 }, { timestamps: true });
 
 productSchema.index({ name: 'text', sku: 'text', category: 'text' });
