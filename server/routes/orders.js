@@ -5,6 +5,10 @@ const Inventory = require('../models/Inventory');
 
 const Invoice = require('../models/Invoice');
 const Customer = require('../models/Customer');
+const Warehouse = require('../models/Warehouse');
+const InventoryEntry = require('../models/InventoryEntry');
+const StockLedger = require('../models/StockLedger');
+
 
 const router = express.Router();
 
@@ -22,7 +26,7 @@ router.get('/', async (req, res) => {
 router.patch('/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
-    if (!['pending', 'processing', 'shipped', 'delivered'].includes(status)) {
+    if (!['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status value' });
     }
     const updated = await Order.findByIdAndUpdate(
@@ -48,7 +52,7 @@ router.put('/:id', async (req, res) => {
     if (phone !== undefined) updateFields.phone = phone.trim();
     if (shippingAddress !== undefined) updateFields.shippingAddress = shippingAddress.trim();
     if (status !== undefined) {
-      if (!['pending', 'processing', 'shipped', 'delivered'].includes(status)) {
+      if (!['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
         return res.status(400).json({ error: 'Invalid status value' });
       }
       updateFields.status = status;
@@ -80,6 +84,12 @@ router.post('/public/create', async (req, res) => {
       return res.status(400).json({ error: 'Missing required order fields or items list' });
     }
 
+    // Resolve Varanasi Central Depot warehouse ONCE (not inside item loop)
+    const warehouse = await Warehouse.findOne({ name: /varanasi central/i });
+    if (!warehouse) {
+      return res.status(500).json({ error: 'Primary warehouse not configured. Please contact administration.' });
+    }
+
     // Validate items and verify stocks/prices
     let totalAmount = 0;
     const validatedItems = [];
@@ -90,7 +100,7 @@ router.post('/public/create', async (req, res) => {
         return res.status(404).json({ error: `Product not found: ${item.name || item.productId}` });
       }
       
-      const qty = parseInt(item.qty, 10);
+      const qty = parseInt(item.qty, 10);  // qty is UNITS (pieces)
       if (isNaN(qty) || qty <= 0) {
         return res.status(400).json({ error: `Invalid quantity for item: ${dbProd.name}` });
       }
@@ -102,10 +112,16 @@ router.post('/public/create', async (req, res) => {
         : dbProd.price;
 
       // Verify warehouse stock availability in CRM
-      const invItems = await Inventory.find({ itemSku: dbProd.sku });
-      const totalAvailable = invItems.reduce((acc, inv) => acc + (inv.qty || 0), 0);
-      if (totalAvailable < qty) {
-        return res.status(400).json({ error: `Insufficient stock for product: ${dbProd.name}. Available: ${totalAvailable}` });
+      // Sort by mfgDate ascending (FIFO: oldest batch first), then by createdAt
+      const entries = await InventoryEntry.find({
+        warehouseId: warehouse._id,
+        productId: dbProd._id
+      }).sort({ mfgDate: 1, expiryDate: 1, createdAt: 1 });
+
+      const totalAvailableUnits = entries.reduce((acc, e) => acc + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
+
+      if (totalAvailableUnits < qty) {
+        return res.status(400).json({ error: `Insufficient stock for product: ${dbProd.name}. Available: ${totalAvailableUnits} units` });
       }
 
       totalAmount += price * qty;
@@ -118,10 +134,50 @@ router.post('/public/create', async (req, res) => {
         size: dbProd.size || 'Standard'
       });
 
-      // Deduct stockLevel in Product model and Inventory model
+      // Deduct stockLevel in Product model (in units)
       dbProd.stockLevel = Math.max(0, dbProd.stockLevel - qty);
       await dbProd.save();
 
+      // FIFO deduction across batches — deduct integer boxes only
+      let unitsNeeded = qty;
+      for (const entry of entries) {
+        if (unitsNeeded <= 0) break;
+        const packSize = entry.packing || 1;
+        const entryUnits = (entry.qtyBoxes || 0) * packSize;
+        if (entryUnits <= 0) continue;
+
+        const deductUnits = Math.min(unitsNeeded, entryUnits);
+        // Round deductBoxes to avoid float drift: floor so we never deduct more than available
+        const deductBoxes = Math.floor(deductUnits / packSize);
+        // If deductBoxes rounds to 0 but we still need units, take at least 1 box to cover partial
+        const actualDeductBoxes = deductBoxes === 0 && deductUnits > 0 ? 1 : deductBoxes;
+
+        entry.qtyBoxes = Math.max(0, entry.qtyBoxes - actualDeductBoxes);
+        await entry.save();
+
+        const actualDeductedUnits = actualDeductBoxes * packSize;
+
+        // Record stock ledger entry (OUT movement) — include batchNo for traceability
+        await StockLedger.create({
+          productId: dbProd._id,
+          warehouseId: warehouse._id,
+          warehouseName: warehouse.name,
+          type: 'OUT',
+          qtyBoxes: -actualDeductBoxes,
+          balanceBoxes: entry.qtyBoxes,
+          reference: `Web Order`,
+          note: `Auto-deducted via Web Order for ${name}`,
+          createdBy: 'System',
+          packing: packSize,
+          vendorId: entry.vendorId || '',
+          vendorName: entry.vendorName || '',
+          batchNo: entry.batchNo || '',
+        });
+
+        unitsNeeded -= actualDeductedUnits;
+      }
+
+      // Also deduct from legacy Inventory for backwards compatibility
       const inv = await Inventory.findOne({ itemSku: dbProd.sku });
       if (inv) {
         inv.qty = Math.max(0, inv.qty - qty);
@@ -141,6 +197,104 @@ router.post('/public/create', async (req, res) => {
     });
 
     res.status(201).json({ message: 'Order placed successfully', order: newOrder });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/orders/:id/cancel — Cancel order & revert stock (Authenticated)
+router.patch('/:id/cancel', async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ error: 'Order is already cancelled' });
+    }
+    if (order.status === 'delivered') {
+      return res.status(400).json({ error: 'Cannot cancel a delivered order' });
+    }
+
+    const warehouse = await Warehouse.findOne({ name: /varanasi central/i });
+
+    // Revert stock for each item
+    for (const item of order.items) {
+      const dbProd = await Product.findById(item.productId);
+      if (!dbProd) continue;
+
+      const qty = item.qty; // units
+
+      // Revert product stockLevel
+      dbProd.stockLevel += qty;
+      await dbProd.save();
+
+      // Revert legacy Inventory
+      const inv = await Inventory.findOne({ itemSku: dbProd.sku });
+      if (inv) {
+        inv.qty += qty;
+        inv.val = inv.qty * dbProd.price;
+        await inv.save();
+      }
+
+      // Revert InventoryEntry — add back to unbatched/first slot for this product
+      if (warehouse) {
+        // Find the most recent OUT ledger entries for this product from this order to know which batches to restore
+        const outLedgers = await StockLedger.find({
+          productId: dbProd._id,
+          warehouseId: warehouse._id,
+          type: 'OUT',
+          reference: 'Web Order',
+        }).sort({ createdAt: -1 }).limit(10);
+
+        if (outLedgers.length > 0) {
+          // Restore using the same batch slots recorded in the ledger
+          for (const ledger of outLedgers) {
+            const entryToRestore = await InventoryEntry.findOne({
+              warehouseId: warehouse._id,
+              productId: dbProd._id,
+              vendorId: ledger.vendorId || '',
+              packing: ledger.packing || 1,
+              batchNo: ledger.batchNo || '',
+            });
+            if (entryToRestore) {
+              entryToRestore.qtyBoxes += Math.abs(ledger.qtyBoxes);
+              await entryToRestore.save();
+            }
+          }
+        } else {
+          // Fallback: add to first available slot
+          const fallbackEntry = await InventoryEntry.findOne({
+            warehouseId: warehouse._id,
+            productId: dbProd._id,
+          });
+          if (fallbackEntry) {
+            const packSize = fallbackEntry.packing || 1;
+            const boxesToRestore = Math.ceil(qty / packSize);
+            fallbackEntry.qtyBoxes += boxesToRestore;
+            await fallbackEntry.save();
+          }
+        }
+
+        await StockLedger.create({
+          productId: dbProd._id,
+          warehouseId: warehouse._id,
+          warehouseName: warehouse.name,
+          type: 'IN',
+          qtyBoxes: Math.ceil(qty / (dbProd.packing || 1)),
+          balanceBoxes: 0, // approximate
+          reference: `Order Cancel`,
+          note: `Stock reverted due to cancellation of Web Order by ${order.name}`,
+          createdBy: 'System',
+          packing: 1,
+          vendorId: '',
+          vendorName: '',
+        });
+      }
+    }
+
+    order.status = 'cancelled';
+    await order.save();
+    res.json({ message: 'Order cancelled and stock reverted', order });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

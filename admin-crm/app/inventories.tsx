@@ -99,6 +99,79 @@ const getProductSelectorDisplayName = (item: { size?: string; shape?: string; co
 };
 
 
+// Helper to format stock in boxes & pieces
+const formatStock = (qtyBoxes: number, packing: number = 1, showSign: boolean = false, compact: boolean = false) => {
+  if (qtyBoxes === 0) return '0 Boxes';
+  const isNegative = qtyBoxes < 0;
+  const absQtyBoxes = Math.abs(qtyBoxes);
+  // Ensure we round to nearest piece to handle float precision issues
+  const totalPcs = Math.round(absQtyBoxes * packing);
+  const boxes = Math.floor(totalPcs / packing);
+  const pcs = totalPcs % packing;
+
+  let str = '';
+  if (compact) {
+    if (boxes > 0 && pcs > 0) {
+      str = `${boxes}b ${pcs}p`;
+    } else if (boxes > 0) {
+      str = `${boxes}b`;
+    } else {
+      str = `${pcs}p`;
+    }
+  } else {
+    if (boxes > 0 && pcs > 0) {
+      str = `${boxes} Box${boxes !== 1 ? 'es' : ''} & ${pcs} Pc${pcs !== 1 ? 's' : ''}`;
+    } else if (boxes > 0) {
+      str = `${boxes} Box${boxes !== 1 ? 'es' : ''}`;
+    } else {
+      str = `${pcs} Pc${pcs !== 1 ? 's' : ''}`;
+    }
+  }
+
+  const sign = isNegative ? '-' : (showSign ? '+' : '');
+  return `${sign}${str}`;
+};
+
+// Component to beautifully display stock split into Boxes and Loose Change
+const StockDisplay = ({ qtyBoxes, packing = 1, showSign = false, textStyle = {} }: any) => {
+  const { colors } = useTheme();
+  if (qtyBoxes === 0) return <Text style={[textStyle, { color: colors.text.muted }]}>0 Boxes</Text>;
+  const isNegative = qtyBoxes < 0;
+  const absQtyBoxes = Math.abs(qtyBoxes);
+  const totalPcs = Math.round(absQtyBoxes * packing);
+  const boxes = Math.floor(totalPcs / packing);
+  const pcs = totalPcs % packing;
+  const sign = isNegative ? '-' : (showSign ? '+' : '');
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+      {boxes > 0 && (
+        <Text style={[textStyle, { color: isNegative ? colors.danger : colors.success, fontWeight: '800' }]}>
+          {sign}{boxes} <Text style={{ fontSize: (textStyle.fontSize || 14) * 0.75, fontWeight: '600' }}>Box{boxes !== 1 ? 'es' : ''}</Text>
+        </Text>
+      )}
+      {pcs > 0 && (
+        <View style={{
+          backgroundColor: isNegative ? colors.danger + '15' : (boxes > 0 ? colors.warning + '20' : colors.success + '15'),
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+          borderRadius: 4,
+          marginLeft: boxes > 0 ? 6 : 0,
+        }}>
+          <Text style={{
+            fontSize: (textStyle.fontSize || 14) * 0.75,
+            fontWeight: '800',
+            color: isNegative ? colors.danger : (boxes > 0 ? colors.warning : colors.success)
+          }}>
+            {boxes === 0 ? sign : '+'} {pcs} Loose
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+
 // 1. Add Warehouse Modal Component
 function AddWarehouseModal({ visible, onClose, onSaved, warehouse }: { visible: boolean; onClose: () => void; onSaved: () => void; warehouse?: Warehouse | null }) {
   const { colors } = useTheme();
@@ -294,6 +367,9 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
   const [vendorName, setVendorName] = useState('');
   const [packing, setPacking] = useState('100');
   const [date, setDate] = useState('');
+  const [batchNo, setBatchNo] = useState('');
+  const [mfgDate, setMfgDate] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -317,6 +393,9 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
       setVendorSearch('');
       setPacking('100');
       setDate(new Date().toISOString().split('T')[0]);
+      setBatchNo('');
+      setMfgDate('');
+      setExpiryDate('');
       setError('');
       setShowProductDropdown(false);
       setShowWarehouseDropdown(false);
@@ -351,6 +430,11 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
       setError('Please enter a valid positive packing size (pcs/box)');
       return;
     }
+    // Issue #8: Warn if dates are set without a batch number
+    if ((mfgDate || expiryDate) && !batchNo.trim()) {
+      setError('Please enter a Batch Number when specifying Mfg/Expiry dates — batch dates without a batch number reduce traceability.');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -365,6 +449,9 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
         vendorId,
         vendorName: vendorName.trim(),
         packing: packVal,
+        batchNo: batchNo.trim(),
+        mfgDate: mfgDate || undefined,
+        expiryDate: expiryDate || undefined,
         createdAt: date ? new Date(date).toISOString() : undefined
       });
       onSaved();
@@ -381,25 +468,14 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
 
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={() => {
+        setShowWarehouseDropdown(false);
+        setShowProductDropdown(false);
+        setShowVendorDropdown(false);
+        onClose();
+      }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.dialogSheet}>
           <Pressable style={styles.dialogContainer}>
-            {(showWarehouseDropdown || showProductDropdown || showVendorDropdown) && (
-              <Pressable
-                style={[
-                  StyleSheet.absoluteFill,
-                  { 
-                    zIndex: showWarehouseDropdown ? 1009 : (showProductDropdown ? 999 : 899),
-                    ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {})
-                  }
-                ]}
-                onPress={() => {
-                  setShowWarehouseDropdown(false);
-                  setShowProductDropdown(false);
-                  setShowVendorDropdown(false);
-                }}
-              />
-            )}
             <View style={styles.dialogHeader}>
               <Text style={styles.dialogTitle}>Add Stock (IN)</Text>
               <TouchableOpacity onPress={onClose}>
@@ -407,7 +483,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
               </TouchableOpacity>
             </View>
 
-            <View style={{ marginVertical: Spacing.sm, zIndex: 50 }}>
+            <ScrollView style={{ flex: 1, marginVertical: Spacing.sm }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
               {/* Warehouse Dropdown */}
@@ -454,7 +530,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                       setShowProductDropdown(true);
                       setShowWarehouseDropdown(false);
                       setShowVendorDropdown(false);
-                      if (productId) setProductId(''); // Clear selected if typing
+                      if (productId) setProductId('');
                     }}
                     onFocus={() => {
                       setShowProductDropdown(true);
@@ -510,11 +586,11 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                     value={vendorSearch || toTitleCase(vendorName)}
                     onChangeText={(val) => {
                       setVendorSearch(val);
-                      setVendorName(val); // Allow entering text directly
+                      setVendorName(val);
                       setShowVendorDropdown(true);
                       setShowProductDropdown(false);
                       setShowWarehouseDropdown(false);
-                      if (vendorId) setVendorId(''); // Clear selected if typing
+                      if (vendorId) setVendorId('');
                     }}
                     onFocus={() => {
                       setShowVendorDropdown(true);
@@ -583,6 +659,60 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                 </View>
               </View>
 
+              {/* Manufacturing Batch Details */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Batch Number (e.g. B-MUST-09)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. B-MUST-09"
+                  placeholderTextColor={colors.text.muted}
+                  value={batchNo}
+                  onChangeText={setBatchNo}
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>Mfg Date (Optional)</Text>
+                  {Platform.OS === 'web' ? (
+                    React.createElement('input', {
+                      type: 'date',
+                      value: mfgDate,
+                      onChange: (e: any) => setMfgDate(e.target.value),
+                      style: { padding: 8, borderRadius: 6, border: '1px solid #ccc', fontSize: 14 }
+                    })
+                  ) : (
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={colors.text.muted}
+                      value={mfgDate}
+                      onChangeText={setMfgDate}
+                    />
+                  )}
+                </View>
+
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>Expiry Date (Optional)</Text>
+                  {Platform.OS === 'web' ? (
+                    React.createElement('input', {
+                      type: 'date',
+                      value: expiryDate,
+                      onChange: (e: any) => setExpiryDate(e.target.value),
+                      style: { padding: 8, borderRadius: 6, border: '1px solid #ccc', fontSize: 14 }
+                    })
+                  ) : (
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={colors.text.muted}
+                      value={expiryDate}
+                      onChangeText={setExpiryDate}
+                    />
+                  )}
+                </View>
+              </View>
+
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Date (Optional backdating)</Text>
                 {Platform.OS === 'web' ? (
@@ -624,7 +754,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                   onChangeText={setNote}
                 />
               </View>
-            </View>
+            </ScrollView>
 
             <View style={[styles.dialogActions, { marginTop: 16 }]}>
               <TouchableOpacity style={styles.dialogCancel} onPress={onClose} disabled={loading}>
@@ -649,16 +779,42 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
 
   const [type, setType] = useState<'IN' | 'OUT' | 'ADJUSTMENT'>('ADJUSTMENT');
   const [qtyBoxes, setQtyBoxes] = useState('');
+  const [qtyPieces, setQtyPieces] = useState('');
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
   const [date, setDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const packSize = entry?.packing || 1;
+
+  // Sync helpers
+  const handleBoxesChange = (val: string) => {
+    setQtyBoxes(val);
+    const b = parseFloat(val);
+    if (!isNaN(b)) {
+      setQtyPieces((b * packSize).toString());
+    } else {
+      setQtyPieces('');
+    }
+  };
+
+  const handlePiecesChange = (val: string) => {
+    setQtyPieces(val);
+    const p = parseFloat(val);
+    if (!isNaN(p)) {
+      // Round to 3 decimal places for box conversion
+      setQtyBoxes(parseFloat((p / packSize).toFixed(3)).toString());
+    } else {
+      setQtyBoxes('');
+    }
+  };
+
   useEffect(() => {
     if (visible && entry) {
       setType('ADJUSTMENT');
       setQtyBoxes(entry.qtyBoxes.toString());
+      setQtyPieces((entry.qtyBoxes * (entry.packing || 1)).toString());
       setReference('');
       setNote('');
       setDate(new Date().toISOString().split('T')[0]);
@@ -675,7 +831,7 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
       return;
     }
     if (type === 'OUT' && qty > entry.qtyBoxes) {
-      setError(`Cannot deduct more than current stock (${entry.qtyBoxes} boxes)`);
+      setError(`Cannot deduct more than current stock (${formatStock(entry.qtyBoxes, entry.packing)})`);
       return;
     }
 
@@ -707,7 +863,7 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
             <View style={styles.dialogHeader}>
               <View>
                 <Text style={styles.dialogTitle}>Adjust Stock Level</Text>
-                <Text style={{ fontSize: 11, color: colors.text.muted }}>{entry.warehouseName} | {getDisplayName(entry, products)} (Packing: {entry.packing} Pcs/Box)</Text>
+                <Text style={{ fontSize: 11, color: colors.text.muted }}>{entry.warehouseName} | {getDisplayName(entry, products)} (Current: {formatStock(entry.qtyBoxes, entry.packing)})</Text>
               </View>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close" size={24} color={colors.text.muted} />
@@ -723,21 +879,25 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
                 <View style={styles.adjustmentTypeContainer}>
                   <TouchableOpacity
                     style={[styles.adjustmentTypeBtn, type === 'IN' && { backgroundColor: colors.success + '20', borderColor: colors.success }]}
-                    onPress={() => { setType('IN'); setQtyBoxes(''); }}
+                    onPress={() => { setType('IN'); setQtyBoxes(''); setQtyPieces(''); }}
                   >
                     <Ionicons name="add-circle" size={16} color={type === 'IN' ? colors.success : colors.text.muted} />
                     <Text style={[styles.adjustmentTypeBtnText, type === 'IN' && { color: colors.success }]}>Add (IN)</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.adjustmentTypeBtn, type === 'OUT' && { backgroundColor: colors.danger + '20', borderColor: colors.danger }]}
-                    onPress={() => { setType('OUT'); setQtyBoxes(''); }}
+                    onPress={() => { setType('OUT'); setQtyBoxes(''); setQtyPieces(''); }}
                   >
                     <Ionicons name="remove-circle" size={16} color={type === 'OUT' ? colors.danger : colors.text.muted} />
                     <Text style={[styles.adjustmentTypeBtnText, type === 'OUT' && { color: colors.danger }]}>Deduct (OUT)</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.adjustmentTypeBtn, type === 'ADJUSTMENT' && { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
-                    onPress={() => { setType('ADJUSTMENT'); setQtyBoxes(entry.qtyBoxes.toString()); }}
+                    onPress={() => {
+                      setType('ADJUSTMENT');
+                      setQtyBoxes(entry.qtyBoxes.toString());
+                      setQtyPieces((entry.qtyBoxes * packSize).toString());
+                    }}
                   >
                     <Ionicons name="options" size={16} color={type === 'ADJUSTMENT' ? colors.primary : colors.text.muted} />
                     <Text style={[styles.adjustmentTypeBtnText, type === 'ADJUSTMENT' && { color: colors.primary }]}>Set Total</Text>
@@ -745,21 +905,42 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
                 </View>
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>
-                  {type === 'IN' && 'Boxes to Add'}
-                  {type === 'OUT' && 'Boxes to Deduct'}
-                  {type === 'ADJUSTMENT' && 'Set Total Stock (Boxes)'} *
-                </Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder={type === 'ADJUSTMENT' ? entry.qtyBoxes.toString() : 'Quantity'}
-                  placeholderTextColor={colors.text.muted}
-                  keyboardType="numeric"
-                  value={qtyBoxes}
-                  onChangeText={setQtyBoxes}
-                />
+              {/* Boxes + Pieces dual input */}
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>
+                    {type === 'IN' && 'Boxes to Add'}
+                    {type === 'OUT' && 'Boxes to Deduct'}
+                    {type === 'ADJUSTMENT' && 'Total Boxes'} *
+                  </Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder={type === 'ADJUSTMENT' ? entry.qtyBoxes.toString() : '0'}
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="numeric"
+                    value={qtyBoxes}
+                    onChangeText={handleBoxesChange}
+                  />
+                </View>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>
+                    {type === 'IN' && 'Pieces to Add'}
+                    {type === 'OUT' && 'Pieces to Deduct'}
+                    {type === 'ADJUSTMENT' && 'Total Pieces'} *
+                  </Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder={type === 'ADJUSTMENT' ? (entry.qtyBoxes * packSize).toString() : '0'}
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="numeric"
+                    value={qtyPieces}
+                    onChangeText={handlePiecesChange}
+                  />
+                </View>
               </View>
+              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -8, marginBottom: 8 }}>
+                Packing: {packSize} Pcs/Box — enter either field, the other updates automatically
+              </Text>
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Date (Optional backdating)</Text>
@@ -966,9 +1147,11 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
                         {log.packing || 0} Pcs
                       </Text>
                       <Text style={[styles.ledgerCell, { width: 70, textAlign: 'right', fontWeight: '700', color: log.type === 'IN' ? colors.success : log.type === 'OUT' ? colors.danger : colors.text.primary }]}>
-                        {qtyChangeStr}
+                        {formatStock(log.qtyBoxes, log.packing || 1, true, true)}
                       </Text>
-                      <Text style={[styles.ledgerCell, { width: 70, textAlign: 'right', fontWeight: '700' }]}>{log.balanceBoxes}</Text>
+                      <Text style={[styles.ledgerCell, { width: 70, textAlign: 'right', fontWeight: '700' }]}>
+                        {formatStock(log.balanceBoxes, log.packing || 1, false, true)}
+                      </Text>
                       <View style={[styles.ledgerCell, { width: 140 }]}>
                         {log.reference ? <Text style={styles.ledgerRefText}>Ref: {log.reference}</Text> : null}
                         {log.note ? <Text style={styles.ledgerNoteText}>{log.note}</Text> : null}
@@ -1114,6 +1297,10 @@ export default function InventoriesScreen() {
           packing: number;
           qtyBoxes: number;
           warehouses: { warehouseId: string; warehouseName: string; qtyBoxes: number }[];
+          batchNo?: string;
+          mfgDate?: string;
+          expiryDate?: string;
+          _id?: string;
         }[];
       }> = {};
 
@@ -1156,7 +1343,10 @@ export default function InventoriesScreen() {
           vendorName: item.vendorName,
           packing: item.packing,
           qtyBoxes: item.totalBoxes,
-          warehouses: item.warehouses
+          warehouses: item.warehouses,
+          batchNo: item.batchNo || '',
+          mfgDate: item.mfgDate || '',
+          expiryDate: item.expiryDate || ''
         });
       });
 
@@ -1208,6 +1398,9 @@ export default function InventoriesScreen() {
           qtyBoxes: number;
           warehouses: { warehouseId: string; warehouseName: string; qtyBoxes: number }[];
           _id: string;
+          batchNo?: string;
+          mfgDate?: string;
+          expiryDate?: string;
         }[];
       }> = {};
 
@@ -1247,7 +1440,10 @@ export default function InventoriesScreen() {
           packing: entry.packing,
           qtyBoxes: entry.qtyBoxes,
           warehouses: [{ warehouseId: entry.warehouseId, warehouseName: entry.warehouseName, qtyBoxes: entry.qtyBoxes }],
-          _id: entry._id
+          _id: entry._id,
+          batchNo: entry.batchNo || '',
+          mfgDate: entry.mfgDate || '',
+          expiryDate: entry.expiryDate || ''
         });
       });
 
@@ -1283,13 +1479,42 @@ export default function InventoriesScreen() {
   // Compute Metrics Summaries
   const totalWarehouses = warehouses.length;
   
-  const totalStockBoxes = selectedWarehouseId === 'all'
-    ? consolidatedItems
-        .filter(item => selectedVendorId === 'all' || item.vendorId === selectedVendorId)
-        .reduce((sum, item) => sum + item.totalBoxes, 0)
-    : warehouseEntries
-        .filter(item => selectedVendorId === 'all' || item.vendorId === selectedVendorId)
-        .reduce((sum, item) => sum + item.qtyBoxes, 0);
+  let totalStockFullBoxes = 0;
+  let totalStockLoosePieces = 0;
+
+  if (selectedWarehouseId === 'all') {
+    consolidatedItems
+      .filter(item => selectedVendorId === 'all' || item.vendorId === selectedVendorId)
+      .forEach(item => {
+        const packing = item.packing || 1;
+        const totalPcs = Math.round(Math.abs(item.totalBoxes) * packing);
+        const b = Math.floor(totalPcs / packing);
+        const p = totalPcs % packing;
+        if (item.totalBoxes < 0) {
+          totalStockFullBoxes -= b;
+          totalStockLoosePieces -= p;
+        } else {
+          totalStockFullBoxes += b;
+          totalStockLoosePieces += p;
+        }
+      });
+  } else {
+    warehouseEntries
+      .filter(item => selectedVendorId === 'all' || item.vendorId === selectedVendorId)
+      .forEach(item => {
+        const packing = item.packing || 1;
+        const totalPcs = Math.round(Math.abs(item.qtyBoxes) * packing);
+        const b = Math.floor(totalPcs / packing);
+        const p = totalPcs % packing;
+        if (item.qtyBoxes < 0) {
+          totalStockFullBoxes -= b;
+          totalStockLoosePieces -= p;
+        } else {
+          totalStockFullBoxes += b;
+          totalStockLoosePieces += p;
+        }
+      });
+  }
 
   const uniqueItemsCount = processedItems.length;
 
@@ -1313,9 +1538,28 @@ export default function InventoriesScreen() {
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Active Stock</Text>
-            <Text style={[styles.summaryValue, { color: colors.success }]}>
-              {totalStockBoxes} Box{totalStockBoxes !== 1 ? 'es' : ''}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.summaryValue, { color: totalStockFullBoxes < 0 ? colors.danger : colors.success }]}>
+                {totalStockFullBoxes} Box{totalStockFullBoxes !== 1 && totalStockFullBoxes !== -1 ? 'es' : ''}
+              </Text>
+              {totalStockLoosePieces !== 0 && (
+                <View style={{
+                  backgroundColor: totalStockLoosePieces < 0 ? colors.danger + '15' : colors.success + '15',
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  borderRadius: 4,
+                  marginLeft: 6,
+                }}>
+                  <Text style={{
+                    fontSize: 12,
+                    fontWeight: '800',
+                    color: totalStockLoosePieces < 0 ? colors.danger : colors.success
+                  }}>
+                    {totalStockLoosePieces > 0 ? '+' : ''}{totalStockLoosePieces} Pcs
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
@@ -1561,18 +1805,23 @@ export default function InventoriesScreen() {
 
                           <View style={[styles.tableCellContainer, { flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }]}>
                             {item.warehouses.map((w: any, idx: number) => (
-                              <View key={idx} style={styles.warehouseBadge}>
+                              <View key={idx} style={[styles.warehouseBadge, { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 }]}>
                                 <Text style={styles.warehouseBadgeText}>
-                                  {w.warehouseName}: {w.qtyBoxes}
+                                  {w.warehouseName}: 
                                 </Text>
+                                <View style={{ marginLeft: 4 }}>
+                                  <StockDisplay qtyBoxes={w.qtyBoxes} packing={item.vendorDetails[0]?.packing || 1} textStyle={{ fontSize: 10, color: colors.text.primary }} />
+                                </View>
                               </View>
                             ))}
                           </View>
 
                           <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]}>
-                            <Text style={{ fontWeight: '700', color: colors.success }}>
-                              {item.totalBoxes} Box{item.totalBoxes !== 1 ? 'es' : ''}
-                            </Text>
+                            <StockDisplay 
+                              qtyBoxes={item.totalBoxes} 
+                              packing={item.vendorDetails[0]?.packing || 1} 
+                              textStyle={{ fontWeight: '700', fontSize: 13 }} 
+                            />
                             <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
                               across {item.vendorDetails.length} batch{item.vendorDetails.length !== 1 ? 'es' : ''}
                             </Text>
@@ -1632,6 +1881,33 @@ export default function InventoriesScreen() {
                                   >
                                     <Text style={styles.breakdownVendorText}>↳ {toTitleCase(vd.vendorName) || 'Unknown Vendor'}</Text>
                                     <Text style={styles.breakdownPackingText}>Packing: {vd.packing} Pcs/Box</Text>
+                                    {vd.batchNo ? (
+                                      <Text style={[styles.breakdownPackingText, { color: colors.warning, fontWeight: '700', marginTop: 2 }]}>
+                                        Batch: {vd.batchNo}
+                                      </Text>
+                                    ) : null}
+                                    {(vd.mfgDate || vd.expiryDate) ? (() => {
+                                      const now = new Date();
+                                      const expDate = vd.expiryDate ? new Date(vd.expiryDate) : null;
+                                      const daysLeft = expDate ? Math.floor((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                                      const expiryColor = daysLeft === null ? colors.text.muted
+                                        : daysLeft < 0 ? '#ef4444'
+                                        : daysLeft <= 30 ? '#f97316'
+                                        : daysLeft <= 90 ? '#eab308'
+                                        : colors.text.muted;
+                                      const expiryLabel = daysLeft === null ? ''
+                                        : daysLeft < 0 ? ' ⚠ EXPIRED'
+                                        : daysLeft <= 30 ? ` ⚠ ${daysLeft}d left`
+                                        : daysLeft <= 90 ? ` (${daysLeft}d)`
+                                        : '';
+                                      return (
+                                        <Text style={{ fontSize: 9, color: expiryColor, marginTop: 2, fontWeight: daysLeft !== null && daysLeft <= 30 ? '700' : '400' }}>
+                                          {vd.mfgDate ? `Mfg: ${new Date(vd.mfgDate).toLocaleDateString('en-IN')}` : ''}
+                                          {vd.mfgDate && vd.expiryDate ? ' | ' : ''}
+                                          {vd.expiryDate ? `Exp: ${new Date(vd.expiryDate).toLocaleDateString('en-IN')}${expiryLabel}` : ''}
+                                        </Text>
+                                      );
+                                    })() : null}
                                   </Pressable>
 
                                   {/* Align under Vendors (Empty space) */}
@@ -1640,10 +1916,13 @@ export default function InventoriesScreen() {
                                   {/* Align under Godowns */}
                                   <View style={{ flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                                     {vd.warehouses.map((w: any, wIdx: number) => (
-                                      <View key={wIdx} style={[styles.warehouseBadge, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
+                                      <View key={wIdx} style={[styles.warehouseBadge, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20', flexDirection: 'row', alignItems: 'center', paddingVertical: 2 }]}>
                                         <Text style={[styles.warehouseBadgeText, { color: colors.primary }]}>
-                                          {w.warehouseName}: {w.qtyBoxes}
+                                          {w.warehouseName}: 
                                         </Text>
+                                        <View style={{ marginLeft: 4 }}>
+                                          <StockDisplay qtyBoxes={w.qtyBoxes} packing={vd.packing} textStyle={{ fontSize: 10, color: colors.primary }} />
+                                        </View>
                                       </View>
                                     ))}
                                   </View>
@@ -1657,9 +1936,11 @@ export default function InventoriesScreen() {
                                     }}
                                   >
                                     <View>
-                                      <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>
-                                        {vd.qtyBoxes} Box{vd.qtyBoxes !== 1 ? 'es' : ''}
-                                      </Text>
+                                      <StockDisplay 
+                                        qtyBoxes={vd.qtyBoxes} 
+                                        packing={vd.packing} 
+                                        textStyle={{ fontWeight: '700', fontSize: 13 }} 
+                                      />
                                       <Text style={{ fontSize: 9, color: colors.text.muted }}>Subtotal</Text>
                                     </View>
                                     <View style={styles.breakdownActionBadge}>
@@ -1734,9 +2015,11 @@ export default function InventoriesScreen() {
                           </View>
 
                           <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]}>
-                            <Text style={{ fontWeight: '700', color: colors.success }}>
-                              {item.totalBoxes} Box{item.totalBoxes !== 1 ? 'es' : ''}
-                            </Text>
+                            <StockDisplay 
+                              qtyBoxes={item.totalBoxes} 
+                              packing={item.vendorDetails[0]?.packing || 1} 
+                              textStyle={{ fontWeight: '700', fontSize: 13 }} 
+                            />
                             <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
                               across {item.vendorDetails.length} batch{item.vendorDetails.length !== 1 ? 'es' : ''}
                             </Text>
@@ -1809,6 +2092,33 @@ export default function InventoriesScreen() {
                                   >
                                     <Text style={styles.breakdownVendorText}>↳ {toTitleCase(vd.vendorName) || 'Unknown Vendor'}</Text>
                                     <Text style={styles.breakdownPackingText}>Packing: {vd.packing} Pcs/Box</Text>
+                                    {vd.batchNo ? (
+                                      <Text style={[styles.breakdownPackingText, { color: colors.warning, fontWeight: '700', marginTop: 2 }]}>
+                                        Batch: {vd.batchNo}
+                                      </Text>
+                                    ) : null}
+                                    {(vd.mfgDate || vd.expiryDate) ? (() => {
+                                      const now = new Date();
+                                      const expDate = vd.expiryDate ? new Date(vd.expiryDate) : null;
+                                      const daysLeft = expDate ? Math.floor((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                                      const expiryColor = daysLeft === null ? colors.text.muted
+                                        : daysLeft < 0 ? '#ef4444'
+                                        : daysLeft <= 30 ? '#f97316'
+                                        : daysLeft <= 90 ? '#eab308'
+                                        : colors.text.muted;
+                                      const expiryLabel = daysLeft === null ? ''
+                                        : daysLeft < 0 ? ' ⚠ EXPIRED'
+                                        : daysLeft <= 30 ? ` ⚠ ${daysLeft}d left`
+                                        : daysLeft <= 90 ? ` (${daysLeft}d)`
+                                        : '';
+                                      return (
+                                        <Text style={{ fontSize: 9, color: expiryColor, marginTop: 2, fontWeight: daysLeft !== null && daysLeft <= 30 ? '700' : '400' }}>
+                                          {vd.mfgDate ? `Mfg: ${new Date(vd.mfgDate).toLocaleDateString('en-IN')}` : ''}
+                                          {vd.mfgDate && vd.expiryDate ? ' | ' : ''}
+                                          {vd.expiryDate ? `Exp: ${new Date(vd.expiryDate).toLocaleDateString('en-IN')}${expiryLabel}` : ''}
+                                        </Text>
+                                      );
+                                    })() : null}
                                   </Pressable>
 
                                   {/* Align under Vendors (Empty space) */}
@@ -1835,9 +2145,11 @@ export default function InventoriesScreen() {
 
                                   {/* Align under Total Stock */}
                                   <View style={{ flex: 1.2 }}>
-                                    <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>
-                                      {vd.qtyBoxes} Box{vd.qtyBoxes !== 1 ? 'es' : ''}
-                                    </Text>
+                                    <StockDisplay 
+                                      qtyBoxes={vd.qtyBoxes} 
+                                      packing={vd.packing} 
+                                      textStyle={{ fontWeight: '700', fontSize: 13 }} 
+                                    />
                                     <Text style={{ fontSize: 9, color: colors.text.muted }}>Subtotal</Text>
                                   </View>
                                 </View>
@@ -1956,8 +2268,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Modals Styling
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  dialogSheet: { width: '90%', maxWidth: 500, backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 10 },
-  dialogContainer: { width: '100%' },
+  dialogSheet: { width: '90%', maxWidth: 500, maxHeight: '90%', flexDirection: 'column', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 10 },
+  dialogContainer: { width: '100%', flex: 1 },
   dialogHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, marginBottom: 8 },
   dialogTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
   

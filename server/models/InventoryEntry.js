@@ -15,10 +15,12 @@ const inventoryEntrySchema = new mongoose.Schema({
   vendorName:    { type: String, default: '', trim: true },
   qtyBoxes:      { type: Number, default: 0 },  // quantity in BOXES
   packing:       { type: Number, required: true, default: 0 }, // pcs/box
+  batchNo:       { type: String, default: '', trim: true },
+  mfgDate:       { type: Date },
+  expiryDate:    { type: Date }
 }, { timestamps: true });
 
-// Unique stock slot = product + vendor + warehouse + packing size
-// This means the SAME product bought from TWO different vendors is tracked as two separate rows.
-inventoryEntrySchema.index({ warehouseId: 1, productId: 1, vendorId: 1, packing: 1 }, { unique: true });
+// Unique stock slot = product + vendor + warehouse + packing size + batch number
+inventoryEntrySchema.index({ warehouseId: 1, productId: 1, vendorId: 1, packing: 1, batchNo: 1 }, { unique: true });
 
 module.exports = mongoose.model('InventoryEntry', inventoryEntrySchema);

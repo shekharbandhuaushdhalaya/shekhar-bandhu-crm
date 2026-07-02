@@ -60,6 +60,19 @@ router.post('/:id/convert', async (req, res) => {
     const queryDoc = await ProductQuery.findById(req.params.id);
     if (!queryDoc) return res.status(404).json({ error: 'Query not found' });
 
+    // Retrieve product to estimate a B2B deal value for the pipeline
+    let dealValue = 5000; // default backup bulk value
+    const Product = require('../models/Product');
+    let dbProd = null;
+    if (queryDoc.productId) {
+      dbProd = await Product.findById(queryDoc.productId);
+    } else {
+      dbProd = await Product.findOne({ name: new RegExp(queryDoc.productName, 'i') });
+    }
+    if (dbProd && dbProd.price) {
+      dealValue = dbProd.price * 50; // estimate based on a standard bulk order of 50 boxes/units
+    }
+
     // Create a new Contact record in CRM pipeline stage "lead"
     const lead = await Contact.create({
       name: queryDoc.name,
@@ -67,8 +80,9 @@ router.post('/:id/convert', async (req, res) => {
       email: queryDoc.email,
       phone: queryDoc.phone,
       stage: 'lead',
-      dealSource: 'Website', // maps to LeadSource enum in Contact
+      dealSource: 'Website', 
       leadSource: 'Website',
+      dealValue,
       productInterest: [queryDoc.productName],
       interactions: [
         {

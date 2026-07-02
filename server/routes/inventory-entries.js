@@ -55,11 +55,14 @@ router.get('/consolidated', async (req, res) => {
       { $match: matchStage },
       {
         $group: {
-          // Group by product + vendor + packing so same product from different vendors appears separately
-          _id: { productId: '$productId', vendorId: '$vendorId', packing: '$packing' },
+          // Group by product + vendor + packing + batchNo so each batch is tracked separately
+          _id: { productId: '$productId', vendorId: '$vendorId', packing: '$packing', batchNo: '$batchNo' },
           productId:   { $first: '$productId' },
           vendorId:    { $first: '$vendorId' },
           packing:     { $first: '$packing' },
+          batchNo:     { $first: '$batchNo' },
+          mfgDate:     { $first: '$mfgDate' },
+          expiryDate:  { $first: '$expiryDate' },
           productType: { $first: '$productType' },
           size:        { $first: '$size' },
           colour:      { $first: '$colour' },
@@ -91,7 +94,7 @@ router.get('/consolidated', async (req, res) => {
 // Same product from a different vendor always creates a separate row.
 router.post('/', async (req, res) => {
   try {
-    const { warehouseId, productId, note, reference, createdBy, vendorId, vendorName } = req.body;
+    const { warehouseId, productId, note, reference, createdBy, vendorId, vendorName, batchNo, mfgDate, expiryDate } = req.body;
     const qtyBoxes = parseFloat(req.body.qtyBoxes);
     const packing  = parseInt(req.body.packing) || 0;
 
@@ -113,19 +116,23 @@ router.post('/', async (req, res) => {
     // Resolve the vendor for this batch
     const resolvedVendorId   = vendorId   || product.vendorId   || '';
     const resolvedVendorName = vendorName || product.vendorName || '';
+    const resolvedBatchNo    = (batchNo || '').trim();
 
-    // Find the slot that matches all four dimensions:
-    // warehouseId + productId + vendorId + packing
+    // Find the slot that matches all five dimensions:
+    // warehouseId + productId + vendorId + packing + batchNo
     let entry = await InventoryEntry.findOne({
       warehouseId,
       productId,
       vendorId: resolvedVendorId,
       packing,
+      batchNo: resolvedBatchNo,
     });
 
     if (entry) {
-      // Increment — never overwrite vendorId / vendorName on an existing slot
+      // Increment
       entry.qtyBoxes += qtyBoxes;
+      if (mfgDate) entry.mfgDate = new Date(mfgDate);
+      if (expiryDate) entry.expiryDate = new Date(expiryDate);
     } else {
       entry = new InventoryEntry({
         warehouseId,
@@ -141,6 +148,9 @@ router.post('/', async (req, res) => {
         vendorName:  resolvedVendorName,
         qtyBoxes,
         packing,
+        batchNo:     resolvedBatchNo,
+        mfgDate:     mfgDate ? new Date(mfgDate) : undefined,
+        expiryDate:  expiryDate ? new Date(expiryDate) : undefined,
       });
     }
     await entry.save();
@@ -159,6 +169,9 @@ router.post('/', async (req, res) => {
       packing,
       vendorId:   resolvedVendorId,
       vendorName: resolvedVendorName,
+      batchNo:    resolvedBatchNo,
+      mfgDate:    entry.mfgDate,
+      expiryDate: entry.expiryDate,
       createdAt: req.body.createdAt ? new Date(req.body.createdAt) : undefined,
     });
 
@@ -197,6 +210,23 @@ router.put('/:id', async (req, res) => {
 
     await entry.save();
 
+    // Sync with legacy Inventory model
+    const product = await Product.findById(entry.productId);
+    if (product) {
+      const Inventory = require('../models/Inventory');
+      let inv = await Inventory.findOne({ itemSku: product.sku });
+      if (!inv) {
+        await Inventory.create({
+          itemSku: product.sku,
+          itemName: product.name,
+          qty: entry.qtyBoxes * entry.packing
+        });
+      } else {
+        inv.qty = Math.max(0, inv.qty + (qtyChangeForLedger * entry.packing));
+        await inv.save();
+      }
+    }
+
     // Record ledger
     await StockLedger.create({
       productId:     entry.productId,
@@ -223,11 +253,12 @@ router.put('/:id', async (req, res) => {
 // GET /api/inventory-entries/ledger/:productId — Stock ledger for a product
 router.get('/ledger/:productId', async (req, res) => {
   try {
-    const { warehouseId, packing, vendorId, startDate, endDate } = req.query;
+    const { warehouseId, packing, vendorId, batchNo, startDate, endDate } = req.query;
     const filter = { productId: req.params.productId };
     if (warehouseId) filter.warehouseId = warehouseId;
     if (packing)     filter.packing  = parseInt(packing);
     if (vendorId)    filter.vendorId  = vendorId;
+    if (batchNo !== undefined) filter.batchNo = batchNo; // supports empty string to filter unbatched
     
     if (startDate || endDate) {
       filter.createdAt = {};

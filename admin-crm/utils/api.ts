@@ -163,6 +163,9 @@ export type Product = {
   vendorId?: string;
   vendorName?: string;
   image?: string;
+  description?: string;
+  disease?: string;
+  ingredients?: string;
 };
 
 export type ChallanItem = {
@@ -273,6 +276,9 @@ export type InventoryEntry = {
   qtyBoxes: number;
   updatedAt: string;
   packing: number;
+  batchNo?: string;
+  mfgDate?: string;
+  expiryDate?: string;
 };
 
 export type ConsolidatedInventory = {
@@ -290,6 +296,9 @@ export type ConsolidatedInventory = {
   val?: number;
   warehouses: { warehouseId: string; warehouseName: string; qtyBoxes: number }[];
   packing: number;
+  batchNo?: string;
+  mfgDate?: string;
+  expiryDate?: string;
 };
 
 export type StockLedger = {
@@ -307,6 +316,9 @@ export type StockLedger = {
   packing: number;
   vendorId?: string;
   vendorName?: string;
+  batchNo?: string;
+  mfgDate?: string;
+  expiryDate?: string;
 };
 
 

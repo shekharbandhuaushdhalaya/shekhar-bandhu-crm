@@ -337,12 +337,14 @@ router.patch('/purchases/:id/finalize', async (req, res) => {
             });
           }
 
-          // Update InventoryEntry
+          // Update InventoryEntry — match exact slot including batchNo (legacy entries use batchNo: '')
+          // For FIFO across batches with same product+vendor+packing, add to the batch with batchNo:''
           let entry = await InventoryEntry.findOne({
             warehouseId: warehouse._id,
             productId: product._id,
             vendorId: resolvedVendorId,
             packing,
+            batchNo: '',  // purchase invoices don't carry batch info; use the legacy/unbatched slot
           });
 
           if (entry) {
@@ -362,6 +364,7 @@ router.patch('/purchases/:id/finalize', async (req, res) => {
               vendorName:  resolvedVendorName,
               qtyBoxes:    boxesNum,
               packing,
+              batchNo:     '',  // unbatched — stock added via purchase invoice
             });
           }
           await entry.save();
@@ -514,18 +517,25 @@ router.delete('/purchases/:id', async (req, res) => {
               await inv.save();
             }
 
-            // 3. Decrement specific InventoryEntry
-            let entry = await InventoryEntry.findOne({
+            // 3. Decrement specific InventoryEntry — FIFO across all batches
+            // Get all batch slots for this product+vendor+packing, sorted oldest first
+            const allBatchEntries = await InventoryEntry.find({
               warehouseId: warehouse._id,
               productId: product._id,
               vendorId: resolvedVendorId,
               packing,
-            });
+            }).sort({ createdAt: 1 });
 
-            if (entry) {
-              entry.qtyBoxes = Math.max(0, entry.qtyBoxes - boxesToRevert);
-              await entry.save();
+            let remaining = boxesToRevert;
+            for (const batchEntry of allBatchEntries) {
+              if (remaining <= 0) break;
+              const deduct = Math.min(remaining, batchEntry.qtyBoxes);
+              batchEntry.qtyBoxes = Math.max(0, batchEntry.qtyBoxes - deduct);
+              await batchEntry.save();
+              remaining -= deduct;
             }
+            // Use first batch entry for ledger balance reference
+            const entry = allBatchEntries[0] || null;
 
             // 4. Record stock ledger entry (OUT movement to revert)
             await StockLedger.create({

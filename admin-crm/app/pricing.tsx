@@ -281,7 +281,7 @@ export default function PricingScreen() {
               <View style={{ flex: 0.9, alignItems: 'center', justifyContent: 'center' }}>
                 <Switch
                   value={row.editPromo}
-                  onValueChange={v => canEdit && updateRow(row._id, { editPromo: v })}
+                  onValueChange={v => { if (canEdit) updateRow(row._id, { editPromo: v }); }}
                   trackColor={{ false: colors.border, true: colors.success + '80' }}
                   thumbColor={row.editPromo ? colors.success : colors.text.muted}
                   disabled={!canEdit}
@@ -358,7 +358,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: Radius.md,
-    ...Shadows.sm,
+    ...Shadows.header,
   },
   saveAllBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
@@ -409,7 +409,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: 8,
-    backgroundColor: colors.bg.tertiary,
+    backgroundColor: colors.bg.primary,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: colors.border,

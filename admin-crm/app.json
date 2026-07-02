@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "VP-CRM",
-    "slug": "vp-crm",
+    "name": "Shekhar Bandhu CRM",
+    "slug": "shekhar-bandhu-crm",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "vp-crm",
+    "scheme": "shekhar-bandhu-crm",
     "userInterfaceStyle": "dark",
     "splash": {
       "backgroundColor": "#090a0f"

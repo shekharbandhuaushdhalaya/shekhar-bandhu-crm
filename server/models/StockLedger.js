@@ -14,6 +14,9 @@ const stockLedgerSchema = new mongoose.Schema({
   packing:       { type: Number, default: 0 },              // packing size (pcs/box)
   vendorId:      { type: String, default: '', trim: true },
   vendorName:    { type: String, default: '', trim: true },
+  batchNo:       { type: String, default: '', trim: true },
+  mfgDate:       { type: Date },
+  expiryDate:    { type: Date }
 }, { timestamps: true });
 
 stockLedgerSchema.index({ productId: 1, createdAt: -1 });

@@ -583,6 +583,13 @@ mongoose
       // Index didn't exist — nothing to do
     }
     try {
+      const InventoryEntry = require('./models/InventoryEntry');
+      await InventoryEntry.collection.dropIndex('warehouseId_1_productId_1_vendorId_1_packing_1');
+      console.log('✅ Dropped 4-field inventory index — new batchNo-aware index will be created');
+    } catch (_) {
+      // Index didn't exist — nothing to do
+    }
+    try {
       const Payment = require('./models/Payment');
       await Payment.collection.dropIndex('paymentNo_1');
       console.log('✅ Dropped old paymentNo index from payments collection');
@@ -591,7 +598,7 @@ mongoose
     console.log('✅ Using MongoDB for data');
 
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 VP-CRM Server running on port ${PORT} (bound to 0.0.0.0)`);
+      console.log(`🚀 Shekhar Bandhu CRM Server running on port ${PORT} (bound to 0.0.0.0)`);
     });
   })
   .catch(err => {
