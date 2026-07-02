@@ -79,11 +79,13 @@ router.post('/', async (req, res) => {
     // Apply normalized specs back to req.body so they are stored normalized
     Object.assign(req.body, specs);
     // Normalize name as well
-    const nameParts = [];
-    if (req.body.size) nameParts.push(req.body.size);
-    if (req.body.shape) nameParts.push(req.body.shape);
-    if (req.body.colour) nameParts.push(req.body.colour);
-    req.body.name = nameParts.length > 0 ? nameParts.join(' ') : (req.body.name || 'Unnamed Product');
+    if (!req.body.name) {
+      const nameParts = [];
+      if (req.body.size) nameParts.push(req.body.size);
+      if (req.body.shape) nameParts.push(req.body.shape);
+      if (req.body.colour) nameParts.push(req.body.colour);
+      req.body.name = nameParts.length > 0 ? nameParts.join(' ') : 'Unnamed Product';
+    }
 
     const product = await Product.create(req.body);
 
@@ -122,11 +124,13 @@ router.put('/:id', async (req, res) => {
     // Apply normalized specs back to req.body so they are stored normalized
     Object.assign(req.body, specs);
     // Normalize name as well
-    const nameParts = [];
-    if (req.body.size) nameParts.push(req.body.size);
-    if (req.body.shape) nameParts.push(req.body.shape);
-    if (req.body.colour) nameParts.push(req.body.colour);
-    req.body.name = nameParts.length > 0 ? nameParts.join(' ') : (req.body.name || 'Unnamed Product');
+    if (!req.body.name) {
+      const nameParts = [];
+      if (req.body.size) nameParts.push(req.body.size);
+      if (req.body.shape) nameParts.push(req.body.shape);
+      if (req.body.colour) nameParts.push(req.body.colour);
+      req.body.name = nameParts.length > 0 ? nameParts.join(' ') : 'Unnamed Product';
+    }
 
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,

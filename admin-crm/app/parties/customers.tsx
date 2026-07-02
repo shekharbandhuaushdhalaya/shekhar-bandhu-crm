@@ -72,6 +72,42 @@ function CustomerDetailModal({
   const { user } = useAuth();
   const canAccessCash = user?.canAccessCash ?? false;
 
+  const [customerOrders, setCustomerOrders] = React.useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = React.useState(false);
+
+  React.useEffect(() => {
+    if (visible && customer) {
+      const fetchOrders = async () => {
+        setLoadingOrders(true);
+        try {
+          const query = customer.phone || customer.email || '';
+          if (query) {
+            const res = await fetch(`http://localhost:5000/api/orders/public/track/${encodeURIComponent(query)}`);
+            if (res.ok) {
+              const data = await res.json();
+              setCustomerOrders(data);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load customer orders:', err);
+        } finally {
+          setLoadingOrders(false);
+        }
+      };
+      fetchOrders();
+    }
+  }, [visible, customer]);
+
+  const getOrderStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return colors.danger;
+      case 'processing': return colors.warning;
+      case 'shipped': return colors.primary;
+      case 'delivered': return colors.success;
+      default: return colors.primary;
+    }
+  };
+
   if (!customer) return null;
 
   const handleDelete = async () => {
@@ -258,6 +294,57 @@ function CustomerDetailModal({
                 </Text>
               </View>
             </View>
+          </View>
+
+          {/* Storefront E-Commerce Order History */}
+          <View style={{ marginTop: 20 }}>
+            <View style={styles.infoSectionHeader}>
+              <Text style={styles.infoSectionTitle}>Storefront Order History</Text>
+            </View>
+
+            {loadingOrders ? (
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
+            ) : customerOrders.length === 0 ? (
+              <Text style={{ fontSize: 13, color: colors.text.muted, marginVertical: 8, fontStyle: 'italic' }}>
+                No storefront orders found matching this customer's details.
+              </Text>
+            ) : (
+              <View style={{ gap: 8, marginTop: 8 }}>
+                {customerOrders.map((o) => (
+                  <View key={o._id} style={{
+                    backgroundColor: colors.bg.secondary,
+                    borderRadius: 8,
+                    padding: 12,
+                    borderLeftWidth: 3,
+                    borderLeftColor: getOrderStatusColor(o.status),
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', fontFamily: 'monospace', color: colors.text.primary }}>
+                        #{o._id.substring(o._id.length - 8).toUpperCase()}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>
+                        Date: {new Date(o.createdAt).toLocaleDateString()}  |  Amt: ₹{o.totalAmount}
+                      </Text>
+                    </View>
+                    <View style={{
+                      backgroundColor: getOrderStatusColor(o.status) + '15',
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: getOrderStatusColor(o.status)
+                    }}>
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: getOrderStatusColor(o.status), textTransform: 'uppercase' }}>
+                        {o.status}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 16 }}>

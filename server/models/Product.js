@@ -21,7 +21,8 @@ const productSchema = new mongoose.Schema({
   vendorName: { type: String, default: '' },
   image: { type: String, default: '' },
   description: { type: String, default: '' },
-  disease: { type: String, default: '' }
+  disease: { type: String, default: '' },
+  ingredients: { type: String, default: '' }
 }, { timestamps: true });
 
 productSchema.index({ name: 'text', sku: 'text', category: 'text' });

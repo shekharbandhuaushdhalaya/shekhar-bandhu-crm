@@ -19,7 +19,11 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'processing', 'shipped', 'delivered'],
     default: 'pending'
-  }
+  },
+  courierName: { type: String, default: '', trim: true },
+  trackingId: { type: String, default: '', trim: true },
+  courierLink: { type: String, default: '', trim: true },
+  adminNotes: { type: String, default: '', trim: true }
 }, { timestamps: true });
 
 orderSchema.index({ createdAt: -1 });

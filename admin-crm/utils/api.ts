@@ -80,6 +80,10 @@ export type DashboardStats = {
   closedWon: number;
   activeLeadsCount: number;
   pendingTasksCount: number;
+  totalWebSales?: number;
+  activeWebOrdersCount?: number;
+  completedWebOrdersCount?: number;
+  webQueriesCount?: number;
 };
 
 export type Customer = {
@@ -914,6 +918,12 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/orders/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
+    });
+    return res.json();
+  }
+  async generateInvoiceFromOrder(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/orders/${id}/invoice`, {
+      method: 'POST'
     });
     return res.json();
   }

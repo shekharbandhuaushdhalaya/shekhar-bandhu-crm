@@ -484,9 +484,32 @@ mongoose
 
     app.get('/api/public/products', async (req, res) => {
       try {
-        const Product = require('./models/Product');
+        const Product        = require('./models/Product');
+        const Warehouse      = require('./models/Warehouse');
+        const InventoryEntry = require('./models/InventoryEntry');
+
+        // Find the primary warehouse (Varanasi Central Depot)
+        const warehouse = await Warehouse.findOne({ name: /varanasi central/i }).lean();
+
+        // Fetch all inventory entries for that warehouse (if found)
+        let stockMap = {};
+        if (warehouse) {
+          const entries = await InventoryEntry.find({ warehouseId: warehouse._id }).lean();
+          for (const entry of entries) {
+            const pid = entry.productId.toString();
+            stockMap[pid] = (stockMap[pid] || 0) + (entry.qtyBoxes || 0);
+          }
+        }
+
         const products = await Product.find({}).sort({ name: 1 }).lean();
-        res.json(products);
+
+        // Attach live inventory qty to each product
+        const enriched = products.map(p => ({
+          ...p,
+          inventoryQty: stockMap[p._id.toString()] ?? p.stockLevel ?? 0,
+        }));
+
+        res.json(enriched);
       } catch (err) {
         res.status(500).json({ error: err.message });
       }

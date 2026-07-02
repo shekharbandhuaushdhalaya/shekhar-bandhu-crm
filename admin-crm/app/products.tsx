@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Spacing, Radius, LightColors } from '../constants/theme';
-import { api, Product } from '../utils/api';
+import { api, Product, getImageUrl } from '../utils/api';
 import { useAuth } from '../utils/auth';
 import { useTheme, useStyles } from '../utils/themeContext';
 
@@ -55,7 +55,7 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
           <View style={{ alignItems: 'center', marginBottom: Spacing.lg }}>
             <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: colors.bg.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
               {product.image ? (
-                <Image source={{ uri: product.image.startsWith('http') ? product.image : `http://localhost:5000${product.image}` }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                <Image source={{ uri: getImageUrl(product.image) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
               ) : (
                 <Ionicons name="cube" size={36} color={colors.primary} />
               )}
@@ -89,6 +89,32 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
                 </Text>
               </View>
             </View>
+
+            <View style={styles.infoItem}>
+              <View style={[styles.infoIcon, { backgroundColor: colors.successLight }]}>
+                <Ionicons name="cash" size={16} color={colors.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.infoLabel}>GST Rate (Tax Slab)</Text>
+                <Text style={styles.infoValue}>
+                  {product.gstRate !== undefined ? `${product.gstRate}%` : '18%'}
+                </Text>
+              </View>
+            </View>
+
+            {product.ingredients ? (
+              <View style={styles.infoItem}>
+                <View style={[styles.infoIcon, { backgroundColor: colors.infoLight }]}>
+                  <Ionicons name="flask" size={16} color={colors.info} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.infoLabel}>Key Ingredients</Text>
+                  <Text style={[styles.infoValue, { fontStyle: 'italic' }]}>
+                    {product.ingredients}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
 
             {/* Dynamic Attributes */}
             {product.productType ? (
@@ -207,6 +233,28 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   const [category, setCategory] = useState('');
   const [minReorder, setMinReorder] = useState('5');
   const [hsnCode, setHsnCode] = useState('');
+  const [gstRate, setGstRate] = useState('18');
+
+  const fileInputRef = React.useRef<any>(null);
+
+  const handleFileChange = (e: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImageUri(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const triggerFileSelect = () => {
+    if (Platform.OS === 'web' && fileInputRef.current) {
+      fileInputRef.current.click();
+    } else {
+      pickImage();
+    }
+  };
 
   const [types, setTypes] = useState(['Asava & Arishta', 'Syrups', 'Medicated Oils', 'Vati & Guggulu', 'Avaleha', 'Churn']);
   const [productType, setProductType] = useState('');
@@ -219,6 +267,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   const [weight, setWeight] = useState('');
   const [description, setDescription] = useState('');
   const [disease, setDisease] = useState('');
+  const [ingredients, setIngredients] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
 
   const [shapes, setShapes] = useState(['liquid', 'tablet', 'capsule', 'powder', 'paste']);
@@ -231,9 +280,9 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       setSku(product.sku || '');
       setPrice(product.price ? product.price.toString() : '');
       setStock(product.stockLevel ? product.stockLevel.toString() : '');
-      setCategory(product.category || '');
       setMinReorder(product.minReorder ? product.minReorder.toString() : '5');
       setHsnCode(product.hsnCode || '');
+      setGstRate(product.gstRate !== undefined ? product.gstRate.toString() : '18');
       setProductType(product.productType || '');
       // Strip the unit suffix from size (e.g. '100 ml' → '100')
       const sizeVal = product.size || '';
@@ -246,12 +295,10 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       setWeight(weightVal.replace(/g$/i, '').trim());
       setDescription(product.description || '');
       setDisease(product.disease || '');
+      setIngredients(product.ingredients || '');
       
       if (product.image) {
-        // Construct full URL if it's a relative path. For Expo Go or web, we need the base API url without /api
-        // Since we don't have a direct backendUrl exported, we can cheat by replacing '/api' in API_BASE
-        // Wait, actually I can just use a generic function or check if it starts with http
-        setImageUri(product.image.startsWith('http') ? product.image : `http://localhost:5000${product.image}`);
+        setImageUri(getImageUrl(product.image));
       } else {
         setImageUri(null);
       }
@@ -275,8 +322,8 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       setPrice('');
       setStock('');
       setCategory('');
-      setMinReorder('5');
       setHsnCode('');
+      setGstRate('18');
       setProductType('');
       setSize('');
       setColour('');
@@ -284,6 +331,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       setWeight('');
       setDescription('');
       setDisease('');
+      setIngredients('');
       setImageUri(null);
     }
     setShowTypeInput(false);
@@ -325,6 +373,14 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   };
 
   const pickImage = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need camera roll permissions to upload product photos!');
+        return;
+      }
+    }
+
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -386,7 +442,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       category: finalCategory,
       minReorder: finalMinReorder,
       hsnCode: hsnCode.trim().toUpperCase(),
-      gstRate: product?.gstRate || 18,
+      gstRate: parseInt(gstRate) || 18,
       productType: productType,
       size: formattedSize,
       colour: colour.trim(),
@@ -394,6 +450,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       weight: weight.trim(),
       description: description.trim(),
       disease: disease.trim(),
+      ingredients: ingredients.trim(),
       vendorId: product?.vendorId || '',
       vendorName: product?.vendorName || ''
     };
@@ -432,7 +489,16 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
           
           <View style={{ alignItems: 'center', marginBottom: Spacing.lg }}>
-            <TouchableOpacity onPress={pickImage} style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: colors.bg.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
+            {Platform.OS === 'web' && (
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                accept="image/*"
+                onChange={handleFileChange}
+              />
+            )}
+            <TouchableOpacity onPress={triggerFileSelect} style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: colors.bg.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
               {imageUri ? (
                 <Image source={{ uri: imageUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
               ) : (
@@ -544,6 +610,33 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           </View>
 
           <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Tax Slab (GST Rate) <Text style={{ color: 'red' }}>*</Text></Text>
+            <View style={styles.formInput}>
+              <Ionicons name="cash-outline" size={16} color={colors.text.muted} />
+              {Platform.OS === 'web' ? React.createElement('select', {
+                value: gstRate,
+                onChange: (e: any) => setGstRate(e.target.value),
+                style: { flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
+              }, [
+                React.createElement('option', { value: '0', key: '0' }, '0% (Exempt)'),
+                React.createElement('option', { value: '5', key: '5' }, '5% (Ayurvedic Classical / Herbs)'),
+                React.createElement('option', { value: '12', key: '12' }, '12% (Patent Medicines)'),
+                React.createElement('option', { value: '18', key: '18' }, '18% (Proprietary / Cosmetics)'),
+                React.createElement('option', { value: '28', key: '28' }, '28% (Luxuries)')
+              ]) : (
+                <TextInput
+                  style={styles.formInputText}
+                  placeholder="e.g. 12"
+                  placeholderTextColor={colors.text.muted}
+                  value={gstRate}
+                  onChangeText={setGstRate}
+                  keyboardType="numeric"
+                />
+              )}
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Description (Website Detail Popup)</Text>
             <View style={[styles.formInput, { height: 80, alignItems: 'flex-start', paddingTop: 8 }]}>
               <TextInput
@@ -567,6 +660,20 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
                 placeholderTextColor={colors.text.muted}
                 value={disease}
                 onChangeText={setDisease}
+              />
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Key Ingredients (Comma-separated)</Text>
+            <View style={[styles.formInput, { height: 80, alignItems: 'flex-start', paddingTop: 8 }]}>
+              <TextInput
+                style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
+                placeholder="e.g. Ashwagandha, Shatavari, Safed Musli..."
+                placeholderTextColor={colors.text.muted}
+                value={ingredients}
+                onChangeText={setIngredients}
+                multiline
               />
             </View>
           </View>
@@ -855,7 +962,7 @@ export default function ProductsScreen() {
                 <View key={item._id} style={styles.tableBodyRow}>
                   <View style={[styles.tableCellContainer, { width: 60, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' }]}>
                     {item.image ? (
-                      <Image source={{ uri: item.image.startsWith('http') ? item.image : `http://localhost:5000${item.image}` }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+                      <Image source={{ uri: getImageUrl(item.image) }} style={{ width: 36, height: 36, borderRadius: 18 }} />
                     ) : (
                       <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center' }}>
                         <Ionicons name="cube" size={18} color={colors.primary} />
@@ -884,7 +991,7 @@ export default function ProductsScreen() {
                   </View>
                 </View>
               );
-            })}     })}
+            })}
 
             {products.length === 0 && (
               <View style={styles.emptyTableContainer}>

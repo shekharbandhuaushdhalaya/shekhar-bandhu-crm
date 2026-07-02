@@ -774,6 +774,48 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
+      {/* E-Commerce Performance Panel */}
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        🛒 E-Commerce Channel Stats
+      </Text>
+      <View style={[styles.metricsGrid, { marginBottom: Spacing.lg }]}>
+        <MetricCard 
+          title="E-COMM SALES" 
+          value={`₹${(stats.totalWebSales || 0).toLocaleString()}`} 
+          icon="cart-outline" 
+          color={colors.primary} 
+          colorLight={colors.primaryLight} 
+          trend="Live Storefront" 
+        />
+        <MetricCard 
+          title="ACTIVE WEB ORDERS" 
+          value={`${stats.activeWebOrdersCount || 0}`} 
+          icon="sync-outline" 
+          color={colors.warning} 
+          colorLight={colors.warningLight} 
+          trend="Needs Processing" 
+        />
+        <MetricCard 
+          title="COMPLETED DELIVERIES" 
+          value={`${stats.completedWebOrdersCount || 0}`} 
+          icon="checkmark-done-circle-outline" 
+          color={colors.success} 
+          colorLight={colors.successLight} 
+          trend="Successfully Shipped" 
+        />
+        <MetricCard 
+          title="WEB INQUIRIES" 
+          value={`${stats.webQueriesCount || 0}`} 
+          icon="chatbubble-ellipses-outline" 
+          color={colors.info} 
+          colorLight={colors.infoLight} 
+          trend="Enquiries / Quizzes" 
+        />
+      </View>
+
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.secondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        📊 B2B Ledger &amp; Inventory
+      </Text>
       <View style={styles.metricsGrid}>
         <FinancialSummaryCard 
           title="TOTAL RECEIVABLES" 
@@ -826,27 +868,6 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Product-Inventory Mapping Section */}
-      <View style={styles.chartCard}>
-        <Text style={styles.sectionTitle}>Product → Inventory Mapping</Text>
-        {consolidatedInv.length === 0 ? (
-          <Text style={{ color: colors.text.muted }}>No inventory data available.</Text>
-        ) : (
-          <FlatList
-            data={consolidatedInv}
-            keyExtractor={item => item._id}
-            renderItem={({ item }) => {
-              const product = products.find(p => p._id === item.productId);
-              return (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{product?.name || 'Unnamed'} ({item.productId})</Text>
-                  <Text style={{ color: colors.text.primary }}>{item.totalBoxes} boxes</Text>
-                </View>
-              );
-            }}
-          />
-        )}
-      </View>
 
     </ScrollView>
   );

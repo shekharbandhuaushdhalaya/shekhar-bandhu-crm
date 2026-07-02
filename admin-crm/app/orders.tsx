@@ -18,6 +18,10 @@ export default function OrdersScreen() {
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editCourierName, setEditCourierName] = useState('');
+  const [editTrackingId, setEditTrackingId] = useState('');
+  const [editCourierLink, setEditCourierLink] = useState('');
+  const [editAdminNotes, setEditAdminNotes] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
   const { colors } = useTheme();
@@ -55,12 +59,32 @@ export default function OrdersScreen() {
     }
   };
 
+  const handleGenerateInvoice = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await (api as any).generateInvoiceFromOrder(id);
+      Alert.alert(
+        '✅ Invoice Generated',
+        'Draft Sale Invoice created successfully! You can verify and finalize it in the Invoices screen.'
+      );
+      await load();
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to generate invoice: ' + err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleOpenEdit = (order: Order) => {
     setEditingOrder(order);
     setEditName(order.name);
     setEditEmail(order.email);
     setEditPhone(order.phone);
     setEditAddress(order.shippingAddress);
+    setEditCourierName((order as any).courierName || '');
+    setEditTrackingId((order as any).trackingId || '');
+    setEditCourierLink((order as any).courierLink || '');
+    setEditAdminNotes((order as any).adminNotes || '');
   };
 
   const handleSaveEdit = async () => {
@@ -76,7 +100,11 @@ export default function OrdersScreen() {
         name: editName,
         email: editEmail,
         phone: editPhone,
-        shippingAddress: editAddress
+        shippingAddress: editAddress,
+        courierName: editCourierName,
+        trackingId: editTrackingId,
+        courierLink: editCourierLink,
+        adminNotes: editAdminNotes
       });
       setEditingOrder(null);
       await load();
@@ -98,6 +126,8 @@ export default function OrdersScreen() {
       o.email.toLowerCase().includes(lower) ||
       o.phone.toLowerCase().includes(lower) ||
       o.shippingAddress.toLowerCase().includes(lower) ||
+      ((o as any).courierName && (o as any).courierName.toLowerCase().includes(lower)) ||
+      ((o as any).trackingId && (o as any).trackingId.toLowerCase().includes(lower)) ||
       o._id.toLowerCase().includes(lower)
     );
   });
@@ -120,7 +150,7 @@ export default function OrdersScreen() {
           <Ionicons name="search" size={18} color={colors.text.muted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search orders by customer name, address, ID..."
+            placeholder="Search orders by customer, tracking, address..."
             placeholderTextColor={colors.text.muted}
             value={search}
             onChangeText={setSearch}
@@ -184,13 +214,24 @@ export default function OrdersScreen() {
                 <Text style={styles.boxTitle}>Customer Details:</Text>
                 <TouchableOpacity style={styles.editBtn} onPress={() => handleOpenEdit(o)}>
                   <Ionicons name="pencil-outline" size={13} color={colors.primary} />
-                  <Text style={styles.editBtnText}>Edit Info</Text>
+                  <Text style={styles.editBtnText}>Edit Order</Text>
                 </TouchableOpacity>
               </View>
               <Text style={styles.customerName}>{o.name}</Text>
               <Text style={styles.customerContact}>📞 {o.phone}  |  ✉️ {o.email}</Text>
               <Text style={styles.customerAddress}>📍 {o.shippingAddress}</Text>
             </View>
+
+            {/* Courier & Delivery Info */}
+            {((o as any).courierName || (o as any).trackingId || (o as any).adminNotes) ? (
+              <View style={styles.courierBox}>
+                <Text style={styles.boxTitle}>Courier &amp; Tracking Details:</Text>
+                {(o as any).courierName ? <Text style={styles.courierInfoText}>Courier Service: <Text style={{ fontWeight: '700' }}>{(o as any).courierName}</Text></Text> : null}
+                {(o as any).trackingId ? <Text style={styles.courierInfoText}>Tracking / AWB No: <Text style={{ fontWeight: '700', fontFamily: 'monospace' }}>{(o as any).trackingId}</Text></Text> : null}
+                {(o as any).courierLink ? <Text style={[styles.courierInfoText, { color: colors.primary }]} numberOfLines={1}>Tracking Link: {(o as any).courierLink}</Text> : null}
+                {(o as any).adminNotes ? <Text style={[styles.courierInfoText, { fontStyle: 'italic', color: colors.text.secondary, marginTop: 4 }]}>Admin Notes: {(o as any).adminNotes}</Text> : null}
+              </View>
+            ) : null}
 
             {/* Items table */}
             <View style={styles.itemsBox}>
@@ -213,6 +254,15 @@ export default function OrdersScreen() {
                 <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 8 }} />
               ) : (
                 <>
+                  {/* Generate Sale Invoice (Draft) */}
+                  <TouchableOpacity 
+                    style={[styles.primaryActionBtn, { backgroundColor: colors.info, marginRight: 'auto' }]} 
+                    onPress={() => handleGenerateInvoice(o._id)}
+                  >
+                    <Ionicons name="document-text-outline" size={14} color="#fff" />
+                    <Text style={styles.primaryActionBtnText}>Generate Invoice</Text>
+                  </TouchableOpacity>
+
                   {o.status === 'pending' && (
                     <TouchableOpacity 
                       style={[styles.primaryActionBtn, { backgroundColor: colors.warning }]} 
@@ -265,7 +315,7 @@ export default function OrdersScreen() {
         )}
       </ScrollView>
 
-      {/* Edit Customer Details Modal */}
+      {/* Edit Details Modal */}
       <Modal
         visible={editingOrder !== null}
         animationType="fade"
@@ -282,6 +332,8 @@ export default function OrdersScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalBody}>
+              <Text style={styles.sectionHeaderTitle}>Customer Contact Info</Text>
+              
               <View style={styles.formGroup}>
                 <Text style={styles.inputLabel}>Customer Name</Text>
                 <TextInput
@@ -321,10 +373,59 @@ export default function OrdersScreen() {
               <View style={styles.formGroup}>
                 <Text style={styles.inputLabel}>Shipping Address</Text>
                 <TextInput
-                  style={[styles.textInput, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
+                  style={[styles.textInput, { height: 60, textAlignVertical: 'top', paddingTop: 10 }]}
                   value={editAddress}
                   onChangeText={setEditAddress}
                   placeholder="Shipping Address"
+                  placeholderTextColor={colors.text.muted}
+                  multiline
+                />
+              </View>
+
+              <Text style={[styles.sectionHeaderTitle, { marginTop: 10 }]}>Courier &amp; Delivery Tracking</Text>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Courier Service Name</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editCourierName}
+                  onChangeText={setEditCourierName}
+                  placeholder="e.g. BlueDart, Delhivery, DTDC"
+                  placeholderTextColor={colors.text.muted}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Tracking ID / AWB Number</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editTrackingId}
+                  onChangeText={setEditTrackingId}
+                  placeholder="AWB Tracking Number"
+                  placeholderTextColor={colors.text.muted}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Courier Tracking URL Link</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editCourierLink}
+                  onChangeText={setEditCourierLink}
+                  placeholder="e.g. https://track.delhivery.com/..."
+                  placeholderTextColor={colors.text.muted}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Internal Admin Notes</Text>
+                <TextInput
+                  style={[styles.textInput, { height: 60, textAlignVertical: 'top', paddingTop: 10 }]}
+                  value={editAdminNotes}
+                  onChangeText={setEditAdminNotes}
+                  placeholder="Admin comments/delivery details..."
                   placeholderTextColor={colors.text.muted}
                   multiline
                 />
@@ -369,7 +470,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   tabBtnTextActive: { color: '#fff', fontWeight: '700' },
   badge: { marginLeft: 6, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 },
   badgeText: { fontSize: 10, fontWeight: '700' },
-  orderCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
+  orderCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card, marginBottom: Spacing.md },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   orderIdText: { fontSize: 14, fontWeight: '700', color: colors.text.primary, fontFamily: 'monospace' },
   orderDate: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
@@ -382,6 +483,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   customerName: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
   customerContact: { fontSize: 12, color: colors.text.secondary, marginVertical: 3 },
   customerAddress: { fontSize: 12, color: colors.text.secondary },
+  
+  // Courier Box styles
+  courierBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: colors.warning },
+  courierInfoText: { fontSize: 12, color: colors.text.primary, marginVertical: 2 },
+
   itemsBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 12 },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   itemNameText: { fontSize: 13, color: colors.text.primary, flex: 1 },
@@ -400,13 +506,14 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Edit Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
-  modalContent: { backgroundColor: colors.bg.card, width: '100%', maxWidth: 460, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.hover },
+  modalContent: { backgroundColor: colors.bg.card, width: '100%', maxWidth: 500, maxHeight: '90%', borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.hover },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
   modalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
   modalBody: { padding: Spacing.lg, gap: Spacing.md },
-  formGroup: { gap: 6 },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary },
-  textInput: { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 44, color: colors.text.primary, fontSize: 14 },
+  sectionHeaderTitle: { fontSize: 13, fontWeight: '800', color: colors.primary, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  formGroup: { gap: 4 },
+  inputLabel: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
+  textInput: { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 40, color: colors.text.primary, fontSize: 14 },
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.primary + '30' },
   modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border },
