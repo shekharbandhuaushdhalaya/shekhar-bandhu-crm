@@ -1097,7 +1097,8 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
                 <Text style={{ color: colors.text.muted }}>Loading ledger logs...</Text>
               </View>
             ) : (
-              <View style={styles.ledgerTable}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                <View style={[styles.ledgerTable, { minWidth: 740 }]}>
                 {/* Headers */}
                 <View style={styles.ledgerHeaderRow}>
                   <Text style={[styles.ledgerHeaderCell, { width: 100 }]}>Date & Time</Text>
@@ -1169,6 +1170,7 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
                   </View>
                 )}
               </View>
+              </ScrollView>
             )}
           </ScrollView>
 
@@ -1600,7 +1602,6 @@ export default function InventoriesScreen() {
             </View>
 
             {/* Filter Dropdowns */}
-            <View style={{ flexDirection: 'row', gap: 10 }}>
               {/* Vendor Filter Button */}
               <View style={{ position: 'relative', zIndex: showVendorFilterDropdown ? 1000 : 1 }}>
                 <TouchableOpacity
@@ -1717,10 +1718,7 @@ export default function InventoriesScreen() {
                   </View>
                 )}
               </View>
-            </View>
-
             {/* Action Buttons */}
-            <View style={{ flexDirection: 'row', gap: 10 }}>
               {user?.role !== 'agent' && (
                 <TouchableOpacity style={styles.headerBtnPrimary} onPress={() => setAddWarehouseVisible(true)}>
                   <Ionicons name="business" size={16} color="#fff" />
@@ -1744,7 +1742,6 @@ export default function InventoriesScreen() {
                 <Ionicons name={showZero ? "eye" : "eye-off-outline"} size={16} color={showZero ? '#fff' : colors.text.secondary} />
                 <Text style={[styles.headerBtnText, { color: showZero ? '#fff' : colors.text.secondary }]}>Zero Stock</Text>
               </TouchableOpacity>
-            </View>
           </View>
         </View>
 
@@ -1760,7 +1757,7 @@ export default function InventoriesScreen() {
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg, flexGrow: 1 }}
           >
-            <View style={styles.table}>
+            <View style={[styles.table, { minWidth: 700 }]}>
               {selectedWarehouseId === 'all' ? (
                 // --- CONSOLIDATED VIEW TABLE ---
                 <>
@@ -2217,7 +2214,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   
   topHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
   topHeaderTitle: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
-  headerBtnPrimary: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, borderRadius: Radius.md, paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  headerBtnPrimary: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, borderRadius: Radius.md, paddingHorizontal: 16, height: 40, gap: 8, borderWidth: 1, borderColor: colors.primary },
   headerBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
   summaryBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginTop: Spacing.lg, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg },

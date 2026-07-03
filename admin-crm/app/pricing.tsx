@@ -8,6 +8,8 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { api, Product } from '../utils/api';
 import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
 import { useAuth } from '../utils/auth';
+import { useToast } from '../utils/ToastContext';
+import { DataTable, Column } from '../components/DataTable';
 
 type PricingRow = {
   _id: string;
@@ -31,6 +33,7 @@ export default function PricingScreen() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const [rows, setRows] = useState<PricingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +63,7 @@ export default function PricingScreen() {
         saving: false,
       })));
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to load products');
+      showToast(e.message || 'Failed to load products', 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -80,11 +83,11 @@ export default function PricingScreen() {
     const priceVal = parseFloat(row.editPrice);
     const discVal = parseFloat(row.editDiscount);
     if (isNaN(priceVal) || priceVal < 0) {
-      Alert.alert('Invalid Price', 'Please enter a valid price (≥ 0).');
+      showToast('Please enter a valid price (≥ 0).', 'error');
       return;
     }
     if (isNaN(discVal) || discVal < 0 || discVal > 100) {
-      Alert.alert('Invalid Discount', 'Discount must be between 0 and 100.');
+      showToast('Discount must be between 0 and 100.', 'error');
       return;
     }
 
@@ -110,7 +113,7 @@ export default function PricingScreen() {
         saving: false,
       } : r));
     } catch (e: any) {
-      Alert.alert('Save Failed', e.message || 'Could not update pricing.');
+      showToast(e.message || 'Could not update pricing.', 'error');
       setRows(prev => prev.map(r => r._id === row._id ? { ...r, saving: false } : r));
     }
   };
@@ -118,13 +121,13 @@ export default function PricingScreen() {
   const saveAll = async () => {
     const dirtyRows = rows.filter(r => r.dirty);
     if (!dirtyRows.length) {
-      Alert.alert('No Changes', 'No unsaved changes detected.');
+      showToast('No unsaved changes detected.', 'info');
       return;
     }
     setSaveAllLoading(true);
     for (const row of dirtyRows) await saveRow(row);
     setSaveAllLoading(false);
-    Alert.alert('✅ Saved', `${dirtyRows.length} product(s) updated successfully.`);
+    showToast(`${dirtyRows.length} product(s) updated successfully.`, 'success');
   };
 
   const filteredRows = rows.filter(r =>
@@ -136,14 +139,109 @@ export default function PricingScreen() {
   const dirtyCount = rows.filter(r => r.dirty).length;
   const activePromoCount = rows.filter(r => r.websitePromoActive).length;
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading products...</Text>
-      </View>
-    );
-  }
+  const columns: Column<PricingRow>[] = [
+    {
+      key: 'product',
+      title: 'Product',
+      flex: 2.5,
+      render: (row) => (
+        <View>
+          <Text style={styles.productName} numberOfLines={1}>{row.name}</Text>
+          <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+            <View style={[styles.catBadge, { backgroundColor: colors.primary + '15' }]}>
+              <Text style={[styles.catBadgeText, { color: colors.primary }]}>{row.category}</Text>
+            </View>
+          </View>
+        </View>
+      )
+    },
+    {
+      key: 'price',
+      title: 'Price (₹)',
+      flex: 1.2,
+      align: 'center',
+      render: (row) => (
+        <TextInput
+          style={[styles.numInput, !canEdit && styles.inputDisabled, { width: '100%', maxWidth: 100 }]}
+          value={row.editPrice}
+          onChangeText={v => updateRow(row._id, { editPrice: v })}
+          keyboardType="decimal-pad"
+          editable={canEdit}
+          selectTextOnFocus
+        />
+      )
+    },
+    {
+      key: 'discount',
+      title: 'Disc %',
+      flex: 1,
+      align: 'center',
+      render: (row) => (
+        <TextInput
+          style={[styles.numInput, !canEdit && styles.inputDisabled, row.editDiscount !== '0' && parseFloat(row.editDiscount) > 0 && styles.discountActive, { width: '100%', maxWidth: 80 }]}
+          value={row.editDiscount}
+          onChangeText={v => updateRow(row._id, { editDiscount: v })}
+          keyboardType="decimal-pad"
+          editable={canEdit}
+          selectTextOnFocus
+        />
+      )
+    },
+    {
+      key: 'promoLabel',
+      title: 'Promo Label',
+      flex: 1.8,
+      render: (row) => (
+        <TextInput
+          style={[styles.labelInput, !canEdit && styles.inputDisabled, { width: '100%' }]}
+          value={row.editLabel}
+          onChangeText={v => updateRow(row._id, { editLabel: v })}
+          placeholder="e.g. Festive Sale"
+          placeholderTextColor={colors.text.muted}
+          editable={canEdit}
+        />
+      )
+    },
+    {
+      key: 'promoActive',
+      title: 'Live',
+      flex: 0.9,
+      align: 'center',
+      render: (row) => (
+        <Switch
+          value={row.editPromo}
+          onValueChange={v => { if (canEdit) updateRow(row._id, { editPromo: v }); }}
+          trackColor={{ false: colors.border, true: colors.success + '80' }}
+          thumbColor={row.editPromo ? colors.success : colors.text.muted}
+          disabled={!canEdit}
+        />
+      )
+    },
+    {
+      key: 'save',
+      title: 'Save',
+      flex: 0.8,
+      align: 'center',
+      render: (row) => (
+        row.saving ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <TouchableOpacity
+            style={[styles.saveRowBtn, !row.dirty && styles.saveRowBtnDisabled]}
+            onPress={() => saveRow(row)}
+            disabled={!row.dirty || !canEdit}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={row.dirty ? 'checkmark-circle' : 'checkmark-circle-outline'}
+              size={22}
+              color={row.dirty && canEdit ? colors.success : colors.text.muted}
+            />
+          </TouchableOpacity>
+        )
+      )
+    }
+  ];
 
   return (
     <View style={styles.container}>
@@ -206,112 +304,23 @@ export default function PricingScreen() {
         )}
       </View>
 
-      {/* Column Headers */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.thCell, { flex: 2.5 }]}>Product</Text>
-        <Text style={[styles.thCell, { flex: 1.2, textAlign: 'center' }]}>Price (₹)</Text>
-        <Text style={[styles.thCell, { flex: 1, textAlign: 'center' }]}>Disc %</Text>
-        <Text style={[styles.thCell, { flex: 1.8 }]}>Promo Label</Text>
-        <Text style={[styles.thCell, { flex: 0.9, textAlign: 'center' }]}>Live</Text>
-        <Text style={[styles.thCell, { flex: 0.8, textAlign: 'center' }]}>Save</Text>
-      </View>
-
-      <ScrollView
-        style={{ flex: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        showsVerticalScrollIndicator={false}
-      >
-        {filteredRows.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="pricetag-outline" size={40} color={colors.text.muted} />
-            <Text style={styles.emptyText}>No products match your search.</Text>
-          </View>
-        ) : (
-          filteredRows.map((row, idx) => (
-            <View
-              key={row._id}
-              style={[
-                styles.tableRow,
-                idx % 2 === 0 && { backgroundColor: colors.bg.secondary },
-                row.dirty && styles.tableRowDirty,
-              ]}
-            >
-              {/* Product Info */}
-              <View style={{ flex: 2.5 }}>
-                <Text style={styles.productName} numberOfLines={1}>{row.name}</Text>
-                <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
-                  <Text style={styles.skuText}>{row.sku}</Text>
-                  <View style={[styles.catBadge, { backgroundColor: colors.primary + '15' }]}>
-                    <Text style={[styles.catBadgeText, { color: colors.primary }]}>{row.category}</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Price */}
-              <TextInput
-                style={[styles.numInput, { flex: 1.2 }, !canEdit && styles.inputDisabled]}
-                value={row.editPrice}
-                onChangeText={v => updateRow(row._id, { editPrice: v })}
-                keyboardType="decimal-pad"
-                editable={canEdit}
-                selectTextOnFocus
-              />
-
-              {/* Discount % */}
-              <TextInput
-                style={[styles.numInput, { flex: 1 }, !canEdit && styles.inputDisabled, row.editDiscount !== '0' && parseFloat(row.editDiscount) > 0 && styles.discountActive]}
-                value={row.editDiscount}
-                onChangeText={v => updateRow(row._id, { editDiscount: v })}
-                keyboardType="decimal-pad"
-                editable={canEdit}
-                selectTextOnFocus
-              />
-
-              {/* Label */}
-              <TextInput
-                style={[styles.labelInput, { flex: 1.8 }, !canEdit && styles.inputDisabled]}
-                value={row.editLabel}
-                onChangeText={v => updateRow(row._id, { editLabel: v })}
-                placeholder="e.g. Festive Sale"
-                placeholderTextColor={colors.text.muted}
-                editable={canEdit}
-              />
-
-              {/* Promo Toggle */}
-              <View style={{ flex: 0.9, alignItems: 'center', justifyContent: 'center' }}>
-                <Switch
-                  value={row.editPromo}
-                  onValueChange={v => { if (canEdit) updateRow(row._id, { editPromo: v }); }}
-                  trackColor={{ false: colors.border, true: colors.success + '80' }}
-                  thumbColor={row.editPromo ? colors.success : colors.text.muted}
-                  disabled={!canEdit}
-                />
-              </View>
-
-              {/* Save button */}
-              <View style={{ flex: 0.8, alignItems: 'center', justifyContent: 'center' }}>
-                {row.saving ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.saveRowBtn, !row.dirty && styles.saveRowBtnDisabled]}
-                    onPress={() => saveRow(row)}
-                    disabled={!row.dirty || !canEdit}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name={row.dirty ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                      size={22}
-                      color={row.dirty && canEdit ? colors.success : colors.text.muted}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
+      <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+        <DataTable 
+          data={filteredRows}
+          columns={columns}
+          keyExtractor={item => item._id}
+          isLoading={loading}
+          isRefreshing={refreshing}
+          onRefresh={onRefresh}
+          rowStyle={(item) => item.dirty ? { borderLeftWidth: 3, borderLeftColor: colors.warning } : {}}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="pricetag-outline" size={40} color={colors.text.muted} />
+              <Text style={styles.emptyText}>No products match your search.</Text>
             </View>
-          ))
-        )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          }
+        />
+      </View>
 
       {!canEdit && (
         <View style={styles.readOnlyBanner}>
@@ -370,9 +379,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.bg.secondary,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    flexWrap: 'wrap',
   },
   statCard: {
     flex: 1,
+    minWidth: 110,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,

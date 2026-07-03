@@ -6,6 +6,8 @@ import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Product, getImageUrl } from '../utils/api';
 import { useAuth } from '../utils/auth';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { useToast } from '../utils/ToastContext';
+import { DataTable, Column } from '../components/DataTable';
 
 const normalizeTitleCase = (str?: string) => {
   if (!str) return '';
@@ -21,6 +23,7 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   if (!product) return null;
 
@@ -32,7 +35,7 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
         onClose();
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to delete product');
+      showToast(err.message || 'Failed to delete product', 'error');
     }
   };
 
@@ -67,15 +70,7 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
           </View>
 
           <View style={styles.infoGrid}>
-            <View style={styles.infoItem}>
-              <View style={[styles.infoIcon, { backgroundColor: colors.infoLight }]}>
-                <Ionicons name="grid" size={16} color={colors.info} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.infoLabel}>Category</Text>
-                <Text style={styles.infoValue}>{product.category}</Text>
-              </View>
-            </View>
+
 
             {/* Indian GST Tax settings */}
             <View style={styles.infoItem}>
@@ -225,12 +220,13 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
 function AddEditProductModal({ visible, onClose, onSaved, product, products }: { visible: boolean; onClose: () => void; onSaved: () => void; product?: Product | null; products: Product[] }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { showToast } = useToast();
 
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [category, setCategory] = useState('');
+
   const [minReorder, setMinReorder] = useState('5');
   const [hsnCode, setHsnCode] = useState('');
   const [gstRate, setGstRate] = useState('18');
@@ -321,7 +317,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       setSku('');
       setPrice('');
       setStock('');
-      setCategory('');
+
       setHsnCode('');
       setGstRate('18');
       setProductType('');
@@ -376,7 +372,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        alert('Sorry, we need camera roll permissions to upload product photos!');
+        showToast('Sorry, we need camera roll permissions to upload product photos!', 'error');
         return;
       }
     }
@@ -396,17 +392,17 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   const handleSave = async () => {
     let finalName = name.trim();
     let finalSku = sku.trim();
-    let finalCategory = category.trim() || productType || 'General';
+    let finalCategory = productType || 'General';
     let finalPrice = parseFloat(price) || 0;
     let finalStock = parseInt(stock) || 0;
     let finalMinReorder = parseInt(minReorder) || 5;
 
     if (!finalName) {
-      alert('Ayurvedic Formulation Name is required!');
+      showToast('Ayurvedic Formulation Name is required!', 'error');
       return;
     }
     if (!finalSku) {
-      alert('Product SKU / Code is required!');
+      showToast('Product SKU / Code is required!', 'error');
       return;
     }
 
@@ -425,12 +421,12 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
     );
 
     if (!hsnCode.trim()) {
-      alert('HSN Code is mandatory!');
+      showToast('HSN Code is mandatory!', 'error');
       return;
     }
 
     if (isDuplicate) {
-      alert('A product with this SKU already exists!');
+      showToast('A product with this SKU already exists!', 'error');
       return;
     }
 
@@ -469,8 +465,9 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
 
       onSaved();
       onClose();
+      showToast('Product saved successfully!', 'success');
     } catch (err: any) {
-      alert(err.message || 'Failed to save product specification');
+      showToast(err.message || 'Failed to save product specification', 'error');
     }
   };
 
@@ -569,22 +566,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
               </View>
             </View>
           </View>
-
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>Category</Text>
-              <View style={styles.formInput}>
-                <Ionicons name="grid-outline" size={16} color={colors.text.muted} />
-                <TextInput 
-                  style={styles.formInputText} 
-                  placeholder="e.g. Asava & Arishta" 
-                  placeholderTextColor={colors.text.muted} 
-                  value={category} 
-                  onChangeText={setCategory} 
-                />
-              </View>
-            </View>
-
             <View style={[styles.formGroup, { flex: 1 }]}>
               <Text style={styles.formLabel}>Minimum Alert Level</Text>
               <View style={styles.formInput}>
@@ -819,6 +801,7 @@ const toTitleCase = (str?: string | null): string => {
 
 export default function ProductsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedProd, setSelectedProd] = useState<Product | null>(null);
@@ -835,8 +818,14 @@ export default function ProductsScreen() {
   const styles = useStyles(createStyles);
 
   const load = useCallback(async () => {
-    const res = await api.getProducts(search);
-    setProducts(res);
+    try {
+      const res = await api.getProducts(search);
+      setProducts(res);
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, [search]);
 
   useEffect(() => { load(); }, [load]);
@@ -871,6 +860,53 @@ export default function ProductsScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
+
+  const columns: Column<Product>[] = [
+    {
+      key: 'image',
+      title: 'Image',
+      width: 60,
+      align: 'center',
+      render: (item) => (
+        item.image ? (
+          <Image source={{ uri: getImageUrl(item.image) }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+        ) : (
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="cube" size={18} color={colors.primary} />
+          </View>
+        )
+      )
+    },
+    {
+      key: 'name',
+      title: 'Name',
+      flex: 2.5,
+      render: (item) => <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.name}</Text>
+    },
+    {
+      key: 'size',
+      title: 'Size',
+      flex: 1.5,
+      render: (item) => <Text style={styles.tableCell} numberOfLines={1}>{toTitleCase(item.size)}</Text>
+    },
+    {
+      key: 'type',
+      title: 'Type',
+      flex: 1.5,
+      render: (item) => <Text style={[styles.tableCell, { color: colors.primary, fontWeight: '600' }]} numberOfLines={1}>{toTitleCase(item.productType)}</Text>
+    },
+    {
+      key: 'action',
+      title: 'Action',
+      width: 100,
+      align: 'center',
+      render: (item) => (
+        <TouchableOpacity style={styles.viewBtn} onPress={() => { setSelectedProd(item); setDetailVisible(true); }}>
+          <Text style={styles.viewBtnText}>View</Text>
+        </TouchableOpacity>
+      )
+    }
+  ];
 
   return (
     <View style={styles.screen}>
@@ -942,65 +978,22 @@ export default function ProductsScreen() {
           )}
         </View>
 
-        <ScrollView
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md }}
-        >
-          <View style={styles.table}>
-            {/* Table Header Row */}
-            <View style={styles.tableHeaderRow}>
-              <View style={[styles.tableHeaderCellContainer, { width: 60, paddingHorizontal: 4 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Image</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 2.5 }]}><Text style={styles.tableHeaderCell}>Name</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 1.5 }]}><Text style={styles.tableHeaderCell}>Size</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 1.5 }]}><Text style={styles.tableHeaderCell}>Type</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
-            </View>
-
-            {/* Table Body Rows */}
-            {filteredProducts.map((item) => {
-              return (
-                <View key={item._id} style={styles.tableBodyRow}>
-                  <View style={[styles.tableCellContainer, { width: 60, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' }]}>
-                    {item.image ? (
-                      <Image source={{ uri: getImageUrl(item.image) }} style={{ width: 36, height: 36, borderRadius: 18 }} />
-                    ) : (
-                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="cube" size={18} color={colors.primary} />
-                      </View>
-                    )}
-                  </View>
-                  <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
-                    <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { flex: 1.5 }]}>
-                    <Text style={styles.tableCell} numberOfLines={1}>
-                      {toTitleCase(item.size)}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { flex: 1.5 }]}>
-                    <Text style={[styles.tableCell, { color: colors.primary, fontWeight: '600' }]} numberOfLines={1}>
-                      {toTitleCase(item.productType)}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 100, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
-                    <TouchableOpacity style={styles.viewBtn} onPress={() => { setSelectedProd(item); setDetailVisible(true); }}>
-                      <Text style={styles.viewBtnText}>View</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-
-            {products.length === 0 && (
+        <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          <DataTable 
+            data={filteredProducts}
+            columns={columns}
+            keyExtractor={item => item._id}
+            isLoading={loading}
+            isRefreshing={refreshing}
+            onRefresh={onRefresh}
+            ListEmptyComponent={
               <View style={styles.emptyTableContainer}>
                 <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
                 <Text style={styles.emptyText}>No products found</Text>
               </View>
-            )}
-          </View>
-        </ScrollView>
+            }
+          />
+        </View>
       </View>
 
       <ProductDetailModal

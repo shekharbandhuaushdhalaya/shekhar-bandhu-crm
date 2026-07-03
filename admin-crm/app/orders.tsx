@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
 import { api, Order } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { useToast } from '../utils/ToastContext';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -26,6 +27,7 @@ export default function OrdersScreen() {
 
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { showToast } = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -33,7 +35,7 @@ export default function OrdersScreen() {
       setOrders(data);
     } catch (err: any) {
       console.error(err);
-      Alert.alert('Error', 'Failed to load orders: ' + err.message);
+      showToast('Failed to load orders: ' + err.message, 'error');
     }
   }, []);
 
@@ -53,7 +55,7 @@ export default function OrdersScreen() {
       await api.updateOrderStatus(id, newStatus);
       await load();
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to update order status: ' + err.message);
+      showToast('Failed to update order status: ' + err.message, 'error');
     } finally {
       setActionLoading(null);
     }
@@ -63,13 +65,10 @@ export default function OrdersScreen() {
     setActionLoading(id);
     try {
       await (api as any).generateInvoiceFromOrder(id);
-      Alert.alert(
-        '✅ Invoice Generated',
-        'Draft Sale Invoice created successfully! You can verify and finalize it in the Invoices screen.'
-      );
+      showToast('Draft Sale Invoice created successfully!', 'success');
       await load();
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to generate invoice: ' + err.message);
+      showToast('Failed to generate invoice: ' + err.message, 'error');
     } finally {
       setActionLoading(null);
     }
@@ -90,7 +89,7 @@ export default function OrdersScreen() {
   const handleSaveEdit = async () => {
     if (!editingOrder) return;
     if (!editName.trim() || !editEmail.trim() || !editPhone.trim() || !editAddress.trim()) {
-      Alert.alert('Validation Error', 'All customer detail fields are required.');
+      showToast('All customer detail fields are required.', 'error');
       return;
     }
 
@@ -108,9 +107,9 @@ export default function OrdersScreen() {
       });
       setEditingOrder(null);
       await load();
-      Alert.alert('✅ Success', 'Order details updated successfully.');
+      showToast('Order details updated successfully.', 'success');
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to save order details: ' + err.message);
+      showToast('Failed to save order details: ' + err.message, 'error');
     } finally {
       setSavingEdit(false);
     }

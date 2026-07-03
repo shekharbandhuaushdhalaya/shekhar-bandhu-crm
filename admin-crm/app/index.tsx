@@ -330,7 +330,8 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
   const height = 250;
   const padX = 45;
   const padY = 30;
-  const gW = width - padX - 20;
+  const chartWidth = Math.max(width, 500);
+  const gW = chartWidth - padX - 20;
   const gH = height - padY * 2 - 10;
 
   const maxVal = Math.max(...invoiceSales, ...cashSales, 10000);
@@ -417,7 +418,8 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
         </View>
       </View>
 
-      <Svg width={width} height={height}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
+        <Svg width={chartWidth} height={height}>
         <Defs>
           <LinearGradient id="invoiceGrad" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={colors.primary} />
@@ -437,7 +439,7 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
               <SvgText x={padX - 8} y={y + 4} fill={colors.text.muted} fontSize={9} textAnchor="end">
                 {`₹${((ratio * maxVal) / 1000).toFixed(0)}k`}
               </SvgText>
-              <Line x1={padX} y1={y} x2={width - 20} y2={y} stroke={colors.border} strokeWidth={1} strokeDasharray="4 4" />
+              <Line x1={padX} y1={y} x2={chartWidth - 20} y2={y} stroke={colors.border} strokeWidth={1} strokeDasharray="4 4" />
             </G>
           );
         })}
@@ -492,6 +494,7 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
           );
         })}
       </Svg>
+      </ScrollView>
 
       {/* Legend */}
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: Spacing.xs }}>
@@ -739,8 +742,8 @@ export default function DashboardScreen() {
 
     const revenueSum = sales.reduce((sum, s) => sum + (s.isFinalized ? s.amount || 0 : 0), 0);
     const cogsSum = saleInvoiceSub + saleCashSub;
-    // Consider a product low-stock only when a reorder level is defined and the current stock is less than that level.
-    const lowStock = products.filter(p => p.minReorder && p.stockLevel < p.minReorder);
+    // Consider a product low-stock when its current stock is less than or equal to its reorder level.
+    const lowStock = prods.filter(p => typeof p.minReorder === 'number' && p.stockLevel <= p.minReorder);
 
     setRecInvoice(recInvoiceSum);
     setRecCash(recCashSum);
@@ -862,7 +865,11 @@ export default function DashboardScreen() {
       </View>
 
       <View style={styles.chartsFeedRow}>
-        {user?.role !== 'agent' && <MonthlySalesWidget width={chartWidth} sales={allSales} challans={allChallans} />}
+        {user?.role !== 'agent' && (
+          <View style={styles.chartWrapper}>
+            <MonthlySalesWidget width={chartWidth} sales={allSales} challans={allChallans} />
+          </View>
+        )}
         <View style={styles.feedWrapper}>
           <LowStockAlerts products={lowStockProds} />
         </View>

@@ -8,6 +8,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { api } from '../utils/api';
 import { AuthProvider, useAuth } from '../utils/auth';
 import { ThemeProvider, useTheme, useStyles } from '../utils/themeContext';
+import { ToastProvider } from '../utils/ToastContext';
 import LoginScreen from './login';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -82,14 +83,16 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
               style={{ width: 36, height: 36, borderRadius: 4 }}
               resizeMode="contain"
             />
-            <View style={{ flexDirection: 'column', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, letterSpacing: 0.5, lineHeight: 15 }}>
-                SHEKHAR BANDHU
-              </Text>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, letterSpacing: 0.8, marginTop: 1 }}>
-                AUSHADHALAYA
-              </Text>
-            </View>
+            {isDesktop && (
+              <View style={{ flexDirection: 'column', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, letterSpacing: 0.5, lineHeight: 15 }}>
+                  SHEKHAR BANDHU
+                </Text>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, letterSpacing: 0.8, marginTop: 1 }}>
+                  AUSHADHALAYA
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -478,7 +481,7 @@ function MainLayout() {
               <Pressable style={styles.drawerBackdrop} onPress={() => setIsSidebarOpen(false)} />
               <View style={[styles.drawerContent, { paddingTop: insets.top }]}>
                 <View style={styles.drawerHeader}>
-                  <Text style={styles.drawerTitle}>Navigation Menu</Text>
+                  <Text style={styles.drawerTitle} numberOfLines={1}>SHEKHAR BANDHU AUSHADHALAYA</Text>
                   <TouchableOpacity onPress={() => setIsSidebarOpen(false)} style={styles.drawerCloseBtn}>
                     <Ionicons name="close" size={24} color={colors.text.primary} />
                   </TouchableOpacity>
@@ -547,7 +550,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <MainLayout />
+          <ToastProvider>
+            <MainLayout />
+          </ToastProvider>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
