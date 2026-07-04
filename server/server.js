@@ -88,14 +88,31 @@ mongoose
     app.get('/api/public/products', async (req, res) => {
       try {
         const Product = require('./models/Product');
+        const InventoryEntry = require('./models/InventoryEntry');
 
         const products = await Product.find({}).sort({ name: 1 }).lean();
+        const entries = await InventoryEntry.find({}).lean();
 
-        // Attach live inventory qty to each product (using stockLevel to match CRM)
-        const enriched = products.map(p => ({
-          ...p,
-          inventoryQty: p.stockLevel || 0,
-        }));
+        // Create a lookup map of productId -> totalUnits (qtyBoxes * packing)
+        const inventoryMap = {};
+        entries.forEach(entry => {
+          const qty = Number(entry.qtyBoxes) || 0;
+          const packing = Number(entry.packing) || 1;
+          const units = qty * packing;
+          const prodId = entry.productId ? entry.productId.toString() : '';
+          if (prodId) {
+            inventoryMap[prodId] = (inventoryMap[prodId] || 0) + units;
+          }
+        });
+
+        // Attach live inventory qty to each product (falling back to stockLevel if missing)
+        const enriched = products.map(p => {
+          const prodId = p._id.toString();
+          return {
+            ...p,
+            inventoryQty: inventoryMap[prodId] !== undefined ? inventoryMap[prodId] : (p.stockLevel || 0),
+          };
+        });
 
         res.json(enriched);
       } catch (err) {

@@ -274,9 +274,9 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
     if (product) {
       setName(product.name || '');
       setSku(product.sku || '');
-      setPrice(product.price ? product.price.toString() : '');
-      setStock(product.stockLevel ? product.stockLevel.toString() : '');
-      setMinReorder(product.minReorder ? product.minReorder.toString() : '5');
+      setPrice(product.price !== undefined && product.price !== null ? product.price.toString() : '');
+      setStock(product.stockLevel !== undefined && product.stockLevel !== null ? product.stockLevel.toString() : '');
+      setMinReorder(product.minReorder !== undefined && product.minReorder !== null ? product.minReorder.toString() : '5');
       setHsnCode(product.hsnCode || '');
       setGstRate(product.gstRate !== undefined ? product.gstRate.toString() : '18');
       setProductType(product.productType || '');
@@ -393,9 +393,9 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
     let finalName = name.trim();
     let finalSku = sku.trim();
     let finalCategory = productType || 'General';
-    let finalPrice = parseFloat(price) || 0;
-    let finalStock = parseInt(stock) || 0;
-    let finalMinReorder = parseInt(minReorder) || 5;
+    let finalPrice = price.trim() !== '' ? parseFloat(price) : 0;
+    let finalStock = stock.trim() !== '' ? parseInt(stock) : 0;
+    let finalMinReorder = minReorder.trim() !== '' ? parseInt(minReorder) : 5;
 
     if (!finalName) {
       showToast('Ayurvedic Formulation Name is required!', 'error');
@@ -434,7 +434,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       name: finalName,
       sku: finalSku,
       price: finalPrice,
-      stockLevel: finalStock,
+      stockLevel: product ? product.stockLevel : 0,
       category: finalCategory,
       minReorder: finalMinReorder,
       hsnCode: hsnCode.trim().toUpperCase(),
@@ -551,22 +551,6 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
               </View>
             </View>
 
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>Initial Stock Level <Text style={{ color: 'red' }}>*</Text></Text>
-              <View style={styles.formInput}>
-                <Ionicons name="cube-outline" size={16} color={colors.text.muted} />
-                <TextInput 
-                  style={styles.formInputText} 
-                  placeholder="e.g. 500" 
-                  placeholderTextColor={colors.text.muted} 
-                  value={stock} 
-                  onChangeText={setStock} 
-                  keyboardType="numeric" 
-                />
-              </View>
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={[styles.formGroup, { flex: 1 }]}>
               <Text style={styles.formLabel}>Minimum Alert Level</Text>
               <View style={styles.formInput}>

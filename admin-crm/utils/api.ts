@@ -664,10 +664,22 @@ class ApiClient {
   
   async uploadProductImage(id: string, imageUri: string): Promise<Product> {
     const formData = new FormData();
-    const filename = imageUri.split('/').pop() || 'image.jpg';
-    const cleanFilename = filename.split('?')[0];
-    const ext = cleanFilename.split('.').pop() || 'jpg';
-    const mimeType = `image/${ext.toLowerCase() === 'png' ? 'png' : 'jpeg'}`;
+    let cleanFilename = 'image.jpg';
+    let mimeType = 'image/jpeg';
+
+    if (imageUri.startsWith('data:')) {
+      const match = imageUri.match(/^data:(image\/[a-zA-Z+.-]+);base64,/);
+      if (match) {
+        mimeType = match[1];
+        const ext = mimeType.split('/')[1] || 'jpg';
+        cleanFilename = `image.${ext}`;
+      }
+    } else {
+      const filename = imageUri.split('/').pop() || 'image.jpg';
+      cleanFilename = filename.split('?')[0];
+      const ext = cleanFilename.split('.').pop() || 'jpg';
+      mimeType = `image/${ext.toLowerCase() === 'png' ? 'png' : 'jpeg'}`;
+    }
 
     if (Platform.OS === 'web') {
       const response = await fetch(imageUri);

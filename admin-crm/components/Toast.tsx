@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Text, StyleSheet, TouchableOpacity, View, Platform, useWindowDimensions } from 'react-native';
+import { Animated, Text, StyleSheet, TouchableOpacity, View, Platform, useWindowDimensions, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/themeContext';
 import { Radius, Spacing, Shadows } from '../constants/theme';
@@ -74,7 +74,7 @@ export function Toast({ message, type = 'info', visible, onDismiss }: ToastProps
 
   const themeColors = getColors();
 
-  return (
+  const toastContent = (
     <Animated.View 
       style={[
         styles.container, 
@@ -95,6 +95,22 @@ export function Toast({ message, type = 'info', visible, onDismiss }: ToastProps
       </View>
     </Animated.View>
   );
+
+  // Wrap in a transparent Modal so the toast always floats above all other Modals,
+  // including product/edit modals (works on both web and native).
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={handleDismiss}
+    >
+      <View style={styles.nativeOverlay} pointerEvents="box-none">
+        {toastContent}
+      </View>
+    </Modal>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -103,6 +119,10 @@ const styles = StyleSheet.create({
     top: Platform.OS === 'web' ? 40 : 60,
     zIndex: 9999,
     ...Shadows.md,
+  },
+  nativeOverlay: {
+    flex: 1,
+    pointerEvents: 'box-none',
   },
   content: {
     flexDirection: 'row',
