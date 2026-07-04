@@ -110,7 +110,7 @@ mongoose
           const prodId = p._id.toString();
           return {
             ...p,
-            inventoryQty: inventoryMap[prodId] !== undefined ? inventoryMap[prodId] : (p.stockLevel || 0),
+            inventoryQty: inventoryMap[prodId] || 0,
           };
         });
 
