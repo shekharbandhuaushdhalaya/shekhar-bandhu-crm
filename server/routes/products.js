@@ -2,25 +2,32 @@ const express = require('express');
 const Product = require('../models/Product');
 const Inventory = require('../models/Inventory');
 const multer = require('multer');
-const path = require('path');
+const { Readable } = require('stream');
+const cloudinary = require('cloudinary').v2;
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../public/uploads/'));
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    let ext = path.extname(file.originalname);
-    if (!ext && file.mimetype) {
-      if (file.mimetype === 'image/png') ext = '.png';
-      else if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/jpg') ext = '.jpg';
-      else if (file.mimetype === 'image/webp') ext = '.webp';
-      else if (file.mimetype === 'image/gif') ext = '.gif';
-    }
-    cb(null, 'product-' + uniqueSuffix + ext);
-  }
+// Configure Cloudinary with env credentials
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-const upload = multer({ storage: storage });
+
+// Use memory storage — we stream the buffer directly to Cloudinary
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Helper: upload a Buffer to Cloudinary and return the secure URL
+function uploadToCloudinary(buffer, folder = 'shekhar-bandhu/products') {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'image' },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    Readable.from(buffer).pipe(stream);
+  });
+}
 
 const router = express.Router();
 
@@ -180,13 +187,14 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST /api/products/:id/image — Upload product image
+// POST /api/products/:id/image — Upload product image to Cloudinary
 router.post('/:id/image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
-    const imageUrl = '/uploads/' + req.file.filename;
+    // Upload buffer to Cloudinary — returns a permanent CDN URL
+    const imageUrl = await uploadToCloudinary(req.file.buffer);
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
       { image: imageUrl },
