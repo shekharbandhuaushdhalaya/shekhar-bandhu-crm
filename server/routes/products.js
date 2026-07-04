@@ -129,10 +129,16 @@ router.put('/:id', async (req, res) => {
     if (!oldProduct) return res.status(404).json({ error: 'Product not found' });
 
     const specs = getNormalizedSpecs(req.body);
-    // Check duplicate combination case-insensitively
-    const existing = await Product.findOne(specs).collation({ locale: 'en', strength: 2 }).lean();
-    if (existing && existing._id.toString() !== req.params.id) {
-      return res.status(400).json({ error: 'A product with this combination of Type, Size, Colour, Shape, and Weight already exists.' });
+    // Only check for duplicates when all spec fields are provided and non-empty
+    const specsComplete = specs.productType && specs.size && specs.colour && specs.shape && specs.weight;
+    if (specsComplete) {
+      const existing = await Product.findOne({
+        ...specs,
+        _id: { $ne: req.params.id }
+      }).collation({ locale: 'en', strength: 2 }).lean();
+      if (existing) {
+        return res.status(400).json({ error: 'A product with this combination of Type, Size, Colour, Shape, and Weight already exists.' });
+      }
     }
 
     // Apply normalized specs back to req.body so they are stored normalized
