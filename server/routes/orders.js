@@ -438,7 +438,7 @@ router.post('/:id/invoice', async (req, res) => {
       customerName: customer.company || customer.name,
       items: invoiceItems,
       amount: order.totalAmount,
-      mode: 'kachha', // default website orders to cash/kachha ledger
+      mode: 'pakka', // default website orders to pakka ledger
       isFinalized: false,
       reference: order._id, // link back to this order
       status: 'unpaid'

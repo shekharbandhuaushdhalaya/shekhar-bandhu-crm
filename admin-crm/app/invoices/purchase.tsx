@@ -90,13 +90,13 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
 
           <View style={styles.infoGrid}>
             <View style={styles.infoItem}>
-              <View style={[styles.infoIcon, { backgroundColor: invoice.mode === 'kachha' ? colors.warningLight : colors.successLight }]}>
-                <Ionicons name="pricetag" size={16} color={invoice.mode === 'kachha' ? colors.warning : colors.success} />
+              <View style={[styles.infoIcon, { backgroundColor: colors.successLight }]}>
+                <Ionicons name="pricetag" size={16} color={colors.success} />
               </View>
               <View>
                 <Text style={styles.infoLabel}>Billing Mode</Text>
-                <Text style={[styles.infoValue, { color: invoice.mode === 'kachha' ? colors.warning : colors.success }]}>
-                  {invoice.mode === 'kachha' ? 'CASH' : 'INVOICE'}
+                <Text style={[styles.infoValue, { color: colors.success }]}>
+                  INVOICE
                 </Text>
               </View>
             </View>
@@ -321,7 +321,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const [supplierName, setSupplierName] = useState('');
   const [stateOfSupply, setStateOfSupply] = useState('Uttar Pradesh');
   const [status, setStatus] = useState('pending');
-  const [mode, setMode] = useState<'pakka' | 'kachha'>('pakka');
+  const mode = 'pakka';
   const [freightAmount, setFreightAmount] = useState('');
   const [cartageAmount, setCartageAmount] = useState('');
   const [transport, setTransport] = useState('');
@@ -363,7 +363,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         setSupplierName(invoiceToEdit.supplierName || '');
         setStateOfSupply(invoiceToEdit.stateOfSupply || 'Uttar Pradesh');
         setStatus(invoiceToEdit.status || 'pending');
-        setMode(!canAccessCash ? 'pakka' : (invoiceToEdit.mode || 'pakka'));
+
         setFreightAmount(invoiceToEdit.freightAmount ? invoiceToEdit.freightAmount.toString() : '');
         setCartageAmount(invoiceToEdit.cartageAmount ? invoiceToEdit.cartageAmount.toString() : '');
         setTransport(invoiceToEdit.transport || '');
@@ -396,7 +396,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         setSupplierName('');
         setStateOfSupply('Uttar Pradesh');
         setStatus('pending');
-        setMode('pakka');
+
         setShowVendorDropdown(false);
         setWarehouseId('');
         setShowWarehouseDropdown(false);
@@ -516,7 +516,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         boxes: '',
         packing: '1',
         rate: '',
-        gstRate: mode === 'pakka' ? 18 : 0
+        gstRate: 18
       },
       ...prev
     ]);
@@ -534,7 +534,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           boxes: '',
           packing: '1',
           rate: '',
-          gstRate: mode === 'pakka' ? 18 : 0
+          gstRate: 18
         }
       ]);
     } else {
@@ -570,17 +570,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     }));
   };
 
-  const handleModeChange = (newMode: 'pakka' | 'kachha') => {
-    setMode(newMode);
-    setRows(prev => prev.map(r => {
-      const pGst = r.selectedProduct ? (r.selectedProduct.gstRate !== undefined ? r.selectedProduct.gstRate : 18) : 18;
-      return {
-        ...r,
-        gstRate: newMode === 'pakka' ? pGst : 0,
-        showGstDropdown: false
-      };
-    }));
-  };
+
 
   const stateCheck = (stateOfSupply || 'Uttar Pradesh').trim().toLowerCase();
   const isIntraState = stateCheck === 'uttar pradesh' || stateCheck === 'up';
@@ -674,10 +664,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     const targetWh = warehouses.find(w => w._id === warehouseId);
     const warehouseName = targetWh ? targetWh.name : '';
 
-    let finalInvoiceNo = invoiceNo.trim();
-    if (mode === 'kachha' && !finalInvoiceNo) {
-      finalInvoiceNo = `PI-REF-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
-    }
+    const finalInvoiceNo = invoiceNo.trim();
 
     try {
       const payload: any = {
@@ -749,39 +736,14 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
               }}
             />
           )}
-          {/* Billing Mode */}
-          {canAccessCash && (
-            <>
-              <Text style={styles.formLabel}>Billing Mode</Text>
-              <View style={styles.modeSelector}>
-                {[
-                  { id: 'pakka', label: 'Invoice (GST / Official)' },
-                  { id: 'kachha', label: 'Cash' }
-                ].map(m => (
-                  <TouchableOpacity
-                    key={m.id}
-                    style={[
-                      styles.modeBtn,
-                      mode === m.id && {
-                        backgroundColor: m.id === 'pakka' ? colors.success : colors.warning,
-                        borderColor: m.id === 'pakka' ? colors.success : colors.warning
-                      }
-                    ]}
-                    onPress={() => handleModeChange(m.id as any)}
-                  >
-                    <Text style={[styles.modeBtnText, mode === m.id && { color: '#fff' }]}>{m.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
-          )}
+
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>{mode === 'kachha' ? 'PI Reference Number' : 'Invoice Number *'}</Text>
+              <Text style={styles.formLabel}>Invoice Number *</Text>
               <View style={styles.formInput}>
                 <Ionicons name="barcode" size={16} color={colors.text.muted} />
-                <TextInput style={styles.formInputText} placeholder={mode === 'kachha' ? 'e.g. PI-REF-1234 (Optional)' : 'e.g. INV-PURCH-8012'} placeholderTextColor={colors.text.muted} value={invoiceNo} onChangeText={setInvoiceNo} />
+                <TextInput style={styles.formInputText} placeholder="e.g. INV-PURCH-8012" placeholderTextColor={colors.text.muted} value={invoiceNo} onChangeText={setInvoiceNo} />
               </View>
             </View>
 
@@ -1117,61 +1079,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
                 {/* GST */}
                 <View style={{ flex: 0.9, position: 'relative' }}>
-                  {mode === 'pakka' ? (
-                    <View style={[styles.tableInputLocked, { width: '100%', alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={styles.tableInputLockedText}>{row.gstRate}%</Text>
-                    </View>
-                  ) : (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', position: 'relative' }}>
-                      <TextInput
-                        style={[styles.tableInput, { flex: 1, textAlign: 'center', paddingRight: 14 }]}
-                        placeholder="0"
-                        placeholderTextColor={colors.text.muted}
-                        keyboardType="numeric"
-                        value={row.gstRate.toString()}
-                        onChangeText={(text) => {
-                          const val = parseFloat(text);
-                          const rate = isNaN(val) ? 0 : val;
-                          setRows(prev => prev.map(r => r.id === row.id ? { ...r, gstRate: rate } : r));
-                        }}
-                      />
-                      <TouchableOpacity
-                        style={{ position: 'absolute', right: 2, height: '100%', justifyContent: 'center' }}
-                        onPress={() => {
-                          setRows(prev => prev.map(r => r.id === row.id ? { ...r, showGstDropdown: !r.showGstDropdown } : { ...r, showGstDropdown: false }));
-                        }}
-                      >
-                        <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {row.showGstDropdown && mode === 'kachha' && (
-                    <View style={styles.rowGstDropdown}>
-                      {(() => {
-                        const slabs = [0, 5, 12, 18, 28];
-                        return slabs.map(rate => (
-                          <TouchableOpacity
-                            key={rate}
-                            style={styles.rowGstDropdownItem}
-                            onPress={() => {
-                              setRows(prev => prev.map(r => r.id === row.id ? { ...r, gstRate: rate, showGstDropdown: false } : r));
-                            }}
-                          >
-                            <Text style={styles.rowGstDropdownItemText}>{rate}%</Text>
-                          </TouchableOpacity>
-                        ));
-                      })()}
-                      <TouchableOpacity
-                        style={[styles.rowGstDropdownItem, { backgroundColor: colors.bg.secondary }]}
-                        onPress={() => {
-                          setRows(prev => prev.map(r => r.id === row.id ? { ...r, showGstDropdown: false } : r));
-                        }}
-                      >
-                        <Text style={[styles.rowGstDropdownItemText, { color: colors.primary, fontSize: 11 }]}>Close</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                  <View style={[styles.tableInputLocked, { width: '100%', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={styles.tableInputLockedText}>{row.gstRate}%</Text>
+                  </View>
                 </View>
 
                 {/* Row Subtotal */}
@@ -1382,7 +1292,7 @@ export default function PurchaseInvoicesScreen() {
     );
   }
 
-  const [modeFilter, setModeFilter] = useState<'all' | 'pakka' | 'kachha'>(canAccessCash ? 'pakka' : 'pakka');
+  const modeFilter = 'pakka';
   const [vendors, setVendors] = useState<Vendor[]>([]);
 
   const load = useCallback(async () => {
@@ -1427,43 +1337,6 @@ export default function PurchaseInvoicesScreen() {
               value={search}
               onChangeText={setSearch}
             />
-            
-            <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
-              <TouchableOpacity
-                style={styles.filterDropdownButton}
-                onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-              >
-                <Text style={styles.filterDropdownButtonText}>
-                  {modeFilter === 'all' ? 'All Invoices' : modeFilter === 'pakka' ? 'Invoice (GST)' : 'Cash'}
-                </Text>
-                <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {showFilterDropdown && (
-                <View style={[styles.filterDropdownPanel, { top: 40, right: 0 }]}>
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
-                    {[
-                      { id: 'all', label: 'All Invoices' },
-                      { id: 'pakka', label: 'Invoice (GST)' },
-                      { id: 'kachha', label: 'Cash' }
-                    ].map(t => (
-                      <TouchableOpacity
-                        key={t.id}
-                        style={[styles.filterDropdownItem, modeFilter === t.id && styles.filterDropdownItemActive]}
-                        onPress={() => {
-                          setModeFilter(t.id as any);
-                          setShowFilterDropdown(false);
-                        }}
-                      >
-                        <Text style={[styles.filterDropdownItemText, modeFilter === t.id && { fontWeight: '700', color: colors.primary }]}>
-                          {t.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
 
             <TouchableOpacity style={styles.addBtn} onPress={() => { setInvoiceToEdit(null); setAddVisible(true); }}>
               <Ionicons name="add" size={22} color="#fff" />

@@ -29,7 +29,7 @@ const customerSchema = new mongoose.Schema({
   },
   shippingSameAsBilling: { type: Boolean, default: false },
   customerType: { type: String, enum: ['gst', 'cash'], default: 'gst' },
-  recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' }
+  recordTracking: { type: String, enum: ['invoice_ledger'], default: 'invoice_ledger' }
 }, { timestamps: true });
 
 customerSchema.index({ name: 'text', company: 'text', email: 'text' });

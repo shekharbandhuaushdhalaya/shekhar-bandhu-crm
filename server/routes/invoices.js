@@ -49,11 +49,7 @@ router.get('/sales', async (req, res) => {
       ];
     }
 
-    if (!req.user || !req.user.canAccessCash) {
-      filter.mode = 'pakka';
-    } else if (mode && mode !== 'all') {
-      filter.mode = mode;
-    }
+    filter.mode = 'pakka';
 
     const invoices = await Invoice.find(filter).sort({ date: -1, createdAt: -1 }).lean();
     res.json(invoices);
@@ -79,11 +75,7 @@ router.get('/purchases', async (req, res) => {
       ];
     }
 
-    if (!req.user || !req.user.canAccessCash) {
-      filter.mode = 'pakka';
-    } else if (mode && mode !== 'all') {
-      filter.mode = mode;
-    }
+    filter.mode = 'pakka';
 
     const invoices = await Invoice.find(filter).sort({ date: -1, createdAt: -1 }).lean();
     res.json(invoices);
@@ -95,9 +87,7 @@ router.get('/purchases', async (req, res) => {
 // POST /api/invoices/sales — Create sale invoice in DRAFT status (no inventory/balance changes yet)
 router.post('/sales', async (req, res) => {
   try {
-    if (req.body.mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to create cash invoices.' });
-    }
+
 
     let invoiceNo = req.body.invoiceNo;
     if (!invoiceNo) {
@@ -153,9 +143,7 @@ router.post('/purchases', async (req, res) => {
     if (req.user && req.user.role === 'agent') {
       return res.status(403).json({ error: 'Access denied: Agents cannot create purchase invoices.' });
     }
-    if (req.body.mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to create cash invoices.' });
-    }
+
 
     const data = {
       ...req.body,
@@ -195,12 +183,7 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    // Check cash permission
-    const currentMode = invoice.mode;
-    const newMode = req.body.mode;
-    if ((currentMode === 'kachha' || newMode === 'kachha') && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to edit cash invoices.' });
-    }
+
 
     // Keep invoice type and number immutable during edits
     const { type, invoiceNo, ...updateData } = req.body;
@@ -239,10 +222,7 @@ router.patch('/sales/:id/finalize', async (req, res) => {
       return res.status(400).json({ error: 'Invoice is already finalized' });
     }
 
-    // Check cash permission
-    if (invoice.mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to finalize cash invoices.' });
-    }
+
 
 
 
@@ -254,13 +234,7 @@ router.patch('/sales/:id/finalize', async (req, res) => {
       ]
     });
     if (cust) {
-      if (cust.recordTracking === 'cash_ledger') {
-        cust.kachhaBalance += invoice.amount;
-      } else if (invoice.mode === 'pakka') {
-        cust.pakkaBalance += invoice.amount;
-      } else {
-        cust.kachhaBalance += invoice.amount;
-      }
+      cust.pakkaBalance += invoice.amount;
       await cust.save();
     }
 
@@ -294,10 +268,7 @@ router.patch('/purchases/:id/finalize', async (req, res) => {
       return res.status(400).json({ error: 'Invoice is already finalized' });
     }
 
-    // Check cash permission
-    if (invoice.mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to finalize cash invoices.' });
-    }
+
 
     // Resolve selected warehouse or default to first
     let warehouse;
@@ -426,11 +397,7 @@ router.patch('/purchases/:id/finalize', async (req, res) => {
 
     // Sync Vendor balance
     if (vend) {
-      if (invoice.mode === 'pakka') {
-        vend.pakkaBalance += invoice.amount;
-      } else {
-        vend.kachhaBalance += invoice.amount;
-      }
+      vend.pakkaBalance += invoice.amount;
       await vend.save();
     }
 
@@ -460,10 +427,7 @@ router.delete('/sales/:id', async (req, res) => {
     const invoice = await Invoice.findOne({ _id: req.params.id, type: 'sale' });
     if (!invoice) return res.status(404).json({ error: 'Sale invoice not found' });
 
-    // Check cash permission
-    if (invoice.mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to delete cash invoices.' });
-    }
+
 
     // Only rollback ledger / stock if it was finalized
     if (invoice.isFinalized) {
@@ -475,13 +439,7 @@ router.delete('/sales/:id', async (req, res) => {
         ]
       });
       if (cust) {
-        if (cust.recordTracking === 'cash_ledger') {
-          cust.kachhaBalance = Math.max(0, cust.kachhaBalance - invoice.amount);
-        } else if (invoice.mode === 'pakka') {
-          cust.pakkaBalance = Math.max(0, cust.pakkaBalance - invoice.amount);
-        } else {
-          cust.kachhaBalance = Math.max(0, cust.kachhaBalance - invoice.amount);
-        }
+        cust.pakkaBalance = Math.max(0, cust.pakkaBalance - invoice.amount);
         await cust.save();
       }
 
@@ -519,10 +477,7 @@ router.delete('/purchases/:id', async (req, res) => {
     const invoice = await Invoice.findOne({ _id: req.params.id, type: 'purchase' });
     if (!invoice) return res.status(404).json({ error: 'Purchase invoice not found' });
 
-    // Check cash permission
-    if (invoice.mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to delete cash invoices.' });
-    }
+
 
     // Only rollback ledger / stock if it was finalized
     if (invoice.isFinalized) {
@@ -534,11 +489,7 @@ router.delete('/purchases/:id', async (req, res) => {
         ]
       });
       if (vend) {
-        if (invoice.mode === 'pakka') {
-          vend.pakkaBalance = Math.max(0, vend.pakkaBalance - invoice.amount);
-        } else {
-          vend.kachhaBalance = Math.max(0, vend.kachhaBalance - invoice.amount);
-        }
+        vend.pakkaBalance = Math.max(0, vend.pakkaBalance - invoice.amount);
         await vend.save();
       }
 

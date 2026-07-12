@@ -155,12 +155,7 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    // Enforce cash access security rule
-    if (!req.user || !req.user.canAccessCash) {
-      filter.mode = 'pakka';
-    } else if (mode && mode !== 'all') {
-      filter.mode = mode;
-    }
+    filter.mode = 'pakka';
 
     const challans = await Challan.find(filter).sort({ date: -1, challanNo: -1 }).lean();
     res.json(challans);
@@ -173,10 +168,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { mode } = req.body;
-    // Enforce cash access security rule
-    if (mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to perform cash transactions.' });
-    }
+
 
     let challanNo = req.body.challanNo;
     if (!challanNo) {
@@ -234,11 +226,7 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Cannot edit a finalized challan' });
     }
     
-    // Enforce cash access security rule
-    const targetMode = req.body.mode || challan.mode;
-    if (targetMode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to perform cash transactions.' });
-    }
+
     
     Object.assign(challan, req.body);
     const updated = await challan.save();
@@ -266,10 +254,7 @@ router.patch('/:id/finalize', async (req, res) => {
       return res.status(400).json({ error: 'Challan is already finalized' });
     }
 
-    // Enforce cash access security rule
-    if (challan.mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to finalize cash challans.' });
-    }
+
 
     if (challan.deductInventory !== false) {
       // Check stock availability before finalizing
@@ -295,20 +280,7 @@ router.patch('/:id/finalize', async (req, res) => {
       await deductInventory(challan);
     }
 
-    // Update customer cash balance if mode is kachha or customer is cash-ledger-tracked
-    const Customer = require('../models/Customer');
-    const cust = await Customer.findOne({
-      $or: [
-        { name: challan.partyName },
-        { company: challan.partyName }
-      ]
-    });
-    if (cust) {
-      if (challan.mode === 'kachha' || cust.recordTracking === 'cash_ledger') {
-        cust.kachhaBalance += (challan.nettTotal || 0);
-        await cust.save();
-      }
-    }
+
 
     // Update status
     challan.status = 'finalized';
@@ -338,10 +310,7 @@ router.delete('/:id', async (req, res) => {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found' });
 
-    // Enforce cash access security rule if it's a cash challan
-    if (challan.mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to delete cash transactions.' });
-    }
+
 
     // Only revert inventory if challan was finalized
     if (challan.status === 'finalized') {
@@ -349,20 +318,7 @@ router.delete('/:id', async (req, res) => {
         await revertInventory(challan);
       }
 
-      // Revert customer cash balance if mode is kachha or customer is cash-ledger-tracked
-      const Customer = require('../models/Customer');
-      const cust = await Customer.findOne({
-        $or: [
-          { name: challan.partyName },
-          { company: challan.partyName }
-        ]
-      });
-      if (cust) {
-        if (challan.mode === 'kachha' || cust.recordTracking === 'cash_ledger') {
-          cust.kachhaBalance = Math.max(0, cust.kachhaBalance - (challan.nettTotal || 0));
-          await cust.save();
-        }
-      }
+
     }
 
     await Challan.findByIdAndDelete(req.params.id);
@@ -401,9 +357,7 @@ router.post('/:id/convert', async (req, res) => {
       return res.status(400).json({ error: `Challan is already converted to Sale Invoice ${challan.invoiceNo}` });
     }
 
-    if (challan.mode === 'kachha') {
-      return res.status(400).json({ error: 'Challans created in Cash Ledger mode cannot be converted to Sale Invoices.' });
-    }
+
 
     // Check if customer is GSTIN registered
     const Customer = require('../models/Customer');

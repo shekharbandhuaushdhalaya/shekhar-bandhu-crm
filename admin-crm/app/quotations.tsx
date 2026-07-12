@@ -442,13 +442,13 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
 
           <View style={styles.infoGrid}>
             <View style={styles.infoItem}>
-              <View style={[styles.infoIcon, { backgroundColor: invoice.mode === 'kachha' ? colors.warningLight : colors.successLight }]}>
-                <Ionicons name="pricetag" size={16} color={invoice.mode === 'kachha' ? colors.warning : colors.success} />
+              <View style={[styles.infoIcon, { backgroundColor: colors.successLight }]}>
+                <Ionicons name="pricetag" size={16} color={colors.success} />
               </View>
               <View>
                 <Text style={styles.infoLabel}>Billing Mode</Text>
-                <Text style={[styles.infoValue, { color: invoice.mode === 'kachha' ? colors.warning : colors.success }]}>
-                  {invoice.mode === 'kachha' ? 'CASH' : 'INVOICE'}
+                <Text style={[styles.infoValue, { color: colors.success }]}>
+                  INVOICE
                 </Text>
               </View>
             </View>
@@ -667,7 +667,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseInventory, setWarehouseInventory] = useState<InventoryEntry[]>([]);
   const [status, setStatus] = useState('draft');
-  const [mode, setMode] = useState<'pakka' | 'kachha'>('pakka');
+  const mode = 'pakka';
   const [freightAmount, setFreightAmount] = useState('');
   const [customerState, setCustomerState] = useState('Uttar Pradesh');
 
@@ -690,7 +690,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
         setShippingAddress(invoiceToEdit.shippingAddress || '');
         setWarehouseId(invoiceToEdit.warehouseId || '');
         setStatus(invoiceToEdit.status || 'draft');
-        setMode((invoiceToEdit.mode as "pakka"|"kachha") || "pakka");
+
         setFreightAmount(invoiceToEdit.freightAmount ? invoiceToEdit.freightAmount.toString() : '');
         setCustomerState(invoiceToEdit.stateOfSupply || 'Uttar Pradesh');
         setItems((invoiceToEdit.items || []).map(it => ({
@@ -776,7 +776,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
     const finalName = c.company || c.name;
     setPartyName(finalName);
     const hasGstin = !!(c.gstin && c.gstin.trim());
-    setMode(hasGstin ? 'pakka' : 'kachha');
+
     setCustomerState(c.state || 'Uttar Pradesh');
     // Auto-fill billing address
     const addr = c.billingAddress;
@@ -1365,7 +1365,7 @@ export default function QuotationsScreen() {
   const [invoiceToEdit, setQuotationToEdit] = useState<Quotation | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
-  const [modeFilter, setModeFilter] = useState<'all' | 'pakka' | 'kachha'>('all');
+  const modeFilter = 'pakka';
 
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
@@ -1415,8 +1415,7 @@ export default function QuotationsScreen() {
               <View style={[styles.tableHeaderCellContainer, { width: 110 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>Mode</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 80, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 80, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell} style={{ textAlign: 'center' }}>Action</Text></View>
             </View>
 
             {/* Table Body Rows */}
@@ -1454,16 +1453,7 @@ export default function QuotationsScreen() {
                     }]}>{item.status.toUpperCase()}</Text>
                   </View>
                 </View>
-                <View style={[styles.tableCellContainer, { width: 100 }]}>
-                  <View style={[styles.modeBadge, {
-                    borderColor: item.mode === 'pakka' ? colors.success : colors.warning,
-                    backgroundColor: (item.mode === 'pakka' ? colors.success : colors.warning) + '12'
-                  }]}>
-                    <Text style={[styles.modeText, {
-                      color: item.mode === 'pakka' ? colors.success : colors.warning
-                    }]}>{item.mode === 'pakka' ? 'INVOICE' : 'CASH'}</Text>
-                  </View>
-                </View>
+
                 <View style={[styles.tableCellContainer, { width: 80, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
                   <TouchableOpacity style={styles.actionIconButton} onPress={() => { setSelectedInv(item); setDetailVisible(true); }}>
                     <Ionicons name="eye" size={16} color={colors.primary} />

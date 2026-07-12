@@ -94,7 +94,7 @@ router.get('/query', async (req, res) => {
           $project: {
             name: 1,
             company: 1,
-            totalOutstanding: { $add: ["$pakkaBalance", "$kachhaBalance"] }
+            totalOutstanding: "$pakkaBalance"
           }
         },
         { $sort: { totalOutstanding: -1 } },

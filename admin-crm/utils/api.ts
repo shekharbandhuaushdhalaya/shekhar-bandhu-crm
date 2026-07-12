@@ -125,7 +125,7 @@ export type Customer = {
   };
   shippingSameAsBilling?: boolean;
   customerType?: 'gst' | 'cash';
-  recordTracking?: 'invoice_ledger' | 'cash_ledger';
+  recordTracking?: 'invoice_ledger';
 };
 
 export type Vendor = {
@@ -202,7 +202,7 @@ export type Challan = {
   warehouseName?: string;
   items: ChallanItem[];
   status: string;
-  mode: 'pakka' | 'kachha';
+  mode: 'pakka';
   baseAmount?: number;
   cgst?: number;
   sgst?: number;
@@ -223,7 +223,7 @@ export type Payment = {
   partyId: string;
   partyName: string;
   amount: number;
-  mode: 'pakka' | 'kachha';
+  mode: 'pakka';
   paymentMethod: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
   referenceNo: string;
   notes: string;
@@ -353,7 +353,7 @@ export type Invoice = {
   dueDate?: string;
   amount: number;
   status: string;
-  mode: 'pakka' | 'kachha';
+  mode: 'pakka';
   baseAmount?: number;
   gstRate?: number;
   hsnCode?: string;

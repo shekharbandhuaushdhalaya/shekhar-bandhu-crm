@@ -265,17 +265,7 @@ function CustomerDetailModal({
                 </Text>
               </View>
             </View>
-            {canAccessCash && (
-              <View style={styles.infoItem}>
-                <Ionicons name="wallet" size={16} color={colors.warning} style={styles.infoIcon} />
-                <View>
-                  <Text style={styles.infoLabel}>Cash Balance (Non-GST)</Text>
-                  <Text style={[styles.infoValue, { color: customer.kachhaBalance > 0 ? colors.warning : colors.text.muted }]}>
-                    ₹{customer.kachhaBalance.toLocaleString()}
-                  </Text>
-                </View>
-              </View>
-            )}
+
             <View style={styles.infoItem}>
               <Ionicons name="ribbon" size={16} color={colors.primary} style={styles.infoIcon} />
               <View>
@@ -283,17 +273,7 @@ function CustomerDetailModal({
                 <Text style={styles.infoValue}>₹{customer.salesVolume.toLocaleString()} | {customer.paymentTerms || 'Net 30'}</Text>
               </View>
             </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="receipt-outline" size={16} color={colors.info} style={styles.infoIcon} />
-              <View>
-                <Text style={styles.infoLabel}>Ledger Tracking Method</Text>
-                <Text style={styles.infoValue}>
-                  {customer.recordTracking === 'cash_ledger'
-                    ? 'Cash Ledger-based (Forces Cash Ledger)'
-                    : 'Invoice Ledger-based (Standard)'}
-                </Text>
-              </View>
-            </View>
+
           </View>
 
           {/* Storefront E-Commerce Order History */}
@@ -374,7 +354,7 @@ function AddEditCustomerModal({
   const canAccessCash = user?.canAccessCash ?? false;
 
   const [customerType, setCustomerType] = useState<'gst' | 'cash'>('gst');
-  const [recordTracking, setRecordTracking] = useState<'invoice_ledger' | 'cash_ledger'>('invoice_ledger');
+  const recordTracking = 'invoice_ledger';
   const [company, setCompany] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
@@ -416,7 +396,7 @@ function AddEditCustomerModal({
 
   // Balances
   const [pakkaBalance, setPakkaBalance] = useState('');
-  const [kachhaBalance, setKachhaBalance] = useState('');
+
   const [salesVolume, setSalesVolume] = useState('');
 
   const [loadingBillingPin, setLoadingBillingPin] = useState(false);
@@ -457,7 +437,7 @@ function AddEditCustomerModal({
       setShippingState(shipping.state || 'Maharashtra');
 
       setPakkaBalance(customer.pakkaBalance.toString());
-      setKachhaBalance(customer.kachhaBalance.toString());
+
       setSalesVolume(customer.salesVolume.toString());
     } else {
       setCustomerType('gst');
@@ -482,7 +462,7 @@ function AddEditCustomerModal({
       setShippingCity('');
       setShippingState('Maharashtra');
       setPakkaBalance('');
-      setKachhaBalance('');
+
       setSalesVolume('');
     }
   }, [customer, visible]);
@@ -607,7 +587,7 @@ function AddEditCustomerModal({
       },
       shippingSameAsBilling,
       pakkaBalance: isCash ? 0 : (parseInt(pakkaBalance) || 0),
-      kachhaBalance: parseInt(kachhaBalance) || 0,
+
       salesVolume: parseInt(salesVolume) || 0,
     };
 
@@ -672,37 +652,6 @@ function AddEditCustomerModal({
               </View>
             </>
           )}
-
-          <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Track Ledger (Payments/Challans) Through</Text></View>
-
-          <View style={styles.formGroup}>
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
-              <TouchableOpacity
-                style={[
-                  styles.typeSelectorBtn,
-                  recordTracking === 'invoice_ledger' && { backgroundColor: colors.primary + '18', borderColor: colors.primary }
-                ]}
-                onPress={() => setRecordTracking('invoice_ledger')}
-              >
-                <Ionicons name="receipt-outline" size={16} color={recordTracking === 'invoice_ledger' ? colors.primary : colors.text.muted} />
-                <Text style={[styles.typeSelectorText, { color: recordTracking === 'invoice_ledger' ? colors.primary : colors.text.secondary }]}>
-                  Invoice Ledger
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.typeSelectorBtn,
-                  recordTracking === 'cash_ledger' && { backgroundColor: colors.warning + '18', borderColor: colors.warning }
-                ]}
-                onPress={() => setRecordTracking('cash_ledger')}
-              >
-                <Ionicons name="wallet-outline" size={16} color={recordTracking === 'cash_ledger' ? colors.warning : colors.text.muted} />
-                <Text style={[styles.typeSelectorText, { color: recordTracking === 'cash_ledger' ? colors.warning : colors.text.secondary }]}>
-                  Cash Ledger
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
 
           <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>General Profile</Text></View>
 
@@ -944,15 +893,7 @@ function AddEditCustomerModal({
             </View>
           ) : null}
 
-          {canAccessCash && (
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Opening Cash Balance (₹)</Text>
-              <View style={styles.formInput}>
-                <Ionicons name="wallet" size={16} color={colors.text.muted} />
-                <TextInput style={styles.formInputText} placeholder="0" placeholderTextColor={colors.text.muted} value={kachhaBalance} onChangeText={setKachhaBalance} keyboardType="numeric" />
-              </View>
-            </View>
-          )}
+
 
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Initial Sales Volume (₹)</Text>
@@ -980,7 +921,7 @@ function CustomerLedgerModal({
   const [initialBalance, setInitialBalance] = useState(0);
   const [closingBalance, setClosingBalance] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [activeLedgerMode, setActiveLedgerMode] = useState<'pakka' | 'kachha'>('pakka');
+  const activeLedgerMode = 'pakka';
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -999,29 +940,15 @@ function CustomerLedgerModal({
       const filteredInvoices = allInvoices.filter(i => {
         if (!i.isFinalized) return false;
         const matchesName = (i.customerName || '').toLowerCase().includes(name.toLowerCase());
-        if (customer.recordTracking === 'cash_ledger') {
-          return activeLedgerMode === 'kachha' && matchesName;
-        }
-        return i.mode === activeLedgerMode && matchesName;
+        return matchesName;
       });
       // Search may miss if partyName doesn't exactly match the search string, so include by exact ID as well
       const filteredPayments = allPayments.filter(p => {
         const matchesParty = ((p.partyName || '').toLowerCase().includes(name.toLowerCase()) || p.partyId === customer._id);
-        if (customer.recordTracking === 'cash_ledger') {
-          return activeLedgerMode === 'kachha' && matchesParty;
-        }
-        return p.mode === activeLedgerMode && matchesParty;
+        return matchesParty;
       });
 
-      const filteredChallans = activeLedgerMode === 'kachha'
-        ? allChallans.filter(c => {
-            const matchesParty = (c.partyName || '').toLowerCase().includes(name.toLowerCase());
-            if (customer.recordTracking === 'cash_ledger') {
-              return c.status === 'finalized' && matchesParty;
-            }
-            return c.status === 'finalized' && c.mode === 'kachha' && matchesParty;
-          })
-        : [];
+      const filteredChallans: any[] = [];
 
       type Row = { _id: string; date: string; no: string; mode: string; status: string; amount: number; isInvoice: boolean; isChallan?: boolean; dueDate?: string };
       let items: Row[] = [];
@@ -1068,7 +995,7 @@ function CustomerLedgerModal({
       items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       // Compute Total Current Balance
-      const currentTotalBalance = activeLedgerMode === 'pakka' ? (customer.pakkaBalance || 0) : (customer.kachhaBalance || 0);
+      const currentTotalBalance = customer.pakkaBalance || 0;
       
       // Calculate Initial Balance
       const totalAmountChange = items.reduce((sum, item) => sum + item.amount, 0);
@@ -1122,11 +1049,7 @@ function CustomerLedgerModal({
     if (visible && customer) load();
   }, [visible, customer, load]);
 
-  useEffect(() => {
-    if (visible && customer) {
-      setActiveLedgerMode(customer.recordTracking === 'cash_ledger' ? 'kachha' : 'pakka');
-    }
-  }, [visible, customer]);
+
 
   if (!customer) return null;
 
@@ -1299,31 +1222,7 @@ function CustomerLedgerModal({
             </View>
           </View>
 
-          {/* Mode Tabs */}
-          {canAccessCash && customer.recordTracking !== 'cash_ledger' && (
-            <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingTop: 10, paddingBottom: 6, gap: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}>
-              <TouchableOpacity
-                style={[
-                  styles.tabBtn,
-                  activeLedgerMode === 'pakka' && { borderColor: colors.primary, backgroundColor: colors.primary + '0a' }
-                ]}
-                onPress={() => setActiveLedgerMode('pakka')}
-              >
-                <Ionicons name="business" size={16} color={activeLedgerMode === 'pakka' ? colors.primary : colors.text.muted} />
-                <Text style={[styles.tabText, activeLedgerMode === 'pakka' && { color: colors.primary }]}>Invoice (GST) Ledger</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.tabBtn,
-                  activeLedgerMode === 'kachha' && { borderColor: colors.warning, backgroundColor: colors.warning + '0a' }
-                ]}
-                onPress={() => setActiveLedgerMode('kachha')}
-              >
-                <Ionicons name="cash" size={16} color={activeLedgerMode === 'kachha' ? colors.warning : colors.text.muted} />
-                <Text style={[styles.tabText, activeLedgerMode === 'kachha' && { color: colors.warning }]}>Cash Ledger</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+
 
           {/* Date Filter */}
           <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingVertical: 10, gap: 10, backgroundColor: colors.bg.primary, borderBottomWidth: 1, borderBottomColor: colors.border }}>
@@ -1612,10 +1511,7 @@ export default function CustomersScreen() {
               const balColor = bal > 0 ? colors.success : bal < 0 ? colors.danger : colors.text.muted;
               const balBg = bal > 0 ? colors.success + '12' : bal < 0 ? colors.danger + '12' : colors.bg.secondary;
 
-              const cashBal = c.kachhaBalance;
-              const cashDrCrLabel = cashBal > 0 ? 'DR' : cashBal < 0 ? 'CR' : null;
-              const cashBalColor = cashBal > 0 ? colors.success : cashBal < 0 ? colors.danger : colors.text.muted;
-              const cashBalBg = cashBal > 0 ? colors.success + '12' : cashBal < 0 ? colors.danger + '12' : colors.bg.secondary;
+
               
               const billing = c.billingAddress || { city: '', state: '', street: '' };
               const compName = c.company || c.name || 'N/A';
@@ -1694,25 +1590,14 @@ export default function CustomersScreen() {
 
                   {/* Dynamic Balance Badges */}
                   <View style={[styles.tableCellContainer, { width: 140, alignItems: 'flex-end', justifyContent: 'center' }]}>
-                    {isCash || c.recordTracking === 'cash_ledger' ? (
-                      <View style={[styles.balanceBadge, { backgroundColor: cashBalBg, borderColor: cashBalColor + '30', borderWidth: 1 }]}>
-                        <Text style={[styles.balanceBadgeLabel, { color: cashBalColor }]}>
-                          CASH {cashDrCrLabel || ''}
-                        </Text>
-                        <Text style={[styles.balanceText, { color: cashBalColor }]}>
-                          ₹{Math.abs(cashBal).toLocaleString('en-IN')}
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={[styles.balanceBadge, { backgroundColor: balBg, borderColor: balColor + '30', borderWidth: 1 }]}>
-                        {drCrLabel && (
-                          <Text style={[styles.balanceBadgeLabel, { color: balColor }]}>{drCrLabel}</Text>
-                        )}
-                        <Text style={[styles.balanceText, { color: balColor }]}>
-                          ₹{Math.abs(bal).toLocaleString('en-IN')}
-                        </Text>
-                      </View>
-                    )}
+                    <View style={[styles.balanceBadge, { backgroundColor: balBg, borderColor: balColor + '30', borderWidth: 1 }]}>
+                      {drCrLabel && (
+                        <Text style={[styles.balanceBadgeLabel, { color: balColor }]}>{drCrLabel}</Text>
+                      )}
+                      <Text style={[styles.balanceText, { color: balColor }]}>
+                        ₹{Math.abs(bal).toLocaleString('en-IN')}
+                      </Text>
+                    </View>
                   </View>
 
                   {/* Action */}

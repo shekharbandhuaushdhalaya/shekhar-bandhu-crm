@@ -29,7 +29,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
   const [showPartyDropdown, setShowPartyDropdown] = useState(false);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(getLocalDateString());
-  const [mode, setMode] = useState<'pakka' | 'kachha'>('pakka');
+  const mode = 'pakka';
   const [method, setMethod] = useState<'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI'>('Cash');
   const [showMethodDropdown, setShowMethodDropdown] = useState(false);
   const [referenceNo, setReferenceNo] = useState('');
@@ -149,7 +149,6 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
                         <Text style={styles.dropdownItemText}>{p.company || p.name}</Text>
                         <Text style={styles.dropdownItemSub}>
                           GST Bal: ₹{(p.pakkaBalance || 0).toLocaleString('en-IN')}
-                          {canAccessCash && ` | Cash Bal: ₹${(p.kachhaBalance || 0).toLocaleString('en-IN')}`}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -197,27 +196,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
             </View>
 
             {/* Mode & Method row */}
-            {canAccessCash && (
-              <View style={[styles.row, { zIndex: 1000, position: 'relative' }]}>
-                <View style={{ flex: 1, zIndex: 1000 }}>
-                  <Text style={styles.label}>Mode</Text>
-                  <View style={styles.toggleGroup}>
-                    <TouchableOpacity
-                      style={[styles.toggleBtn, mode === 'pakka' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                      onPress={() => setMode('pakka')}
-                    >
-                      <Text style={[styles.toggleText, mode === 'pakka' && { color: '#fff' }]}>GST</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.toggleBtn, mode === 'kachha' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                      onPress={() => setMode('kachha')}
-                    >
-                      <Text style={[styles.toggleText, mode === 'kachha' && { color: '#fff' }]}>Cash</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            )}
+
               
               <View style={{ marginBottom: Spacing.md }}>
                 <Text style={styles.label}>Payment Method</Text>

@@ -19,7 +19,7 @@ const quotationSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },
   amount: { type: Number, required: true, default: 0 },
   status: { type: String, default: 'draft', enum: ['draft', 'sent', 'approved', 'rejected'] },
-  mode: { type: String, enum: ['pakka', 'kachha'], default: 'pakka' },
+  mode: { type: String, enum: ['pakka'], default: 'pakka' },
   baseAmount: { type: Number },
   gstRate: { type: Number },
   cgst: { type: Number },

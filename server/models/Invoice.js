@@ -21,7 +21,7 @@ const invoiceSchema = new mongoose.Schema({
   amount: { type: Number, required: true, default: 0 },
   dueDate: { type: Date },
   status: { type: String, default: 'unpaid' },
-  mode: { type: String, enum: ['pakka', 'kachha'], default: 'pakka' },
+  mode: { type: String, enum: ['pakka'], default: 'pakka' },
   baseAmount: { type: Number },
   gstRate: { type: Number },
   cgst: { type: Number },

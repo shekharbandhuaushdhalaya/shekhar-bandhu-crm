@@ -30,11 +30,7 @@ router.get('/', async (req, res) => {
     }
 
     // Enforce cash access security rule
-    if (!req.user || !req.user.canAccessCash) {
-      filter.mode = 'pakka';
-    } else if (mode && mode !== 'all') {
-      filter.mode = mode;
-    }
+    filter.mode = 'pakka';
 
     const payments = await Payment.find(filter).sort({ date: -1, createdAt: -1 }).lean();
     res.json(payments);
@@ -52,10 +48,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Enforce cash access security rule
-    if (mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to perform cash transactions.' });
-    }
+
 
     const payment = await Payment.create(req.body);
 
@@ -63,25 +56,13 @@ router.post('/', async (req, res) => {
     if (partyType === 'Customer') {
       const cust = await Customer.findById(partyId);
       if (cust) {
-        if (cust.recordTracking === 'cash_ledger') {
-          cust.kachhaBalance += (type === 'receive' ? -amount : amount);
-        } else if (mode === 'pakka') {
-          // 'receive' reduces their debt (balance goes down, can go negative for advance)
-          cust.pakkaBalance += (type === 'receive' ? -amount : amount);
-        } else {
-          cust.kachhaBalance += (type === 'receive' ? -amount : amount);
-        }
+        cust.pakkaBalance += (type === 'receive' ? -amount : amount);
         await cust.save();
       }
     } else if (partyType === 'Vendor') {
       const vend = await Vendor.findById(partyId);
       if (vend) {
-        if (mode === 'pakka') {
-          // 'make' reduces our debt to them (balance goes down)
-          vend.pakkaBalance += (type === 'make' ? -amount : amount);
-        } else {
-          vend.kachhaBalance += (type === 'make' ? -amount : amount);
-        }
+        vend.pakkaBalance += (type === 'make' ? -amount : amount);
         await vend.save();
       }
     }
@@ -98,10 +79,7 @@ router.delete('/:id', async (req, res) => {
     const payment = await Payment.findById(req.params.id);
     if (!payment) return res.status(404).json({ error: 'Payment not found' });
 
-    // Enforce cash access security rule
-    if (payment.mode === 'kachha' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permissions to delete cash transactions.' });
-    }
+
 
     const { type, partyType, partyId, amount, mode } = payment;
 
@@ -109,23 +87,13 @@ router.delete('/:id', async (req, res) => {
     if (partyType === 'Customer') {
       const cust = await Customer.findById(partyId);
       if (cust) {
-        if (cust.recordTracking === 'cash_ledger') {
-          cust.kachhaBalance += (type === 'receive' ? amount : -amount);
-        } else if (mode === 'pakka') {
-          cust.pakkaBalance += (type === 'receive' ? amount : -amount);
-        } else {
-          cust.kachhaBalance += (type === 'receive' ? amount : -amount);
-        }
+        cust.pakkaBalance += (type === 'receive' ? amount : -amount);
         await cust.save();
       }
     } else if (partyType === 'Vendor') {
       const vend = await Vendor.findById(partyId);
       if (vend) {
-        if (mode === 'pakka') {
-          vend.pakkaBalance += (type === 'make' ? amount : -amount);
-        } else {
-          vend.kachhaBalance += (type === 'make' ? amount : -amount);
-        }
+        vend.pakkaBalance += (type === 'make' ? amount : -amount);
         await vend.save();
       }
     }

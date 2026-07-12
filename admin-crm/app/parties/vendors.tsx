@@ -160,17 +160,7 @@ function VendorDetailModal({ vendor, visible, onClose, onDeleted, onEdit }: { ve
                 </Text>
               </View>
             </View>
-            {canAccessCash && (
-              <View style={styles.infoItem}>
-                <Ionicons name="wallet" size={16} color={colors.warning} style={styles.infoIcon} />
-                <View>
-                  <Text style={styles.infoLabel}>Cash Balance (Non-GST)</Text>
-                  <Text style={[styles.infoValue, { color: vendor.kachhaBalance > 0 ? colors.warning : colors.text.muted }]}>
-                    ₹{vendor.kachhaBalance.toLocaleString()}
-                  </Text>
-                </View>
-              </View>
-            )}
+
             <View style={styles.infoItem}>
               <Ionicons name="time" size={16} color={colors.primary} style={styles.infoIcon} />
               <View>
@@ -211,7 +201,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState('');
   const [pakkaBalance, setPakkaBalance] = useState('');
-  const [kachhaBalance, setKachhaBalance] = useState('');
+
   const [terms, setTerms] = useState('Net 30');
   const [selectedDropdownTerm, setSelectedDropdownTerm] = useState('Net 30');
   const [showTermsDropdown, setShowTermsDropdown] = useState(false);
@@ -252,7 +242,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setEmail(vendor.email || '');
       setCategory(vendor.productCategory || '');
       setPakkaBalance(vendor.pakkaBalance.toString());
-      setKachhaBalance(vendor.kachhaBalance.toString());
+
       
       const currentTerms = vendor.paymentTerms || 'Net 30';
       setTerms(currentTerms);
@@ -279,7 +269,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setEmail('');
       setCategory('');
       setPakkaBalance('');
-      setKachhaBalance('');
+
       setTerms('Net 30');
       setSelectedDropdownTerm('Net 30');
       setShowTermsDropdown(false);
@@ -363,7 +353,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       email: email.trim(),
       productCategory: category || 'General',
       pakkaBalance: parseInt(pakkaBalance) || 0,
-      kachhaBalance: parseInt(kachhaBalance) || 0,
+
       paymentTerms: terms,
       gstin: gstin.trim(),
       pan: pan.trim(),
@@ -531,15 +521,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
             </View>
           </View>
 
-          {canAccessCash && (
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Opening Cash Balance (₹)</Text>
-              <View style={styles.formInput}>
-                <Ionicons name="wallet" size={16} color={colors.text.muted} />
-                <TextInput style={styles.formInputText} placeholder="0" placeholderTextColor={colors.text.muted} value={kachhaBalance} onChangeText={setKachhaBalance} keyboardType="numeric" />
-              </View>
-            </View>
-          )}
+
 
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Product Category</Text>
@@ -640,7 +622,7 @@ function VendorLedgerModal({
   const [loading, setLoading]   = useState(false);
   const [initialBalance, setInitialBalance] = useState(0);
   const [closingBalance, setClosingBalance] = useState(0);
-  const [activeLedgerMode, setActiveLedgerMode] = useState<'pakka' | 'kachha'>('pakka');
+  const activeLedgerMode = 'pakka';
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -657,11 +639,9 @@ function VendorLedgerModal({
       ]);
 
       const filteredInvoices = allInvoices.filter(i => 
-        i.mode === activeLedgerMode && 
         (i.supplierName || '').toLowerCase().includes(name.toLowerCase())
       );
       const filteredPayments = allPayments.filter(p => 
-        p.mode === activeLedgerMode && 
         ((p.partyName || '').toLowerCase().includes(name.toLowerCase()) || p.partyId === vendor._id)
       );
 
@@ -697,7 +677,7 @@ function VendorLedgerModal({
       items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       // Compute Total Current Balance
-      const currentTotalBalance = activeLedgerMode === 'pakka' ? (vendor.pakkaBalance || 0) : (vendor.kachhaBalance || 0);
+      const currentTotalBalance = vendor.pakkaBalance || 0;
       
       // Calculate Initial Balance
       const totalAmountChange = items.reduce((sum, item) => sum + item.amount, 0);
@@ -932,31 +912,7 @@ function VendorLedgerModal({
             </View>
           </View>
 
-          {/* Mode Tabs */}
-          {canAccessCash && (
-            <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingTop: 10, paddingBottom: 6, gap: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}>
-              <TouchableOpacity
-                style={[
-                  styles.tabBtn,
-                  activeLedgerMode === 'pakka' && { borderColor: colors.primary, backgroundColor: colors.primary + '0a' }
-                ]}
-                onPress={() => setActiveLedgerMode('pakka')}
-              >
-                <Ionicons name="business" size={16} color={activeLedgerMode === 'pakka' ? colors.primary : colors.text.muted} />
-                <Text style={[styles.tabText, activeLedgerMode === 'pakka' && { color: colors.primary }]}>Invoice (GST) Ledger</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.tabBtn,
-                  activeLedgerMode === 'kachha' && { borderColor: colors.warning, backgroundColor: colors.warning + '0a' }
-                ]}
-                onPress={() => setActiveLedgerMode('kachha')}
-              >
-                <Ionicons name="cash" size={16} color={activeLedgerMode === 'kachha' ? colors.warning : colors.text.muted} />
-                <Text style={[styles.tabText, activeLedgerMode === 'kachha' && { color: colors.warning }]}>Cash Ledger</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+
 
           {/* Date Filter */}
           <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingVertical: 10, gap: 10, backgroundColor: colors.bg.primary, borderBottomWidth: 1, borderBottomColor: colors.border }}>

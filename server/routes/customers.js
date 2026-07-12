@@ -19,14 +19,11 @@ router.get('/', async (req, res) => {
     }
 
     const customers = await Customer.find(filter).sort({ createdAt: -1 }).lean();
-    if (!req.user || !req.user.canAccessCash) {
-      const sanitized = customers.map(c => {
-        c.kachhaBalance = 0;
-        return c;
-      });
-      return res.json(sanitized);
-    }
-    res.json(customers);
+    const sanitized = customers.map(c => {
+      c.kachhaBalance = 0;
+      return c;
+    });
+    res.json(sanitized);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -36,11 +33,11 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const data = { ...req.body };
-    if (!req.user || !req.user.canAccessCash) {
-      delete data.kachhaBalance;
-    }
+    delete data.kachhaBalance;
     const customer = await Customer.create(data);
-    res.status(201).json(customer);
+    const doc = customer.toObject();
+    doc.kachhaBalance = 0;
+    res.status(201).json(doc);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -50,9 +47,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const data = { ...req.body };
-    if (!req.user || !req.user.canAccessCash) {
-      delete data.kachhaBalance;
-    }
+    delete data.kachhaBalance;
     const customer = await Customer.findByIdAndUpdate(
       req.params.id,
       data,
@@ -60,9 +55,7 @@ router.put('/:id', async (req, res) => {
     );
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
     const doc = customer.toObject();
-    if (!req.user || !req.user.canAccessCash) {
-      doc.kachhaBalance = 0;
-    }
+    doc.kachhaBalance = 0;
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: err.message });

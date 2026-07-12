@@ -26,14 +26,11 @@ router.get('/', async (req, res) => {
     }
 
     const vendors = await Vendor.find(filter).sort({ createdAt: -1 }).lean();
-    if (!req.user || !req.user.canAccessCash) {
-      const sanitized = vendors.map(v => {
-        v.kachhaBalance = 0;
-        return v;
-      });
-      return res.json(sanitized);
-    }
-    res.json(vendors);
+    const sanitized = vendors.map(v => {
+      v.kachhaBalance = 0;
+      return v;
+    });
+    res.json(sanitized);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -48,9 +45,7 @@ router.post('/', async (req, res) => {
       name: req.body.displayName || req.body.name || '',
       company: req.body.registeredName || req.body.company || '',
     };
-    if (!req.user || !req.user.canAccessCash) {
-      delete data.kachhaBalance;
-    }
+    delete data.kachhaBalance;
     const vendor = await Vendor.create(data);
     res.status(201).json(vendor);
   } catch (err) {
@@ -70,9 +65,7 @@ router.put('/:id', async (req, res) => {
     if (req.body.registeredName || req.body.company) {
       data.company = req.body.registeredName ?? req.body.company;
     }
-    if (!req.user || !req.user.canAccessCash) {
-      delete data.kachhaBalance;
-    }
+    delete data.kachhaBalance;
     const vendor = await Vendor.findByIdAndUpdate(
       req.params.id,
       data,
@@ -81,9 +74,7 @@ router.put('/:id', async (req, res) => {
     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
     
     const doc = vendor.toObject();
-    if (!req.user || !req.user.canAccessCash) {
-      doc.kachhaBalance = 0;
-    }
+    doc.kachhaBalance = 0;
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: err.message });

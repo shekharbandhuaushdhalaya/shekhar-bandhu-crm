@@ -28,7 +28,7 @@ const paymentSchema = new mongoose.Schema({
   },
   mode: { 
     type: String, 
-    enum: ['pakka', 'kachha'], 
+    enum: ['pakka'], 
     default: 'pakka' 
   },
   paymentMethod: { 

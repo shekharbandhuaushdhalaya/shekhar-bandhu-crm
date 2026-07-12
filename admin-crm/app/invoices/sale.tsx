@@ -496,13 +496,13 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
 
           <View style={styles.infoGrid}>
             <View style={styles.infoItem}>
-              <View style={[styles.infoIcon, { backgroundColor: invoice.mode === 'kachha' ? colors.warningLight : colors.successLight }]}>
-                <Ionicons name="pricetag" size={16} color={invoice.mode === 'kachha' ? colors.warning : colors.success} />
+              <View style={[styles.infoIcon, { backgroundColor: colors.successLight }]}>
+                <Ionicons name="pricetag" size={16} color={colors.success} />
               </View>
               <View>
                 <Text style={styles.infoLabel}>Billing Mode</Text>
-                <Text style={[styles.infoValue, { color: invoice.mode === 'kachha' ? colors.warning : colors.success }]}>
-                  {invoice.mode === 'kachha' ? 'CASH' : 'INVOICE'}
+                <Text style={[styles.infoValue, { color: colors.success }]}>
+                  INVOICE
                 </Text>
               </View>
             </View>
@@ -783,7 +783,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseInventory, setWarehouseInventory] = useState<InventoryEntry[]>([]);
   const [status, setStatus] = useState('draft');
-  const [mode, setMode] = useState<'pakka' | 'kachha'>('pakka');
+  const mode = 'pakka';
   const [internalFreightExpense, setInternalFreightExpense] = useState('');
   const [customerState, setCustomerState] = useState('Uttar Pradesh');
   const [overridePaymentTerms, setOverridePaymentTerms] = useState(false);
@@ -814,7 +814,6 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         setIrn(invoiceToEdit.irn || '');
         setWarehouseId(invoiceToEdit.warehouseId || '');
         setStatus(invoiceToEdit.status || 'draft');
-        setMode(!canAccessCash ? 'pakka' : (invoiceToEdit.mode || 'pakka'));
         setInternalFreightExpense(invoiceToEdit.internalFreightExpense ? invoiceToEdit.internalFreightExpense.toString() : '');
         setCustomerState(invoiceToEdit.stateOfSupply || 'Uttar Pradesh');
         setItems((invoiceToEdit.items || []).map(it => ({
@@ -844,7 +843,6 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         setWarehouses([]);
         setWarehouseInventory([]);
         setStatus('draft');
-        setMode('pakka');
         setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0 }]);
         setShowCustomerDropdown(false);
         setActiveItemDropdownIdx(null);
@@ -905,7 +903,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     const finalName = c.company || c.name;
     setPartyName(finalName);
     const hasGstin = !!(c.gstin && c.gstin.trim());
-    setMode(!canAccessCash ? 'pakka' : (hasGstin ? 'pakka' : 'kachha'));
+
     setCustomerState(c.state || 'Uttar Pradesh');
     // Auto-fill billing address
     const addr = c.billingAddress;
@@ -1703,7 +1701,7 @@ export default function SaleInvoicesScreen() {
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
 
-  const [modeFilter, setModeFilter] = useState<'all' | 'pakka' | 'kachha'>(canAccessCash ? 'all' : 'pakka');
+  const modeFilter = 'pakka';
 
   const load = useCallback(async () => {
     const [resInvoices, resCustomers] = await Promise.all([

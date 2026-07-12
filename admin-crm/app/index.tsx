@@ -133,16 +133,20 @@ function FinancialSummaryCard({
   label, 
   icon, 
   color,
-  invoiceValue,
-  cashValue
+  breakdown1Label,
+  breakdown1Value,
+  breakdown2Label,
+  breakdown2Value
 }: { 
   title: string; 
   value: string; 
   label: string; 
   icon: string; 
   color: string;
-  invoiceValue?: string;
-  cashValue?: string;
+  breakdown1Label?: string;
+  breakdown1Value?: string;
+  breakdown2Label?: string;
+  breakdown2Value?: string;
 }) {
   const styles = useStyles(createStyles);
   const bgLight = color + '08';
@@ -162,19 +166,19 @@ function FinancialSummaryCard({
       </View>
       <Text style={styles.summaryCardValue}>{value}</Text>
       
-      {invoiceValue || cashValue ? (
+      {breakdown1Value || breakdown2Value ? (
         <View style={styles.breakdownRow}>
-          {invoiceValue ? (
+          {breakdown1Value ? (
             <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>INVOICE</Text>
-              <Text style={styles.breakdownValue}>{invoiceValue}</Text>
+              {breakdown1Label ? <Text style={styles.breakdownLabel}>{breakdown1Label}</Text> : null}
+              <Text style={styles.breakdownValue}>{breakdown1Value}</Text>
             </View>
           ) : null}
-          {invoiceValue && cashValue ? <View style={styles.breakdownSeparator} /> : null}
-          {cashValue ? (
+          {breakdown1Value && breakdown2Value ? <View style={styles.breakdownSeparator} /> : null}
+          {breakdown2Value ? (
             <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>CASH</Text>
-              <Text style={styles.breakdownValue}>{cashValue}</Text>
+              {breakdown2Label ? <Text style={styles.breakdownLabel}>{breakdown2Label}</Text> : null}
+              <Text style={styles.breakdownValue}>{breakdown2Value}</Text>
             </View>
           ) : null}
         </View>
@@ -217,7 +221,7 @@ function LowStockAlerts({ products }: { products: Product[] }) {
   );
 }
 
-function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: Invoice[]; challans: Challan[] }) {
+function MonthlySalesWidget({ width, sales }: { width: number; sales: Invoice[] }) {
   const { colors, themeMode } = useTheme();
   const styles = useStyles(createStyles);
 
@@ -256,12 +260,6 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
         if (fy) yearsSet.add(fy);
       }
     });
-    challans.forEach(ch => {
-      if (ch.status === 'finalized' && ch.mode === 'kachha' && !ch.convertedToInvoice && ch.date) {
-        const fy = getFinancialYear(ch.date);
-        if (fy) yearsSet.add(fy);
-      }
-    });
     const arr = Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
     return arr;
   })();
@@ -290,7 +288,6 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
   ];
 
   const invoiceSales = Array(12).fill(0);
-  const cashSales = Array(12).fill(0);
 
   const match = activeFY.match(/FY (\d{4})/);
   const startYear = match ? parseInt(match[1]) : currentFYStart;
@@ -304,25 +301,7 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
       const isWithinFY = (m >= 3 && y === startYear) || (m < 3 && y === startYear + 1);
       if (isWithinFY) {
         const monthIdx = m >= 3 ? m - 3 : m + 9;
-        if (s.mode === 'pakka') {
-          invoiceSales[monthIdx] += s.amount || 0;
-        } else {
-          cashSales[monthIdx] += s.amount || 0;
-        }
-      }
-    }
-  });
-
-  challans.forEach(ch => {
-    if (ch.status === 'finalized' && ch.mode === 'kachha' && !ch.convertedToInvoice && ch.date) {
-      const d = new Date(ch.date);
-      const y = d.getFullYear();
-      const m = d.getMonth();
-      
-      const isWithinFY = (m >= 3 && y === startYear) || (m < 3 && y === startYear + 1);
-      if (isWithinFY) {
-        const monthIdx = m >= 3 ? m - 3 : m + 9;
-        cashSales[monthIdx] += ch.nettTotal || ch.baseAmount || 0;
+        invoiceSales[monthIdx] += s.amount || 0;
       }
     }
   });
@@ -334,9 +313,8 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
   const gW = chartWidth - padX - 20;
   const gH = height - padY * 2 - 10;
 
-  const maxVal = Math.max(...invoiceSales, ...cashSales, 10000);
-  const barWidth = Math.max(4, (gW / 12) * 0.3);
-  const gap = 2;
+  const maxVal = Math.max(...invoiceSales, 10000);
+  const barWidth = Math.max(4, (gW / 12) * 0.4);
 
   return (
     <View style={[styles.chartCard, { zIndex: 10 }]}>
@@ -425,10 +403,6 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
             <Stop offset="0%" stopColor={colors.primary} />
             <Stop offset="100%" stopColor={colors.primary + '40'} />
           </LinearGradient>
-          <LinearGradient id="cashGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={colors.warning} />
-            <Stop offset="100%" stopColor={colors.warning + '40'} />
-          </LinearGradient>
         </Defs>
 
         {/* Y Axis Grid lines */}
@@ -451,14 +425,8 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
           // Invoice Bar (Pakka)
           const invVal = invoiceSales[idx];
           const invH = (Math.max(invVal, 0) / maxVal) * gH;
-          const invX = centerX - barWidth - gap / 2;
+          const invX = centerX - barWidth / 2;
           const invY = padY + gH - invH;
-
-          // Cash Bar (Kachha)
-          const cashVal = cashSales[idx];
-          const cashH = (Math.max(cashVal, 0) / maxVal) * gH;
-          const cashX = centerX + gap / 2;
-          const cashY = padY + gH - cashH;
 
           return (
             <G key={idx}>
@@ -470,18 +438,6 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
                   width={barWidth}
                   height={invH}
                   fill="url(#invoiceGrad)"
-                  rx={2}
-                />
-              )}
-              
-              {/* Cash Rect */}
-              {cashVal > 0 && (
-                <Rect
-                  x={cashX}
-                  y={cashY}
-                  width={barWidth}
-                  height={cashH}
-                  fill="url(#cashGrad)"
                   rx={2}
                 />
               )}
@@ -500,11 +456,7 @@ function MonthlySalesWidget({ width, sales, challans }: { width: number; sales: 
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: Spacing.xs }}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-          <Text style={styles.legendText}>Invoice</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
-          <Text style={styles.legendText}>Cash</Text>
+          <Text style={styles.legendText}>Sales Revenue</Text>
         </View>
       </View>
     </View>
@@ -625,12 +577,8 @@ export default function DashboardScreen() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [recInvoice, setRecInvoice] = useState(0);
-  const [recCash, setRecCash] = useState(0);
   const [payInvoice, setPayInvoice] = useState(0);
-  const [payCash, setPayCash] = useState(0);
   const [assetValue, setAssetValue] = useState(0);
-  const [assetInvoice, setAssetInvoice] = useState(0);
-  const [assetCash, setAssetCash] = useState(0);
   const [salesVolume, setSalesVolume] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalCOGS, setTotalCOGS] = useState(0);
@@ -660,13 +608,10 @@ export default function DashboardScreen() {
     ]);
 
     const recInvoiceSum = custs.reduce((sum, cust) => sum + (cust.pakkaBalance || 0), 0);
-    const recCashSum = custs.reduce((sum, cust) => sum + (cust.kachhaBalance || 0), 0);
     const payInvoiceSum = vends.reduce((sum, vend) => sum + (vend.pakkaBalance || 0), 0);
-    const payCashSum = vends.reduce((sum, vend) => sum + (vend.kachhaBalance || 0), 0);
     
     // Calculate the asset value: purchases minus sales at purchase price
     let purchaseInvoiceSum = 0;
-    let purchaseCashSum = 0;
     const purchaseRatesMap: Record<string, number> = {};
     
     purchs.forEach(p => {
@@ -675,12 +620,7 @@ export default function DashboardScreen() {
           const pcs = getItemTotalPieces(item);
           const rate = item.rate || 0;
           const val = pcs * rate;
-          
-          if (p.mode === 'pakka') {
-            purchaseInvoiceSum += val;
-          } else {
-            purchaseCashSum += val;
-          }
+          purchaseInvoiceSum += val;
           
           if (item.productId) {
             purchaseRatesMap[item.productId] = rate;
@@ -690,7 +630,6 @@ export default function DashboardScreen() {
     });
 
     let saleInvoiceSub = 0;
-    let saleCashSub = 0;
     sales.forEach(s => {
       if (s.isFinalized) {
         (s.items || []).forEach(item => {
@@ -705,53 +644,20 @@ export default function DashboardScreen() {
           }
           
           const val = pcs * purchasePrice;
-          
-          if (s.mode === 'pakka') {
-            saleInvoiceSub += val;
-          } else {
-            saleCashSub += val;
-          }
-        });
-      }
-    });
-
-    // Count finalized cash (kachha) challans as cash sales (deducting cash asset value)
-    challans.forEach(ch => {
-      if (ch.status === 'finalized' && ch.mode === 'kachha') {
-        (ch.items || []).forEach(item => {
-          const pcs = getItemTotalPieces(item);
-          
-          let purchasePrice = 0;
-          if (item.productId && purchaseRatesMap[item.productId] !== undefined) {
-            purchasePrice = purchaseRatesMap[item.productId];
-          } else {
-            const product = prods.find(p => p._id === item.productId);
-            purchasePrice = product ? (product.price || 0) : 0;
-          }
-          
-          const val = pcs * purchasePrice;
-          saleCashSub += val;
+          saleInvoiceSub += val;
         });
       }
     });
 
     const assetInvoiceSum = Math.max(0, purchaseInvoiceSum - saleInvoiceSub);
-    const assetCashSum = Math.max(0, purchaseCashSum - saleCashSub);
-    
     const volSum = custs.reduce((sum, cust) => sum + (cust.salesVolume || 0), 0);
-
     const revenueSum = sales.reduce((sum, s) => sum + (s.isFinalized ? s.amount || 0 : 0), 0);
-    const cogsSum = saleInvoiceSub + saleCashSub;
-    // Consider a product low-stock when its current stock is less than or equal to its reorder level.
+    const cogsSum = saleInvoiceSub;
     const lowStock = prods.filter(p => typeof p.minReorder === 'number' && p.stockLevel <= p.minReorder);
 
     setRecInvoice(recInvoiceSum);
-    setRecCash(recCashSum);
     setPayInvoice(payInvoiceSum);
-    setPayCash(payCashSum);
-    setAssetInvoice(assetInvoiceSum);
-    setAssetCash(assetCashSum);
-    setAssetValue(assetInvoiceSum + assetCashSum);
+    setAssetValue(assetInvoiceSum);
     setSalesVolume(volSum);
     setTotalRevenue(revenueSum);
     setTotalCOGS(cogsSum);
@@ -822,22 +728,18 @@ export default function DashboardScreen() {
       <View style={styles.metricsGrid}>
         <FinancialSummaryCard 
           title="TOTAL RECEIVABLES" 
-          value={`₹${(recInvoice + recCash).toLocaleString()}`} 
+          value={`₹${recInvoice.toLocaleString()}`} 
           label="Owed by Customers" 
           icon="arrow-down-circle" 
           color={colors.success}
-          invoiceValue={`₹${recInvoice.toLocaleString()}`}
-          cashValue={`₹${recCash.toLocaleString()}`}
         />
         {user?.role !== 'agent' && (
           <FinancialSummaryCard 
             title="TOTAL PAYABLES" 
-            value={`₹${(payInvoice + payCash).toLocaleString()}`} 
+            value={`₹${payInvoice.toLocaleString()}`} 
             label="Owed to Vendors" 
             icon="arrow-up-circle" 
             color={colors.warning}
-            invoiceValue={`₹${payInvoice.toLocaleString()}`}
-            cashValue={`₹${payCash.toLocaleString()}`}
           />
         )}
         {user?.role !== 'agent' && (
@@ -847,8 +749,6 @@ export default function DashboardScreen() {
             label="Warehouse Stock Value" 
             icon="cube" 
             color={colors.primary}
-            invoiceValue={`₹${assetInvoice.toLocaleString()}`}
-            cashValue={`₹${assetCash.toLocaleString()}`}
           />
         )}
         {user?.role !== 'agent' && (
@@ -858,8 +758,10 @@ export default function DashboardScreen() {
             label={`Margin: ${totalRevenue ? (((totalRevenue - totalCOGS) / totalRevenue) * 100).toFixed(1) : 0}%`} 
             icon="trending-up" 
             color={colors.purple} 
-            invoiceValue={`Rev: ₹${totalRevenue.toLocaleString()}`}
-            cashValue={`Cost: ₹${totalCOGS.toLocaleString()}`}
+            breakdown1Label="REVENUE"
+            breakdown1Value={`₹${totalRevenue.toLocaleString()}`}
+            breakdown2Label="COGS (COST)"
+            breakdown2Value={`₹${totalCOGS.toLocaleString()}`}
           />
         )}
       </View>
@@ -867,7 +769,7 @@ export default function DashboardScreen() {
       <View style={styles.chartsFeedRow}>
         {user?.role !== 'agent' && (
           <View style={styles.chartWrapper}>
-            <MonthlySalesWidget width={chartWidth} sales={allSales} challans={allChallans} />
+            <MonthlySalesWidget width={chartWidth} sales={allSales} />
           </View>
         )}
         <View style={styles.feedWrapper}>
