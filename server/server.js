@@ -33,6 +33,7 @@ const sampleRoutes = require('./routes/samples');
 const salesTargetRoutes = require('./routes/salesTargets');
 const dispatchRoutes = require('./routes/dispatches');
 const systemRoutes = require('./routes/system');
+const partiesRoutes = require('./routes/parties');
 
 
 // — Seed data models —
@@ -233,6 +234,7 @@ mongoose
     app.use('/api/samples', authenticateJWT, sampleRoutes);
     app.use('/api/sales-targets', authenticateJWT, salesTargetRoutes);
     app.use('/api/dispatches', authenticateJWT, dispatchRoutes);
+    app.use('/api/parties', authenticateJWT, partiesRoutes);
 
     // Drop old unique products index if it exists before seeding duplicate specs
     try {

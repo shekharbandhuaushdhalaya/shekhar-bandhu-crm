@@ -359,7 +359,33 @@ export default function ManufacturingScreen() {
       default: return colors.text.muted;
     }
   };
+  const matchingBom = boms.find(b => {
+    const bPid = b.productId && typeof b.productId === 'object' ? b.productId._id : b.productId;
+    return bPid === prodProductId;
+  });
 
+  const plannedVal = Number(prodPlannedQty);
+  let previewIngredients: { name: string; qtyNeeded: number; unit: string; available: number }[] = [];
+  if (matchingBom && !isNaN(plannedVal) && plannedVal > 0) {
+    const scale = plannedVal / matchingBom.batchYieldSize;
+    previewIngredients = matchingBom.ingredients.map(ing => {
+      const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
+      const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown Raw Material';
+      const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'kg';
+      
+      const qtyNeeded = ing.qtyRequired * scale;
+      
+      const matchingMaterial = materials.find(m => m._id === ingId);
+      const available = matchingMaterial ? (matchingMaterial.stockLevel || 0) : 0;
+      
+      return {
+        name: ingName,
+        qtyNeeded,
+        unit: ingUnit,
+        available
+      };
+    });
+  }
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -1081,6 +1107,38 @@ export default function ManufacturingScreen() {
               <Text style={styles.warningDisclaimer}>
                 ⚠️ Starting this batch will automatically deduct the corresponding raw material quantities from active stock batches (FIFO). If stocks are insufficient, the launch will be blocked.
               </Text>
+
+              {/* Recipe preview checklist */}
+              {previewIngredients.length > 0 && (
+                <View style={{ marginTop: 16, padding: 12, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>
+                    📋 Auto-Deduction Ingredients Preview:
+                  </Text>
+                  {previewIngredients.map((item, idx) => {
+                    const isShortage = item.available < item.qtyNeeded;
+                    return (
+                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: idx === previewIngredients.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={{ fontSize: 12, color: colors.text.primary }}>🌿 {item.name}</Text>
+                          <Text style={{ fontSize: 10.5, color: isShortage ? colors.danger : colors.text.secondary, marginTop: 2 }}>
+                            Available: {item.available.toFixed(2)} {item.unit}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: isShortage ? colors.danger : colors.text.primary }}>
+                            {item.qtyNeeded.toFixed(2)} {item.unit}
+                          </Text>
+                          {isShortage && (
+                            <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
+                              <Text style={{ fontSize: 9, color: colors.danger, fontWeight: '800' }}>SHORTAGE</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </ScrollView>
             <View style={styles.modalFooter}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setProductionModalVisible(false)}>

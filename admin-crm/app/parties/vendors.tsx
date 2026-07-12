@@ -232,6 +232,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
 
   const [loadingPin, setLoadingPin] = useState(false);
   const [loadingIfsc, setLoadingIfsc] = useState(false);
+  const [loadingGst, setLoadingGst] = useState(false);
 
   useEffect(() => {
     if (vendor) {
@@ -294,6 +295,31 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       if (/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panPart)) {
         setPan(panPart);
       }
+    }
+  };
+
+  const handleAutoFillGst = async () => {
+    if (!gstin.trim()) {
+      alert('Please enter a GSTIN first.');
+      return;
+    }
+    setLoadingGst(true);
+    try {
+      const data = await api.verifyGSTIN(gstin.trim());
+      setRegisteredName(data.companyName);
+      setDisplayName(data.companyName.split('(')[0].trim());
+      setAddressCity(data.billingAddress.split(',')[3]?.trim() || 'Varanasi');
+      setState(data.state);
+      
+      if (gstin.length >= 12) {
+        setPan(gstin.substring(2, 12).toUpperCase());
+      }
+      
+      alert('GSTIN verified & profile auto-filled!');
+    } catch (err: any) {
+      alert(err.message || 'Verification failed. Please check GSTIN format.');
+    } finally {
+      setLoadingGst(false);
     }
   };
 
@@ -464,7 +490,17 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
             <Text style={styles.formLabel}>GSTIN</Text>
             <View style={styles.formInput}>
               <Ionicons name="finger-print" size={16} color={colors.text.muted} />
-              <TextInput style={styles.formInputText} placeholder="e.g. 27AAAAA1111A1Z1" placeholderTextColor={colors.text.muted} value={gstin} onChangeText={handleGstinChange} autoCapitalize="characters" />
+              <TextInput style={[styles.formInputText, { flex: 1 }]} placeholder="e.g. 27AAAAA1111A1Z1" placeholderTextColor={colors.text.muted} value={gstin} onChangeText={handleGstinChange} autoCapitalize="characters" />
+              {loadingGst ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 8 }} />
+              ) : (
+                <TouchableOpacity
+                  onPress={handleAutoFillGst}
+                  style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: colors.primary + '15', borderRadius: 4, marginLeft: 8 }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Auto-Fill</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 

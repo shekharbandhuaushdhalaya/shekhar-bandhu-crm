@@ -847,6 +847,17 @@ class ApiClient {
     return res.ok;
   }
 
+  async verifyGSTIN(gstin: string): Promise<{ companyName: string; billingAddress: string; state: string; placeOfSupply: string }> {
+    const res = await this.request(`${API_BASE}/parties/verify-gstin`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ gstin })
+    });
+    return res.json();
+  }
+
   // --- Products ---
   async getProducts(search = '', vendorId = ''): Promise<Product[]> {
     const res = await this.request(`${API_BASE}/products?search=${encodeURIComponent(search)}&vendorId=${encodeURIComponent(vendorId)}`);
