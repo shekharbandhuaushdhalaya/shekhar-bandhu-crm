@@ -232,6 +232,24 @@ export default function OrdersScreen() {
               </View>
             ) : null}
 
+            {/* Dispatch Alerts Logs */}
+            {o.notifications && o.notifications.length > 0 ? (
+              <View style={[styles.courierBox, { borderLeftColor: colors.info, backgroundColor: colors.info + '05', marginTop: 0, marginBottom: 12 }]}>
+                <Text style={[styles.boxTitle, { color: colors.info, fontWeight: '800' }]}>🔔 Automated Dispatch Log:</Text>
+                {o.notifications.map((note, idx) => {
+                  const parts = note.split(':: ');
+                  const time = parts[0] ? new Date(parts[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(parts[0]).toLocaleDateString([], { day: 'numeric', month: 'short' }) : '';
+                  const msg = parts[1] || note;
+                  return (
+                    <View key={idx} style={{ marginTop: 6, borderBottomWidth: idx < o.notifications.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, paddingBottom: 6 }}>
+                      <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '700' }}>DISPATCHED AT {time.toUpperCase()}</Text>
+                      <Text style={{ fontSize: 11, color: colors.text.primary, marginTop: 2, lineHeight: 16 }}>{msg}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+
             {/* Items table */}
             <View style={styles.itemsBox}>
               <Text style={styles.boxTitle}>Order Items:</Text>

@@ -144,4 +144,69 @@ ${dbContextStr}`;
   }
 });
 
+router.get('/manufacturing', async (req, res) => {
+  try {
+    const RawMaterialEntry = require('../models/RawMaterialEntry');
+    const BatchProduction = require('../models/BatchProduction');
+
+    // 1. Raw Materials Valuation
+    const rmEntries = await RawMaterialEntry.find({ qty: { $gt: 0 } }).lean();
+    const netRawMaterialValue = rmEntries.reduce((acc, entry) => {
+      return acc + (entry.qty * (entry.purchaseRate || 0));
+    }, 0);
+
+    // 2. Finished Goods Valuation
+    const fgEntries = await InventoryEntry.find({ qtyBoxes: { $gt: 0 } }).populate('productId').lean();
+    const netFinishedGoodsValue = fgEntries.reduce((acc, entry) => {
+      const price = entry.productId ? (entry.productId.price || 0) : 0;
+      const units = (entry.qtyBoxes || 0) * (entry.packing || 1);
+      return acc + (units * price);
+    }, 0);
+
+    // 3. Yield Performance of last 10 completed batches
+    const completedRuns = await BatchProduction.find({ status: 'completed' })
+      .sort({ endDate: -1 })
+      .limit(10)
+      .populate('productId')
+      .lean();
+
+    const yieldPerformance = completedRuns.map(run => ({
+      batchNo: run.batchNo,
+      productName: run.productId ? run.productId.name : 'Unknown Product',
+      plannedQty: run.plannedQty,
+      actualYieldQty: run.actualYieldQty || 0,
+      efficiency: run.plannedQty > 0 
+        ? Number(((run.actualYieldQty || 0) / run.plannedQty * 100).toFixed(1)) 
+        : 100
+    }));
+
+    // 4. Timeline (Gantt representation) of active and historical runs
+    const allRuns = await BatchProduction.find({})
+      .sort({ startDate: -1 })
+      .limit(20)
+      .populate('productId')
+      .lean();
+
+    const timeline = allRuns.map(run => ({
+      id: run._id,
+      batchNo: run.batchNo,
+      productName: run.productId ? run.productId.name : 'Unknown Product',
+      plannedQty: run.plannedQty,
+      actualYieldQty: run.actualYieldQty || 0,
+      status: run.status,
+      startDate: run.startDate,
+      endDate: run.endDate
+    }));
+
+    res.json({
+      netRawMaterialValue: Number(netRawMaterialValue.toFixed(2)),
+      netFinishedGoodsValue: Number(netFinishedGoodsValue.toFixed(2)),
+      yieldPerformance,
+      timeline
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

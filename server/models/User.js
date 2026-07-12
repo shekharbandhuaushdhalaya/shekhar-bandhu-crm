@@ -13,6 +13,18 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  lastActive: {
+    type: Date,
+    default: null,
+  },
+  ipAddress: {
+    type: String,
+    default: null,
+  },
+  deviceInfo: {
+    type: String,
+    default: null,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

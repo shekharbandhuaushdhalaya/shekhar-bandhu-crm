@@ -7,6 +7,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const compression = require('compression');
+const { trackAgentActivity } = require('./utils/agentTracker');
 
 const contactRoutes = require('./routes/contacts');
 const taskRoutes = require('./routes/tasks');
@@ -24,6 +25,13 @@ const paymentRoutes = require('./routes/payments');
 const analyticsRoutes = require('./routes/analytics');
 const queryRoutes = require('./routes/queries');
 const orderRoutes = require('./routes/orders');
+const rawMaterialRoutes = require('./routes/rawMaterials');
+const bomRoutes = require('./routes/bom');
+const batchProductionRoutes = require('./routes/batchProductions');
+const complaintRoutes = require('./routes/complaints');
+const sampleRoutes = require('./routes/samples');
+const salesTargetRoutes = require('./routes/salesTargets');
+const dispatchRoutes = require('./routes/dispatches');
 
 
 // — Seed data models —
@@ -60,6 +68,8 @@ function authenticateJWT(req, res, next) {
       return res.status(403).json({ error: 'Forbidden: Invalid or expired token' });
     }
     req.user = user;
+    // Track agent activity asynchronously
+    trackAgentActivity(user.id, req);
     next();
   });
 }
@@ -120,6 +130,51 @@ mongoose
       }
     });
 
+    app.get('/api/public/products/:id', async (req, res) => {
+      try {
+        const Product = require('./models/Product');
+        const InventoryEntry = require('./models/InventoryEntry');
+
+        const product = await Product.findById(req.params.id).lean();
+        if (!product) return res.status(404).json({ error: 'Product not found' });
+
+        const entries = await InventoryEntry.find({ productId: product._id }).lean();
+        const totalUnits = entries.reduce((acc, entry) => {
+          const qty = Number(entry.qtyBoxes) || 0;
+          const packing = Number(entry.packing) || 1;
+          return acc + (qty * packing);
+        }, 0);
+
+        // Find sibling size variants (case-insensitive name match)
+        const variants = await Product.find({ 
+          name: { $regex: new RegExp(`^${product.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') } 
+        }).lean();
+
+        // Enforce live inventory on variants
+        const allEntries = await InventoryEntry.find({ productId: { $in: variants.map(v => v._id) } }).lean();
+        const invMap = {};
+        allEntries.forEach(entry => {
+          const q = Number(entry.qtyBoxes) || 0;
+          const p = Number(entry.packing) || 1;
+          const pid = entry.productId.toString();
+          invMap[pid] = (invMap[pid] || 0) + (q * p);
+        });
+
+        const enrichedVariants = variants.map(v => ({
+          ...v,
+          inventoryQty: invMap[v._id.toString()] || 0
+        })).sort((a, b) => a.price - b.price);
+
+        res.json({
+          ...product,
+          inventoryQty: totalUnits,
+          variants: enrichedVariants
+        });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
     app.post('/api/public/products/:id/rate', async (req, res) => {
       try {
         const { rating } = req.body;
@@ -169,7 +224,14 @@ mongoose
     app.use('/api/queries', authenticateJWT, queryRoutes);
     app.use('/api/orders', orderRoutes);
     app.use('/api/public/orders', orderRoutes); // alias public path
-    
+    app.use('/api/raw-materials', authenticateJWT, rawMaterialRoutes);
+    app.use('/api/bom', authenticateJWT, bomRoutes);
+    app.use('/api/batch-productions', authenticateJWT, batchProductionRoutes);
+    app.use('/api/complaints', authenticateJWT, complaintRoutes);
+    app.use('/api/samples', authenticateJWT, sampleRoutes);
+    app.use('/api/sales-targets', authenticateJWT, salesTargetRoutes);
+    app.use('/api/dispatches', authenticateJWT, dispatchRoutes);
+
     // Drop old unique products index if it exists before seeding duplicate specs
     try {
       const Product = require('./models/Product');

@@ -2,6 +2,8 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Otp = require('../models/Otp');
+const { trackAgentActivity } = require('../utils/agentTracker');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'vp_crm_secret_key_2026';
@@ -16,6 +18,8 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) return res.status(403).json({ error: 'Invalid or expired token' });
     req.user = decoded;
+    // Track agent activity asynchronously
+    trackAgentActivity(decoded.id, req);
     next();
   });
 };
@@ -144,6 +148,93 @@ router.delete('/users/:id', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     
     res.json({ message: 'User deleted successfully', userId: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/whatsapp/send-otp — Generate and send OTP via WhatsApp (Mocked)
+router.post('/whatsapp/send-otp', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    // Normalize phone number (keep only digits and + symbol)
+    const cleanPhone = phone.trim().replace(/[^0-9+]/g, '');
+    if (cleanPhone.length < 10) {
+      return res.status(400).json({ error: 'Please enter a valid phone number' });
+    }
+
+    // Generate random 6-digit OTP code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store in OTP database (expires in 5 minutes)
+    await Otp.findOneAndUpdate(
+      { phone: cleanPhone },
+      { code, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
+      { upsert: true, new: true }
+    );
+
+    // Print OTP code prominently to the server logs
+    console.log('\n==================================================');
+    console.log('[WHATSAPP OTP SIMULATOR]');
+    console.log(`To: ${cleanPhone}`);
+    console.log(`Message: Your Shekhar Bandhu Aushadhalaya verification code is: ${code}`);
+    console.log('==================================================\n');
+
+    // Return the code in response for testing/development simplicity
+    res.status(200).json({ 
+      message: 'Verification code sent to WhatsApp',
+      devOtp: code 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/whatsapp/verify-otp — Verify WhatsApp OTP code
+router.post('/whatsapp/verify-otp', async (req, res) => {
+  try {
+    const { phone, code } = req.body;
+    if (!phone || !code) {
+      return res.status(400).json({ error: 'Phone number and verification code are required' });
+    }
+
+    const cleanPhone = phone.trim().replace(/[^0-9+]/g, '');
+    const cleanCode = code.trim();
+
+    // Query OTP record from DB
+    const record = await Otp.findOne({ phone: cleanPhone });
+    if (!record) {
+      return res.status(400).json({ error: 'Code expired or never requested. Please try again.' });
+    }
+
+    // Verify expiration time (as fallback)
+    if (record.expiresAt < new Date()) {
+      await Otp.deleteOne({ phone: cleanPhone });
+      return res.status(400).json({ error: 'Code expired. Please request a new one.' });
+    }
+
+    // Verify matching code
+    if (record.code !== cleanCode) {
+      return res.status(400).json({ error: 'Invalid verification code.' });
+    }
+
+    // OTP verified successfully — delete it so it cannot be reused
+    await Otp.deleteOne({ phone: cleanPhone });
+
+    // Fetch user details from existing orders to return customerName
+    const Order = require('../models/Order');
+    const lastOrder = await Order.findOne({ phone: cleanPhone }).sort({ createdAt: -1 }).lean();
+    const customerName = lastOrder ? lastOrder.name : 'Valued Customer';
+
+    res.status(200).json({
+      success: true,
+      phone: cleanPhone,
+      customerName
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

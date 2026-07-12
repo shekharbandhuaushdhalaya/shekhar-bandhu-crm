@@ -12,6 +12,30 @@ const StockLedger = require('../models/StockLedger');
 
 const router = express.Router();
 
+function checkAndAddAlerts(order, newStatus, newTrackingId, newCourierName) {
+  const oldStatus = order.status;
+  if (oldStatus !== newStatus) {
+    let alertMsg = '';
+    const tracker = newTrackingId || order.trackingId || 'N/A';
+    const courier = newCourierName || order.courierName || 'Courier Service';
+
+    if (newStatus === 'processing') {
+      alertMsg = `[SMS/WhatsApp Alert sent to ${order.phone}]: Hello ${order.name}, your order of ₹${order.totalAmount} has been approved and is now being processed at our Varanasi factory.`;
+    } else if (newStatus === 'shipped') {
+      alertMsg = `[SMS/WhatsApp/Email Alert sent to ${order.phone} / ${order.email}]: Hello ${order.name}, your order has been dispatched via ${courier}. Tracking ID: ${tracker}. Monitor your delivery live!`;
+    } else if (newStatus === 'delivered') {
+      alertMsg = `[SMS/WhatsApp Alert sent to ${order.phone}]: Hello ${order.name}, your order has been successfully delivered. Thank you for choosing Shekhar Bandhu Aushadhalaya!`;
+    } else if (newStatus === 'cancelled') {
+      alertMsg = `[SMS/WhatsApp Alert sent to ${order.phone}]: Hello ${order.name}, your order has been cancelled. Please contact B2B support for details.`;
+    }
+
+    if (alertMsg) {
+      if (!order.notifications) order.notifications = [];
+      order.notifications.push(`${new Date().toISOString()}:: ${alertMsg}`);
+    }
+  }
+}
+
 // GET /api/orders — List all orders (Authenticated)
 router.get('/', async (req, res) => {
   try {
@@ -29,13 +53,14 @@ router.patch('/:id/status', async (req, res) => {
     if (!['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status value' });
     }
-    const updated = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Order not found' });
-    res.json(updated);
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    checkAndAddAlerts(order, status);
+    order.status = status;
+    await order.save();
+
+    res.json(order);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -45,31 +70,30 @@ router.patch('/:id/status', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { name, email, phone, shippingAddress, status, totalAmount, courierName, trackingId, courierLink, adminNotes } = req.body;
-    
-    const updateFields = {};
-    if (name !== undefined) updateFields.name = name.trim();
-    if (email !== undefined) updateFields.email = email.trim().toLowerCase();
-    if (phone !== undefined) updateFields.phone = phone.trim();
-    if (shippingAddress !== undefined) updateFields.shippingAddress = shippingAddress.trim();
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
     if (status !== undefined) {
       if (!['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
         return res.status(400).json({ error: 'Invalid status value' });
       }
-      updateFields.status = status;
+      checkAndAddAlerts(order, status, trackingId, courierName);
+      order.status = status;
     }
-    if (totalAmount !== undefined) updateFields.totalAmount = Number(totalAmount);
-    if (courierName !== undefined) updateFields.courierName = courierName.trim();
-    if (trackingId !== undefined) updateFields.trackingId = trackingId.trim();
-    if (courierLink !== undefined) updateFields.courierLink = courierLink.trim();
-    if (adminNotes !== undefined) updateFields.adminNotes = adminNotes.trim();
 
-    const updated = await Order.findByIdAndUpdate(
-      req.params.id,
-      updateFields,
-      { new: true, runValidators: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Order not found' });
-    res.json(updated);
+    if (name !== undefined) order.name = name.trim();
+    if (email !== undefined) order.email = email.trim().toLowerCase();
+    if (phone !== undefined) order.phone = phone.trim();
+    if (shippingAddress !== undefined) order.shippingAddress = shippingAddress.trim();
+    if (totalAmount !== undefined) order.totalAmount = Number(totalAmount);
+    if (courierName !== undefined) order.courierName = courierName.trim();
+    if (trackingId !== undefined) order.trackingId = trackingId.trim();
+    if (courierLink !== undefined) order.courierLink = courierLink.trim();
+    if (adminNotes !== undefined) order.adminNotes = adminNotes.trim();
+
+    await order.save();
+    res.json(order);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

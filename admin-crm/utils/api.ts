@@ -432,7 +432,168 @@ export type MockDataType = {
 
 
 
-// Types moved to top of file
+export type RawMaterial = {
+  _id: string;
+  name: string;
+  sku: string;
+  unit: string;
+  minReorder: number;
+  stockLevel?: number;
+};
+
+export type RawMaterialEntry = {
+  _id: string;
+  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
+  batchNo: string;
+  qty: number;
+  purchaseRate: number;
+  vendorId?: string;
+  vendorName?: string;
+  expiryDate?: string;
+  createdAt: string;
+};
+
+export type BOMIngredient = {
+  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
+  qtyRequired: number;
+};
+
+export type BillOfMaterials = {
+  _id: string;
+  productId: string | { _id: string; name: string; sku: string; size?: string };
+  batchYieldSize: number;
+  ingredients: BOMIngredient[];
+};
+
+export type BatchProductionIngredient = {
+  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
+  rawMaterialEntryId: string;
+  qtyConsumed: number;
+  batchNo: string;
+};
+
+export type BatchProduction = {
+  _id: string;
+  batchNo: string;
+  productId: string | { _id: string; name: string; sku: string; size?: string; packing?: number; price?: number };
+  plannedQty: number;
+  actualYieldQty: number;
+  status: 'draft' | 'in_progress' | 'qc_hold' | 'completed' | 'cancelled';
+  ingredientsConsumed: BatchProductionIngredient[];
+  startDate?: string;
+  endDate?: string;
+  qcNotes?: string;
+  qcPassedBy?: string;
+  rawMaterialCost?: number;
+  unitProductionCost?: number;
+  createdAt: string;
+};
+
+export type Complaint = {
+  _id: string;
+  complaintNo: string;
+  type: 'complaint' | 'return' | 'exchange';
+  customerId?: string;
+  customerName: string;
+  customerPhone: string;
+  invoiceId?: string;
+  invoiceNo: string;
+  productName: string;
+  description: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high';
+  resolution: string;
+  resolvedBy: string;
+  resolvedAt?: string;
+  assignedTo: string;
+  createdAt: string;
+};
+
+export type SampleItem = {
+  productId?: string;
+  productName: string;
+  qty: number;
+  size?: string;
+  mrp: number;
+};
+
+export type Sample = {
+  _id: string;
+  sampleNo: string;
+  givenTo: string;
+  designation: string;
+  phone: string;
+  location: string;
+  purpose: string;
+  items: SampleItem[];
+  totalMrpValue: number;
+  givenBy: string;
+  date: string;
+  followUpDate?: string;
+  notes: string;
+  status: 'given' | 'follow_up_done' | 'converted' | 'no_response';
+  createdAt: string;
+};
+
+export type SalesTarget = {
+  _id: string;
+  agentId: string;
+  agentName: string;
+  month: number;
+  year: number;
+  targetAmount: number;
+  notes: string;
+  createdAt: string;
+};
+
+export type CommissionReport = {
+  commissionRate: number;
+  agents: {
+    agentName: string;
+    totalSales: number;
+    invoiceCount: number;
+    commission: number;
+  }[];
+};
+
+export type Dispatch = {
+  _id: string;
+  dispatchNo: string;
+  invoiceId?: string;
+  invoiceNo: string;
+  customerName: string;
+  customerPhone: string;
+  shippingAddress: string;
+  dispatchDate: string;
+  transporter: string;
+  lrNo: string;
+  vehicleNo: string;
+  courierName: string;
+  trackingId: string;
+  trackingUrl: string;
+  totalBoxes: number;
+  totalWeight: string;
+  freightCharge: number;
+  status: 'pending' | 'dispatched' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'returned';
+  deliveredAt?: string;
+  notes: string;
+  createdAt: string;
+};
+
+export type DeadStockItem = {
+  productId: string;
+  productName: string;
+  productSku: string;
+  price: number;
+  size: string;
+  warehouseId: string;
+  warehouseName: string;
+  qty: number;
+  stockValue: number;
+  lastMovementDate: string;
+  daysSinceMovement: number;
+};
+
 
 class ApiClient {
   private authToken: string | null = null;
@@ -951,7 +1112,223 @@ class ApiClient {
     });
     return res.json();
   }
+
+  // --- Raw Materials ---
+  async getRawMaterials(): Promise<RawMaterial[]> {
+    const res = await this.request(`${API_BASE}/raw-materials`);
+    return res.json();
+  }
+  async getRawMaterialExpiryAlerts(): Promise<RawMaterialEntry[]> {
+    const res = await this.request(`${API_BASE}/raw-materials/expiry-alerts`);
+    return res.json();
+  }
+  async createRawMaterial(data: Partial<RawMaterial>): Promise<RawMaterial> {
+    const res = await this.request(`${API_BASE}/raw-materials`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async updateRawMaterial(id: string, data: Partial<RawMaterial>): Promise<RawMaterial> {
+    const res = await this.request(`${API_BASE}/raw-materials/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteRawMaterial(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/raw-materials/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+
+  // --- Raw Material Entries ---
+  async getRawMaterialEntries(): Promise<RawMaterialEntry[]> {
+    const res = await this.request(`${API_BASE}/raw-materials/entries`);
+    return res.json();
+  }
+  async inwardRawMaterial(data: { rawMaterialId: string; batchNo: string; qty: number; purchaseRate: number; vendorId?: string; vendorName?: string; expiryDate?: string }): Promise<RawMaterialEntry> {
+    const res = await this.request(`${API_BASE}/raw-materials/entries`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteRawMaterialEntry(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/raw-materials/entries/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+
+  // --- Bill of Materials (BOM) ---
+  async getBOMs(): Promise<BillOfMaterials[]> {
+    const res = await this.request(`${API_BASE}/bom`);
+    return res.json();
+  }
+  async getBOMForProduct(productId: string): Promise<BillOfMaterials | null> {
+    try {
+      const res = await this.request(`${API_BASE}/bom/${productId}`);
+      return res.json();
+    } catch {
+      return null;
+    }
+  }
+  async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number }[] }): Promise<BillOfMaterials> {
+    const res = await this.request(`${API_BASE}/bom`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteBOM(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/bom/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+
+  // --- Batch Production ---
+  async getBatchProductions(): Promise<BatchProduction[]> {
+    const res = await this.request(`${API_BASE}/batch-productions`);
+    return res.json();
+  }
+  async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string }): Promise<BatchProduction> {
+    const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async completeBatchProduction(id: string, data: { actualYieldQty: number; qcNotes: string; qcPassedBy: string }): Promise<BatchProduction> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/complete`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async cancelBatchProduction(id: string): Promise<BatchProduction> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/cancel`, { method: 'PATCH' });
+    return res.json();
+  }
+  async getBMRReport(id: string): Promise<BMRReport> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/bmr-report`);
+    return res.json();
+  }
+  async getManufacturingAnalytics(): Promise<ManufacturingAnalytics> {
+    const res = await this.request(`${API_BASE}/analytics/manufacturing`);
+    return res.json();
+  }
+
+  // --- Complaints & Returns ---
+  async getComplaints(status = 'all', type = 'all', search = ''): Promise<Complaint[]> {
+    const res = await this.request(`${API_BASE}/complaints?status=${status}&type=${type}&search=${encodeURIComponent(search)}`);
+    return res.json();
+  }
+  async createComplaint(data: Partial<Complaint>): Promise<Complaint> {
+    const res = await this.request(`${API_BASE}/complaints`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async updateComplaint(id: string, data: Partial<Complaint>): Promise<Complaint> {
+    const res = await this.request(`${API_BASE}/complaints/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteComplaint(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/complaints/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+
+  // --- Samples ---
+  async getSamples(status = 'all', search = ''): Promise<Sample[]> {
+    const res = await this.request(`${API_BASE}/samples?status=${status}&search=${encodeURIComponent(search)}`);
+    return res.json();
+  }
+  async createSample(data: Partial<Sample>): Promise<Sample> {
+    const res = await this.request(`${API_BASE}/samples`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async updateSample(id: string, data: Partial<Sample>): Promise<Sample> {
+    const res = await this.request(`${API_BASE}/samples/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteSample(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/samples/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+
+  // --- Sales Targets & Commission ---
+  async getSalesTargets(month?: number, year?: number): Promise<SalesTarget[]> {
+    let url = `${API_BASE}/sales-targets?`;
+    if (month) url += `month=${month}&`;
+    if (year) url += `year=${year}`;
+    const res = await this.request(url);
+    return res.json();
+  }
+  async setSalesTarget(data: Partial<SalesTarget>): Promise<SalesTarget> {
+    const res = await this.request(`${API_BASE}/sales-targets`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteSalesTarget(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/sales-targets/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+  async getCommissionReport(month?: number, year?: number, commissionRate = 5): Promise<CommissionReport> {
+    let url = `${API_BASE}/sales-targets/commission?commissionRate=${commissionRate}`;
+    if (month) url += `&month=${month}`;
+    if (year) url += `&year=${year}`;
+    const res = await this.request(url);
+    return res.json();
+  }
+
+  // --- Dispatches ---
+  async getDispatches(status = 'all', search = ''): Promise<Dispatch[]> {
+    const res = await this.request(`${API_BASE}/dispatches?status=${status}&search=${encodeURIComponent(search)}`);
+    return res.json();
+  }
+  async createDispatch(data: Partial<Dispatch>): Promise<Dispatch> {
+    const res = await this.request(`${API_BASE}/dispatches`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async updateDispatch(id: string, data: Partial<Dispatch>): Promise<Dispatch> {
+    const res = await this.request(`${API_BASE}/dispatches/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteDispatch(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/dispatches/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+  async getDeadStock(): Promise<DeadStockItem[]> {
+    const res = await this.request(`${API_BASE}/dispatches/dead-stock`);
+    return res.json();
+  }
 }
+
+
+export type BMRReportIngredient = {
+  name: string;
+  code: string;
+  batchNo: string;
+  qtyConsumed: number;
+  unit: string;
+  purchaseRate: number;
+  itemCost: number;
+};
+
+export type BMRReport = {
+  batchNo: string;
+  productName: string;
+  productSku: string;
+  productPrice: number;
+  plannedQty: number;
+  actualYieldQty: number;
+  status: string;
+  startDate: string;
+  endDate?: string;
+  qcNotes: string;
+  qcPassedBy: string;
+  rawMaterialCost: number;
+  unitProductionCost: number;
+  ingredients: BMRReportIngredient[];
+};
+
+export type ManufacturingAnalytics = {
+  netRawMaterialValue: number;
+  netFinishedGoodsValue: number;
+  yieldPerformance: {
+    batchNo: string;
+    productName: string;
+    plannedQty: number;
+    actualYieldQty: number;
+    efficiency: number;
+  }[];
+  timeline: {
+    id: string;
+    batchNo: string;
+    productName: string;
+    plannedQty: number;
+    actualYieldQty: number;
+    status: string;
+    startDate: string;
+    endDate?: string;
+  }[];
+};
 
 export type OrderItem = {
   productId: string;
@@ -969,7 +1346,12 @@ export type Order = {
   shippingAddress: string;
   items: OrderItem[];
   totalAmount: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered';
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  courierName?: string;
+  trackingId?: string;
+  courierLink?: string;
+  adminNotes?: string;
+  notifications?: string[];
   createdAt: string;
   updatedAt: string;
 };

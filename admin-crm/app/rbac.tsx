@@ -26,7 +26,31 @@ type UserItem = {
   email: string;
   role: 'admin' | 'manager' | 'agent';
   canAccessCash: boolean;
+  lastActive?: string;
+  ipAddress?: string;
+  deviceInfo?: string;
 };
+
+function formatTimeAgo(dateStr: string) {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (isNaN(diffMs)) return 'unknown';
+    
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHr / 24);
+
+    if (diffSec < 60) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHr < 24) return `${diffHr}h ago`;
+    return `${diffDay}d ago`;
+  } catch (_) {
+    return 'unknown';
+  }
+}
 
 export default function RbacScreen() {
   const { colors } = useTheme();
@@ -221,6 +245,36 @@ export default function RbacScreen() {
                     </View>
                   </View>
                   <Text style={styles.userEmail}>{item.email}</Text>
+                  
+                  {/* Activity and online status tracking */}
+                  {(() => {
+                    const isOnline = item.lastActive
+                      ? new Date().getTime() - new Date(item.lastActive).getTime() < 5 * 60 * 1000
+                      : false;
+                    return (
+                      <View style={{ marginTop: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isOnline ? colors.success : '#999' }} />
+                          <Text style={{ fontSize: 11, color: isOnline ? colors.success : colors.text.muted, fontWeight: isOnline ? '600' : '400' }}>
+                            {isOnline ? 'Online' : 'Offline'}
+                          </Text>
+                          {item.lastActive && (
+                            <Text style={{ fontSize: 10, color: colors.text.muted }}>
+                              • Active {formatTimeAgo(item.lastActive)}
+                            </Text>
+                          )}
+                        </View>
+                        {(item.ipAddress || item.deviceInfo) && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="desktop-outline" size={10} color={colors.text.muted} />
+                            <Text style={{ fontSize: 10, color: colors.text.muted }} numberOfLines={1}>
+                              {item.deviceInfo || 'Unknown'} • IP: {item.ipAddress || '—'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })()}
                 </View>
               </View>
 

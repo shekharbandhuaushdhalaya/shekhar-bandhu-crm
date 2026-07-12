@@ -37,6 +37,9 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     if (path.startsWith('/reports')) return 'Reports';
     if (path.startsWith('/rbac')) return 'Access Control';
     if (path.startsWith('/pricing')) return 'Pricing & Discounts';
+    if (path.startsWith('/manufacturing')) return 'Manufacturing / BMR';
+    if (path.startsWith('/salescrm')) return 'Sales & CRM';
+    if (path.startsWith('/inventorydispatch')) return 'Inventory & Dispatch';
     return '';
   };
 
@@ -338,6 +341,40 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             {isActive('payments') && <View style={styles.activeIndicator} />}
           </TouchableOpacity>
 
+          {/* Sales & CRM */}
+          <TouchableOpacity
+            style={[styles.sidebarNavItem, isActive('salescrm') && styles.sidebarNavItemActive]}
+            onPress={() => handlePress('salescrm')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={isActive('salescrm') ? 'people-circle' : 'people-circle-outline'}
+              size={18}
+              color={isActive('salescrm') ? colors.primary : colors.text.secondary}
+            />
+            <Text style={[styles.sidebarNavText, isActive('salescrm') && styles.sidebarNavTextActive]}>
+              Sales &amp; CRM
+            </Text>
+            {isActive('salescrm') && <View style={styles.activeIndicator} />}
+          </TouchableOpacity>
+
+          {/* Inventory & Dispatch */}
+          <TouchableOpacity
+            style={[styles.sidebarNavItem, isActive('inventorydispatch') && styles.sidebarNavItemActive]}
+            onPress={() => handlePress('inventorydispatch')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={isActive('inventorydispatch') ? 'bus' : 'bus-outline'}
+              size={18}
+              color={isActive('inventorydispatch') ? colors.primary : colors.text.secondary}
+            />
+            <Text style={[styles.sidebarNavText, isActive('inventorydispatch') && styles.sidebarNavTextActive]}>
+              Inventory &amp; Dispatch
+            </Text>
+            {isActive('inventorydispatch') && <View style={styles.activeIndicator} />}
+          </TouchableOpacity>
+
           {/* Inventories */}
           <TouchableOpacity
             style={[styles.sidebarNavItem, isActive('inventories') && styles.sidebarNavItemActive]}
@@ -355,6 +392,41 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             {isActive('inventories') && <View style={styles.activeIndicator} />}
           </TouchableOpacity>
 
+          {/* Manufacturing */}
+          <TouchableOpacity
+            style={[styles.sidebarNavItem, isActive('manufacturing') && styles.sidebarNavItemActive]}
+            onPress={() => handlePress('manufacturing')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={isActive('manufacturing') ? 'hammer' : 'hammer-outline'}
+              size={18}
+              color={isActive('manufacturing') ? colors.primary : colors.text.secondary}
+            />
+            <Text style={[styles.sidebarNavText, isActive('manufacturing') && styles.sidebarNavTextActive]}>
+              Manufacturing
+            </Text>
+            {isActive('manufacturing') && <View style={styles.activeIndicator} />}
+          </TouchableOpacity>
+
+          {/* Reports */}
+          {user && user.role !== 'agent' && (
+            <TouchableOpacity
+              style={[styles.sidebarNavItem, isActive('reports') && styles.sidebarNavItemActive]}
+              onPress={() => handlePress('reports')}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={isActive('reports') ? 'bar-chart' : 'bar-chart-outline'}
+                size={18}
+                color={isActive('reports') ? colors.primary : colors.text.secondary}
+              />
+              <Text style={[styles.sidebarNavText, isActive('reports') && styles.sidebarNavTextActive]}>
+                Reports
+              </Text>
+              {isActive('reports') && <View style={styles.activeIndicator} />}
+            </TouchableOpacity>
+          )}
 
           {/* Pricing & Discounts */}
           {user && user.role !== 'agent' && (
@@ -538,6 +610,7 @@ function MainLayout() {
             <Tabs.Screen name="queries" options={{ href: null }} />
             <Tabs.Screen name="orders" options={{ href: null }} />
             <Tabs.Screen name="pricing" options={{ href: null }} />
+            <Tabs.Screen name="manufacturing" options={{ href: null }} />
           </Tabs>
         </View>
       </View>

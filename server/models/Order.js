@@ -23,7 +23,8 @@ const orderSchema = new mongoose.Schema({
   courierName: { type: String, default: '', trim: true },
   trackingId: { type: String, default: '', trim: true },
   courierLink: { type: String, default: '', trim: true },
-  adminNotes: { type: String, default: '', trim: true }
+  adminNotes: { type: String, default: '', trim: true },
+  notifications: [{ type: String }]
 }, { timestamps: true });
 
 orderSchema.index({ createdAt: -1 });

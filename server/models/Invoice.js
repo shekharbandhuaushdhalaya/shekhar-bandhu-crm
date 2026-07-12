@@ -41,6 +41,8 @@ const invoiceSchema = new mongoose.Schema({
   warehouseName: { type: String, default: '', trim: true },
   deductInventory: { type: Boolean, default: false },
   isFinalized: { type: Boolean, default: false },
+  agentId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  agentName: { type: String, default: '', trim: true },
   items: [invoiceItemSchema]
 }, { timestamps: true });
 
