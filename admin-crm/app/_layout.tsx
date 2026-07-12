@@ -164,12 +164,45 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth();
   const styles = useStyles(createStyles);
 
-  const [partiesExpanded, setPartiesExpanded] = useState(pathname.includes('parties'));
-  const [invoicesExpanded, setInvoicesExpanded] = useState(pathname.includes('invoices'));
+  const [opsExpanded, setOpsExpanded] = useState(
+    pathname.includes('products') ||
+    pathname.includes('inventories') ||
+    pathname.includes('manufacturing')
+  );
+  const [salesExpanded, setSalesExpanded] = useState(
+    pathname.includes('leads') ||
+    pathname.includes('queries') ||
+    pathname.includes('parties/customers') ||
+    pathname.includes('orders') ||
+    pathname.includes('salescrm')
+  );
+  const [financeExpanded, setFinanceExpanded] = useState(
+    pathname.includes('invoices') ||
+    pathname.includes('payments') ||
+    pathname.includes('parties/vendors') ||
+    pathname.includes('inventorydispatch') ||
+    pathname.includes('pricing')
+  );
+  const [systemExpanded, setSystemExpanded] = useState(
+    pathname.includes('reports') ||
+    pathname.includes('rbac') ||
+    pathname.includes('audit') ||
+    pathname.includes('profile')
+  );
 
   useEffect(() => {
-    if (pathname.includes('parties')) setPartiesExpanded(true);
-    if (pathname.includes('invoices')) setInvoicesExpanded(true);
+    if (pathname.includes('products') || pathname.includes('inventories') || pathname.includes('manufacturing')) {
+      setOpsExpanded(true);
+    }
+    if (pathname.includes('leads') || pathname.includes('queries') || pathname.includes('parties/customers') || pathname.includes('orders') || pathname.includes('salescrm')) {
+      setSalesExpanded(true);
+    }
+    if (pathname.includes('invoices') || pathname.includes('payments') || pathname.includes('parties/vendors') || pathname.includes('inventorydispatch') || pathname.includes('pricing')) {
+      setFinanceExpanded(true);
+    }
+    if (pathname.includes('reports') || pathname.includes('rbac') || pathname.includes('audit') || pathname.includes('profile')) {
+      setSystemExpanded(true);
+    }
   }, [pathname]);
 
   const isActive = (routeName: string) => {
@@ -203,308 +236,377 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             {isActive('index') && <View style={styles.activeIndicator} />}
           </TouchableOpacity>
 
-          {/* Products */}
+          {/* Group 1: Operations */}
           <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('products') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('products')}
+            style={[styles.sidebarNavItem, opsExpanded && styles.sidebarNavItemParentActive]}
+            onPress={() => setOpsExpanded(!opsExpanded)}
             activeOpacity={0.7}
           >
             <Ionicons
-              name={isActive('products') ? 'cube' : 'cube-outline'}
+              name="business-outline"
               size={18}
-              color={isActive('products') ? colors.primary : colors.text.secondary}
+              color={colors.text.secondary}
             />
-            <Text style={[styles.sidebarNavText, isActive('products') && styles.sidebarNavTextActive]}>
-              Products
-            </Text>
-            {isActive('products') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-
-          {/* Leads */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('leads') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('leads')}
-            activeOpacity={0.7}
-          >
+            <Text style={[styles.sidebarNavText, { flex: 1 }]}>Operations</Text>
             <Ionicons
-              name={isActive('leads') ? 'git-branch' : 'git-branch-outline'}
-              size={18}
-              color={isActive('leads') ? colors.primary : colors.text.secondary}
+              name={opsExpanded ? "chevron-down" : "chevron-forward"}
+              size={14}
+              color={colors.text.secondary}
             />
-            <Text style={[styles.sidebarNavText, isActive('leads') && styles.sidebarNavTextActive]}>
-              Leads
-            </Text>
-            {isActive('leads') && <View style={styles.activeIndicator} />}
           </TouchableOpacity>
 
-          {/* Web Queries */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('queries') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('queries')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('queries') ? 'mail-unread' : 'mail-unread-outline'}
-              size={18}
-              color={isActive('queries') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('queries') && styles.sidebarNavTextActive]}>
-              Web Queries
-            </Text>
-            {isActive('queries') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
+          {opsExpanded && (
+            <View style={{ paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.border, marginLeft: 20, gap: 2, marginVertical: 4 }}>
+              {/* Products */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('products') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('products')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('products') ? 'cube' : 'cube-outline'}
+                  size={16}
+                  color={isActive('products') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('products') && styles.sidebarNavTextActive]}>
+                  Products
+                </Text>
+              </TouchableOpacity>
 
-          {/* Orders */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('orders') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('orders')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('orders') ? 'cart' : 'cart-outline'}
-              size={18}
-              color={isActive('orders') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('orders') && styles.sidebarNavTextActive]}>
-              Orders
-            </Text>
-            {isActive('orders') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
+              {/* Inventories */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('inventories') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('inventories')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('inventories') ? 'home' : 'home-outline'}
+                  size={16}
+                  color={isActive('inventories') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('inventories') && styles.sidebarNavTextActive]}>
+                  Inventories
+                </Text>
+              </TouchableOpacity>
 
-
-
-
-          {/* Customers direct link */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('parties/customers') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('parties/customers')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('parties/customers') ? 'people' : 'people-outline'}
-              size={18}
-              color={isActive('parties/customers') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('parties/customers') && styles.sidebarNavTextActive]}>
-              Customers
-            </Text>
-            {isActive('parties/customers') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-
-          {/* Vendors direct link */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('parties/vendors') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('parties/vendors')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('parties/vendors') ? 'storefront' : 'storefront-outline'}
-              size={18}
-              color={isActive('parties/vendors') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('parties/vendors') && styles.sidebarNavTextActive]}>
-              Vendors
-            </Text>
-            {isActive('parties/vendors') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-
-
-          {/* Invoices direct link */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('invoices/sale') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('invoices/sale')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('invoices/sale') ? 'receipt' : 'receipt-outline'}
-              size={18}
-              color={isActive('invoices/sale') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('invoices/sale') && styles.sidebarNavTextActive]}>
-              Invoices
-            </Text>
-            {isActive('invoices/sale') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-
-          {/* Payments */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('payments') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('payments')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('payments') ? 'wallet' : 'wallet-outline'}
-              size={18}
-              color={isActive('payments') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('payments') && styles.sidebarNavTextActive]}>
-              Payments
-            </Text>
-            {isActive('payments') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-
-          {/* Sales & CRM */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('salescrm') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('salescrm')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('salescrm') ? 'people-circle' : 'people-circle-outline'}
-              size={18}
-              color={isActive('salescrm') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('salescrm') && styles.sidebarNavTextActive]}>
-              Sales &amp; CRM
-            </Text>
-            {isActive('salescrm') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-
-          {/* Inventory & Dispatch */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('inventorydispatch') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('inventorydispatch')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('inventorydispatch') ? 'bus' : 'bus-outline'}
-              size={18}
-              color={isActive('inventorydispatch') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('inventorydispatch') && styles.sidebarNavTextActive]}>
-              Inventory &amp; Dispatch
-            </Text>
-            {isActive('inventorydispatch') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-
-          {/* Inventories */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('inventories') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('inventories')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('inventories') ? 'home' : 'home-outline'}
-              size={18}
-              color={isActive('inventories') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('inventories') && styles.sidebarNavTextActive]}>
-              Inventories
-            </Text>
-            {isActive('inventories') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-
-          {/* Manufacturing */}
-          <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('manufacturing') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('manufacturing')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isActive('manufacturing') ? 'hammer' : 'hammer-outline'}
-              size={18}
-              color={isActive('manufacturing') ? colors.primary : colors.text.secondary}
-            />
-            <Text style={[styles.sidebarNavText, isActive('manufacturing') && styles.sidebarNavTextActive]}>
-              Manufacturing
-            </Text>
-            {isActive('manufacturing') && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-
-          {/* Reports */}
-          {user && user.role !== 'agent' && (
-            <TouchableOpacity
-              style={[styles.sidebarNavItem, isActive('reports') && styles.sidebarNavItemActive]}
-              onPress={() => handlePress('reports')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={isActive('reports') ? 'bar-chart' : 'bar-chart-outline'}
-                size={18}
-                color={isActive('reports') ? colors.primary : colors.text.secondary}
-              />
-              <Text style={[styles.sidebarNavText, isActive('reports') && styles.sidebarNavTextActive]}>
-                Reports
-              </Text>
-              {isActive('reports') && <View style={styles.activeIndicator} />}
-            </TouchableOpacity>
+              {/* Manufacturing */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('manufacturing') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('manufacturing')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('manufacturing') ? 'hammer' : 'hammer-outline'}
+                  size={16}
+                  color={isActive('manufacturing') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('manufacturing') && styles.sidebarNavTextActive]}>
+                  Manufacturing
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
 
-          {/* Pricing & Discounts */}
-          {user && user.role !== 'agent' && (
-            <TouchableOpacity
-              style={[styles.sidebarNavItem, isActive('pricing') && styles.sidebarNavItemActive]}
-              onPress={() => handlePress('pricing')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={isActive('pricing') ? 'pricetag' : 'pricetag-outline'}
-                size={18}
-                color={isActive('pricing') ? colors.primary : colors.text.secondary}
-              />
-              <Text style={[styles.sidebarNavText, isActive('pricing') && styles.sidebarNavTextActive]}>
-                Pricing &amp; Discounts
-              </Text>
-              {isActive('pricing') && <View style={styles.activeIndicator} />}
-            </TouchableOpacity>
-          )}
-
-
-
-          {/* Access Control */}
-          {user && user.role === 'admin' && (
-            <TouchableOpacity
-              style={[styles.sidebarNavItem, isActive('rbac') && styles.sidebarNavItemActive]}
-              onPress={() => handlePress('rbac')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={isActive('rbac') ? 'shield-checkmark' : 'shield-checkmark-outline'}
-                size={18}
-                color={isActive('rbac') ? colors.primary : colors.text.secondary}
-              />
-              <Text style={[styles.sidebarNavText, isActive('rbac') && styles.sidebarNavTextActive]}>
-                Access Control
-              </Text>
-              {isActive('rbac') && <View style={styles.activeIndicator} />}
-            </TouchableOpacity>
-          )}
-
-          {/* Audit Logs */}
-          {user && user.role === 'admin' && (
-            <TouchableOpacity
-              style={[styles.sidebarNavItem, isActive('audit') && styles.sidebarNavItemActive]}
-              onPress={() => handlePress('audit')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={isActive('audit') ? 'newspaper' : 'newspaper-outline'}
-                size={18}
-                color={isActive('audit') ? colors.primary : colors.text.secondary}
-              />
-              <Text style={[styles.sidebarNavText, isActive('audit') && styles.sidebarNavTextActive]}>
-                Audit Logs
-              </Text>
-              {isActive('audit') && <View style={styles.activeIndicator} />}
-            </TouchableOpacity>
-          )}
-
-          {/* My Details */}
+          {/* Group 2: Sales & CRM */}
           <TouchableOpacity
-            style={[styles.sidebarNavItem, isActive('profile') && styles.sidebarNavItemActive]}
-            onPress={() => handlePress('profile')}
+            style={[styles.sidebarNavItem, salesExpanded && styles.sidebarNavItemParentActive]}
+            onPress={() => setSalesExpanded(!salesExpanded)}
             activeOpacity={0.7}
           >
             <Ionicons
-              name={isActive('profile') ? 'person' : 'person-outline'}
+              name="people-outline"
               size={18}
-              color={isActive('profile') ? colors.primary : colors.text.secondary}
+              color={colors.text.secondary}
             />
-            <Text style={[styles.sidebarNavText, isActive('profile') && styles.sidebarNavTextActive]}>
-              My Details
-            </Text>
-            {isActive('profile') && <View style={styles.activeIndicator} />}
+            <Text style={[styles.sidebarNavText, { flex: 1 }]}>Sales & CRM</Text>
+            <Ionicons
+              name={salesExpanded ? "chevron-down" : "chevron-forward"}
+              size={14}
+              color={colors.text.secondary}
+            />
           </TouchableOpacity>
+
+          {salesExpanded && (
+            <View style={{ paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.border, marginLeft: 20, gap: 2, marginVertical: 4 }}>
+              {/* Leads */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('leads') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('leads')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('leads') ? 'git-branch' : 'git-branch-outline'}
+                  size={16}
+                  color={isActive('leads') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('leads') && styles.sidebarNavTextActive]}>
+                  Leads
+                </Text>
+              </TouchableOpacity>
+
+              {/* Web Queries */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('queries') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('queries')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('queries') ? 'mail-unread' : 'mail-unread-outline'}
+                  size={16}
+                  color={isActive('queries') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('queries') && styles.sidebarNavTextActive]}>
+                  Web Queries
+                </Text>
+              </TouchableOpacity>
+
+              {/* Customers */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('parties/customers') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('parties/customers')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('parties/customers') ? 'people' : 'people-outline'}
+                  size={16}
+                  color={isActive('parties/customers') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('parties/customers') && styles.sidebarNavTextActive]}>
+                  Customers
+                </Text>
+              </TouchableOpacity>
+
+              {/* Orders */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('orders') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('orders')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('orders') ? 'cart' : 'cart-outline'}
+                  size={16}
+                  color={isActive('orders') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('orders') && styles.sidebarNavTextActive]}>
+                  Orders
+                </Text>
+              </TouchableOpacity>
+
+              {/* Sales Targets */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('salescrm') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('salescrm')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('salescrm') ? 'people-circle' : 'people-circle-outline'}
+                  size={16}
+                  color={isActive('salescrm') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('salescrm') && styles.sidebarNavTextActive]}>
+                  Sales Targets
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Group 3: Finance & Logistics */}
+          <TouchableOpacity
+            style={[styles.sidebarNavItem, financeExpanded && styles.sidebarNavItemParentActive]}
+            onPress={() => setFinanceExpanded(!financeExpanded)}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="wallet-outline"
+              size={18}
+              color={colors.text.secondary}
+            />
+            <Text style={[styles.sidebarNavText, { flex: 1 }]}>Finance & Logistics</Text>
+            <Ionicons
+              name={financeExpanded ? "chevron-down" : "chevron-forward"}
+              size={14}
+              color={colors.text.secondary}
+            />
+          </TouchableOpacity>
+
+          {financeExpanded && (
+            <View style={{ paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.border, marginLeft: 20, gap: 2, marginVertical: 4 }}>
+              {/* Invoices */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('invoices/sale') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('invoices/sale')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('invoices/sale') ? 'receipt' : 'receipt-outline'}
+                  size={16}
+                  color={isActive('invoices/sale') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('invoices/sale') && styles.sidebarNavTextActive]}>
+                  Invoices
+                </Text>
+              </TouchableOpacity>
+
+              {/* Payments */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('payments') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('payments')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('payments') ? 'cash' : 'cash-outline'}
+                  size={16}
+                  color={isActive('payments') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('payments') && styles.sidebarNavTextActive]}>
+                  Payments
+                </Text>
+              </TouchableOpacity>
+
+              {/* Vendors */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('parties/vendors') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('parties/vendors')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('parties/vendors') ? 'storefront' : 'storefront-outline'}
+                  size={16}
+                  color={isActive('parties/vendors') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('parties/vendors') && styles.sidebarNavTextActive]}>
+                  Vendors
+                </Text>
+              </TouchableOpacity>
+
+              {/* Inventory & Dispatch */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('inventorydispatch') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('inventorydispatch')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('inventorydispatch') ? 'bus' : 'bus-outline'}
+                  size={16}
+                  color={isActive('inventorydispatch') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('inventorydispatch') && styles.sidebarNavTextActive]}>
+                  Challans &amp; Dispatch
+                </Text>
+              </TouchableOpacity>
+
+              {/* Pricing & Discounts */}
+              {user && user.role !== 'agent' && (
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, isActive('pricing') && styles.sidebarNavItemActive]}
+                  onPress={() => handlePress('pricing')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={isActive('pricing') ? 'pricetag' : 'pricetag-outline'}
+                    size={16}
+                    color={isActive('pricing') ? colors.primary : colors.text.secondary}
+                  />
+                  <Text style={[styles.sidebarNavText, isActive('pricing') && styles.sidebarNavTextActive]}>
+                    Pricing &amp; Discounts
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Group 4: System & Security */}
+          <TouchableOpacity
+            style={[styles.sidebarNavItem, systemExpanded && styles.sidebarNavItemParentActive]}
+            onPress={() => setSystemExpanded(!systemExpanded)}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="settings-outline"
+              size={18}
+              color={colors.text.secondary}
+            />
+            <Text style={[styles.sidebarNavText, { flex: 1 }]}>System & Settings</Text>
+            <Ionicons
+              name={systemExpanded ? "chevron-down" : "chevron-forward"}
+              size={14}
+              color={colors.text.secondary}
+            />
+          </TouchableOpacity>
+
+          {systemExpanded && (
+            <View style={{ paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.border, marginLeft: 20, gap: 2, marginVertical: 4 }}>
+              {/* Reports */}
+              {user && user.role !== 'agent' && (
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, isActive('reports') && styles.sidebarNavItemActive]}
+                  onPress={() => handlePress('reports')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={isActive('reports') ? 'bar-chart' : 'bar-chart-outline'}
+                    size={16}
+                    color={isActive('reports') ? colors.primary : colors.text.secondary}
+                  />
+                  <Text style={[styles.sidebarNavText, isActive('reports') && styles.sidebarNavTextActive]}>
+                    Reports
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Access Control */}
+              {user && user.role === 'admin' && (
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, isActive('rbac') && styles.sidebarNavItemActive]}
+                  onPress={() => handlePress('rbac')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={isActive('rbac') ? 'shield-checkmark' : 'shield-checkmark-outline'}
+                    size={16}
+                    color={isActive('rbac') ? colors.primary : colors.text.secondary}
+                  />
+                  <Text style={[styles.sidebarNavText, isActive('rbac') && styles.sidebarNavTextActive]}>
+                    Access Control
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Audit Logs */}
+              {user && user.role === 'admin' && (
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, isActive('audit') && styles.sidebarNavItemActive]}
+                  onPress={() => handlePress('audit')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={isActive('audit') ? 'newspaper' : 'newspaper-outline'}
+                    size={16}
+                    color={isActive('audit') ? colors.primary : colors.text.secondary}
+                  />
+                  <Text style={[styles.sidebarNavText, isActive('audit') && styles.sidebarNavTextActive]}>
+                    Audit Logs
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* My Details */}
+              <TouchableOpacity
+                style={[styles.sidebarNavItem, isActive('profile') && styles.sidebarNavItemActive]}
+                onPress={() => handlePress('profile')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isActive('profile') ? 'person' : 'person-outline'}
+                  size={16}
+                  color={isActive('profile') ? colors.primary : colors.text.secondary}
+                />
+                <Text style={[styles.sidebarNavText, isActive('profile') && styles.sidebarNavTextActive]}>
+                  My Details
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
