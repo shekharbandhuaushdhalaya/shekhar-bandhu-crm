@@ -716,7 +716,6 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
         setWarehouses([]);
         setWarehouseInventory([]);
         setStatus('draft');
-        setMode('pakka');
         setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0 }]);
         setShowCustomerDropdown(false);
         setActiveItemDropdownIdx(null);
@@ -1415,7 +1414,7 @@ export default function QuotationsScreen() {
               <View style={[styles.tableHeaderCellContainer, { width: 110 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 80, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell} style={{ textAlign: 'center' }}>Action</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 80, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
             </View>
 
             {/* Table Body Rows */}

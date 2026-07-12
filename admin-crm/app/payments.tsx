@@ -46,7 +46,6 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
       setShowPartyDropdown(false);
       setAmount('');
       setDate(getLocalDateString());
-      setMode('pakka');
       setMethod('Cash');
       setReferenceNo('');
       setNotes('');

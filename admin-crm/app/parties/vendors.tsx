@@ -731,11 +731,7 @@ function VendorLedgerModal({
     if (visible && vendor) load();
   }, [visible, vendor, load]);
 
-  useEffect(() => {
-    if (visible) {
-      setActiveLedgerMode('pakka');
-    }
-  }, [visible]);
+
 
   if (!vendor) return null;
 
@@ -822,7 +818,7 @@ function VendorLedgerModal({
       <strong>Period:</strong><br/>
       ${periodStr}<br/><br/>
       <strong>Ledger Type:</strong><br/>
-      ${activeLedgerMode === 'pakka' ? 'Invoice (GST) Ledger' : 'Cash Ledger'}
+      Invoice (GST) Ledger
     </div>
   </div>
 

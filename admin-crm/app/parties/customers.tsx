@@ -354,7 +354,7 @@ function AddEditCustomerModal({
   const canAccessCash = user?.canAccessCash ?? false;
 
   const [customerType, setCustomerType] = useState<'gst' | 'cash'>('gst');
-  const recordTracking = 'invoice_ledger';
+  const recordTracking = 'invoice_ledger' as const;
   const [company, setCompany] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
@@ -405,7 +405,6 @@ function AddEditCustomerModal({
   useEffect(() => {
     if (customer) {
       setCustomerType(customer.customerType || 'gst');
-      setRecordTracking(customer.recordTracking || 'invoice_ledger');
       setCompany(customer.company || '');
       setContactPerson(customer.contactPerson || customer.name || '');
       setPhone(customer.phone || '');
@@ -441,7 +440,6 @@ function AddEditCustomerModal({
       setSalesVolume(customer.salesVolume.toString());
     } else {
       setCustomerType('gst');
-      setRecordTracking('invoice_ledger');
       setCompany('');
       setContactPerson('');
       setPhone('');
