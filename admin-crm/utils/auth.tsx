@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { authStorage } from './storage';
 import { api, setApiBaseUrl } from './api';
+import { loadFirmDetailsFromStorage } from '../constants/firm';
 
 export type UserProfile = {
   id: string;
@@ -34,6 +35,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (storedApiUrl) {
           setApiBaseUrl(storedApiUrl);
         }
+
+        await loadFirmDetailsFromStorage();
 
         const storedToken = await authStorage.getItem('vp_crm_token');
         const storedUser = await authStorage.getItem('vp_crm_user');

@@ -32,6 +32,7 @@ const complaintRoutes = require('./routes/complaints');
 const sampleRoutes = require('./routes/samples');
 const salesTargetRoutes = require('./routes/salesTargets');
 const dispatchRoutes = require('./routes/dispatches');
+const systemRoutes = require('./routes/system');
 
 
 // — Seed data models —
@@ -94,6 +95,7 @@ mongoose
     console.log('🔌 Connected to MongoDB');
     const { router: authRoutes } = require('./routes/auth');
     app.use('/api/auth', authRoutes);
+    app.use('/api/system', systemRoutes);
 
     app.get('/api/public/products', async (req, res) => {
       try {

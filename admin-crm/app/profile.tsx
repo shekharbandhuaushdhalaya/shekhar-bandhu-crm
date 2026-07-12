@@ -17,6 +17,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { api, getApiBaseUrl, setApiBaseUrl } from '../utils/api';
 import { authStorage } from '../utils/storage';
+import { updateActiveFirmDetails } from '../constants/firm';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 
 export default function ProfileScreen() {
@@ -26,6 +27,9 @@ export default function ProfileScreen() {
   const { showToast } = useToast();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
+
+  // Tab State for Admin
+  const [activeTab, setActiveTab] = useState<'profile' | 'company'>('profile');
 
   // Form states for profile details
   const [name, setName] = useState(user?.name || '');
@@ -40,6 +44,28 @@ export default function ProfileScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+
+  // Form states for Company Config (Admin Only)
+  const [firmName, setFirmName] = useState('');
+  const [firmAddress, setFirmAddress] = useState('');
+  const [firmEmail, setFirmEmail] = useState('');
+  const [firmPhone, setFirmPhone] = useState('');
+  const [firmGstin, setFirmGstin] = useState('');
+  
+  const [bankName, setBankName] = useState('');
+  const [bankAccountNo, setBankAccountNo] = useState('');
+  const [bankIfsc, setBankIfsc] = useState('');
+  const [bankBranch, setBankBranch] = useState('');
+  const [bankUpi, setBankUpi] = useState('');
+
+  const [invoicePrefix, setInvoicePrefix] = useState('');
+  const [quotationPrefix, setQuotationPrefix] = useState('');
+  const [challanPrefix, setChallanPrefix] = useState('');
+  const [dispatchPrefix, setDispatchPrefix] = useState('');
+
+  const [defaultTerms, setDefaultTerms] = useState('');
+  const [defaultGstRate, setDefaultGstRate] = useState('18');
+  const [companyLoading, setCompanyLoading] = useState(false);
 
   // User session states
   const [sessionInfo, setSessionInfo] = useState<{
@@ -67,13 +93,49 @@ export default function ProfileScreen() {
     }
   };
 
+  // Load company config from DB
+  const loadCompanyConfig = async () => {
+    try {
+      const config = await api.getSystemSettings();
+      if (config) {
+        setFirmName(config.firmName || '');
+        setFirmAddress(config.firmAddress || '');
+        setFirmEmail(config.firmEmail || '');
+        setFirmPhone(config.firmPhone || '');
+        setFirmGstin(config.firmGstin || '');
+        setBankName(config.bankName || '');
+        setBankAccountNo(config.bankAccountNo || '');
+        setBankIfsc(config.bankIfsc || '');
+        setBankBranch(config.bankBranch || '');
+        setBankUpi(config.bankUpi || '');
+        setInvoicePrefix(config.invoicePrefix || '');
+        setQuotationPrefix(config.quotationPrefix || '');
+        setChallanPrefix(config.challanPrefix || '');
+        setDispatchPrefix(config.dispatchPrefix || '');
+        setDefaultTerms(config.defaultTerms || '');
+        setDefaultGstRate(config.defaultGstRate ? config.defaultGstRate.toString() : '18');
+
+        // Instantly synchronize in-memory config on frontend
+        updateActiveFirmDetails(config);
+      }
+    } catch (err) {
+      console.error('Failed to load company configuration:', err);
+    }
+  };
+
   useEffect(() => {
     loadSessionDetails();
-  }, []);
+    if (user?.role === 'admin') {
+      loadCompanyConfig();
+    }
+  }, [user]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadSessionDetails();
+    if (user?.role === 'admin') {
+      await loadCompanyConfig();
+    }
     setRefreshing(false);
   };
 
@@ -147,6 +209,49 @@ export default function ProfileScreen() {
     }
   };
 
+  // Company Settings update handler (Admin Only)
+  const handleSaveCompanyConfig = async () => {
+    if (!firmName.trim()) {
+      showToast('Firm name is required.', 'warning');
+      return;
+    }
+    setCompanyLoading(true);
+    try {
+      const payload = {
+        firmName: firmName.trim(),
+        firmAddress: firmAddress.trim(),
+        firmEmail: firmEmail.trim(),
+        firmPhone: firmPhone.trim(),
+        firmGstin: firmGstin.trim().toUpperCase(),
+        bankName: bankName.trim(),
+        bankAccountNo: bankAccountNo.trim(),
+        bankIfsc: bankIfsc.trim().toUpperCase(),
+        bankBranch: bankBranch.trim(),
+        bankUpi: bankUpi.trim(),
+        invoicePrefix: invoicePrefix.trim(),
+        quotationPrefix: quotationPrefix.trim(),
+        challanPrefix: challanPrefix.trim(),
+        dispatchPrefix: dispatchPrefix.trim(),
+        defaultTerms: defaultTerms.trim(),
+        defaultGstRate: Number(defaultGstRate) || 18,
+      };
+
+      const updated = await api.updateSystemSettings(payload);
+      
+      // Update AsyncStorage cache for offline retrieval
+      await authStorage.setItem('vp_crm_firm_settings', JSON.stringify(updated));
+      
+      // Update in-memory proxy
+      updateActiveFirmDetails(updated);
+
+      showToast('Company settings saved successfully!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to save company settings.', 'error');
+    } finally {
+      setCompanyLoading(false);
+    }
+  };
+
   const roleColors: { [key: string]: string } = {
     admin: colors.danger,
     manager: colors.warning,
@@ -154,14 +259,6 @@ export default function ProfileScreen() {
   };
 
   const userInitials = user?.name ? user.name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) : 'U';
-
-  const formatTimestamp = (dateStr?: string) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleString(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    });
-  };
 
   const renderForms = () => (
     <View style={styles.formContainer}>
@@ -295,6 +392,224 @@ export default function ProfileScreen() {
     </View>
   );
 
+  const renderCompanySettings = () => (
+    <View style={styles.formContainer}>
+      {/* Firm details card */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="business-outline" size={18} color={colors.primary} />
+          <Text style={styles.cardTitle}>Firm Details</Text>
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.label}>Firm / Company Name</Text>
+          <TextInput
+            style={styles.input}
+            value={firmName}
+            onChangeText={setFirmName}
+            placeholder="Enter firm name"
+            placeholderTextColor={colors.text.muted}
+          />
+
+          <Text style={styles.label}>Address</Text>
+          <TextInput
+            style={[styles.input, { minHeight: 60 }]}
+            value={firmAddress}
+            onChangeText={setFirmAddress}
+            placeholder="Enter billing address"
+            placeholderTextColor={colors.text.muted}
+            multiline
+          />
+
+          <View style={styles.rowInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Phone Number</Text>
+              <TextInput
+                style={styles.input}
+                value={firmPhone}
+                onChangeText={setFirmPhone}
+                placeholder="Phone number"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="phone-pad"
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.label}>GSTIN / Tax ID</Text>
+              <TextInput
+                style={styles.input}
+                value={firmGstin}
+                onChangeText={setFirmGstin}
+                placeholder="GSTIN number"
+                placeholderTextColor={colors.text.muted}
+                autoCapitalize="characters"
+              />
+            </View>
+          </View>
+
+          <Text style={styles.label}>Firm Email Address</Text>
+          <TextInput
+            style={styles.input}
+            value={firmEmail}
+            onChangeText={setFirmEmail}
+            placeholder="Enter contact email"
+            placeholderTextColor={colors.text.muted}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+        </View>
+      </View>
+
+      {/* Bank Details Card */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="card-outline" size={18} color={colors.primary} />
+          <Text style={styles.cardTitle}>Bank Details</Text>
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.label}>Bank Name</Text>
+          <TextInput
+            style={styles.input}
+            value={bankName}
+            onChangeText={setBankName}
+            placeholder="e.g. State Bank of India"
+            placeholderTextColor={colors.text.muted}
+          />
+
+          <View style={styles.rowInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Account Number</Text>
+              <TextInput
+                style={styles.input}
+                value={bankAccountNo}
+                onChangeText={setBankAccountNo}
+                placeholder="Account number"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.label}>IFSC Code</Text>
+              <TextInput
+                style={styles.input}
+                value={bankIfsc}
+                onChangeText={setBankIfsc}
+                placeholder="IFSC code"
+                placeholderTextColor={colors.text.muted}
+                autoCapitalize="characters"
+              />
+            </View>
+          </View>
+
+          <View style={styles.rowInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Branch Name</Text>
+              <TextInput
+                style={styles.input}
+                value={bankBranch}
+                onChangeText={setBankBranch}
+                placeholder="Branch details"
+                placeholderTextColor={colors.text.muted}
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.label}>UPI ID (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={bankUpi}
+                onChangeText={setBankUpi}
+                placeholder="e.g. shopify@upi"
+                placeholderTextColor={colors.text.muted}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Bill Prefixes & Taxes Card */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="options-outline" size={18} color={colors.primary} />
+          <Text style={styles.cardTitle}>Prefixes, Terms & Taxes</Text>
+        </View>
+        <View style={styles.cardContent}>
+          <View style={styles.rowInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Invoice Prefix</Text>
+              <TextInput
+                style={styles.input}
+                value={invoicePrefix}
+                onChangeText={setInvoicePrefix}
+                placeholder="e.g. VP"
+                placeholderTextColor={colors.text.muted}
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.label}>Quotation Prefix</Text>
+              <TextInput
+                style={styles.input}
+                value={quotationPrefix}
+                onChangeText={setQuotationPrefix}
+                placeholder="e.g. QT"
+                placeholderTextColor={colors.text.muted}
+              />
+            </View>
+          </View>
+
+          <View style={styles.rowInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Challan Prefix</Text>
+              <TextInput
+                style={styles.input}
+                value={challanPrefix}
+                onChangeText={setChallanPrefix}
+                placeholder="e.g. CH"
+                placeholderTextColor={colors.text.muted}
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.label}>Default GST Slab (%)</Text>
+              <TextInput
+                style={styles.input}
+                value={defaultGstRate}
+                onChangeText={setDefaultGstRate}
+                placeholder="e.g. 18"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+
+          <Text style={styles.label}>Invoice Terms & Conditions</Text>
+          <TextInput
+            style={[styles.input, { minHeight: 100, fontSize: 12 }]}
+            value={defaultTerms}
+            onChangeText={setDefaultTerms}
+            placeholder="Type default terms printed on documents..."
+            placeholderTextColor={colors.text.muted}
+            multiline
+          />
+        </View>
+      </View>
+
+      {/* Save Button */}
+      <TouchableOpacity
+        style={[styles.btnPrimary, { backgroundColor: colors.success }]}
+        onPress={handleSaveCompanyConfig}
+        disabled={companyLoading}
+        activeOpacity={0.8}
+      >
+        {companyLoading ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <>
+            <Ionicons name="cloud-upload-outline" size={16} color="#fff" />
+            <Text style={styles.btnText}>Update Global Settings</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderSidebar = () => (
     <View style={styles.sidebarContainer}>
       {/* Overview Card */}
@@ -361,16 +676,40 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
     >
+      {/* Tab Selectors for Admins */}
+      {user?.role === 'admin' && (
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'profile' && styles.tabActiveButton]}
+            onPress={() => setActiveTab('profile')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="lock-closed-outline" size={16} color={activeTab === 'profile' ? colors.primary : colors.text.secondary} />
+            <Text style={[styles.tabText, activeTab === 'profile' && styles.tabActiveText]}>My Credentials</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'company' && styles.tabActiveButton]}
+            onPress={() => setActiveTab('company')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="business-outline" size={16} color={activeTab === 'company' ? colors.primary : colors.text.secondary} />
+            <Text style={[styles.tabText, activeTab === 'company' && styles.tabActiveText]}>Company Configuration</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={[styles.layoutGrid, { flexDirection: isDesktop ? 'row' : 'column' }]}>
         {isDesktop ? (
           <>
-            <View style={{ flex: 2, marginRight: Spacing.lg }}>{renderForms()}</View>
+            <View style={{ flex: 2, marginRight: Spacing.lg }}>
+              {activeTab === 'profile' ? renderForms() : renderCompanySettings()}
+            </View>
             <View style={{ flex: 1 }}>{renderSidebar()}</View>
           </>
         ) : (
           <>
             {renderSidebar()}
-            {renderForms()}
+            {activeTab === 'profile' ? renderForms() : renderCompanySettings()}
           </>
         )}
       </View>
@@ -385,6 +724,38 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.lg,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.bg.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: Radius.md,
+    padding: 4,
+    marginBottom: Spacing.lg,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: Radius.sm,
+  },
+  tabActiveButton: {
+    backgroundColor: colors.bg.primary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text.secondary,
+  },
+  tabActiveText: {
+    color: colors.primary,
+    fontWeight: '800',
   },
   layoutGrid: {
     width: '100%',
@@ -439,6 +810,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     fontSize: 13,
     color: colors.text.primary,
     marginBottom: 4,
+  },
+  rowInputs: {
+    flexDirection: 'row',
   },
   btnPrimary: {
     backgroundColor: colors.primary,

@@ -64,7 +64,7 @@ const printQuotation = (invoice: Quotation) => {
       let iRate = 0, iAmt = 0;
       
       if (isPakka) {
-        const gstRate = it.gstRate || invoice.gstRate || 18;
+        const gstRate = it.gstRate || invoice.gstRate || FIRM_DETAILS.defaultGstRate;
         if (invoice.igst && invoice.igst > 0) {
           iRate = gstRate;
           iAmt = taxable * (iRate / 100);
@@ -296,11 +296,7 @@ const printQuotation = (invoice: Quotation) => {
           </td>
           <td style="width:34%; border-right: 1px solid #000; padding:5px; vertical-align:top; font-size:8px; line-height: 1.3;">
             <strong>Terms & Conditions</strong><br/>
-            1. All disputes are subject to "VARANASI" Jurisdiction only.<br/>
-            2. Goods despatched at your risk and responsibility. Kindly retire the documents on presentation.<br/>
-            3. We do not accept any responsibility for any loss/damages once the goods are delivered to the carriers.<br/>
-            4. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.<br/>
-            5. Goods once sold will not be taken back.
+            ${FIRM_DETAILS.defaultTerms ? FIRM_DETAILS.defaultTerms.replace(/\n/g, '<br/>') : ''}
           </td>
           <td style="width:33%; text-align:center; padding:5px; vertical-align:bottom; height: 80px;">
             <div style="font-weight:bold; margin-bottom: 40px; font-size: 11px;">For ${FIRM_DETAILS.name}</div>
@@ -862,7 +858,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
     const next = [...items];
     const product = products.find(p => p._id === entry.productId);
     const price = product ? product.price : 0;
-    const gst = product ? (product.gstRate || 18) : 18;
+    const gst = product ? (product.gstRate || FIRM_DETAILS.defaultGstRate) : FIRM_DETAILS.defaultGstRate;
     const hsn = product ? (product.hsnCode || '') : '';
 
     next[idx] = {

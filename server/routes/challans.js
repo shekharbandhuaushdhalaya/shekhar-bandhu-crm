@@ -180,7 +180,10 @@ router.post('/', async (req, res) => {
 
     let challanNo = req.body.challanNo;
     if (!challanNo) {
-      const lastChallan = await Challan.findOne({ challanNo: /^VP-CH-\d+$/ }).sort({ createdAt: -1 }).lean();
+      const SystemSettings = require('../models/SystemSettings');
+      const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
+      const pfx = settings.challanPrefix || 'CH';
+      const lastChallan = await Challan.findOne({ challanNo: new RegExp(`^${pfx}-\\d+$`) }).sort({ createdAt: -1 }).lean();
       let nextNum = 1;
       if (lastChallan) {
         const parts = lastChallan.challanNo.split('-');
@@ -188,7 +191,7 @@ router.post('/', async (req, res) => {
           nextNum = parseInt(parts[2], 10) + 1;
         }
       }
-      challanNo = `VP-CH-${nextNum.toString().padStart(3, '0')}`;
+      challanNo = `${pfx}-${nextNum.toString().padStart(3, '0')}`;
     }
 
     const data = {
@@ -387,7 +390,10 @@ router.post('/:id/convert', async (req, res) => {
     // Generate Invoice Number
     const Invoice = require('../models/Invoice');
     const fy = getFinancialYearString();
-    const prefix = `VP/${fy}/`;
+    const SystemSettings = require('../models/SystemSettings');
+    const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
+    const pfx = settings.invoicePrefix || 'VP';
+    const prefix = `${pfx}/${fy}/`;
     
     const lastInvoice = await Invoice.findOne({ 
       type: 'sale',

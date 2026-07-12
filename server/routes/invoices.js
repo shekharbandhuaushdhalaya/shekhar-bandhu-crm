@@ -102,7 +102,10 @@ router.post('/sales', async (req, res) => {
     let invoiceNo = req.body.invoiceNo;
     if (!invoiceNo) {
       const fy = getFinancialYearString();
-      const prefix = `VP/${fy}/`;
+      const SystemSettings = require('../models/SystemSettings');
+      const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
+      const pfx = settings.invoicePrefix || 'VP';
+      const prefix = `${pfx}/${fy}/`;
       
       const lastInvoice = await Invoice.findOne({ 
         type: 'sale',

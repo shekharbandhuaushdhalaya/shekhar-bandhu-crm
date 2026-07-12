@@ -412,7 +412,10 @@ router.post('/:id/invoice', async (req, res) => {
 
     // 4. Generate unique invoice number
     const fy = getFinancialYearString(new Date());
-    const prefix = `VP/${fy}/`;
+    const SystemSettings = require('../models/SystemSettings');
+    const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
+    const pfx = settings.invoicePrefix || 'VP';
+    const prefix = `${pfx}/${fy}/`;
     const lastInvoice = await Invoice.findOne({ 
       type: 'sale',
       invoiceNo: { $regex: `^${prefix.replace(/\//g, '\\/')}\\d+$` }

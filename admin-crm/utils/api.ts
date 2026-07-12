@@ -705,6 +705,19 @@ class ApiClient {
     return res.json();
   }
 
+  async getSystemSettings(): Promise<any> {
+    const res = await this.request(`${API_BASE}/system/settings`);
+    return res.json();
+  }
+
+  async updateSystemSettings(data: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/system/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  }
+
   async updateProfile(data: { name: string; email: string }): Promise<any> {
     const res = await this.request(`${API_BASE}/auth/update-profile`, {
       method: 'PUT',
