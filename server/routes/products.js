@@ -198,6 +198,47 @@ router.post('/:id/image', upload.single('image'), async (req, res) => {
   }
 });
 
+// POST /api/products/:id/image/append — Upload and append a new image to the product's image list
+router.post('/:id/image/append', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+    const imageUrl = await uploadToCloudinary(req.file.buffer);
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    let images = product.image ? product.image.split(',').map(s => s.trim()).filter(Boolean) : [];
+    images.push(imageUrl);
+    product.image = images.join(',');
+    await product.save();
+
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/products/:id/image/delete — Remove a specific image URL from the product's image list
+router.post('/:id/image/delete', async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
+
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    let images = product.image ? product.image.split(',').map(s => s.trim()).filter(Boolean) : [];
+    images = images.filter(url => url !== imageUrl);
+    product.image = images.join(',');
+    await product.save();
+
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/products/:id/pricing — Update price, discount & promo banner (admin/manager only)
 router.patch('/:id/pricing', async (req, res) => {
   try {

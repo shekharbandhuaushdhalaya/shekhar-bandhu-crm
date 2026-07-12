@@ -54,15 +54,21 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
 
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
           
-          {/* Image Picker */}
-          <View style={{ alignItems: 'center', marginBottom: Spacing.lg }}>
-            <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: colors.bg.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
+          {/* Image Gallery */}
+          <View style={{ marginBottom: Spacing.lg }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 10, alignSelf: 'center', paddingVertical: 5 }}>
               {product.image ? (
-                <Image source={{ uri: getImageUrl(product.image) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                product.image.split(',').map((img, idx) => (
+                  <View key={idx} style={{ width: 120, height: 120, borderRadius: 8, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', backgroundColor: colors.bg.secondary }}>
+                    <Image source={{ uri: getImageUrl(img.trim()) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  </View>
+                ))
               ) : (
-                <Ionicons name="cube" size={36} color={colors.primary} />
+                <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: colors.bg.secondary, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border }}>
+                  <Ionicons name="cube" size={36} color={colors.primary} />
+                </View>
               )}
-            </View>
+            </ScrollView>
           </View>
 
           <View style={styles.profileHeader}>
@@ -233,12 +239,23 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
 
   const fileInputRef = React.useRef<any>(null);
 
-  const handleFileChange = (e: any) => {
+  const handleFileChange = async (e: any) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = () => {
-        setImageUri(reader.result as string);
+      reader.onload = async () => {
+        const fileUri = reader.result as string;
+        if (product) {
+          try {
+            const updated = await api.appendProductImage(product._id, fileUri);
+            setImagesList(updated.image ? updated.image.split(',').map(s => s.trim()).filter(Boolean) : []);
+            showToast('Image uploaded successfully!', 'success');
+          } catch (err: any) {
+            showToast(err.message || 'Failed to upload image', 'error');
+          }
+        } else {
+          setLocalNewImages(prev => [...prev, fileUri]);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -264,7 +281,8 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   const [description, setDescription] = useState('');
   const [disease, setDisease] = useState('');
   const [ingredients, setIngredients] = useState('');
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imagesList, setImagesList] = useState<string[]>([]);
+  const [localNewImages, setLocalNewImages] = useState<string[]>([]);
 
   const [shapes, setShapes] = useState(['liquid', 'tablet', 'capsule', 'powder', 'paste']);
   const [showShapeInput, setShowShapeInput] = useState(false);
@@ -293,11 +311,8 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       setDisease(product.disease || '');
       setIngredients(product.ingredients || '');
       
-      if (product.image) {
-        setImageUri(getImageUrl(product.image));
-      } else {
-        setImageUri(null);
-      }
+      setImagesList(product.image ? product.image.split(',').map(s => s.trim()).filter(Boolean) : []);
+      setLocalNewImages([]);
 
       if (product.productType) {
         const norm = normalizeTitleCase(product.productType);
@@ -328,7 +343,8 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       setDescription('');
       setDisease('');
       setIngredients('');
-      setImageUri(null);
+      setImagesList([]);
+      setLocalNewImages([]);
     }
     setShowTypeInput(false);
     setNewTypeName('');
@@ -385,7 +401,32 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImageUri(result.assets[0].uri);
+      const pickedUri = result.assets[0].uri;
+      if (product) {
+        try {
+          const updated = await api.appendProductImage(product._id, pickedUri);
+          setImagesList(updated.image ? updated.image.split(',').map(s => s.trim()).filter(Boolean) : []);
+          showToast('Image uploaded successfully!', 'success');
+        } catch (err: any) {
+          showToast(err.message || 'Failed to upload image', 'error');
+        }
+      } else {
+        setLocalNewImages(prev => [...prev, pickedUri]);
+      }
+    }
+  };
+
+  const handleDeleteImage = async (url: string, index: number) => {
+    if (product) {
+      try {
+        const updated = await api.deleteProductImage(product._id, url);
+        setImagesList(updated.image ? updated.image.split(',').map(s => s.trim()).filter(Boolean) : []);
+        showToast('Image deleted successfully!', 'success');
+      } catch (err: any) {
+        showToast(err.message || 'Failed to delete image', 'error');
+      }
+    } else {
+      setLocalNewImages(prev => prev.filter((_, idx) => idx !== index));
     }
   };
 
@@ -457,10 +498,10 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
         savedProduct = await api.updateProduct(product._id, payload);
       } else {
         savedProduct = await api.createProduct(payload);
-      }
-      
-      if (imageUri && (imageUri.startsWith('file:') || imageUri.startsWith('blob:') || imageUri.startsWith('data:'))) {
-        await api.uploadProductImage(savedProduct._id, imageUri);
+        // Upload staged local new images
+        for (const localImg of localNewImages) {
+          savedProduct = await api.appendProductImage(savedProduct._id, localImg);
+        }
       }
 
       onSaved();
@@ -485,24 +526,54 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
         </View>
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
           
-          <View style={{ alignItems: 'center', marginBottom: Spacing.lg }}>
-            {Platform.OS === 'web' && (
-              <input
-                type="file"
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                accept="image/*"
-                onChange={handleFileChange}
-              />
-            )}
-            <TouchableOpacity onPress={triggerFileSelect} style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: colors.bg.secondary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
-              {imageUri ? (
-                <Image source={{ uri: imageUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-              ) : (
-                <Ionicons name="camera-outline" size={32} color={colors.text.muted} />
+          <View style={{ marginBottom: Spacing.lg }}>
+            <Text style={styles.formLabel}>Product Gallery</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexDirection: 'row', gap: 10, paddingVertical: 5 }}>
+              {Platform.OS === 'web' && (
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
               )}
-            </TouchableOpacity>
-            <Text style={{ marginTop: 8, fontSize: 12, color: colors.text.muted }}>Tap to {imageUri ? 'change' : 'add'} image</Text>
+
+              {/* Render existing images */}
+              {imagesList.map((url, idx) => (
+                <View key={`exist-${idx}`} style={{ width: 80, height: 80, borderRadius: 8, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', position: 'relative' }}>
+                  <Image source={{ uri: getImageUrl(url) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  <TouchableOpacity
+                    style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}
+                    onPress={() => handleDeleteImage(url, idx)}
+                  >
+                    <Ionicons name="trash" size={14} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {/* Render staged new images */}
+              {localNewImages.map((uri, idx) => (
+                <View key={`new-${idx}`} style={{ width: 80, height: 80, borderRadius: 8, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', position: 'relative' }}>
+                  <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  <TouchableOpacity
+                    style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}
+                    onPress={() => handleDeleteImage(uri, idx)}
+                  >
+                    <Ionicons name="trash" size={14} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {/* Upload button */}
+              <TouchableOpacity
+                onPress={triggerFileSelect}
+                style={{ width: 80, height: 80, borderRadius: 8, borderStyle: 'dashed', borderWidth: 1.5, borderColor: colors.primary, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.secondary }}
+              >
+                <Ionicons name="add" size={24} color={colors.primary} />
+                <Text style={{ fontSize: 9, color: colors.primary, fontWeight: '700', marginTop: 4 }}>Add Photo</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
           
           <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Core Product Specifications</Text></View>

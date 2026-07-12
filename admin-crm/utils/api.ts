@@ -937,6 +937,80 @@ class ApiClient {
     }
   }
 
+  async appendProductImage(id: string, imageUri: string): Promise<Product> {
+    const formData = new FormData();
+    let cleanFilename = 'image.jpg';
+    let mimeType = 'image/jpeg';
+
+    if (imageUri.startsWith('data:')) {
+      const match = imageUri.match(/^data:(image\/[a-zA-Z+.-]+);base64,/);
+      if (match) {
+        mimeType = match[1];
+        const ext = mimeType.split('/')[1] || 'jpg';
+        cleanFilename = `image.${ext}`;
+      }
+    } else {
+      const filename = imageUri.split('/').pop() || 'image.jpg';
+      cleanFilename = filename.split('?')[0];
+      const ext = cleanFilename.split('.').pop() || 'jpg';
+      mimeType = `image/${ext.toLowerCase() === 'png' ? 'png' : 'jpeg'}`;
+    }
+
+    if (Platform.OS === 'web') {
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      formData.append('image', blob, cleanFilename);
+    } else {
+      // Native React Native format
+      formData.append('image', {
+        uri: imageUri,
+        name: cleanFilename,
+        type: mimeType,
+      } as any);
+    }
+
+    const headers: Record<string, string> = {};
+    if (!this.authToken) {
+      try { this.authToken = await authStorage.getItem('vp_crm_token'); } catch (e) {}
+    }
+    if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
+
+    this.activeRequests++;
+    DeviceEventEmitter.emit('global_loader', { isLoading: true });
+
+    try {
+      const res = await fetch(`${API_BASE}/products/${id}/image/append`, {
+        method: 'POST',
+        body: formData,
+        headers
+      });
+      if (!res.ok) {
+        let errMsg = 'API Error';
+        try {
+          const errData = await res.json();
+          errMsg = errData.error || errData.message || res.statusText;
+        } catch { errMsg = res.statusText; }
+        throw new Error(errMsg);
+      }
+      return await res.json();
+    } finally {
+      this.activeRequests = Math.max(0, this.activeRequests - 1);
+      DeviceEventEmitter.emit('global_loader', { isLoading: this.activeRequests > 0 });
+    }
+  }
+
+  async deleteProductImage(id: string, imageUrl: string): Promise<Product> {
+    const res = await this.request(`${API_BASE}/products/${id}/image/delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ imageUrl })
+    });
+    return res.json();
+  }
+
+
   // --- Challans ---
   async getChallans(search = "", modeFilter = "all"): Promise<Challan[]> {
     const res = await this.request(`${API_BASE}/challans?search=${encodeURIComponent(search)}&mode=${encodeURIComponent(modeFilter)}`);
