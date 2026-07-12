@@ -718,6 +718,16 @@ class ApiClient {
     return res.json();
   }
 
+  async getAuditLogs(search: string = '', page: number = 1, limit: number = 50): Promise<any> {
+    const queryParams = new URLSearchParams({
+      search,
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    const res = await this.request(`${API_BASE}/system/audit-logs?${queryParams}`);
+    return res.json();
+  }
+
   async updateProfile(data: { name: string; email: string }): Promise<any> {
     const res = await this.request(`${API_BASE}/auth/update-profile`, {
       method: 'PUT',

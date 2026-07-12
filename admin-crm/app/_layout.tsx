@@ -36,6 +36,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     if (path.startsWith('/payments')) return 'Payments';
     if (path.startsWith('/reports')) return 'Reports';
     if (path.startsWith('/rbac')) return 'Access Control';
+    if (path.startsWith('/audit')) return 'System Audit Logs';
     if (path.startsWith('/pricing')) return 'Pricing & Discounts';
     if (path.startsWith('/manufacturing')) return 'Manufacturing / BMR';
     if (path.startsWith('/salescrm')) return 'Sales & CRM';
@@ -469,6 +470,25 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </TouchableOpacity>
           )}
 
+          {/* Audit Logs */}
+          {user && user.role === 'admin' && (
+            <TouchableOpacity
+              style={[styles.sidebarNavItem, isActive('audit') && styles.sidebarNavItemActive]}
+              onPress={() => handlePress('audit')}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={isActive('audit') ? 'newspaper' : 'newspaper-outline'}
+                size={18}
+                color={isActive('audit') ? colors.primary : colors.text.secondary}
+              />
+              <Text style={[styles.sidebarNavText, isActive('audit') && styles.sidebarNavTextActive]}>
+                Audit Logs
+              </Text>
+              {isActive('audit') && <View style={styles.activeIndicator} />}
+            </TouchableOpacity>
+          )}
+
           {/* My Details */}
           <TouchableOpacity
             style={[styles.sidebarNavItem, isActive('profile') && styles.sidebarNavItemActive]}
@@ -625,6 +645,7 @@ function MainLayout() {
             <Tabs.Screen name="pipeline" options={{ href: null }} />
             <Tabs.Screen name="login" options={{ href: null }} />
             <Tabs.Screen name="rbac" options={{ href: null }} />
+            <Tabs.Screen name="audit" options={{ href: null }} />
             <Tabs.Screen name="queries" options={{ href: null }} />
             <Tabs.Screen name="orders" options={{ href: null }} />
             <Tabs.Screen name="pricing" options={{ href: null }} />

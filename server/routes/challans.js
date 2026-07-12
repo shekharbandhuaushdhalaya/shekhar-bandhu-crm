@@ -212,6 +212,14 @@ router.post('/', async (req, res) => {
 
     const challan = await Challan.create(data);
     res.status(201).json(challan);
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'CREATE_CHALLAN_DRAFT',
+      description: `Created challan draft: ${challan.challanNo} (Party: ${challan.partyName}, Amt: ₹${challan.nettTotal})`,
+      details: { id: challan._id },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -235,6 +243,14 @@ router.put('/:id', async (req, res) => {
     Object.assign(challan, req.body);
     const updated = await challan.save();
     res.json(updated);
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'UPDATE_CHALLAN',
+      description: `Updated challan draft: ${challan.challanNo}`,
+      details: { id: challan._id },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -299,6 +315,14 @@ router.patch('/:id/finalize', async (req, res) => {
     await challan.save();
 
     res.json(challan);
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'FINALIZE_CHALLAN',
+      description: `Finalized challan: ${challan.challanNo} (Party: ${challan.partyName}, Amt: ₹${challan.nettTotal})`,
+      details: { id: challan._id },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -343,6 +367,14 @@ router.delete('/:id', async (req, res) => {
 
     await Challan.findByIdAndDelete(req.params.id);
     res.json({ message: 'Challan deleted' });
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'DELETE_CHALLAN',
+      description: `Deleted challan: ${challan.challanNo} (Party: ${challan.partyName})`,
+      details: { id: challan._id },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -477,6 +509,14 @@ router.post('/:id/convert', async (req, res) => {
       message: 'Challan successfully converted to Sale Invoice',
       invoice,
       challan
+    });
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'CONVERT_CHALLAN_TO_INVOICE',
+      description: `Converted challan ${challan.challanNo} to invoice: ${invoice.invoiceNo}`,
+      details: { challanId: challan._id, invoiceId: invoice._id },
+      req
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

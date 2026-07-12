@@ -66,11 +66,27 @@ router.post('/login', async (req, res) => {
     
     const user = await User.findOne({ email }).lean();
     if (!user) {
+      const { logAction } = require('../utils/auditLogger');
+      await logAction({
+        userEmail: email,
+        action: 'LOGIN_FAILED',
+        description: `Failed login attempt for unregistered email: ${email}`,
+        req
+      });
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      const { logAction } = require('../utils/auditLogger');
+      await logAction({
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        action: 'LOGIN_FAILED',
+        description: `Failed login attempt (incorrect password) for email: ${email}`,
+        req
+      });
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
@@ -83,6 +99,16 @@ router.post('/login', async (req, res) => {
     res.json({
       token,
       user: { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash }
+    });
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      userId: user._id,
+      userName: user.name,
+      userEmail: user.email,
+      action: 'LOGIN_SUCCESS',
+      description: `User logged in successfully: ${user.name} (${user.email})`,
+      req
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -259,6 +285,13 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
     const user = await User.findByIdAndUpdate(req.user.id, updateFields, { new: true }).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'UPDATE_PROFILE',
+      description: `User updated profile settings: ${user.name} (${user.email})`,
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -284,6 +317,13 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     await user.save();
 
     res.json({ message: 'Password changed successfully' });
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'CHANGE_PASSWORD',
+      description: `User changed password: ${user.name} (${user.email})`,
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -134,6 +134,14 @@ router.post('/sales', async (req, res) => {
     };
     const invoice = await Invoice.create(data);
     res.status(201).json(invoice);
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'CREATE_SALE_INVOICE_DRAFT',
+      description: `Created sale invoice draft: ${invoice.invoiceNo} (Customer: ${invoice.customerName}, Amt: ₹${invoice.amount})`,
+      details: { id: invoice._id },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -157,6 +165,14 @@ router.post('/purchases', async (req, res) => {
     };
     const invoice = await Invoice.create(data);
     res.status(201).json(invoice);
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'CREATE_PURCHASE_INVOICE_DRAFT',
+      description: `Created purchase invoice draft: ${invoice.invoiceNo} (Supplier: ${invoice.supplierName}, Amt: ₹${invoice.amount})`,
+      details: { id: invoice._id },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -200,6 +216,14 @@ router.put('/:id', async (req, res) => {
     Object.assign(invoice, updateData);
     await invoice.save();
     res.json(invoice);
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'UPDATE_INVOICE',
+      description: `Updated invoice draft: ${invoice.invoiceNo} (${invoice.type})`,
+      details: { id: invoice._id },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -244,6 +268,14 @@ router.patch('/sales/:id/finalize', async (req, res) => {
     invoice.isFinalized = true;
     await invoice.save();
     res.json(invoice);
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'FINALIZE_SALE_INVOICE',
+      description: `Finalized sale invoice: ${invoice.invoiceNo} (Customer: ${invoice.customerName}, Amt: ₹${invoice.amount})`,
+      details: { id: invoice._id },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -406,6 +438,14 @@ router.patch('/purchases/:id/finalize', async (req, res) => {
     invoice.isFinalized = true;
     await invoice.save();
     res.json(invoice);
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'FINALIZE_PURCHASE_INVOICE',
+      description: `Finalized purchase invoice: ${invoice.invoiceNo} (Supplier: ${invoice.supplierName}, Amt: ₹${invoice.amount})`,
+      details: { id: invoice._id },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -454,6 +494,14 @@ router.delete('/sales/:id', async (req, res) => {
     await invoice.save();
     
     res.json({ message: 'Sale invoice marked as Cancelled' });
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'CANCEL_SALE_INVOICE',
+      description: `Cancelled sale invoice: ${invoice.invoiceNo} (Customer: ${invoice.customerName})`,
+      details: { id: invoice._id },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -566,6 +614,14 @@ router.delete('/purchases/:id', async (req, res) => {
     await invoice.save();
 
     res.json({ message: 'Purchase invoice marked as Cancelled' });
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction({
+      action: 'CANCEL_PURCHASE_INVOICE',
+      description: `Cancelled purchase invoice: ${invoice.invoiceNo} (Supplier: ${invoice.supplierName})`,
+      details: { id: invoice._id },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
