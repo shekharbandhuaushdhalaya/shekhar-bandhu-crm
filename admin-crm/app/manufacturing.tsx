@@ -611,7 +611,7 @@ export default function ManufacturingScreen() {
               const productPrice = batch.productId && typeof batch.productId === 'object' ? batch.productId.price || 0 : 0;
               const hasCosting = batch.rawMaterialCost !== undefined;
               const hasUnitCost = isFinished && batch.unitProductionCost !== undefined && batch.unitProductionCost > 0;
-              const grossMargin = hasUnitCost && productPrice > 0 
+              const grossMargin = hasUnitCost && productPrice > 0 && batch.unitProductionCost !== undefined
                 ? Math.max(0, ((productPrice - batch.unitProductionCost) / productPrice) * 100)
                 : 0;
 
@@ -642,13 +642,13 @@ export default function ManufacturingScreen() {
                     {batch.endDate && (
                       <Text style={styles.metaLabel}>Ended: <Text style={styles.metaVal}>{new Date(batch.endDate).toLocaleDateString()}</Text></Text>
                     )}
-                    {hasCosting && (
+                    {batch.rawMaterialCost !== undefined && (
                       <Text style={styles.metaLabel}>Ingredient Cost: <Text style={[styles.metaVal, { color: colors.warning }]}>₹{batch.rawMaterialCost.toFixed(2)}</Text></Text>
                     )}
-                    {hasUnitCost && (
+                    {batch.unitProductionCost !== undefined && batch.unitProductionCost > 0 && (
                       <Text style={styles.metaLabel}>Unit Cost: <Text style={styles.metaVal}>₹{batch.unitProductionCost.toFixed(2)}</Text></Text>
                     )}
-                    {hasUnitCost && productPrice > 0 && (
+                    {batch.unitProductionCost !== undefined && batch.unitProductionCost > 0 && productPrice > 0 && (
                       <Text style={styles.metaLabel}>Gross Margin: <Text style={[styles.metaVal, { color: grossMargin > 40 ? colors.success : colors.warning }]}>{grossMargin.toFixed(0)}% (MSRP ₹{productPrice})</Text></Text>
                     )}
                   </View>
@@ -1530,6 +1530,12 @@ const createStyles = (colors: typeof LightColors) =>
       fontStyle: 'italic',
       textAlign: 'center',
       paddingVertical: 20,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+      gap: 12,
     },
     // Recipe BOM styles
     recipeHeader: {
