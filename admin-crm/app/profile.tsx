@@ -258,6 +258,14 @@ export default function ProfileScreen() {
     agent: colors.success,
   };
 
+  const formatTimestamp = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+  };
+
   const userInitials = user?.name ? user.name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) : 'U';
 
   const renderForms = () => (
