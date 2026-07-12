@@ -40,6 +40,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     if (path.startsWith('/manufacturing')) return 'Manufacturing / BMR';
     if (path.startsWith('/salescrm')) return 'Sales & CRM';
     if (path.startsWith('/inventorydispatch')) return 'Inventory & Dispatch';
+    if (path.startsWith('/profile')) return 'My Details';
     return '';
   };
 
@@ -129,7 +130,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
         <View style={styles.headerDivider} />
 
         {/* User Card */}
-        <View style={styles.headerUser}>
+        <TouchableOpacity style={styles.headerUser} onPress={() => router.push('/profile')} activeOpacity={0.7}>
           <View style={[styles.headerAvatar, { borderColor: roleColors[user.role] || colors.text.muted }]}>
             <Text style={styles.headerAvatarText}>{user.name.charAt(0)}</Text>
           </View>
@@ -143,7 +144,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
               </View>
             </View>
           )}
-        </View>
+        </TouchableOpacity>
 
         {/* Logout */}
         <TouchableOpacity onPress={logout} style={styles.logoutBtn} activeOpacity={0.7}>
@@ -467,6 +468,23 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               {isActive('rbac') && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
           )}
+
+          {/* My Details */}
+          <TouchableOpacity
+            style={[styles.sidebarNavItem, isActive('profile') && styles.sidebarNavItemActive]}
+            onPress={() => handlePress('profile')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={isActive('profile') ? 'person' : 'person-outline'}
+              size={18}
+              color={isActive('profile') ? colors.primary : colors.text.secondary}
+            />
+            <Text style={[styles.sidebarNavText, isActive('profile') && styles.sidebarNavTextActive]}>
+              My Details
+            </Text>
+            {isActive('profile') && <View style={styles.activeIndicator} />}
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -611,6 +629,7 @@ function MainLayout() {
             <Tabs.Screen name="orders" options={{ href: null }} />
             <Tabs.Screen name="pricing" options={{ href: null }} />
             <Tabs.Screen name="manufacturing" options={{ href: null }} />
+            <Tabs.Screen name="profile" options={{ href: null }} />
           </Tabs>
         </View>
       </View>

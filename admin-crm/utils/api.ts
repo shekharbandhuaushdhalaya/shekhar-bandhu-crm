@@ -30,7 +30,15 @@ const getBaseUrl = () => {
   return 'http://192.168.31.189:5000/api';
 };
 
-const API_BASE = getBaseUrl();
+let API_BASE = getBaseUrl();
+
+export function getApiBaseUrl(): string {
+  return API_BASE;
+}
+
+export function setApiBaseUrl(newUrl: string): void {
+  API_BASE = newUrl;
+}
 
 export const getImageUrl = (imagePath: string | undefined): string => {
   if (!imagePath) return '';
@@ -688,6 +696,27 @@ class ApiClient {
   async deleteUser(id: string): Promise<any> {
     const res = await this.request(`${API_BASE}/auth/users/${id}`, {
       method: 'DELETE',
+    });
+    return res.json();
+  }
+
+  async getMe(): Promise<any> {
+    const res = await this.request(`${API_BASE}/auth/me`);
+    return res.json();
+  }
+
+  async updateProfile(data: { name: string; email: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/auth/update-profile`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/auth/change-password`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
     return res.json();
   }

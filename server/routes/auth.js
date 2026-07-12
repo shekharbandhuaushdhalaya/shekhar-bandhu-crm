@@ -240,6 +240,55 @@ router.post('/whatsapp/verify-otp', async (req, res) => {
   }
 });
 
+// PUT /api/auth/update-profile — Update own profile details (Authenticated)
+router.put('/update-profile', authenticateToken, async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name.trim();
+    if (email !== undefined) {
+      const emailLower = email.trim().toLowerCase();
+      // Check if email already exists for another user
+      const existing = await User.findOne({ email: emailLower, _id: { $ne: req.user.id } }).lean();
+      if (existing) {
+        return res.status(400).json({ error: 'Email already in use' });
+      }
+      updateFields.email = emailLower;
+    }
+
+    const user = await User.findByIdAndUpdate(req.user.id, updateFields, { new: true }).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/auth/change-password — Update own password (Authenticated)
+router.put('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Invalid current password' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = {
   router,
   authenticateToken

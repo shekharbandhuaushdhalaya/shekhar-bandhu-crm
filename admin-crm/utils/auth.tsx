@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { authStorage } from './storage';
-import { api } from './api';
+import { api, setApiBaseUrl } from './api';
 
 export type UserProfile = {
   id: string;
@@ -16,6 +16,7 @@ type AuthContextType = {
   loading: boolean;
   login: (email: string, password: string) => Promise<UserProfile>;
   logout: () => Promise<void>;
+  updateUser: (updatedUser: UserProfile) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +30,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     async function loadStoredAuth() {
       try {
+        const storedApiUrl = await authStorage.getItem('vp_crm_api_url');
+        if (storedApiUrl) {
+          setApiBaseUrl(storedApiUrl);
+        }
+
         const storedToken = await authStorage.getItem('vp_crm_token');
         const storedUser = await authStorage.getItem('vp_crm_user');
 
@@ -79,8 +85,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUser = async (updatedUser: UserProfile) => {
+    try {
+      await authStorage.setItem('vp_crm_user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      // Synchronize in API client as well
+      api.setToken(token, updatedUser);
+    } catch (err) {
+      console.error('Failed to update stored user:', err);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
