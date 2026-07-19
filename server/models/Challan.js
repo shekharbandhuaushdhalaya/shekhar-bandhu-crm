@@ -3,13 +3,14 @@ const mongoose = require('mongoose');
 const challanItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
   name: { type: String, required: true },
-  qty: { type: Number, required: true, default: 0 }, // quantity in boxes
+  qty: { type: Number, required: true, default: 0 },
   rate: { type: Number, default: 0 },
   packing: { type: Number, default: 1 },
   hsnCode: { type: String, default: '' },
   gstRate: { type: Number, default: 0 },
   vendorId: { type: String, default: '', trim: true },
-  vendorName: { type: String, default: '', trim: true }
+  vendorName: { type: String, default: '', trim: true },
+  batchNo: { type: String, default: '', trim: true }
 }, { _id: false });
 
 const challanSchema = new mongoose.Schema({

@@ -106,7 +106,7 @@ export function Toast({ message, type = 'info', visible, onDismiss }: ToastProps
       statusBarTranslucent
       onRequestClose={handleDismiss}
     >
-      <View style={styles.nativeOverlay} pointerEvents="box-none">
+      <View style={[styles.nativeOverlay, { pointerEvents: 'box-none' }]}>
         {toastContent}
       </View>
     </Modal>
@@ -131,10 +131,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: Radius.md,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    boxShadow: '0px 4px 12px rgba(0,0,0,0.1)',
     elevation: 4,
   },
   icon: {

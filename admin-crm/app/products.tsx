@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Product, getImageUrl } from '../utils/api';
 import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { DataTable, Column } from '../components/DataTable';
@@ -23,6 +24,7 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
+  const perm = usePermission();
   const { showToast } = useToast();
 
   if (!product) return null;
@@ -204,13 +206,13 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
           </View>
 
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 16 }}>
-            {user?.role !== 'agent' && (
+            {perm.can('product:editPricing') && (
               <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
                 <Ionicons name="create-outline" size={16} color="#fff" />
                 <Text style={styles.editBtnText}>Edit Details</Text>
               </TouchableOpacity>
             )}
-            {user?.role === 'admin' && (
+            {perm.can('product:delete') && (
               <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
                 <Ionicons name="trash-outline" size={16} color="#fff" />
                 <Text style={styles.deleteBtnText}>Delete</Text>
@@ -594,15 +596,33 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
 
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Product SKU / Code <Text style={{ color: 'red' }}>*</Text></Text>
-            <View style={styles.formInput}>
-              <Ionicons name="barcode-outline" size={16} color={colors.text.muted} />
-              <TextInput 
-                style={styles.formInputText} 
-                placeholder="e.g. ASV-ABH-450" 
-                placeholderTextColor={colors.text.muted} 
-                value={sku} 
-                onChangeText={setSku} 
-              />
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <View style={[styles.formInput, { flex: 1 }]}>
+                <Ionicons name="barcode-outline" size={16} color={colors.text.muted} />
+                <TextInput 
+                  style={styles.formInputText} 
+                  placeholder="e.g. ASV-ABH-450" 
+                  placeholderTextColor={colors.text.muted} 
+                  value={sku} 
+                  onChangeText={setSku} 
+                />
+              </View>
+              <TouchableOpacity
+                style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10' }}
+                onPress={() => {
+                  const t = (productType || '').toLowerCase();
+                  const typeMap: Record<string, string> = { 'asava & arishta': 'ASV', 'vati & guggulu': 'VAT', 'medicated oils': 'OIL', 'syrups': 'SYR', 'avaleha': 'AVA' };
+                  const type = typeMap[t] || t.replace(/[^a-z]/g, '').slice(0, 3).toUpperCase() || 'GEN';
+                  const words = (name || '').split(/\s+/).filter(Boolean);
+                  const nameAbbr = words.length > 1 ? words.map(w => w[0]).filter(Boolean).join('').toUpperCase().slice(0, 4) : (words[0] || '').slice(0, 4).toUpperCase() || 'PROD';
+                  const sz = (size || '').replace(/[^0-9]/g, '').slice(0, 3) || '000';
+                  const shapeMap: Record<string, string> = { 'round': 'ROU', 'flat': 'FLA', 'jar': 'JAR', 'oval': 'OVA' };
+                  const shp = shapeMap[(shape || '').toLowerCase()] || (shape || '').slice(0, 3).toUpperCase() || 'STD';
+                  setSku(`${type}-${nameAbbr}-${sz}-${shp}`);
+                }}
+              >
+                <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -870,6 +890,7 @@ export default function ProductsScreen() {
 
   const { colors } = useTheme();
   const { user } = useAuth();
+  const perm = usePermission();
   const styles = useStyles(createStyles);
 
   const load = useCallback(async () => {
@@ -997,7 +1018,7 @@ export default function ProductsScreen() {
               <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
             </TouchableOpacity>
 
-            {user?.role !== 'agent' && (
+            {perm.can('product:create') && (
               <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedProd(null); setIsEditing(false); setAddVisible(true); }}>
                 <Ionicons name="add" size={22} color="#fff" />
               </TouchableOpacity>
@@ -1139,7 +1160,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', top: 52, right: 50, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 220, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', top: 52, right: 50, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 220, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
 });

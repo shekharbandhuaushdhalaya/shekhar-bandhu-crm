@@ -6,6 +6,7 @@ import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Quotation, Product, Customer, Warehouse, InventoryEntry, QuotationItem } from '../utils/api';
 import { getStateStrWithCode } from '../utils/gst';
 import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import * as Sharing from 'expo-sharing';
 import { LOGO_BASE64 } from '../utils/logo';
@@ -403,6 +404,7 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
+  const perm = usePermission();
 
   if (!invoice) return null;
 
@@ -640,7 +642,7 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
             <Text style={styles.printBtnText}>Print Quotation</Text>
           </TouchableOpacity>
           
-          {user?.role === 'admin' && (
+          {perm.can('quotation:delete') && (
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
               <Ionicons name="trash-outline" size={16} color="#fff" />
               <Text style={styles.deleteBtnText}>Delete Quotation</Text>
@@ -1562,7 +1564,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   
   // Missing from earlier migration
   customSearchSelectContainer: { position: 'relative', width: '100%' },
-  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 },
+  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)', elevation: 4 },
   customSelectItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   customSelectItemText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   customSelectItemSubtext: { fontSize: 10, color: colors.text.muted, marginTop: 2 },

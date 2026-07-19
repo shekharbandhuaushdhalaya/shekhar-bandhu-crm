@@ -5,7 +5,8 @@ const orderItemSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   qty: { type: Number, required: true, min: 1 },
   price: { type: Number, required: true, min: 0 },
-  size: { type: String, default: '' }
+  size: { type: String, default: '' },
+  deductedBoxes: { type: Number, default: 0 }
 });
 
 const orderSchema = new mongoose.Schema({

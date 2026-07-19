@@ -8,7 +8,8 @@ const invoiceItemSchema = new mongoose.Schema({
   packing: { type: Number, required: true, default: 1 },
   rate: { type: Number, required: true, default: 0 },
   hsnCode: { type: String, default: '' },
-  gstRate: { type: Number, default: 0 }
+  gstRate: { type: Number, default: 0 },
+  batchNo: { type: String, default: '', trim: true }
 }, { _id: false });
 
 const invoiceSchema = new mongoose.Schema({
@@ -43,7 +44,15 @@ const invoiceSchema = new mongoose.Schema({
   isFinalized: { type: Boolean, default: false },
   agentId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   agentName: { type: String, default: '', trim: true },
-  items: [invoiceItemSchema]
+  items: [invoiceItemSchema],
+  paymentTransactionId: { type: String, default: '' },
+  paymentGatewayData: { type: mongoose.Schema.Types.Mixed, default: null },
+  cartageAmount: { type: Number, default: 0 },
+  subTotal: { type: Number, default: 0 },
+  grandTotal: { type: Number, default: 0 },
+  partyGstin: { type: String, default: '', trim: true },
+  qrCode: { type: String, default: '' },
+  reference: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' }
 }, { timestamps: true });
 
 invoiceSchema.index({ invoiceNo: 'text', customerName: 'text', supplierName: 'text', status: 'text' });

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, STAGES, Stage, getStageColors, LightColors } from '../constants/theme';
 import { api, Contact } from '../utils/api';
 import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 
 export function ContactDetailModal({ contact, visible, onClose, onDeleted }: { contact: Contact | null; visible: boolean; onClose: () => void; onDeleted: () => void }) {
@@ -16,6 +17,7 @@ export function ContactDetailModal({ contact, visible, onClose, onDeleted }: { c
   const [logVisible, setLogVisible] = useState(false);
   const [currentContact, setCurrentContact] = useState<Contact | null>(contact);
   const { user } = useAuth();
+  const perm = usePermission();
 
   useEffect(() => { setCurrentContact(contact); }, [contact]);
   if (!currentContact) return null;
@@ -157,7 +159,7 @@ export function ContactDetailModal({ contact, visible, onClose, onDeleted }: { c
             </View>
           ))}
 
-          {user?.role === 'admin' && (
+          {perm.can('contact:delete') && (
             <TouchableOpacity style={styles.deleteContactBtn} onPress={handleDelete}>
               <Ionicons name="trash-outline" size={16} color="#fff" />
               <Text style={styles.deleteContactBtnText}>Delete Contact</Text>
@@ -468,7 +470,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 220, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 220, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { fontSize: 13, color: colors.text.primary },

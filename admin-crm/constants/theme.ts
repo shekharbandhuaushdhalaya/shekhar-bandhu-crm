@@ -86,24 +86,15 @@ export const Radius = {
 
 export const Shadows = {
   card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
+    boxShadow: '0px 4px 12px rgba(0,0,0,0.05)',
     elevation: 3,
   },
   header: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
+    boxShadow: '0px 2px 6px rgba(0,0,0,0.03)',
     elevation: 2,
   },
   hover: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+    boxShadow: '0px 8px 16px rgba(0,0,0,0.08)',
     elevation: 5,
   }
 };

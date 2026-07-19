@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { api, getApiBaseUrl, setApiBaseUrl } from '../utils/api';
@@ -22,6 +23,7 @@ import { Spacing, Radius, LightColors } from '../constants/theme';
 
 export default function ProfileScreen() {
   const { user, updateUser } = useAuth();
+  const perm = usePermission();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { showToast } = useToast();
@@ -65,6 +67,10 @@ export default function ProfileScreen() {
 
   const [defaultTerms, setDefaultTerms] = useState('');
   const [defaultGstRate, setDefaultGstRate] = useState('18');
+  const [paymentGatewayEnabled, setPaymentGatewayEnabled] = useState(false);
+  const [razorpayKeyId, setRazorpayKeyId] = useState('');
+  const [razorpayKeySecret, setRazorpayKeySecret] = useState('');
+  const [razorpayWebhookSecret, setRazorpayWebhookSecret] = useState('');
   const [companyLoading, setCompanyLoading] = useState(false);
 
   // User session states
@@ -114,6 +120,10 @@ export default function ProfileScreen() {
         setDispatchPrefix(config.dispatchPrefix || '');
         setDefaultTerms(config.defaultTerms || '');
         setDefaultGstRate(config.defaultGstRate ? config.defaultGstRate.toString() : '18');
+        setPaymentGatewayEnabled(config.paymentGatewayEnabled || false);
+        setRazorpayKeyId(config.razorpayKeyId || '');
+        setRazorpayKeySecret(config.razorpayKeySecret || '');
+        setRazorpayWebhookSecret(config.razorpayWebhookSecret || '');
 
         // Instantly synchronize in-memory config on frontend
         updateActiveFirmDetails(config);
@@ -125,17 +135,13 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     loadSessionDetails();
-    if (user?.role === 'admin') {
-      loadCompanyConfig();
-    }
+    loadCompanyConfig();
   }, [user]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadSessionDetails();
-    if (user?.role === 'admin') {
-      await loadCompanyConfig();
-    }
+    await loadCompanyConfig();
     setRefreshing(false);
   };
 
@@ -234,6 +240,10 @@ export default function ProfileScreen() {
         dispatchPrefix: dispatchPrefix.trim(),
         defaultTerms: defaultTerms.trim(),
         defaultGstRate: Number(defaultGstRate) || 18,
+        paymentGatewayEnabled,
+        razorpayKeyId: razorpayKeyId.trim(),
+        razorpayKeySecret: razorpayKeySecret.trim(),
+        razorpayWebhookSecret: razorpayWebhookSecret.trim(),
       };
 
       const updated = await api.updateSystemSettings(payload);
@@ -400,15 +410,25 @@ export default function ProfileScreen() {
     </View>
   );
 
+  const canEdit = perm.can('settings:edit');
+
   const renderCompanySettings = () => (
     <View style={styles.formContainer}>
+      {!canEdit && (
+        <View style={{ backgroundColor: colors.warning + '20', padding: Spacing.md, borderRadius: Radius.sm, marginBottom: Spacing.md }}>
+          <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '600' }}>
+            Viewing company configuration. Only administrators can edit these settings.
+          </Text>
+        </View>
+      )}
+
       {/* Firm details card */}
-      <View style={styles.card}>
+      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
         <View style={styles.cardHeader}>
           <Ionicons name="business-outline" size={18} color={colors.primary} />
           <Text style={styles.cardTitle}>Firm Details</Text>
         </View>
-        <View style={styles.cardContent}>
+        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
           <Text style={styles.label}>Firm / Company Name</Text>
           <TextInput
             style={styles.input}
@@ -472,7 +492,7 @@ export default function ProfileScreen() {
           <Ionicons name="card-outline" size={18} color={colors.primary} />
           <Text style={styles.cardTitle}>Bank Details</Text>
         </View>
-        <View style={styles.cardContent}>
+        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
           <Text style={styles.label}>Bank Name</Text>
           <TextInput
             style={styles.input}
@@ -533,13 +553,70 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Payment Gateway Card */}
+      <View style={[styles.card, !canEdit && { opacity: 0.6 }]}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="card-outline" size={18} color={colors.primary} />
+          <Text style={styles.cardTitle}>Payment Gateway (Razorpay)</Text>
+        </View>
+        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Enable Online Payments</Text>
+            <TouchableOpacity
+              style={[styles.toggleBtn, paymentGatewayEnabled && { backgroundColor: colors.success }]}
+              onPress={() => setPaymentGatewayEnabled(!paymentGatewayEnabled)}
+            >
+              <Text style={{ color: paymentGatewayEnabled ? '#fff' : colors.text.secondary, fontSize: 12, fontWeight: '700' }}>
+                {paymentGatewayEnabled ? 'ENABLED' : 'DISABLED'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12, lineHeight: 14 }}>
+            Configure Razorpay keys to allow customers to pay invoices online. Keys are stored encrypted in your database.
+          </Text>
+
+          <Text style={styles.label}>Razorpay Key ID</Text>
+          <TextInput
+            style={styles.input}
+            value={razorpayKeyId}
+            onChangeText={setRazorpayKeyId}
+            placeholder="e.g. rzp_live_xxxxxxxx"
+            placeholderTextColor={colors.text.muted}
+            autoCapitalize="none"
+          />
+
+          <Text style={styles.label}>Razorpay Key Secret</Text>
+          <TextInput
+            style={styles.input}
+            value={razorpayKeySecret}
+            onChangeText={setRazorpayKeySecret}
+            placeholder="Enter secret key"
+            placeholderTextColor={colors.text.muted}
+            autoCapitalize="none"
+            secureTextEntry
+          />
+
+          <Text style={styles.label}>Webhook Secret (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={razorpayWebhookSecret}
+            onChangeText={setRazorpayWebhookSecret}
+            placeholder="For auto-confirming payments"
+            placeholderTextColor={colors.text.muted}
+            autoCapitalize="none"
+            secureTextEntry
+          />
+        </View>
+      </View>
+
       {/* Bill Prefixes & Taxes Card */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Ionicons name="options-outline" size={18} color={colors.primary} />
           <Text style={styles.cardTitle}>Prefixes, Terms & Taxes</Text>
         </View>
-        <View style={styles.cardContent}>
+        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
           <View style={styles.rowInputs}>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>Invoice Prefix</Text>
@@ -547,7 +624,7 @@ export default function ProfileScreen() {
                 style={styles.input}
                 value={invoicePrefix}
                 onChangeText={setInvoicePrefix}
-                placeholder="e.g. VP"
+                placeholder="e.g. SB"
                 placeholderTextColor={colors.text.muted}
               />
             </View>
@@ -600,6 +677,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Save Button */}
+      {canEdit && (
       <TouchableOpacity
         style={[styles.btnPrimary, { backgroundColor: colors.success }]}
         onPress={handleSaveCompanyConfig}
@@ -615,6 +693,7 @@ export default function ProfileScreen() {
           </>
         )}
       </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -684,27 +763,25 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
     >
-      {/* Tab Selectors for Admins */}
-      {user?.role === 'admin' && (
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'profile' && styles.tabActiveButton]}
-            onPress={() => setActiveTab('profile')}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="lock-closed-outline" size={16} color={activeTab === 'profile' ? colors.primary : colors.text.secondary} />
-            <Text style={[styles.tabText, activeTab === 'profile' && styles.tabActiveText]}>My Credentials</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'company' && styles.tabActiveButton]}
-            onPress={() => setActiveTab('company')}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="business-outline" size={16} color={activeTab === 'company' ? colors.primary : colors.text.secondary} />
-            <Text style={[styles.tabText, activeTab === 'company' && styles.tabActiveText]}>Company Configuration</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Tab Selectors */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'profile' && styles.tabActiveButton]}
+          onPress={() => setActiveTab('profile')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="lock-closed-outline" size={16} color={activeTab === 'profile' ? colors.primary : colors.text.secondary} />
+          <Text style={[styles.tabText, activeTab === 'profile' && styles.tabActiveText]}>My Credentials</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'company' && styles.tabActiveButton]}
+          onPress={() => setActiveTab('company')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="business-outline" size={16} color={activeTab === 'company' ? colors.primary : colors.text.secondary} />
+          <Text style={[styles.tabText, activeTab === 'company' && styles.tabActiveText]}>Company Configuration</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={[styles.layoutGrid, { flexDirection: isDesktop ? 'row' : 'column' }]}>
         {isDesktop ? (
@@ -836,6 +913,20 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  toggleBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    backgroundColor: colors.border,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   overviewAvatarContainer: {
     alignItems: 'center',

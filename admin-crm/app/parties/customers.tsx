@@ -2,8 +2,9 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Pressable, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
-import { api, Customer, Invoice } from '../../utils/api';
+import { api, Customer, Invoice, getApiBaseUrl } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
+import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
 
 import { FIRM_DETAILS } from '../../constants/firm';
@@ -70,6 +71,7 @@ function CustomerDetailModal({
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
+  const perm = usePermission();
   const canAccessCash = user?.canAccessCash ?? false;
 
   const [customerOrders, setCustomerOrders] = React.useState<any[]>([]);
@@ -82,7 +84,7 @@ function CustomerDetailModal({
         try {
           const query = customer.phone || customer.email || '';
           if (query) {
-            const res = await fetch(`http://localhost:5000/api/orders/public/track/${encodeURIComponent(query)}`);
+            const res = await fetch(`${getApiBaseUrl()}/orders/public/track/${encodeURIComponent(query)}`);
             if (res.ok) {
               const data = await res.json();
               setCustomerOrders(data);
@@ -332,7 +334,7 @@ function CustomerDetailModal({
               <Ionicons name="create-outline" size={16} color="#fff" />
               <Text style={styles.editBtnText}>Edit Details</Text>
             </TouchableOpacity>
-            {user?.role === 'admin' && (
+            {perm.can('customer:delete') && (
               <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
                 <Ionicons name="trash-outline" size={16} color="#fff" />
                 <Text style={styles.deleteBtnText}>Delete</Text>
@@ -1772,7 +1774,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Dropdown filter styles
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', top: 52, right: 50, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', top: 52, right: 50, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
@@ -1801,10 +1803,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     zIndex: 9999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
     elevation: 8
   },
   customSelectItem: {

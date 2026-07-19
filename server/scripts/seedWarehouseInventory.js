@@ -14,17 +14,15 @@ const Product   = require('../models/Product');
 const Warehouse = require('../models/Warehouse');
 const Inventory = require('../models/Inventory');
 
-const WAREHOUSE_NAME = 'Varanasi Central Deposit';
-
 async function main() {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('✅ Connected to MongoDB');
 
-  // 1. Find or create the warehouse
-  let warehouse = await Warehouse.findOne({ name: { $regex: /varanasi central/i } });
+  // 1. Find or create the first warehouse
+  let warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
   if (!warehouse) {
     warehouse = await Warehouse.create({
-      name:          WAREHOUSE_NAME,
+      name:          'Primary Warehouse',
       addressLine1:  'Shekhar Bandhu Aushadhalaya',
       addressLine2:  'Industrial Area, Lanka',
       city:          'Varanasi',

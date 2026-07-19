@@ -17,9 +17,9 @@ async function seedDatabase() {
     const agentPassword = await bcrypt.hash('agent123', salt);
     
     await User.insertMany([
-      { name: 'Admin User', email: 'admin@shekharbandhu.com', password: adminPassword, role: 'admin', canAccessCash: true },
-      { name: 'Manager User', email: 'manager@shekharbandhu.com', password: managerPassword, role: 'manager' },
-      { name: 'Agent User', email: 'agent@shekharbandhu.com', password: agentPassword, role: 'agent' }
+      { name: 'Admin User', email: 'admin@shekharbandhu.com', password: adminPassword, role: 'admin', canAccessCash: true, mustChangePassword: false },
+      { name: 'Manager User', email: 'manager@shekharbandhu.com', password: managerPassword, role: 'manager', mustChangePassword: false },
+      { name: 'Agent User', email: 'agent@shekharbandhu.com', password: agentPassword, role: 'agent', mustChangePassword: false }
     ]);
     console.log('👤 Users seeded successfully');
   }
@@ -30,8 +30,12 @@ async function seedDatabase() {
   if (warehouseCount === 0) {
     await Warehouse.create({
       name: "Varanasi Central Depot",
-      location: "Varanasi, Uttar Pradesh",
-      contactNo: "+91 62905 97810"
+      addressLine1: "Shekhar Bandhu Aushadhalaya",
+      city: "Varanasi",
+      state: "Uttar Pradesh",
+      pincode: "221005",
+      contactPerson: "Store Manager",
+      phone: "+91 62905 97810"
     });
     console.log('🏭 Warehouse seeded successfully');
   }
@@ -363,44 +367,52 @@ async function seedDatabase() {
     }
   ];
 
-  // Purge any legacy packaging products not in Shekhar Bandhu catalog
+  // Seed or update Ayurvedic products (upsert — never deletes custom products)
   const ayurvedicSkus = AyurvedicProducts.map(p => p.sku);
-  const deleteProductsRes = await Product.deleteMany({ sku: { $nin: ayurvedicSkus } });
-  const deleteInventoryRes = await Inventory.deleteMany({ itemSku: { $nin: ayurvedicSkus } });
-  const InventoryEntry = require('../models/InventoryEntry');
-  const StockLedger = require('../models/StockLedger');
-  
-  // Resolve valid product IDs
-  const validProductIds = await Product.find({ sku: { $in: ayurvedicSkus } }).distinct('_id');
-  const deleteEntriesRes = await InventoryEntry.deleteMany({ productId: { $nin: validProductIds } });
-  const deleteLedgerRes = await StockLedger.deleteMany({ productId: { $nin: validProductIds } });
-  
-  console.log(`🧹 Purged legacy packaging data: ${deleteProductsRes.deletedCount} products, ${deleteInventoryRes.deletedCount} warehouse items, ${deleteEntriesRes.deletedCount} inventory slots, and ${deleteLedgerRes.deletedCount} stock ledgers.`);
 
   for (const p of AyurvedicProducts) {
     let prod = await Product.findOne({ sku: p.sku });
     if (!prod) {
       prod = await Product.create(p);
-      // Create corresponding Inventory record if none exists
-      const existingInv = await Inventory.findOne({ itemSku: prod.sku });
-      if (!existingInv) {
-        await Inventory.create({
-          warehouse: 'Varanasi Central Depot',
-          itemSku: prod.sku,
-          itemName: prod.name,
-          qty: prod.stockLevel,
-          minReorder: prod.minReorder,
-          val: prod.price * prod.stockLevel,
-        });
+      // Create corresponding Inventory record using the first warehouse
+      const wh = await Warehouse.findOne().sort({ createdAt: 1 });
+      if (wh) {
+        const existingInv = await Inventory.findOne({ itemSku: prod.sku });
+        if (!existingInv) {
+          await Inventory.create({
+            warehouse: wh.name,
+            itemSku: prod.sku,
+            itemName: prod.name,
+            qty: prod.stockLevel,
+            minReorder: prod.minReorder,
+            val: prod.price * prod.stockLevel,
+          });
+        }
+        // Also create InventoryEntry so product appears in inventory screen
+        const existingEntry = await InventoryEntry.findOne({ productId: prod._id, warehouseId: wh._id });
+        if (!existingEntry) {
+          await InventoryEntry.create({
+            warehouseId: wh._id,
+            warehouseName: wh.name,
+            productId: prod._id,
+            productType: prod.productType || prod.name,
+            size: prod.size || '',
+            colour: prod.colour || '',
+            shape: prod.shape || '',
+            weight: prod.weight || '',
+            hsnCode: prod.hsnCode || '',
+            qtyBoxes: prod.stockLevel || 0,
+            packing: 1,
+          });
+        }
       }
     } else {
-      // Update description and disease properties
       prod.description = p.description;
       prod.disease = p.disease;
       await prod.save();
     }
   }
-  console.log('📦 Shekhar Bandhu Ayurvedic products seeding verification complete');
+  console.log(`📦 Shekhar Bandhu Ayurvedic products seeded (${AyurvedicProducts.length} products checked)`);
 
   console.log('✅ Database seeded successfully');
 }

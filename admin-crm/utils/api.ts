@@ -26,8 +26,8 @@ const getBaseUrl = () => {
   // Fallback for Android Emulator
   if (Platform.OS === 'android' && !Constants.isDevice) return 'http://10.0.2.2:5000/api';
   
-  // Hardcoded fallback for the development machine IP
-  return 'http://192.168.31.189:5000/api';
+  // Fallback — user can configure the correct URL from Profile > Server URL
+  return 'http://localhost:5000/api';
 };
 
 let API_BASE = getBaseUrl();
@@ -49,560 +49,6 @@ export const getImageUrl = (imagePath: string | undefined): string => {
 };
 
 const STORAGE_KEY = 'vp_crm_database';
-
-export type Contact = {
-  _id: string;
-  name: string;
-  company: string;
-  email: string;
-  phone: string;
-  stage: string;
-  dealValue: number;
-  productInterest?: string[];
-  estimatedVolume?: string;
-  city?: string;
-  leadSource: string;
-  createdAt: string;
-  interactions: { type: string; note: string; date: string }[];
-};
-
-export type Task = {
-  _id: string;
-  title: string;
-  desc: string;
-  priority: string;
-  dueDate: string;
-  completed: boolean;
-  contactId: string | null;
-};
-
-export type Activity = {
-  _id: string;
-  type: string;
-  text: string;
-  date: string;
-};
-
-export type DashboardStats = {
-  totalPipeline: number;
-  closedWon: number;
-  activeLeadsCount: number;
-  pendingTasksCount: number;
-  totalWebSales?: number;
-  activeWebOrdersCount?: number;
-  completedWebOrdersCount?: number;
-  webQueriesCount?: number;
-};
-
-export type Customer = {
-  _id: string;
-  name: string;
-  company: string;
-  email: string;
-  phone: string;
-  pakkaBalance: number;
-  kachhaBalance: number;
-  outstandingInvoices: number;
-  salesVolume: number;
-  createdAt: string;
-  gstin?: string;
-  state?: string;
-  contactPerson?: string;
-  pan?: string;
-  placeOfSupply?: string;
-  paymentTerms?: string;
-  billingAddress?: {
-    street: string;
-    pin: string;
-    city: string;
-    state: string;
-  };
-  shippingAddress?: {
-    street: string;
-    pin: string;
-    city: string;
-    state: string;
-  };
-  shippingSameAsBilling?: boolean;
-  customerType?: 'gst' | 'cash';
-  recordTracking?: 'invoice_ledger';
-};
-
-export type Vendor = {
-  _id: string;
-  name: string;
-  company: string;
-  email: string;
-  phone: string;
-  productCategory: string;
-  pakkaBalance: number;
-  kachhaBalance: number;
-  paymentTerms: string;
-  createdAt: string;
-  gstin?: string;
-  state?: string;
-  registeredName?: string;
-  displayName?: string;
-  contactPerson?: string;
-  addressPin?: string;
-  addressCity?: string;
-  pan?: string;
-  bankAccountNumber?: string;
-  bankIfsc?: string;
-  bankName?: string;
-  bankBranch?: string;
-};
-
-export type Product = {
-  _id: string;
-  name: string;
-  sku: string;
-  price: number;
-  stockLevel: number;
-  category: string;
-  minReorder: number;
-  hsnCode?: string;
-  gstRate?: number;
-  productType?: string;
-  size?: string;
-  colour?: string;
-  shape?: string;
-  weight?: string;
-  vendorId?: string;
-  vendorName?: string;
-  image?: string;
-  description?: string;
-  disease?: string;
-  ingredients?: string;
-};
-
-export type ChallanItem = {
-  productId?: string;
-  name: string;
-  qty: number; // quantity in boxes
-  rate?: number;
-  packing?: number;
-  vendorId?: string;
-  vendorName?: string;
-  gstRate?: number;
-  hsnCode?: string;
-};
-
-export type Challan = {
-  _id: string;
-  challanNo: string;
-  partyName: string;
-  partyAddress: string;
-  shippingAddress?: string;
-  partyCity: string;
-  stateOfSupply?: string;
-  gstin?: string;
-  date: string;
-  warehouseId?: string;
-  warehouseName?: string;
-  items: ChallanItem[];
-  status: string;
-  mode: 'pakka';
-  baseAmount?: number;
-  cgst?: number;
-  sgst?: number;
-  igst?: number;
-  roundOff?: number;
-  freightAmount?: number;
-  internalFreightExpense?: number;
-  nettTotal?: number;
-  convertedToInvoice?: boolean;
-  invoiceId?: string;
-  invoiceNo?: string;
-};
-
-export type Payment = {
-  _id: string;
-  type: 'receive' | 'make';
-  partyType: 'Customer' | 'Vendor';
-  partyId: string;
-  partyName: string;
-  amount: number;
-  mode: 'pakka';
-  paymentMethod: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
-  referenceNo: string;
-  notes: string;
-  date: string;
-};
-
-export type ProductQuery = {
-  _id: string;
-  name: string;
-  email: string;
-  phone: string;
-  productName: string;
-  productId?: string;
-  query: string;
-  image?: string;
-  status: 'pending' | 'contacted' | 'converted' | 'closed';
-  createdAt: string;
-  updatedAt: string;
-};
-
-
-export type Inventory = {
-  _id: string;
-  warehouse: string;
-  itemSku: string;
-  itemName: string;
-  qty: number;
-  minReorder: number;
-  val: number;
-};
-
-export type Warehouse = {
-  _id: string;
-  name: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  state: string;
-  pincode: string;
-  contactPerson: string;
-  phone: string;
-  createdAt: string;
-};
-
-export type InventoryEntry = {
-  _id: string;
-  warehouseId: string;
-  warehouseName: string;
-  productId: string;
-  productType: string;
-  size?: string;
-  colour: string;
-  shape: string;
-  weight: string;
-  hsnCode: string;
-  vendorId?: string;
-  vendorName: string;
-  qtyBoxes: number;
-  updatedAt: string;
-  packing: number;
-  batchNo?: string;
-  mfgDate?: string;
-  expiryDate?: string;
-};
-
-export type ConsolidatedInventory = {
-  _id: string; // unique combined key, e.g. productId_vendorId_packing
-  productId: string;
-  vendorId: string;
-  productType: string;
-  size?: string;
-  colour: string;
-  shape: string;
-  weight: string;
-  hsnCode: string;
-  vendorName: string;
-  totalBoxes: number;
-  val?: number;
-  warehouses: { warehouseId: string; warehouseName: string; qtyBoxes: number }[];
-  packing: number;
-  batchNo?: string;
-  mfgDate?: string;
-  expiryDate?: string;
-};
-
-export type StockLedger = {
-  _id: string;
-  productId: string;
-  warehouseId: string;
-  warehouseName: string;
-  type: 'IN' | 'OUT' | 'ADJUSTMENT';
-  qtyBoxes: number;
-  balanceBoxes: number;
-  reference: string;
-  note: string;
-  createdBy: string;
-  createdAt: string;
-  packing: number;
-  vendorId?: string;
-  vendorName?: string;
-  batchNo?: string;
-  mfgDate?: string;
-  expiryDate?: string;
-};
-
-
-export type InvoiceItem = {
-  productId?: string;
-  name: string;
-  qty: number;
-  boxes: number;
-  packing: number;
-  rate: number;
-  qtyBoxes?: number;
-  hsnCode?: string;
-  gstRate: number;
-};
-
-export type Invoice = {
-  _id: string;
-  invoiceNo: string;
-  customerName?: string;
-  supplierName?: string;
-  partyAddress?: string;
-  shippingAddress?: string;
-  date: string;
-  dueDate?: string;
-  amount: number;
-  status: string;
-  mode: 'pakka';
-  baseAmount?: number;
-  gstRate?: number;
-  hsnCode?: string;
-  cgst?: number;
-  sgst?: number;
-  igst?: number;
-  roundOff?: number;
-  freightAmount?: number;
-  cartageAmount?: number;
-  stateOfSupply?: string;
-  gstin?: string;
-  warehouseId?: string;
-  warehouseName?: string;
-  items?: InvoiceItem[];
-  subTotal?: number;
-  grandTotal?: number;
-  vendorName?: string;
-  partyGstin?: string;
-  deductInventory?: boolean;
-  isFinalized?: boolean;
-  transport?: string;
-  vehicleNo?: string;
-  ewayBillNo?: string;
-  irn?: string;
-  internalFreightExpense?: number;
-  qrCode?: string;
-};
-
-export type QuotationItem = {
-  productId?: string;
-  name: string;
-  qty: number;
-  boxes: number;
-  packing: number;
-  rate: number;
-  hsnCode?: string;
-  gstRate: number;
-};
-
-export type Quotation = {
-  _id: string;
-  quotationNo: string;
-  customerName?: string;
-  partyAddress?: string;
-  shippingAddress?: string;
-  date: string;
-  amount: number;
-  status: string;
-  baseAmount?: number;
-  gstRate?: number;
-  hsnCode?: string;
-  cgst?: number;
-  sgst?: number;
-  igst?: number;
-  roundOff?: number;
-  freightAmount?: number;
-  stateOfSupply?: string;
-  gstin?: string;
-  items?: QuotationItem[];
-  warehouseName?: string;
-  mode?: string;
-  isFinalized?: boolean;
-  warehouseId?: string;
-};
-
-export type MockDataType = {
-  contacts: Contact[];
-  tasks: Task[];
-  activities: Activity[];
-  customers: Customer[];
-  vendors: Vendor[];
-  products: Product[];
-  challans: Challan[];
-  inventories: Inventory[];
-  saleInvoices: Invoice[];
-  purchaseInvoices: Invoice[];
-  quotations?: Quotation[];
-  warehouses?: Warehouse[];
-  inventoryEntries?: InventoryEntry[];
-  stockLedgers?: StockLedger[];
-  payments?: Payment[];
-  queries?: ProductQuery[];
-};
-
-
-
-export type RawMaterial = {
-  _id: string;
-  name: string;
-  sku: string;
-  unit: string;
-  minReorder: number;
-  stockLevel?: number;
-};
-
-export type RawMaterialEntry = {
-  _id: string;
-  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
-  batchNo: string;
-  qty: number;
-  purchaseRate: number;
-  vendorId?: string;
-  vendorName?: string;
-  expiryDate?: string;
-  createdAt: string;
-};
-
-export type BOMIngredient = {
-  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
-  qtyRequired: number;
-};
-
-export type BillOfMaterials = {
-  _id: string;
-  productId: string | { _id: string; name: string; sku: string; size?: string };
-  batchYieldSize: number;
-  ingredients: BOMIngredient[];
-};
-
-export type BatchProductionIngredient = {
-  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
-  rawMaterialEntryId: string;
-  qtyConsumed: number;
-  batchNo: string;
-};
-
-export type BatchProduction = {
-  _id: string;
-  batchNo: string;
-  productId: string | { _id: string; name: string; sku: string; size?: string; packing?: number; price?: number };
-  plannedQty: number;
-  actualYieldQty: number;
-  status: 'draft' | 'in_progress' | 'qc_hold' | 'completed' | 'cancelled';
-  ingredientsConsumed: BatchProductionIngredient[];
-  startDate?: string;
-  endDate?: string;
-  qcNotes?: string;
-  qcPassedBy?: string;
-  rawMaterialCost?: number;
-  unitProductionCost?: number;
-  createdAt: string;
-};
-
-export type Complaint = {
-  _id: string;
-  complaintNo: string;
-  type: 'complaint' | 'return' | 'exchange';
-  customerId?: string;
-  customerName: string;
-  customerPhone: string;
-  invoiceId?: string;
-  invoiceNo: string;
-  productName: string;
-  description: string;
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
-  priority: 'low' | 'medium' | 'high';
-  resolution: string;
-  resolvedBy: string;
-  resolvedAt?: string;
-  assignedTo: string;
-  createdAt: string;
-};
-
-export type SampleItem = {
-  productId?: string;
-  productName: string;
-  qty: number;
-  size?: string;
-  mrp: number;
-};
-
-export type Sample = {
-  _id: string;
-  sampleNo: string;
-  givenTo: string;
-  designation: string;
-  phone: string;
-  location: string;
-  purpose: string;
-  items: SampleItem[];
-  totalMrpValue: number;
-  givenBy: string;
-  date: string;
-  followUpDate?: string;
-  notes: string;
-  status: 'given' | 'follow_up_done' | 'converted' | 'no_response';
-  createdAt: string;
-};
-
-export type SalesTarget = {
-  _id: string;
-  agentId: string;
-  agentName: string;
-  month: number;
-  year: number;
-  targetAmount: number;
-  notes: string;
-  createdAt: string;
-};
-
-export type CommissionReport = {
-  commissionRate: number;
-  agents: {
-    agentName: string;
-    totalSales: number;
-    invoiceCount: number;
-    commission: number;
-  }[];
-};
-
-export type Dispatch = {
-  _id: string;
-  dispatchNo: string;
-  invoiceId?: string;
-  invoiceNo: string;
-  customerName: string;
-  customerPhone: string;
-  shippingAddress: string;
-  dispatchDate: string;
-  transporter: string;
-  lrNo: string;
-  vehicleNo: string;
-  courierName: string;
-  trackingId: string;
-  trackingUrl: string;
-  totalBoxes: number;
-  totalWeight: string;
-  freightCharge: number;
-  status: 'pending' | 'dispatched' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'returned';
-  deliveredAt?: string;
-  notes: string;
-  createdAt: string;
-};
-
-export type DeadStockItem = {
-  productId: string;
-  productName: string;
-  productSku: string;
-  price: number;
-  size: string;
-  warehouseId: string;
-  warehouseName: string;
-  qty: number;
-  stockValue: number;
-  lastMovementDate: string;
-  daysSinceMovement: number;
-};
-
-
 class ApiClient {
   private authToken: string | null = null;
   currentUser: any = null;
@@ -1157,8 +603,8 @@ class ApiClient {
     return res.json();
   }
   async deleteWarehouse(id: string): Promise<boolean> {
-    await this.request(`${API_BASE}/warehouses/${id}`, { method: 'DELETE' });
-    return true;
+    const res = await this.request(`${API_BASE}/warehouses/${id}`, { method: 'DELETE' });
+    return res.ok;
   }
 
   // --- Inventory Entries (Direct Stock adjustments) ---
@@ -1317,12 +763,68 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
-  async completeBatchProduction(id: string, data: { actualYieldQty: number; qcNotes: string; qcPassedBy: string }): Promise<BatchProduction> {
+  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string }): Promise<BatchProduction> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async completeBatchProduction(id: string, data: { actualYieldQty: number; wasteQty?: number; wasteReason?: string; qcNotes: string; qcPassedBy: string }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/complete`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
   async cancelBatchProduction(id: string): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/cancel`, { method: 'PATCH' });
+    return res.json();
+  }
+  async getBatchGenealogy(id: string): Promise<BatchGenealogy> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/genealogy`);
+    return res.json();
+  }
+  async getRawMaterialGenealogy(id: string): Promise<RawMaterialGenealogy> {
+    const res = await this.request(`${API_BASE}/raw-materials/${id}/genealogy`);
+    return res.json();
+  }
+  async traceBatch(batchNo: string): Promise<TraceResult> {
+    const res = await this.request(`${API_BASE}/trace/${encodeURIComponent(batchNo)}`);
+    return res.json();
+  }
+  async getRBACPermissions(): Promise<RBACPermissionsResponse> {
+    const res = await this.request(`${API_BASE}/rbac/permissions`);
+    return res.json();
+  }
+  async updateRolePermissions(role: string, permissions: string[]): Promise<RolePermissionConfig> {
+    const res = await this.request(`${API_BASE}/rbac/permissions/${role}`, {
+      method: 'PUT', body: JSON.stringify({ permissions })
+    });
+    return res.json();
+  }
+  async createRole(data: { role: string; permissions?: string[]; label?: string; description?: string }): Promise<RolePermissionConfig> {
+    const res = await this.request(`${API_BASE}/rbac/permissions`, {
+      method: 'POST', body: JSON.stringify(data)
+    });
+    return res.json();
+  }
+  async deleteRole(role: string): Promise<{ message: string }> {
+    const res = await this.request(`${API_BASE}/rbac/permissions/${encodeURIComponent(role)}`, { method: 'DELETE' });
+    return res.json();
+  }
+  async resetRolePermissions(role: string): Promise<RolePermissionConfig> {
+    const res = await this.request(`${API_BASE}/rbac/permissions/${role}/reset`, { method: 'POST' });
+    return res.json();
+  }
+  async getMyPermissions(): Promise<{ role: string; permissions: string[] }> {
+    const res = await this.request(`${API_BASE}/rbac/my-permissions`);
+    return res.json();
+  }
+  async createPaymentOrder(invoiceId: string): Promise<PaymentOrderResponse> {
+    const res = await this.request(`${API_BASE}/payments/gateway/create-order`, {
+      method: 'POST', body: JSON.stringify({ invoiceId })
+    });
+    return res.json();
+  }
+  async verifyPayment(data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; invoiceId: string }): Promise<PaymentVerifyResponse> {
+    const res = await this.request(`${API_BASE}/payments/gateway/verify`, {
+      method: 'POST', body: JSON.stringify(data)
+    });
     return res.json();
   }
   async getBMRReport(id: string): Promise<BMRReport> {
@@ -1370,6 +872,49 @@ class ApiClient {
     return res.ok;
   }
 
+  // --- Stock Movements ---
+  async getStockMovements(params?: { direction?: string; type?: string; status?: string; search?: string }): Promise<StockMovement[]> {
+    const q = new URLSearchParams();
+    if (params?.direction) q.set('direction', params.direction);
+    if (params?.type) q.set('type', params.type);
+    if (params?.status) q.set('status', params.status);
+    if (params?.search) q.set('search', params.search);
+    const res = await this.request(`${API_BASE}/stock-movements?${q.toString()}`);
+    return res.json();
+  }
+  async getStockMovement(id: string): Promise<StockMovement> {
+    const res = await this.request(`${API_BASE}/stock-movements/${id}`);
+    return res.json();
+  }
+  async createStockMovement(data: any): Promise<StockMovement> {
+    const res = await this.request(`${API_BASE}/stock-movements`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async updateStockMovement(id: string, data: any): Promise<StockMovement> {
+    const res = await this.request(`${API_BASE}/stock-movements/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async dispatchStockMovement(id: string): Promise<StockMovement> {
+    const res = await this.request(`${API_BASE}/stock-movements/${id}/dispatch`, { method: 'PATCH' });
+    return res.json();
+  }
+  async receiveStockMovement(id: string): Promise<StockMovement> {
+    const res = await this.request(`${API_BASE}/stock-movements/${id}/receive`, { method: 'PATCH' });
+    return res.json();
+  }
+  async cancelStockMovement(id: string): Promise<StockMovement> {
+    const res = await this.request(`${API_BASE}/stock-movements/${id}/cancel`, { method: 'PATCH' });
+    return res.json();
+  }
+  async deleteStockMovement(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/stock-movements/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+  async convertStockMovementToInvoice(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/stock-movements/${id}/convert-to-invoice`, { method: 'POST' });
+    return res.json();
+  }
+
   // --- Sales Targets & Commission ---
   async getSalesTargets(month?: number, year?: number): Promise<SalesTarget[]> {
     let url = `${API_BASE}/sales-targets?`;
@@ -1415,82 +960,150 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/dispatches/dead-stock`);
     return res.json();
   }
+
+  // ─── MR API Methods ───
+  async getMRs(search?: string, active?: string): Promise<MedicalRepresentative[]> {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (active !== undefined) params.set('active', active);
+    const res = await this.request(`${API_BASE}/medical-reps?${params}`);
+    return res.json();
+  }
+  async createMR(data: Partial<MedicalRepresentative>): Promise<MedicalRepresentative> {
+    const res = await this.request(`${API_BASE}/medical-reps`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async getMR(id: string): Promise<MedicalRepresentative> {
+    const res = await this.request(`${API_BASE}/medical-reps/${id}`);
+    return res.json();
+  }
+  async updateMR(id: string, data: Partial<MedicalRepresentative>): Promise<MedicalRepresentative> {
+    const res = await this.request(`${API_BASE}/medical-reps/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteMR(id: string): Promise<void> {
+    await this.request(`${API_BASE}/medical-reps/${id}`, { method: 'DELETE' });
+  }
+  async getMrAttendance(mrId: string, from?: string, to?: string): Promise<MrDailyLog[]> {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/attendance?${params}`);
+    return res.json();
+  }
+  async mrCheckIn(mrId: string, data: { latitude?: number; longitude?: number; photo?: string; location?: string; startKmReading?: number }): Promise<MrDailyLog> {
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/checkin`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async mrCheckOut(mrId: string, data: { latitude?: number; longitude?: number; photo?: string; location?: string; endKmReading?: number }): Promise<MrDailyLog> {
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/checkout`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async getMrVisits(mrId: string, from?: string, to?: string): Promise<MrVisit[]> {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/visits?${params}`);
+    return res.json();
+  }
+  async createMrVisit(mrId: string, data: Partial<MrVisit>): Promise<MrVisit> {
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/visits`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async updateMrVisit(visitId: string, data: Partial<MrVisit>): Promise<MrVisit> {
+    const res = await this.request(`${API_BASE}/medical-reps/visits/${visitId}`, { method: 'PUT', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteMrVisit(visitId: string): Promise<void> {
+    await this.request(`${API_BASE}/medical-reps/visits/${visitId}`, { method: 'DELETE' });
+  }
+  async getAllMrVisits(mrId?: string, from?: string, to?: string): Promise<MrVisit[]> {
+    const params = new URLSearchParams();
+    if (mrId) params.set('mrId', mrId);
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const res = await this.request(`${API_BASE}/medical-reps/visits/all?${params}`);
+    return res.json();
+  }
+  async getMrExpenses(mrId: string, from?: string, to?: string, status?: string): Promise<MrExpense[]> {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (status) params.set('status', status);
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/expenses?${params}`);
+    return res.json();
+  }
+  async createMrExpense(mrId: string, data: Partial<MrExpense>): Promise<MrExpense> {
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/expenses`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async approveMrExpense(expenseId: string, status: 'approved' | 'rejected', rejectionReason?: string): Promise<MrExpense> {
+    const res = await this.request(`${API_BASE}/medical-reps/expenses/${expenseId}/approve`, { method: 'PUT', body: JSON.stringify({ status, rejectionReason }) });
+    return res.json();
+  }
+  async deleteMrExpense(expenseId: string): Promise<void> {
+    await this.request(`${API_BASE}/medical-reps/expenses/${expenseId}`, { method: 'DELETE' });
+  }
+  async getAllMrExpenses(from?: string, to?: string, status?: string): Promise<MrExpense[]> {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (status) params.set('status', status);
+    const res = await this.request(`${API_BASE}/medical-reps/expenses/all?${params}`);
+    return res.json();
+  }
+  async getMrDashboard(from?: string, to?: string, mrId?: string): Promise<MrDashboardSummary> {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (mrId) params.set('mrId', mrId);
+    const res = await this.request(`${API_BASE}/medical-reps/dashboard/summary?${params}`);
+    return res.json();
+  }
+
+  // ─── Campaigns ───
+  async getCampaigns(search?: string, status?: string, platform?: string): Promise<Campaign[]> {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (status) params.set('status', status);
+    if (platform) params.set('platform', platform);
+    const res = await this.request(`${API_BASE}/campaigns?${params}`);
+    return res.json();
+  }
+  async getCampaign(id: string): Promise<Campaign> {
+    const res = await this.request(`${API_BASE}/campaigns/${id}`);
+    return res.json();
+  }
+  async createCampaign(data: Partial<Campaign>): Promise<Campaign> {
+    const res = await this.request(`${API_BASE}/campaigns`, {
+      method: 'POST', body: JSON.stringify(data)
+    });
+    return res.json();
+  }
+  async updateCampaign(id: string, data: Partial<Campaign>): Promise<Campaign> {
+    const res = await this.request(`${API_BASE}/campaigns/${id}`, {
+      method: 'PUT', body: JSON.stringify(data)
+    });
+    return res.json();
+  }
+  async launchCampaign(id: string): Promise<Campaign> {
+    const res = await this.request(`${API_BASE}/campaigns/${id}/launch`, { method: 'POST' });
+    return res.json();
+  }
+  async pauseCampaign(id: string): Promise<Campaign> {
+    const res = await this.request(`${API_BASE}/campaigns/${id}/pause`, { method: 'POST' });
+    return res.json();
+  }
+  async completeCampaign(id: string): Promise<Campaign> {
+    const res = await this.request(`${API_BASE}/campaigns/${id}/complete`, { method: 'POST' });
+    return res.json();
+  }
+  async deleteCampaign(id: string): Promise<{ message: string }> {
+    const res = await this.request(`${API_BASE}/campaigns/${id}`, { method: 'DELETE' });
+    return res.json();
+  }
 }
 
-
-export type BMRReportIngredient = {
-  name: string;
-  code: string;
-  batchNo: string;
-  qtyConsumed: number;
-  unit: string;
-  purchaseRate: number;
-  itemCost: number;
-};
-
-export type BMRReport = {
-  batchNo: string;
-  productName: string;
-  productSku: string;
-  productPrice: number;
-  plannedQty: number;
-  actualYieldQty: number;
-  status: string;
-  startDate: string;
-  endDate?: string;
-  qcNotes: string;
-  qcPassedBy: string;
-  rawMaterialCost: number;
-  unitProductionCost: number;
-  ingredients: BMRReportIngredient[];
-};
-
-export type ManufacturingAnalytics = {
-  netRawMaterialValue: number;
-  netFinishedGoodsValue: number;
-  yieldPerformance: {
-    batchNo: string;
-    productName: string;
-    plannedQty: number;
-    actualYieldQty: number;
-    efficiency: number;
-  }[];
-  timeline: {
-    id: string;
-    batchNo: string;
-    productName: string;
-    plannedQty: number;
-    actualYieldQty: number;
-    status: string;
-    startDate: string;
-    endDate?: string;
-  }[];
-};
-
-export type OrderItem = {
-  productId: string;
-  name: string;
-  qty: number;
-  price: number;
-  size?: string;
-};
-
-export type Order = {
-  _id: string;
-  name: string;
-  email: string;
-  phone: string;
-  shippingAddress: string;
-  items: OrderItem[];
-  totalAmount: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  courierName?: string;
-  trackingId?: string;
-  courierLink?: string;
-  adminNotes?: string;
-  notifications?: string[];
-  createdAt: string;
-  updatedAt: string;
-};
+export * from './api/types';
 
 export const api = new ApiClient();

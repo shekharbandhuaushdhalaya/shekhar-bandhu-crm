@@ -8,6 +8,7 @@ import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Invoice, ManufacturingAnalytics, RawMaterial, RawMaterialEntry } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
 import { FIRM_DETAILS } from '../constants/firm';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -16,22 +17,11 @@ type ReportTab = 'accounting' | 'gst' | 'aging' | 'manufacturing' | 'rawmaterial
 
 export default function ReportsScreen() {
   const { user } = useAuth();
+  const perm = usePermission();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
-
-  if (user && user.role === 'agent') {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
-        <Ionicons name="lock-closed" size={48} color={colors.danger} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
-        <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>
-          Agents do not have permissions to access financial reports.
-        </Text>
-      </View>
-    );
-  }
 
   const [activeTab, setActiveTab] = useState<ReportTab>('accounting');
   const [refreshing, setRefreshing] = useState(false);
@@ -475,6 +465,18 @@ export default function ReportsScreen() {
     { id: 'manufacturing',label: 'Manufacturing',        icon: 'analytics-outline' },
     { id: 'rawmaterials', label: 'Raw Materials',        icon: 'leaf-outline' },
   ];
+
+  if (perm.permissions && !perm.can('report:view')) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
+        <Ionicons name="lock-closed" size={48} color={colors.danger} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
+        <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>
+          You do not have permission to access reports.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -1477,10 +1479,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(0,0,0,0.12)',
     elevation: 6,
     zIndex: 9999,
   },

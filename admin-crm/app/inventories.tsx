@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product } from '../utils/api';
 import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 
 // Helper to format strings to Upper Camel Case (Title Case)
@@ -1189,6 +1190,7 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
 export default function InventoriesScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const perm = usePermission();
   const styles = useStyles(createStyles);
 
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -1700,7 +1702,7 @@ export default function InventoriesScreen() {
                             </Text>
                             <Text style={{ fontSize: 10, color: colors.text.muted }}>{w.city}, {w.state}</Text>
                           </TouchableOpacity>
-                          {user?.role !== 'agent' && (
+                          {perm.can('inventory:viewValue') && (
                             <TouchableOpacity
                               style={{ padding: 10, paddingRight: 16 }}
                               onPress={() => {
@@ -1719,13 +1721,13 @@ export default function InventoriesScreen() {
                 )}
               </View>
             {/* Action Buttons */}
-              {user?.role !== 'agent' && (
+              {perm.can('inventory:edit') && (
                 <TouchableOpacity style={styles.headerBtnPrimary} onPress={() => setAddWarehouseVisible(true)}>
                   <Ionicons name="business" size={16} color="#fff" />
                   <Text style={styles.headerBtnText}>Add Warehouse</Text>
                 </TouchableOpacity>
               )}
-              {user?.role !== 'agent' && (
+              {perm.can('inventory:edit') && (
                 <TouchableOpacity style={styles.headerBtnPrimary} onPress={() => { setAddStockInitialProductId(''); setAddStockVisible(true); }}>
                   <Ionicons name="cube-outline" size={16} color="#fff" />
                   <Text style={styles.headerBtnText}>Add Stock</Text>
@@ -2039,7 +2041,7 @@ export default function InventoriesScreen() {
                                 </Pressable>
                                 <View style={{ flex: 1.8 }} />
                                 <View style={{ flex: 2.2, justifyContent: 'center', alignItems: 'flex-start' }}>
-                                  {user?.role !== 'agent' && (
+                                  {perm.can('inventory:edit') && (
                                     <TouchableOpacity
                                       style={styles.actionBtnSecondary}
                                       onPress={() => {
@@ -2123,7 +2125,7 @@ export default function InventoriesScreen() {
 
                                   {/* Align under Godowns (Adjust Stock Button) */}
                                   <View style={{ flex: 2.2, justifyContent: 'center', alignItems: 'flex-start' }}>
-                                    {user?.role !== 'agent' && (
+                                    {perm.can('inventory:edit') && (
                                       <TouchableOpacity
                                         style={styles.actionBtnSecondary}
                                         onPress={() => {
@@ -2228,14 +2230,14 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', top: 52, right: Spacing.lg, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 280, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', top: 52, right: Spacing.lg, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 280, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
 
   // Control sub bar & vendor filter
   controlSubBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: Spacing.lg, marginBottom: Spacing.md, gap: 12, zIndex: 1050 },
-  vendorDropdownPanel: { position: 'absolute', top: 52, right: 180, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 12 },
+  vendorDropdownPanel: { position: 'absolute', top: 52, right: 180, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
 
   table: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden', flex: 1 },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, alignItems: 'center' },
@@ -2265,7 +2267,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Modals Styling
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  dialogSheet: { width: '90%', maxWidth: 500, maxHeight: '90%', flexDirection: 'column', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 10 },
+  dialogSheet: { width: '90%', maxWidth: 500, maxHeight: '90%', flexDirection: 'column', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
   dialogContainer: { width: '100%', flex: 1 },
   dialogHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, marginBottom: 8 },
   dialogTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
@@ -2284,7 +2286,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   customSelectTrigger: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 42 },
   customSearchSelectContainer: { flexDirection: 'row', alignItems: 'center', position: 'relative' },
   clearProductSelection: { position: 'absolute', right: 12 },
-  customSelectPanel: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginTop: 4, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5 },
+  customSelectPanel: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginTop: 4, overflow: 'hidden', boxShadow: '0px 4px 8px rgba(0,0,0,0.1)', elevation: 5 },
   customSelectItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   customSelectItemText: { fontSize: 13, color: colors.text.primary, fontWeight: '700' },
   customSelectItemSubtext: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
@@ -2295,7 +2297,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   adjustmentTypeBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
 
   // Ledger sheets (Wider modal for ledger logs)
-  ledgerSheet: { width: '95%', maxWidth: 750, height: '80%', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 10 },
+  ledgerSheet: { width: '95%', maxWidth: 750, height: '80%', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
   ledgerTable: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
   ledgerHeaderCell: { fontSize: 10, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },

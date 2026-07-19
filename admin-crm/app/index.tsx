@@ -5,6 +5,7 @@ import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
 import { api, DashboardStats, Activity, Contact, Product, Invoice, Challan, ConsolidatedInventory } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
 import Svg, { Path, Circle, Text as SvgText, Line, Defs, LinearGradient, Stop, Rect, G } from 'react-native-svg';
 
 function MetricCard({ title, value, icon, color, colorLight, trend }: { title: string; value: string; icon: string; color: string; colorLight: string; trend: string }) {
@@ -358,10 +359,7 @@ function MonthlySalesWidget({ width, sales }: { width: number; sales: Invoice[] 
               borderRadius: 6,
               width: 110,
               zIndex: 9999,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 8,
+              boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
               elevation: 8,
               overflow: 'hidden',
             }}>
@@ -590,6 +588,7 @@ export default function DashboardScreen() {
   const [allChallans, setAllChallans] = useState<Challan[]>([]);
   
   const { user } = useAuth();
+  const perm = usePermission();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
 
@@ -733,7 +732,7 @@ export default function DashboardScreen() {
           icon="arrow-down-circle" 
           color={colors.success}
         />
-        {user?.role !== 'agent' && (
+        {perm.can('report:view') && (
           <FinancialSummaryCard 
             title="TOTAL PAYABLES" 
             value={`₹${payInvoice.toLocaleString()}`} 
@@ -742,7 +741,7 @@ export default function DashboardScreen() {
             color={colors.warning}
           />
         )}
-        {user?.role !== 'agent' && (
+        {perm.can('report:view') && (
           <FinancialSummaryCard 
             title="ASSET VALUE" 
             value={`₹${assetValue.toLocaleString()}`} 
@@ -751,7 +750,7 @@ export default function DashboardScreen() {
             color={colors.primary}
           />
         )}
-        {user?.role !== 'agent' && (
+        {perm.can('report:view') && (
           <FinancialSummaryCard 
             title="PROFIT & LOSS" 
             value={`₹${(totalRevenue - totalCOGS).toLocaleString()}`} 
@@ -767,7 +766,7 @@ export default function DashboardScreen() {
       </View>
 
       <View style={styles.chartsFeedRow}>
-        {user?.role !== 'agent' && (
+        {perm.can('report:view') && (
           <View style={styles.chartWrapper}>
             <MonthlySalesWidget width={chartWidth} sales={allSales} />
           </View>

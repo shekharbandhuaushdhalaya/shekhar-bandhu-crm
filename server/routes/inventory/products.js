@@ -1,0 +1,237 @@
+const express = require('express');
+const Product = require('../../models/Product');
+const multer = require('multer');
+const { Readable } = require('stream');
+const cloudinary = require('cloudinary').v2;
+const { authorize } = require('../../middleware/authorize');
+const { generateSku } = require('../../utils/skuGenerator');
+const { getRolePermissions } = require('../../middleware/authorize');
+const { validate } = require('../../middleware/validate');
+const schemas = require('../../validation/schemas');
+const { z } = require('zod');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+function uploadToCloudinary(buffer, folder = 'shekhar-bandhu/products') {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'image' },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    Readable.from(buffer).pipe(stream);
+  });
+}
+
+const router = express.Router();
+
+// GET /api/products — List products with optional search filter
+router.get('/', authorize('product:view'), async (req, res) => {
+  try {
+    const { search } = req.query;
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    let query = Product.find(filter);
+    const rolePerms = await getRolePermissions(req.user.role);
+    if (!rolePerms.includes('product:viewPricing') && !rolePerms.includes('*')) {
+      query = query.select('-price');
+    }
+
+    const products = await query.sort({ createdAt: -1 }).lean();
+    res.json(products);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const normalizeTitleCase = (str) => {
+  if (!str) return '';
+  return str.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+};
+
+const normalizeWhitespace = (str) => {
+  if (!str) return '';
+  return str.trim().replace(/\s+/g, ' ');
+};
+
+const getNormalizedSpecs = (body) => {
+  return {
+    productType: normalizeTitleCase(body.productType),
+    size: normalizeWhitespace(body.size),
+    colour: normalizeTitleCase(body.colour),
+    shape: normalizeTitleCase(body.shape),
+    weight: normalizeWhitespace(body.weight)
+  };
+};
+
+// POST /api/products — Create product and instantiate inventory record
+router.post('/', validate(schemas.productSchema), authorize('product:create'), async (req, res) => {
+  try {
+    const specs = getNormalizedSpecs(req.body);
+    const existing = await Product.findOne(specs).collation({ locale: 'en', strength: 2 }).lean();
+    if (existing) {
+      return res.status(400).json({ error: 'A product with this combination of Type, Size, Colour, Shape, and Weight already exists.' });
+    }
+
+    Object.assign(req.body, specs);
+    if (!req.body.name) {
+      const nameParts = [];
+      if (req.body.size) nameParts.push(req.body.size);
+      if (req.body.shape) nameParts.push(req.body.shape);
+      if (req.body.colour) nameParts.push(req.body.colour);
+      req.body.name = nameParts.length > 0 ? nameParts.join(' ') : 'Unnamed Product';
+    }
+
+    if (!req.body.sku || !req.body.sku.trim()) {
+      req.body.sku = generateSku(req.body);
+    }
+
+    const product = await Product.create(req.body);
+
+    res.status(201).json(product);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT /api/products/:id — Update product specifications
+router.put('/:id', validate(schemas.productSchema.partial()), authorize('product:edit'), async (req, res) => {
+  try {
+    const oldProduct = await Product.findById(req.params.id);
+    if (!oldProduct) return res.status(404).json({ error: 'Product not found' });
+
+    if (!req.body.name) {
+      const nameParts = [];
+      if (req.body.size) nameParts.push(req.body.size);
+      if (req.body.shape) nameParts.push(req.body.shape);
+      if (req.body.colour) nameParts.push(req.body.colour);
+      req.body.name = nameParts.length > 0 ? nameParts.join(' ') : 'Unnamed Product';
+    }
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+
+    res.json(updatedProduct);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE /api/products/:id — Remove product and its associated inventory entries
+router.delete('/:id', authorize('product:delete'), async (req, res) => {
+  try {
+    const product = await Product.findByIdAndDelete(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    await InventoryEntry.deleteMany({ productId: product._id });
+    await StockLedger.deleteMany({ productId: product._id });
+
+    res.json({ message: 'Product deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/products/:id/image — Upload product image to Cloudinary
+router.post('/:id/image', authorize('product:edit'), upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+    const imageUrl = await uploadToCloudinary(req.file.buffer);
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id,
+      { image: imageUrl },
+      { new: true }
+    );
+    res.json(updatedProduct);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/products/:id/image/append — Upload and append a new image to the product's image list
+router.post('/:id/image/append', authorize('product:edit'), upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+    const imageUrl = await uploadToCloudinary(req.file.buffer);
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    let images = product.image ? product.image.split(',').map(s => s.trim()).filter(Boolean) : [];
+    images.push(imageUrl);
+    product.image = images.join(',');
+    await product.save();
+
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/products/:id/image/delete — Remove a specific image URL from the product's image list
+router.post('/:id/image/delete', authorize('product:edit'), async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
+
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    let images = product.image ? product.image.split(',').map(s => s.trim()).filter(Boolean) : [];
+    images = images.filter(url => url !== imageUrl);
+    product.image = images.join(',');
+    await product.save();
+
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/products/:id/pricing — Update price, discount & promo banner (requires editPricing permission)
+router.patch('/:id/pricing', validate(z.object({ discount: z.number().optional(), discountLabel: z.string().optional(), websitePromoActive: z.boolean().optional() })), authorize('product:editPricing'), async (req, res) => {
+  try {
+    const { price, discount, discountLabel, websitePromoActive } = req.body;
+
+    const updateFields = {};
+    if (price !== undefined)              updateFields.price = Number(price);
+    if (discount !== undefined)           updateFields.discount = Math.min(100, Math.max(0, Number(discount)));
+    if (discountLabel !== undefined)      updateFields.discountLabel = String(discountLabel).trim();
+    if (websitePromoActive !== undefined) updateFields.websitePromoActive = Boolean(websitePromoActive);
+
+    const updated = await Product.findByIdAndUpdate(
+      req.params.id,
+      updateFields,
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Product not found' });
+
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+module.exports = router;

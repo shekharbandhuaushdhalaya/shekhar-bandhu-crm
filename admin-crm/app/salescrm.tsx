@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
-import { api, Complaint, Sample, SampleItem, SalesTarget, CommissionReport } from '../utils/api';
+import { api, Complaint, Sample, SampleItem, SalesTarget, CommissionReport, Product } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 
@@ -58,6 +58,8 @@ export default function SalesCRMScreen() {
   const [smpNotes, setSmpNotes] = useState('');
   const [smpItems, setSmpItems] = useState<SampleItem[]>([{ productName: '', qty: 1, mrp: 0 }]);
   const [smpError, setSmpError] = useState('');
+  const [smpProductResults, setSmpProductResults] = useState<Product[]>([]);
+  const [smpProductDropdownIdx, setSmpProductDropdownIdx] = useState<number | null>(null);
 
   // ── Targets / Commission ──
   const [targets, setTargets] = useState<SalesTarget[]>([]);
@@ -131,6 +133,7 @@ export default function SalesCRMScreen() {
     setSmpGivenTo(''); setSmpDesignation(''); setSmpPhone(''); setSmpLocation('');
     setSmpPurpose(''); setSmpGivenBy(user?.name || ''); setSmpDate(new Date().toISOString().split('T')[0]);
     setSmpFollowUp(''); setSmpNotes(''); setSmpItems([{ productName: '', qty: 1, mrp: 0 }]); setSmpError('');
+    setSmpProductResults([]); setSmpProductDropdownIdx(null);
   };
 
   const handleSaveSample = async () => {
@@ -553,11 +556,45 @@ export default function SalesCRMScreen() {
               <TextInput style={[styles.input, { height: 60, textAlignVertical: 'top' }]} value={smpNotes} onChangeText={setSmpNotes} placeholder="Additional notes..." placeholderTextColor={colors.text.muted} multiline />
               <Text style={[styles.inputLabel, { marginTop: 8 }]}>Products Given:</Text>
               {smpItems.map((item, idx) => (
-                <View key={idx} style={{ flexDirection: 'row', gap: 6, marginBottom: 8, alignItems: 'center' }}>
-                  <TextInput style={[styles.input, { flex: 2, marginBottom: 0 }]} value={item.productName} onChangeText={v => { const n = [...smpItems]; n[idx].productName = v; setSmpItems(n); }} placeholder="Product name" placeholderTextColor={colors.text.muted} />
-                  <TextInput style={[styles.input, { flex: 0.6, marginBottom: 0 }]} value={String(item.qty)} onChangeText={v => { const n = [...smpItems]; n[idx].qty = parseInt(v) || 1; setSmpItems(n); }} placeholder="Qty" keyboardType="numeric" placeholderTextColor={colors.text.muted} />
-                  <TextInput style={[styles.input, { flex: 0.8, marginBottom: 0 }]} value={String(item.mrp)} onChangeText={v => { const n = [...smpItems]; n[idx].mrp = parseFloat(v) || 0; setSmpItems(n); }} placeholder="MRP" keyboardType="numeric" placeholderTextColor={colors.text.muted} />
-                  {smpItems.length > 1 && <TouchableOpacity onPress={() => setSmpItems(smpItems.filter((_, i) => i !== idx))}><Ionicons name="remove-circle" size={20} color={colors.danger} /></TouchableOpacity>}
+                <View key={idx} style={{ marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-start' }}>
+                    <View style={{ flex: 2 }}>
+                      <TextInput style={[styles.input, { marginBottom: 0 }]} value={item.productName} onChangeText={v => {
+                        const n = [...smpItems];
+                        n[idx].productName = v;
+                        n[idx].productId = undefined;
+                        n[idx].mrp = 0;
+                        n[idx].size = undefined;
+                        setSmpItems(n);
+                        if (v.length >= 2) {
+                          api.getProducts(v).then(res => { setSmpProductResults(res); setSmpProductDropdownIdx(idx); }).catch(() => {});
+                        } else { setSmpProductResults([]); setSmpProductDropdownIdx(null); }
+                      }} placeholder="Search product..." placeholderTextColor={colors.text.muted} />
+                      {smpProductDropdownIdx === idx && smpProductResults.length > 0 && (
+                        <View style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, marginTop: 2 }}>
+                          {smpProductResults.slice(0, 8).map(p => (
+                            <TouchableOpacity key={p._id} style={{ paddingHorizontal: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                              onPress={() => {
+                                const n = [...smpItems];
+                                n[idx].productName = p.name;
+                                n[idx].productId = p._id;
+                                n[idx].mrp = p.price;
+                                n[idx].size = p.size;
+                                setSmpItems(n);
+                                setSmpProductResults([]);
+                                setSmpProductDropdownIdx(null);
+                              }}>
+                              <Text style={{ fontSize: 12, color: colors.text.primary }}>{p.name}</Text>
+                              <Text style={{ fontSize: 10, color: colors.text.muted }}>MRP: ₹{p.price} | {p.size || 'N/A'}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                    <TextInput style={[styles.input, { flex: 0.6, marginBottom: 0 }]} value={String(item.qty)} onChangeText={v => { const n = [...smpItems]; n[idx].qty = parseInt(v) || 1; setSmpItems(n); }} placeholder="Qty" keyboardType="numeric" placeholderTextColor={colors.text.muted} />
+                    <TextInput style={[styles.input, { flex: 0.8, marginBottom: 0 }]} value={String(item.mrp)} onChangeText={v => { const n = [...smpItems]; n[idx].mrp = parseFloat(v) || 0; setSmpItems(n); }} placeholder="MRP" keyboardType="numeric" placeholderTextColor={colors.text.muted} />
+                    {smpItems.length > 1 && <TouchableOpacity onPress={() => { setSmpItems(smpItems.filter((_, i) => i !== idx)); setSmpProductDropdownIdx(null); }}><Ionicons name="remove-circle" size={20} color={colors.danger} /></TouchableOpacity>}
+                  </View>
                 </View>
               ))}
               <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }} onPress={() => setSmpItems([...smpItems, { productName: '', qty: 1, mrp: 0 }])}>

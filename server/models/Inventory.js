@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const inventorySchema = new mongoose.Schema({
-  warehouse: { type: String, default: 'Gotham Depot A', trim: true },
+  warehouse: { type: String, default: '', trim: true },
   itemSku: { type: String, required: true, trim: true },
   itemName: { type: String, required: true, trim: true },
   qty: { type: Number, default: 0 },

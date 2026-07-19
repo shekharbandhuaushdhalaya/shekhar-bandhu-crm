@@ -8,6 +8,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { api, Product } from '../utils/api';
 import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
 import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
 import { useToast } from '../utils/ToastContext';
 import { DataTable, Column } from '../components/DataTable';
 
@@ -33,6 +34,7 @@ export default function PricingScreen() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
+  const perm = usePermission();
   const { showToast } = useToast();
 
   const [rows, setRows] = useState<PricingRow[]>([]);
@@ -41,7 +43,7 @@ export default function PricingScreen() {
   const [search, setSearch] = useState('');
   const [saveAllLoading, setSaveAllLoading] = useState(false);
 
-  const canEdit = user?.role === 'admin' || user?.role === 'manager';
+  const canEdit = perm.can('product:editPricing');
 
   const fetchProducts = useCallback(async () => {
     try {

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
 import { api, Invoice, Product, Vendor, Warehouse } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
+import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
 
 const toTitleCase = (str?: string) => {
@@ -297,7 +298,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
             </TouchableOpacity>
           )}
 
-          {user?.role === 'admin' && invoice.status !== 'Cancelled' && (
+          {perm.can('invoice:delete') && invoice.status !== 'Cancelled' && (
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
               <Ionicons name="trash-outline" size={16} color="#fff" />
               <Text style={styles.deleteBtnText}>Delete Invoice</Text>
@@ -312,6 +313,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
 function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible: boolean; onClose: () => void; onSaved: () => void; invoiceToEdit?: Invoice | null }) {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const perm = usePermission();
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
 
@@ -646,15 +648,15 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       const boxes = parseFloat(r.boxes) || 0;
       const packing = parseFloat(r.packing) || 1;
       return {
-        productId: r.selectedProduct ? r.selectedProduct._id : undefined,
-        name: r.selectedProduct ? getProductSelectorDisplayName(r.selectedProduct) : r.productSearch.trim(),
-        qty: boxes * packing,
-        boxes: boxes,
-        packing: packing,
-        rate: parseFloat(r.rate) || 0,
-        gstRate: r.gstRate,
-        hsnCode: r.selectedProduct ? (r.selectedProduct.hsnCode || '') : ''
-      };
+    productId: r.selectedProduct ? r.selectedProduct._id : undefined,
+    name: r.selectedProduct ? getProductSelectorDisplayName(r.selectedProduct) : r.productSearch.trim(),
+    qty: boxes,               // BOXES (consistent with sale invoices)
+    boxes: boxes,            // <--- boxes = box count
+    packing: packing,
+    rate: parseFloat(r.rate) || 0,
+    gstRate: r.gstRate,
+    hsnCode: r.selectedProduct ? (r.selectedProduct.hsnCode || '') : ''
+  };
     });
 
     // Find vendor's GSTIN and State from CRM seeds
@@ -1279,18 +1281,9 @@ export default function PurchaseInvoicesScreen() {
 
   const { colors } = useTheme();
   const { user } = useAuth();
+  const perm = usePermission();
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
-
-  if (user && user.role === 'agent') {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
-        <Ionicons name="lock-closed" size={48} color={colors.danger} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
-        <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>Agents do not have permissions to access purchase invoices.</Text>
-      </View>
-    );
-  }
 
   const modeFilter = 'pakka';
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -1311,6 +1304,16 @@ export default function PurchaseInvoicesScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
+
+  if (perm.permissions && !perm.can('invoice:view')) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
+        <Ionicons name="lock-closed" size={48} color={colors.danger} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
+        <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>You do not have permission to access purchase invoices.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -1447,7 +1450,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 200, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 200, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
@@ -1512,7 +1515,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Dropdown search panel selector additions
   customSearchSelectContainer: { position: 'relative', width: '100%' },
-  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 },
+  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)', elevation: 4 },
   customSelectItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   customSelectItemText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   customSelectItemSubtext: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
@@ -1531,12 +1534,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   tableInputBtnText: { fontSize: 13, color: colors.text.primary, fontWeight: '600' },
   tableRowSubtotal: { fontSize: 12, fontWeight: '600', color: colors.text.primary },
   
-  rowDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 5 },
+  rowDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, boxShadow: '0px 2px 3px rgba(0,0,0,0.1)', elevation: 5 },
   rowDropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   rowDropdownItemText: { fontSize: 12, fontWeight: '700', color: colors.text.primary },
   rowDropdownItemSubtext: { fontSize: 9, color: colors.text.muted, marginTop: 1 },
 
-  rowGstDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 5 },
+  rowGstDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, boxShadow: '0px 2px 3px rgba(0,0,0,0.1)', elevation: 5 },
   rowGstDropdownItem: { padding: 8, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
   rowGstDropdownItemText: { fontSize: 12, fontWeight: '600', color: colors.text.primary },
 

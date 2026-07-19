@@ -252,7 +252,7 @@ export default function InventoryDispatchScreen() {
                         <Text style={{ fontSize: 10, color: colors.text.muted }}>SKU: {item.productSku} · Size: {item.size}</Text>
                       </View>
                       <Text style={[styles.td, { flex: 1.2 }]}>{item.warehouseName}</Text>
-                      <Text style={[styles.td, { flex: 0.8, textAlign: 'right', fontWeight: '700' }]}>{item.qty}</Text>
+                      <Text style={[styles.td, { flex: 0.8, textAlign: 'right', fontWeight: '700' }]}>{item.qtyBoxes}</Text>
                       <Text style={[styles.td, { flex: 1.2, textAlign: 'right', color: colors.success, fontWeight: '700' }]}>₹{item.stockValue.toLocaleString()}</Text>
                       <Text style={[styles.td, { flex: 1, textAlign: 'right', color: colors.danger, fontWeight: '700' }]}>{item.daysSinceMovement} Days</Text>
                     </View>
@@ -262,7 +262,7 @@ export default function InventoryDispatchScreen() {
                   <View style={[styles.tableRow, { backgroundColor: colors.danger + '08', borderTopWidth: 2, borderTopColor: colors.danger, marginTop: 4 }]}>
                     <Text style={{ flex: 2, fontSize: 12, fontWeight: '800', color: colors.danger }}>TOTAL DEAD STOCK</Text>
                     <Text style={{ flex: 1.2 }} />
-                    <Text style={[styles.td, { flex: 0.8, textAlign: 'right', fontWeight: '800', color: colors.danger }]}>{deadStock.reduce((s, a) => s + a.qty, 0)}</Text>
+                    <Text style={[styles.td, { flex: 0.8, textAlign: 'right', fontWeight: '800', color: colors.danger }]}>{deadStock.reduce((s, a) => s + a.qtyBoxes, 0)}</Text>
                     <Text style={[styles.td, { flex: 1.2, textAlign: 'right', fontWeight: '800', color: colors.danger }]}>₹{deadStock.reduce((s, a) => s + a.stockValue, 0).toLocaleString()}</Text>
                     <Text style={{ flex: 1 }} />
                   </View>

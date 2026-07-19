@@ -6,7 +6,6 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ['admin', 'manager', 'agent'],
     default: 'agent',
   },
   canAccessCash: {
@@ -24,6 +23,10 @@ const userSchema = new mongoose.Schema({
   deviceInfo: {
     type: String,
     default: null,
+  },
+  mustChangePassword: {
+    type: Boolean,
+    default: true,
   },
 }, { timestamps: true });
 

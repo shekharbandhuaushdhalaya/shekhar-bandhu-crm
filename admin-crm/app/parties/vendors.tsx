@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
 import { api, Vendor, Invoice } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
+import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
 
 import { FIRM_DETAILS } from '../../constants/firm';
@@ -27,6 +28,7 @@ function VendorDetailModal({ vendor, visible, onClose, onDeleted, onEdit }: { ve
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
+  const perm = usePermission();
   const canAccessCash = user?.canAccessCash ?? false;
 
   if (!vendor) return null;
@@ -175,7 +177,7 @@ function VendorDetailModal({ vendor, visible, onClose, onDeleted, onEdit }: { ve
               <Ionicons name="create-outline" size={16} color="#fff" />
               <Text style={styles.editBtnText}>Edit Details</Text>
             </TouchableOpacity>
-            {user?.role === 'admin' && (
+            {perm.can('vendor:delete') && (
               <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
                 <Ionicons name="trash-outline" size={16} color="#fff" />
                 <Text style={styles.deleteBtnText}>Delete</Text>
@@ -1120,18 +1122,9 @@ export default function VendorsScreen() {
 
   const { colors } = useTheme();
   const { user } = useAuth();
+  const perm = usePermission();
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
-
-  if (user && user.role === 'agent') {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
-        <Ionicons name="lock-closed" size={48} color={colors.danger} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
-        <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>Agents do not have permissions to access vendor data.</Text>
-      </View>
-    );
-  }
 
   const load = useCallback(async () => {
     const res = await api.getVendors(search);
@@ -1146,10 +1139,20 @@ export default function VendorsScreen() {
     setRefreshing(false);
   }, [load]);
 
+  if (perm.permissions && !perm.can('vendor:view')) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
+        <Ionicons name="lock-closed" size={48} color={colors.danger} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
+        <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>You do not have permission to access vendor data.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.innerContainer}>
-        <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
+        <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>:
           <Ionicons name="search" size={18} color={colors.text.muted} />
           <TextInput
             style={[styles.searchInput, { minWidth: 100 }]}
@@ -1421,10 +1424,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     zIndex: 9999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
     elevation: 8
   },
   customSelectItem: {

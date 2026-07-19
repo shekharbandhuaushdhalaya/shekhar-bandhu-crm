@@ -6,6 +6,7 @@ import { api, Invoice, Product, Customer, Warehouse, InventoryEntry, InvoiceItem
 import { shortenPartyName } from '../../utils/string';
 import { getStateStrWithCode } from '../../utils/gst';
 import { useAuth } from '../../utils/auth';
+import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
 import { LOGO_BASE64 } from '../../utils/logo';
 import { FIRM_DETAILS } from '../../constants/firm';
@@ -704,21 +705,70 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
 
           {/* Toggle Payment Status */}
           {invoice.isFinalized && invoice.status?.toLowerCase() !== 'paid' && (
-            <TouchableOpacity
-              style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.success }]}
-              onPress={async () => {
-                try {
-                  await api.updateSaleInvoice(invoice._id, { status: 'paid' });
-                  onDeleted(); // Reload parent
-                  onClose();
-                } catch (err: any) {
-                  alert(err.message || 'Failed to update payment status');
-                }
-              }}
-            >
-              <Ionicons name="cash-outline" size={18} color="#fff" />
-              <Text style={styles.printBtnText}>Mark as Paid</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+              <TouchableOpacity
+                style={[styles.printBtn, { flex: 1, backgroundColor: colors.success }]}
+                onPress={async () => {
+                  try {
+                    await api.updateSaleInvoice(invoice._id, { status: 'paid' });
+                    onDeleted();
+                    onClose();
+                  } catch (err: any) {
+                    alert(err.message || 'Failed to update payment status');
+                  }
+                }}
+              >
+                <Ionicons name="cash-outline" size={18} color="#fff" />
+                <Text style={styles.printBtnText}>Mark as Paid</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.printBtn, { flex: 1, backgroundColor: colors.primary }]}
+                onPress={async () => {
+                  try {
+                    const orderData = await api.createPaymentOrder(invoice._id);
+                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                      const script = document.createElement('script');
+                      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+                      script.onload = () => {
+                        const options = {
+                          key: orderData.keyId,
+                          amount: orderData.amount,
+                          currency: orderData.currency,
+                          name: 'Shekhar Bandhu Aushadhalaya',
+                          description: `Invoice ${orderData.invoiceNo}`,
+                          order_id: orderData.orderId,
+                          prefill: { name: orderData.customerName, email: orderData.customerEmail, contact: orderData.customerPhone },
+                          handler: async (response: any) => {
+                            const verify = await api.verifyPayment({
+                              razorpay_order_id: response.razorpay_order_id,
+                              razorpay_payment_id: response.razorpay_payment_id,
+                              razorpay_signature: response.razorpay_signature,
+                              invoiceId: invoice._id,
+                            });
+                            if (verify.success) {
+                              alert('Payment successful! Invoice marked as paid.');
+                              onDeleted();
+                              onClose();
+                            }
+                          },
+                          modal: { ondismiss: () => {} },
+                        };
+                        const rzp = new (window as any).Razorpay(options);
+                        rzp.open();
+                      };
+                      document.body.appendChild(script);
+                    } else {
+                      alert('Online payment is available on web. Use Mark as Paid for manual recording.');
+                    }
+                  } catch (err: any) {
+                    alert(err.message || 'Failed to initiate payment');
+                  }
+                }}
+              >
+                <Ionicons name="globe-outline" size={18} color="#fff" />
+                <Text style={styles.printBtnText}>Pay Online</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {invoice.isFinalized && invoice.status?.toLowerCase() === 'paid' && (
@@ -747,7 +797,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
             <Text style={styles.printBtnText}>Print Invoice</Text>
           </TouchableOpacity>
           
-          {user?.role === 'admin' && invoice.status !== 'Cancelled' && (
+          {perm.can('invoice:delete') && invoice.status !== 'Cancelled' && (
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
               <Ionicons name="trash-outline" size={16} color="#fff" />
               <Text style={styles.deleteBtnText}>Delete Invoice</Text>
@@ -762,6 +812,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
 function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible: boolean; onClose: () => void; onSaved: () => void; invoiceToEdit?: Invoice | null }) {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const perm = usePermission();
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
 
@@ -1698,6 +1749,7 @@ export default function SaleInvoicesScreen() {
 
   const { colors } = useTheme();
   const { user } = useAuth();
+  const perm = usePermission();
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
 
@@ -1923,7 +1975,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 200, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 200, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
@@ -1986,7 +2038,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   
   // Missing from earlier migration
   customSearchSelectContainer: { position: 'relative', width: '100%' },
-  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 },
+  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)', elevation: 4 },
   customSelectItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   customSelectItemText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   customSelectItemSubtext: { fontSize: 10, color: colors.text.muted, marginTop: 2 },

@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
 import { api } from '../utils/api';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 
@@ -33,6 +34,7 @@ type AuditLogItem = {
 
 export default function AuditLogsScreen() {
   const { user } = useAuth();
+  const perm = usePermission();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { width: winWidth } = useWindowDimensions();
@@ -68,7 +70,7 @@ export default function AuditLogsScreen() {
   }, []);
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (perm.can('audit:view')) {
       fetchLogs(page, searchVal);
     } else {
       setLoading(false);
@@ -93,7 +95,7 @@ export default function AuditLogsScreen() {
   };
 
   // Render Access Denied for non-admins
-  if (!user || user.role !== 'admin') {
+  if (!perm.can('audit:view')) {
     return (
       <View style={styles.deniedContainer}>
         <View style={styles.deniedCard}>

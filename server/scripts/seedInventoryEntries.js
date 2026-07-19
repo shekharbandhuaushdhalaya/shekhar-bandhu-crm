@@ -13,16 +13,14 @@ const Product        = require('../models/Product');
 const Warehouse      = require('../models/Warehouse');
 const InventoryEntry = require('../models/InventoryEntry');
 
-const WAREHOUSE_SEARCH = /varanasi central/i;
-
 async function main() {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('✅ Connected to MongoDB');
 
-  // 1. Find the warehouse
-  const warehouse = await Warehouse.findOne({ name: WAREHOUSE_SEARCH });
+  // 1. Find the first warehouse (previously hardcoded to "Varanasi Central Depot")
+  const warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
   if (!warehouse) {
-    console.error('❌ Warehouse "Varanasi Central Depot" not found. Please create it in the CRM first.');
+    console.error('❌ No warehouse found. Please create one in the CRM first.');
     process.exit(1);
   }
   console.log(`🏭 Warehouse: ${warehouse.name} (${warehouse._id})`);

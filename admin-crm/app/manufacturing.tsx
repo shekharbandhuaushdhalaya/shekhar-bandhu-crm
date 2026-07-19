@@ -26,6 +26,7 @@ import {
   Vendor
 } from '../utils/api';
 import { Spacing, Radius, LightColors } from '../constants/theme';
+import { FIRM_DETAILS } from '../constants/firm';
 
 export default function ManufacturingScreen() {
   const { colors } = useTheme();
@@ -55,6 +56,16 @@ export default function ManufacturingScreen() {
   const [bomModalVisible, setBomModalVisible] = useState(false);
   const [productionModalVisible, setProductionModalVisible] = useState(false);
   const [qcModalVisible, setQcModalVisible] = useState(false);
+  const [genealogyModalVisible, setGenealogyModalVisible] = useState(false);
+  const [genealogyData, setGenealogyData] = useState<any>(null);
+  const [genealogyLoading, setGenealogyLoading] = useState(false);
+  const [genealogyType, setGenealogyType] = useState<'batch' | 'material'>('batch');
+  const [traceModalVisible, setTraceModalVisible] = useState(false);
+  const [traceBatchNo, setTraceBatchNo] = useState('');
+  const [traceResult, setTraceResult] = useState<any>(null);
+  const [traceLoading, setTraceLoading] = useState(false);
+  const [currentInProgressStage, setCurrentInProgressStage] = useState<{ batchId: string; stageIndex: number } | null>(null);
+  const [stageNotes, setStageNotes] = useState('');
 
   // Form States — Raw Material
   const [rmName, setRmName] = useState('');
@@ -90,6 +101,9 @@ export default function ManufacturingScreen() {
   // Form States — QC Signoff
   const [selectedBatchRun, setSelectedBatchRun] = useState<BatchProduction | null>(null);
   const [qcYieldQty, setQcYieldQty] = useState('');
+  const [qcPacking, setQcPacking] = useState('');
+  const [qcWasteQty, setQcWasteQty] = useState('');
+  const [qcWasteReason, setQcWasteReason] = useState('');
   const [qcNotes, setQcNotes] = useState('');
   const [qcPassedBy, setQcPassedBy] = useState('');
   const [qcError, setQcError] = useState('');
@@ -292,14 +306,22 @@ export default function ManufacturingScreen() {
     }
     setQcError('');
     try {
-      await api.completeBatchProduction(selectedBatchRun._id, {
+      const payload: any = {
         actualYieldQty: Number(qcYieldQty),
+        packing: Number(qcPacking) || undefined,
         qcNotes: qcNotes.trim(),
         qcPassedBy: qcPassedBy.trim()
-      });
+      };
+      if (qcWasteQty) payload.wasteQty = Number(qcWasteQty);
+      if (qcWasteReason.trim()) payload.wasteReason = qcWasteReason.trim();
+
+      await api.completeBatchProduction(selectedBatchRun._id, payload);
 
       setSelectedBatchRun(null);
       setQcYieldQty('');
+      setQcPacking('');
+      setQcWasteQty('');
+      setQcWasteReason('');
       setQcNotes('');
       setQcPassedBy('');
       setQcModalVisible(false);
@@ -325,6 +347,64 @@ export default function ManufacturingScreen() {
       loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to cancel production run');
+    }
+  };
+
+  const handleAdvanceStage = async (batchId: string, stageIndex: number) => {
+    try {
+      setCurrentInProgressStage({ batchId, stageIndex });
+      await api.advanceStage(batchId, stageIndex, {
+        status: 'completed',
+        completedBy: 'Operator',
+        notes: stageNotes
+      });
+      setStageNotes('');
+      setCurrentInProgressStage(null);
+      loadData();
+    } catch (err: any) {
+      setCurrentInProgressStage(null);
+      alert(err.message || 'Failed to advance stage');
+    }
+  };
+
+  const handleSkipStage = async (batchId: string, stageIndex: number) => {
+    try {
+      await api.advanceStage(batchId, stageIndex, { status: 'skipped' });
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to skip stage');
+    }
+  };
+
+  const handleOpenGenealogy = async (type: 'batch' | 'material', id: string) => {
+    try {
+      setGenealogyType(type);
+      setGenealogyLoading(true);
+      setGenealogyModalVisible(true);
+      const data = type === 'batch'
+        ? await api.getBatchGenealogy(id)
+        : await api.getRawMaterialGenealogy(id);
+      setGenealogyData(data);
+    } catch (err: any) {
+      alert(err.message || 'Failed to load genealogy data');
+      setGenealogyModalVisible(false);
+    } finally {
+      setGenealogyLoading(false);
+    }
+  };
+
+  const handleTrace = async () => {
+    if (!traceBatchNo.trim()) return;
+    try {
+      setTraceLoading(true);
+      setTraceModalVisible(true);
+      const data = await api.traceBatch(traceBatchNo.trim().toUpperCase());
+      setTraceResult(data);
+    } catch (err: any) {
+      alert(err.message || 'Trace lookup failed');
+      setTraceModalVisible(false);
+    } finally {
+      setTraceLoading(false);
     }
   };
 
@@ -419,6 +499,24 @@ export default function ManufacturingScreen() {
         ))}
       </View>
 
+      {/* Trace Lookup Bar */}
+      <View style={[styles.card, { margin: Spacing.lg, marginBottom: 0, padding: 10, flexDirection: 'row', gap: 8, alignItems: 'center' }]}>
+        <Ionicons name="git-network-outline" size={16} color={colors.text.secondary} />
+        <TextInput
+          style={{ flex: 1, fontSize: 13, color: colors.text.primary, paddingVertical: 6 }}
+          placeholder="Trace batch no. (raw or finished)..."
+          placeholderTextColor={colors.text.muted}
+          value={traceBatchNo}
+          onChangeText={setTraceBatchNo}
+          onSubmitEditing={handleTrace}
+          returnKeyType="search"
+        />
+        <TouchableOpacity style={[styles.primaryBtn, { opacity: traceBatchNo.trim() ? 1 : 0.5 }]} disabled={!traceBatchNo.trim()} onPress={handleTrace}>
+          <Ionicons name="search-outline" size={14} color="#fff" />
+          <Text style={styles.primaryBtnText}>Trace</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
@@ -482,13 +580,9 @@ export default function ManufacturingScreen() {
                       </Text>
                       <Text style={styles.rmMin}>Min: {rm.minReorder} {rm.unit}</Text>
                     </View>
-                    <View style={{ width: 30, alignItems: 'center' }}>
-                      {lowStock ? (
-                        <Ionicons name="warning" size={16} color={colors.danger} title="Low Stock Warning" />
-                      ) : (
-                        <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                      )}
-                    </View>
+                    <TouchableOpacity style={{ width: 30, alignItems: 'center' }} onPress={() => handleOpenGenealogy('material', rm._id)}>
+                      <Ionicons name="git-network-outline" size={16} color={colors.text.muted} />
+                    </TouchableOpacity>
                   </View>
                 );
               })}
@@ -653,6 +747,75 @@ export default function ManufacturingScreen() {
                     )}
                   </View>
 
+                  {/* Stage Stepper */}
+                  {batch.stages && batch.stages.length > 0 && (
+                    <View style={styles.stageStepperContainer}>
+                      <Text style={styles.ingredientsHeaderLabel}>Manufacturing Stages:</Text>
+                      <View style={styles.stageStepperRow}>
+                        {batch.stages.map((stage, sIdx) => {
+                          const stageColors: Record<string, string> = {
+                            pending: colors.text.muted,
+                            in_progress: colors.primary,
+                            completed: colors.success,
+                            skipped: colors.warning,
+                          };
+                          const isActive = stage.status === 'in_progress';
+                          const isDone = stage.status === 'completed' || stage.status === 'skipped';
+                          const isInProgress = batch.status === 'in_progress' && stage.status === 'in_progress';
+                          const isCancelled = batch.status === 'cancelled';
+                          return (
+                            <TouchableOpacity
+                              key={sIdx}
+                              style={styles.stageStep}
+                              disabled={!isInProgress || isCancelled}
+                              onPress={() => {
+                                if (isInProgress) {
+                                  handleAdvanceStage(batch._id, sIdx);
+                                }
+                              }}
+                            >
+                              <View style={[
+                                styles.stageDot,
+                                { backgroundColor: isDone ? stageColors[stage.status] : isActive ? colors.primary : colors.border }
+                              ]}>
+                                {isDone ? (
+                                  <Ionicons name="checkmark" size={10} color="#fff" />
+                                ) : isActive ? (
+                                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
+                                ) : null}
+                              </View>
+                              <Text style={[
+                                styles.stageLabel,
+                                { color: isDone || isActive ? stageColors[stage.status] : colors.text.muted }
+                              ]} numberOfLines={2}>
+                                {stage.name}
+                              </Text>
+                              {isInProgress && (
+                                <TouchableOpacity
+                                  style={styles.stageSkipBtn}
+                                  onPress={() => handleSkipStage(batch._id, sIdx)}
+                                >
+                                  <Text style={styles.stageSkipText}>skip</Text>
+                                </TouchableOpacity>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Waste / Variance Info for Completed Batches */}
+                  {isFinished && batch.wasteQty > 0 && (
+                    <View style={[styles.wasteBox, { marginBottom: 8 }]}>
+                      <Ionicons name="trending-down-outline" size={13} color={colors.warning} />
+                      <Text style={styles.wasteText}>
+                        Waste: {batch.wasteQty} units ({batch.variancePercent > 0 ? '+' : ''}{batch.variancePercent}% variance)
+                        {batch.wasteReason ? ` — ${batch.wasteReason}` : ''}
+                      </Text>
+                    </View>
+                  )}
+
                   {/* Consumed Ingredients Info */}
                   <View style={styles.batchIngredientsConsumedSection}>
                     <Text style={styles.ingredientsHeaderLabel}>Raw Material Batches Consumed:</Text>
@@ -680,6 +843,8 @@ export default function ManufacturingScreen() {
                       <TouchableOpacity style={styles.completeBatchBtn} onPress={() => {
                         setSelectedBatchRun(batch);
                         setQcYieldQty(batch.plannedQty.toString());
+                        setQcWasteQty('');
+                        setQcWasteReason('');
                         setQcPassedBy('');
                         setQcNotes('');
                         setQcModalVisible(true);
@@ -691,12 +856,30 @@ export default function ManufacturingScreen() {
                   )}
 
                   {isFinished && (
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                      <TouchableOpacity 
+                        style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12 }]} 
+                        onPress={() => handleOpenBMR(batch._id)}
+                      >
+                        <Ionicons name="document-text-outline" size={15} color={colors.primary} />
+                        <Text style={styles.outlineBtnText}>BMR Report</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.text.secondary }]} 
+                        onPress={() => handleOpenGenealogy('batch', batch._id)}
+                      >
+                        <Ionicons name="git-network-outline" size={15} color={colors.text.secondary} />
+                        <Text style={[styles.outlineBtnText, { color: colors.text.secondary }]}>Genealogy</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {!isFinished && !isCancelled && (
                     <TouchableOpacity 
-                      style={[styles.outlineBtn, { marginTop: 12, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start' }]} 
-                      onPress={() => handleOpenBMR(batch._id)}
+                      style={[styles.outlineBtn, { marginTop: 12, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start', borderColor: colors.text.secondary }]} 
+                      onPress={() => handleOpenGenealogy('batch', batch._id)}
                     >
-                      <Ionicons name="document-text-outline" size={15} color={colors.primary} />
-                      <Text style={styles.outlineBtnText}>BMR compliance report</Text>
+                      <Ionicons name="git-network-outline" size={15} color={colors.text.secondary} />
+                      <Text style={[styles.outlineBtnText, { color: colors.text.secondary }]}>Genealogy</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -1170,6 +1353,15 @@ export default function ManufacturingScreen() {
               <Text style={styles.inputLabel}>Actual Output Yield Size (units) *</Text>
               <TextInput style={styles.input} placeholder="e.g. 498" placeholderTextColor={colors.text.muted} value={qcYieldQty} onChangeText={setQcYieldQty} keyboardType="numeric" />
 
+              <Text style={styles.inputLabel}>Packing (pcs per box)</Text>
+              <TextInput style={styles.input} placeholder="e.g. 10" placeholderTextColor={colors.text.muted} value={qcPacking} onChangeText={setQcPacking} keyboardType="numeric" />
+
+              <Text style={styles.inputLabel}>Waste / Shrinkage Quantity</Text>
+              <TextInput style={styles.input} placeholder="e.g. 2 (leave empty to auto-calculate)" placeholderTextColor={colors.text.muted} value={qcWasteQty} onChangeText={setQcWasteQty} keyboardType="numeric" />
+
+              <Text style={styles.inputLabel}>Waste / Variance Reason</Text>
+              <TextInput style={styles.input} placeholder="e.g. Drying loss, spillage, QC rejects" placeholderTextColor={colors.text.muted} value={qcWasteReason} onChangeText={setQcWasteReason} />
+
               <Text style={styles.inputLabel}>QC Inspector Name *</Text>
               <TextInput style={styles.input} placeholder="e.g. Dr. P. K. Sharma" placeholderTextColor={colors.text.muted} value={qcPassedBy} onChangeText={setQcPassedBy} />
 
@@ -1226,8 +1418,8 @@ export default function ManufacturingScreen() {
                 
                 {/* 1. Header branding for printing */}
                 <View style={{ alignItems: 'center', borderBottomWidth: 2, borderBottomColor: colors.primary, paddingBottom: 12, marginBottom: 12 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>SHEKHAR BANDHU AUSHADHALAYA</Text>
-                  <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 2 }}>Industrial Area, Lanka, Varanasi, UP | GMP Certified Plant</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>{FIRM_DETAILS.name}</Text>
+                  <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 2 }}>{FIRM_DETAILS.address}</Text>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, marginTop: 8, letterSpacing: 0.5 }}>OFFICIAL BATCH RECORD SUMMARY</Text>
                 </View>
 
@@ -1346,6 +1538,332 @@ export default function ManufacturingScreen() {
                   <Text style={styles.submitBtnText}>Print PDF Record</Text>
                 </TouchableOpacity>
               )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ======================================================== */}
+      {/* MODAL 7: BATCH / RAW MATERIAL GENEALOGY */}
+      {/* ======================================================== */}
+      <Modal visible={genealogyModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setGenealogyModalVisible(false)} />
+          <View style={[styles.modalContainer, { maxWidth: 760, width: '92%', height: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>
+                  {genealogyType === 'batch' ? 'Batch Genealogy Trace' : 'Raw Material Genealogy'}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                  {genealogyType === 'batch' ? 'Raw material source trace for this batch' : 'Finished batches using this material'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setGenealogyModalVisible(false)}>
+                <Ionicons name="close" size={20} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {genealogyLoading ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : genealogyData ? (
+              <ScrollView style={[styles.modalForm, { padding: 16 }]} contentContainerStyle={{ gap: 16 }}>
+                {genealogyType === 'batch' ? (
+                  <>
+                    {/* Batch Genealogy: Show sources of raw materials */}
+                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                      <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Batch Identity</Text>
+                      </View>
+                      <View style={{ padding: 12, gap: 6 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Batch No:</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.batchNo}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Product:</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.productName} ({genealogyData.productSku})</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Status:</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.status}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Planned → Actual:</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.plannedQty} → {genealogyData.actualYieldQty} units</Text>
+                        </View>
+                        {genealogyData.wasteQty > 0 && (
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 13, color: colors.text.secondary }}>Waste / Variance:</Text>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.warning }}>{genealogyData.wasteQty} units ({genealogyData.variancePercent}%){genealogyData.wasteReason ? ` — ${genealogyData.wasteReason}` : ''}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Raw Material Sources */}
+                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                      <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Raw Materials Consumed</Text>
+                      </View>
+                      <View style={{ padding: 8 }}>
+                        <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
+                          <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material</Text>
+                          <Text style={{ flex: 1.3, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Batch</Text>
+                          <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Qty Used</Text>
+                          <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Vendor</Text>
+                          <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Rate</Text>
+                        </View>
+                        {genealogyData.ingredients.map((ing: any, idx: number) => (
+                          <View key={idx} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: idx === genealogyData.ingredients.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
+                            <Text style={{ flex: 2, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
+                              {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Material'}
+                            </Text>
+                            <Text style={{ flex: 1.3, fontSize: 11, color: colors.text.primary }}>{ing.batchNo}</Text>
+                            <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{ing.qtyConsumed?.toFixed(2)}</Text>
+                            <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{ing.sourceBatch?.vendorName || '—'}</Text>
+                            <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>₹{ing.sourceBatch?.purchaseRate || 0}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    {/* Raw Material Genealogy: Show batches that used this material */}
+                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                      <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Material Identity</Text>
+                      </View>
+                      <View style={{ padding: 12, gap: 6 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Material:</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.rawMaterial?.name} ({genealogyData.rawMaterial?.sku})</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Used in:</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>{genealogyData.totalBatchesUsedIn} finished batch(es)</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {genealogyData.batches?.length > 0 ? (
+                      <View style={{ gap: 12 }}>
+                        {genealogyData.batches.map((b: any) => (
+                          <View key={b.batchProductionId} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                              <View style={{ flex: 1, marginRight: 8 }}>
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary }}>{b.batchNo}</Text>
+                                <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 2 }}>{b.productName} ({b.productSku})</Text>
+                              </View>
+                              <View style={[styles.statusBadge, { borderColor: getStatusColor(b.status), backgroundColor: getStatusColor(b.status) + '10' }]}>
+                                <Text style={[styles.statusBadgeText, { color: getStatusColor(b.status) }]}>{b.status.toUpperCase()}</Text>
+                              </View>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                              <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                                Consumed: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{b.totalConsumed?.toFixed(2)} {b.unit}</Text>
+                              </Text>
+                              <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                                Planned: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{b.plannedQty}</Text>
+                              </Text>
+                              <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                                Yield: <Text style={{ fontWeight: '700', color: colors.success }}>{b.actualYieldQty}</Text>
+                              </Text>
+                              {b.wasteQty > 0 && (
+                                <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                                  Waste: <Text style={{ fontWeight: '700', color: colors.warning }}>{b.wasteQty} ({b.variancePercent > 0 ? '+' : ''}{b.variancePercent}%)</Text>
+                                </Text>
+                              )}
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.emptyText}>This raw material has not been used in any finished batch yet.</Text>
+                    )}
+                  </>
+                )}
+              </ScrollView>
+            ) : (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: colors.text.secondary }}>No genealogy data available.</Text>
+              </View>
+            )}
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setGenealogyModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ======================================================== */}
+      {/* MODAL 8: END-TO-END BATCH TRACE */}
+      {/* ======================================================== */}
+      <Modal visible={traceModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setTraceModalVisible(false)} />
+          <View style={[styles.modalContainer, { maxWidth: 800, width: '92%', height: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>End-to-End Batch Trace</Text>
+                <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                  {traceResult ? `Batch: ${traceResult.batchNo}` : 'Enter a batch number to trace'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setTraceModalVisible(false)}>
+                <Ionicons name="close" size={20} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {traceLoading ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : traceResult ? (
+              <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ gap: 16 }}>
+                {/* Raw Material Entries */}
+                {traceResult.rawMaterialEntries?.length > 0 && (
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                    <View style={{ backgroundColor: colors.warning + '15', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>📦 Raw Material Inward ({traceResult.rawMaterialEntries.length})</Text>
+                    </View>
+                    {traceResult.rawMaterialEntries.map((e: any) => (
+                      <View key={e._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{e.materialName} ({e.materialSku})</Text>
+                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                          Qty: {e.qty} {e.unit} • Vendor: {e.vendorName || 'Direct'} • Rate: ₹{e.purchaseRate}
+                          {e.expiryDate ? ` • Exp: ${new Date(e.expiryDate).toLocaleDateString()}` : ''}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Production Batches */}
+                {traceResult.productionBatches?.length > 0 && (
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                    <View style={{ backgroundColor: colors.primary + '15', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>🏭 Production Batches ({traceResult.productionBatches.length})</Text>
+                    </View>
+                    {traceResult.productionBatches.map((b: any, idx: number) => (
+                      <View key={idx} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{b.productName}</Text>
+                          <View style={[styles.statusBadge, { borderColor: getStatusColor(b.status), backgroundColor: getStatusColor(b.status) + '10' }]}>
+                            <Text style={[styles.statusBadgeText, { color: getStatusColor(b.status) }]}>{b.status.toUpperCase()}</Text>
+                          </View>
+                        </View>
+                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                          {b.relation === 'raw_material_consumed_in' ? '→ Consumed in batch: ' : '→ Finished batch: '}
+                          {b.batchNo}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                          Planned: {b.plannedQty} • Yield: {b.actualYieldQty}
+                          {b.qtyConsumed ? ` • Qty Consumed: ${b.qtyConsumed}` : ''}
+                          {b.wasteQty > 0 ? ` • Waste: ${b.wasteQty} (${b.variancePercent}%)` : ''}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Finished Goods Stock */}
+                {traceResult.finishedGoodsEntries?.length > 0 && (
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                    <View style={{ backgroundColor: colors.success + '15', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>📊 Finished Goods Stock ({traceResult.finishedGoodsEntries.length})</Text>
+                    </View>
+                    {traceResult.finishedGoodsEntries.map((e: any) => (
+                      <View key={e._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{e.productName}</Text>
+                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                          {e.qtyBoxes} boxes × {e.packing} pcs • {e.warehouseName}
+                          {e.mfgDate ? ` • Mfg: ${new Date(e.mfgDate).toLocaleDateString()}` : ''}
+                          {e.expiryDate ? ` • Exp: ${new Date(e.expiryDate).toLocaleDateString()}` : ''}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Challans */}
+                {traceResult.challans?.length > 0 && (
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                    <View style={{ backgroundColor: colors.primary + '10', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>📋 Challans ({traceResult.challans.length})</Text>
+                    </View>
+                    {traceResult.challans.map((c: any) => (
+                      <View key={c._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{c.challanNo} — {c.partyName}</Text>
+                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                          {c.items.map((i: any) => `${i.name}: ${i.qty} boxes`).join(', ')}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Invoices */}
+                {traceResult.invoices?.length > 0 && (
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                    <View style={{ backgroundColor: colors.success + '10', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>🧾 Invoices ({traceResult.invoices.length})</Text>
+                    </View>
+                    {traceResult.invoices.map((inv: any) => (
+                      <View key={inv._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{inv.invoiceNo} — {inv.customerName}</Text>
+                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                          ₹{inv.amount} • {inv.status.toUpperCase()}
+                          {inv.paymentTransactionId ? ` • TXN: ${inv.paymentTransactionId}` : ''}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Dispatches */}
+                {traceResult.dispatches?.length > 0 && (
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                    <View style={{ backgroundColor: colors.warning + '10', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>🚚 Dispatches ({traceResult.dispatches.length})</Text>
+                    </View>
+                    {traceResult.dispatches.map((d: any) => (
+                      <View key={d._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{d.dispatchNo} — {d.customerName}</Text>
+                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                          {d.transporter} • LR: {d.lrNo || '—'} • {d.status.toUpperCase()}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                          Items: {d.items.map((i: any) => `${i.name}: ${i.qty} boxes`).join(', ')}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {!traceResult.rawMaterialEntries?.length && !traceResult.productionBatches?.length && 
+                 !traceResult.finishedGoodsEntries?.length && !traceResult.challans?.length &&
+                 !traceResult.invoices?.length && !traceResult.dispatches?.length && (
+                  <View style={{ alignItems: 'center', padding: 24 }}>
+                    <Ionicons name="search-outline" size={40} color={colors.text.muted} />
+                    <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 8 }}>
+                      No trace records found for batch "{traceResult.batchNo}"
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            ) : null}
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setTraceModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Close</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1853,5 +2371,61 @@ const createStyles = (colors: typeof LightColors) =>
       color: '#fff',
       fontSize: 12.5,
       fontWeight: '700',
+    },
+    // Stage Stepper Styles
+    stageStepperContainer: {
+      marginBottom: 12,
+    },
+    stageStepperRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 4,
+      marginTop: 4,
+    },
+    stageStep: {
+      alignItems: 'center',
+      width: 80,
+      paddingVertical: 4,
+    },
+    stageDot: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 3,
+    },
+    stageLabel: {
+      fontSize: 8,
+      fontWeight: '600',
+      textAlign: 'center',
+      lineHeight: 10,
+    },
+    stageSkipBtn: {
+      marginTop: 2,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+      backgroundColor: 'transparent',
+    },
+    stageSkipText: {
+      fontSize: 8,
+      color: '#888',
+      textDecorationLine: 'underline',
+    },
+    // Waste Box Styles
+    wasteBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.warning + '0a',
+      borderColor: colors.warning + '30',
+      borderWidth: 1,
+      borderRadius: Radius.md,
+      padding: 8,
+    },
+    wasteText: {
+      fontSize: 11,
+      color: colors.text.secondary,
+      flex: 1,
     },
   }); // End of style sheet

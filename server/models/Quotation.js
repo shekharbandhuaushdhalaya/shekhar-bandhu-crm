@@ -29,7 +29,12 @@ const quotationSchema = new mongoose.Schema({
   freightAmount: { type: Number, default: 0 },
   stateOfSupply: { type: String, default: '' },
   gstin: { type: String, default: '', trim: true },
-  items: [quotationItemSchema]
+  items: [quotationItemSchema],
+  warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse' },
+  warehouseName: { type: String, default: '', trim: true },
+  isFinalized: { type: Boolean, default: false },
+  mode: { type: String, default: 'pakka' },
+  shippingAddress: { type: String, default: '', trim: true }
 }, { timestamps: true });
 
 quotationSchema.index({ quotationNo: 'text', customerName: 'text', status: 'text' });

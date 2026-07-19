@@ -1,17 +1,18 @@
 import { authStorage } from '../utils/storage';
+import { api } from '../utils/api';
 
 const DEFAULT_FIRM_DETAILS = {
-  name: "VISHWANATH PACKAGING",
-  address: "ROHANIYA JAGATPUR, VARANASI (U.P.)",
-  email: "vishwanathpackaging@gmail.com",
-  phone: "+91-9415202905",
-  gstin: "09BZSPK1819H1ZY",
+  name: "SHEKHAR BANDHU AUSHADHALAYA",
+  address: "PILIKOTHI, VARANASI (U.P.)",
+  email: "info@shekharbandhuaushadhalaya.in",
+  phone: "+91-9450371661",
+  gstin: "09ABKFS1983L1Z4",
   bankName: "Bank of India",
   bankAccountNo: "691527110000080",
   bankIfsc: "BKID0006915",
-  bankBranch: "Lohatiya,Varanasi",
+  bankBranch: "Lohatiya, Varanasi",
   bankUpi: "",
-  invoicePrefix: "VP",
+  invoicePrefix: "SB",
   quotationPrefix: "QT",
   challanPrefix: "CH",
   dispatchPrefix: "DP",
@@ -53,6 +54,17 @@ export function getDefaultFirmDetails() {
 }
 
 export async function loadFirmDetailsFromStorage() {
+  try {
+    const serverSettings = await api.getSystemSettings();
+    if (serverSettings) {
+      updateActiveFirmDetails(serverSettings);
+      await authStorage.setItem('vp_crm_firm_settings', JSON.stringify(serverSettings));
+      return;
+    }
+  } catch {
+    // Offline — fall through to cached settings
+  }
+
   try {
     const stored = await authStorage.getItem('vp_crm_firm_settings');
     if (stored) {
