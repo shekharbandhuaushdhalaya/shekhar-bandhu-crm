@@ -1,11 +1,12 @@
 import { io, Socket } from 'socket.io-client';
-import { API_BASE } from './api';
+import { getApiBaseUrl } from './api';
 
 const getSocketUrl = () => {
-  if (API_BASE.startsWith('http')) {
-    return API_BASE.replace(/\/api\/?$/, '');
+  const baseUrl = getApiBaseUrl();
+  if (baseUrl && typeof baseUrl === 'string' && baseUrl.startsWith('http')) {
+    return baseUrl.replace(/\/api\/?$/, '');
   }
-  return 'http://localhost:5001';
+  return 'http://localhost:5000';
 };
 
 let socket: Socket | null = null;

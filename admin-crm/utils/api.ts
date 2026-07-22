@@ -47,7 +47,7 @@ const getBaseUrl = () => {
   return 'http://localhost:5000/api';
 };
 
-let API_BASE = getBaseUrl();
+export let API_BASE = getBaseUrl();
 
 export function getApiBaseUrl(): string {
   return API_BASE;
