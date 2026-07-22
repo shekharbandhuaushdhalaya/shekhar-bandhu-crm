@@ -107,6 +107,11 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
       status: 'pending',
     });
 
+    if (req.io) {
+      req.io.emit('new_web_order', order);
+      req.io.emit('inventory_updated', { type: 'web_order', orderId: order._id });
+    }
+
     res.status(201).json({ message: 'Order placed successfully', order });
   } catch (err) {
     res.status(500).json({ error: err.message });

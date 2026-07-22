@@ -12,7 +12,8 @@ import {
   RefreshControl,
   Pressable,
   Platform,
-  Alert
+  Alert,
+  DeviceEventEmitter
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
@@ -158,6 +159,16 @@ export default function ManufacturingScreen() {
 
   useEffect(() => {
     loadData();
+
+    const sub1 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => loadData());
+    const sub2 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => loadData());
+    const sub3 = DeviceEventEmitter.addListener('inventory_updated_event', () => loadData());
+
+    return () => {
+      sub1.remove();
+      sub2.remove();
+      sub3.remove();
+    };
   }, [loadData]);
 
   const handleRefresh = () => {

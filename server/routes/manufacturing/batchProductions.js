@@ -152,6 +152,11 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       startDate: new Date()
     });
 
+    if (req.io) {
+      req.io.emit('mfg_batch_created', newBatch);
+      req.io.emit('inventory_updated', { type: 'raw_material_deduction', batchNo: newBatch.batchNo });
+    }
+
     res.status(201).json(newBatch);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -221,6 +226,12 @@ router.patch('/:id/stage/:stageIndex', async (req, res) => {
     }
 
     await batch.save();
+    if (req.io) {
+      req.io.emit('mfg_stage_updated', batch);
+      if (batch.status === 'qc_hold') {
+        req.io.emit('qc_hold_alert', { batchNo: batch.batchNo, productId: batch.productId });
+      }
+    }
     res.json(batch);
   } catch (err) {
     res.status(500).json({ error: err.message });

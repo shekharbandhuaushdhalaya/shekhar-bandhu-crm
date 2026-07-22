@@ -34,7 +34,6 @@ export default function AyurvedicLoader({ message, inline = false }: { message?:
   if (inline) {
     return (
       <View style={styles.inlineContainer}>
-        <ActivityIndicator size="small" color={colors.primary} />
         <Text style={[styles.inlineText, { color: colors.text.secondary }]}>
           {activePhrase.icon} {activePhrase.text}
         </Text>
@@ -45,16 +44,14 @@ export default function AyurvedicLoader({ message, inline = false }: { message?:
   return (
     <View style={[styles.fullContainer, { backgroundColor: colors.bg.primary }]}>
       <View style={[styles.card, { backgroundColor: colors.bg.secondary, borderColor: colors.primary + '30' }]}>
-        <Text style={{ fontSize: 36, marginBottom: 8 }}>{activePhrase.icon}</Text>
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 16 }} />
-        
         {message ? (
-          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
             {message}
           </Text>
         ) : null}
 
         <Animated.View style={[{ alignItems: 'center' }, { opacity: fadeAnim }]}>
+          <Text style={{ fontSize: 42, marginBottom: 12 }}>{activePhrase.icon}</Text>
           <Text style={[styles.heading, { color: colors.primary }]}>
             {activePhrase.text}
           </Text>

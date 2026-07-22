@@ -63,7 +63,31 @@ const dashboardRoutes = require('./routes/analytics/dashboard');
 const publicProductRoutes = require('./routes/public/products');
 const publicOrderRoutes = require('./routes/public/orders');
 
+const http = require('http');
+const { Server } = require('socket.io');
+
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
+  },
+});
+
+// Attach socket.io instance to req object
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+io.on('connection', (socket) => {
+  console.log('⚡ Client connected via WebSocket:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('🔌 Client disconnected:', socket.id);
+  });
+});
+
 const PORT = config.port;
 const MONGODB_URI = config.mongoUri;
 const JWT_SECRET = config.jwtSecret;
@@ -215,8 +239,8 @@ mongoose
       res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
     });
 
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Shekhar Bandhu CRM Server running on port ${PORT} (bound to 0.0.0.0)`);
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Shekhar Bandhu CRM Server running on port ${PORT} with WebSockets enabled (bound to 0.0.0.0)`);
     });
   })
   .catch(err => {

@@ -14,6 +14,7 @@ import LoginScreen from './login';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Sidebar from '../components/Sidebar';
 import AyurvedicLoader from '../components/AyurvedicLoader';
+import { getSocket } from '../utils/socket';
 
 function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnline: boolean; logout: () => void; toggleSidebar?: () => void }) {
   const { themeMode, toggleTheme, colors } = useTheme();
@@ -167,9 +168,32 @@ function MainLayout() {
       setGlobalLoading(data.isLoading);
     });
 
+    // Initialize Socket.io real-time connection
+    const socket = getSocket();
+
+    socket.on('mfg_stage_updated', (data) => {
+      DeviceEventEmitter.emit('mfg_stage_updated_event', data);
+    });
+
+    socket.on('mfg_batch_created', (data) => {
+      DeviceEventEmitter.emit('mfg_batch_created_event', data);
+    });
+
+    socket.on('new_web_order', (data) => {
+      DeviceEventEmitter.emit('new_web_order_event', data);
+    });
+
+    socket.on('inventory_updated', (data) => {
+      DeviceEventEmitter.emit('inventory_updated_event', data);
+    });
+
     return () => {
       unsubscribeNetInfo();
       sub.remove();
+      socket.off('mfg_stage_updated');
+      socket.off('mfg_batch_created');
+      socket.off('new_web_order');
+      socket.off('inventory_updated');
     };
   }, []);
 
