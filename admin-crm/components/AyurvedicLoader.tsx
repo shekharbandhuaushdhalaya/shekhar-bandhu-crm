@@ -17,19 +17,17 @@ export default function AyurvedicLoader({ message, inline = false }: { message?:
   const [fadeAnim] = useState(new Animated.Value(1));
 
   useEffect(() => {
-    if (message) return; // Static custom message supplied
-
     const interval = setInterval(() => {
       Animated.sequence([
-        Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
       ]).start();
 
       setIndex((prev) => (prev + 1) % AYURVEDIC_PHRASES.length);
-    }, 3500);
+    }, 3200);
 
     return () => clearInterval(interval);
-  }, [message]);
+  }, []);
 
   const activePhrase = AYURVEDIC_PHRASES[index];
 
@@ -38,7 +36,7 @@ export default function AyurvedicLoader({ message, inline = false }: { message?:
       <View style={styles.inlineContainer}>
         <ActivityIndicator size="small" color={colors.primary} />
         <Text style={[styles.inlineText, { color: colors.text.secondary }]}>
-          {message || `${activePhrase.icon} ${activePhrase.subtext}`}
+          {activePhrase.icon} {activePhrase.text}
         </Text>
       </View>
     );
@@ -47,14 +45,21 @@ export default function AyurvedicLoader({ message, inline = false }: { message?:
   return (
     <View style={[styles.fullContainer, { backgroundColor: colors.bg.primary }]}>
       <View style={[styles.card, { backgroundColor: colors.bg.secondary, borderColor: colors.primary + '30' }]}>
+        <Text style={{ fontSize: 36, marginBottom: 8 }}>{activePhrase.icon}</Text>
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 16 }} />
+        
+        {message ? (
+          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+            {message}
+          </Text>
+        ) : null}
+
         <Animated.View style={[{ alignItems: 'center' }, { opacity: fadeAnim }]}>
-          <Text style={{ fontSize: 32, marginBottom: 8 }}>{message ? '🌿' : activePhrase.icon}</Text>
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 16 }} />
           <Text style={[styles.heading, { color: colors.primary }]}>
-            {message || activePhrase.text}
+            {activePhrase.text}
           </Text>
           <Text style={[styles.subheading, { color: colors.text.secondary }]}>
-            {message ? 'Shekhar Bandhu Aushadhalaya' : activePhrase.subtext}
+            {activePhrase.subtext}
           </Text>
         </Animated.View>
       </View>
