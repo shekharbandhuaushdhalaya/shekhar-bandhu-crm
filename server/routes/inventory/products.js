@@ -98,9 +98,15 @@ router.post('/', validate(schemas.productSchema), authorize('product:create'), a
       req.body.name = nameParts.length > 0 ? nameParts.join(' ') : 'Unnamed Product';
     }
 
-    if (!req.body.sku || !req.body.sku.trim()) {
-      req.body.sku = generateSku(req.body);
+    let computedSku = generateSku(req.body);
+    let skuConflict = await Product.findOne({ sku: computedSku }).lean();
+    let counter = 1;
+    while (skuConflict) {
+      computedSku = `${generateSku(req.body)}-${counter}`;
+      skuConflict = await Product.findOne({ sku: computedSku }).lean();
+      counter++;
     }
+    req.body.sku = computedSku;
 
     const product = await Product.create(req.body);
 
@@ -122,6 +128,20 @@ router.put('/:id', validate(schemas.productSchema.partial()), authorize('product
       if (req.body.shape) nameParts.push(req.body.shape);
       if (req.body.colour) nameParts.push(req.body.colour);
       req.body.name = nameParts.length > 0 ? nameParts.join(' ') : 'Unnamed Product';
+    }
+
+    const hasSpecChange = ['name', 'productType', 'size', 'shape'].some(k => req.body[k] !== undefined);
+    if (hasSpecChange) {
+      const mergedObj = Object.assign({}, oldProduct.toObject(), req.body);
+      let computedSku = generateSku(mergedObj);
+      let skuConflict = await Product.findOne({ sku: computedSku, _id: { $ne: req.params.id } }).lean();
+      let counter = 1;
+      while (skuConflict) {
+        computedSku = `${generateSku(mergedObj)}-${counter}`;
+        skuConflict = await Product.findOne({ sku: computedSku, _id: { $ne: req.params.id } }).lean();
+        counter++;
+      }
+      req.body.sku = computedSku;
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(

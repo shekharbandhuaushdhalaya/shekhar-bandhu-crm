@@ -3,6 +3,8 @@ const Invoice = require('../../models/Invoice');
 const Customer = require('../../models/Customer');
 const Vendor = require('../../models/Vendor');
 const Product = require('../../models/Product');
+const RawMaterial = require('../../models/RawMaterial');
+const RawMaterialEntry = require('../../models/RawMaterialEntry');
 const InventoryEntry = require('../../models/InventoryEntry');
 const Warehouse = require('../../models/Warehouse');
 const StockLedger = require('../../models/StockLedger');
@@ -35,6 +37,134 @@ async function validateSaleInvoiceDate(dateToCheck) {
   }
 }
 
+// Helper: deduct inventory for a finalized sale invoice
+async function deductInventoryForInvoice(invoice) {
+  if (!invoice.items || invoice.items.length === 0 || !invoice.warehouseId) return;
+
+  const warehouse = await Warehouse.findById(invoice.warehouseId);
+  if (!warehouse) return;
+
+  for (const item of invoice.items) {
+    if (!item.productId) continue;
+    const product = await Product.findById(item.productId);
+    if (!product) continue;
+
+    const qty = item.qty || 0;
+    const packing = item.packing || 1;
+
+    // 1. Decrement Product stock level
+    product.stockLevel = Math.max(0, product.stockLevel - qty);
+    await product.save();
+
+    // 2. Decrement specific InventoryEntry in warehouse
+    let entry = await InventoryEntry.findOne({
+      warehouseId: warehouse._id,
+      productId: product._id,
+      packing,
+    });
+
+    if (entry) {
+      entry.qtyBoxes = Math.max(0, entry.qtyBoxes - qty);
+      await entry.save();
+    }
+
+    // 3. Record stock ledger entry (OUT movement)
+    let note = `Sold via Sale Invoice ${invoice.invoiceNo} (Finalized)`;
+    if (invoice.saleType === 'doctor_sampling') {
+      note = `Doctor Sample: MR ${invoice.medicalRepName || 'N/A'} to Dr. ${invoice.doctorName || 'N/A'}`;
+    } else if (invoice.saleType === 'damage') {
+      note = `Damaged Goods Write-off: ${invoice.damageReason || 'No details'}`;
+    }
+
+    await StockLedger.create({
+      productId: product._id,
+      warehouseId: warehouse._id,
+      warehouseName: warehouse.name,
+      type: 'OUT',
+      qtyBoxes: -qty,
+      balanceBoxes: entry ? entry.qtyBoxes : 0,
+      reference: invoice.invoiceNo,
+      note,
+      createdBy: 'System',
+      packing,
+      vendorId: entry ? entry.vendorId : '',
+      vendorName: entry ? entry.vendorName : '',
+    });
+  }
+}
+
+// Helper: revert inventory for a deleted/cancelled sale invoice
+async function revertInventoryForInvoice(invoice) {
+  if (!invoice.items || invoice.items.length === 0 || !invoice.warehouseId) return;
+
+  const warehouse = await Warehouse.findById(invoice.warehouseId);
+  if (!warehouse) return;
+
+  for (const item of invoice.items) {
+    if (!item.productId) continue;
+    const product = await Product.findById(item.productId);
+    if (!product) continue;
+
+    const qty = item.qty || 0;
+    const packing = item.packing || 1;
+
+    // 1. Revert Product stock level
+    product.stockLevel += qty;
+    await product.save();
+
+    // 2. Revert specific InventoryEntry
+    let entry = await InventoryEntry.findOne({
+      warehouseId: warehouse._id,
+      productId: product._id,
+      packing,
+    });
+
+    if (entry) {
+      entry.qtyBoxes += qty;
+      await entry.save();
+    } else {
+      entry = await InventoryEntry.create({
+        warehouseId: warehouse._id,
+        warehouseName: warehouse.name,
+        productId: product._id,
+        productType: product.productType || '',
+        size:        product.size        || '',
+        colour:      product.colour      || '',
+        shape:       product.shape       || '',
+        weight:      product.weight      || '',
+        hsnCode:     product.hsnCode     || '',
+        vendorId:    '',
+        vendorName:  '',
+        qtyBoxes:    qty,
+        packing,
+      });
+    }
+
+    // 3. Record stock ledger entry (IN movement)
+    let note = `Reverted via Cancellation of Sale Invoice ${invoice.invoiceNo}`;
+    if (invoice.saleType === 'doctor_sampling') {
+      note = `Reverted Doctor Sample of Sale Invoice ${invoice.invoiceNo}`;
+    } else if (invoice.saleType === 'damage') {
+      note = `Reverted Damaged Goods of Sale Invoice ${invoice.invoiceNo}`;
+    }
+
+    await StockLedger.create({
+      productId: product._id,
+      warehouseId: warehouse._id,
+      warehouseName: warehouse.name,
+      type: 'IN',
+      qtyBoxes: qty,
+      balanceBoxes: entry ? entry.qtyBoxes : qty,
+      reference: invoice.invoiceNo,
+      note,
+      createdBy: 'System',
+      packing,
+      vendorId: entry ? entry.vendorId : '',
+      vendorName: entry ? entry.vendorName : '',
+    });
+  }
+}
+
 const router = express.Router();
 
 // GET /api/invoices/sales — List sale invoices
@@ -51,7 +181,7 @@ router.get('/sales', async (req, res) => {
       ];
     }
 
-    filter.mode = 'pakka';
+    filter.mode = 'regular';
 
     const invoices = await Invoice.find(filter).sort({ date: -1, createdAt: -1 }).lean();
     res.json(invoices);
@@ -74,7 +204,9 @@ router.get('/purchases', authorize('invoice:view'), async (req, res) => {
       ];
     }
 
-    filter.mode = 'pakka';
+    if (mode && mode !== 'all') {
+      filter.mode = mode;
+    }
 
     const invoices = await Invoice.find(filter).sort({ date: -1, createdAt: -1 }).lean();
     res.json(invoices);
@@ -214,10 +346,6 @@ router.patch('/sales/:id/finalize', authorize('invoice:markPaid'), async (req, r
       return res.status(400).json({ error: 'Invoice is already finalized' });
     }
 
-
-
-
-
     // Sync Customer balance
     const cust = await Customer.findOne({
       $or: [
@@ -225,9 +353,18 @@ router.patch('/sales/:id/finalize', authorize('invoice:markPaid'), async (req, r
         { company: invoice.customerName }
       ]
     });
-    if (cust) {
-      cust.pakkaBalance += invoice.amount;
+    if (cust && invoice.saleType !== 'doctor_sampling' && invoice.saleType !== 'damage') {
+      if (invoice.mode === 'cash') {
+        cust.cashBalance += invoice.amount;
+      } else {
+        cust.regularBalance += invoice.amount;
+      }
       await cust.save();
+    }
+
+    // Deduct inventory if required (direct sales/sampling/damage)
+    if (invoice.deductInventory || invoice.saleType === 'doctor_sampling' || invoice.saleType === 'damage') {
+      await deductInventoryForInvoice(invoice);
     }
 
     if (invoice.status === 'Cancelled') invoice.status = 'unpaid';
@@ -288,6 +425,48 @@ router.patch('/purchases/:id/finalize', authorize('invoice:markPaid'), async (re
     // Automatically update inventories for each purchase invoice item
     if (invoice.items && invoice.items.length > 0) {
       for (const item of invoice.items) {
+        // 1. Check if item is a Raw Material
+        let rawMaterial;
+        if (item.rawMaterialId) {
+          rawMaterial = await RawMaterial.findById(item.rawMaterialId);
+        }
+        if (!rawMaterial && item.name) {
+          rawMaterial = await RawMaterial.findOne({ name: { $regex: `^${item.name.trim()}$`, $options: 'i' } });
+        }
+
+        if (rawMaterial) {
+          const qtyToAdd = item.qty || item.boxes || 0;
+          const rate = item.rate || 0;
+          const batchNo = item.batchNo || `PUR-${invoice.invoiceNo}`;
+
+          let rmEntry = await RawMaterialEntry.findOne({
+            rawMaterialId: rawMaterial._id,
+            batchNo: batchNo
+          });
+
+          if (rmEntry) {
+            rmEntry.qty += qtyToAdd;
+            if (rate > 0) rmEntry.purchaseRate = rate;
+            if (resolvedVendorId) {
+              rmEntry.vendorId = resolvedVendorId;
+              rmEntry.vendorName = resolvedVendorName;
+            }
+            rmEntry.purchaseRef = invoice.invoiceNo;
+            await rmEntry.save();
+          } else {
+            await RawMaterialEntry.create({
+              rawMaterialId: rawMaterial._id,
+              batchNo: batchNo,
+              qty: qtyToAdd,
+              purchaseRate: rate,
+              vendorId: resolvedVendorId || null,
+              vendorName: resolvedVendorName || '',
+              purchaseRef: invoice.invoiceNo,
+            });
+          }
+          continue;
+        }
+
         let product;
         if (item.productId) {
           product = await Product.findById(item.productId);
@@ -369,7 +548,7 @@ router.patch('/purchases/:id/finalize', authorize('invoice:markPaid'), async (re
 
     // Sync Vendor balance
     if (vend) {
-      vend.pakkaBalance += invoice.amount;
+      vend.regularBalance += invoice.amount;
       await vend.save();
     }
 
@@ -396,8 +575,6 @@ router.delete('/sales/:id', authorize('invoice:delete'), async (req, res) => {
     const invoice = await Invoice.findOne({ _id: req.params.id, type: 'sale' });
     if (!invoice) return res.status(404).json({ error: 'Sale invoice not found' });
 
-
-
     // Only rollback ledger / stock if it was finalized
     if (invoice.isFinalized) {
       // Deduct Customer balance
@@ -407,12 +584,19 @@ router.delete('/sales/:id', authorize('invoice:delete'), async (req, res) => {
           { company: invoice.customerName }
         ]
       });
-      if (cust) {
-        cust.pakkaBalance = Math.max(0, cust.pakkaBalance - invoice.amount);
+      if (cust && invoice.saleType !== 'doctor_sampling' && invoice.saleType !== 'damage') {
+        if (invoice.mode === 'cash') {
+          cust.cashBalance = Math.max(0, cust.cashBalance - invoice.amount);
+        } else {
+          cust.regularBalance = Math.max(0, cust.regularBalance - invoice.amount);
+        }
         await cust.save();
       }
 
-
+      // Revert stock level if required (direct sales/sampling/damage)
+      if (invoice.deductInventory || invoice.saleType === 'doctor_sampling' || invoice.saleType === 'damage') {
+        await revertInventoryForInvoice(invoice);
+      }
     }
 
     // Soft Delete
@@ -452,7 +636,7 @@ router.delete('/purchases/:id', authorize('invoice:delete'), async (req, res) =>
         ]
       });
       if (vend) {
-        vend.pakkaBalance = Math.max(0, vend.pakkaBalance - invoice.amount);
+        vend.regularBalance = Math.max(0, vend.regularBalance - invoice.amount);
         await vend.save();
       }
 
@@ -463,6 +647,29 @@ router.delete('/purchases/:id', authorize('invoice:delete'), async (req, res) =>
         if (warehouse) {
           const resolvedVendorId = vend ? vend._id.toString() : '';
           for (const item of invoice.items) {
+            // Check Raw Material
+            let rawMaterial;
+            if (item.rawMaterialId) {
+              rawMaterial = await RawMaterial.findById(item.rawMaterialId);
+            }
+            if (!rawMaterial && item.name) {
+              rawMaterial = await RawMaterial.findOne({ name: { $regex: `^${item.name.trim()}$`, $options: 'i' } });
+            }
+
+            if (rawMaterial) {
+              const boxesToRevert = item.qty || item.boxes || 0;
+              const batchNo = item.batchNo || `PUR-${invoice.invoiceNo}`;
+              const rmEntry = await RawMaterialEntry.findOne({
+                rawMaterialId: rawMaterial._id,
+                batchNo: batchNo
+              });
+              if (rmEntry) {
+                rmEntry.qty = Math.max(0, rmEntry.qty - boxesToRevert);
+                await rmEntry.save();
+              }
+              continue;
+            }
+
             if (!item.productId) continue;
             const product = await Product.findById(item.productId);
             if (!product) continue;

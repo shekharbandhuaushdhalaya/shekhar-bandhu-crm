@@ -174,26 +174,42 @@ export default function SalesCRMScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* Header */}
-      <View style={styles.pageHeader}>
-        <View>
-          <Text style={styles.pageTitle}>Sales & CRM</Text>
-          <Text style={styles.pageSubtitle}>Complaints, samples, targets & commissions</Text>
+      {/* Standardized Search & Title Topbar */}
+      <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.bg.card,
+          paddingHorizontal: 14,
+          paddingRight: 8,
+          borderRadius: Radius.md,
+          borderWidth: 1,
+          borderColor: colors.border,
+          gap: 12,
+          minHeight: 46
+        }}>
+          {/* Tab Selector pills inside topbar */}
+          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+            {TABS.map(tab => {
+              const active = activeTab === tab.id;
+              return (
+                <TouchableOpacity
+                  key={tab.id}
+                  style={[
+                    { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm, flexDirection: 'row', alignItems: 'center', gap: 6 },
+                    active ? { backgroundColor: colors.primary } : { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border }
+                  ]}
+                  onPress={() => setActiveTab(tab.id)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name={tab.icon as any} size={14} color={active ? '#fff' : colors.text.secondary} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.text.primary }}>{tab.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
       </View>
-
-      {/* Tab bar */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBarScroll} contentContainerStyle={styles.tabBarContent}>
-        {TABS.map(tab => {
-          const active = activeTab === tab.id;
-          return (
-            <TouchableOpacity key={tab.id} style={[styles.tabPill, active && styles.tabPillActive]} onPress={() => setActiveTab(tab.id)} activeOpacity={0.7}>
-              <Ionicons name={tab.icon as any} size={15} color={active ? '#fff' : colors.text.secondary} />
-              <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>

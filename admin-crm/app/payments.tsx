@@ -29,7 +29,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
   const [showPartyDropdown, setShowPartyDropdown] = useState(false);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(getLocalDateString());
-  const mode = 'pakka';
+  const [mode, setMode] = useState<'regular' | 'cash'>('regular');
   const [method, setMethod] = useState<'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI'>('Cash');
   const [showMethodDropdown, setShowMethodDropdown] = useState(false);
   const [referenceNo, setReferenceNo] = useState('');
@@ -46,6 +46,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
       setShowPartyDropdown(false);
       setAmount('');
       setDate(getLocalDateString());
+      setMode('regular');
       setMethod('Cash');
       setReferenceNo('');
       setNotes('');
@@ -56,12 +57,18 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
     if (visible) {
       const loadParties = async () => {
         try {
+          let res: any[] = [];
           if (partyType === 'Customer') {
-            const res = await api.getCustomers();
-            setParties(res);
+            res = await api.getCustomers();
           } else {
-            const res = await api.getVendors();
-            setParties(res);
+            res = await api.getVendors();
+          }
+          setParties(res);
+
+          // Auto-populate partyName if fixedPartyId was passed without name
+          if (fixedPartyId && !partyName) {
+            const found = res.find((p: any) => p._id === fixedPartyId);
+            if (found) setPartyName(found.company || found.name);
           }
         } catch (err) {
           console.error(err);
@@ -69,7 +76,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
       };
       loadParties();
     }
-  }, [visible, partyType]);
+  }, [visible, partyType, fixedPartyId]);
 
   const filteredParties = partyName
     ? parties.filter(p => (p.company || p.name).toLowerCase().includes(partyName.toLowerCase()))
@@ -137,7 +144,16 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
                   placeholder={`Search ${type === 'receive' ? 'customer' : 'vendor'}...`}
                   placeholderTextColor={colors.text.muted}
                   value={partyName}
-                  onChangeText={(txt) => { setPartyName(txt); setPartyId(''); setShowPartyDropdown(true); }}
+                  onChangeText={(txt) => {
+                    setPartyName(txt);
+                    const exact = parties.find(p => (p.company || p.name).toLowerCase() === txt.trim().toLowerCase());
+                    if (exact) {
+                      setPartyId(exact._id);
+                    } else {
+                      setPartyId('');
+                    }
+                    setShowPartyDropdown(true);
+                  }}
                   onFocus={() => { if (!fixedPartyId) setShowPartyDropdown(true); }}
                   editable={!fixedPartyId}
                 />
@@ -147,7 +163,8 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
                       <TouchableOpacity key={p._id} style={styles.dropdownItem} onPress={() => handleSelectParty(p)}>
                         <Text style={styles.dropdownItemText}>{p.company || p.name}</Text>
                         <Text style={styles.dropdownItemSub}>
-                          GST Bal: ₹{(p.pakkaBalance || 0).toLocaleString('en-IN')}
+                          GST Bal: ₹{(p.regularBalance || 0).toLocaleString('en-IN')}
+                          {canAccessCash && ` | Cash Bal: ₹${(p.cashBalance || 0).toLocaleString('en-IN')}`}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -155,6 +172,31 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
                 )}
               </View>
             </View>
+
+            {/* Selected Party Balance Preview & Quick Fill */}
+            {partyId && (
+              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 10, marginBottom: Spacing.md, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>CURRENT DUE BALANCE</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 2 }}>
+                    GST: ₹{((parties.find(p => p._id === partyId)?.regularBalance) || 0).toLocaleString('en-IN')}
+                    {canAccessCash && ` | Cash: ₹${((parties.find(p => p._id === partyId)?.cashBalance) || 0).toLocaleString('en-IN')}`}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.primary + '15', borderColor: colors.primary + '40', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                  onPress={() => {
+                    const selParty = parties.find(p => p._id === partyId);
+                    if (selParty) {
+                      const bal = mode === 'cash' ? (selParty.cashBalance || 0) : (selParty.regularBalance || 0);
+                      if (bal > 0) setAmount(bal.toString());
+                    }
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Fill Due</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Amount */}
             <View style={{ marginBottom: Spacing.md }}>
@@ -195,7 +237,27 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
             </View>
 
             {/* Mode & Method row */}
-
+            {canAccessCash && (
+              <View style={[styles.row, { zIndex: 1000, position: 'relative' }]}>
+                <View style={{ flex: 1, zIndex: 1000 }}>
+                  <Text style={styles.label}>Mode</Text>
+                  <View style={styles.toggleGroup}>
+                    <TouchableOpacity
+                      style={[styles.toggleBtn, mode === 'regular' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                      onPress={() => setMode('regular')}
+                    >
+                      <Text style={[styles.toggleText, mode === 'regular' && { color: '#fff' }]}>GST (Regular)</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.toggleBtn, mode === 'cash' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                      onPress={() => setMode('cash')}
+                    >
+                      <Text style={[styles.toggleText, mode === 'cash' && { color: '#fff' }]}>Cash</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
               
               <View style={{ marginBottom: Spacing.md }}>
                 <Text style={styles.label}>Payment Method</Text>
@@ -293,7 +355,7 @@ export function PaymentDetailModal({ visible, payment, onClose }: { visible: boo
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
               <View>
                 <Text style={{ fontSize: 12, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Mode & Method</Text>
-                <Text style={{ fontSize: 14, color: colors.text.primary }}>{payment.mode === 'pakka' ? 'GST' : 'Cash'} - {payment.paymentMethod}</Text>
+                <Text style={{ fontSize: 14, color: colors.text.primary }}>{payment.mode === 'regular' ? 'GST (Regular)' : 'Cash'} - {payment.paymentMethod}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={{ fontSize: 12, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Reference No</Text>
@@ -382,7 +444,7 @@ export default function PaymentsScreen() {
     <View style={styles.screen}>
       <View style={styles.innerContainer}>
         {/* Header Actions & Filters */}
-        <View style={{ zIndex: 1100, position: 'relative', paddingHorizontal: Spacing.md, marginTop: Spacing.md, marginBottom: Spacing.md }}>
+        <View style={{ zIndex: 1100, position: 'relative', paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
           <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12, marginBottom: 0 }]}>
             <Ionicons name="search" size={18} color={colors.text.muted} />
             <TextInput
@@ -441,39 +503,76 @@ export default function PaymentsScreen() {
           </View>
         </View>
 
+        {/* Financial Summary Cards */}
+        {(() => {
+          const totalReceived = payments.filter(p => p.type === 'receive').reduce((sum, p) => sum + (p.amount || 0), 0);
+          const totalPaid = payments.filter(p => p.type === 'make').reduce((sum, p) => sum + (p.amount || 0), 0);
+          const netFlow = totalReceived - totalPaid;
+          return (
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: Spacing.md, marginTop: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+              <View style={[styles.statCard, { backgroundColor: colors.success + '10', borderColor: colors.success + '30' }]}>
+                <Text style={[styles.statLabel, { color: colors.success }]}>TOTAL RECEIVED</Text>
+                <Text style={[styles.statValue, { color: colors.success }]}>₹{totalReceived.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={[styles.statCard, { backgroundColor: colors.danger + '10', borderColor: colors.danger + '30' }]}>
+                <Text style={[styles.statLabel, { color: colors.danger }]}>TOTAL PAID OUT</Text>
+                <Text style={[styles.statValue, { color: colors.danger }]}>₹{totalPaid.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={[styles.statCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
+                <Text style={[styles.statLabel, { color: colors.primary }]}>NET INFLOW</Text>
+                <Text style={[styles.statValue, { color: colors.primary }]}>₹{netFlow.toLocaleString('en-IN')}</Text>
+              </View>
+            </View>
+          );
+        })()}
+
         {/* Table */}
         <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.md }}>
-            <View style={[styles.tableCard, { minWidth: 600, width: '100%' }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
+            <View style={[styles.tableCard, { minWidth: 950, width: '100%' }]}>
               <View style={styles.tableHeader}>
-                <View style={[styles.tableHeaderCellContainer, { flex: 0.8, minWidth: 90 }]}><Text style={styles.th}>DATE</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 2.0, minWidth: 200 }]}><Text style={styles.th}>PARTY</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { flex: 0.9, minWidth: 95 }]}><Text style={styles.th}>DATE</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { flex: 2.2, minWidth: 220 }]}><Text style={styles.th}>PARTY</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { flex: 1.3, minWidth: 140 }]}><Text style={styles.th}>METHOD/REF</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 1.0, minWidth: 110 }]}><Text style={[styles.th, { textAlign: 'right' }]}>AMOUNT</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 0.5, minWidth: 60, borderRightWidth: 0 }]}></View>
+                <View style={[styles.tableHeaderCellContainer, { flex: 1.1, minWidth: 110 }]}><Text style={[styles.th, { textAlign: 'right' }]}>AMOUNT</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { flex: 1.2, minWidth: 130, borderRightWidth: 0 }]}><Text style={[styles.th, { textAlign: 'center' }]}>ACTIONS</Text></View>
               </View>
               
               {[...payments].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => (
                 <TouchableOpacity key={p._id} style={styles.tableRow} onPress={() => { setSelectedPayment(p); setDetailVisible(true); }}>
-                  <View style={[styles.tableCellContainer, { flex: 0.8, minWidth: 90 }]}>
+                  <View style={[styles.tableCellContainer, { flex: 0.9, minWidth: 95 }]}>
                     <Text style={[styles.td, { color: colors.text.secondary }]}>{new Date(p.date).toLocaleDateString('en-IN')}</Text>
                   </View>
-                  <View style={[styles.tableCellContainer, { flex: 2.0, minWidth: 200 }]}>
+                  <View style={[styles.tableCellContainer, { flex: 2.2, minWidth: 220 }]}>
                     <Text style={[styles.td, { fontWeight: '600' }]} numberOfLines={1}>{shortenPartyName(p.partyName, winWidth < 768)}</Text>
                     <Text style={[styles.td, { fontSize: 11, color: colors.text.muted, marginTop: 2 }]}>{p.partyType}</Text>
                   </View>
                   <View style={[styles.tableCellContainer, { flex: 1.3, minWidth: 140 }]}>
-                    <Text style={styles.td}>{p.paymentMethod}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={styles.td}>{p.paymentMethod}</Text>
+                      {canAccessCash && (
+                        <View style={[styles.badge, { backgroundColor: p.mode === 'cash' ? '#FFF3E0' : colors.primaryLight }]}>
+                          <Text style={[styles.badgeText, { color: p.mode === 'cash' ? '#F57C00' : colors.primary }]}>
+                            {p.mode === 'cash' ? 'Cash' : 'Regular'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     {!!p.referenceNo && <Text style={[styles.td, { fontSize: 11, color: colors.text.muted, marginTop: 2 }]}>{p.referenceNo}</Text>}
                   </View>
-                  <View style={[styles.tableCellContainer, { flex: 1.0, minWidth: 110 }]}>
+                  <View style={[styles.tableCellContainer, { flex: 1.1, minWidth: 110 }]}>
                     <Text style={[styles.td, { textAlign: 'right', fontWeight: '800', color: p.type === 'receive' ? colors.success : colors.danger }]}>
                       {p.type === 'receive' ? '+ ' : '- '}₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </Text>
                   </View>
-                  <View style={[styles.tableCellContainer, { flex: 0.5, minWidth: 60, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
-                    <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleDelete(p._id); }} style={styles.iconBtn}>
-                      <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                  <View style={[styles.tableCellContainer, { flex: 1.2, minWidth: 130, borderRightWidth: 0, flexDirection: 'row', gap: 6, justifyContent: 'center' }]}>
+                    <TouchableOpacity style={styles.actionPillBtn} onPress={() => { setSelectedPayment(p); setDetailVisible(true); }}>
+                      <Ionicons name="eye-outline" size={12} color={colors.primary} />
+                      <Text style={[styles.actionPillText, { color: colors.primary }]}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.actionPillBtn, { backgroundColor: colors.danger + '12', borderColor: colors.danger + '40' }]} onPress={(e) => { e.stopPropagation(); handleDelete(p._id); }}>
+                      <Ionicons name="trash-outline" size={12} color={colors.danger} />
+                      <Text style={[styles.actionPillText, { color: colors.danger }]}>Delete</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
@@ -497,7 +596,7 @@ export default function PaymentsScreen() {
 
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
-  innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
+  innerContainer: { flex: 1, width: '100%' },
   headerBar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.sm },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
   searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
@@ -518,7 +617,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   td: { fontSize: 13, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  badgeText: { fontSize: 10, fontWeight: '800' },
+  statCard: { flex: 1, minWidth: 130, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1 },
+  statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  statValue: { fontSize: 16, fontWeight: '800', marginTop: 2 },
+  actionPillBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' },
+  actionPillText: { fontSize: 11, fontWeight: '700' },
   iconBtn: { padding: 6 },
   emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyText: { marginTop: 10, color: colors.text.muted, fontSize: 14 },

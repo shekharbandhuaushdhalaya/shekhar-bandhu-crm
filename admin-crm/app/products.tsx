@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -290,6 +290,119 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   const [showShapeInput, setShowShapeInput] = useState(false);
   const [newShapeName, setNewShapeName] = useState('');
 
+  const [activeFormTab, setActiveFormTab] = useState<'basic' | 'recipe'>('basic');
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [bomYield, setBomYield] = useState('100');
+  const [bomOverhead, setBomOverhead] = useState('0');
+  const [bomNotes, setBomNotes] = useState('');
+  const [bomIsActive, setBomIsActive] = useState(true);
+  const [bomIngredients, setBomIngredients] = useState<{ rawMaterialId: string; qtyRequired: string; itemType: 'formulation' | 'packaging' }[]>([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
+  const [bomStages, setBomStages] = useState<{ name: string; targetDurationDays: string }[]>([{ name: '', targetDurationDays: '1' }]);
+
+  // Load raw materials & existing BOM when product is set
+  useEffect(() => {
+    async function fetchBOMAndMaterials() {
+      try {
+        const [rms, existingBom] = await Promise.all([
+          api.getRawMaterials(),
+          product ? api.getBOMForProduct(product._id).catch(() => null) : Promise.resolve(null)
+        ]);
+        setMaterials(rms);
+        if (existingBom) {
+          setBomYield(existingBom.batchYieldSize ? existingBom.batchYieldSize.toString() : '100');
+          setBomOverhead(existingBom.overheadCost ? existingBom.overheadCost.toString() : '0');
+          setBomNotes(existingBom.productionNotes || '');
+          setBomIsActive(existingBom.isActive !== undefined ? existingBom.isActive : true);
+          if (existingBom.ingredients && existingBom.ingredients.length > 0) {
+            setBomIngredients(existingBom.ingredients.map(ing => ({
+              rawMaterialId: (ing.rawMaterialId as any)?._id || ing.rawMaterialId,
+              qtyRequired: ing.qtyRequired.toString(),
+              itemType: ing.itemType === 'packaging' ? 'packaging' : 'formulation'
+            })));
+          } else {
+            setBomIngredients([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
+          }
+          if (existingBom.stages && existingBom.stages.length > 0) {
+            setBomStages(existingBom.stages.map(st => ({
+              name: st.name,
+              targetDurationDays: st.targetDurationDays.toString()
+            })));
+          } else {
+            setBomStages([{ name: '', targetDurationDays: '1' }]);
+          }
+        } else {
+          // Defaults for new product / no configured BOM
+          setBomYield('100');
+          setBomOverhead('0');
+          setBomNotes('');
+          setBomIsActive(true);
+          setBomIngredients([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
+          setBomStages([{ name: '', targetDurationDays: '1' }]);
+        }
+      } catch (err) {
+        console.error('Failed to load raw materials or BOM in AddEditProductModal:', err);
+      }
+    }
+    if (visible) {
+      fetchBOMAndMaterials();
+    }
+  }, [visible, product]);
+
+  const handleIngredientChange = (index: number, field: string, value: string) => {
+    const list = [...bomIngredients];
+    (list[index] as any)[field] = value;
+    setBomIngredients(list);
+  };
+
+  // Compute live total formula ratio percentage (for formulation items only)
+  const totalFormulaRatio = useMemo(() => {
+    return bomIngredients
+      .filter(ing => ing.itemType !== 'packaging')
+      .reduce((acc, ing) => {
+        const val = parseFloat(ing.qtyRequired);
+        return acc + (isNaN(val) ? 0 : val);
+      }, 0);
+  }, [bomIngredients]);
+
+  // Sync Key Ingredients summary text from BOM formulation ingredients ratio
+  useEffect(() => {
+    const activeIngs = bomIngredients.filter(ing => ing.itemType !== 'packaging' && ing.rawMaterialId && ing.qtyRequired);
+    if (activeIngs.length > 0) {
+      const summary = activeIngs.map(ing => {
+        const mat = materials.find(m => m._id === ing.rawMaterialId);
+        const name = mat ? mat.name : 'Ingredient';
+        return `${name} (${ing.qtyRequired}%)`;
+      }).join(', ');
+      setIngredients(summary);
+    }
+  }, [bomIngredients, materials]);
+
+  const handleAddIngredientRow = (type: 'formulation' | 'packaging' = 'formulation') => {
+    setBomIngredients([...bomIngredients, { rawMaterialId: '', qtyRequired: '', itemType: type }]);
+  };
+
+  const handleRemoveIngredientRow = (index: number) => {
+    const list = [...bomIngredients];
+    list.splice(index, 1);
+    setBomIngredients(list.length > 0 ? list : [{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
+  };
+
+  const handleStageChange = (index: number, field: string, value: string) => {
+    const list = [...bomStages];
+    (list[index] as any)[field] = value;
+    setBomStages(list);
+  };
+
+  const handleAddStageRow = () => {
+    setBomStages([...bomStages, { name: '', targetDurationDays: '1' }]);
+  };
+
+  const handleRemoveStageRow = (index: number) => {
+    const list = [...bomStages];
+    list.splice(index, 1);
+    setBomStages(list.length > 0 ? list : [{ name: '', targetDurationDays: '1' }]);
+  };
+
   useEffect(() => {
     if (product) {
       setName(product.name || '');
@@ -352,6 +465,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
     setNewTypeName('');
     setShowShapeInput(false);
     setNewShapeName('');
+    setActiveFormTab('basic');
   }, [product, visible]);
 
   const handleAddCustomType = () => {
@@ -379,10 +493,11 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   };
 
   const getSizeUnit = () => {
-    const t = (productType || '').toLowerCase();
-    if (t.includes('asava') || t.includes('arishta') || t.includes('syrup') || t.includes('oil')) return 'ml';
-    if (t.includes('vati') || t.includes('guggulu') || t.includes('tablet') || t.includes('capsule')) return 'Tablets';
-    if (t.includes('avaleha') || t.includes('churn') || t.includes('powder')) return 'g';
+    const s = (shape || '').toLowerCase().trim();
+    if (s === 'liquid') return 'ml';
+    if (s === 'tablet') return 'Tablets';
+    if (s === 'capsule') return 'Capsules';
+    if (s === 'powder' || s === 'paste') return 'g';
     return 'ml';
   };
 
@@ -444,10 +559,6 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       showToast('Ayurvedic Formulation Name is required!', 'error');
       return;
     }
-    if (!finalSku) {
-      showToast('Product SKU / Code is required!', 'error');
-      return;
-    }
 
     const sizeUnit = getSizeUnit();
     let formattedSize = '';
@@ -458,24 +569,14 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
         : `${trimmedSize} ${sizeUnit}`;
     }
 
-    const isDuplicate = products.some(p => 
-      p._id !== (product?._id || '') &&
-      p.sku.toLowerCase() === finalSku.toLowerCase()
-    );
-
     if (!hsnCode.trim()) {
       showToast('HSN Code is mandatory!', 'error');
       return;
     }
 
-    if (isDuplicate) {
-      showToast('A product with this SKU already exists!', 'error');
-      return;
-    }
-
     const payload = {
       name: finalName,
-      sku: finalSku,
+      sku: sku.trim() || undefined,
       price: finalPrice,
       stockLevel: product ? product.stockLevel : 0,
       category: finalCategory,
@@ -506,13 +607,68 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
         }
       }
 
+      // Configure BOM recipe/stages
+      const hasIngredients = bomIngredients.some(ing => ing.rawMaterialId && ing.qtyRequired);
+      const hasStages = bomStages.some(st => st.name.trim().length > 0);
+      if (hasIngredients || hasStages || bomYield !== '100' || bomOverhead !== '0' || bomNotes.trim() !== '') {
+        const filteredStages = bomStages
+          .filter(st => st.name.trim().length > 0)
+          .map(st => ({
+            name: st.name.trim(),
+            targetDurationDays: parseFloat(st.targetDurationDays) || 1
+          }));
+
+        await api.configureBOM({
+          productId: savedProduct._id,
+          batchYieldSize: Number(bomYield) || 100,
+          ingredients: bomIngredients
+            .filter(ing => ing.rawMaterialId && ing.qtyRequired)
+            .map(ing => ({
+              rawMaterialId: ing.rawMaterialId,
+              qtyRequired: Number(ing.qtyRequired),
+              itemType: ing.itemType || 'formulation'
+            })),
+          isActive: bomIsActive,
+          productionNotes: bomNotes.trim(),
+          overheadCost: parseFloat(bomOverhead) || 0,
+          stages: filteredStages
+        });
+      }
+
       onSaved();
       onClose();
-      showToast('Product saved successfully!', 'success');
+      showToast('Product and Formulation saved successfully!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to save product specification', 'error');
     }
   };
+  const getYieldLabelAndPlaceholder = () => {
+    const s = (shape || '').toLowerCase().trim();
+    if (s === 'liquid') {
+      return {
+        label: 'Standard Batch Yield Size (Liters)',
+        placeholder: 'e.g. 100 (in Liters)'
+      };
+    }
+    if (s === 'tablet' || s === 'capsule') {
+      return {
+        label: 'Standard Batch Yield Size (Number of Pieces)',
+        placeholder: 'e.g. 10000 (Number of tablets/capsules)'
+      };
+    }
+    if (s === 'powder') {
+      return {
+        label: 'Standard Batch Yield Size (Kilograms)',
+        placeholder: 'e.g. 50 (in Kilograms)'
+      };
+    }
+    return {
+      label: 'Standard Batch Yield Output Size (Bottles / Units)',
+      placeholder: 'e.g. 100'
+    };
+  };
+
+  const yieldMeta = getYieldLabelAndPlaceholder();
 
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
@@ -578,7 +734,41 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
             </ScrollView>
           </View>
           
-          <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Core Product Specifications</Text></View>
+          {/* Form Tabs Bar */}
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border, marginBottom: 16 }}>
+            <TouchableOpacity
+              onPress={() => setActiveFormTab('basic')}
+              style={{
+                flex: 1,
+                paddingVertical: 12,
+                alignItems: 'center',
+                borderBottomWidth: 2,
+                borderColor: activeFormTab === 'basic' ? colors.primary : 'transparent'
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: activeFormTab === 'basic' ? colors.primary : colors.text.secondary }}>
+                1. Basic Details
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveFormTab('recipe')}
+              style={{
+                flex: 1,
+                paddingVertical: 12,
+                alignItems: 'center',
+                borderBottomWidth: 2,
+                borderColor: activeFormTab === 'recipe' ? colors.primary : 'transparent'
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: activeFormTab === 'recipe' ? colors.primary : colors.text.secondary }}>
+                2. Formulation Recipe (BOM)
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {activeFormTab === 'basic' && (
+            <>
+              <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Core Product Specifications</Text></View>
 
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Ayurvedic Formulation Name <Text style={{ color: 'red' }}>*</Text></Text>
@@ -595,34 +785,18 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Product SKU / Code <Text style={{ color: 'red' }}>*</Text></Text>
+            <Text style={styles.formLabel}>Product SKU / Code (Auto-Generated)</Text>
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              <View style={[styles.formInput, { flex: 1 }]}>
+              <View style={[styles.formInput, { flex: 1, backgroundColor: colors.bg.secondary }]}>
                 <Ionicons name="barcode-outline" size={16} color={colors.text.muted} />
                 <TextInput 
-                  style={styles.formInputText} 
-                  placeholder="e.g. ASV-ABH-450" 
+                  style={[styles.formInputText, { color: colors.text.muted }]} 
+                  placeholder="Auto-generated on save" 
                   placeholderTextColor={colors.text.muted} 
                   value={sku} 
-                  onChangeText={setSku} 
+                  editable={false} 
                 />
               </View>
-              <TouchableOpacity
-                style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10' }}
-                onPress={() => {
-                  const t = (productType || '').toLowerCase();
-                  const typeMap: Record<string, string> = { 'asava & arishta': 'ASV', 'vati & guggulu': 'VAT', 'medicated oils': 'OIL', 'syrups': 'SYR', 'avaleha': 'AVA' };
-                  const type = typeMap[t] || t.replace(/[^a-z]/g, '').slice(0, 3).toUpperCase() || 'GEN';
-                  const words = (name || '').split(/\s+/).filter(Boolean);
-                  const nameAbbr = words.length > 1 ? words.map(w => w[0]).filter(Boolean).join('').toUpperCase().slice(0, 4) : (words[0] || '').slice(0, 4).toUpperCase() || 'PROD';
-                  const sz = (size || '').replace(/[^0-9]/g, '').slice(0, 3) || '000';
-                  const shapeMap: Record<string, string> = { 'round': 'ROU', 'flat': 'FLA', 'jar': 'JAR', 'oval': 'OVA' };
-                  const shp = shapeMap[(shape || '').toLowerCase()] || (shape || '').slice(0, 3).toUpperCase() || 'STD';
-                  setSku(`${type}-${nameAbbr}-${sz}-${shp}`);
-                }}
-              >
-                <Ionicons name="refresh-outline" size={16} color={colors.primary} />
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -722,14 +896,14 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Key Ingredients (Comma-separated)</Text>
-            <View style={[styles.formInput, { height: 80, alignItems: 'flex-start', paddingTop: 8 }]}>
+            <Text style={styles.formLabel}>Key Ingredients (Auto-Calculated from BOM)</Text>
+            <View style={[styles.formInput, { height: 60, backgroundColor: colors.bg.secondary, alignItems: 'flex-start', paddingTop: 8 }]}>
               <TextInput
-                style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
-                placeholder="e.g. Ashwagandha, Shatavari, Safed Musli..."
+                style={[styles.formInputText, { height: '100%', color: colors.text.muted, textAlignVertical: 'top' }]}
+                placeholder="Will be auto-calculated from BOM recipe"
                 placeholderTextColor={colors.text.muted}
                 value={ingredients}
-                onChangeText={setIngredients}
+                editable={false}
                 multiline
               />
             </View>
@@ -780,34 +954,6 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           {productType ? (
             <>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Size / Quantity (in {getSizeUnit()})</Text>
-                <View style={styles.formInput}>
-                  <Ionicons name="expand" size={16} color={colors.text.muted} />
-                  <TextInput
-                    style={styles.formInputText}
-                    placeholder={`e.g. 250 (unit: ${getSizeUnit()})`}
-                    placeholderTextColor={colors.text.muted}
-                    value={size}
-                    onChangeText={setSize}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Formulation Color</Text>
-                <View style={styles.formInput}>
-                  <Ionicons name="color-palette" size={16} color={colors.text.muted} />
-                  <TextInput
-                    style={styles.formInputText}
-                    placeholder="e.g. Amber, Reddish Brown, Blackish"
-                    placeholderTextColor={colors.text.muted}
-                    value={colour}
-                    onChangeText={setColour}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Physical Form</Text>
                 <View style={styles.typeSelector}>
                   {shapes.map(s => (
@@ -846,6 +992,34 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
               </View>
 
               <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Size / Quantity (in {getSizeUnit()})</Text>
+                <View style={styles.formInput}>
+                  <Ionicons name="expand" size={16} color={colors.text.muted} />
+                  <TextInput
+                    style={styles.formInputText}
+                    placeholder={`e.g. 250 (unit: ${getSizeUnit()})`}
+                    placeholderTextColor={colors.text.muted}
+                    value={size}
+                    onChangeText={setSize}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Formulation Color</Text>
+                <View style={styles.formInput}>
+                  <Ionicons name="color-palette" size={16} color={colors.text.muted} />
+                  <TextInput
+                    style={styles.formInputText}
+                    placeholder="e.g. Amber, Reddish Brown, Blackish"
+                    placeholderTextColor={colors.text.muted}
+                    value={colour}
+                    onChangeText={setColour}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Total Weight (in grams)</Text>
                 <View style={styles.formInput}>
                   <Ionicons name="speedometer" size={16} color={colors.text.muted} />
@@ -860,6 +1034,287 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
               </View>
             </>
           ) : null}
+            </>
+          )}
+          
+          {activeFormTab === 'basic' && (
+            <TouchableOpacity
+              onPress={() => setActiveFormTab('recipe')}
+              style={{
+                backgroundColor: colors.primary + '15',
+                borderColor: colors.primary,
+                borderWidth: 1,
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 6,
+                marginTop: 20,
+                marginBottom: 10
+              }}
+            >
+              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Next: Configure Recipe (BOM)</Text>
+              <Ionicons name="arrow-forward-outline" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+
+          {activeFormTab === 'recipe' && (
+            <>
+              {/* ========================================== */}
+              {/* FORMULATION & PROCESS STAGES SECTION       */}
+              {/* ========================================== */}
+              <View style={[styles.formSectionHeader, { marginTop: 24 }]}><Text style={styles.formSectionTitle}>Recipe Formulation & Process Stages</Text></View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>{yieldMeta.label}</Text>
+            <View style={styles.formInput}>
+              <Ionicons name="apps-outline" size={16} color={colors.text.muted} />
+              <TextInput
+                style={styles.formInputText}
+                placeholder={yieldMeta.placeholder}
+                placeholderTextColor={colors.text.muted}
+                value={bomYield}
+                onChangeText={setBomYield}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Overhead Cost per Batch Run (₹)</Text>
+            <View style={styles.formInput}>
+              <Ionicons name="calculator-outline" size={16} color={colors.text.muted} />
+              <TextInput
+                style={styles.formInputText}
+                placeholder="e.g. 1500"
+                placeholderTextColor={colors.text.muted}
+                value={bomOverhead}
+                onChangeText={setBomOverhead}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Manufacturing SOP & Notes</Text>
+            <View style={[styles.formInput, { height: 80, alignItems: 'flex-start', paddingTop: 8 }]}>
+              <TextInput
+                style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
+                placeholder="Instructions for processing, mixing time, boiling details..."
+                placeholderTextColor={colors.text.muted}
+                value={bomNotes}
+                onChangeText={setBomNotes}
+                multiline
+              />
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 12 }}>
+            <Text style={styles.formLabel}>Formulation Status</Text>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity
+                onPress={() => setBomIsActive(true)}
+                style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: bomIsActive ? colors.success : colors.bg.secondary, borderWidth: 1, borderColor: bomIsActive ? colors.success : colors.border }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: bomIsActive ? '#fff' : colors.text.secondary }}>Active</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setBomIsActive(false)}
+                style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: !bomIsActive ? colors.danger : colors.bg.secondary, borderWidth: 1, borderColor: !bomIsActive ? colors.danger : colors.border }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: !bomIsActive ? '#fff' : colors.text.secondary }}>Inactive</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Section 1: Formulation Ingredients */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>🧪 Formulation Ingredients (% Ratio):</Text>
+            <View style={{
+              backgroundColor: Math.abs(totalFormulaRatio - 100) < 0.01 ? colors.success + '20' : colors.warning + '20',
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: Math.abs(totalFormulaRatio - 100) < 0.01 ? colors.success : colors.warning
+            }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: Math.abs(totalFormulaRatio - 100) < 0.01 ? colors.success : colors.warning }}>
+                Formula Total: {totalFormulaRatio}% {Math.abs(totalFormulaRatio - 100) < 0.01 ? '✓ Balanced' : ''}
+              </Text>
+            </View>
+          </View>
+          {bomIngredients.map((item, idx) => {
+            if (item.itemType === 'packaging') return null;
+            const formulationMaterials = materials.filter(rm => !rm.category || rm.category === 'Herb' || rm.category === 'Excipient' || rm.category === 'General');
+            return (
+              <View key={`ing-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <View style={[styles.formInput, { flex: 2, height: 42 }]}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={item.rawMaterialId}
+                      onChange={(e: any) => handleIngredientChange(idx, 'rawMaterialId', e.target.value)}
+                      style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                    >
+                      <option value="">-- Select Formulation Material --</option>
+                      {formulationMaterials.map(rm => {
+                        const icon = rm.category === 'Excipient' ? '💧' : (rm.category === 'Packaging' ? '📦' : '🌿');
+                        return (
+                          <option key={rm._id} value={rm._id}>{icon} {rm.name} ({rm.sku})</option>
+                        );
+                      })}
+                    </select>
+                  ) : (
+                    <TextInput
+                      style={styles.formInputText}
+                      placeholder="RM ID"
+                      placeholderTextColor={colors.text.muted}
+                      value={item.rawMaterialId}
+                      onChangeText={(val) => handleIngredientChange(idx, 'rawMaterialId', val)}
+                    />
+                  )}
+                </View>
+                <View style={[styles.formInput, { flex: 1, height: 42 }]}>
+                  <TextInput
+                    style={styles.formInputText}
+                    placeholder="e.g. 60%"
+                    placeholderTextColor={colors.text.muted}
+                    value={item.qtyRequired}
+                    onChangeText={(val) => handleIngredientChange(idx, 'qtyRequired', val)}
+                    keyboardType="numeric"
+                  />
+                  <Text style={{ fontSize: 12, color: colors.text.muted, marginRight: 8, fontWeight: '700' }}>%</Text>
+                </View>
+                <TouchableOpacity onPress={() => handleRemoveIngredientRow(idx)}>
+                  <Ionicons name="remove-circle" size={22} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, marginBottom: 16, alignSelf: 'flex-start' }}
+            onPress={() => handleAddIngredientRow('formulation')}
+          >
+            <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Formulation Raw Material (% Ratio)</Text>
+          </TouchableOpacity>
+
+          {/* Section 2: Packaging Materials */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>📦 Packaging & Primary Materials (Per-Unit Pcs):</Text>
+          <Text style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 8 }}>
+            Bottles, caps, labels, outer cartons (e.g. 1 bottle per unit produced, 0.1 box per unit).
+          </Text>
+          {bomIngredients.map((item, idx) => {
+            if (item.itemType !== 'packaging') return null;
+            const packagingMaterials = materials.filter(rm => !rm.category || rm.category === 'Packaging' || rm.category === 'General');
+            return (
+              <View key={`ing-pkg-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <View style={[styles.formInput, { flex: 2, height: 42 }]}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={item.rawMaterialId}
+                      onChange={(e: any) => handleIngredientChange(idx, 'rawMaterialId', e.target.value)}
+                      style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                    >
+                      <option value="">-- Select Packaging Material --</option>
+                      {packagingMaterials.map(rm => (
+                        <option key={rm._id} value={rm._id}>📦 {rm.name} ({rm.sku})</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TextInput
+                      style={styles.formInputText}
+                      placeholder="Packaging Material ID"
+                      placeholderTextColor={colors.text.muted}
+                      value={item.rawMaterialId}
+                      onChangeText={(val) => handleIngredientChange(idx, 'rawMaterialId', val)}
+                    />
+                  )}
+                </View>
+                <View style={[styles.formInput, { flex: 1, height: 42 }]}>
+                  <TextInput
+                    style={styles.formInputText}
+                    placeholder="e.g. 1"
+                    placeholderTextColor={colors.text.muted}
+                    value={item.qtyRequired}
+                    onChangeText={(val) => handleIngredientChange(idx, 'qtyRequired', val)}
+                    keyboardType="numeric"
+                  />
+                  <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 6, fontWeight: '700' }}>Pcs/unit</Text>
+                </View>
+                <TouchableOpacity onPress={() => handleRemoveIngredientRow(idx)}>
+                  <Ionicons name="remove-circle" size={22} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, alignSelf: 'flex-start' }}
+            onPress={() => handleAddIngredientRow('packaging')}
+          >
+            <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Packaging Material (Pcs/Unit)</Text>
+          </TouchableOpacity>
+
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 20, marginBottom: 8 }}>Configured Process Stages / Timelines:</Text>
+          {bomStages.map((item, idx) => (
+            <View key={`stage-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <View style={[styles.formInput, { flex: 2, height: 42 }]}>
+                <TextInput
+                  style={styles.formInputText}
+                  placeholder="e.g. Clay-Sealed Fermentation"
+                  placeholderTextColor={colors.text.muted}
+                  value={item.name}
+                  onChangeText={(val) => handleStageChange(idx, 'name', val)}
+                />
+              </View>
+              <View style={[styles.formInput, { flex: 1, height: 42 }]}>
+                <TextInput
+                  style={styles.formInputText}
+                  placeholder="Days"
+                  placeholderTextColor={colors.text.muted}
+                  value={item.targetDurationDays}
+                  onChangeText={(val) => handleStageChange(idx, 'targetDurationDays', val)}
+                  keyboardType="numeric"
+                />
+              </View>
+              <TouchableOpacity onPress={() => handleRemoveStageRow(idx)}>
+                <Ionicons name="remove-circle" size={22} color={colors.danger} />
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, alignSelf: 'flex-start', marginBottom: 20 }}
+            onPress={handleAddStageRow}
+          >
+            <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Stage</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: colors.bg.secondary,
+              borderColor: colors.border,
+              borderWidth: 1,
+              borderRadius: 8,
+              paddingVertical: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: 6,
+              marginTop: 10,
+              marginBottom: 20
+            }}
+            onPress={() => setActiveFormTab('basic')}
+          >
+            <Ionicons name="arrow-back-outline" size={16} color={colors.text.secondary} />
+            <Text style={{ color: colors.text.secondary, fontWeight: '700', fontSize: 13 }}>Back to Product Details</Text>
+          </TouchableOpacity>
+          </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>

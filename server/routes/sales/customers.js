@@ -22,11 +22,14 @@ router.get('/', async (req, res) => {
     }
 
     const customers = await Customer.find(filter).sort({ createdAt: -1 }).lean();
-    const sanitized = customers.map(c => {
-      c.kachhaBalance = 0;
-      return c;
-    });
-    res.json(sanitized);
+    if (!req.user || !req.user.canAccessCash) {
+      const sanitized = customers.map(c => {
+        c.cashBalance = 0;
+        return c;
+      });
+      return res.json(sanitized);
+    }
+    res.json(customers);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -36,10 +39,14 @@ router.get('/', async (req, res) => {
 router.post('/', validate(schemas.customerSchema), async (req, res) => {
   try {
     const data = { ...req.body };
-    delete data.kachhaBalance;
+    if (!req.user || !req.user.canAccessCash) {
+      delete data.cashBalance;
+    }
     const customer = await Customer.create(data);
     const doc = customer.toObject();
-    doc.kachhaBalance = 0;
+    if (!req.user || !req.user.canAccessCash) {
+      doc.cashBalance = 0;
+    }
     res.status(201).json(doc);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -50,7 +57,9 @@ router.post('/', validate(schemas.customerSchema), async (req, res) => {
 router.put('/:id', validate(schemas.customerSchema.partial()), async (req, res) => {
   try {
     const data = { ...req.body };
-    delete data.kachhaBalance;
+    if (!req.user || !req.user.canAccessCash) {
+      delete data.cashBalance;
+    }
     const customer = await Customer.findByIdAndUpdate(
       req.params.id,
       data,
@@ -58,7 +67,9 @@ router.put('/:id', validate(schemas.customerSchema.partial()), async (req, res) 
     );
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
     const doc = customer.toObject();
-    doc.kachhaBalance = 0;
+    if (!req.user || !req.user.canAccessCash) {
+      doc.cashBalance = 0;
+    }
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: err.message });

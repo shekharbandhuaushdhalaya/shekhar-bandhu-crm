@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, TextInput, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, TextInput, ActivityIndicator, Alert, Modal, DeviceEventEmitter, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
 import { api, Order } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
@@ -12,6 +13,9 @@ export default function OrdersScreen() {
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'processing' | 'shipped' | 'delivered'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Detail Modal State
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Edit Order States
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -28,6 +32,13 @@ export default function OrdersScreen() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { showToast } = useToast();
+  const router = useRouter();
+
+  const handleCreateChallan = (order: Order) => {
+    setSelectedOrder(null);
+    DeviceEventEmitter.emit('prefill_challan', order);
+    router.push('/stockmovements');
+  };
 
   const load = useCallback(async () => {
     try {
@@ -54,6 +65,10 @@ export default function OrdersScreen() {
     try {
       await api.updateOrderStatus(id, newStatus);
       await load();
+      if (selectedOrder && selectedOrder._id === id) {
+        setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+      }
+      showToast(`Order status updated to ${newStatus.toUpperCase()}`, 'success');
     } catch (err: any) {
       showToast('Failed to update order status: ' + err.message, 'error');
     } finally {
@@ -107,6 +122,19 @@ export default function OrdersScreen() {
       });
       setEditingOrder(null);
       await load();
+      if (selectedOrder && selectedOrder._id === editingOrder._id) {
+        setSelectedOrder(prev => prev ? {
+          ...prev,
+          name: editName,
+          email: editEmail,
+          phone: editPhone,
+          shippingAddress: editAddress,
+          courierName: editCourierName,
+          trackingId: editTrackingId,
+          courierLink: editCourierLink,
+          adminNotes: editAdminNotes
+        } as any : null);
+      }
       showToast('Order details updated successfully.', 'success');
     } catch (err: any) {
       showToast('Failed to save order details: ' + err.message, 'error');
@@ -143,12 +171,23 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* Search & Tabs Topbar */}
-      <View style={styles.topBar}>
-        <View style={styles.searchBar}>
+      {/* Integrated Search & Filter Header */}
+      <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xs }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.bg.card,
+          paddingHorizontal: 12,
+          paddingRight: 8,
+          borderRadius: Radius.md,
+          borderWidth: 1,
+          borderColor: colors.border,
+          gap: 10,
+          minHeight: 46
+        }}>
           <Ionicons name="search" size={18} color={colors.text.muted} />
           <TextInput
-            style={styles.searchInput}
+            style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 100 }}
             placeholder="Search orders by customer, tracking, address..."
             placeholderTextColor={colors.text.muted}
             value={search}
@@ -159,178 +198,300 @@ export default function OrdersScreen() {
               <Ionicons name="close-circle" size={18} color={colors.text.muted} />
             </TouchableOpacity>
           ) : null}
+
+          {/* Status Dropdown inside search bar */}
+          {Platform.OS === 'web' ? (
+            <select
+              value={activeTab}
+              onChange={(e: any) => setActiveTab(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: `1px solid ${colors.border}`,
+                backgroundColor: colors.bg.secondary,
+                color: colors.text.primary,
+                fontSize: 12,
+                fontWeight: '600',
+                outline: 'none',
+                height: 34,
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all">All Statuses ({orders.length})</option>
+              <option value="pending">Pending ({orders.filter(o => o.status === 'pending').length})</option>
+              <option value="processing">Processing ({orders.filter(o => o.status === 'processing').length})</option>
+              <option value="shipped">Shipped ({orders.filter(o => o.status === 'shipped').length})</option>
+              <option value="delivered">Delivered ({orders.filter(o => o.status === 'delivered').length})</option>
+            </select>
+          ) : (
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: colors.bg.secondary,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 6,
+                paddingHorizontal: 10,
+                height: 34,
+                gap: 6
+              }}
+              onPress={() => {
+                const opts = [
+                  { label: `All Statuses (${orders.length})`, val: 'all' },
+                  { label: `Pending (${orders.filter(o => o.status === 'pending').length})`, val: 'pending' },
+                  { label: `Processing (${orders.filter(o => o.status === 'processing').length})`, val: 'processing' },
+                  { label: `Shipped (${orders.filter(o => o.status === 'shipped').length})`, val: 'shipped' },
+                  { label: `Delivered (${orders.filter(o => o.status === 'delivered').length})`, val: 'delivered' },
+                ];
+                Alert.alert('Filter Status', '', opts.map(o => ({
+                  text: o.label,
+                  onPress: () => setActiveTab(o.val as any)
+                })));
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+                {activeTab.toUpperCase()} ({activeTab === 'all' ? orders.length : orders.filter(o => o.status === activeTab).length})
+              </Text>
+              <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        {(['all', 'pending', 'processing', 'shipped', 'delivered'] as const).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabBtnText, activeTab === tab && styles.tabBtnTextActive]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
-            {tab !== 'all' && (
-              <View style={[styles.badge, { backgroundColor: getStatusColor(tab) + '20' }]}>
-                <Text style={[styles.badgeText, { color: getStatusColor(tab) }]}>
-                  {orders.filter(o => o.status === tab).length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Orders List */}
+      {/* Orders Table Container */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.md }}
+        contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        {filteredOrders.map(o => (
-          <View key={o._id} style={[styles.orderCard, { borderLeftColor: getStatusColor(o.status), borderLeftWidth: 4 }]}>
-            {/* Header info */}
-            <View style={styles.cardHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.orderIdText} numberOfLines={1}>Order ID: {o._id}</Text>
-                <Text style={styles.orderDate}>
-                  {new Date(o.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1 }}>
+          <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
+            {/* Table Header */}
+            <View style={styles.tableHeaderRow}>
+              <View style={[styles.tableHeaderCellContainer, { width: 140 }]}>
+                <Text style={styles.tableHeaderCell}>Order &amp; Date</Text>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(o.status) + '15', borderColor: getStatusColor(o.status) }]}>
-                <Text style={[styles.statusBadgeText, { color: getStatusColor(o.status) }]}>
-                  {o.status.toUpperCase()}
-                </Text>
+              <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}>
+                <Text style={styles.tableHeaderCell}>Customer</Text>
+              </View>
+              <View style={[styles.tableHeaderCellContainer, { flex: 1.2, minWidth: 140 }]}>
+                <Text style={styles.tableHeaderCell}>Items</Text>
+              </View>
+              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}>
+                <Text style={styles.tableHeaderCell}>Amount</Text>
+              </View>
+              <View style={[styles.tableHeaderCellContainer, { width: 130 }]}>
+                <Text style={styles.tableHeaderCell}>Status</Text>
+              </View>
+              <View style={[styles.tableHeaderCellContainer, { width: 190, borderRightWidth: 0 }]}>
+                <Text style={styles.tableHeaderCell}>Action</Text>
               </View>
             </View>
 
-            {/* Customer Information */}
-            <View style={styles.customerBox}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <Text style={styles.boxTitle}>Customer Details:</Text>
-                <TouchableOpacity style={styles.editBtn} onPress={() => handleOpenEdit(o)}>
-                  <Ionicons name="pencil-outline" size={13} color={colors.primary} />
-                  <Text style={styles.editBtnText}>Edit Order</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.customerName}>{o.name}</Text>
-              <Text style={styles.customerContact}>📞 {o.phone}  |  ✉️ {o.email}</Text>
-              <Text style={styles.customerAddress}>📍 {o.shippingAddress}</Text>
-            </View>
-
-            {/* Courier & Delivery Info */}
-            {((o as any).courierName || (o as any).trackingId || (o as any).adminNotes) ? (
-              <View style={styles.courierBox}>
-                <Text style={styles.boxTitle}>Courier &amp; Tracking Details:</Text>
-                {(o as any).courierName ? <Text style={styles.courierInfoText}>Courier Service: <Text style={{ fontWeight: '700' }}>{(o as any).courierName}</Text></Text> : null}
-                {(o as any).trackingId ? <Text style={styles.courierInfoText}>Tracking / AWB No: <Text style={{ fontWeight: '700', fontFamily: 'monospace' }}>{(o as any).trackingId}</Text></Text> : null}
-                {(o as any).courierLink ? <Text style={[styles.courierInfoText, { color: colors.primary }]} numberOfLines={1}>Tracking Link: {(o as any).courierLink}</Text> : null}
-                {(o as any).adminNotes ? <Text style={[styles.courierInfoText, { fontStyle: 'italic', color: colors.text.secondary, marginTop: 4 }]}>Admin Notes: {(o as any).adminNotes}</Text> : null}
-              </View>
-            ) : null}
-
-            {/* Dispatch Alerts Logs */}
-            {o.notifications && o.notifications.length > 0 ? (
-              <View style={[styles.courierBox, { borderLeftColor: colors.info, backgroundColor: colors.info + '05', marginTop: 0, marginBottom: 12 }]}>
-                <Text style={[styles.boxTitle, { color: colors.info, fontWeight: '800' }]}>🔔 Automated Dispatch Log:</Text>
-                {o.notifications.map((note, idx) => {
-                  const parts = note.split(':: ');
-                  const time = parts[0] ? new Date(parts[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(parts[0]).toLocaleDateString([], { day: 'numeric', month: 'short' }) : '';
-                  const msg = parts[1] || note;
-                  return (
-                    <View key={idx} style={{ marginTop: 6, borderBottomWidth: idx < o.notifications.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, paddingBottom: 6 }}>
-                      <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '700' }}>DISPATCHED AT {time.toUpperCase()}</Text>
-                      <Text style={{ fontSize: 11, color: colors.text.primary, marginTop: 2, lineHeight: 16 }}>{msg}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : null}
-
-            {/* Items table */}
-            <View style={styles.itemsBox}>
-              <Text style={styles.boxTitle}>Order Items:</Text>
-              {o.items.map((item, index) => (
-                <View key={index} style={styles.itemRow}>
-                  <Text style={styles.itemNameText}>• {item.name} ({item.size})</Text>
-                  <Text style={styles.itemQtyPriceText}>x{item.qty}  @  ₹{item.price}</Text>
+            {/* Table Body Rows */}
+            {filteredOrders.map(o => {
+              const statusColor = getStatusColor(o.status);
+              return (
+                <TouchableOpacity
+                  key={o._id}
+                  style={[
+                    styles.tableBodyRow,
+                    {
+                      backgroundColor: statusColor + '0A',
+                      borderLeftWidth: 4,
+                      borderLeftColor: statusColor
+                    }
+                  ]}
+                  onPress={() => setSelectedOrder(o)}
+                >
+                <View style={[styles.tableCellContainer, { width: 140 }]}>
+                  <Text style={styles.orderIdText} numberOfLines={1}>#{o._id.slice(-6)}</Text>
+                  <Text style={styles.orderDate}>{new Date(o.createdAt).toLocaleDateString('en-IN')}</Text>
                 </View>
-              ))}
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Total Payment:</Text>
-                <Text style={styles.totalValue}>₹{o.totalAmount}</Text>
-              </View>
-            </View>
 
-            {/* Footer Actions */}
-            <View style={styles.cardActions}>
-              {actionLoading === o._id ? (
-                <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 8 }} />
-              ) : (
-                <>
-                  {/* Generate Sale Invoice (Draft) */}
-                  <TouchableOpacity 
-                    style={[styles.primaryActionBtn, { backgroundColor: colors.info, marginRight: 'auto' }]} 
-                    onPress={() => handleGenerateInvoice(o._id)}
+                <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
+                  <Text style={styles.primaryText} numberOfLines={1}>{o.name}</Text>
+                  <Text style={styles.subText} numberOfLines={1}>📞 {o.phone}</Text>
+                </View>
+
+                <View style={[styles.tableCellContainer, { flex: 1.2, minWidth: 140 }]}>
+                  <Text style={styles.primaryText}>{o.items.length} {o.items.length === 1 ? 'Item' : 'Items'}</Text>
+                  <Text style={styles.subText} numberOfLines={1}>{o.items.map(i => i.name).join(', ')}</Text>
+                </View>
+
+                <View style={[styles.tableCellContainer, { width: 120 }]}>
+                  <Text style={[styles.primaryText, { color: colors.success, fontWeight: '800' }]}>₹{(o.totalAmount || 0).toLocaleString('en-IN')}</Text>
+                </View>
+
+                <View style={[styles.tableCellContainer, { width: 130 }]}>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(o.status) + '15', borderColor: getStatusColor(o.status) }]}>
+                    <Text style={[styles.statusBadgeText, { color: getStatusColor(o.status) }]}>
+                      {o.status.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[styles.tableCellContainer, { width: 190, borderRightWidth: 0, flexDirection: 'row', gap: 6 }]}>
+                  <TouchableOpacity
+                    style={[styles.actionPillBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                    onPress={() => setSelectedOrder(o)}
                   >
-                    <Ionicons name="document-text-outline" size={14} color="#fff" />
-                    <Text style={styles.primaryActionBtnText}>Generate Invoice</Text>
+                    <Ionicons name="eye-outline" size={13} color={colors.primary} />
+                    <Text style={[styles.actionPillText, { color: colors.primary }]}>View</Text>
                   </TouchableOpacity>
 
-                  {o.status === 'pending' && (
-                    <TouchableOpacity 
-                      style={[styles.primaryActionBtn, { backgroundColor: colors.warning }]} 
-                      onPress={() => handleUpdateStatus(o._id, 'processing')}
-                    >
-                      <Ionicons name="cog-outline" size={14} color="#fff" />
-                      <Text style={styles.primaryActionBtnText}>Start Processing</Text>
-                    </TouchableOpacity>
-                  )}
-                  {o.status === 'processing' && (
-                    <TouchableOpacity 
-                      style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]} 
-                      onPress={() => handleUpdateStatus(o._id, 'shipped')}
-                    >
-                      <Ionicons name="airplane-outline" size={14} color="#fff" />
-                      <Text style={styles.primaryActionBtnText}>Mark Shipped</Text>
-                    </TouchableOpacity>
-                  )}
-                  {o.status === 'shipped' && (
-                    <TouchableOpacity 
-                      style={[styles.primaryActionBtn, { backgroundColor: colors.success }]} 
-                      onPress={() => handleUpdateStatus(o._id, 'delivered')}
-                    >
-                      <Ionicons name="checkmark-done-circle" size={14} color="#fff" />
-                      <Text style={styles.primaryActionBtnText}>Mark Delivered</Text>
-                    </TouchableOpacity>
-                  )}
-                  {o.status === 'delivered' && (
-                    <View style={styles.successLabel}>
-                      <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                      <Text style={styles.successLabelText}>Delivered successfully</Text>
-                    </View>
-                  )}
-                </>
-              )}
-            </View>
+                  <TouchableOpacity
+                    style={[styles.actionPillBtn, { backgroundColor: '#0d948815', borderColor: '#0d9488' }]}
+                    onPress={() => handleCreateChallan(o)}
+                  >
+                    <Ionicons name="document-attach-outline" size={13} color="#0d9488" />
+                    <Text style={[styles.actionPillText, { color: '#0d9488' }]}>Challan</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
           </View>
-        ))}
+        </ScrollView>
 
         {filteredOrders.length === 0 && (
           <View style={styles.emptyContainer}>
-            <Ionicons name="cart-outline" size={48} color={colors.text.muted} />
+            <Ionicons name="cart-outline" size={40} color={colors.text.muted} />
             <Text style={styles.emptyTitle}>No Orders Found</Text>
             <Text style={styles.emptySubtitle}>
-              {activeTab === 'all' 
-                ? 'No B2B orders have been placed yet.' 
+              {activeTab === 'all'
+                ? 'No B2B orders have been placed yet.'
                 : `No orders with status "${activeTab}" found.`}
             </Text>
           </View>
         )}
       </ScrollView>
+
+      {/* Order Detail Modal Drawer */}
+      {selectedOrder && (
+        <Modal
+          visible={selectedOrder !== null}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setSelectedOrder(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 650 }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>Order Details: #{selectedOrder._id}</Text>
+                  <Text style={{ fontSize: 11, color: colors.text.muted }}>
+                    Placed on {new Date(selectedOrder.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedOrder(null)}>
+                  <Ionicons name="close" size={22} color={colors.text.primary} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ padding: Spacing.lg }} contentContainerStyle={{ gap: 12 }}>
+                {/* Status Bar */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>ORDER STATUS</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedOrder.status) + '15', borderColor: getStatusColor(selectedOrder.status) }]}>
+                    <Text style={[styles.statusBadgeText, { color: getStatusColor(selectedOrder.status) }]}>
+                      {selectedOrder.status.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Customer Details Card */}
+                <View style={styles.customerBox}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={styles.boxTitle}>Customer Contact Details</Text>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => { handleOpenEdit(selectedOrder); }}>
+                      <Ionicons name="pencil-outline" size={13} color={colors.primary} />
+                      <Text style={styles.editBtnText}>Edit</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.customerName}>{selectedOrder.name}</Text>
+                  <Text style={styles.customerContact}>📞 {selectedOrder.phone}  |  ✉️ {selectedOrder.email}</Text>
+                  <Text style={styles.customerAddress}>📍 {selectedOrder.shippingAddress}</Text>
+                </View>
+
+                {/* Logistics & Tracking */}
+                {((selectedOrder as any).courierName || (selectedOrder as any).trackingId || (selectedOrder as any).adminNotes) ? (
+                  <View style={styles.courierBox}>
+                    <Text style={styles.boxTitle}>Courier &amp; Delivery Tracking Details</Text>
+                    {(selectedOrder as any).courierName ? <Text style={styles.courierInfoText}>Courier Service: <Text style={{ fontWeight: '700' }}>{(selectedOrder as any).courierName}</Text></Text> : null}
+                    {(selectedOrder as any).trackingId ? <Text style={styles.courierInfoText}>Tracking / AWB No: <Text style={{ fontWeight: '700', fontFamily: 'monospace' }}>{(selectedOrder as any).trackingId}</Text></Text> : null}
+                    {(selectedOrder as any).courierLink ? <Text style={[styles.courierInfoText, { color: colors.primary }]} numberOfLines={1}>Link: {(selectedOrder as any).courierLink}</Text> : null}
+                    {(selectedOrder as any).adminNotes ? <Text style={[styles.courierInfoText, { fontStyle: 'italic', color: colors.text.secondary, marginTop: 4 }]}>Notes: {(selectedOrder as any).adminNotes}</Text> : null}
+                  </View>
+                ) : null}
+
+                {/* Items Breakdown */}
+                <View style={styles.itemsBox}>
+                  <Text style={styles.boxTitle}>Ordered Items Breakdown</Text>
+                  {selectedOrder.items.map((item, index) => (
+                    <View key={index} style={styles.itemRow}>
+                      <Text style={styles.itemNameText}>• {item.name} ({item.size})</Text>
+                      <Text style={styles.itemQtyPriceText}>x{item.qty}  @  ₹{item.price}</Text>
+                    </View>
+                  ))}
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>Total Payment Amount:</Text>
+                    <Text style={styles.totalValue}>₹{(selectedOrder.totalAmount || 0).toLocaleString('en-IN')}</Text>
+                  </View>
+                </View>
+
+                {/* Quick Process Actions */}
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                  <TouchableOpacity
+                    style={[styles.primaryActionBtn, { backgroundColor: '#0d9488', flex: 1 }]}
+                    onPress={() => handleCreateChallan(selectedOrder)}
+                  >
+                    <Ionicons name="document-attach-outline" size={14} color="#fff" />
+                    <Text style={styles.primaryActionBtnText}>Create Challan</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.primaryActionBtn, { backgroundColor: colors.info, flex: 1 }]}
+                    onPress={() => handleGenerateInvoice(selectedOrder._id)}
+                  >
+                    <Ionicons name="document-text-outline" size={14} color="#fff" />
+                    <Text style={styles.primaryActionBtnText}>Generate Invoice</Text>
+                  </TouchableOpacity>
+
+                  {selectedOrder.status === 'pending' && (
+                    <TouchableOpacity
+                      style={[styles.primaryActionBtn, { backgroundColor: colors.warning, flex: 1 }]}
+                      onPress={() => handleUpdateStatus(selectedOrder._id, 'processing')}
+                    >
+                      <Ionicons name="cog-outline" size={14} color="#fff" />
+                      <Text style={styles.primaryActionBtnText}>Start Processing</Text>
+                    </TouchableOpacity>
+                  )}
+                  {selectedOrder.status === 'processing' && (
+                    <TouchableOpacity
+                      style={[styles.primaryActionBtn, { backgroundColor: colors.primary, flex: 1 }]}
+                      onPress={() => handleUpdateStatus(selectedOrder._id, 'shipped')}
+                    >
+                      <Ionicons name="airplane-outline" size={14} color="#fff" />
+                      <Text style={styles.primaryActionBtnText}>Mark Shipped</Text>
+                    </TouchableOpacity>
+                  )}
+                  {selectedOrder.status === 'shipped' && (
+                    <TouchableOpacity
+                      style={[styles.primaryActionBtn, { backgroundColor: colors.success, flex: 1 }]}
+                      onPress={() => handleUpdateStatus(selectedOrder._id, 'delivered')}
+                    >
+                      <Ionicons name="checkmark-done-circle" size={14} color="#fff" />
+                      <Text style={styles.primaryActionBtnText}>Mark Delivered</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* Edit Details Modal */}
       <Modal
@@ -350,7 +511,7 @@ export default function OrdersScreen() {
 
             <ScrollView contentContainerStyle={styles.modalBody}>
               <Text style={styles.sectionHeaderTitle}>Customer Contact Info</Text>
-              
+
               <View style={styles.formGroup}>
                 <Text style={styles.inputLabel}>Customer Name</Text>
                 <TextInput
@@ -450,14 +611,14 @@ export default function OrdersScreen() {
             </ScrollView>
 
             <View style={styles.modalFooter}>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.cancelBtn]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.cancelBtn]}
                 onPress={() => setEditingOrder(null)}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.saveBtn]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.saveBtn]}
                 onPress={handleSaveEdit}
                 disabled={savingEdit}
               >
@@ -477,52 +638,54 @@ export default function OrdersScreen() {
 
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
-  topBar: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.sm },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 44 },
-  searchInput: { flex: 1, height: '100%', color: colors.text.primary, fontSize: 14, marginLeft: 8 },
-  tabsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  tabBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border },
-  tabBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabBtnText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
-  tabBtnTextActive: { color: '#fff', fontWeight: '700' },
-  badge: { marginLeft: 6, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 },
-  badgeText: { fontSize: 10, fontWeight: '700' },
-  orderCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card, marginBottom: Spacing.md },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  orderIdText: { fontSize: 14, fontWeight: '700', color: colors.text.primary, fontFamily: 'monospace' },
+
+  // Table styles
+  table: { flex: 1, width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
+  tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
+  tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, justifyContent: 'center' },
+  
+  primaryText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+  subText: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  orderIdText: { fontSize: 13, fontWeight: '800', color: colors.text.primary, fontFamily: 'monospace' },
   orderDate: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
-  statusBadge: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+
+  statusBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignItems: 'center' },
   statusBadgeText: { fontSize: 9, fontWeight: '800' },
-  customerBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 12 },
-  boxTitle: { fontSize: 11, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' },
+  
+  actionPillBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, borderWidth: 1 },
+  actionPillText: { fontSize: 11, fontWeight: '700' },
+
+  customerBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 4 },
+  boxTitle: { fontSize: 11, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', marginBottom: 4 },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   editBtnText: { fontSize: 11, fontWeight: '700', color: colors.primary },
   customerName: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
   customerContact: { fontSize: 12, color: colors.text.secondary, marginVertical: 3 },
   customerAddress: { fontSize: 12, color: colors.text.secondary },
-  
-  // Courier Box styles
-  courierBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: colors.warning },
+
+  courierBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 4, borderLeftWidth: 3, borderLeftColor: colors.warning },
   courierInfoText: { fontSize: 12, color: colors.text.primary, marginVertical: 2 },
 
-  itemsBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 12 },
+  itemsBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 4 },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   itemNameText: { fontSize: 13, color: colors.text.primary, flex: 1 },
   itemQtyPriceText: { fontSize: 12, color: colors.text.secondary, marginLeft: 8 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, marginTop: 8, paddingTop: 8 },
   totalLabel: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   totalValue: { fontSize: 14, fontWeight: '800', color: colors.primary },
-  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
-  primaryActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.sm },
+  
+  primaryActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.sm },
   primaryActionBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  successLabel: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
-  successLabelText: { color: colors.success, fontSize: 12, fontWeight: '700' },
-  emptyContainer: { alignItems: 'center', paddingVertical: 80, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+
+  emptyContainer: { alignItems: 'center', paddingVertical: 60, gap: 10 },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
   emptySubtitle: { fontSize: 13, color: colors.text.muted, textAlign: 'center', paddingHorizontal: 20 },
 
   // Edit Modal Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
   modalContent: { backgroundColor: colors.bg.card, width: '100%', maxWidth: 500, maxHeight: '90%', borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.hover },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
   modalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },

@@ -32,19 +32,24 @@ router.get('/', async (req, res) => {
 // POST /api/raw-materials — Create raw material definition
 router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
   try {
-    const { name, sku, unit, minReorder } = req.body;
-    if (!name || !sku) {
-      return res.status(400).json({ error: 'Name and SKU are required' });
+    const { name, unit, minReorder } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
     }
 
-    const existing = await RawMaterial.findOne({ sku });
-    if (existing) {
-      return res.status(400).json({ error: `Raw material with SKU ${sku} already exists` });
+    const { generateRawMaterialSku } = require('../../utils/skuGenerator');
+    let computedSku = generateRawMaterialSku(name);
+    let skuConflict = await RawMaterial.findOne({ sku: computedSku }).lean();
+    let counter = 1;
+    while (skuConflict) {
+      computedSku = `${generateRawMaterialSku(name)}-${counter}`;
+      skuConflict = await RawMaterial.findOne({ sku: computedSku }).lean();
+      counter++;
     }
 
     const newRM = await RawMaterial.create({
       name: name.trim(),
-      sku: sku.trim().toUpperCase(),
+      sku: computedSku,
       unit: unit || 'kg',
       minReorder: Number(minReorder) || 0
     });
@@ -58,10 +63,21 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
 // PUT /api/raw-materials/:id — Update raw material definition
 router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, res) => {
   try {
-    const { name, sku, unit, minReorder } = req.body;
+    const { name, unit, minReorder } = req.body;
     const updateFields = {};
-    if (name !== undefined) updateFields.name = name.trim();
-    if (sku !== undefined) updateFields.sku = sku.trim().toUpperCase();
+    if (name !== undefined) {
+      updateFields.name = name.trim();
+      const { generateRawMaterialSku } = require('../../utils/skuGenerator');
+      let computedSku = generateRawMaterialSku(name);
+      let skuConflict = await RawMaterial.findOne({ sku: computedSku, _id: { $ne: req.params.id } }).lean();
+      let counter = 1;
+      while (skuConflict) {
+        computedSku = `${generateRawMaterialSku(name)}-${counter}`;
+        skuConflict = await RawMaterial.findOne({ sku: computedSku, _id: { $ne: req.params.id } }).lean();
+        counter++;
+      }
+      updateFields.sku = computedSku;
+    }
     if (unit !== undefined) updateFields.unit = unit;
     if (minReorder !== undefined) updateFields.minReorder = Number(minReorder) || 0;
 
@@ -228,6 +244,77 @@ router.get('/:id/genealogy', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/raw-materials/purchases — List purchases grouped by purchaseRef
+router.get('/purchases/list', async (req, res) => {
+  try {
+    const entries = await RawMaterialEntry.find({ purchaseRef: { $ne: '' } })
+      .populate('rawMaterialId', 'name sku unit')
+      .populate('vendorId', 'name company')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const groups = {};
+    entries.forEach(e => {
+      const ref = e.purchaseRef;
+      if (!groups[ref]) {
+        groups[ref] = { purchaseRef: ref, createdAt: e.createdAt, items: [], vendors: new Set() };
+      }
+      groups[ref].items.push(e);
+      if (e.vendorName) groups[ref].vendors.add(e.vendorName);
+    });
+
+    const result = Object.values(groups).map((g) => ({
+      ...g,
+      vendors: Array.from(g.vendors),
+      itemCount: g.items.length,
+      totalQty: g.items.reduce((s, i) => s + (i.qty || 0), 0),
+      totalCost: g.items.reduce((s, i) => s + ((i.qty || 0) * (i.purchaseRate || 0)), 0),
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/raw-materials/purchase — Create a bulk purchase (creates RawMaterialEntry records)
+router.post('/purchase', async (req, res) => {
+  try {
+    const { vendorId, vendorName, date, items } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'At least one item is required' });
+    }
+
+    // Generate purchase reference
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const count = await RawMaterialEntry.countDocuments({ purchaseRef: { $regex: `^PR-${dateStr}` } });
+    const purchaseRef = `PR-${dateStr}-${String(count + 1).padStart(3, '0')}`;
+
+    const created = [];
+    for (const item of items) {
+      if (!item.rawMaterialId || !item.batchNo || !item.qty) {
+        continue;
+      }
+      const entry = await RawMaterialEntry.create({
+        rawMaterialId: item.rawMaterialId,
+        batchNo: item.batchNo.trim().toUpperCase(),
+        qty: Number(item.qty),
+        purchaseRate: Number(item.purchaseRate) || 0,
+        vendorId: vendorId || undefined,
+        vendorName: vendorName || item.vendorName || '',
+        expiryDate: item.expiryDate || undefined,
+        purchaseRef,
+      });
+      created.push(entry);
+    }
+
+    res.status(201).json({ purchaseRef, entries: created });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

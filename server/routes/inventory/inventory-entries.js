@@ -25,6 +25,7 @@ router.get('/', async (req, res) => {
         { colour: { $regex: search, $options: 'i' } },
         { shape: { $regex: search, $options: 'i' } },
         { vendorName: { $regex: search, $options: 'i' } },
+        { batchNo: { $regex: search, $options: 'i' } },
       ];
     }
     const entries = await InventoryEntry.find(filter).sort({ updatedAt: -1 }).lean();
@@ -50,6 +51,7 @@ router.get('/consolidated', async (req, res) => {
         { colour: { $regex: search, $options: 'i' } },
         { shape: { $regex: search, $options: 'i' } },
         { vendorName: { $regex: search, $options: 'i' } },
+        { batchNo: { $regex: search, $options: 'i' } },
       ];
     }
 

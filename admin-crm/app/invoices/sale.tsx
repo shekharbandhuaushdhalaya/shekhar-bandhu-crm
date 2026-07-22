@@ -426,6 +426,8 @@ const shareInvoiceOnWhatsApp = (invoice: Invoice, customers: Customer[]) => {
 interface ExtendedInvoiceItem extends InvoiceItem {
   maxQty?: number;
   rateText?: string;
+  mrpText?: string;
+  discountText?: string;
 }
 
 const toTitleCase = (str?: string) => {
@@ -458,6 +460,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
+  const perm = usePermission();
 
   if (!invoice) return null;
 
@@ -619,8 +622,24 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
             
             {invoice.mode === 'pakka' && ((invoice.cgst || 0) > 0 || (invoice.sgst || 0) > 0 || (invoice.igst || 0) > 0) ? (
               <View style={{ borderTopWidth: 2, borderTopColor: colors.border, paddingTop: 10, marginTop: 4, gap: 6, paddingBottom: 10 }}>
+                {(invoice.totalMrp || 0) > 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={[styles.itemNameText, { fontSize: 12, color: colors.text.muted }]}>Total Item MRP</Text>
+                    <Text style={[styles.itemQtyText, { fontSize: 12, color: colors.text.muted }]}>
+                      ₹{(invoice.totalMrp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                )}
+                {(invoice.totalDiscount || 0) > 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={[styles.itemNameText, { fontSize: 12, fontWeight: '600', color: colors.success }]}>Total Discount Saved</Text>
+                    <Text style={[styles.itemQtyText, { fontSize: 12, fontWeight: '700', color: colors.success }]}>
+                      - ₹{(invoice.totalDiscount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                )}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={[styles.itemNameText, { fontSize: 12, color: colors.text.secondary }]}>Base Amount</Text>
+                  <Text style={[styles.itemNameText, { fontSize: 12, color: colors.text.secondary }]}>Taxable Base Amount</Text>
                   <Text style={[styles.itemQtyText, { fontSize: 12, color: colors.text.secondary }]}>
                     ₹{(invoice.baseAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
@@ -872,6 +891,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           name: it.name,
           qty: it.boxes !== undefined ? it.boxes : it.qty,
           boxes: it.boxes !== undefined ? it.boxes : it.qty,
+          mrp: it.mrp || it.rate || 0,
+          mrpText: (it.mrp || it.rate || 0).toString(),
+          discountPercent: it.discountPercent || 0,
+          discountText: (it.discountPercent || 0).toString(),
           rate: it.rate,
           rateText: it.rate.toString(),
           packing: it.packing || 1,
@@ -900,6 +923,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         setItemSearchText('');
         setCustomerState('Uttar Pradesh');
         setOverridePaymentTerms(false);
+
       }
 
       const loadData = async () => {
@@ -1012,17 +1036,12 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
   const getInventoryEntryDisplayName = (entry: InventoryEntry) => {
     const product = products.find(p => p._id === entry.productId);
-    const parts = [
-      formatSize(entry.size),
-      toTitleCase(entry.shape),
-      toTitleCase(entry.colour),
-      formatWeight(entry.weight)
-    ];
-    const combined = parts.filter(Boolean).join(' ');
-    if (combined) {
-      return combined;
+    const name = product ? product.name : entry.productType || 'Unnamed Product';
+    const size = entry.size || '';
+    if (size && !name.toLowerCase().includes(size.toLowerCase())) {
+      return `${name} (${size})`;
     }
-    return product ? product.name : entry.productType || 'Unnamed Product';
+    return name;
   };
 
   const getFilteredInventoryEntries = (search: string) => {
@@ -1067,17 +1086,27 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const handleSelectInventoryEntry = (idx: number, entry: InventoryEntry) => {
     const next = [...items];
     const product = products.find(p => p._id === entry.productId);
-    const price = product ? product.price : 0;
+    const productMrp = product ? (product.mrp || product.price || 0) : 0;
+    const basePrice = product ? (product.price || productMrp) : 0;
     const gst = product ? (product.gstRate || FIRM_DETAILS.defaultGstRate) : FIRM_DETAILS.defaultGstRate;
     const hsn = product ? (product.hsnCode || '') : '';
+
+    // Check target customer default discount
+    const targetCustomer = customers.find(c => (c.company || c.name || '').trim().toLowerCase() === customerName.trim().toLowerCase());
+    const customerDisc = targetCustomer ? (targetCustomer.discountPercent || 0) : 0;
+    const netRate = customerDisc > 0 && productMrp > 0 ? (productMrp * (1 - customerDisc / 100)) : basePrice;
 
     next[idx] = {
       productId: entry.productId,
       name: getInventoryEntryDisplayName(entry),
       qty: 1,
       boxes: 1,
-      rate: price,
-      rateText: price.toString(),
+      mrp: productMrp,
+      mrpText: productMrp > 0 ? productMrp.toString() : '',
+      discountPercent: customerDisc,
+      discountText: customerDisc > 0 ? customerDisc.toString() : '',
+      rate: netRate,
+      rateText: netRate > 0 ? netRate.toString() : '',
       packing: entry.packing || 1,
       gstRate: gst,
       hsnCode: hsn,
@@ -1099,13 +1128,14 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       c => (c.company || c.name || '').trim().toLowerCase() === customerName.trim().toLowerCase()
     );
     if (!selectedCustomer || !selectedCustomer.gstin || !selectedCustomer.gstin.trim()) {
-      alert('Sale invoices can only be created for customers with a valid GSTIN.');
+      alert('Sale invoices can only be created for customers with a valid GSTIN. For kaccha/sampling/damage movements, use the Delivery Challan module.');
       return;
     }
 
 
     // Strip maxQty before saving
     const finalItems = validItems.map(({ maxQty, ...rest }) => rest);
+
 
     try {
       const selectedWarehouse = warehouses.find(w => w._id === warehouseId);
@@ -1131,6 +1161,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         items: finalItems as InvoiceItem[],
         mode,
         baseAmount: totalBase,
+        totalMrp: totalMrpValue,
+        totalDiscount: totalDiscountSaved,
         cgst,
         sgst,
         igst,
@@ -1164,12 +1196,24 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const stateCheck = (customerState || 'Uttar Pradesh').trim().toLowerCase();
   const isIntraState = stateCheck === 'uttar pradesh' || stateCheck === 'up';
 
+  let totalMrpValue = 0;
+  let totalDiscountSaved = 0;
   let totalBase = 0;
   let totalTax = 0;
   items.forEach(it => {
     if (it.name.trim() !== '' && it.productId) {
-      const itemBase = it.qty * (it.rate || 0) * (it.packing || 1);
+      const qtyPcs = it.qty * (it.packing || 1);
+      const mrpRate = it.mrp || 0;
+      const netRate = it.rate || 0;
+
+      const itemMrpTotal = mrpRate > 0 ? (qtyPcs * mrpRate) : (qtyPcs * netRate);
+      const itemBase = qtyPcs * netRate;
+      const itemDiscount = Math.max(0, itemMrpTotal - itemBase);
+
+      totalMrpValue += itemMrpTotal;
+      totalDiscountSaved += itemDiscount;
       totalBase += itemBase;
+
       const gst = it.gstRate || 0;
       if (mode === 'pakka') {
         const itemTax = (itemBase * gst) / 100;
@@ -1369,7 +1413,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
           {/* Party Name Customer Search Input Selector */}
           <View style={[styles.formGroup, { zIndex: 1010 }]}>
-            <Text style={styles.formLabel}>Party Name (Customer/Vendor) *</Text>
+            <Text style={styles.formLabel}>Party Name (Customer) *</Text>
             <View style={styles.customSearchSelectContainer}>
               <View style={styles.formInput}>
                 <Ionicons name="person-outline" size={16} color={colors.text.muted} />
@@ -1589,9 +1633,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   )}
                 </View>
 
-                {/* Bottom line: Qty, Rate, Subtotal, Remove */}
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, alignItems: 'center' }}>
-                  <View style={{ flex: 1.2 }}>
+                {/* Bottom line: Qty, MRP, Disc %, Net Rate, Subtotal, Remove */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                  <View style={{ flex: 0.9 }}>
                     <Text style={styles.itemSublabel}>Boxes</Text>
                     <TextInput
                       style={[styles.itemInput, hasError && { borderColor: colors.danger, borderWidth: 1 }]}
@@ -1609,8 +1653,52 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                     />
                   </View>
 
-                  <View style={{ flex: 1.5 }}>
-                    <Text style={styles.itemSublabel}>Rate (₹)</Text>
+                  <View style={{ flex: 1.1 }}>
+                    <Text style={styles.itemSublabel}>MRP (₹)</Text>
+                    <TextInput
+                      style={styles.itemInput}
+                      placeholder="0.00"
+                      placeholderTextColor={colors.text.muted}
+                      keyboardType="numeric"
+                      value={it.mrpText !== undefined ? it.mrpText : (it.mrp || 0).toString()}
+                      onChangeText={(v) => {
+                        const next = [...items];
+                        const mrpVal = parseFloat(v) || 0;
+                        next[idx].mrpText = v;
+                        next[idx].mrp = mrpVal;
+                        const disc = next[idx].discountPercent || 0;
+                        const computedRate = mrpVal > 0 ? (disc > 0 ? mrpVal * (1 - disc / 100) : mrpVal) : (next[idx].rate || 0);
+                        next[idx].rate = computedRate;
+                        next[idx].rateText = computedRate > 0 ? computedRate.toString() : '';
+                        setItems(next);
+                      }}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1.0 }}>
+                    <Text style={styles.itemSublabel}>Disc (%)</Text>
+                    <TextInput
+                      style={styles.itemInput}
+                      placeholder="0%"
+                      placeholderTextColor={colors.text.muted}
+                      keyboardType="numeric"
+                      value={it.discountText !== undefined ? it.discountText : (it.discountPercent || 0).toString()}
+                      onChangeText={(v) => {
+                        const next = [...items];
+                        const discVal = parseFloat(v) || 0;
+                        next[idx].discountText = v;
+                        next[idx].discountPercent = discVal;
+                        const mrpVal = next[idx].mrp || next[idx].rate || 0;
+                        const computedRate = mrpVal > 0 ? mrpVal * (1 - discVal / 100) : (next[idx].rate || 0);
+                        next[idx].rate = computedRate;
+                        next[idx].rateText = computedRate > 0 ? computedRate.toString() : '';
+                        setItems(next);
+                      }}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1.1 }}>
+                    <Text style={styles.itemSublabel}>Net Rate (₹)</Text>
                     <TextInput
                       style={styles.itemInput}
                       placeholder="Rate"
@@ -1619,16 +1707,23 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                       value={it.rateText !== undefined ? it.rateText : (it.rate || 0).toString()}
                       onChangeText={(v) => {
                         const next = [...items];
+                        const netRate = parseFloat(v) || 0;
                         next[idx].rateText = v;
-                        next[idx].rate = parseFloat(v) || 0;
+                        next[idx].rate = netRate;
+                        const mrpVal = next[idx].mrp || 0;
+                        if (mrpVal > 0 && mrpVal >= netRate) {
+                          const computedDisc = ((mrpVal - netRate) / mrpVal) * 100;
+                          next[idx].discountPercent = parseFloat(computedDisc.toFixed(1));
+                          next[idx].discountText = computedDisc > 0 ? computedDisc.toFixed(1) : '';
+                        }
                         setItems(next);
                       }}
                     />
                   </View>
 
-                  <View style={{ flex: 2, alignItems: 'flex-end', justifyContent: 'center', minHeight: 40, marginTop: 12 }}>
-                    <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '600' }}>Amount</Text>
-                    <Text style={{ fontSize: 13, color: colors.success, fontWeight: '800' }}>
+                  <View style={{ flex: 1.4, alignItems: 'flex-end', justifyContent: 'center', minHeight: 40, marginTop: 12 }}>
+                    <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '600' }}>Amount</Text>
+                    <Text style={{ fontSize: 12, color: colors.success, fontWeight: '800' }}>
                       ₹{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Text>
                   </View>
@@ -1651,8 +1746,28 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
           {mode === 'pakka' ? (
             <View style={[styles.grandTotalContainer, { flexDirection: 'column', alignItems: 'stretch', gap: 6 }]}>
+              {totalMrpValue > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <Text style={[styles.grandTotalLabel, { fontSize: 12, fontWeight: '500', color: colors.text.muted }]}>Total Item MRP:</Text>
+                  <Text style={[styles.grandTotalValue, { fontSize: 12, fontWeight: '600', color: colors.text.secondary }]}>
+                    ₹{totalMrpValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Text>
+                </View>
+              )}
+
+              {totalDiscountSaved > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                  <Text style={[styles.grandTotalLabel, { fontSize: 12, fontWeight: '600', color: colors.success }]}>Total Discount Saved:</Text>
+                  <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.sm }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>
+                      - ₹{totalDiscountSaved.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.grandTotalLabel, { fontSize: 13, fontWeight: '600', color: colors.text.secondary }]}>Base Amount:</Text>
+                <Text style={[styles.grandTotalLabel, { fontSize: 13, fontWeight: '600', color: colors.text.secondary }]}>Taxable Base Amount:</Text>
                 <Text style={[styles.grandTotalValue, { fontSize: 13, fontWeight: '600', color: colors.text.secondary }]}>₹{totalBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
               </View>
               {isIntraState ? (
@@ -1848,17 +1963,17 @@ export default function SaleInvoicesScreen() {
         </View>
 
       <ScrollView style={{ flex: 1 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
-          <View style={styles.table}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
+          <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
             {/* Table Header Row */}
             <View style={styles.tableHeaderRow}>
               <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Invoice No</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 1, minWidth: 110 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 110 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Overdue Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 160, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Actions</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 140, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Actions</Text></View>
             </View>
 
             {/* Table Body Rows */}
@@ -1869,7 +1984,7 @@ export default function SaleInvoicesScreen() {
                   <View style={[styles.tableCellContainer, { width: 160 }]}>
                     <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.invoiceNo}</Text>
                   </View>
-                  <View style={[styles.tableCellContainer, { flex: 1, minWidth: 110 }]}>
+                  <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
                     <Text style={styles.tableCell} numberOfLines={1}>{item.customerName || 'N/A'}</Text>
                   </View>
                   <View style={[styles.tableCellContainer, { width: 110 }]}>
@@ -1968,13 +2083,13 @@ export default function SaleInvoicesScreen() {
 
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
-  innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
-  searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
-  addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  innerContainer: { flex: 1, width: '100%' },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs, paddingHorizontal: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, minHeight: 46 },
+  searchInput: { flex: 1, height: 42, color: colors.text.primary, fontSize: 13 },
+  addBtn: { width: 34, height: 34, borderRadius: Radius.sm, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
 
-  filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
-  filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 34, gap: 6 },
+  filterDropdownButtonText: { fontSize: 12, fontWeight: '700', color: colors.text.secondary },
   filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 200, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
@@ -1982,7 +2097,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 40, fontSize: 13 },
 
-  table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
+  table: { flex: 1, width: '100%', minWidth: 950, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },

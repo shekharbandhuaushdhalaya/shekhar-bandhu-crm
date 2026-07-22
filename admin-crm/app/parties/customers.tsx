@@ -262,11 +262,23 @@ function CustomerDetailModal({
               <Ionicons name="cash" size={16} color={colors.success} style={styles.infoIcon} />
               <View>
                 <Text style={styles.infoLabel}>Invoice Balance (GST)</Text>
-                <Text style={[styles.infoValue, { color: customer.pakkaBalance > 0 ? colors.success : colors.text.muted }]}>
-                  ₹{customer.pakkaBalance.toLocaleString()}
+                <Text style={[styles.infoValue, { color: customer.regularBalance > 0 ? colors.success : colors.text.muted }]}>
+                  ₹{customer.regularBalance.toLocaleString()}
                 </Text>
               </View>
             </View>
+
+            {canAccessCash && (
+              <View style={styles.infoItem}>
+                <Ionicons name="wallet-outline" size={16} color={colors.warning} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>Challan Balance (Cash/No GST)</Text>
+                  <Text style={[styles.infoValue, { color: customer.cashBalance > 0 ? colors.warning : colors.text.muted }]}>
+                    ₹{(customer.cashBalance || 0).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             <View style={styles.infoItem}>
               <Ionicons name="ribbon" size={16} color={colors.primary} style={styles.infoIcon} />
@@ -397,7 +409,8 @@ function AddEditCustomerModal({
   const [shippingState, setShippingState] = useState('Maharashtra');
 
   // Balances
-  const [pakkaBalance, setPakkaBalance] = useState('');
+  const [regularBalance, setRegularBalance] = useState('');
+  const [cashBalance, setCashBalance] = useState('');
 
   const [salesVolume, setSalesVolume] = useState('');
 
@@ -438,7 +451,8 @@ function AddEditCustomerModal({
       setShippingCity(shipping.city || '');
       setShippingState(shipping.state || 'Maharashtra');
 
-      setPakkaBalance(customer.pakkaBalance.toString());
+      setRegularBalance(customer.regularBalance.toString());
+      setCashBalance(customer.cashBalance ? customer.cashBalance.toString() : '0');
 
       setSalesVolume(customer.salesVolume.toString());
     } else {
@@ -462,7 +476,8 @@ function AddEditCustomerModal({
       setShippingPin('');
       setShippingCity('');
       setShippingState('Maharashtra');
-      setPakkaBalance('');
+      setRegularBalance('');
+      setCashBalance('');
 
       setSalesVolume('');
     }
@@ -613,7 +628,8 @@ function AddEditCustomerModal({
         state: shippingSameAsBilling ? billingState.trim() : shippingState.trim()
       },
       shippingSameAsBilling,
-      pakkaBalance: isCash ? 0 : (parseInt(pakkaBalance) || 0),
+      regularBalance: isCash ? 0 : (parseInt(regularBalance) || 0),
+      cashBalance: canAccessCash ? (parseInt(cashBalance) || 0) : 0,
 
       salesVolume: parseInt(salesVolume) || 0,
     };
@@ -925,7 +941,17 @@ function AddEditCustomerModal({
               <Text style={styles.formLabel}>Opening Invoice Balance (₹)</Text>
               <View style={styles.formInput}>
                 <Ionicons name="cash" size={16} color={colors.text.muted} />
-                <TextInput style={styles.formInputText} placeholder="0" placeholderTextColor={colors.text.muted} value={pakkaBalance} onChangeText={setPakkaBalance} keyboardType="numeric" />
+                <TextInput style={styles.formInputText} placeholder="0" placeholderTextColor={colors.text.muted} value={regularBalance} onChangeText={setRegularBalance} keyboardType="numeric" />
+              </View>
+            </View>
+          ) : null}
+
+          {canAccessCash ? (
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Opening Cash/Challan Balance (₹)</Text>
+              <View style={styles.formInput}>
+                <Ionicons name="wallet-outline" size={16} color={colors.text.muted} />
+                <TextInput style={styles.formInputText} placeholder="0" placeholderTextColor={colors.text.muted} value={cashBalance} onChangeText={setCashBalance} keyboardType="numeric" />
               </View>
             </View>
           ) : null}
@@ -958,7 +984,7 @@ function CustomerLedgerModal({
   const [initialBalance, setInitialBalance] = useState(0);
   const [closingBalance, setClosingBalance] = useState(0);
   const [loading, setLoading] = useState(false);
-  const activeLedgerMode = 'pakka';
+  const [activeLedgerMode, setActiveLedgerMode] = useState<'regular' | 'cash'>('regular');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -968,26 +994,39 @@ function CustomerLedgerModal({
     setLoading(true);
     try {
       const name = customer.company || customer.name || '';
-      const [allInvoices, allPayments, allChallans] = await Promise.all([
+      const [allInvoices, allPayments, allMovements] = await Promise.all([
         api.getSaleInvoices(name),
         api.getPayments(customer._id, 'all', 'Customer'),
-        api.getChallans(name)
+        api.getStockMovements({ search: name })
       ]);
 
-      const filteredInvoices = allInvoices.filter(i => {
-        if (!i.isFinalized) return false;
-        const matchesName = (i.customerName || '').toLowerCase().includes(name.toLowerCase());
-        return matchesName;
-      });
+      const filteredInvoices = activeLedgerMode === 'regular'
+        ? allInvoices.filter(i => {
+            if (!i.isFinalized) return false;
+            const matchesName = (i.customerName || '').toLowerCase().includes(name.toLowerCase());
+            return i.mode === 'regular' && matchesName;
+          })
+        : [];
+
       // Search may miss if partyName doesn't exactly match the search string, so include by exact ID as well
       const filteredPayments = allPayments.filter(p => {
         const matchesParty = ((p.partyName || '').toLowerCase().includes(name.toLowerCase()) || p.partyId === customer._id);
-        return matchesParty;
+        return p.mode === activeLedgerMode && matchesParty;
       });
 
-      const filteredChallans: any[] = [];
+      const filteredMovements = allMovements.filter((m: any) => {
+        const matchesParty = (m.partyName || '').toLowerCase().includes(name.toLowerCase());
+        if (!matchesParty) return false;
+        if (m.type !== 'sale' || m.status !== 'dispatched') return false;
+        
+        if (activeLedgerMode === 'regular') {
+          return m.billingMode === 'regular' && !m.convertedToInvoice;
+        } else {
+          return m.billingMode === 'cash';
+        }
+      });
 
-      type Row = { _id: string; date: string; no: string; mode: string; status: string; amount: number; isInvoice: boolean; isChallan?: boolean; dueDate?: string };
+      type Row = { _id: string; date: string; no: string; mode: string; status: string; amount: number; isInvoice: boolean; isMovement?: boolean; dueDate?: string };
       let items: Row[] = [];
       
       filteredInvoices.forEach(inv => {
@@ -1003,16 +1042,16 @@ function CustomerLedgerModal({
         });
       });
 
-      filteredChallans.forEach(ch => {
+      filteredMovements.forEach(m => {
         items.push({
-          _id: ch._id,
-          date: ch.date,
-          no: ch.challanNo,
-          mode: ch.mode,
-          status: ch.status,
-          amount: ch.nettTotal || ch.baseAmount || 0, // Customer owes us more
+          _id: m._id,
+          date: m.date,
+          no: m.docNo,
+          mode: m.billingMode || 'regular',
+          status: m.status,
+          amount: m.totalAmount || 0, // Customer owes us more
           isInvoice: false,
-          isChallan: true
+          isMovement: true
         });
       });
 
@@ -1032,7 +1071,7 @@ function CustomerLedgerModal({
       items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       // Compute Total Current Balance
-      const currentTotalBalance = customer.pakkaBalance || 0;
+      const currentTotalBalance = activeLedgerMode === 'regular' ? (customer.regularBalance || 0) : (customer.cashBalance || 0);
       
       // Calculate Initial Balance
       const totalAmountChange = items.reduce((sum, item) => sum + item.amount, 0);
@@ -1118,7 +1157,7 @@ function CustomerLedgerModal({
         <tr>
           <td>${d}</td>
           <td>${r.no}</td>
-          <td>${r.mode === 'pakka' ? 'GST' : 'Cash'}</td>
+          <td>${r.mode === 'regular' ? 'GST' : 'Cash'}</td>
           <td style="color:${r.amount > 0 ? 'red' : 'green'}">${dr}</td>
           <td style="color:${r.amount < 0 ? 'green' : 'red'}">${cr}</td>
           <td><strong>${balStr}</strong></td>
@@ -1173,7 +1212,7 @@ function CustomerLedgerModal({
       <strong>Period:</strong><br/>
       ${periodStr}<br/><br/>
       <strong>Ledger Type:</strong><br/>
-      ${activeLedgerMode === 'pakka' ? 'Invoice (GST) Ledger' : 'Cash Ledger'}
+      ${activeLedgerMode === 'regular' ? 'Invoice (GST) Ledger' : 'Cash Ledger'}
     </div>
   </div>
 
@@ -1258,6 +1297,31 @@ function CustomerLedgerModal({
               </TouchableOpacity>
             </View>
           </View>
+
+          {canAccessCash && (
+            <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, paddingHorizontal: Spacing.lg }}>
+              <TouchableOpacity
+                onPress={() => setActiveLedgerMode('regular')}
+                style={[
+                  { paddingVertical: 12, marginRight: 24, borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 6 },
+                  activeLedgerMode === 'regular' && { borderColor: colors.primary, backgroundColor: colors.primary + '0a' }
+                ]}
+              >
+                <Ionicons name="business" size={16} color={activeLedgerMode === 'regular' ? colors.primary : colors.text.muted} />
+                <Text style={[{ fontSize: 13, fontWeight: '700', color: colors.text.muted }, activeLedgerMode === 'regular' && { color: colors.primary }]}>Invoice (GST) Ledger</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveLedgerMode('cash')}
+                style={[
+                  { paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 6 },
+                  activeLedgerMode === 'cash' && { borderColor: colors.warning, backgroundColor: colors.warning + '0a' }
+                ]}
+              >
+                <Ionicons name="cash" size={16} color={activeLedgerMode === 'cash' ? colors.warning : colors.text.muted} />
+                <Text style={[{ fontSize: 13, fontWeight: '700', color: colors.text.muted }, activeLedgerMode === 'cash' && { color: colors.warning }]}>Cash Ledger</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
 
 
@@ -1358,10 +1422,10 @@ function CustomerLedgerModal({
                       <Text style={[styles.ledgerCell, { width: 160, fontWeight: '600' }]} numberOfLines={1}>{row.no}</Text>
                       <View style={{ width: 80, paddingRight: 8, justifyContent: 'center' }}>
                         <Text style={[styles.modeBadge,
-                          row.mode === 'pakka'
+                          row.mode === 'regular'
                             ? { backgroundColor: colors.primary + '18', color: colors.primary }
                             : { backgroundColor: colors.warning + '18', color: colors.warning }]}>
-                          {row.mode === 'pakka' ? 'GST' : 'Cash'}
+                          {row.mode === 'regular' ? 'GST' : 'Cash'}
                         </Text>
                       </View>
                       <Text style={[styles.ledgerCell, { width: 80, fontSize: 11, fontWeight: isOverdue ? 'bold' : 'normal',
@@ -1543,7 +1607,7 @@ export default function CustomersScreen() {
             {filteredCustomers.map((c) => {
               const isCash = !c.gstin || !c.gstin.trim();
               
-              const bal = c.pakkaBalance;
+              const bal = c.regularBalance;
               const drCrLabel = bal > 0 ? 'DR' : bal < 0 ? 'CR' : null;
               const balColor = bal > 0 ? colors.success : bal < 0 ? colors.danger : colors.text.muted;
               const balBg = bal > 0 ? colors.success + '12' : bal < 0 ? colors.danger + '12' : colors.bg.secondary;
@@ -1626,15 +1690,30 @@ export default function CustomersScreen() {
                   </View>
 
                   {/* Dynamic Balance Badges */}
-                  <View style={[styles.tableCellContainer, { width: 140, alignItems: 'flex-end', justifyContent: 'center' }]}>
+                  <View style={[styles.tableCellContainer, { width: 140, alignItems: 'flex-end', justifyContent: 'center', gap: 4 }]}>
                     <View style={[styles.balanceBadge, { backgroundColor: balBg, borderColor: balColor + '30', borderWidth: 1 }]}>
                       {drCrLabel && (
                         <Text style={[styles.balanceBadgeLabel, { color: balColor }]}>{drCrLabel}</Text>
                       )}
-                      <Text style={[styles.balanceText, { color: balColor }]}>
-                        ₹{Math.abs(bal).toLocaleString('en-IN')}
+                      <Text style={[styles.balanceText, { color: balColor, fontSize: 11 }]}>
+                        GST: ₹{Math.abs(bal).toLocaleString('en-IN')}
                       </Text>
                     </View>
+                    {canAccessCash && (
+                      <View style={[
+                        styles.balanceBadge,
+                        {
+                          backgroundColor: c.cashBalance > 0 ? colors.warning + '12' : colors.bg.secondary,
+                          borderColor: c.cashBalance > 0 ? colors.warning + '30' : colors.border,
+                          borderWidth: 1
+                        }
+                      ]}>
+                        {c.cashBalance > 0 && <Text style={[styles.balanceBadgeLabel, { color: colors.warning }]}>DR</Text>}
+                        <Text style={[styles.balanceText, { color: c.cashBalance > 0 ? colors.warning : colors.text.muted, fontSize: 11 }]}>
+                          Cash: ₹{Math.abs(c.cashBalance || 0).toLocaleString('en-IN')}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Action */}

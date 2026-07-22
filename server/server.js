@@ -8,6 +8,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const compression = require('compression');
 const morgan = require('morgan');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { trackAgentActivity } = require('./utils/agentTracker');
 
 // ─── Route imports (grouped by domain) ───
@@ -24,6 +26,7 @@ const medicalRepRoutes = require('./routes/crm/medicalReps');
 const campaignRoutes = require('./routes/marketing/campaigns');
 
 const customerRoutes = require('./routes/sales/customers');
+const customerPricingRoutes = require('./routes/sales/customerPricing');
 const vendorRoutes = require('./routes/sales/vendors');
 const quotationRoutes = require('./routes/sales/quotations');
 const invoiceRoutes = require('./routes/sales/invoices');
@@ -43,6 +46,11 @@ const batchProductionRoutes = require('./routes/manufacturing/batchProductions')
 
 const paymentRoutes = require('./routes/finance/payments');
 const paymentGatewayRoutes = require('./routes/finance/paymentGateway');
+const creditNoteRoutes = require('./routes/finance/creditNotes');
+const accountRoutes = require('./routes/finance/accounts');
+const journalEntryRoutes = require('./routes/finance/journalEntries');
+const gstReturnRoutes = require('./routes/finance/gstReturns');
+const bankReconciliationRoutes = require('./routes/finance/bankReconciliation');
 
 const dispatchRoutes = require('./routes/operations/dispatches');
 const complaintRoutes = require('./routes/operations/complaints');
@@ -53,6 +61,7 @@ const analyticsRoutes = require('./routes/analytics/analytics');
 const dashboardRoutes = require('./routes/analytics/dashboard');
 
 const publicProductRoutes = require('./routes/public/products');
+const publicOrderRoutes = require('./routes/public/orders');
 
 const app = express();
 const PORT = config.port;
@@ -88,6 +97,21 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 app.use(morgan('short'));
 
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false,
+}));
+
+// Rate limit: 100 req/min per IP
+app.use(rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+}));
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
 });
@@ -95,7 +119,17 @@ app.get('/api/health', (req, res) => {
 // ─── Public routes (no auth) ───
 app.use('/api/public/products', publicProductRoutes);
 app.use('/api/public/queries', queryRoutes);
-app.use('/api/public/orders', orderRoutes);
+app.use('/api/public/orders', publicOrderRoutes);
+app.use('/api/orders', publicOrderRoutes); // also at /api/orders/public/* for website compat
+
+// Rate limiter for auth routes (stricter: 20 req/min)
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many auth attempts, please try again later.' },
+});
 
 // ─── Try MongoDB connection & start server ───
 const { seedDatabase } = require('./utils/seed');
@@ -105,13 +139,14 @@ mongoose
   .then(async () => {
     console.log('🔌 Connected to MongoDB');
 
-    app.use('/api/auth', authRoutes);
+    app.use('/api/auth', authLimiter, authRoutes);
     app.use('/api/system', systemRoutes);
 
     app.use('/api/contacts', authenticateJWT, contactRoutes);
     app.use('/api/tasks', authenticateJWT, taskRoutes);
     app.use('/api/dashboard', authenticateJWT, dashboardRoutes);
     app.use('/api/customers', authenticateJWT, customerRoutes);
+    app.use('/api/customer-pricing', authenticateJWT, customerPricingRoutes);
     app.use('/api/vendors', authenticateJWT, vendorRoutes);
     app.use('/api/products', authenticateJWT, productRoutes);
     app.use('/api/challans', authenticateJWT, challanRoutes);
@@ -139,6 +174,11 @@ mongoose
     app.use('/api/rbac', authenticateJWT, rbacRoutes);
     app.use('/api/medical-reps', authenticateJWT, medicalRepRoutes);
     app.use('/api/campaigns', authenticateJWT, campaignRoutes);
+    app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
+    app.use('/api/accounts', authenticateJWT, accountRoutes);
+    app.use('/api/journal-entries', authenticateJWT, journalEntryRoutes);
+    app.use('/api/gst', authenticateJWT, gstReturnRoutes);
+    app.use('/api/bank-reconciliation', authenticateJWT, bankReconciliationRoutes);
 
     // Drop old unique products index if it exists before seeding duplicate specs
     try {
@@ -169,6 +209,12 @@ mongoose
     await require('./models/InventoryEntry').syncIndexes();
     console.log('✅ Using MongoDB for data');
 
+    // Global error handler (must be after all routes)
+    app.use((err, req, res, next) => {
+      console.error('Unhandled error:', err.message, err.stack);
+      res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+    });
+
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Shekhar Bandhu CRM Server running on port ${PORT} (bound to 0.0.0.0)`);
     });
@@ -178,4 +224,14 @@ mongoose
     console.error(err.message);
     process.exit(1);
   });
+
+// ─── Process-level error handling ───
+process.on('unhandledRejection', (reason) => {
+  console.error('UNHANDLED REJECTION:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err.message, err.stack);
+  process.exit(1);
+});
 

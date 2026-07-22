@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
-import { api, Invoice, Product, Vendor, Warehouse } from '../../utils/api';
+import { api, Invoice, Product, RawMaterial, Vendor, Warehouse } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
@@ -52,6 +52,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
+  const perm = usePermission();
 
   if (!invoice) return null;
 
@@ -111,7 +112,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
               </View>
             </View>
 
-            {((invoice.gstRate || 0) > 0 || invoice.mode === 'pakka') && (
+            {((invoice.gstRate || 0) > 0 || invoice.mode === 'regular' || (invoice.mode as string) === 'pakka') && (
               <>
                 <View style={styles.infoItem}>
                   <View style={[styles.infoIcon, { backgroundColor: colors.primaryLight }]}>
@@ -197,29 +198,26 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
               <View style={styles.detailTable}>
                 {/* Table Header */}
                 <View style={styles.detailTableHeader}>
-                  <Text style={[styles.detailTableHeaderCell, { flex: 1.8 }]}>Product</Text>
-                  <Text style={[styles.detailTableHeaderCell, { flex: 0.8, textAlign: 'center' }]}>Boxes</Text>
-                  <Text style={[styles.detailTableHeaderCell, { flex: 0.8, textAlign: 'center' }]}>Packing</Text>
+                  <Text style={[styles.detailTableHeaderCell, { flex: 3.5 }]}>Raw Material</Text>
+                  <Text style={[styles.detailTableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Qty / Unit</Text>
                   <Text style={[styles.detailTableHeaderCell, { flex: 1.0, textAlign: 'right' }]}>Rate (₹)</Text>
-                  <Text style={[styles.detailTableHeaderCell, { flex: 0.9, textAlign: 'center' }]}>GST</Text>
+                  <Text style={[styles.detailTableHeaderCell, { flex: 0.8, textAlign: 'center' }]}>GST</Text>
                   <Text style={[styles.detailTableHeaderCell, { flex: 1.0, textAlign: 'right' }]}>Subtotal</Text>
                 </View>
 
                 {/* Table Body */}
                 {invoice.items.map((item, idx) => {
-                  const boxes = item.boxes !== undefined ? item.boxes : (item.qty || 0);
-                  const packing = item.packing !== undefined ? item.packing : 1;
+                  const qty = item.qty !== undefined ? item.qty : (item.boxes || 0);
                   const rate = item.rate || 0;
-                  const itemSubtotal = boxes * packing * rate;
+                  const itemSubtotal = qty * rate;
                   const gstVal = (itemSubtotal * (item.gstRate || 0)) / 100;
                   const itemTotal = itemSubtotal + gstVal;
                   return (
                     <View key={idx} style={styles.detailTableRow}>
-                      <Text style={[styles.detailTableCell, { flex: 1.8, fontWeight: '600' }]} numberOfLines={2}>{item.name}</Text>
-                      <Text style={[styles.detailTableCell, { flex: 0.8, textAlign: 'center' }]}>{boxes}</Text>
-                      <Text style={[styles.detailTableCell, { flex: 0.8, textAlign: 'center' }]}>{packing}/box</Text>
+                      <Text style={[styles.detailTableCell, { flex: 3.5, fontWeight: '600' }]} numberOfLines={2}>{item.name}</Text>
+                      <Text style={[styles.detailTableCell, { flex: 1.2, textAlign: 'center' }]}>{qty} {item.unit || 'pcs'}</Text>
                       <Text style={[styles.detailTableCell, { flex: 1.0, textAlign: 'right' }]}>₹{rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
-                      <Text style={[styles.detailTableCell, { flex: 0.9, textAlign: 'center' }]}>{item.gstRate || 0}%</Text>
+                      <Text style={[styles.detailTableCell, { flex: 0.8, textAlign: 'center' }]}>{item.gstRate || 0}%</Text>
                       <Text style={[styles.detailTableCell, { flex: 1.0, textAlign: 'right', fontWeight: '700' }]}>₹{itemTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
                     </View>
                   );
@@ -323,7 +321,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const [supplierName, setSupplierName] = useState('');
   const [stateOfSupply, setStateOfSupply] = useState('Uttar Pradesh');
   const [status, setStatus] = useState('pending');
-  const mode = 'pakka';
+  const [mode, setMode] = useState<'regular' | 'cash'>('regular');
   const [freightAmount, setFreightAmount] = useState('');
   const [cartageAmount, setCartageAmount] = useState('');
   const [transport, setTransport] = useState('');
@@ -337,6 +335,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   // Search list states
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
@@ -350,6 +349,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     showProductDropdown: boolean;
     showGstDropdown: boolean;
     selectedProduct: Product | null;
+    rawMaterialId?: string;
+    unit?: string;
     boxes: string;
     packing: string;
     rate: string;
@@ -365,6 +366,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         setSupplierName(invoiceToEdit.supplierName || '');
         setStateOfSupply(invoiceToEdit.stateOfSupply || 'Uttar Pradesh');
         setStatus(invoiceToEdit.status || 'pending');
+        setMode(invoiceToEdit.mode || 'regular');
 
         setFreightAmount(invoiceToEdit.freightAmount ? invoiceToEdit.freightAmount.toString() : '');
         setCartageAmount(invoiceToEdit.cartageAmount ? invoiceToEdit.cartageAmount.toString() : '');
@@ -381,6 +383,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           showProductDropdown: false,
           showGstDropdown: false,
           selectedProduct: null,
+          unit: it.unit || '',
           boxes: it.boxes !== undefined ? it.boxes.toString() : (it.qty || 0).toString(),
           packing: (it.packing || 1).toString(),
           rate: (it.rate || 0).toString(),
@@ -398,6 +401,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         setSupplierName('');
         setStateOfSupply('Uttar Pradesh');
         setStatus('pending');
+        setMode('regular');
 
         setShowVendorDropdown(false);
         setWarehouseId('');
@@ -424,14 +428,16 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
       const loadData = async () => {
         try {
-          const [v, p, w] = await Promise.all([
+          const [v, p, w, rm] = await Promise.all([
             api.getVendors(),
             api.getProducts(),
-            api.getWarehouses()
+            api.getWarehouses(),
+            api.getRawMaterials().catch(() => [])
           ]);
           setVendors(v);
           setProducts(p);
           setWarehouses(w);
+          setRawMaterials(rm);
           if (w.length > 0 && !invoiceToEdit) {
             setWarehouseId(w[0]._id);
           }
@@ -566,7 +572,37 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         productSearch: getProductSelectorDisplayName(p),
         rate: p.price ? p.price.toString() : '',
         packing: '1',
-        gstRate: mode === 'pakka' ? pGst : 0,
+        gstRate: (mode === 'regular' || (mode as string) === 'pakka') ? pGst : 0,
+        showProductDropdown: false
+      };
+    }));
+  };
+
+  const selectableItems = rawMaterials.map(rm => ({
+    id: rm._id,
+    name: rm.name,
+    sku: rm.sku || '',
+    unit: rm.unit || '',
+    price: 0,
+    gstRate: 18,
+    isRawMaterial: true,
+    rawMaterial: rm,
+    product: null as Product | null
+  }));
+
+  const handleSelectRowItem = (id: string, item: typeof selectableItems[0]) => {
+    setRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const itemGst = item.gstRate !== undefined ? item.gstRate : 18;
+      return {
+        ...r,
+        selectedProduct: item.product || null,
+        rawMaterialId: item.rawMaterial ? item.rawMaterial._id : undefined,
+        productSearch: item.name,
+        unit: item.unit || '',
+        rate: item.price ? item.price.toString() : (r.rate || ''),
+        packing: '1',
+        gstRate: mode === 'regular' ? itemGst : 0,
         showProductDropdown: false
       };
     }));
@@ -581,19 +617,19 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   let totalBase = 0;
   let totalGstAmount = 0;
   rows.forEach(r => {
-    const boxes = parseFloat(r.boxes) || 0;
-    const packing = parseFloat(r.packing) || 1;
+    const qty = parseFloat(r.boxes) || 0;
     const rate = parseFloat(r.rate) || 0;
-    const rowBase = boxes * packing * rate;
-    totalBase += rowBase;
-    totalGstAmount += (rowBase * r.gstRate) / 100;
+    const gstRate = (mode === 'regular' || (mode as string) === 'pakka') ? (parseFloat(r.gstRate) || 0) : 0;
+    const itemBase = qty * rate;
+    const itemGst = itemBase * (gstRate / 100);
+    totalBase += itemBase;
+    totalGstAmount += itemGst;
   });
 
   const freightVal = parseFloat(freightAmount) || 0;
   const cartageVal = parseFloat(cartageAmount) || 0;
   if (freightVal > 0) {
     totalBase += freightVal;
-    // Assuming standard 18% GST on freight
     totalGstAmount += (freightVal * 18) / 100;
   }
   if (cartageVal > 0) {
@@ -634,9 +670,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
     const validRows = rows.filter(r => {
       const name = r.selectedProduct ? getProductSelectorDisplayName(r.selectedProduct) : r.productSearch.trim();
-      const boxes = parseFloat(r.boxes) || 0;
+      const qty = parseFloat(r.boxes) || 0;
       const rate = parseFloat(r.rate) || 0;
-      return name && boxes > 0 && rate > 0;
+      return name && qty > 0 && rate > 0;
     });
 
     if (validRows.length === 0) {
@@ -645,18 +681,19 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     }
 
     const finalItems = validRows.map(r => {
-      const boxes = parseFloat(r.boxes) || 0;
-      const packing = parseFloat(r.packing) || 1;
+      const qty = parseFloat(r.boxes) || 0;
       return {
-    productId: r.selectedProduct ? r.selectedProduct._id : undefined,
-    name: r.selectedProduct ? getProductSelectorDisplayName(r.selectedProduct) : r.productSearch.trim(),
-    qty: boxes,               // BOXES (consistent with sale invoices)
-    boxes: boxes,            // <--- boxes = box count
-    packing: packing,
-    rate: parseFloat(r.rate) || 0,
-    gstRate: r.gstRate,
-    hsnCode: r.selectedProduct ? (r.selectedProduct.hsnCode || '') : ''
-  };
+        productId: r.selectedProduct ? r.selectedProduct._id : undefined,
+        rawMaterialId: r.rawMaterialId,
+        name: r.selectedProduct ? getProductSelectorDisplayName(r.selectedProduct) : r.productSearch.trim(),
+        qty: qty,
+        boxes: qty,
+        unit: r.unit || 'pcs',
+        packing: 1,
+        rate: parseFloat(r.rate) || 0,
+        gstRate: mode === 'regular' ? r.gstRate : 0,
+        hsnCode: r.selectedProduct ? (r.selectedProduct.hsnCode || '') : ''
+      };
     });
 
     // Find vendor's GSTIN and State from CRM seeds
@@ -740,12 +777,38 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           )}
 
 
+          {/* Billing Mode Switch */}
+          <View style={styles.modeSelector}>
+            <TouchableOpacity
+              style={[
+                styles.modeBtn,
+                mode === 'regular' && { backgroundColor: colors.primary + '18', borderColor: colors.primary }
+              ]}
+              onPress={() => setMode('regular')}
+            >
+              <Text style={[styles.modeBtnText, mode === 'regular' && { color: colors.primary, fontWeight: '700' }]}>
+                📄 Regular GST Purchase
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.modeBtn,
+                mode === 'cash' && { backgroundColor: colors.warning + '18', borderColor: colors.warning }
+              ]}
+              onPress={() => setMode('cash')}
+            >
+              <Text style={[styles.modeBtnText, mode === 'cash' && { color: colors.warning, fontWeight: '700' }]}>
+                💵 Non-GST / Cash Purchase
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>Invoice Number *</Text>
+              <Text style={styles.formLabel}>{mode === 'regular' ? 'Invoice Number *' : 'Ref / Bill Number (Optional)'}</Text>
               <View style={styles.formInput}>
                 <Ionicons name="barcode" size={16} color={colors.text.muted} />
-                <TextInput style={styles.formInputText} placeholder="e.g. INV-PURCH-8012" placeholderTextColor={colors.text.muted} value={invoiceNo} onChangeText={setInvoiceNo} />
+                <TextInput style={styles.formInputText} placeholder={mode === 'regular' ? "e.g. INV-PURCH-8012" : "e.g. CASH-BILL-01 (Optional)"} placeholderTextColor={colors.text.muted} value={invoiceNo} onChangeText={setInvoiceNo} />
               </View>
             </View>
 
@@ -977,36 +1040,36 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           <Text style={[styles.formLabel, { marginTop: 12, marginBottom: 8, fontSize: 13, color: colors.text.primary }]}>Items Breakdown *</Text>
           
           <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderLabel, { flex: 1.8 }]}>Product Name *</Text>
-            <Text style={[styles.tableHeaderLabel, { flex: 0.8, textAlign: 'center' }]}>Boxes</Text>
-            <Text style={[styles.tableHeaderLabel, { flex: 0.8, textAlign: 'center' }]}>Packing</Text>
-            <Text style={[styles.tableHeaderLabel, { flex: 1.0, textAlign: 'right' }]}>Rate (₹)</Text>
-            <Text style={[styles.tableHeaderLabel, { flex: 0.9, textAlign: 'center' }]}>GST</Text>
-            <Text style={[styles.tableHeaderLabel, { flex: 1.0, textAlign: 'right' }]}>Total</Text>
+            <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 3.2 : 3.6 }]}>Raw Material Name *</Text>
+            <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.4 : 1.6, textAlign: 'center' }]}>Qty / Unit *</Text>
+            <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}>Rate (₹)</Text>
+            {mode === 'regular' && (
+              <Text style={[styles.tableHeaderLabel, { flex: 0.7, textAlign: 'center' }]}>GST</Text>
+            )}
+            <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}>Total</Text>
             <View style={{ flex: 0.4 }} />
           </View>
 
           {rows.map((row, index) => {
-            const boxesNum = parseFloat(row.boxes) || 0;
-            const packingNum = parseFloat(row.packing) || 1;
-            const subtotal = boxesNum * packingNum * (parseFloat(row.rate) || 0);
-            const gstAmount = (subtotal * row.gstRate) / 100;
+            const qtyNum = parseFloat(row.boxes) || 0;
+            const subtotal = qtyNum * (parseFloat(row.rate) || 0);
+            const gstAmount = mode === 'regular' ? (subtotal * row.gstRate) / 100 : 0;
             const rowTotal = subtotal + gstAmount;
 
-            const rowFilteredProducts = row.productSearch
-              ? products.filter(p =>
-                  getProductSelectorDisplayName(p).toLowerCase().includes(row.productSearch.toLowerCase()) ||
-                  p.sku.toLowerCase().includes(row.productSearch.toLowerCase())
+            const rowFilteredItems = row.productSearch
+              ? selectableItems.filter(item =>
+                  item.name.toLowerCase().includes(row.productSearch.toLowerCase()) ||
+                  item.sku.toLowerCase().includes(row.productSearch.toLowerCase())
                 )
-              : products;
+              : selectableItems;
 
             return (
               <View key={row.id} style={[styles.tableRow, { zIndex: (row.showProductDropdown || row.showGstDropdown) ? 1000 : 100 - index }]}>
-                {/* Product search */}
-                <View style={{ flex: 1.8, position: 'relative' }}>
+                {/* Raw Material search */}
+                <View style={{ flex: mode === 'regular' ? 3.2 : 3.6, position: 'relative' }}>
                   <TextInput
                     style={styles.tableInput}
-                    placeholder="Search product..."
+                    placeholder="Search raw material..."
                     placeholderTextColor={colors.text.muted}
                     value={row.productSearch}
                     onChangeText={(text) => updateRowProductSearch(row.id, text)}
@@ -1016,20 +1079,24 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   />
                   {row.showProductDropdown && (
                     <View style={styles.rowDropdown}>
-                      <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }} keyboardShouldPersistTaps="handled">
-                        {rowFilteredProducts.map(p => (
+                      <ScrollView nestedScrollEnabled style={{ maxHeight: 160 }} keyboardShouldPersistTaps="handled">
+                        {rowFilteredItems.map(item => (
                           <TouchableOpacity
-                            key={p._id}
+                            key={`rm-${item.id}`}
                             style={styles.rowDropdownItem}
-                            onPress={() => handleSelectRowProduct(row.id, p)}
+                            onPress={() => handleSelectRowItem(row.id, item)}
                           >
-                            <Text style={styles.rowDropdownItemText}>{getProductSelectorDisplayName(p)}</Text>
-                            <Text style={styles.rowDropdownItemSubtext}>SKU: {p.sku} | GST: {p.gstRate}%</Text>
+                            <Text style={styles.rowDropdownItemText}>
+                              🧪 {item.name}
+                            </Text>
+                            <Text style={styles.rowDropdownItemSubtext}>
+                              SKU: {item.sku || 'N/A'} | Unit: {item.unit || 'units'}
+                            </Text>
                           </TouchableOpacity>
                         ))}
-                        {rowFilteredProducts.length === 0 && (
+                        {rowFilteredItems.length === 0 && (
                           <View style={{ padding: 8 }}>
-                            <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'center' }}>No products found</Text>
+                            <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'center' }}>No raw materials found</Text>
                           </View>
                         )}
                         <TouchableOpacity
@@ -1043,33 +1110,28 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   )}
                 </View>
 
-                {/* Boxes */}
-                <TextInput
-                  style={[styles.tableInput, { flex: 0.8, textAlign: 'center' }]}
-                  placeholder="0"
-                  placeholderTextColor={colors.text.muted}
-                  keyboardType="numeric"
-                  value={row.boxes}
-                  onChangeText={(text) => {
-                    setRows(prev => prev.map(r => r.id === row.id ? { ...r, boxes: text } : r));
-                  }}
-                />
-
-                {/* Packing */}
-                <TextInput
-                  style={[styles.tableInput, { flex: 0.8, textAlign: 'center' }]}
-                  placeholder="1"
-                  placeholderTextColor={colors.text.muted}
-                  keyboardType="numeric"
-                  value={row.packing}
-                  onChangeText={(text) => {
-                    setRows(prev => prev.map(r => r.id === row.id ? { ...r, packing: text } : r));
-                  }}
-                />
+                {/* Qty (Unit) */}
+                <View style={{ flex: mode === 'regular' ? 1.4 : 1.6, position: 'relative', justifyContent: 'center' }}>
+                  <TextInput
+                    style={[styles.tableInput, { width: '100%', textAlign: 'center', paddingRight: row.unit ? 36 : 8 }]}
+                    placeholder="0"
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="numeric"
+                    value={row.boxes}
+                    onChangeText={(text) => {
+                      setRows(prev => prev.map(r => r.id === row.id ? { ...r, boxes: text } : r));
+                    }}
+                  />
+                  {row.unit ? (
+                    <View style={{ position: 'absolute', right: 4, backgroundColor: colors.primary + '18', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>{row.unit}</Text>
+                    </View>
+                  ) : null}
+                </View>
 
                 {/* Rate */}
                 <TextInput
-                  style={[styles.tableInput, { flex: 1.0, textAlign: 'right' }]}
+                  style={[styles.tableInput, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}
                   placeholder="0.00"
                   placeholderTextColor={colors.text.muted}
                   keyboardType="numeric"
@@ -1079,15 +1141,41 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   }}
                 />
 
-                {/* GST */}
-                <View style={{ flex: 0.9, position: 'relative' }}>
-                  <View style={[styles.tableInputLocked, { width: '100%', alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={styles.tableInputLockedText}>{row.gstRate}%</Text>
+                {/* GST (Only in Regular mode) */}
+                {mode === 'regular' && (
+                  <View style={{ flex: 0.7, position: 'relative' }}>
+                    <TouchableOpacity
+                      style={[styles.tableInputBtn, { width: '100%', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 2 }]}
+                      onPress={() => {
+                        setRows(prev => prev.map(r => r.id === row.id ? { ...r, showGstDropdown: !r.showGstDropdown, showProductDropdown: false } : { ...r, showGstDropdown: false }));
+                      }}
+                    >
+                      <Text style={styles.tableInputBtnText}>{row.gstRate}%</Text>
+                      <Ionicons name={row.showGstDropdown ? "chevron-up" : "chevron-down"} size={12} color={colors.text.muted} />
+                    </TouchableOpacity>
+
+                    {row.showGstDropdown && (
+                      <View style={styles.rowGstDropdown}>
+                        {[0, 5, 12, 18, 28].map(rateVal => (
+                          <TouchableOpacity
+                            key={rateVal}
+                            style={[styles.rowGstDropdownItem, row.gstRate === rateVal && { backgroundColor: colors.primary + '15' }]}
+                            onPress={() => {
+                              setRows(prev => prev.map(r => r.id === row.id ? { ...r, gstRate: rateVal, showGstDropdown: false } : r));
+                            }}
+                          >
+                            <Text style={[styles.rowGstDropdownItemText, row.gstRate === rateVal && { color: colors.primary, fontWeight: 'bold' }]}>
+                              {rateVal}%
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
                   </View>
-                </View>
+                )}
 
                 {/* Row Subtotal */}
-                <View style={{ flex: 1.0, justifyContent: 'center', alignItems: 'flex-end' }}>
+                <View style={{ flex: mode === 'regular' ? 1.0 : 1.2, justifyContent: 'center', alignItems: 'flex-end' }}>
                   <Text style={styles.tableRowSubtotal} numberOfLines={1}>
                     ₹{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                   </Text>
@@ -1285,7 +1373,7 @@ export default function PurchaseInvoicesScreen() {
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
 
-  const modeFilter = 'pakka';
+  const [modeFilter, setModeFilter] = useState<'regular' | 'cash' | 'all'>('all');
   const [vendors, setVendors] = useState<Vendor[]>([]);
 
   const load = useCallback(async () => {
@@ -1341,6 +1429,76 @@ export default function PurchaseInvoicesScreen() {
               onChangeText={setSearch}
             />
 
+            {canAccessCash && (
+              <View style={{ position: 'relative', marginRight: 8, zIndex: 1200 }}>
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: Radius.sm,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.bg.card
+                  }}
+                  onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+                >
+                  <Ionicons name="funnel-outline" size={14} color={colors.primary} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>
+                    {modeFilter === 'all' ? 'All Bills' : modeFilter === 'regular' ? 'GST Invoices' : 'Non-GST / Cash'}
+                  </Text>
+                  <Ionicons name={showFilterDropdown ? "chevron-up" : "chevron-down"} size={14} color={colors.text.muted} />
+                </TouchableOpacity>
+
+                {showFilterDropdown && (
+                  <View style={{
+                    position: 'absolute',
+                    top: 40,
+                    right: 0,
+                    minWidth: 170,
+                    backgroundColor: colors.bg.card,
+                    borderRadius: Radius.sm,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    zIndex: 3000,
+                    boxShadow: '0px 4px 10px rgba(0,0,0,0.12)',
+                    elevation: 6
+                  }}>
+                    {[
+                      { id: 'all', label: '🌐 All Bills' },
+                      { id: 'regular', label: '📄 GST Invoices' },
+                      { id: 'cash', label: '💵 Non-GST / Cash' },
+                    ].map(f => (
+                      <TouchableOpacity
+                        key={f.id}
+                        style={{
+                          paddingVertical: 10,
+                          paddingHorizontal: 12,
+                          borderBottomWidth: f.id === 'cash' ? 0 : 1,
+                          borderBottomColor: colors.border + '60',
+                          backgroundColor: modeFilter === f.id ? colors.primary + '15' : 'transparent'
+                        }}
+                        onPress={() => {
+                          setModeFilter(f.id as any);
+                          setShowFilterDropdown(false);
+                        }}
+                      >
+                        <Text style={{
+                          fontSize: 13,
+                          fontWeight: modeFilter === f.id ? '700' : '500',
+                          color: modeFilter === f.id ? colors.primary : colors.text.primary
+                        }}>
+                          {f.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
             <TouchableOpacity style={styles.addBtn} onPress={() => { setInvoiceToEdit(null); setAddVisible(true); }}>
               <Ionicons name="add" size={22} color="#fff" />
             </TouchableOpacity>
@@ -1348,14 +1506,14 @@ export default function PurchaseInvoicesScreen() {
         </View>
 
       <ScrollView style={{ flex: 1 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
-          <View style={styles.table}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
+          <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
             {/* Table Header Row */}
             <View style={styles.tableHeaderRow}>
               <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Invoice No</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 1, minWidth: 110 }]}><Text style={styles.tableHeaderCell}>Supplier Name</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}><Text style={styles.tableHeaderCell}>Supplier Name</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 110 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Overdue Status</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
@@ -1369,7 +1527,7 @@ export default function PurchaseInvoicesScreen() {
                 <View style={[styles.tableCellContainer, { width: 160 }]}>
                   <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.invoiceNo}</Text>
                 </View>
-                <View style={[styles.tableCellContainer, { flex: 1, minWidth: 110 }]}>
+                <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
                   <Text style={styles.tableCell} numberOfLines={1}>{item.supplierName || 'N/A'}</Text>
                 </View>
                 <View style={[styles.tableCellContainer, { width: 120 }]}>
@@ -1432,8 +1590,10 @@ export default function PurchaseInvoicesScreen() {
           setInvoiceToEdit(null);
         }}
         onSaved={() => {
-          load();
+          setAddVisible(false);
+          setInvoiceToEdit(null);
           setDetailVisible(false);
+          load();
         }}
         invoiceToEdit={invoiceToEdit}
       />
@@ -1443,21 +1603,12 @@ export default function PurchaseInvoicesScreen() {
 
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
-  innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, marginBottom: 0, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
-  searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
-  addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  
-  filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
-  filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 200, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
-  filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
-  filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
+  innerContainer: { flex: 1, width: '100%' },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs, paddingHorizontal: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, minHeight: 46 },
+  searchInput: { flex: 1, height: 42, color: colors.text.primary, fontSize: 13 },
+  addBtn: { width: 34, height: 34, borderRadius: Radius.sm, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
 
-  emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 40, fontSize: 13 },
-
-  table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
+  table: { flex: 1, width: '100%', minWidth: 950, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
@@ -1524,7 +1675,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   addItemBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.primary, borderRadius: Radius.md, paddingVertical: 10, marginTop: 14, marginBottom: 10, borderStyle: 'dashed' },
   addItemBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   
-  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, paddingHorizontal: 4, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, marginBottom: 8 },
+  tableHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, paddingHorizontal: 4, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, marginBottom: 8 },
   tableHeaderLabel: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
   tableRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border + '50', paddingHorizontal: 4 },
   tableInput: { height: 36, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, fontSize: 13, color: colors.text.primary },

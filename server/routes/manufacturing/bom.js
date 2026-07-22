@@ -35,7 +35,7 @@ router.get('/:productId', async (req, res) => {
 // POST /api/bom — Configure a BOM formulation
 router.post('/', validate(schemas.bomSchema), async (req, res) => {
   try {
-    const { productId, batchYieldSize, ingredients } = req.body;
+    const { productId, batchYieldSize, ingredients, isActive, productionNotes, overheadCost, stages } = req.body;
     if (!productId || !batchYieldSize || !ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
       return res.status(400).json({ error: 'Missing required formulation fields' });
     }
@@ -51,9 +51,24 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
       }
       return {
         rawMaterialId: ing.rawMaterialId,
-        qtyRequired: qty
+        qtyRequired: qty,
+        itemType: ing.itemType === 'packaging' ? 'packaging' : 'formulation'
       };
     });
+
+    // Validate stages list if provided
+    let validatedStages = undefined;
+    if (stages && Array.isArray(stages)) {
+      validatedStages = stages.map(st => {
+        if (!st.name) throw new Error('Stage name is required');
+        const duration = Number(st.targetDurationDays);
+        if (isNaN(duration) || duration <= 0) throw new Error('Stage target duration must be a positive number');
+        return {
+          name: st.name.trim(),
+          targetDurationDays: duration
+        };
+      });
+    }
 
     // Check if BOM already exists for this product
     let bom = await BillOfMaterials.findOne({ productId });
@@ -61,13 +76,36 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
       // Update existing BOM
       bom.batchYieldSize = Number(batchYieldSize);
       bom.ingredients = validatedIngredients;
+      if (isActive !== undefined) bom.isActive = isActive;
+      if (productionNotes !== undefined) bom.productionNotes = productionNotes;
+      if (overheadCost !== undefined) bom.overheadCost = Number(overheadCost);
+      if (validatedStages !== undefined) bom.stages = validatedStages;
       await bom.save();
     } else {
       bom = await BillOfMaterials.create({
         productId,
         batchYieldSize: Number(batchYieldSize),
-        ingredients: validatedIngredients
+        ingredients: validatedIngredients,
+        isActive: isActive !== undefined ? isActive : true,
+        productionNotes: productionNotes || '',
+        overheadCost: overheadCost !== undefined ? Number(overheadCost) : 0,
+        stages: validatedStages || []
       });
+    }
+    // Automatically update Product's ingredients field with percentage proportions
+    const populatedBom = await BillOfMaterials.findById(bom._id).populate('ingredients.rawMaterialId', 'name');
+    if (populatedBom && populatedBom.ingredients && populatedBom.ingredients.length > 0) {
+      const totalQty = populatedBom.ingredients.reduce((sum, ing) => sum + (ing.qtyRequired || 0), 0);
+      if (totalQty > 0) {
+        const ingredientsString = populatedBom.ingredients
+          .map(ing => {
+            const pct = ((ing.qtyRequired / totalQty) * 100).toFixed(1);
+            const name = ing.rawMaterialId ? ing.rawMaterialId.name : 'Unknown Material';
+            return `${name} (${pct}%)`;
+          })
+          .join(', ');
+        await Product.findByIdAndUpdate(productId, { ingredients: ingredientsString });
+      }
     }
 
     res.status(201).json(bom);

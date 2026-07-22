@@ -80,4 +80,10 @@ function generateSku(product) {
   return `${type}-${name}-${size}-${shape}`;
 }
 
-module.exports = { generateSku, abbreviateType, abbreviateName, abbreviateSize, abbreviateShape };
+function generateRawMaterialSku(name) {
+  if (!name) return 'RM-UNKNOWN';
+  const prefix = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+  return `RM-${prefix || 'MAT'}-${Math.floor(100 + Math.random() * 900)}`;
+}
+
+module.exports = { generateSku, generateRawMaterialSku, abbreviateType, abbreviateName, abbreviateSize, abbreviateShape };

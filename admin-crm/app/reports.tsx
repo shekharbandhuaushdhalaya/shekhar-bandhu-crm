@@ -63,11 +63,11 @@ export default function ReportsScreen() {
     ]);
 
     const gstCol = sInvs.reduce((sum, i) => {
-      if (i.mode === 'pakka') return sum + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0);
+      if (i.mode === 'regular' || (i.mode as any) === 'pakka') return sum + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0);
       return sum;
     }, 0);
     const gstPd = pInvs.reduce((sum, i) => {
-      if (i.mode === 'pakka') return sum + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0);
+      if (i.mode === 'regular' || (i.mode as any) === 'pakka') return sum + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0);
       return sum;
     }, 0);
 
@@ -126,7 +126,7 @@ export default function ReportsScreen() {
     const filtered = invs.filter(i => {
       if (!i.date) return false;
       const d = new Date(i.date);
-      return d.getMonth() === reportMonth && d.getFullYear() === reportYear && i.mode === 'pakka';
+      return d.getMonth() === reportMonth && d.getFullYear() === reportYear && (i.mode === 'regular' || (i.mode as any) === 'pakka');
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const hsnSet = new Set<string>();
@@ -631,7 +631,7 @@ export default function ReportsScreen() {
                 const filtered = invs.filter(i => {
                   if (!i.date) return false;
                   const d = new Date(i.date);
-                  return d.getMonth() === reportMonth && d.getFullYear() === reportYear && i.mode === 'pakka';
+                  return d.getMonth() === reportMonth && d.getFullYear() === reportYear && (i.mode === 'regular' || (i.mode as any) === 'pakka');
                 });
                 const total = filtered.reduce((s, i) => s + (i.amount || 0), 0);
                 const totalTax = filtered.reduce((s, i) => s + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0), 0);
@@ -719,9 +719,9 @@ export default function ReportsScreen() {
                 return Array.from({ length: 6 }, (_, i) => {
                   const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
                   const m = d.getMonth(), y = d.getFullYear();
-                  const colSale = saleInvs.filter(inv => inv.mode === 'pakka' && new Date(inv.date).getMonth() === m && new Date(inv.date).getFullYear() === y)
+                  const colSale = saleInvs.filter(inv => (inv.mode === 'regular' || (inv.mode as any) === 'pakka') && new Date(inv.date).getMonth() === m && new Date(inv.date).getFullYear() === y)
                     .reduce((s, inv) => s + (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0), 0);
-                  const colPurch = purchInvs.filter(inv => inv.mode === 'pakka' && new Date(inv.date).getMonth() === m && new Date(inv.date).getFullYear() === y)
+                  const colPurch = purchInvs.filter(inv => (inv.mode === 'regular' || (inv.mode as any) === 'pakka') && new Date(inv.date).getMonth() === m && new Date(inv.date).getFullYear() === y)
                     .reduce((s, inv) => s + (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0), 0);
                   const net = colSale - colPurch;
                   return (

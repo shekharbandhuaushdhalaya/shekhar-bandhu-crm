@@ -1,6 +1,23 @@
 // API Client — Dual mode: Server fetch with localStorage fallback
 import { Platform, DeviceEventEmitter } from 'react-native';
 import { authStorage } from './storage';
+import type {
+  Contact, Task, Activity, DashboardStats, Customer, Vendor, Product,
+  ChallanItem, Challan, Payment, ProductQuery, Inventory, Warehouse,
+  InventoryEntry, ConsolidatedInventory, StockLedger, InvoiceItem, Invoice,
+  QuotationItem, Quotation, RawMaterial, RawMaterialEntry, BOMIngredient,
+  BillOfMaterials, ManufacturingStage, BatchProductionIngredient, BatchProduction,
+  Complaint, SampleItem, Sample, SalesTarget, CommissionReport, StockMovementItem,
+  StockMovement, Dispatch, DeadStockItem, BMRReportIngredient, BMRReport,
+  BatchGenealogyIngredient, BatchGenealogy, RawMaterialGenealogyBatch,
+  RawMaterialGenealogy, TraceRawMaterialEntry, TraceProductionBatch, TraceFinishedGood,
+  TraceChallan, TraceInvoice, TraceDispatch, TraceResult, RolePermissionConfig,
+  RBACPermissionsResponse, PaymentOrderResponse, PaymentVerifyResponse,
+  ManufacturingAnalytics, OrderItem, Order, MedicalRepresentative, MrDailyLog,
+  MrVisit, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics
+} from './api/types';
+
+export * from './api/types';
 
 import Constants from 'expo-constants';
 
@@ -48,6 +65,22 @@ export const getImageUrl = (imagePath: string | undefined): string => {
   return `${baseUrl}${cleanPath}`;
 };
 
+export interface CreditNote {
+  _id: string;
+  noteNo: string;
+  type: 'credit_note' | 'debit_note';
+  partyType: 'Customer' | 'Vendor';
+  partyId?: string;
+  partyName: string;
+  invoiceNo?: string;
+  baseAmount?: number;
+  taxAmount?: number;
+  totalAmount: number;
+  reason?: string;
+  status: 'draft' | 'finalized' | 'cancelled';
+  date: string;
+}
+
 const STORAGE_KEY = 'vp_crm_database';
 class ApiClient {
   private authToken: string | null = null;
@@ -89,7 +122,9 @@ class ApiClient {
     }
 
     try {
-      const res = await fetch(url, { ...options, headers });
+      const res = await fetch(url, { ...options, headers }).catch((netErr: any) => {
+        throw new Error(`Connection Error: Unable to reach backend server (${netErr?.message || 'Network Failure'}). Please ensure the server is running.`);
+      });
       if (!res.ok) {
           let errMsg = 'API Error';
           try {
@@ -588,6 +623,37 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/quotations/${id}`, { method: 'DELETE' });
     return res.ok;
   }
+  async convertQuotationToChallan(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/quotations/${id}/convert-to-challan`, { method: 'POST' });
+    return res.json();
+  }
+
+  // --- Credit / Debit Notes ---
+  async getCreditNotes(search?: string, type?: string): Promise<CreditNote[]> {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (type && type !== 'all') params.set('type', type);
+    const res = await this.request(`${API_BASE}/credit-notes?${params}`);
+    return res.json();
+  }
+  async createCreditNote(data: Partial<CreditNote>): Promise<CreditNote> {
+    const res = await this.request(`${API_BASE}/credit-notes`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async finalizeCreditNote(id: string): Promise<CreditNote> {
+    const res = await this.request(`${API_BASE}/credit-notes/${id}/finalize`, { method: 'PATCH' });
+    return res.json();
+  }
+  async cancelCreditNote(id: string): Promise<CreditNote> {
+    const res = await this.request(`${API_BASE}/credit-notes/${id}/cancel`, { method: 'PATCH' });
+    return res.json();
+  }
+
+  // --- GST Returns ---
+  async getGstReturn(view: string, month: number, year: number): Promise<any> {
+    const res = await this.request(`${API_BASE}/gst/${view}?month=${month}&year=${year}`);
+    return res.json();
+  }
 
   // --- Warehouses ---
   async getWarehouses(): Promise<Warehouse[]> {
@@ -745,7 +811,7 @@ class ApiClient {
       return null;
     }
   }
-  async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number }[] }): Promise<BillOfMaterials> {
+  async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number; itemType?: string }[]; isActive?: boolean; productionNotes?: string; overheadCost?: number; stages?: any[] }): Promise<BillOfMaterials> {
     const res = await this.request(`${API_BASE}/bom`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }

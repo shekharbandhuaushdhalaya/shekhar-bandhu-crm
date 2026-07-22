@@ -4,6 +4,7 @@ const productSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   sku: { type: String, required: true, unique: true, trim: true },
   price: { type: Number, default: 0 },
+  mrp: { type: Number, default: 0 },
   discount: { type: Number, default: 0, min: 0, max: 100 },   // % discount to display on website
   discountLabel: { type: String, default: '', trim: true },    // e.g. "Festive Offer", "Bulk Deal"
   websitePromoActive: { type: Boolean, default: false },       // master toggle for promo banner

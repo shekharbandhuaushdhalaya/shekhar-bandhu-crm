@@ -5,8 +5,8 @@ const customerSchema = new mongoose.Schema({
   company: { type: String, default: '', trim: true },
   email: { type: String, default: '', trim: true, lowercase: true },
   phone: { type: String, default: '' },
-  pakkaBalance: { type: Number, default: 0 },
-  kachhaBalance: { type: Number, default: 0 },
+  regularBalance: { type: Number, default: 0 },
+  cashBalance: { type: Number, default: 0 },
   outstandingInvoices: { type: Number, default: 0 },
   salesVolume: { type: Number, default: 0 },
   gstin: { type: String, default: '', trim: true },
@@ -29,7 +29,8 @@ const customerSchema = new mongoose.Schema({
   },
   shippingSameAsBilling: { type: Boolean, default: false },
   customerType: { type: String, enum: ['gst', 'cash'], default: 'gst' },
-  recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' }
+  recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' },
+  discountPercent: { type: Number, default: 0, min: 0, max: 100 }
 }, { timestamps: true });
 
 customerSchema.index({ name: 'text', company: 'text', email: 'text' });

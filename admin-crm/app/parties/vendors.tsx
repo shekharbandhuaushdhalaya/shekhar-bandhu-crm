@@ -157,8 +157,8 @@ function VendorDetailModal({ vendor, visible, onClose, onDeleted, onEdit }: { ve
               <Ionicons name="cash" size={16} color={colors.success} style={styles.infoIcon} />
               <View>
                 <Text style={styles.infoLabel}>Invoice Balance (GST)</Text>
-                <Text style={[styles.infoValue, { color: vendor.pakkaBalance > 0 ? colors.success : colors.text.muted }]}>
-                  ₹{vendor.pakkaBalance.toLocaleString()}
+                <Text style={[styles.infoValue, { color: vendor.regularBalance > 0 ? colors.success : colors.text.muted }]}>
+                  ₹{vendor.regularBalance.toLocaleString()}
                 </Text>
               </View>
             </View>
@@ -202,7 +202,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState('');
-  const [pakkaBalance, setPakkaBalance] = useState('');
+  const [regularBalance, setRegularBalance] = useState('');
 
   const [terms, setTerms] = useState('Net 30');
   const [selectedDropdownTerm, setSelectedDropdownTerm] = useState('Net 30');
@@ -244,7 +244,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setPhone(vendor.phone || '');
       setEmail(vendor.email || '');
       setCategory(vendor.productCategory || '');
-      setPakkaBalance(vendor.pakkaBalance.toString());
+      setRegularBalance(vendor.regularBalance.toString());
 
       
       const currentTerms = vendor.paymentTerms || 'Net 30';
@@ -271,7 +271,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setPhone('');
       setEmail('');
       setCategory('');
-      setPakkaBalance('');
+      setRegularBalance('');
 
       setTerms('Net 30');
       setSelectedDropdownTerm('Net 30');
@@ -380,7 +380,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       phone: phone.trim(),
       email: email.trim(),
       productCategory: category || 'General',
-      pakkaBalance: parseInt(pakkaBalance) || 0,
+      regularBalance: parseInt(regularBalance) || 0,
 
       paymentTerms: terms,
       gstin: gstin.trim(),
@@ -555,7 +555,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
             <Text style={styles.formLabel}>Opening Invoice Balance (₹)</Text>
             <View style={styles.formInput}>
               <Ionicons name="cash" size={16} color={colors.text.muted} />
-              <TextInput style={styles.formInputText} placeholder="0" placeholderTextColor={colors.text.muted} value={pakkaBalance} onChangeText={setPakkaBalance} keyboardType="numeric" />
+              <TextInput style={styles.formInputText} placeholder="0" placeholderTextColor={colors.text.muted} value={regularBalance} onChangeText={setRegularBalance} keyboardType="numeric" />
             </View>
           </View>
 
@@ -715,7 +715,7 @@ function VendorLedgerModal({
       items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       // Compute Total Current Balance
-      const currentTotalBalance = vendor.pakkaBalance || 0;
+      const currentTotalBalance = vendor.regularBalance || 0;
       
       // Calculate Initial Balance
       const totalAmountChange = items.reduce((sum, item) => sum + item.amount, 0);
@@ -801,7 +801,7 @@ function VendorLedgerModal({
         <tr>
           <td>${d}</td>
           <td>${r.no}</td>
-          <td>${r.mode === 'pakka' ? 'GST' : 'Cash'}</td>
+          <td>${r.mode === 'regular' ? 'GST' : 'Cash'}</td>
           <td style="color:${r.amount < 0 ? 'green' : 'red'}">${dr}</td>
           <td style="color:${r.amount > 0 ? 'red' : 'green'}">${cr}</td>
           <td><strong>${balStr}</strong></td>
@@ -1048,10 +1048,10 @@ function VendorLedgerModal({
                       <Text style={[styles.ledgerCell, { width: 160, fontWeight: '600' }]} numberOfLines={1}>{row.no}</Text>
                       <View style={[{ width: 80, paddingRight: 8, justifyContent: 'center' }]}>
                         <Text style={[styles.modeBadge,
-                          row.mode === 'pakka'
+                          row.mode === 'regular'
                             ? { backgroundColor: colors.primary + '18', color: colors.primary }
                             : { backgroundColor: colors.warning + '18', color: colors.warning }]}>
-                          {row.mode === 'pakka' ? 'GST' : 'Cash'}
+                          {row.mode === 'regular' ? 'GST' : 'Cash'}
                         </Text>
                       </View>
                       <Text style={[styles.ledgerCell, { width: 80, fontSize: 11, fontWeight: isOverdue ? 'bold' : 'normal',
@@ -1183,7 +1183,7 @@ export default function VendorsScreen() {
 
             {/* Table Body — each row is clickable for ledger */}
             {[...vendors].sort((a,b) => (a.company || a.registeredName || a.name || '').localeCompare(b.company || b.registeredName || b.name || '')).map((v) => {
-              const bal = v.pakkaBalance;
+              const bal = v.regularBalance;
               const drCrLabel = bal > 0 ? 'CR' : bal < 0 ? 'DR' : null;
               const balColor  = bal > 0 ? colors.danger : bal < 0 ? colors.success : colors.text.muted;
               const balBg = bal > 0 ? colors.danger + '12' : bal < 0 ? colors.success + '12' : colors.bg.secondary;

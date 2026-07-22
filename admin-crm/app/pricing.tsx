@@ -247,30 +247,7 @@ export default function PricingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Page Header */}
-      <View style={styles.pageHeader}>
-        <View>
-          <Text style={styles.pageTitle}>Pricing &amp; Discounts</Text>
-          <Text style={styles.pageSubtitle}>Set rates and website promo banners for all products</Text>
-        </View>
-        {canEdit && (
-          <TouchableOpacity
-            style={[styles.saveAllBtn, saveAllLoading && { opacity: 0.7 }]}
-            onPress={saveAll}
-            disabled={saveAllLoading}
-            activeOpacity={0.8}
-          >
-            {saveAllLoading
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Ionicons name="save-outline" size={16} color="#fff" />}
-            <Text style={styles.saveAllBtnText}>
-              {saveAllLoading ? 'Saving...' : `Save All${dirtyCount > 0 ? ` (${dirtyCount})` : ''}`}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Stats Strip */}
+      {/* Stats Strip with Integrated Save All Button */}
       <View style={styles.statsStrip}>
         <View style={styles.statCard}>
           <Ionicons name="cube-outline" size={18} color={colors.primary} />
@@ -287,6 +264,22 @@ export default function PricingScreen() {
           <Text style={styles.statValue}>{dirtyCount}</Text>
           <Text style={styles.statLabel}>Unsaved Changes</Text>
         </View>
+
+        {canEdit && (
+          <TouchableOpacity
+            style={[styles.saveAllBtn, saveAllLoading && { opacity: 0.7 }]}
+            onPress={saveAll}
+            disabled={saveAllLoading}
+            activeOpacity={0.8}
+          >
+            {saveAllLoading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="save-outline" size={16} color="#fff" />}
+            <Text style={styles.saveAllBtnText}>
+              {saveAllLoading ? 'Saving...' : `Save All${dirtyCount > 0 ? ` (${dirtyCount})` : ''}`}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Search */}
@@ -375,6 +368,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   statsStrip: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     gap: Spacing.md,

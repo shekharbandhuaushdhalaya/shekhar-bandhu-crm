@@ -33,8 +33,8 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     if (path.startsWith('/queries')) return 'Web Queries';
     if (path.startsWith('/orders')) return 'Orders';
     if (path.startsWith('/quotations')) return 'Quotations';
-    if (path.startsWith('/invoices/sale')) return 'Sale Invoice';
-    if (path.startsWith('/invoices/purchase')) return 'Purchase Invoice';
+    if (path.startsWith('/invoices/sale')) return 'Sale Invoices';
+    if (path.startsWith('/invoices/purchase')) return 'Purchase Invoices';
     if (path.startsWith('/payments')) return 'Payments';
     if (path.startsWith('/reports')) return 'Reports';
     if (path.startsWith('/rbac')) return 'Access Control';
@@ -43,9 +43,15 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     if (path.startsWith('/manufacturing')) return 'Manufacturing / BMR';
     if (path.startsWith('/salescrm')) return 'Sales & CRM';
     if (path.startsWith('/inventorydispatch')) return 'Inventory & Dispatch';
-    if (path.startsWith('/stockmovements')) return 'Stock Movements';
+    if (path.startsWith('/stockmovements')) return 'Delivery Challans';
     if (path.startsWith('/profile')) return 'My Details';
     if (path.startsWith('/campaigns')) return 'Campaigns';
+    if (path.startsWith('/credit-notes')) return 'Credit / Debit Notes';
+    if (path.startsWith('/gst-returns')) return 'GST Returns';
+    if (path.startsWith('/accounts')) return 'Chart of Accounts';
+    if (path.startsWith('/journal-entries')) return 'Journal Entries';
+    if (path.startsWith('/bank-reconciliation')) return 'Bank Reconciliation';
+    if (path.startsWith('/medicalreps')) return 'Medical Representatives';
     return '';
   };
 
@@ -116,24 +122,6 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
 
       {/* Right Controls */}
       <View style={styles.headerControls}>
-        {/* Connection status */}
-        <View style={[styles.statusBadge, { backgroundColor: isOnline ? colors.successLight : colors.warningLight, borderColor: isOnline ? colors.success : colors.warning }]}>
-          <View style={[styles.dot, { backgroundColor: isOnline ? colors.success : colors.warning }]} />
-          {isDesktop && (
-            <Text style={[styles.badgeText, { color: isOnline ? colors.success : colors.warning }]}>
-              {isOnline ? 'Synced' : 'Local'}
-            </Text>
-          )}
-        </View>
-
-        {/* Theme Toggle */}
-        <TouchableOpacity onPress={toggleTheme} style={styles.headerBtn} activeOpacity={0.7}>
-          <Ionicons name={themeMode === 'dark' ? 'sunny-outline' : 'moon-outline'} size={18} color={colors.text.secondary} />
-        </TouchableOpacity>
-
-        {/* Divider */}
-        <View style={styles.headerDivider} />
-
         {/* User Card */}
         <TouchableOpacity style={styles.headerUser} onPress={() => router.push('/profile')} activeOpacity={0.7}>
           <View style={[styles.headerAvatar, { borderColor: roleColors[user.role] || colors.text.muted }]}>
@@ -149,12 +137,6 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
               </View>
             </View>
           )}
-        </TouchableOpacity>
-
-        {/* Logout */}
-        <TouchableOpacity onPress={logout} style={styles.logoutBtn} activeOpacity={0.7}>
-          <Ionicons name="log-out-outline" size={16} color={colors.danger} />
-          {isDesktop && <Text style={styles.logoutBtnText}>Sign Out</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -228,7 +210,7 @@ function MainLayout() {
       <TopHeader user={user} isOnline={isOnline} logout={logout} toggleSidebar={() => setIsSidebarOpen(true)} />
       
       <View style={[styles.mainContainer, { flexDirection: isDesktop ? 'row' : 'column' }]}>
-        {isDesktop && <Sidebar />}
+        {isDesktop && <Sidebar isOnline={isOnline} logout={logout} />}
         
         {/* Mobile Navigation Drawer Modal */}
         {!isDesktop && (
@@ -247,7 +229,7 @@ function MainLayout() {
                     <Ionicons name="close" size={24} color={colors.text.primary} />
                   </TouchableOpacity>
                 </View>
-                <Sidebar onNavigate={() => setIsSidebarOpen(false)} />
+                <Sidebar onNavigate={() => setIsSidebarOpen(false)} isOnline={isOnline} logout={logout} />
               </View>
             </View>
           </Modal>

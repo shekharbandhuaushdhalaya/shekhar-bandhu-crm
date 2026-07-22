@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
-import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product } from '../utils/api';
+import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product, DeadStockItem } from '../utils/api';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
@@ -66,12 +66,12 @@ const compareSizes = (aSize?: string, bSize?: string) => {
 const getDisplayName = (item: { productType?: string; size?: string; colour?: string; shape?: string; weight?: string; name?: string; itemName?: string; productId?: string }, products: Product[] = []) => {
   const p = products.find(prod => prod._id === item.productId);
   if (p && p.name) {
-    const sizeStr = p.size ? ` (${p.size})` : '';
+    const sizeStr = (p.size && !p.name.toLowerCase().includes(p.size.toLowerCase())) ? ` (${p.size})` : '';
     return `${p.name}${sizeStr}`;
   }
   const name = item.name || item.itemName;
   if (name) {
-    const sizeStr = item.size ? ` (${item.size})` : '';
+    const sizeStr = (item.size && !name.toLowerCase().includes(item.size.toLowerCase())) ? ` (${item.size})` : '';
     return `${name}${sizeStr}`;
   }
   const parts = [
@@ -86,7 +86,7 @@ const getDisplayName = (item: { productType?: string; size?: string; colour?: st
 
 const getProductSelectorDisplayName = (item: { size?: string; shape?: string; colour?: string; weight?: string; name?: string }) => {
   if (item.name) {
-    const sizeStr = item.size ? ` (${item.size})` : '';
+    const sizeStr = (item.size && !item.name.toLowerCase().includes(item.size.toLowerCase())) ? ` (${item.size})` : '';
     return `${item.name}${sizeStr}`;
   }
   const parts = [
@@ -102,73 +102,26 @@ const getProductSelectorDisplayName = (item: { size?: string; shape?: string; co
 
 // Helper to format stock in boxes & pieces
 const formatStock = (qtyBoxes: number, packing: number = 1, showSign: boolean = false, compact: boolean = false) => {
-  if (qtyBoxes === 0) return '0 Boxes';
+  const totalPcs = Math.round(Math.abs(qtyBoxes) * packing);
   const isNegative = qtyBoxes < 0;
-  const absQtyBoxes = Math.abs(qtyBoxes);
-  // Ensure we round to nearest piece to handle float precision issues
-  const totalPcs = Math.round(absQtyBoxes * packing);
-  const boxes = Math.floor(totalPcs / packing);
-  const pcs = totalPcs % packing;
-
-  let str = '';
-  if (compact) {
-    if (boxes > 0 && pcs > 0) {
-      str = `${boxes}b ${pcs}p`;
-    } else if (boxes > 0) {
-      str = `${boxes}b`;
-    } else {
-      str = `${pcs}p`;
-    }
-  } else {
-    if (boxes > 0 && pcs > 0) {
-      str = `${boxes} Box${boxes !== 1 ? 'es' : ''} & ${pcs} Pc${pcs !== 1 ? 's' : ''}`;
-    } else if (boxes > 0) {
-      str = `${boxes} Box${boxes !== 1 ? 'es' : ''}`;
-    } else {
-      str = `${pcs} Pc${pcs !== 1 ? 's' : ''}`;
-    }
-  }
-
   const sign = isNegative ? '-' : (showSign ? '+' : '');
-  return `${sign}${str}`;
+  if (compact) {
+    return `${sign}${totalPcs}p`;
+  }
+  return `${sign}${totalPcs} Pc${totalPcs !== 1 ? 's' : ''}`;
 };
 
 // Component to beautifully display stock split into Boxes and Loose Change
 const StockDisplay = ({ qtyBoxes, packing = 1, showSign = false, textStyle = {} }: any) => {
   const { colors } = useTheme();
-  if (qtyBoxes === 0) return <Text style={[textStyle, { color: colors.text.muted }]}>0 Boxes</Text>;
+  const totalPcs = Math.round(Math.abs(qtyBoxes) * packing);
   const isNegative = qtyBoxes < 0;
-  const absQtyBoxes = Math.abs(qtyBoxes);
-  const totalPcs = Math.round(absQtyBoxes * packing);
-  const boxes = Math.floor(totalPcs / packing);
-  const pcs = totalPcs % packing;
   const sign = isNegative ? '-' : (showSign ? '+' : '');
-
+  const color = isNegative ? colors.danger : (totalPcs === 0 ? colors.text.muted : colors.success);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
-      {boxes > 0 && (
-        <Text style={[textStyle, { color: isNegative ? colors.danger : colors.success, fontWeight: '800' }]}>
-          {sign}{boxes} <Text style={{ fontSize: (textStyle.fontSize || 14) * 0.75, fontWeight: '600' }}>Box{boxes !== 1 ? 'es' : ''}</Text>
-        </Text>
-      )}
-      {pcs > 0 && (
-        <View style={{
-          backgroundColor: isNegative ? colors.danger + '15' : (boxes > 0 ? colors.warning + '20' : colors.success + '15'),
-          paddingHorizontal: 6,
-          paddingVertical: 2,
-          borderRadius: 4,
-          marginLeft: boxes > 0 ? 6 : 0,
-        }}>
-          <Text style={{
-            fontSize: (textStyle.fontSize || 14) * 0.75,
-            fontWeight: '800',
-            color: isNegative ? colors.danger : (boxes > 0 ? colors.warning : colors.success)
-          }}>
-            {boxes === 0 ? sign : '+'} {pcs} Loose
-          </Text>
-        </View>
-      )}
-    </View>
+    <Text style={[textStyle, { color, fontWeight: '800' }]}>
+      {sign}{totalPcs} <Text style={{ fontSize: (textStyle.fontSize || 14) * 0.8, fontWeight: '600' }}>Pcs</Text>
+    </Text>
   );
 };
 
@@ -366,7 +319,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
   const [note, setNote] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [vendorName, setVendorName] = useState('');
-  const [packing, setPacking] = useState('100');
+  const [packing, setPacking] = useState('1');
   const [date, setDate] = useState('');
   const [batchNo, setBatchNo] = useState('');
   const [mfgDate, setMfgDate] = useState('');
@@ -392,7 +345,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
       setVendorId('');
       setVendorName('');
       setVendorSearch('');
-      setPacking('100');
+      setPacking('1');
       setDate(new Date().toISOString().split('T')[0]);
       setBatchNo('');
       setMfgDate('');
@@ -423,14 +376,10 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
     }
     const qty = parseFloat(qtyBoxes);
     if (isNaN(qty) || qty <= 0) {
-      setError('Please enter a valid positive number of boxes');
+      setError('Please enter a valid positive quantity in Pcs');
       return;
     }
-    const packVal = parseInt(packing);
-    if (isNaN(packVal) || packVal <= 0) {
-      setError('Please enter a valid positive packing size (pcs/box)');
-      return;
-    }
+    const packVal = 1; // Always track in Pcs (packing = 1)
     // Issue #8: Warn if dates are set without a batch number
     if ((mfgDate || expiryDate) && !batchNo.trim()) {
       setError('Please enter a Batch Number when specifying Mfg/Expiry dates — batch dates without a batch number reduce traceability.');
@@ -634,30 +583,16 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                 )}
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={styles.formLabel}>Quantity (Boxes) *</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. 50"
-                    placeholderTextColor={colors.text.muted}
-                    keyboardType="numeric"
-                    value={qtyBoxes}
-                    onChangeText={setQtyBoxes}
-                  />
-                </View>
-
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={styles.formLabel}>Packing (Pcs/Box) *</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. 100"
-                    placeholderTextColor={colors.text.muted}
-                    keyboardType="numeric"
-                    value={packing}
-                    onChangeText={setPacking}
-                  />
-                </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Quantity (Pcs) *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. 500"
+                  placeholderTextColor={colors.text.muted}
+                  keyboardType="numeric"
+                  value={qtyBoxes}
+                  onChangeText={setQtyBoxes}
+                />
               </View>
 
               {/* Manufacturing Batch Details */}
@@ -906,42 +841,22 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
                 </View>
               </View>
 
-              {/* Boxes + Pieces dual input */}
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={styles.formLabel}>
-                    {type === 'IN' && 'Boxes to Add'}
-                    {type === 'OUT' && 'Boxes to Deduct'}
-                    {type === 'ADJUSTMENT' && 'Total Boxes'} *
-                  </Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder={type === 'ADJUSTMENT' ? entry.qtyBoxes.toString() : '0'}
-                    placeholderTextColor={colors.text.muted}
-                    keyboardType="numeric"
-                    value={qtyBoxes}
-                    onChangeText={handleBoxesChange}
-                  />
-                </View>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={styles.formLabel}>
-                    {type === 'IN' && 'Pieces to Add'}
-                    {type === 'OUT' && 'Pieces to Deduct'}
-                    {type === 'ADJUSTMENT' && 'Total Pieces'} *
-                  </Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder={type === 'ADJUSTMENT' ? (entry.qtyBoxes * packSize).toString() : '0'}
-                    placeholderTextColor={colors.text.muted}
-                    keyboardType="numeric"
-                    value={qtyPieces}
-                    onChangeText={handlePiecesChange}
-                  />
-                </View>
+              {/* Single Pcs input */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  {type === 'IN' && 'Pcs to Add'}
+                  {type === 'OUT' && 'Pcs to Deduct'}
+                  {type === 'ADJUSTMENT' && 'New Total (Pcs)'} *
+                </Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder={type === 'ADJUSTMENT' ? Math.round(entry.qtyBoxes * packSize).toString() : '0'}
+                  placeholderTextColor={colors.text.muted}
+                  keyboardType="numeric"
+                  value={qtyPieces}
+                  onChangeText={handlePiecesChange}
+                />
               </View>
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -8, marginBottom: 8 }}>
-                Packing: {packSize} Pcs/Box — enter either field, the other updates automatically
-              </Text>
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Date (Optional backdating)</Text>
@@ -1199,12 +1114,12 @@ export default function InventoriesScreen() {
   const getDisplayName = (item: any) => {
     const p = products.find(prod => prod._id === item.productId);
     if (p && p.name) {
-      const sizeStr = p.size ? ` (${p.size})` : '';
+      const sizeStr = (p.size && !p.name.toLowerCase().includes(p.size.toLowerCase())) ? ` (${p.size})` : '';
       return `${p.name}${sizeStr}`;
     }
     const name = item.name || item.itemName;
     if (name) {
-      const sizeStr = item.size ? ` (${item.size})` : '';
+      const sizeStr = (item.size && !name.toLowerCase().includes(item.size.toLowerCase())) ? ` (${item.size})` : '';
       return `${name}${sizeStr}`;
     }
     const parts = [
@@ -1244,18 +1159,22 @@ export default function InventoriesScreen() {
   const [showVendorFilterDropdown, setShowVendorFilterDropdown] = useState(false);
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
   const [showZero, setShowZero] = useState(false);
+  const [showDeadStock, setShowDeadStock] = useState(false);
+  const [deadStockItems, setDeadStockItems] = useState<DeadStockItem[]>([]);
 
   const loadData = useCallback(async () => {
     try {
-      // 1. Fetch Warehouses, Products, and Vendors
-      const [ws, prods, vends] = await Promise.all([
+      // 1. Fetch Warehouses, Products, Vendors, and Dead Stock
+      const [ws, prods, vends, dead] = await Promise.all([
         api.getWarehouses(),
         api.getProducts(),
-        api.getVendors()
+        api.getVendors(),
+        api.getDeadStock().catch(() => [])
       ]);
       setWarehouses(ws);
       setProducts(prods);
       setVendors(vends);
+      setDeadStockItems(dead);
 
       // 2. Fetch inventory based on selected godown
       if (selectedWarehouseId === 'all') {
@@ -1744,6 +1663,17 @@ export default function InventoriesScreen() {
                 <Ionicons name={showZero ? "eye" : "eye-off-outline"} size={16} color={showZero ? '#fff' : colors.text.secondary} />
                 <Text style={[styles.headerBtnText, { color: showZero ? '#fff' : colors.text.secondary }]}>Zero Stock</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.headerBtnPrimary, {
+                  backgroundColor: showDeadStock ? colors.danger : colors.bg.card,
+                  borderWidth: 1,
+                  borderColor: showDeadStock ? colors.danger : colors.border,
+                }]}
+                onPress={() => setShowDeadStock(p => !p)}
+              >
+                <Ionicons name={showDeadStock ? "alert-circle" : "alert-circle-outline"} size={16} color={showDeadStock ? '#fff' : colors.danger} />
+                <Text style={[styles.headerBtnText, { color: showDeadStock ? '#fff' : colors.danger }]}>Dead Stock (90+ Days)</Text>
+              </TouchableOpacity>
           </View>
         </View>
 
@@ -1760,7 +1690,64 @@ export default function InventoriesScreen() {
             contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg, flexGrow: 1 }}
           >
             <View style={[styles.table, { minWidth: 700 }]}>
-              {selectedWarehouseId === 'all' ? (
+              {showDeadStock ? (
+                // --- DEAD STOCK REPORT VIEW ---
+                <>
+                  <View style={styles.tableHeaderRow}>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 2.5 }]}><Text style={styles.tableHeaderCell}>Product</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.8 }]}><Text style={styles.tableHeaderCell}>Warehouse</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2, textAlign: 'right' }]}><Text style={styles.tableHeaderCell}>Qty (Boxes)</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.5, textAlign: 'right' }]}><Text style={styles.tableHeaderCell}>Stock Value (₹)</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0, textAlign: 'right' }]}><Text style={styles.tableHeaderCell}>Inactive Days</Text></View>
+                  </View>
+
+                  {deadStockItems.map((item, idx) => (
+                    <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
+                      <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
+                        <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.productName}</Text>
+                        <Text style={{ fontSize: 10, color: colors.text.muted }}>SKU: {item.productSku} · Size: {item.size}</Text>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
+                        <Text style={styles.tableCell}>{item.warehouseName}</Text>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1.2 }]}>
+                        <Text style={[styles.tableCell, { textAlign: 'right', fontWeight: '700' }]}>{item.qtyBoxes}</Text>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1.5 }]}>
+                        <Text style={[styles.tableCell, { textAlign: 'right', color: colors.success, fontWeight: '700' }]}>₹{item.stockValue.toLocaleString('en-IN')}</Text>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]}>
+                        <Text style={[styles.tableCell, { textAlign: 'right', color: colors.danger, fontWeight: '700' }]}>{item.daysSinceMovement} Days</Text>
+                      </View>
+                    </View>
+                  ))}
+
+                  {deadStockItems.length === 0 ? (
+                    <View style={{ padding: 40, alignItems: 'center' }}>
+                      <Ionicons name="checkmark-circle-outline" size={36} color={colors.success} />
+                      <Text style={{ marginTop: 8, color: colors.text.muted, fontSize: 13 }}>All products have active stock movement!</Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.tableBodyRow, { backgroundColor: colors.danger + '0d', borderTopWidth: 2, borderTopColor: colors.danger }]}>
+                      <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: colors.danger }}>TOTAL DEAD STOCK</Text>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1.8 }]} />
+                      <View style={[styles.tableCellContainer, { flex: 1.2 }]}>
+                        <Text style={[styles.tableCell, { textAlign: 'right', fontWeight: '800', color: colors.danger }]}>
+                          {deadStockItems.reduce((s, a) => s + a.qtyBoxes, 0)}
+                        </Text>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1.5 }]}>
+                        <Text style={[styles.tableCell, { textAlign: 'right', fontWeight: '800', color: colors.danger }]}>
+                          ₹{deadStockItems.reduce((s, a) => s + a.stockValue, 0).toLocaleString('en-IN')}
+                        </Text>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]} />
+                    </View>
+                  )}
+                </>
+              ) : selectedWarehouseId === 'all' ? (
                 // --- CONSOLIDATED VIEW TABLE ---
                 <>
                   <View style={styles.tableHeaderRow}>

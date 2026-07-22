@@ -15,7 +15,17 @@ const billOfMaterialsSchema = new mongoose.Schema({
         ref: 'RawMaterial',
         required: true,
       },
-      qtyRequired: { type: Number, required: true }, // qty required of raw material
+      qtyRequired: { type: Number, required: true }, // qty required (% for formulation, pcs/unit for packaging)
+      itemType: { type: String, enum: ['formulation', 'packaging'], default: 'formulation' },
+    }
+  ],
+  isActive: { type: Boolean, default: true },
+  productionNotes: { type: String, default: "" },
+  overheadCost: { type: Number, default: 0 },
+  stages: [
+    {
+      name: { type: String, required: true },
+      targetDurationDays: { type: Number, required: true, default: 1 }
     }
   ],
 }, { timestamps: true });

@@ -31,8 +31,12 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // Enforce cash access security rule
-    filter.mode = 'pakka';
+    // Cash access gating — restrict non-cash users to regular payments only
+    if (!req.user || !req.user.canAccessCash) {
+      filter.mode = 'regular';
+    } else if (mode && mode !== 'all') {
+      filter.mode = mode;
+    }
 
     const payments = await Payment.find(filter).sort({ date: -1, createdAt: -1 }).lean();
     res.json(payments);
@@ -50,26 +54,45 @@ router.post('/', validate(schemas.paymentSchema), async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-
+    // Cash access gating
+    if (mode === 'cash' && (!req.user || !req.user.canAccessCash)) {
+      return res.status(403).json({ error: 'Access denied: You do not have permission to perform cash transactions.' });
+    }
 
     const payment = await Payment.create(req.body);
 
-    // Update balances
+    // Update balances — branch on mode
     if (partyType === 'Customer') {
       const cust = await Customer.findById(partyId);
       if (cust) {
-        cust.pakkaBalance += (type === 'receive' ? -amount : amount);
+        if (mode === 'cash') {
+          cust.cashBalance += (type === 'receive' ? -amount : amount);
+        } else {
+          cust.regularBalance += (type === 'receive' ? -amount : amount);
+        }
         await cust.save();
       }
     } else if (partyType === 'Vendor') {
       const vend = await Vendor.findById(partyId);
       if (vend) {
-        vend.pakkaBalance += (type === 'make' ? -amount : amount);
+        if (mode === 'cash') {
+          vend.cashBalance += (type === 'make' ? -amount : amount);
+        } else {
+          vend.regularBalance += (type === 'make' ? -amount : amount);
+        }
         await vend.save();
       }
     }
 
     res.status(201).json(payment);
+
+    const { logAction } = require('../../utils/auditLogger');
+    await logAction({
+      action: 'CREATE_PAYMENT',
+      description: `${type === 'receive' ? 'Received' : 'Made'} payment of ₹${amount} for ${partyType} (Mode: ${(mode || 'regular').toUpperCase()})`,
+      details: { id: payment._id },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -81,27 +104,46 @@ router.delete('/:id', async (req, res) => {
     const payment = await Payment.findById(req.params.id);
     if (!payment) return res.status(404).json({ error: 'Payment not found' });
 
-
+    // Cash access gating
+    if (payment.mode === 'cash' && (!req.user || !req.user.canAccessCash)) {
+      return res.status(403).json({ error: 'Access denied: You do not have permission to delete cash transactions.' });
+    }
 
     const { type, partyType, partyId, amount, mode } = payment;
 
-    // Revert balances
+    // Revert balances — branch on mode
     if (partyType === 'Customer') {
       const cust = await Customer.findById(partyId);
       if (cust) {
-        cust.pakkaBalance += (type === 'receive' ? amount : -amount);
+        if (mode === 'cash') {
+          cust.cashBalance += (type === 'receive' ? amount : -amount);
+        } else {
+          cust.regularBalance += (type === 'receive' ? amount : -amount);
+        }
         await cust.save();
       }
     } else if (partyType === 'Vendor') {
       const vend = await Vendor.findById(partyId);
       if (vend) {
-        vend.pakkaBalance += (type === 'make' ? amount : -amount);
+        if (mode === 'cash') {
+          vend.cashBalance += (type === 'make' ? amount : -amount);
+        } else {
+          vend.regularBalance += (type === 'make' ? amount : -amount);
+        }
         await vend.save();
       }
     }
 
     await Payment.findByIdAndDelete(req.params.id);
     res.json({ message: 'Payment deleted and balance reverted' });
+
+    const { logAction } = require('../../utils/auditLogger');
+    await logAction({
+      action: 'DELETE_PAYMENT',
+      description: `Deleted ${type === 'receive' ? 'received' : 'made'} payment of ₹${amount} (Mode: ${(mode || 'regular').toUpperCase()})`,
+      details: { id: payment._id },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1,6 +1,10 @@
 const z = require('zod');
 
-const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ObjectId');
+const objectId = z.union([
+  z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ObjectId'),
+  z.literal(''),
+  z.null()
+]).transform(val => (val === '' || val === null) ? undefined : val);
 
 // ── Shared field types ──────────────────────────────────────
 const phone = z.string().max(20).default('');
@@ -29,8 +33,9 @@ const productItem = z.object({
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name required'),
-  sku: z.string().min(1, 'SKU required'),
+  sku: z.string().optional(),
   price: z.number().default(0),
+  mrp: z.number().default(0),
   discount: z.number().min(0).max(100).default(0),
   discountLabel: z.string().default(''),
   websitePromoActive: z.boolean().default(false),
@@ -67,8 +72,8 @@ const customerSchema = z.object({
   company: z.string().default(''),
   email,
   phone,
-  pakkaBalance: z.number().default(0),
-  kachhaBalance: z.number().default(0),
+  regularBalance: z.number().default(0),
+  cashBalance: z.number().default(0),
   outstandingInvoices: z.number().default(0),
   salesVolume: z.number().default(0),
   gstin,
@@ -82,6 +87,7 @@ const customerSchema = z.object({
   shippingSameAsBilling: z.boolean().default(false),
   customerType: z.enum(['gst', 'cash']).default('gst'),
   recordTracking: z.enum(['invoice_ledger', 'cash_ledger']).default('invoice_ledger'),
+  discountPercent: z.number().min(0).max(100).default(0),
 });
 
 // ── Invoice ──────────────────────────────────────────────────
@@ -95,12 +101,17 @@ const invoiceItem = z.object({
   hsnCode: z.string().default(''),
   gstRate: z.number().default(0),
   batchNo: z.string().default(''),
+  expiryDate: z.string().or(z.date()).optional().nullable(),
   amount: z.number().optional(),
   size: z.string().optional(),
+  mrp: z.number().default(0),
+  discountPercent: z.number().default(0),
+  discountAmount: z.number().default(0),
 });
 
 const invoiceSchema = z.object({
   type: z.enum(['sale', 'purchase']),
+  purchaseType: z.enum(['finished_goods', 'raw_materials']).default('finished_goods'),
   invoiceNo: z.string().optional(),
   customerName: z.string().default(''),
   supplierName: z.string().default(''),
@@ -110,8 +121,10 @@ const invoiceSchema = z.object({
   amount: z.number().default(0),
   dueDate: z.string().or(z.date()).optional(),
   status: z.string().default('unpaid'),
-  mode: z.enum(['pakka']).default('pakka'),
+  mode: z.enum(['regular', 'cash', 'pakka', 'non_gst']).default('regular'),
   baseAmount: z.number().optional(),
+  totalMrp: z.number().optional(),
+  totalDiscount: z.number().optional(),
   gstRate: z.number().optional(),
   cgst: z.number().optional(),
   sgst: z.number().optional(),
@@ -140,7 +153,7 @@ const invoiceSchema = z.object({
   partyGstin: z.string().default(''),
   qrCode: z.string().default(''),
   reference: objectId.optional(),
-});
+}).passthrough();
 
 // ── Quote ────────────────────────────────────────────────────
 const quotationItem = z.object({
@@ -162,7 +175,7 @@ const quotationSchema = z.object({
   date: z.string().or(z.date()).optional(),
   amount: z.number().default(0),
   status: z.enum(['draft', 'sent', 'approved', 'rejected']).default('draft'),
-  mode: z.enum(['pakka']).default('pakka'),
+  mode: z.enum(['regular']).default('regular'),
   baseAmount: z.number().optional(),
   gstRate: z.number().optional(),
   cgst: z.number().optional(),
@@ -185,6 +198,7 @@ const smItem = z.object({
   qty: z.number(),
   packing: z.number().default(1),
   rate: z.number().default(0),
+  discountPercent: z.number().default(0),
   gstRate: z.number().default(0),
   batchNo: z.string().default(''),
   mrp: z.number().default(0),
@@ -193,7 +207,8 @@ const smItem = z.object({
 const stockMovementSchema = z.object({
   docNo: z.string().optional(),
   direction: z.enum(['in', 'out']),
-  type: z.enum(['sale', 'sample', 'order', 'return', 'purchase', 'transfer_out', 'transfer_in']),
+  type: z.enum(['sale', 'sample', 'order', 'return', 'purchase', 'transfer_out', 'transfer_in', 'damage']),
+  billingMode: z.enum(['cash', 'regular']).optional().default('regular'),
   date: z.string().or(z.date()).optional(),
   warehouseId: objectId.optional(),
   warehouseName: z.string().default(''),
@@ -211,6 +226,12 @@ const stockMovementSchema = z.object({
   totalAmount: z.number().default(0),
   isFree: z.boolean().default(false),
   status: z.enum(['draft', 'dispatched', 'received', 'cancelled']).default('draft'),
+  convertedToInvoice: z.boolean().optional().default(false),
+  invoiceId: objectId.optional(),
+  invoiceNo: z.string().optional().default(''),
+  medicalRepName: z.string().optional().default(''),
+  doctorName: z.string().optional().default(''),
+  damageReason: z.string().optional().default(''),
   notes: z.string().default(''),
   createdBy: z.string().default(''),
 });
@@ -256,7 +277,7 @@ const userSchema = z.object({
   name: z.string().min(1, 'Name required'),
   email: z.string().email('Valid email required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  role: z.enum(['admin', 'manager', 'agent']).default('agent'),
+  role: z.string().default('agent'),
   canAccessCash: z.boolean().default(false),
 });
 
@@ -273,7 +294,7 @@ const changePasswordSchema = z.object({
 const updateProfileSchema = z.object({
   name: z.string().min(1).optional(),
   email: z.string().email().optional(),
-  role: z.enum(['admin', 'manager', 'agent']).optional(),
+  role: z.string().optional(),
   canAccessCash: z.boolean().optional(),
 });
 
@@ -284,8 +305,8 @@ const vendorSchema = z.object({
   email,
   phone,
   productCategory: z.string().default('General'),
-  pakkaBalance: z.number().default(0),
-  kachhaBalance: z.number().default(0),
+  regularBalance: z.number().default(0),
+  cashBalance: z.number().default(0),
   paymentTerms: z.string().default('Net 30'),
   gstin,
   state: z.string().default('Maharashtra'),
@@ -328,11 +349,41 @@ const paymentSchema = z.object({
   partyId: objectId,
   partyName: z.string().min(1),
   amount: z.number().min(0),
-  mode: z.enum(['pakka']).default('pakka'),
+  mode: z.enum(['regular', 'cash']).default('regular'),
   paymentMethod: z.enum(['Cash', 'Bank Transfer', 'Cheque', 'UPI']).default('Cash'),
   referenceNo: z.string().default(''),
   notes: z.string().default(''),
   date: z.string().or(z.date()).optional(),
+});
+
+// ── Credit / Debit Note ──────────────────────────────────────
+const creditNoteItem = z.object({
+  productId: objectId.optional(),
+  name: z.string().min(1),
+  qty: z.number().min(0).default(0),
+  boxes: z.number().min(0).default(0),
+  packing: z.number().min(1).default(1),
+  rate: z.number().min(0).default(0),
+  amount: z.number().min(0).default(0),
+});
+
+const creditNoteSchema = z.object({
+  noteNo: z.string().optional(),
+  type: z.enum(['credit_note', 'debit_note']),
+  invoiceId: objectId.optional(),
+  invoiceNo: z.string().default(''),
+  partyType: z.enum(['Customer', 'Vendor']),
+  partyId: objectId,
+  partyName: z.string().min(1),
+  date: z.string().or(z.date()).optional(),
+  reason: z.string().default(''),
+  baseAmount: z.number().min(0).default(0),
+  gstRate: z.number().min(0).default(0),
+  cgst: z.number().min(0).default(0),
+  sgst: z.number().min(0).default(0),
+  igst: z.number().min(0).default(0),
+  totalAmount: z.number().min(0).default(0),
+  items: z.array(creditNoteItem).default([]),
 });
 
 // ── Sample ───────────────────────────────────────────────────
@@ -368,6 +419,12 @@ const batchProductionSchema = z.object({
   startDate: z.string().or(z.date()).optional(),
 });
 
+const yieldItemSchema = z.object({
+  productId: objectId,
+  actualYieldQty: z.number().int().min(0),
+  packing: z.number().int().min(1).default(1),
+});
+
 const batchCompleteSchema = z.object({
   actualYieldQty: z.number().int().min(0),
   wasteQty: z.number().int().min(0).default(0),
@@ -375,6 +432,7 @@ const batchCompleteSchema = z.object({
   qcNotes: z.string().default(''),
   qcPassedBy: z.string().default(''),
   packing: z.number().int().min(1).default(1),
+  yields: z.array(yieldItemSchema).optional(),
 });
 
 // ── Challan ──────────────────────────────────────────────────
@@ -404,7 +462,7 @@ const challanSchema = z.object({
   warehouseName: z.string().default(''),
   items: z.array(challanItem).default([]),
   status: z.string().default('draft'),
-  mode: z.enum(['pakka']).default('pakka'),
+  mode: z.enum(['regular']).default('regular'),
   baseAmount: z.number().default(0),
   cgst: z.number().default(0),
   sgst: z.number().default(0),
@@ -417,8 +475,9 @@ const challanSchema = z.object({
 // ── RawMaterial ──────────────────────────────────────────────
 const rawMaterialSchema = z.object({
   name: z.string().min(1),
-  sku: z.string().min(1),
+  sku: z.string().optional(),
   unit: z.string().min(1),
+  category: z.enum(['Herb', 'Packaging', 'Excipient', 'General']).default('Herb'),
 });
 
 const rawMaterialEntrySchema = z.object({
@@ -436,10 +495,19 @@ const bomIngredient = z.object({
   qtyRequired: z.number().positive(),
 });
 
+const bomStage = z.object({
+  name: z.string().min(1),
+  targetDurationDays: z.number().positive().default(1),
+});
+
 const bomSchema = z.object({
   productId: objectId,
   batchYieldSize: z.number().int().positive(),
   ingredients: z.array(bomIngredient).min(1),
+  isActive: z.boolean().optional(),
+  productionNotes: z.string().optional(),
+  overheadCost: z.number().nonnegative().optional(),
+  stages: z.array(bomStage).optional(),
 });
 
 // ── Contact ──────────────────────────────────────────────────
@@ -545,8 +613,10 @@ const systemSettingsSchema = z.object({
 
 // ── RBAC ─────────────────────────────────────────────────────
 const rbacPermissionsSchema = z.object({
-  role: z.string().min(1),
-  permissions: z.record(z.boolean()),
+  role: z.string().min(1).optional(),
+  permissions: z.array(z.string()).optional(),
+  label: z.string().optional(),
+  description: z.string().optional(),
 });
 
 // ── Web Query ────────────────────────────────────────────────
@@ -593,6 +663,7 @@ module.exports = {
   vendorSchema,
   inventoryEntrySchema,
   paymentSchema,
+  creditNoteSchema,
   sampleSchema,
   batchProductionSchema,
   batchCompleteSchema,

@@ -216,36 +216,57 @@ export default function CampaignsScreen() {
         ))}
       </View>
 
-      {/* Search & Filter Bar */}
-      <View style={styles.searchRow}>
-        <View style={styles.searchInputWrap}>
-          <Ionicons name="search-outline" size={16} color={colors.text.muted} />
+      {/* Standardized Search & Title Topbar */}
+      <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.bg.card,
+          paddingHorizontal: 12,
+          paddingRight: 8,
+          borderRadius: Radius.md,
+          borderWidth: 1,
+          borderColor: colors.border,
+          gap: 10,
+          minHeight: 46
+        }}>
+          <Ionicons name="megaphone-outline" size={18} color={colors.text.muted} />
+
           <TextInput
-            style={styles.searchInput}
+            style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 120 }}
             placeholder="Search campaigns..."
             placeholderTextColor={colors.text.muted}
             value={search}
             onChangeText={setSearch}
           />
-        </View>
-        <View style={styles.filterGroup}>
-          {['', 'draft', 'running', 'completed'].map(s => (
+
+          <View style={{ flexDirection: 'row', gap: 4 }}>
+            {['', 'draft', 'running', 'completed'].map(s => (
+              <TouchableOpacity
+                key={s}
+                style={[
+                  { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border },
+                  statusFilter === s ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: colors.bg.secondary }
+                ]}
+                onPress={() => setStatusFilter(s)}
+              >
+                <Text style={[{ fontSize: 11, fontWeight: '600' }, statusFilter === s ? { color: '#fff', fontWeight: '700' } : { color: colors.text.secondary }]}>
+                  {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {perm.can('campaign:create') && (
             <TouchableOpacity
-              key={s}
-              style={[styles.filterChip, statusFilter === s && { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-              onPress={() => setStatusFilter(s)}
+              style={{ height: 34, paddingHorizontal: 14, borderRadius: Radius.sm, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              onPress={openCreateModal}
             >
-              <Text style={[styles.filterChipText, statusFilter === s && { color: colors.primary, fontWeight: '700' }]}>
-                {s || 'All'}
-              </Text>
+              <Ionicons name="add" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>New Campaign</Text>
             </TouchableOpacity>
-          ))}
+          )}
         </View>
-        {perm.can('campaign:create') && (
-          <TouchableOpacity style={styles.addBtn} onPress={openCreateModal}>
-            <Ionicons name="add" size={18} color="#fff" />
-          </TouchableOpacity>
-        )}
       </View>
 
       <ScrollView

@@ -112,6 +112,33 @@ describe('StockMovement schema', () => {
     expect(r.success).toBe(true);
   });
 
+  test('accepts damage type and new fields (billingMode, damageReason)', () => {
+    const r = schemas.stockMovementSchema.safeParse({
+      direction: 'out',
+      type: 'damage',
+      billingMode: 'cash',
+      damageReason: 'Expired stock',
+      items: [{ productName: 'Test', qty: 10 }],
+    });
+    expect(r.success).toBe(true);
+    expect(r.data.type).toBe('damage');
+    expect(r.data.billingMode).toBe('cash');
+    expect(r.data.damageReason).toBe('Expired stock');
+  });
+
+  test('accepts empty/null objectIds and transforms them to undefined', () => {
+    const r = schemas.stockMovementSchema.safeParse({
+      direction: 'out',
+      type: 'order',
+      partyId: '',
+      warehouseId: null,
+      items: [{ productName: 'Test', qty: 10 }],
+    });
+    expect(r.success).toBe(true);
+    expect(r.data.partyId).toBeUndefined();
+    expect(r.data.warehouseId).toBeUndefined();
+  });
+
   test('rejects empty items', () => {
     const r = schemas.stockMovementSchema.safeParse({
       direction: 'in',

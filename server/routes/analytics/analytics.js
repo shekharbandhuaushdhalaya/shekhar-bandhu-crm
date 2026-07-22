@@ -89,7 +89,7 @@ router.get('/query', authorize('analytics:query'), async (req, res) => {
           $project: {
             name: 1,
             company: 1,
-            totalOutstanding: "$pakkaBalance"
+            totalOutstanding: "$regularBalance"
           }
         },
         { $sort: { totalOutstanding: -1 } },
@@ -190,7 +190,8 @@ router.get('/manufacturing', async (req, res) => {
       actualYieldQty: run.actualYieldQty || 0,
       status: run.status,
       startDate: run.startDate,
-      endDate: run.endDate
+      endDate: run.endDate,
+      stages: run.stages || []
     }));
 
     res.json({

@@ -425,7 +425,7 @@ router.post('/:id/convert', async (req, res) => {
       shippingAddress: challan.shippingAddress,
       date: new Date(),
       amount: nettTotal,
-      status: 'unpaid',
+      status: 'draft',
       mode: 'pakka', // converted invoice is pakka
       baseAmount: totalBase,
       cgst,

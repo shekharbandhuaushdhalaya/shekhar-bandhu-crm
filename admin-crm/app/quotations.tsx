@@ -634,6 +634,26 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
             </TouchableOpacity>
           )}
           
+          {/* Convert to Delivery Challan Button */}
+          {!(invoice as any).convertedToChallan && (
+            <TouchableOpacity
+              style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.purple }]}
+              onPress={async () => {
+                try {
+                  const res = await api.convertQuotationToChallan(invoice._id);
+                  alert(`Draft Delivery Challan ${res.stockMovement?.docNo || ''} created successfully!`);
+                  onDeleted();
+                  onClose();
+                } catch (err: any) {
+                  alert(err.message || 'Failed to convert quotation to delivery challan');
+                }
+              }}
+            >
+              <Ionicons name="cart-outline" size={18} color="#fff" />
+              <Text style={styles.printBtnText}>Convert to Delivery Challan (Draft)</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.primary }]}
             onPress={() => printQuotation(invoice)}
@@ -803,17 +823,12 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
 
   const getInventoryEntryDisplayName = (entry: InventoryEntry) => {
     const product = products.find(p => p._id === entry.productId);
-    const parts = [
-      formatSize(entry.size),
-      toTitleCase(entry.shape),
-      toTitleCase(entry.colour),
-      formatWeight(entry.weight)
-    ];
-    const combined = parts.filter(Boolean).join(' ');
-    if (combined) {
-      return combined;
+    const name = product ? product.name : entry.productType || 'Unnamed Product';
+    const size = entry.size || '';
+    if (size && !name.toLowerCase().includes(size.toLowerCase())) {
+      return `${name} (${size})`;
     }
-    return product ? product.name : entry.productType || 'Unnamed Product';
+    return name;
   };
 
   const getFilteredInventoryEntries = (search: string) => {
@@ -1232,7 +1247,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                           >
                             <Text style={styles.customSelectItemText}>{getInventoryEntryDisplayName(entry)}</Text>
                             <Text style={styles.customSelectItemSubtext}>
-                              Packing: {entry.packing} | Vendor: {entry.vendorName} | Available: {entry.qtyBoxes} boxes
+                              Packing: {entry.packing} | Vendor: {entry.vendorName} | Available: {entry.qtyBoxes * (entry.packing || 1)} pcs
                             </Text>
                           </TouchableOpacity>
                         ))}
@@ -1257,7 +1272,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                 {/* Bottom line: Qty, Rate, Subtotal, Remove */}
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, alignItems: 'center' }}>
                   <View style={{ flex: 1.2 }}>
-                    <Text style={styles.itemSublabel}>Boxes</Text>
+                    <Text style={styles.itemSublabel}>Pcs</Text>
                     <TextInput
                       style={[styles.itemInput, hasError && { borderColor: colors.danger, borderWidth: 1 }]}
                       placeholder="Qty"
@@ -1305,7 +1320,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
 
                 {it.productId ? (
                   <Text style={{ fontSize: 10, color: hasError ? colors.danger : colors.text.muted, marginTop: 4, fontWeight: '600' }}>
-                    {hasError ? `Error: Exceeds stock limit of ${maxQty} boxes` : `Available stock: ${maxQty} boxes (Packing: ${it.packing || 1})`}
+                    {hasError ? `Error: Exceeds stock limit of ${maxQty} pcs` : `Available stock: ${maxQty} pcs`}
                   </Text>
                 ) : null}
               </View>
@@ -1387,54 +1402,67 @@ export default function QuotationsScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.innerContainer}>
-        <View style={{ zIndex: 1100, position: 'relative' }}>
-          <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput
-              style={[styles.searchInput, { minWidth: 100 }]}
-              placeholder="Search sale invoices..."
-              placeholderTextColor={colors.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
-            <TouchableOpacity style={styles.addBtn} onPress={() => { setQuotationToEdit(null); setAddVisible(true); }}>
-              <Ionicons name="add" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        {/* Standardized Search Bar */}
+      <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.bg.card,
+          paddingHorizontal: 12,
+          paddingRight: 8,
+          borderRadius: Radius.md,
+          borderWidth: 1,
+          borderColor: colors.border,
+          gap: 10,
+          minHeight: 46
+        }}>
+          <Ionicons name="search" size={18} color={colors.text.muted} />
+          <TextInput
+            style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 100 }}
+            placeholder="Search quotations by number, customer..."
+            placeholderTextColor={colors.text.muted}
+            value={search}
+            onChangeText={setSearch}
+          />
+          <TouchableOpacity style={{ height: 34, paddingHorizontal: 14, borderRadius: Radius.sm, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }} onPress={() => { setQuotationToEdit(null); setAddVisible(true); }}>
+            <Ionicons name="add" size={18} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>New Quotation</Text>
+          </TouchableOpacity>
         </View>
+      </View>
 
 
 
       <ScrollView style={{ flex: 1 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
-          <View style={styles.table}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
+          <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
             {/* Table Header Row */}
             <View style={styles.tableHeaderRow}>
-              <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Quotation No</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>Quotation No</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 110 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 80, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Status</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
             </View>
 
             {/* Table Body Rows */}
             {invoices.map((item) => (
               <View key={item._id} style={styles.tableBodyRow}>
-                <View style={[styles.tableCellContainer, { width: 130 }]}>
+                <View style={[styles.tableCellContainer, { width: 140 }]}>
                   <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.quotationNo}</Text>
                 </View>
-                <View style={[styles.tableCellContainer, { width: 160 }]}>
+                <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
                   <Text style={styles.tableCell} numberOfLines={1}>{item.customerName || 'N/A'}</Text>
                 </View>
                 <View style={[styles.tableCellContainer, { width: 120 }]}>
                   <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
                 </View>
-                <View style={[styles.tableCellContainer, { width: 110 }]}>
+                <View style={[styles.tableCellContainer, { width: 120 }]}>
                   <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString()}</Text>
                 </View>
-                <View style={[styles.tableCellContainer, { width: 120 }]}>
+                <View style={[styles.tableCellContainer, { width: 130 }]}>
                   <View style={[styles.statusBadge, {
                     borderColor: item.isFinalized ? colors.success : colors.warning,
                     backgroundColor: (item.isFinalized ? colors.success : colors.warning) + '12'
@@ -1444,7 +1472,7 @@ export default function QuotationsScreen() {
                     }]}>{item.isFinalized ? 'FINALIZED' : 'DRAFT'}</Text>
                   </View>
                 </View>
-                <View style={[styles.tableCellContainer, { width: 120 }]}>
+                <View style={[styles.tableCellContainer, { width: 130 }]}>
                   <View style={[styles.statusBadge, {
                     borderColor: item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning,
                     backgroundColor: (item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning) + '12'
@@ -1455,7 +1483,7 @@ export default function QuotationsScreen() {
                   </View>
                 </View>
 
-                <View style={[styles.tableCellContainer, { width: 80, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
+                <View style={[styles.tableCellContainer, { width: 100, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
                   <TouchableOpacity style={styles.actionIconButton} onPress={() => { setSelectedInv(item); setDetailVisible(true); }}>
                     <Ionicons name="eye" size={16} color={colors.primary} />
                   </TouchableOpacity>
@@ -1466,7 +1494,7 @@ export default function QuotationsScreen() {
             {invoices.length === 0 && (
               <View style={styles.emptyTableContainer}>
                 <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                <Text style={styles.emptyText}>No invoices found</Text>
+                <Text style={styles.emptyText}>No quotations found</Text>
               </View>
             )}
           </View>
@@ -1502,13 +1530,13 @@ export default function QuotationsScreen() {
 
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
-  innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
+  innerContainer: { flex: 1, width: '100%' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
   searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 40, fontSize: 13 },
 
-  table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
+  table: { flex: 1, width: '100%', minWidth: 950, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },

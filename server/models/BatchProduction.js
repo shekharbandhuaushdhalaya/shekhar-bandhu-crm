@@ -20,7 +20,9 @@ const stageSchema = new mongoose.Schema({
   startedAt: { type: Date, default: null },
   completedAt: { type: Date, default: null },
   completedBy: { type: String, default: '' },
-  notes: { type: String, default: '' }
+  notes: { type: String, default: '' },
+  targetDurationDays: { type: Number, default: 1 },
+  targetCompletionDate: { type: Date, default: null }
 }, { _id: false });
 
 const batchProductionSchema = new mongoose.Schema({
@@ -57,11 +59,13 @@ const batchProductionSchema = new mongoose.Schema({
       batchNo: { type: String, required: true },
     }
   ],
+  packagingDeducted: { type: Boolean, default: false },
   startDate: { type: Date, default: null },
   endDate: { type: Date, default: null },
   qcNotes: { type: String, default: '' },
   qcPassedBy: { type: String, default: '' },
   rawMaterialCost: { type: Number, default: 0 },
+  overheadCost: { type: Number, default: 0 },
   unitProductionCost: { type: Number, default: 0 },
 }, { timestamps: true });
 

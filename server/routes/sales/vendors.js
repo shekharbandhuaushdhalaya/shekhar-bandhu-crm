@@ -22,7 +22,7 @@ router.get('/', authorize('vendor:view'), async (req, res) => {
 
     const vendors = await Vendor.find(filter).sort({ createdAt: -1 }).lean();
     const sanitized = vendors.map(v => {
-      v.kachhaBalance = 0;
+      v.cashBalance = 0;
       return v;
     });
     res.json(sanitized);
@@ -40,7 +40,7 @@ router.post('/', authorize('vendor:create'), validate(schemas.vendorSchema), asy
       name: req.body.displayName || req.body.name || '',
       company: req.body.registeredName || req.body.company || '',
     };
-    delete data.kachhaBalance;
+    delete data.cashBalance;
     const vendor = await Vendor.create(data);
     res.status(201).json(vendor);
   } catch (err) {
@@ -60,7 +60,7 @@ router.put('/:id', authorize('vendor:edit'), validate(schemas.vendorSchema.parti
     if (req.body.registeredName || req.body.company) {
       data.company = req.body.registeredName ?? req.body.company;
     }
-    delete data.kachhaBalance;
+    delete data.cashBalance;
     const vendor = await Vendor.findByIdAndUpdate(
       req.params.id,
       data,
@@ -69,7 +69,7 @@ router.put('/:id', authorize('vendor:edit'), validate(schemas.vendorSchema.parti
     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
     
     const doc = vendor.toObject();
-    doc.kachhaBalance = 0;
+    doc.cashBalance = 0;
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: err.message });

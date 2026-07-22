@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, TextInput, Image, Modal, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, TextInput, Image, Modal, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
 import { api, ProductQuery, getImageUrl } from '../utils/api';
@@ -90,12 +90,23 @@ export default function QueriesScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* Search & Tabs Topbar */}
-      <View style={styles.topBar}>
-        <View style={styles.searchBar}>
+      {/* Search Bar Container with Status Dropdown Inside */}
+      <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xs }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.bg.card,
+          paddingHorizontal: 12,
+          paddingRight: 8,
+          borderRadius: Radius.md,
+          borderWidth: 1,
+          borderColor: colors.border,
+          gap: 10,
+          minHeight: 46
+        }}>
           <Ionicons name="search" size={18} color={colors.text.muted} />
           <TextInput
-            style={styles.searchInput}
+            style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 100 }}
             placeholder="Search queries by name, product, text..."
             placeholderTextColor={colors.text.muted}
             value={search}
@@ -106,29 +117,65 @@ export default function QueriesScreen() {
               <Ionicons name="close-circle" size={18} color={colors.text.muted} />
             </TouchableOpacity>
           ) : null}
-        </View>
-      </View>
 
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        {(['all', 'pending', 'contacted', 'converted', 'closed'] as const).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabBtnText, activeTab === tab && styles.tabBtnTextActive]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
-            {tab !== 'all' && (
-              <View style={[styles.badge, { backgroundColor: getStatusColor(tab) + '20' }]}>
-                <Text style={[styles.badgeText, { color: getStatusColor(tab) }]}>
-                  {queries.filter(q => q.status === tab).length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+          {/* Status Dropdown inside search bar */}
+          {Platform.OS === 'web' ? (
+            <select
+              value={activeTab}
+              onChange={(e: any) => setActiveTab(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: `1px solid ${colors.border}`,
+                backgroundColor: colors.bg.secondary,
+                color: colors.text.primary,
+                fontSize: 12,
+                fontWeight: '600',
+                outline: 'none',
+                height: 34,
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all">All Statuses ({queries.length})</option>
+              <option value="pending">Pending ({queries.filter(q => q.status === 'pending').length})</option>
+              <option value="contacted">Contacted ({queries.filter(q => q.status === 'contacted').length})</option>
+              <option value="converted">Converted ({queries.filter(q => q.status === 'converted').length})</option>
+              <option value="closed">Closed ({queries.filter(q => q.status === 'closed').length})</option>
+            </select>
+          ) : (
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: colors.bg.secondary,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 6,
+                paddingHorizontal: 10,
+                height: 34,
+                gap: 6
+              }}
+              onPress={() => {
+                const opts = [
+                  { label: `All Statuses (${queries.length})`, val: 'all' },
+                  { label: `Pending (${queries.filter(q => q.status === 'pending').length})`, val: 'pending' },
+                  { label: `Contacted (${queries.filter(q => q.status === 'contacted').length})`, val: 'contacted' },
+                  { label: `Converted (${queries.filter(q => q.status === 'converted').length})`, val: 'converted' },
+                  { label: `Closed (${queries.filter(q => q.status === 'closed').length})`, val: 'closed' },
+                ];
+                Alert.alert('Filter Status', '', opts.map(o => ({
+                  text: o.label,
+                  onPress: () => setActiveTab(o.val as any)
+                })));
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+                {activeTab.toUpperCase()} ({activeTab === 'all' ? queries.length : queries.filter(q => q.status === activeTab).length})
+              </Text>
+              <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Query List */}

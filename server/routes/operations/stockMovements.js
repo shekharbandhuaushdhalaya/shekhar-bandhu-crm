@@ -4,11 +4,90 @@ const Product = require('../../models/Product');
 const InventoryEntry = require('../../models/InventoryEntry');
 const Warehouse = require('../../models/Warehouse');
 const StockLedger = require('../../models/StockLedger');
+const Customer = require('../../models/Customer');
+const LedgerEntry = require('../../models/LedgerEntry');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
 const router = express.Router();
+
+// ── Customer Ledger Sync ──────────────────────────────────────────────────────
+// Called when a SALE challan is dispatched.
+// Updates customer regular/cash balance and creates a LedgerEntry.
+async function syncCustomerLedger(movement, createdByName) {
+  if (movement.type !== 'sale' || movement.direction !== 'out') return;
+  const amount = movement.totalAmount || 0;
+  if (!amount) return;
+
+  const cust = await Customer.findOne({
+    $or: [
+      { name: movement.partyName },
+      { company: movement.partyName }
+    ]
+  });
+  if (!cust) return;
+
+  if (cust.recordTracking === 'cash_ledger' || movement.billingMode === 'cash') {
+    cust.cashBalance = (cust.cashBalance || 0) + amount;
+  } else {
+    cust.regularBalance = (cust.regularBalance || 0) + amount;
+  }
+  await cust.save();
+
+  await LedgerEntry.create({
+    partyId:    cust._id,
+    partyType:  'Customer',
+    partyName:  cust.company || cust.name,
+    date:       movement.date || new Date(),
+    mode:       movement.billingMode || 'regular',
+    refModel:   'StockMovement',
+    refId:      movement._id,
+    refNo:      movement.docNo,
+    debit:      amount,
+    credit:     0,
+    description: `Delivery Challan ${movement.docNo} dispatched`,
+    createdBy:  createdByName || 'System',
+  });
+}
+
+// Revert customer ledger on cancel
+async function revertCustomerLedger(movement) {
+  if (movement.type !== 'sale' || movement.direction !== 'out') return;
+  const amount = movement.totalAmount || 0;
+  if (!amount) return;
+
+  const cust = await Customer.findOne({
+    $or: [
+      { name: movement.partyName },
+      { company: movement.partyName }
+    ]
+  });
+  if (!cust) return;
+
+  if (cust.recordTracking === 'cash_ledger' || movement.billingMode === 'cash') {
+    cust.cashBalance = Math.max(0, (cust.cashBalance || 0) - amount);
+  } else {
+    cust.regularBalance = Math.max(0, (cust.regularBalance || 0) - amount);
+  }
+  await cust.save();
+
+  // Mark original ledger entry as reversed
+  await LedgerEntry.create({
+    partyId:    cust._id,
+    partyType:  'Customer',
+    partyName:  cust.company || cust.name,
+    date:       new Date(),
+    mode:       movement.billingMode || 'regular',
+    refModel:   'StockMovement',
+    refId:      movement._id,
+    refNo:      movement.docNo,
+    debit:      0,
+    credit:     amount,
+    description: `Reversal of Delivery Challan ${movement.docNo}`,
+    createdBy:  'System',
+  });
+}
 
 // ── Helpers ──
 
@@ -141,6 +220,28 @@ async function revertInventory(movement) {
   }
 }
 
+async function syncOrderLogistics(movement) {
+  try {
+    const Order = require('../../models/Order');
+    let order = null;
+    if (movement.sourceDocId) {
+      order = await Order.findById(movement.sourceDocId);
+    } else if (movement.type === 'order' && movement.partyName) {
+      order = await Order.findOne({ name: { $regex: movement.partyName, $options: 'i' } }).sort({ createdAt: -1 });
+    }
+
+    if (order) {
+      if (movement.courierName) order.courierName = movement.courierName;
+      if (movement.trackingId) order.trackingId = movement.trackingId;
+      if (movement.transporter && !order.courierName) order.courierName = movement.transporter;
+      if (movement.status === 'dispatched') order.status = 'shipped';
+      await order.save();
+    }
+  } catch (err) {
+    console.error('Failed to sync logistics to order:', err);
+  }
+}
+
 // Increase inventory for inbound movements
 async function increaseInventory(movement) {
   if (movement.direction !== 'in' || !movement.items?.length || !movement.warehouseId) return;
@@ -270,6 +371,7 @@ router.post('/', authorize('stockmovement:create'), validate(schemas.stockMoveme
       docNo,
       direction: data.direction,
       type: data.type,
+      billingMode: data.billingMode || 'regular',
       date: data.date || new Date(),
       warehouseId: data.warehouseId,
       warehouseName: data.warehouseName,
@@ -285,14 +387,26 @@ router.post('/', authorize('stockmovement:create'), validate(schemas.stockMoveme
       isFree: data.isFree || false,
       status: data.status || 'draft',
       notes: data.notes || '',
+      medicalRepName: data.medicalRepName || '',
+      doctorName: data.doctorName || '',
+      damageReason: data.damageReason || '',
+      transporter: data.transporter || '',
+      lrNo: data.lrNo || '',
+      vehicleNo: data.vehicleNo || '',
+      courierName: data.courierName || '',
+      trackingId: data.trackingId || '',
+      totalBoxes: data.totalBoxes || '1',
       createdBy: req.user?.name || 'System',
       sourceDocType: data.sourceDocType || '',
       sourceDocId: data.sourceDocId,
     });
 
+    await syncOrderLogistics(movement);
+
     // Auto-dispatch: if direction is 'out', immediately deduct inventory
     if (movement.direction === 'out' && movement.status === 'dispatched') {
       await deductInventory(movement);
+      await syncCustomerLedger(movement, req.user?.name);
     }
 
     // Auto-receive: if direction is 'in', immediately increase inventory
@@ -317,6 +431,7 @@ router.put('/:id', authorize('stockmovement:edit'), validate(schemas.stockMoveme
     Object.assign(movement, data);
     movement.createdBy = req.user?.name || movement.createdBy;
     await movement.save();
+    await syncOrderLogistics(movement);
     res.json(movement);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -334,6 +449,8 @@ router.patch('/:id/dispatch', authorize('stockmovement:edit'), async (req, res) 
     movement.status = 'dispatched';
     await movement.save();
     await deductInventory(movement);
+    await syncCustomerLedger(movement, req.user?.name);
+    await syncOrderLogistics(movement);
 
     res.json(movement);
   } catch (err) {
@@ -372,6 +489,7 @@ router.patch('/:id/cancel', authorize('stockmovement:delete'), async (req, res) 
 
     if (wasDispatched && movement.direction === 'out') {
       await revertInventory(movement);
+      await revertCustomerLedger(movement);
     }
 
     res.json(movement);
@@ -395,7 +513,7 @@ router.delete('/:id', authorize('stockmovement:delete'), async (req, res) => {
   }
 });
 
-// ── Convert to Invoice (for GST sales) ──
+// ── Convert to Invoice (for Pakka / GST sales only) ──
 router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (req, res) => {
   try {
     const movement = await StockMovement.findById(req.params.id);
@@ -406,8 +524,12 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
     if (movement.convertedToInvoice) {
       return res.status(400).json({ error: `Already converted to invoice ${movement.invoiceNo}` });
     }
+    // Cash sales don't need a tax invoice — the DC is the final document
+    if (movement.billingMode === 'cash') {
+      return res.status(400).json({ error: 'Cash sales do not generate a tax invoice. The Delivery Challan is the final document.' });
+    }
     if (!movement.partyGstin || !movement.partyGstin.trim()) {
-      return res.status(400).json({ error: 'Party does not have a GSTIN. Cannot create GST invoice.' });
+      return res.status(400).json({ error: 'Party does not have a GSTIN. Cannot create a GST (Regular) invoice.' });
     }
 
     const Invoice = require('../../models/Invoice');
@@ -456,26 +578,33 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
     const nettTotal = Math.round(rawTotal);
     const roundOff = nettTotal - rawTotal;
 
+    // Create draft tax invoice — inventory already deducted when DC was dispatched
     const invoice = await Invoice.create({
       invoiceNo,
       customerName: movement.partyName,
       partyAddress: movement.partyAddress,
       shippingAddress: movement.partyAddress,
-      date: new Date(),
+      date: movement.date || new Date(),
       amount: nettTotal,
-      status: 'unpaid',
-      mode: 'pakka',
+      status: 'draft',          // created in draft mode
+      mode: 'regular',
       baseAmount: totalBase,
       cgst, sgst, igst, roundOff,
       stateOfSupply: isIntraState ? 'Uttar Pradesh' : 'Other State',
       gstin: movement.partyGstin,
       warehouseId: movement.warehouseId,
       warehouseName: movement.warehouseName,
-      deductInventory: false,
-      isFinalized: false,
+      deductInventory: false,   // already deducted with DC
+      isFinalized: false,       // draft mode
       type: 'sale',
       items: invoiceItems,
+      // Link back to source DC
+      sourceDocType: 'StockMovement',
+      sourceDocId: movement._id,
     });
+
+    // Note: customer regularBalance was already updated when DC was dispatched.
+    // The invoice is now the GST record for GSTR-1.
 
     // Link movement to invoice
     movement.convertedToInvoice = true;
@@ -483,7 +612,7 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
     movement.invoiceNo = invoiceNo;
     await movement.save();
 
-    res.status(201).json({ message: 'Converted to invoice', invoice, movement });
+    res.status(201).json({ message: 'Converted to GST invoice', invoice, movement });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

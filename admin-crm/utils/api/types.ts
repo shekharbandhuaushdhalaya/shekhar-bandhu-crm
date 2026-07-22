@@ -48,8 +48,8 @@ export type Customer = {
   company: string;
   email: string;
   phone: string;
-  pakkaBalance: number;
-  kachhaBalance: number;
+  regularBalance: number;
+  cashBalance: number;
   outstandingInvoices: number;
   salesVolume: number;
   createdAt: string;
@@ -74,6 +74,7 @@ export type Customer = {
   shippingSameAsBilling?: boolean;
   customerType?: 'gst' | 'cash';
   recordTracking?: 'invoice_ledger';
+  discountPercent?: number;
 };
 
 export type Vendor = {
@@ -83,8 +84,8 @@ export type Vendor = {
   email: string;
   phone: string;
   productCategory: string;
-  pakkaBalance: number;
-  kachhaBalance: number;
+  regularBalance: number;
+  cashBalance: number;
   paymentTerms: string;
   createdAt: string;
   gstin?: string;
@@ -106,6 +107,8 @@ export type Product = {
   name: string;
   sku: string;
   price: number;
+  mrp?: number;
+  discount?: number;
   stockLevel: number;
   category: string;
   minReorder: number;
@@ -150,7 +153,7 @@ export type Challan = {
   warehouseName?: string;
   items: ChallanItem[];
   status: string;
-  mode: 'pakka';
+  mode: 'regular';
   baseAmount?: number;
   cgst?: number;
   sgst?: number;
@@ -171,7 +174,7 @@ export type Payment = {
   partyId: string;
   partyName: string;
   amount: number;
-  mode: 'pakka';
+  mode: 'regular' | 'cash';
   paymentMethod: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
   referenceNo: string;
   notes: string;
@@ -278,10 +281,15 @@ export type StockLedger = {
 
 export type InvoiceItem = {
   productId?: string;
+  rawMaterialId?: string;
   name: string;
   qty: number;
   boxes: number;
   packing: number;
+  unit?: string;
+  mrp?: number;
+  discountPercent?: number;
+  discountAmount?: number;
   rate: number;
   qtyBoxes?: number;
   hsnCode?: string;
@@ -299,8 +307,10 @@ export type Invoice = {
   dueDate?: string;
   amount: number;
   status: string;
-  mode: 'pakka';
+  mode: 'regular' | 'cash';
   baseAmount?: number;
+  totalMrp?: number;
+  totalDiscount?: number;
   gstRate?: number;
   hsnCode?: string;
   cgst?: number;
@@ -389,6 +399,7 @@ export type RawMaterial = {
   name: string;
   sku: string;
   unit: string;
+  category?: 'Herb' | 'Packaging' | 'Excipient' | 'General';
   minReorder: number;
   stockLevel?: number;
 };
@@ -408,6 +419,7 @@ export type RawMaterialEntry = {
 export type BOMIngredient = {
   rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
   qtyRequired: number;
+  itemType?: 'formulation' | 'packaging';
 };
 
 export type BillOfMaterials = {
@@ -527,6 +539,7 @@ export type StockMovementItem = {
   qty: number;
   packing?: number;
   rate?: number;
+  discountPercent?: number;
   gstRate?: number;
   batchNo?: string;
   mrp?: number;
@@ -536,7 +549,8 @@ export type StockMovement = {
   _id: string;
   docNo: string;
   direction: 'in' | 'out';
-  type: 'sale' | 'sample' | 'order' | 'return' | 'purchase' | 'transfer_out' | 'transfer_in';
+  type: 'sale' | 'sample' | 'order' | 'return' | 'purchase' | 'transfer_out' | 'transfer_in' | 'damage';
+  billingMode?: 'cash' | 'regular';
   date: string;
   warehouseId?: string;
   warehouseName?: string;
@@ -551,7 +565,7 @@ export type StockMovement = {
   sgst?: number;
   igst?: number;
   roundOff?: number;
-  totalAmount?: number;
+  totalAmount: number;
   isFree?: boolean;
   status: 'draft' | 'dispatched' | 'received' | 'cancelled';
   convertedToInvoice?: boolean;
@@ -560,6 +574,14 @@ export type StockMovement = {
   sourceDocType?: string;
   sourceDocId?: string;
   notes?: string;
+  medicalRepName?: string;
+  doctorName?: string;
+  transporter?: string;
+  courierName?: string;
+  lrNo?: string;
+  vehicleNo?: string;
+  trackingId?: string;
+  totalBoxes?: number;
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
