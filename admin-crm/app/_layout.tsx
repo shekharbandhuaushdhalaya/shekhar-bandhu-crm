@@ -13,6 +13,7 @@ import { ToastProvider } from '../utils/ToastContext';
 import LoginScreen from './login';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Sidebar from '../components/Sidebar';
+import AyurvedicLoader from '../components/AyurvedicLoader';
 
 function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnline: boolean; logout: () => void; toggleSidebar?: () => void }) {
   const { themeMode, toggleTheme, colors } = useTheme();
@@ -173,11 +174,7 @@ function MainLayout() {
   }, []);
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <AyurvedicLoader message="Welcome to Shekhar Bandhu Aushadhalaya" />;
   }
 
   if (!user) {
@@ -191,17 +188,11 @@ function MainLayout() {
       {globalLoading && (
         <Modal transparent visible={globalLoading} animationType="none">
           <View style={{
-            flex: 1, backgroundColor: 'rgba(0,0,0,0.3)',
+            flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
             justifyContent: 'center', alignItems: 'center',
             zIndex: 99999
           }}>
-            <View style={{ 
-              padding: 24, backgroundColor: colors.bg.card, borderRadius: Radius.lg, 
-              alignItems: 'center', boxShadow: '0px 4px 10px rgba(0,0,0,0.3)', elevation: 10 
-            }}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={{ marginTop: 12, color: colors.text.primary, fontWeight: '700', fontSize: 15 }}>Processing...</Text>
-            </View>
+            <AyurvedicLoader />
           </View>
         </Modal>
       )}

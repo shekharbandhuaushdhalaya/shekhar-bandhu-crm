@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useRouter } from 'expo-router';
+import AyurvedicLoader from '../components/AyurvedicLoader';
 import {
   api,
   RawMaterial,
@@ -564,12 +565,7 @@ export default function ManufacturingScreen() {
     });
   }
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading Manufacturing Hub...</Text>
-      </View>
-    );
+    return <AyurvedicLoader />;
   }
 
   const filteredMaterials = materials.filter(rm => {
