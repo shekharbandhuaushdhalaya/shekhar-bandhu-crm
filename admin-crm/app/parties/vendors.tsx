@@ -153,27 +153,25 @@ function VendorDetailModal({ vendor, visible, onClose, onDeleted, onEdit }: { ve
             <View style={styles.infoSectionHeader}>
               <Text style={styles.infoSectionTitle}>Outstanding Balances & Terms</Text>
             </View>
-            {(vendor as any).recordTracking === 'cash_ledger' ? (
-              <View style={styles.infoItem}>
-                <Ionicons name="wallet-outline" size={16} color={colors.warning} style={styles.infoIcon} />
-                <View>
-                  <Text style={styles.infoLabel}>Challan Balance (Cash/No GST) *Selected Ledger*</Text>
-                  <Text style={[styles.infoValue, { color: (vendor.cashBalance || 0) > 0 ? colors.warning : colors.text.muted }]}>
-                    ₹{(vendor.cashBalance || 0).toLocaleString()}
-                  </Text>
-                </View>
+            <View style={styles.infoItem}>
+              <Ionicons name="cash" size={16} color={colors.success} style={styles.infoIcon} />
+              <View>
+                <Text style={styles.infoLabel}>Invoice Balance (GST) {(vendor as any).recordTracking !== 'cash_ledger' ? '⭐ (Active Ledger)' : ''}</Text>
+                <Text style={[styles.infoValue, { color: vendor.regularBalance > 0 ? colors.success : colors.text.muted }]}>
+                  ₹{vendor.regularBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
               </View>
-            ) : (
-              <View style={styles.infoItem}>
-                <Ionicons name="cash" size={16} color={colors.success} style={styles.infoIcon} />
-                <View>
-                  <Text style={styles.infoLabel}>Invoice Balance (GST) *Selected Ledger*</Text>
-                  <Text style={[styles.infoValue, { color: vendor.regularBalance > 0 ? colors.success : colors.text.muted }]}>
-                    ₹{vendor.regularBalance.toLocaleString()}
-                  </Text>
-                </View>
+            </View>
+
+            <View style={styles.infoItem}>
+              <Ionicons name="wallet-outline" size={16} color={colors.warning} style={styles.infoIcon} />
+              <View>
+                <Text style={styles.infoLabel}>Challan Balance (Cash/No GST) {(vendor as any).recordTracking === 'cash_ledger' ? '⭐ (Active Ledger)' : ''}</Text>
+                <Text style={[styles.infoValue, { color: (vendor.cashBalance || 0) > 0 ? colors.warning : colors.text.muted }]}>
+                  ₹{(vendor.cashBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
               </View>
-            )}
+            </View>
 
             <View style={styles.infoItem}>
               <Ionicons name="time" size={16} color={colors.primary} style={styles.infoIcon} />
