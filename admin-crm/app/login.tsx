@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../utils/auth';
-import { Spacing, Radius, LightColors } from '../constants/theme';
-import { useTheme, useStyles } from '../utils/themeContext';
+import { Spacing, Radius } from '../constants/theme';
+import { useTheme } from '../utils/themeContext';
+
+// Premium Ayurvedic Color Theme constants
+const BRAND_GREEN = '#1A3F24'; // Deep forest herbal green
+const BRAND_GOLD = '#C29F68';  // Warm golden highlight
+const CREAM_BG = '#FAF8F5';    // Herbal cream soft background
 
 export default function LoginScreen() {
   const { login } = useAuth();
   const { colors } = useTheme();
-  const styles = useStyles(createStyles);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,9 +20,9 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async (eEmail = email, ePassword = password) => {
-    if (!eEmail.trim() || !ePassword.trim()) {
-      setError('Please fill in all fields');
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter your email and password');
       return;
     }
 
@@ -26,7 +30,7 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      await login(eEmail, ePassword);
+      await login(email.trim(), password);
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -46,14 +50,17 @@ export default function LoginScreen() {
           />
           <Text style={styles.title}>SHEKHAR BANDHU</Text>
           <Text style={styles.subtitle}>AUSHADHALAYA • CRM PORTAL</Text>
+          <View style={styles.divider} />
         </View>
-
 
         {/* Login Card */}
         <View style={styles.card}>
+          <Text style={styles.welcomeText}>Welcome Back</Text>
+          <Text style={styles.welcomeSub}>Please sign in to access your dashboard</Text>
+
           {error && (
             <View style={styles.errorAlert}>
-              <Ionicons name="alert-circle-outline" size={18} color={colors.danger} style={{ marginRight: 8 }} />
+              <Ionicons name="alert-circle-outline" size={18} color="#D32F2F" style={{ marginRight: 8 }} />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
@@ -62,11 +69,11 @@ export default function LoginScreen() {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Email Address</Text>
             <View style={[styles.inputContainer, error ? styles.inputError : null]}>
-              <Ionicons name="mail-outline" size={18} color={colors.text.muted} style={styles.inputIcon} />
+              <Ionicons name="mail-outline" size={18} color={BRAND_GREEN} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="you@company.com"
-                placeholderTextColor={colors.text.muted}
+                placeholderTextColor="#A0A0A0"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -82,11 +89,11 @@ export default function LoginScreen() {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Password</Text>
             <View style={[styles.inputContainer, error ? styles.inputError : null]}>
-              <Ionicons name="lock-closed-outline" size={18} color={colors.text.muted} style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={18} color={BRAND_GREEN} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="••••••••"
-                placeholderTextColor={colors.text.muted}
+                placeholderTextColor="#A0A0A0"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -96,13 +103,13 @@ export default function LoginScreen() {
                 onSubmitEditing={() => handleLogin()}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.passwordToggle}>
-                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.text.muted} />
+                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="#707070" />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Submit Button */}
-          <TouchableOpacity style={styles.loginBtn} onPress={() => handleLogin()} disabled={loading}>
+          <TouchableOpacity style={styles.loginBtn} onPress={() => handleLogin()} disabled={loading} activeOpacity={0.9}>
             {loading ? (
               <ActivityIndicator color="#ffffff" size="small" />
             ) : (
@@ -112,45 +119,21 @@ export default function LoginScreen() {
               </>
             )}
           </TouchableOpacity>
-
-          {/* Quick Demo Login Chips */}
-          <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted, textAlign: 'center', marginBottom: 10 }}>
-              QUICK DEMO ACCESSIBLE ACCOUNTS
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <TouchableOpacity
-                style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.primary + '40' }}
-                onPress={() => handleLogin('admin@shekharbandhu.com', 'admin123')}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>👑 Admin</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={{ backgroundColor: colors.info + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.info + '40' }}
-                onPress={() => handleLogin('rahul.mr@shekharbandhu.com', 'admin123')}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.info }}>👨‍⚕️ Medical Rep (MR)</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={{ backgroundColor: colors.warning + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.warning + '40' }}
-                onPress={() => handleLogin('manager@shekharbandhu.com', 'manager123')}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.warning }}>💼 Manager</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
+
+        {/* Footer Brand Seal */}
+        <Text style={styles.footerText}>
+          🔒 Secure Enterprise Portal
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const createStyles = (colors: typeof LightColors) => StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.primary,
+    backgroundColor: CREAM_BG,
   },
   scrollContent: {
     flexGrow: 1,
@@ -159,83 +142,99 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 400,
     alignSelf: 'center',
-  },
-  logoContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: Radius.lg,
-    backgroundColor: colors.bg.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  logoImage: {
-    width: 44,
-    height: 44,
-    tintColor: colors.primary,
   },
   heroLogo: {
-    width: 200,
+    width: 140,
     height: 90,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
-    color: colors.text.primary,
+    color: BRAND_GREEN,
     letterSpacing: 2,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginTop: 6,
     textAlign: 'center',
   },
+  subtitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: BRAND_GOLD,
+    marginTop: 4,
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  divider: {
+    width: 60,
+    height: 2,
+    backgroundColor: BRAND_GOLD,
+    marginTop: 14,
+    borderRadius: 1,
+  },
   card: {
-    backgroundColor: colors.bg.card,
+    backgroundColor: '#ffffff',
     borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: 30,
+    shadowColor: BRAND_GREEN,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 4,
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 400,
     alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#EFECE6',
+  },
+  welcomeText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: BRAND_GREEN,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  welcomeSub: {
+    fontSize: 12,
+    color: '#808080',
+    textAlign: 'center',
+    marginBottom: 24,
   },
   formGroup: {
     marginBottom: Spacing.lg,
   },
   label: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: colors.text.secondary,
+    color: '#606060',
     marginBottom: Spacing.sm,
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.bg.primary,
+    backgroundColor: '#FAF9F6',
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E3DFD5',
     paddingHorizontal: Spacing.md,
-    height: 48,
+    height: 46,
   },
   inputError: {
-    borderColor: colors.danger,
+    borderColor: '#D32F2F',
+    backgroundColor: '#FFF8F8',
   },
   inputIcon: {
     marginRight: 10,
   },
   input: {
     flex: 1,
-    color: colors.text.primary,
-    fontSize: 14,
+    color: BRAND_GREEN,
+    fontSize: 13,
     height: '100%',
   },
   passwordToggle: {
@@ -243,12 +242,17 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   loginBtn: {
     flexDirection: 'row',
-    backgroundColor: colors.primary,
+    backgroundColor: BRAND_GREEN,
     borderRadius: Radius.md,
-    height: 48,
+    height: 46,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: Spacing.sm,
+    shadowColor: BRAND_GREEN,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   loginBtnText: {
     color: '#ffffff',
@@ -258,17 +262,24 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   errorAlert: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.dangerLight,
-    borderColor: colors.danger,
+    backgroundColor: '#FFEBEE',
+    borderColor: '#FFCDD2',
     borderWidth: 1,
     borderRadius: Radius.md,
     padding: Spacing.md,
     marginBottom: Spacing.lg,
   },
   errorText: {
-    color: colors.danger,
-    fontSize: 13,
+    color: '#D32F2F',
+    fontSize: 12,
     fontWeight: '600',
     flex: 1,
+  },
+  footerText: {
+    fontSize: 11,
+    color: '#909090',
+    textAlign: 'center',
+    marginTop: 24,
+    fontWeight: '500',
   },
 });
