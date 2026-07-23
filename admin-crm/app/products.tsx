@@ -355,8 +355,8 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
     setBomIngredients(list);
   };
 
-  // Compute live total formula ratio percentage (for formulation items only)
-  const totalFormulaRatio = useMemo(() => {
+  // Compute live total formula quantity (for formulation items only)
+  const totalFormulaQty = useMemo(() => {
     return bomIngredients
       .filter(ing => ing.itemType !== 'packaging')
       .reduce((acc, ing) => {
@@ -372,11 +372,14 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       const isPackaging = mat?.category === 'Packaging' || ing.itemType === 'packaging';
       return !isPackaging && ing.rawMaterialId && ing.qtyRequired;
     });
-    if (activeIngs.length > 0) {
+    const totalQty = activeIngs.reduce((sum, ing) => sum + (parseFloat(ing.qtyRequired) || 0), 0);
+
+    if (activeIngs.length > 0 && totalQty > 0) {
       const summary = activeIngs.map(ing => {
         const mat = materials.find(m => m._id === ing.rawMaterialId);
         const name = mat ? mat.name : 'Ingredient';
-        return `${name} (${ing.qtyRequired}%)`;
+        const pct = (((parseFloat(ing.qtyRequired) || 0) / totalQty) * 100).toFixed(1);
+        return `${name} (${pct}%)`;
       }).join(', ');
       setIngredients(summary);
     } else {
@@ -1137,17 +1140,17 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
 
           {/* Section 1: Formulation Ingredients */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>🧪 Formulation Ingredients (% Ratio):</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>🧪 Formulation Ingredients:</Text>
             <View style={{
-              backgroundColor: Math.abs(totalFormulaRatio - 100) < 0.01 ? colors.success + '20' : colors.warning + '20',
+              backgroundColor: Math.abs(totalFormulaQty - (parseFloat(bomYield) || 100)) < 0.1 ? colors.success + '20' : colors.warning + '20',
               paddingHorizontal: 8,
               paddingVertical: 3,
               borderRadius: 6,
               borderWidth: 1,
-              borderColor: Math.abs(totalFormulaRatio - 100) < 0.01 ? colors.success : colors.warning
+              borderColor: Math.abs(totalFormulaQty - (parseFloat(bomYield) || 100)) < 0.1 ? colors.success : colors.warning
             }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: Math.abs(totalFormulaRatio - 100) < 0.01 ? colors.success : colors.warning }}>
-                Formula Total: {totalFormulaRatio}% {Math.abs(totalFormulaRatio - 100) < 0.01 ? '✓ Balanced' : ''}
+              <Text style={{ fontSize: 11, fontWeight: '800', color: Math.abs(totalFormulaQty - (parseFloat(bomYield) || 100)) < 0.1 ? colors.success : colors.warning }}>
+                Total Qty: {totalFormulaQty} / {bomYield || '100'} {Math.abs(totalFormulaQty - (parseFloat(bomYield) || 100)) < 0.1 ? '✓ Balanced' : '⚠ Unbalanced'}
               </Text>
             </View>
           </View>
@@ -1181,16 +1184,24 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
                     />
                   )}
                 </View>
-                <View style={[styles.formInput, { flex: 1, height: 42 }]}>
+                <View style={[styles.formInput, { flex: 1.2, height: 42 }]}>
                   <TextInput
                     style={styles.formInputText}
-                    placeholder="e.g. 60%"
+                    placeholder="Qty"
                     placeholderTextColor={colors.text.muted}
                     value={item.qtyRequired}
                     onChangeText={(val) => handleIngredientChange(idx, 'qtyRequired', val)}
                     keyboardType="numeric"
                   />
-                  <Text style={{ fontSize: 12, color: colors.text.muted, marginRight: 8, fontWeight: '700' }}>%</Text>
+                  {(() => {
+                    const val = parseFloat(item.qtyRequired) || 0;
+                    const pct = totalFormulaQty > 0 ? ((val / totalFormulaQty) * 100).toFixed(1) : '0.0';
+                    return (
+                      <Text style={{ fontSize: 10, color: colors.primary, marginRight: 8, fontWeight: '700' }}>
+                        {pct}%
+                      </Text>
+                    );
+                  })()}
                 </View>
                 <TouchableOpacity onPress={() => handleRemoveIngredientRow(idx)}>
                   <Ionicons name="remove-circle" size={22} color={colors.danger} />
@@ -1204,7 +1215,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
             onPress={() => handleAddIngredientRow('formulation')}
           >
             <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Formulation Raw Material (% Ratio)</Text>
+            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Formulation Raw Material</Text>
           </TouchableOpacity>
 
           {/* Section 2: Packaging Materials */}
