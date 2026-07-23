@@ -315,11 +315,17 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           setBomNotes(existingBom.productionNotes || '');
           setBomIsActive(existingBom.isActive !== undefined ? existingBom.isActive : true);
           if (existingBom.ingredients && existingBom.ingredients.length > 0) {
-            setBomIngredients(existingBom.ingredients.map(ing => ({
-              rawMaterialId: (ing.rawMaterialId as any)?._id || ing.rawMaterialId,
-              qtyRequired: ing.qtyRequired.toString(),
-              itemType: ing.itemType === 'packaging' ? 'packaging' : 'formulation'
-            })));
+            setBomIngredients(existingBom.ingredients.map(ing => {
+              const rId = (ing.rawMaterialId as any)?._id || ing.rawMaterialId;
+              const matchedMat = rms.find((r: any) => r._id === rId);
+              const isPackagingCategory = matchedMat && matchedMat.category === 'Packaging';
+              const resolvedType = ing.itemType === 'packaging' || isPackagingCategory ? 'packaging' : 'formulation';
+              return {
+                rawMaterialId: rId,
+                qtyRequired: ing.qtyRequired.toString(),
+                itemType: resolvedType
+              };
+            }));
           } else {
             setBomIngredients([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
           }
@@ -1077,21 +1083,6 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
               <View style={[styles.formSectionHeader, { marginTop: 24 }]}><Text style={styles.formSectionTitle}>Recipe Formulation & Process Stages</Text></View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>{yieldMeta.label}</Text>
-            <View style={styles.formInput}>
-              <Ionicons name="apps-outline" size={16} color={colors.text.muted} />
-              <TextInput
-                style={styles.formInputText}
-                placeholder={yieldMeta.placeholder}
-                placeholderTextColor={colors.text.muted}
-                value={bomYield}
-                onChangeText={setBomYield}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Overhead Cost per Batch Run (₹)</Text>
             <View style={styles.formInput}>
               <Ionicons name="calculator-outline" size={16} color={colors.text.muted} />
@@ -1102,20 +1093,6 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
                 value={bomOverhead}
                 onChangeText={setBomOverhead}
                 keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Manufacturing SOP & Notes</Text>
-            <View style={[styles.formInput, { height: 80, alignItems: 'flex-start', paddingTop: 8 }]}>
-              <TextInput
-                style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
-                placeholder="Instructions for processing, mixing time, boiling details..."
-                placeholderTextColor={colors.text.muted}
-                value={bomNotes}
-                onChangeText={setBomNotes}
-                multiline
               />
             </View>
           </View>
@@ -1312,6 +1289,21 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
             <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
             <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Stage</Text>
           </TouchableOpacity>
+
+          {/* Section 4: Manufacturing SOP & Notes at the end */}
+          <View style={[styles.formGroup, { marginTop: 12 }]}>
+            <Text style={styles.formLabel}>Manufacturing SOP & Operational Notes</Text>
+            <View style={[styles.formInput, { height: 90, alignItems: 'flex-start', paddingTop: 8 }]}>
+              <TextInput
+                style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
+                placeholder="Instructions for processing, boiling time, temperature settings, blending sequence..."
+                placeholderTextColor={colors.text.muted}
+                value={bomNotes}
+                onChangeText={setBomNotes}
+                multiline
+              />
+            </View>
+          </View>
 
           <TouchableOpacity
             style={{

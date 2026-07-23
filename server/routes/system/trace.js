@@ -11,11 +11,12 @@ const router = express.Router();
 // GET /api/trace/:batchNo — End-to-end batch traceability
 router.get('/:batchNo', async (req, res) => {
   try {
-    const batchNo = req.params.batchNo.trim().toUpperCase();
-    if (!batchNo) return res.status(400).json({ error: 'Batch number is required' });
+    const searchKey = req.params.batchNo.trim();
+    if (!searchKey) return res.status(400).json({ error: 'Batch number or material parameter is required' });
 
+    const batchNo = searchKey;
     const result = {
-      batchNo,
+      batchNo: searchKey,
       rawMaterialEntries: [],
       productionBatches: [],
       finishedGoodsEntries: [],
@@ -24,31 +25,87 @@ router.get('/:batchNo', async (req, res) => {
       dispatches: [],
     };
 
-    // 1. Search RawMaterialEntry (inward raw material batches)
-    const rawEntries = await RawMaterialEntry.find({ batchNo })
-      .populate('rawMaterialId', 'name sku unit')
-      .lean();
+    // 1. Search RawMaterialEntry (by batchNo or by RawMaterial ID / name / sku)
+    const RawMaterial = require('../../models/RawMaterial');
+    const safeRegex = searchKey.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    let rawMaterial = await RawMaterial.findOne({
+      $or: [
+        { _id: searchKey.length === 24 && /^[0-9a-fA-F]{24}$/.test(searchKey) ? searchKey : null },
+        { name: new RegExp(safeRegex, 'i') },
+        { sku: new RegExp(safeRegex, 'i') }
+      ]
+    }).lean();
+
+    let rawEntries = [];
+    if (rawMaterial) {
+      result.materialName = rawMaterial.name;
+      result.materialSku = rawMaterial.sku;
+      rawEntries = await RawMaterialEntry.find({ rawMaterialId: rawMaterial._id })
+        .populate('rawMaterialId', 'name sku unit')
+        .lean();
+    }
+    
+    if (rawEntries.length === 0) {
+      rawEntries = await RawMaterialEntry.find({
+        $or: [
+          { batchNo: new RegExp(safeRegex, 'i') },
+          { vendorName: new RegExp(safeRegex, 'i') }
+        ]
+      })
+        .populate('rawMaterialId', 'name sku unit')
+        .lean();
+    }
+
     result.rawMaterialEntries = rawEntries.map(e => ({
       _id: e._id,
       materialName: e.rawMaterialId ? e.rawMaterialId.name : 'Unknown',
       materialSku: e.rawMaterialId ? e.rawMaterialId.sku : '',
       unit: e.rawMaterialId ? e.rawMaterialId.unit : '',
       qty: e.qty,
+      batchNo: e.batchNo,
       purchaseRate: e.purchaseRate,
+      purchaseRef: e.purchaseRef,
       vendorName: e.vendorName,
+      warehouseName: e.warehouseName,
       expiryDate: e.expiryDate,
       createdAt: e.createdAt,
     }));
 
     // 2. Search BatchProduction (as a raw material batch consumed in production)
-    const prodBatchesAsConsumer = await BatchProduction.find({
-      'ingredientsConsumed.batchNo': batchNo
-    })
-      .populate('productId', 'name sku')
-      .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
-      .lean();
+    let prodBatchesAsConsumer = [];
+    if (rawMaterial) {
+      prodBatchesAsConsumer = await BatchProduction.find({
+        $or: [
+          { 'ingredientsConsumed.rawMaterialId': rawMaterial._id },
+          { 'ingredientsConsumed.batchNo': batchNo }
+        ]
+      })
+        .populate('productId', 'name sku')
+        .populate('manufacturingUnitId', 'name code')
+        .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
+        .lean();
+    } else {
+      prodBatchesAsConsumer = await BatchProduction.find({
+        'ingredientsConsumed.batchNo': batchNo
+      })
+        .populate('productId', 'name sku')
+        .populate('manufacturingUnitId', 'name code')
+        .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
+        .lean();
+    }
+
     for (const b of prodBatchesAsConsumer) {
-      const relevant = b.ingredientsConsumed.filter(ing => ing.batchNo === batchNo);
+      const relevant = b.ingredientsConsumed.filter(ing => {
+        if (rawMaterial) {
+          const rmId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id.toString() : ing.rawMaterialId?.toString();
+          return rmId === rawMaterial._id.toString() || ing.batchNo === batchNo;
+        }
+        return ing.batchNo === batchNo;
+      });
+      let warehouseName = '';
+      if (b.manufacturingUnitId && typeof b.manufacturingUnitId === 'object') {
+        warehouseName = b.manufacturingUnitId.name || '';
+      }
       result.productionBatches.push({
         relation: 'raw_material_consumed_in',
         batchProductionId: b._id,
@@ -59,6 +116,7 @@ router.get('/:batchNo', async (req, res) => {
         plannedQty: b.plannedQty,
         actualYieldQty: b.actualYieldQty || 0,
         qtyConsumed: relevant.reduce((s, i) => s + (i.qtyConsumed || 0), 0),
+        warehouseName: warehouseName || 'Manufacturing Facility',
         startDate: b.startDate,
         endDate: b.endDate,
       });

@@ -72,9 +72,10 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
 
     // Check if BOM already exists for this product
     let bom = await BillOfMaterials.findOne({ productId });
+    const yieldBase = Number(batchYieldSize) && Number(batchYieldSize) > 0 ? Number(batchYieldSize) : 100;
     if (bom) {
       // Update existing BOM
-      bom.batchYieldSize = Number(batchYieldSize);
+      bom.batchYieldSize = yieldBase;
       bom.ingredients = validatedIngredients;
       if (isActive !== undefined) bom.isActive = isActive;
       if (productionNotes !== undefined) bom.productionNotes = productionNotes;
@@ -84,7 +85,7 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
     } else {
       bom = await BillOfMaterials.create({
         productId,
-        batchYieldSize: Number(batchYieldSize),
+        batchYieldSize: yieldBase,
         ingredients: validatedIngredients,
         isActive: isActive !== undefined ? isActive : true,
         productionNotes: productionNotes || '',

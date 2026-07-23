@@ -1643,6 +1643,8 @@ export default function InventoriesScreen() {
                 )}
               </View>
 
+
+
             {/* Merged Stock Actions & Filters Dropdown */}
             <View style={{ position: 'relative', zIndex: showStockActionsDropdown ? 1000 : 1 }}>
               <TouchableOpacity
@@ -1706,6 +1708,33 @@ export default function InventoriesScreen() {
                       </Text>
                     </TouchableOpacity>
                   )}
+
+                  {/* Toggle In-Stock */}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      backgroundColor: (!showZero && !showDeadStock) ? colors.success + '15' : 'transparent',
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border + '40',
+                    }}
+                    onPress={() => {
+                      setShowZero(false);
+                      setShowDeadStock(false);
+                      setShowStockActionsDropdown(false);
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="checkmark-circle-outline" size={16} color={(!showZero && !showDeadStock) ? colors.success : colors.text.secondary} />
+                      <Text style={{ fontSize: 12, fontWeight: (!showZero && !showDeadStock) ? '700' : '600', color: (!showZero && !showDeadStock) ? colors.success : colors.text.secondary }}>
+                        In-Stock View
+                      </Text>
+                    </View>
+                    {(!showZero && !showDeadStock) && <Ionicons name="checkmark" size={14} color={colors.success} />}
+                  </TouchableOpacity>
 
                   {/* Toggle Zero Stock */}
                   <TouchableOpacity

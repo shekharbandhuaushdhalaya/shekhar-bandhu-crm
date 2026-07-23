@@ -767,11 +767,117 @@ function FullMrAnalyticsTab() {
   );
 }
 
+function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) {
+  const { width: winWidth } = useWindowDimensions();
+  const isDesktop = winWidth > 768;
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+
+  if (!mfgAnalytics) {
+    return (
+      <View style={{ padding: 24, alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 12 }}>Loading Manufacturing Analytics...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 16 }}>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        🏭 Manufacturing Facility Financial & Asset Valuation
+      </Text>
+
+      <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16 }}>
+        {/* Raw Materials Valuation */}
+        <View style={[styles.chartCard, { flex: 1, padding: 16, marginBottom: 0 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.success + '15', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="leaf-outline" size={20} color={colors.success} />
+            </View>
+            <View>
+              <Text style={{ fontSize: 11, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>Raw Stock Valuation</Text>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
+                ₹{(mfgAnalytics?.netRawMaterialValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Finished Goods Valuation */}
+        <View style={[styles.chartCard, { flex: 1, padding: 16, marginBottom: 0 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="cube-outline" size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={{ fontSize: 11, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>Finished Goods Value</Text>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
+                ₹{(mfgAnalytics?.netFinishedGoodsValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Facility Total Value */}
+        <View style={[styles.chartCard, { flex: 1, padding: 16, backgroundColor: colors.primary + '05', marginBottom: 0 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '25', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="wallet-outline" size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Facility Assets</Text>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
+                ₹{((mfgAnalytics?.netRawMaterialValue || 0) + (mfgAnalytics?.netFinishedGoodsValue || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Yield Efficiencies */}
+      <View style={[styles.chartCard, { padding: 16 }]}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginBottom: 16 }}>Yield Performance & Recipe Efficiency</Text>
+        
+        {mfgAnalytics?.yieldPerformance && mfgAnalytics.yieldPerformance.length > 0 ? (
+          <View style={{ gap: 16 }}>
+            {mfgAnalytics.yieldPerformance.map((item: any, idx: number) => {
+              const isLow = item.efficiency < 95;
+              const barColor = isLow ? colors.warning : colors.success;
+              return (
+                <View key={idx}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' }}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>Batch: {item.batchNo} · {item.productName}</Text>
+                      <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>Yielded {item.actualYieldQty} / {item.plannedQty} planned units</Text>
+                    </View>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: barColor }}>{item.efficiency}%</Text>
+                  </View>
+                  {/* Progress bar */}
+                  <View style={{ height: 8, width: '100%', backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' }}>
+                    <View style={{ height: '100%', width: `${Math.min(100, item.efficiency)}%`, backgroundColor: barColor }} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={{ alignItems: 'center', padding: 24 }}>
+            <Ionicons name="bar-chart-outline" size={32} color={colors.text.secondary} />
+            <Text style={{ color: colors.text.secondary, fontSize: 13, marginTop: 8 }}>No completed yield batches to analyze.</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
   const chartWidth = isDesktop ? (Math.min(winWidth, 1200) - 240 - 64) * 0.5 - 20 : winWidth - 64;
-  const [activeTab, setActiveTab] = useState<'overview' | 'mr_analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'mr_analytics' | 'manufacturing_analytics'>('overview');
+  const [mfgAnalytics, setMfgAnalytics] = useState<any>(null);
   const [stats, setStats] = useState<DashboardStats>({ totalPipeline: 0, closedWon: 0, activeLeadsCount: 0, pendingTasksCount: 0 });
   const [activities, setActivities] = useState<Activity[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -794,7 +900,7 @@ export default function DashboardScreen() {
   const styles = useStyles(createStyles);
 
   const load = useCallback(async () => {
-    const [s, a, c, custs, vends, invs, prods, purchs, sales, challans] = await Promise.all([
+    const [s, a, c, custs, vends, invs, prods, purchs, sales, challans, mfgData] = await Promise.all([
       api.getStats(), 
       api.getActivities(), 
       api.getContacts(),
@@ -804,8 +910,10 @@ export default function DashboardScreen() {
       api.getProducts(),
       api.getPurchaseInvoices('', 'all'),
       api.getSaleInvoices('', 'all'),
-      api.getChallans('', 'all')
+      api.getChallans('', 'all'),
+      api.getManufacturingAnalytics().catch(() => null)
     ]);
+    if (mfgData) setMfgAnalytics(mfgData);
 
     const recInvoiceSum = custs.reduce((sum, cust) => sum + (cust.pakkaBalance || 0), 0);
     const payInvoiceSum = vends.reduce((sum, vend) => sum + (vend.pakkaBalance || 0), 0);
@@ -919,7 +1027,26 @@ export default function DashboardScreen() {
         >
           <Ionicons name="stats-chart-outline" size={16} color={activeTab === 'mr_analytics' ? '#fff' : colors.text.secondary} />
           <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'mr_analytics' ? '#fff' : colors.text.secondary }}>
-            MR Field Performance & ROI
+            MR Field & ROI
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            paddingVertical: 10,
+            borderRadius: Radius.md,
+            backgroundColor: activeTab === 'manufacturing_analytics' ? colors.primary : 'transparent'
+          }}
+          onPress={() => setActiveTab('manufacturing_analytics')}
+        >
+          <Ionicons name="build-outline" size={16} color={activeTab === 'manufacturing_analytics' ? '#fff' : colors.text.secondary} />
+          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'manufacturing_analytics' ? '#fff' : colors.text.secondary }}>
+            Manufacturing Facility Analytics
           </Text>
         </Pressable>
       </View>
@@ -1021,8 +1148,10 @@ export default function DashboardScreen() {
       </View>
 
         </>
-      ) : (
+      ) : activeTab === 'mr_analytics' ? (
         <FullMrAnalyticsTab />
+      ) : (
+        <FullManufacturingAnalyticsTab mfgAnalytics={mfgAnalytics} />
       )}
     </ScrollView>
   );

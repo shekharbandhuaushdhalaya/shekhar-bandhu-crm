@@ -276,6 +276,25 @@ router.patch('/:id/finalize', async (req, res) => {
 
 
 
+    // Sync Customer balance on Challan finalization
+    if (challan.partyName && challan.nettTotal > 0) {
+      const Customer = require('../../models/Customer');
+      const cust = await Customer.findOne({
+        $or: [
+          { name: challan.partyName },
+          { company: challan.partyName }
+        ]
+      });
+      if (cust) {
+        if (challan.mode === 'cash') {
+          cust.cashBalance = (cust.cashBalance || 0) + challan.nettTotal;
+        } else {
+          cust.regularBalance = (cust.regularBalance || 0) + challan.nettTotal;
+        }
+        await cust.save();
+      }
+    }
+
     // Update status
     challan.status = 'finalized';
     await challan.save();
@@ -303,13 +322,29 @@ router.delete('/:id', authorize('challan:delete'), async (req, res) => {
 
 
 
-    // Only revert inventory if challan was finalized
+    // Only revert inventory and balance if challan was finalized
     if (challan.status === 'finalized') {
       if (challan.deductInventory !== false) {
         await revertInventory(challan);
       }
 
-
+      if (challan.partyName && challan.nettTotal > 0) {
+        const Customer = require('../../models/Customer');
+        const cust = await Customer.findOne({
+          $or: [
+            { name: challan.partyName },
+            { company: challan.partyName }
+          ]
+        });
+        if (cust) {
+          if (challan.mode === 'cash') {
+            cust.cashBalance = Math.max(0, (cust.cashBalance || 0) - challan.nettTotal);
+          } else {
+            cust.regularBalance = Math.max(0, (cust.regularBalance || 0) - challan.nettTotal);
+          }
+          await cust.save();
+        }
+      }
     }
 
     await Challan.findByIdAndDelete(req.params.id);

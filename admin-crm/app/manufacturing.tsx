@@ -186,6 +186,9 @@ export default function ManufacturingScreen() {
       setMfgAnalytics(analyticsData);
       setWarehouses(whData);
       setManufacturingUnits(mfgUnitsData);
+      if (mfgUnitsData && mfgUnitsData.length > 0) {
+        setProdManufacturingUnitId(prev => prev || mfgUnitsData[0]._id);
+      }
     } catch (err) {
       console.error('Failed to load manufacturing workspace data:', err);
     } finally {
@@ -788,12 +791,11 @@ export default function ManufacturingScreen() {
       const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
       const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown Raw Material';
       const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'kg';
-      const isPkg = ing.itemType === 'packaging';
-
-      const qtyNeeded = isPkg ? ing.qtyRequired * plannedVal : ing.qtyRequired * scale;
-
       const matchingMaterial = materials.find(m => m._id === ingId);
       const available = matchingMaterial ? (matchingMaterial.stockLevel || 0) : 0;
+      const isPkg = ing.itemType === 'packaging' || (matchingMaterial && matchingMaterial.category === 'Packaging');
+
+      const qtyNeeded = isPkg ? ing.qtyRequired * plannedVal : ing.qtyRequired * scale;
 
       return {
         name: ingName,
@@ -837,7 +839,6 @@ export default function ManufacturingScreen() {
           { id: 'materials', label: 'Raw Materials & Batches', icon: 'leaf-outline' },
           { id: 'batches', label: 'Production Runs (BMR)', icon: 'hammer-outline' },
           { id: 'scheduler', label: 'Production Timeline', icon: 'calendar-outline' },
-          { id: 'analytics', label: 'Manufacturing Analytics', icon: 'analytics-outline' },
         ].map(t => (
           <TouchableOpacity
             key={t.id}
@@ -998,109 +999,68 @@ export default function ManufacturingScreen() {
                   <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
                   <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
                   <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
-                  <Text style={{ width: 65, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
+                  <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
                 </View>
                 {/* Body */}
                 {filteredMaterials.map((rm, idx) => {
                   const lowStock = (rm.stockLevel || 0) < rm.minReorder;
-                  const materialBatches = entries.filter(e => {
-                    const rmId = e.rawMaterialId && typeof e.rawMaterialId === 'object' ? e.rawMaterialId._id : e.rawMaterialId;
-                    return rmId === rm._id && e.qty > 0;
-                  });
-                  const isExpanded = expandedMaterials[rm._id];
 
                   return (
                     <View key={rm._id} style={{ borderBottomWidth: idx === filteredMaterials.length - 1 ? 0 : 0.5, borderBottomColor: colors.border, paddingVertical: 4 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8 }}>
-                        <TouchableOpacity
-                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 2 }}
-                          onPress={() => {
-                            if (materialBatches.length > 0) {
-                              setExpandedMaterials(prev => ({ ...prev, [rm._id]: !prev[rm._id] }));
-                            }
-                          }}
-                          disabled={materialBatches.length === 0}
-                        >
-                          {materialBatches.length > 0 ? (
-                            <Ionicons
-                              name={isExpanded ? "chevron-down" : "chevron-forward"}
-                              size={14}
-                              color={colors.text.secondary}
-                            />
-                          ) : (
-                            <View style={{ width: 14 }} />
-                          )}
-                          <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }}>{rm.name}</Text>
-                              <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
-                                <Text style={{ fontSize: 8.5, fontWeight: '700', color: colors.text.secondary }}>
-                                  {rm.category === 'Packaging' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 Herb'))}
-                                </Text>
-                              </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8 }}>
+                        <View style={{ flex: 2, paddingLeft: 4 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{rm.name}</Text>
+                            <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
+                              <Text style={{ fontSize: 9, fontWeight: '700', color: colors.text.secondary }}>
+                                {rm.category === 'Packaging' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 Herb'))}
+                              </Text>
                             </View>
-                            <Text style={{ fontSize: 9.5, color: colors.text.muted }}>{rm.sku}</Text>
                           </View>
-                        </TouchableOpacity>
-                        <Text style={{ flex: 1.2, fontSize: 12, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
+                          {rm.sku ? <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>SKU: {rm.sku}</Text> : null}
+                        </View>
+                        <Text style={{ flex: 1.2, fontSize: 13, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
                           {rm.stockLevel?.toFixed(1) || '0.0'} {rm.unit}
                         </Text>
                         <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
                           {rm.minReorder} {rm.unit}
                         </Text>
-                        <View style={{ width: 65, flexDirection: 'row', justifyContent: 'center', gap: 12, alignItems: 'center' }}>
-                          <TouchableOpacity onPress={() => handleEditMaterial(rm)}>
-                            <Ionicons name="pencil-outline" size={14} color={colors.primary} />
+                        <View style={{ width: 140, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
+                          <TouchableOpacity
+                            onPress={() => handleEditMaterial(rm)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: colors.primary + '10', borderWidth: 0.5, borderColor: colors.primary + '30' }}
+                          >
+                            <Ionicons name="pencil-outline" size={13} color={colors.primary} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Edit</Text>
                           </TouchableOpacity>
-                          <TouchableOpacity onPress={() => handleOpenGenealogy('material', rm._id)}>
-                            <Ionicons name="git-network-outline" size={14} color={colors.text.muted} />
+                          <TouchableOpacity
+                            onPress={async () => {
+                              const searchTerm = rm.name ? rm.name.trim() : rm._id;
+                              setTraceBatchNo(searchTerm);
+                              setTraceModalVisible(true);
+                              setTraceLoading(true);
+                              setTraceResult(null);
+                              try {
+                                const data = await api.traceBatch(encodeURIComponent(searchTerm));
+                                setTraceResult(data);
+                              } catch (err: any) {
+                                try {
+                                  const data = await api.traceBatch(rm._id);
+                                  setTraceResult(data);
+                                } catch(e) {
+                                  console.log('Trace fetch error', e);
+                                }
+                              } finally {
+                                setTraceLoading(false);
+                              }
+                            }}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: colors.success + '10', borderWidth: 0.5, borderColor: colors.success + '30' }}
+                          >
+                            <Ionicons name="list-outline" size={13} color={colors.success} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>Ledger</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
-
-                      {isExpanded && materialBatches.length > 0 && (
-                        <View style={{ backgroundColor: colors.bg.secondary, padding: 8, marginLeft: 20, marginRight: 8, borderRadius: 6, marginBottom: 6, borderLeftWidth: 3, borderLeftColor: colors.primary }}>
-                          <Text style={{ fontSize: 9, fontWeight: '800', color: colors.text.muted, marginBottom: 4, letterSpacing: 0.5 }}>ACTIVE INWARD BATCHES</Text>
-                          {materialBatches.map((e, batchIdx) => (
-                            <View key={e._id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: batchIdx < materialBatches.length - 1 ? 0.5 : 0, borderBottomColor: colors.border }}>
-                              <View style={{ flex: 2 }}>
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Batch: {e.batchNo}</Text>
-                                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 1 }}>
-                                  {e.vendorName ? <Text style={{ fontSize: 9, color: colors.text.muted }}>Vendor: {e.vendorName}</Text> : null}
-                                  {e.warehouseName ? <Text style={{ fontSize: 9, color: colors.primary, fontWeight: '600' }}>• Wh: {e.warehouseName}</Text> : null}
-                                </View>
-                              </View>
-                              <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.primary, textAlign: 'right' }}>
-                                {e.qty.toFixed(1)} {rm.unit}
-                              </Text>
-                              <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
-                                ₹{e.purchaseRate}
-                              </Text>
-                              <View style={{ width: 65, flexDirection: 'row', justifyContent: 'center', gap: 12, alignItems: 'center' }}>
-                                <TouchableOpacity onPress={async () => {
-                                  setTraceBatchNo(e.batchNo);
-                                  setTraceLoading(true);
-                                  setTraceModalVisible(true);
-                                  try {
-                                    const data = await api.traceBatch(e.batchNo.trim().toUpperCase());
-                                    setTraceResult(data);
-                                  } catch (err: any) {
-                                    alert(err.message || 'Trace lookup failed');
-                                    setTraceModalVisible(false);
-                                  } finally {
-                                    setTraceLoading(false);
-                                  }
-                                }}>
-                                  <Ionicons name="git-network-outline" size={13} color={colors.primary} />
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={() => handleVoidInward(e._id)}>
-                                  <Ionicons name="trash-outline" size={13} color={colors.danger} />
-                                </TouchableOpacity>
-                              </View>
-                            </View>
-                          ))}
-                        </View>
-                      )}
                     </View>
                   );
                 })}
@@ -1471,11 +1431,19 @@ export default function ManufacturingScreen() {
                       {!isCancelled && (
                         <>
                           <TouchableOpacity 
-                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.text.secondary }]} 
-                            onPress={() => handleOpenGenealogy('batch', batch._id)}
+                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.primary }]} 
+                            onPress={() => {
+                              setTraceBatchNo(batch.batchNo);
+                              setTraceModalVisible(true);
+                              setTraceLoading(true);
+                              api.traceBatch(batch.batchNo.trim().toUpperCase())
+                                .then(data => setTraceResult(data))
+                                .catch(err => alert(err.message || 'Trace lookup failed'))
+                                .finally(() => setTraceLoading(false));
+                            }}
                           >
-                            <Ionicons name="git-network-outline" size={15} color={colors.text.secondary} />
-                            <Text style={[styles.outlineBtnText, { color: colors.text.secondary }]}>Genealogy</Text>
+                            <Ionicons name="list-outline" size={15} color={colors.primary} />
+                            <Text style={[styles.outlineBtnText, { color: colors.primary }]}>Stock Trace & Genealogy</Text>
                           </TouchableOpacity>
                           <TouchableOpacity 
                             style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.success }]} 
@@ -1648,95 +1616,6 @@ export default function ManufacturingScreen() {
           </View>
         )}
 
-        {/* ======================================================== */}
-        {/* TAB 5: MANUFACTURING ANALYTICS */}
-        {/* ======================================================== */}
-        {activeTab === 'analytics' && (
-          <View style={styles.tabContent}>
-            <Text style={styles.sectionTitle}>Facility Financial & Asset Valuation</Text>
-            
-            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16, marginVertical: 16 }}>
-              {/* Raw Materials Valuation */}
-              <View style={[styles.card, { flex: 1, padding: 16 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.success + '15', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="leaf-outline" size={20} color={colors.success} />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>Raw Stock Valuation</Text>
-                    <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
-                      ₹{(mfgAnalytics?.netRawMaterialValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Finished Goods Valuation */}
-              <View style={[styles.card, { flex: 1, padding: 16 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="cube-outline" size={20} color={colors.primary} />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>Finished Goods Value</Text>
-                    <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
-                      ₹{(mfgAnalytics?.netFinishedGoodsValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Facility Total Value */}
-              <View style={[styles.card, { flex: 1, padding: 16, backgroundColor: colors.primary + '05' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '25', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="wallet-outline" size={20} color={colors.primary} />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Facility Assets</Text>
-                    <Text style={{ fontSize: 20, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
-                      ₹{((mfgAnalytics?.netRawMaterialValue || 0) + (mfgAnalytics?.netFinishedGoodsValue || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {/* Yield Efficiencies */}
-            <View style={[styles.card, { padding: 16 }]}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginBottom: 16 }}>Yield Performance & Recipe Efficiency</Text>
-              
-              {mfgAnalytics?.yieldPerformance && mfgAnalytics.yieldPerformance.length > 0 ? (
-                <View style={{ gap: 16 }}>
-                  {mfgAnalytics.yieldPerformance.map((item: any, idx: number) => {
-                    const isLow = item.efficiency < 95;
-                    const barColor = isLow ? colors.warning : colors.success;
-                    return (
-                      <View key={idx}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' }}>
-                          <View style={{ flex: 1, marginRight: 8 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>Batch: {item.batchNo} · {item.productName}</Text>
-                            <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>Yielded {item.actualYieldQty} / {item.plannedQty} planned units</Text>
-                          </View>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: barColor }}>{item.efficiency}%</Text>
-                        </View>
-                        {/* Progress bar */}
-                        <View style={{ height: 8, width: '100%', backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' }}>
-                          <View style={{ height: '100%', width: `${Math.min(100, item.efficiency)}%`, backgroundColor: barColor }} />
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : (
-                <View style={{ alignItems: 'center', padding: 24 }}>
-                  <Ionicons name="bar-chart-outline" size={32} color={colors.text.secondary} />
-                  <Text style={{ color: colors.text.secondary, fontSize: 13, marginTop: 8 }}>No completed yield batches to analyze.</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
       </ScrollView>
 
       {/* ======================================================== */}
@@ -2477,196 +2356,7 @@ export default function ManufacturingScreen() {
         </View>
       </Modal>
 
-      {/* ======================================================== */}
-      {/* MODAL 7: BATCH / RAW MATERIAL GENEALOGY */}
-      {/* ======================================================== */}
-      <Modal visible={genealogyModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setGenealogyModalVisible(false)} />
-          <View style={[styles.modalContainer, { maxWidth: 760, width: '92%', height: '85%' }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>
-                  {genealogyType === 'batch' ? 'Batch Genealogy Trace' : 'Raw Material Genealogy'}
-                </Text>
-                <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                  {genealogyType === 'batch' ? 'Raw material source trace for this batch' : 'Finished batches using this material'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setGenealogyModalVisible(false)}>
-                <Ionicons name="close" size={20} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
 
-            {/* Genealogy Search Bar */}
-            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8, alignItems: 'center' }}>
-              <TextInput
-                style={[styles.input, { flex: 1, marginBottom: 0, fontSize: 13 }]}
-                placeholder="Search Finished Goods / Raw Material Batch No..."
-                placeholderTextColor={colors.text.muted}
-                value={genealogySearchQuery}
-                onChangeText={setGenealogySearchQuery}
-                onSubmitEditing={handleExecuteGenealogySearch}
-              />
-              <TouchableOpacity
-                onPress={handleExecuteGenealogySearch}
-                style={{
-                  backgroundColor: colors.primary,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderRadius: 6,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4
-                }}
-              >
-                <Ionicons name="search" size={14} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Search</Text>
-              </TouchableOpacity>
-            </View>
-            {genealogySearchError ? (
-              <Text style={{ color: colors.danger, fontSize: 11, fontWeight: '600', paddingHorizontal: 16, marginTop: 4 }}>
-                ⚠️ {genealogySearchError}
-              </Text>
-            ) : null}
-
-            {genealogyLoading ? (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            ) : genealogyData ? (
-              <ScrollView style={[styles.modalForm, { padding: 16 }]} contentContainerStyle={{ gap: 16 }}>
-                {genealogyType === 'batch' ? (
-                  <>
-                    {/* Batch Genealogy: Show sources of raw materials */}
-                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                      <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Batch Identity</Text>
-                      </View>
-                      <View style={{ padding: 12, gap: 6 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Batch No:</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.batchNo}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Product:</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.productName} ({genealogyData.productSku})</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Status:</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.status}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Planned → Actual:</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.plannedQty} → {genealogyData.actualYieldQty} units</Text>
-                        </View>
-                        {genealogyData.wasteQty > 0 && (
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 13, color: colors.text.secondary }}>Waste / Variance:</Text>
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.warning }}>{genealogyData.wasteQty} units ({genealogyData.variancePercent}%){genealogyData.wasteReason ? ` — ${genealogyData.wasteReason}` : ''}</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Raw Material Sources */}
-                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                      <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Raw Materials Consumed</Text>
-                      </View>
-                      <View style={{ padding: 8 }}>
-                        <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
-                          <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material</Text>
-                          <Text style={{ flex: 1.3, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Batch</Text>
-                          <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Qty Used</Text>
-                          <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Vendor</Text>
-                          <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Rate</Text>
-                        </View>
-                        {genealogyData.ingredients.map((ing: any, idx: number) => (
-                          <View key={idx} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: idx === genealogyData.ingredients.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
-                            <Text style={{ flex: 2, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
-                              {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Material'}
-                            </Text>
-                            <Text style={{ flex: 1.3, fontSize: 11, color: colors.text.primary }}>{ing.batchNo}</Text>
-                            <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{ing.qtyConsumed?.toFixed(2)}</Text>
-                            <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{ing.sourceBatch?.vendorName || '—'}</Text>
-                            <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>₹{ing.sourceBatch?.purchaseRate || 0}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    {/* Raw Material Genealogy: Show batches that used this material */}
-                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                      <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Material Identity</Text>
-                      </View>
-                      <View style={{ padding: 12, gap: 6 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Material:</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{genealogyData.rawMaterial?.name} ({genealogyData.rawMaterial?.sku})</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 13, color: colors.text.secondary }}>Used in:</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>{genealogyData.totalBatchesUsedIn} finished batch(es)</Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {genealogyData.batches?.length > 0 ? (
-                      <View style={{ gap: 12 }}>
-                        {genealogyData.batches.map((b: any) => (
-                          <View key={b.batchProductionId} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                              <View style={{ flex: 1, marginRight: 8 }}>
-                                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary }}>{b.batchNo}</Text>
-                                <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 2 }}>{b.productName} ({b.productSku})</Text>
-                              </View>
-                              <View style={[styles.statusBadge, { borderColor: getStatusColor(b.status), backgroundColor: getStatusColor(b.status) + '10' }]}>
-                                <Text style={[styles.statusBadgeText, { color: getStatusColor(b.status) }]}>{b.status.toUpperCase()}</Text>
-                              </View>
-                            </View>
-                            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-                              <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                                Consumed: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{b.totalConsumed?.toFixed(2)} {b.unit}</Text>
-                              </Text>
-                              <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                                Planned: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{b.plannedQty}</Text>
-                              </Text>
-                              <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                                Yield: <Text style={{ fontWeight: '700', color: colors.success }}>{b.actualYieldQty}</Text>
-                              </Text>
-                              {b.wasteQty > 0 && (
-                                <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                                  Waste: <Text style={{ fontWeight: '700', color: colors.warning }}>{b.wasteQty} ({b.variancePercent > 0 ? '+' : ''}{b.variancePercent}%)</Text>
-                                </Text>
-                              )}
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    ) : (
-                      <Text style={styles.emptyText}>This raw material has not been used in any finished batch yet.</Text>
-                    )}
-                  </>
-                )}
-              </ScrollView>
-            ) : (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ color: colors.text.secondary }}>No genealogy data available.</Text>
-              </View>
-            )}
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setGenealogyModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* ======================================================== */}
       {/* MODAL 8: END-TO-END BATCH TRACE */}
@@ -2690,24 +2380,24 @@ export default function ManufacturingScreen() {
             {traceLoading ? (
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 12, fontWeight: '600' }}>Fetching raw material stock ledger...</Text>
               </View>
-            ) : traceResult ? (
+            ) : (
               <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ gap: 16 }}>
                 {/* Raw Material Stock Ledger (IN/OUT) */}
-                {traceResult.rawMaterialEntries?.length > 0 ? (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
-                    {/* Header */}
-                    <View style={{ backgroundColor: colors.primary + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>
-                        📋 Raw Material Stock: {traceResult.rawMaterialEntries[0].materialName}
-                      </Text>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>
-                        SKU: {traceResult.rawMaterialEntries[0].materialSku}
-                      </Text>
-                    </View>
+                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
+                  {/* Header */}
+                  <View style={{ backgroundColor: colors.primary + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>
+                      📋 Raw Material Stock Ledger: {traceResult?.materialName || traceResult?.rawMaterialEntries?.[0]?.materialName || traceBatchNo || traceResult?.batchNo || 'Stock Trace'}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>
+                      SKU: {traceResult?.materialSku || traceResult?.rawMaterialEntries?.[0]?.materialSku || '-'}
+                    </Text>
+                  </View>
 
                     {/* Search Bar */}
-                    <View style={{ paddingHorizontal: 12, paddingColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8, height: 38 }}>
+                    <View style={{ paddingHorizontal: 12, backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8, height: 38 }}>
                       <Ionicons name="search-outline" size={15} color={colors.text.muted} />
                       <TextInput
                         style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
@@ -2772,7 +2462,8 @@ export default function ManufacturingScreen() {
                                 const d = new Date(val);
                                 return isNaN(d.getTime()) ? new Date() : d;
                               };
-                              const filtered = traceResult.rawMaterialEntries.filter((e: any) => {
+                              const inEntries = traceResult?.rawMaterialEntries || [];
+                              const filtered = inEntries.filter((e: any) => {
                                 if (!traceSearch) return true;
                                 return e.batchNo?.toLowerCase().includes(traceSearch.toLowerCase()) ||
                                        e.purchaseRef?.toLowerCase().includes(traceSearch.toLowerCase());
@@ -2811,9 +2502,10 @@ export default function ManufacturingScreen() {
                             {/* Table Header for OUT */}
                             <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                               <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                              <Text style={{ width: 150, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Production Batch No</Text>
+                              <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Production Batch No</Text>
                               <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Product Name</Text>
-                              <Text style={{ width: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Consumed Qty</Text>
+                              <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Consumed Qty</Text>
+                              <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Unit / Warehouse</Text>
                             </View>
                             {/* Table Body for OUT */}
                             {(() => {
@@ -2822,11 +2514,12 @@ export default function ManufacturingScreen() {
                                 const d = new Date(val);
                                 return isNaN(d.getTime()) ? new Date() : d;
                               };
-                              const outItems = (traceResult.productionBatches || []).filter((b: any) => b.relation === 'raw_material_consumed_in');
+                              const outItems = (traceResult?.productionBatches || []).filter((b: any) => b.relation === 'raw_material_consumed_in');
                               const filtered = outItems.filter((b: any) => {
                                 if (!traceSearch) return true;
                                 return b.batchNo?.toLowerCase().includes(traceSearch.toLowerCase()) ||
-                                       b.productName?.toLowerCase().includes(traceSearch.toLowerCase());
+                                       b.productName?.toLowerCase().includes(traceSearch.toLowerCase()) ||
+                                       b.warehouseName?.toLowerCase().includes(traceSearch.toLowerCase());
                               });
 
                               if (filtered.length === 0) {
@@ -2838,14 +2531,17 @@ export default function ManufacturingScreen() {
                                   <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>
                                     {parseDate(row.startDate || row.endDate || row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                   </Text>
-                                  <Text style={{ width: 150, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                                  <Text style={{ width: 140, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
                                     {row.batchNo}
                                   </Text>
                                   <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
                                     {row.productName}
                                   </Text>
-                                  <Text style={{ width: 110, fontSize: 11, fontWeight: '700', color: colors.warning, textAlign: 'right' }}>
-                                    {row.qtyConsumed.toFixed(1)} {traceResult.rawMaterialEntries[0].unit || ''}
+                                  <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.warning, textAlign: 'right' }}>
+                                    {row.qtyConsumed.toFixed(1)} {traceResult.rawMaterialEntries?.[0]?.unit || ''}
+                                  </Text>
+                                  <Text style={{ width: 130, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'right' }} numberOfLines={1}>
+                                    {row.warehouseName || 'Factory Unit'}
                                   </Text>
                                 </View>
                               ));
@@ -2855,54 +2551,9 @@ export default function ManufacturingScreen() {
                       </View>
                     </ScrollView>
                   </View>
-                ) : (
-                  /* Standard trace sections for Finished Goods batches */
-                  traceResult.productionBatches?.length > 0 && (
-                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                      <View style={{ backgroundColor: colors.primary + '15', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>🏭 Production Batches ({traceResult.productionBatches.length})</Text>
-                      </View>
-                      {traceResult.productionBatches.map((b: any, idx: number) => (
-                        <View key={idx} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{b.productName}</Text>
-                            <View style={[styles.statusBadge, { borderColor: getStatusColor(b.status), backgroundColor: getStatusColor(b.status) + '10' }]}>
-                              <Text style={[styles.statusBadgeText, { color: getStatusColor(b.status) }]}>{b.status.toUpperCase()}</Text>
-                            </View>
-                          </View>
-                          <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                            {b.relation === 'raw_material_consumed_in' ? '→ Consumed in batch: ' : '→ Finished batch: '}
-                            {b.batchNo}
-                          </Text>
-                          <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                            Planned: {b.plannedQty} • Yield: {b.actualYieldQty}
-                            {b.qtyConsumed ? ` • Qty Consumed: ${b.qtyConsumed}` : ''}
-                            {b.wasteQty > 0 ? ` • Waste: ${b.wasteQty} (${b.variancePercent}%)` : ''}
-                          </Text>
-                          
-                          {b.ingredientsConsumed && b.ingredientsConsumed.length > 0 && (
-                            <View style={{ marginTop: 8, padding: 8, backgroundColor: colors.bg.secondary, borderRadius: 6, gap: 4 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 2 }}>🌿 Consumed Raw Materials & Trace to Vendor:</Text>
-                              {b.ingredientsConsumed.map((ing: any, idx2: number) => (
-                                <View key={idx2} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2, borderBottomWidth: idx2 < b.ingredientsConsumed.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
-                                  <Text style={{ fontSize: 11, color: colors.text.primary }}>
-                                    {ing.materialName} ({ing.qtyConsumed} {ing.unit})
-                                  </Text>
-                                  <Text style={{ fontSize: 11, color: colors.warning, fontWeight: '600' }}>
-                                    Batch: {ing.batchNo} • Vendor: {ing.vendorName}
-                                  </Text>
-                                </View>
-                              ))}
-                            </View>
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  )
-                )}
 
                 {/* Finished Goods Stock */}
-                {traceResult.finishedGoodsEntries?.length > 0 && (
+                {!!traceResult?.finishedGoodsEntries?.length && (
                   <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                     <View style={{ backgroundColor: colors.success + '15', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                       <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>📊 Finished Goods Stock ({traceResult.finishedGoodsEntries.length})</Text>
@@ -2921,7 +2572,7 @@ export default function ManufacturingScreen() {
                 )}
 
                 {/* Challans */}
-                {traceResult.challans?.length > 0 && (
+                {!!traceResult?.challans?.length && (
                   <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                     <View style={{ backgroundColor: colors.primary + '10', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                       <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>📋 Challans ({traceResult.challans.length})</Text>
@@ -2938,7 +2589,7 @@ export default function ManufacturingScreen() {
                 )}
 
                 {/* Invoices */}
-                {traceResult.invoices?.length > 0 && (
+                {!!traceResult?.invoices?.length && (
                   <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                     <View style={{ backgroundColor: colors.success + '10', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                       <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>🧾 Invoices ({traceResult.invoices.length})</Text>
@@ -2956,7 +2607,7 @@ export default function ManufacturingScreen() {
                 )}
 
                 {/* Dispatches */}
-                {traceResult.dispatches?.length > 0 && (
+                {!!traceResult?.dispatches?.length && (
                   <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                     <View style={{ backgroundColor: colors.warning + '10', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                       <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>🚚 Dispatches ({traceResult.dispatches.length})</Text>
@@ -2975,18 +2626,18 @@ export default function ManufacturingScreen() {
                   </View>
                 )}
 
-                {!traceResult.rawMaterialEntries?.length && !traceResult.productionBatches?.length && 
-                 !traceResult.finishedGoodsEntries?.length && !traceResult.challans?.length &&
-                 !traceResult.invoices?.length && !traceResult.dispatches?.length && (
+                {!traceResult?.rawMaterialEntries?.length && !traceResult?.productionBatches?.length && 
+                 !traceResult?.finishedGoodsEntries?.length && !traceResult?.challans?.length &&
+                 !traceResult?.invoices?.length && !traceResult?.dispatches?.length && (
                   <View style={{ alignItems: 'center', padding: 24 }}>
                     <Ionicons name="search-outline" size={40} color={colors.text.muted} />
                     <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 8 }}>
-                      No trace records found for batch "{traceResult.batchNo}"
+                      No trace records found for "{traceResult?.batchNo || traceBatchNo}"
                     </Text>
                   </View>
                 )}
               </ScrollView>
-            ) : null}
+            )}
 
             <View style={styles.modalFooter}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setTraceModalVisible(false)}>

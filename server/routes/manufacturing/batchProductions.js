@@ -57,14 +57,17 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       return res.status(400).json({ error: `No Bill of Materials configured for product: ${prod.name}` });
     }
 
-    const ingredientsRequired = bom.ingredients
-      .filter(ing => ing.itemType !== 'packaging')
-      .map(ing => {
-        // Formulation ingredients: % ratio of total formula
-        const scale = valPlanned / (bom.batchYieldSize || 100);
+    const ingredientsRequired = [];
+    for (const ing of bom.ingredients) {
+      const rm = await RawMaterial.findById(ing.rawMaterialId);
+      const isPackaging = ing.itemType === 'packaging' || (rm && rm.category === 'Packaging');
+      if (!isPackaging) {
+        const scaleBase = bom.batchYieldSize && bom.batchYieldSize > 0 ? bom.batchYieldSize : 100;
+        const scale = valPlanned / scaleBase;
         const qtyNeeded = ing.qtyRequired * scale;
-        return { rawMaterialId: ing.rawMaterialId, qtyNeeded };
-      });
+        ingredientsRequired.push({ rawMaterialId: ing.rawMaterialId, qtyNeeded });
+      }
+    }
 
     const verifiedDeductions = [];
     for (const reqIng of ingredientsRequired) {
