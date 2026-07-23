@@ -772,7 +772,7 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
   const handleSave = async () => {
     const qty = parseFloat(qtyBoxes);
     if (isNaN(qty) || qty < 0) {
-      setError('Please enter a valid non-negative number of boxes');
+      setError('Please enter a valid non-negative quantity of pieces');
       return;
     }
     if (type === 'OUT' && qty > entry.qtyBoxes) {
