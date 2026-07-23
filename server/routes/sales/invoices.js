@@ -548,7 +548,11 @@ router.patch('/purchases/:id/finalize', authorize('invoice:markPaid'), async (re
 
     // Sync Vendor balance
     if (vend) {
-      vend.regularBalance += invoice.amount;
+      if (invoice.mode === 'cash') {
+        vend.cashBalance = (vend.cashBalance || 0) + invoice.amount;
+      } else {
+        vend.regularBalance = (vend.regularBalance || 0) + invoice.amount;
+      }
       await vend.save();
     }
 
@@ -636,7 +640,11 @@ router.delete('/purchases/:id', authorize('invoice:delete'), async (req, res) =>
         ]
       });
       if (vend) {
-        vend.regularBalance = Math.max(0, vend.regularBalance - invoice.amount);
+        if (invoice.mode === 'cash') {
+          vend.cashBalance = Math.max(0, (vend.cashBalance || 0) - invoice.amount);
+        } else {
+          vend.regularBalance = Math.max(0, (vend.regularBalance || 0) - invoice.amount);
+        }
         await vend.save();
       }
 
