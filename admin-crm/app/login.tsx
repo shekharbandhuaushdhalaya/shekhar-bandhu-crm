@@ -396,7 +396,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.bg.primary,
+    backgroundColor: colors.bg.card,
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: colors.border,
