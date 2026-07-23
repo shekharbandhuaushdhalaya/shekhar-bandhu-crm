@@ -982,6 +982,20 @@ export default function DashboardScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
+    const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => load());
+    const sub3 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => load());
+    const sub4 = DeviceEventEmitter.addListener('new_web_order_event', () => load());
+
+    return () => {
+      sub1.remove();
+      sub2.remove();
+      sub3.remove();
+      sub4.remove();
+    };
+  }, [load]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await api.checkConnection();

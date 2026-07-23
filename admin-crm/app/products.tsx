@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Image, Pressable } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Image, Pressable, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Spacing, Radius, LightColors } from '../constants/theme';
@@ -1371,6 +1371,17 @@ export default function ProductsScreen() {
   }, [search]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
+    const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => load());
+    const sub3 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => load());
+    return () => {
+      sub1.remove();
+      sub2.remove();
+      sub3.remove();
+    };
+  }, [load]);
 
   useEffect(() => {
     if (products.length > 0) {

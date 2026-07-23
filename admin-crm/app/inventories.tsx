@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product, DeadStockItem } from '../utils/api';
@@ -1201,6 +1201,16 @@ export default function InventoriesScreen() {
 
   useEffect(() => {
     loadData();
+
+    const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => loadData());
+    const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => loadData());
+    const sub3 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => loadData());
+
+    return () => {
+      sub1.remove();
+      sub2.remove();
+      sub3.remove();
+    };
   }, [loadData]);
 
   const onRefresh = useCallback(async () => {
