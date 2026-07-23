@@ -73,7 +73,7 @@ export type Customer = {
   };
   shippingSameAsBilling?: boolean;
   customerType?: 'gst' | 'cash';
-  recordTracking?: 'invoice_ledger';
+  recordTracking?: 'invoice_ledger' | 'cash_ledger';
   discountPercent?: number;
 };
 
