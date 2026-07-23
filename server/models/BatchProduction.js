@@ -32,6 +32,12 @@ const batchProductionSchema = new mongoose.Schema({
     ref: 'Product',
     required: true,
   },
+  warehouseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Warehouse',
+    required: true,
+  },
+  warehouseName: { type: String, default: '' },
   plannedQty: { type: Number, required: true },
   actualYieldQty: { type: Number, default: 0 },
   status: {

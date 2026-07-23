@@ -875,7 +875,7 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`);
     return res.json();
   }
-  async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string }): Promise<BatchProduction> {
+  async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; warehouseId: string }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }

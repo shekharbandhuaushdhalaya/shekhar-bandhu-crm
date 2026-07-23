@@ -417,6 +417,7 @@ const batchProductionSchema = z.object({
   batchNo: z.string().min(1),
   productId: objectId,
   plannedQty: z.number().int().positive(),
+  warehouseId: objectId,
   startDate: z.string().or(z.date()).optional(),
 });
 

@@ -26,7 +26,8 @@ import {
   BillOfMaterials,
   BatchProduction,
   Product,
-  Vendor
+  Vendor,
+  Warehouse
 } from '../utils/api';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { FIRM_DETAILS } from '../constants/firm';
@@ -49,6 +50,8 @@ export default function ManufacturingScreen() {
   const [batches, setBatches] = useState<BatchProduction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [prodWarehouseId, setProdWarehouseId] = useState('');
   const [expiryAlerts, setExpiryAlerts] = useState<RawMaterialEntry[]>([]);
   const [mfgAnalytics, setMfgAnalytics] = useState<any>(null);
   const [bmrReport, setBmrReport] = useState<any>(null);
@@ -141,7 +144,7 @@ export default function ManufacturingScreen() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [rmsData, entriesData, bomsData, batchesData, prodsData, vendsData, alertsData, analyticsData] = await Promise.all([
+      const [rmsData, entriesData, bomsData, batchesData, prodsData, vendsData, alertsData, analyticsData, whData] = await Promise.all([
         api.getRawMaterials(),
         api.getRawMaterialEntries(),
         api.getBOMs(),
@@ -149,7 +152,8 @@ export default function ManufacturingScreen() {
         api.getProducts(),
         api.getVendors(),
         api.getRawMaterialExpiryAlerts(),
-        api.getManufacturingAnalytics()
+        api.getManufacturingAnalytics(),
+        api.getWarehouses()
       ]);
 
       setMaterials(rmsData);
@@ -160,6 +164,7 @@ export default function ManufacturingScreen() {
       setVendors(vendsData);
       setExpiryAlerts(alertsData);
       setMfgAnalytics(analyticsData);
+      setWarehouses(whData);
     } catch (err) {
       console.error('Failed to load manufacturing workspace data:', err);
     } finally {
@@ -325,8 +330,8 @@ export default function ManufacturingScreen() {
 
   // --- Handlers: Batch Productions ---
   const handleStartProduction = async () => {
-    if (!prodProductId || !prodPlannedQty || !prodBatchNo.trim()) {
-      setProdError('Please fill in all launch requirements.');
+    if (!prodProductId || !prodPlannedQty || !prodBatchNo.trim() || !prodWarehouseId) {
+      setProdError('Please fill in all launch requirements, including the manufacturing unit.');
       return;
     }
     setProdError('');
@@ -334,12 +339,14 @@ export default function ManufacturingScreen() {
       await api.startBatchProduction({
         productId: prodProductId,
         plannedQty: Number(prodPlannedQty),
-        batchNo: prodBatchNo.trim().toUpperCase()
+        batchNo: prodBatchNo.trim().toUpperCase(),
+        warehouseId: prodWarehouseId
       });
 
       setProdProductId('');
       setProdPlannedQty('');
       setProdBatchNo('');
+      setProdWarehouseId('');
       setProductionModalVisible(false);
       loadData();
     } catch (err: any) {
@@ -1676,6 +1683,24 @@ export default function ManufacturingScreen() {
                   </select>
                 ) : (
                   <TextInput style={styles.input} placeholder="Product ID" value={prodProductId} onChangeText={setProdProductId} />
+                )}
+              </View>
+
+              <Text style={styles.inputLabel}>Manufacturing Unit / Target Warehouse *</Text>
+              <View style={styles.pickerWrapper}>
+                {Platform.OS === 'web' ? (
+                  <select
+                    value={prodWarehouseId}
+                    onChange={(e: any) => setProdWarehouseId(e.target.value)}
+                    style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                  >
+                    <option value="">-- Select Manufacturing Unit --</option>
+                    {warehouses.map(w => (
+                      <option key={w._id} value={w._id}>{w.name} ({w.city || 'Default'})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <TextInput style={styles.input} placeholder="Warehouse ID" value={prodWarehouseId} onChangeText={setProdWarehouseId} />
                 )}
               </View>
 
