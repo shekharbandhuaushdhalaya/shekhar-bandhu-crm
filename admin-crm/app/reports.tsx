@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, RefreshControl,
-  useWindowDimensions, Pressable, TouchableOpacity, Platform
+  useWindowDimensions, Pressable, TouchableOpacity, Platform,
+  TextInput, Alert, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
@@ -12,6 +13,8 @@ import { usePermission } from '../utils/permissions';
 import { FIRM_DETAILS } from '../constants/firm';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import GstReturnsPage from './gst-returns';
+import UnauthorizedScreen from '../components/UnauthorizedScreen';
 
 type ReportTab = 'accounting' | 'gst' | 'aging' | 'manufacturing' | 'rawmaterials';
 
@@ -25,6 +28,25 @@ export default function ReportsScreen() {
 
   const [activeTab, setActiveTab] = useState<ReportTab>('accounting');
   const [refreshing, setRefreshing] = useState(false);
+
+  // --- AI Analytics ---
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState<any>(null);
+
+  const handleAskAi = async () => {
+    if (!aiPrompt.trim()) return;
+    try {
+      setAiLoading(true);
+      const res = await api.askAiAnalytics(aiPrompt.trim());
+      setAiResponse(res);
+    } catch (err: any) {
+      console.error('AI Analytics Error:', err);
+      setAiResponse({ answer: err.message || 'Failed to get response from AI Analytics.' });
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // --- Accounting / GST / Aging data ---
   const [saleInvs, setSaleInvs] = useState<Invoice[]>([]);
@@ -220,7 +242,7 @@ export default function ReportsScreen() {
       `;
     });
 
-    const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const monthName = MONTHS[reportMonth];
     const reportLabel = reportType === 'sale' ? 'Sale' : 'Purchase';
 
@@ -455,58 +477,88 @@ export default function ReportsScreen() {
   const netPayable = gstCollected - gstPaid;
   const isItc = netPayable < 0;
 
-  const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const MONTHS_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   const TABS: { id: ReportTab; label: string; icon: string }[] = [
-    { id: 'accounting',   label: 'Monthly Accounting',  icon: 'document-text-outline' },
-    { id: 'gst',          label: 'GST & ITC',            icon: 'calculator-outline' },
-    { id: 'aging',        label: 'Receivables Aging',    icon: 'time-outline' },
-    { id: 'manufacturing',label: 'Manufacturing',        icon: 'analytics-outline' },
-    { id: 'rawmaterials', label: 'Raw Materials',        icon: 'leaf-outline' },
+    { id: 'accounting', label: 'Monthly Accounting', icon: 'document-text-outline' },
+    { id: 'gst', label: 'GST & ITC', icon: 'calculator-outline' },
+    { id: 'aging', label: 'Receivables Aging', icon: 'time-outline' },
+    { id: 'manufacturing', label: 'Manufacturing', icon: 'analytics-outline' },
+    { id: 'rawmaterials', label: 'Raw Materials', icon: 'leaf-outline' },
   ];
 
   if (perm.permissions && !perm.can('report:view')) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
-        <Ionicons name="lock-closed" size={48} color={colors.danger} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
-        <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>
-          You do not have permission to access reports.
-        </Text>
-      </View>
+      <UnauthorizedScreen
+        title="Reports & Analytics Chamber Locked"
+        description="Your account role does not hold the required Veda credentials for viewing financial statements, GST filings & operational reports."
+        requiredPermission="report:view"
+      />
     );
   }
 
+  const renderReportSelector = () => (
+    <View style={{ width: isDesktop ? 260 : '100%', minWidth: 190 }}>
+      {Platform.OS === 'web' ? (
+        <select
+          value={activeTab}
+          onChange={(e: any) => setActiveTab(e.target.value as ReportTab)}
+          style={{
+            width: '100%',
+            height: 38,
+            padding: '0 12px',
+            borderRadius: 8,
+            border: `1px solid ${colors.primary}`,
+            backgroundColor: colors.bg.card,
+            color: colors.primary,
+            fontSize: 13,
+            fontWeight: '700',
+            outline: 'none',
+            cursor: 'pointer',
+            boxShadow: '0px 2px 4px rgba(0,0,0,0.04)'
+          }}
+        >
+          <option value="accounting">📊 Monthly Accounting Register</option>
+          <option value="gst">🧾 GST Returns (GSTR-1 & GSTR-3B)</option>
+          <option value="aging">⏳ Receivables Aging</option>
+          <option value="manufacturing">🏭 Manufacturing Analytics</option>
+          <option value="rawmaterials">🌿 Raw Materials Stock Register</option>
+        </select>
+      ) : (
+        <TouchableOpacity
+          style={{
+            height: 38,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.primary,
+            backgroundColor: colors.bg.card,
+            paddingHorizontal: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+          onPress={() => {
+            Alert.alert('Select Report Section', '', [
+              { text: '📊 Monthly Accounting', onPress: () => setActiveTab('accounting') },
+              { text: '🧾 GST Returns (GSTR-1 & GSTR-3B)', onPress: () => setActiveTab('gst') },
+              { text: '⏳ Receivables Aging', onPress: () => setActiveTab('aging') },
+              { text: '🏭 Manufacturing Analytics', onPress: () => setActiveTab('manufacturing') },
+              { text: '🌿 Raw Materials', onPress: () => setActiveTab('rawmaterials') }
+            ]);
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+            {activeTab === 'accounting' ? '📊 Monthly Accounting' : activeTab === 'gst' ? '🧾 GST Returns' : activeTab === 'aging' ? '⏳ Receivables Aging' : activeTab === 'manufacturing' ? '🏭 Manufacturing Analytics' : '🌿 Raw Materials'}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={colors.primary} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <View style={styles.screen}>
-
-      {/* Page Header */}
-      <View style={styles.pageHeader}>
-        <View>
-          <Text style={styles.pageTitle}>Reports & Analytics</Text>
-          <Text style={styles.pageSubtitle}>All business reports in one place</Text>
-        </View>
-      </View>
-
-      {/* Tab Bar */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBarScroll} contentContainerStyle={styles.tabBarContent}>
-        {TABS.map(tab => {
-          const active = activeTab === tab.id;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tabPill, active && styles.tabPillActive]}
-              onPress={() => setActiveTab(tab.id)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name={tab.icon as any} size={15} color={active ? '#fff' : colors.text.secondary} />
-              <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
       {/* Content Area */}
       <ScrollView
         style={{ flex: 1 }}
@@ -517,14 +569,17 @@ export default function ReportsScreen() {
         {activeTab === 'accounting' && (
           <View>
             <View style={styles.sectionCard}>
-              <View style={styles.sectionCardHeader}>
-                <View style={[styles.iconBadge, { backgroundColor: colors.primary + '15' }]}>
-                  <Ionicons name="document-text" size={20} color={colors.primary} />
+              <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
+                  <View style={[styles.iconBadge, { backgroundColor: colors.primary + '15' }]}>
+                    <Ionicons name="document-text" size={20} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sectionCardTitle}>Monthly Accounting Report</Text>
+                    <Text style={styles.sectionCardSubtitle}>Generate printable GST-compliant Sale / Purchase register PDF</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionCardTitle}>Monthly Accounting Report</Text>
-                  <Text style={styles.sectionCardSubtitle}>Generate printable GST-compliant Sale / Purchase register PDF</Text>
-                </View>
+                {renderReportSelector()}
               </View>
 
               <View style={[styles.divider]} />
@@ -664,14 +719,17 @@ export default function ReportsScreen() {
         {activeTab === 'gst' && (
           <View>
             <View style={styles.sectionCard}>
-              <View style={styles.sectionCardHeader}>
-                <View style={[styles.iconBadge, { backgroundColor: colors.success + '15' }]}>
-                  <Ionicons name="calculator" size={20} color={colors.success} />
+              <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
+                  <View style={[styles.iconBadge, { backgroundColor: colors.success + '15' }]}>
+                    <Ionicons name="calculator" size={20} color={colors.success} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sectionCardTitle}>GST Tax Administration & ITC</Text>
+                    <Text style={styles.sectionCardSubtitle}>Consolidated GST collected vs. paid, and net tax liability</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionCardTitle}>GST Tax Administration & ITC</Text>
-                  <Text style={styles.sectionCardSubtitle}>Consolidated GST collected vs. paid, and net tax liability</Text>
-                </View>
+                {renderReportSelector()}
               </View>
               <View style={styles.divider} />
 
@@ -710,43 +768,20 @@ export default function ReportsScreen() {
               </View>
             </View>
 
-            {/* GST Breakdown by month (last 6 months) */}
+            {/* Embedded Official GSTR-1 & GSTR-3B Return Generator */}
             <View style={[styles.sectionCard, { marginTop: 16 }]}>
-              <Text style={styles.sectionCardTitle}>Last 6 Months – GST Snapshot</Text>
+              <View style={styles.sectionCardHeader}>
+                <View style={[styles.iconBadge, { backgroundColor: colors.primary + '15' }]}>
+                  <Ionicons name="document-attach" size={20} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sectionCardTitle}>Monthly Statutory GST Returns (GSTR-1 & GSTR-3B)</Text>
+                  <Text style={styles.sectionCardSubtitle}>Official filing reports with Table 9B Credit/Debit Notes</Text>
+                </View>
+              </View>
               <View style={styles.divider} />
-              {(() => {
-                const now = new Date();
-                return Array.from({ length: 6 }, (_, i) => {
-                  const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-                  const m = d.getMonth(), y = d.getFullYear();
-                  const colSale = saleInvs.filter(inv => (inv.mode === 'regular' || (inv.mode as any) === 'pakka') && new Date(inv.date).getMonth() === m && new Date(inv.date).getFullYear() === y)
-                    .reduce((s, inv) => s + (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0), 0);
-                  const colPurch = purchInvs.filter(inv => (inv.mode === 'regular' || (inv.mode as any) === 'pakka') && new Date(inv.date).getMonth() === m && new Date(inv.date).getFullYear() === y)
-                    .reduce((s, inv) => s + (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0), 0);
-                  const net = colSale - colPurch;
-                  return (
-                    <View key={`${m}-${y}`} style={styles.gstMonthRow}>
-                      <Text style={styles.gstMonthLabel}>{MONTHS_SHORT[m]} {y}</Text>
-                      <View style={styles.gstMonthValues}>
-                        <View style={styles.gstMonthChip}>
-                          <Text style={[styles.gstMonthChipLabel, { color: colors.primary }]}>Collected</Text>
-                          <Text style={[styles.gstMonthChipValue, { color: colors.primary }]}>₹{colSale.toLocaleString()}</Text>
-                        </View>
-                        <View style={styles.gstMonthChip}>
-                          <Text style={[styles.gstMonthChipLabel, { color: colors.success }]}>ITC</Text>
-                          <Text style={[styles.gstMonthChipValue, { color: colors.success }]}>₹{colPurch.toLocaleString()}</Text>
-                        </View>
-                        <View style={styles.gstMonthChip}>
-                          <Text style={[styles.gstMonthChipLabel, { color: net >= 0 ? colors.warning : colors.success }]}>Net</Text>
-                          <Text style={[styles.gstMonthChipValue, { color: net >= 0 ? colors.warning : colors.success }]}>
-                            {net >= 0 ? '' : '-'}₹{Math.abs(net).toLocaleString()}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  );
-                });
-              })()}
+
+              <GstReturnsPage />
             </View>
           </View>
         )}
@@ -755,14 +790,17 @@ export default function ReportsScreen() {
         {activeTab === 'aging' && (
           <View>
             <View style={styles.sectionCard}>
-              <View style={styles.sectionCardHeader}>
-                <View style={[styles.iconBadge, { backgroundColor: colors.warning + '15' }]}>
-                  <Ionicons name="time" size={20} color={colors.warning} />
+              <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
+                  <View style={[styles.iconBadge, { backgroundColor: colors.warning + '15' }]}>
+                    <Ionicons name="time" size={20} color={colors.warning} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sectionCardTitle}>Receivables Aging Report</Text>
+                    <Text style={styles.sectionCardSubtitle}>Outstanding unpaid invoice balances by overdue period</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionCardTitle}>Receivables Aging Report</Text>
-                  <Text style={styles.sectionCardSubtitle}>Outstanding unpaid invoice balances by overdue period</Text>
-                </View>
+                {renderReportSelector()}
               </View>
               <View style={styles.divider} />
 
@@ -834,11 +872,11 @@ export default function ReportsScreen() {
                 due.setHours(0, 0, 0, 0);
                 return today.getTime() > due.getTime();
               }).length === 0 && (
-                <View style={{ alignItems: 'center', padding: 24 }}>
-                  <Ionicons name="checkmark-circle-outline" size={32} color={colors.success} />
-                  <Text style={{ color: colors.text.muted, marginTop: 8 }}>No overdue invoices. Great work!</Text>
-                </View>
-              )}
+                  <View style={{ alignItems: 'center', padding: 24 }}>
+                    <Ionicons name="checkmark-circle-outline" size={32} color={colors.success} />
+                    <Text style={{ color: colors.text.muted, marginTop: 8 }}>No overdue invoices. Great work!</Text>
+                  </View>
+                )}
             </View>
           </View>
         )}
@@ -848,14 +886,17 @@ export default function ReportsScreen() {
           <View>
             {/* Asset Valuation */}
             <View style={styles.sectionCard}>
-              <View style={styles.sectionCardHeader}>
-                <View style={[styles.iconBadge, { backgroundColor: colors.purple + '15' }]}>
-                  <Ionicons name="analytics" size={20} color={colors.purple || colors.primary} />
+              <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
+                  <View style={[styles.iconBadge, { backgroundColor: colors.purple + '15' }]}>
+                    <Ionicons name="analytics" size={20} color={colors.purple || colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sectionCardTitle}>Manufacturing Asset Valuation</Text>
+                    <Text style={styles.sectionCardSubtitle}>Live raw material & finished goods inventory value</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionCardTitle}>Manufacturing Asset Valuation</Text>
-                  <Text style={styles.sectionCardSubtitle}>Live raw material & finished goods inventory value</Text>
-                </View>
+                {renderReportSelector()}
               </View>
               <View style={styles.divider} />
 
@@ -1019,18 +1060,23 @@ export default function ReportsScreen() {
             <View>
               {/* Header card */}
               <View style={styles.sectionCard}>
-                <View style={styles.sectionCardHeader}>
-                  <View style={[styles.iconBadge, { backgroundColor: colors.success + '15' }]}>
-                    <Ionicons name="leaf" size={20} color={colors.success} />
+                <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
+                    <View style={[styles.iconBadge, { backgroundColor: colors.success + '15' }]}>
+                      <Ionicons name="leaf" size={20} color={colors.success} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.sectionCardTitle}>Raw Materials Stock Report</Text>
+                      <Text style={styles.sectionCardSubtitle}>Live inventory, batch register & expiry alerts</Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sectionCardTitle}>Raw Materials Stock Report</Text>
-                    <Text style={styles.sectionCardSubtitle}>Live inventory, batch register & expiry alerts</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <TouchableOpacity style={styles.generateBtn} onPress={handlePrintRawMaterialReport} activeOpacity={0.8}>
+                      <Ionicons name="print" size={15} color="#fff" />
+                      <Text style={styles.generateBtnText}>Print PDF</Text>
+                    </TouchableOpacity>
+                    {renderReportSelector()}
                   </View>
-                  <TouchableOpacity style={styles.generateBtn} onPress={handlePrintRawMaterialReport} activeOpacity={0.8}>
-                    <Ionicons name="print" size={15} color="#fff" />
-                    <Text style={styles.generateBtnText}>Print PDF</Text>
-                  </TouchableOpacity>
                 </View>
                 <View style={styles.divider} />
 
@@ -1146,7 +1192,7 @@ export default function ReportsScreen() {
                   <View style={styles.rmSearchBox}>
                     <Ionicons name="search-outline" size={14} color={colors.text.muted} />
                     <Text
-                      onPress={() => {}}
+                      onPress={() => { }}
                       style={{ fontSize: 13, color: rmSearchText ? colors.text.primary : colors.text.muted, flex: 1, paddingVertical: 2 }}
                     >
                       {/* Native TextInput for real use — static display for now */}

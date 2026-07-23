@@ -99,7 +99,10 @@ const printInvoice = (invoice: Invoice) => {
       return `
         <tr>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${i + 1}</td>
-          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:left;">${(it.name || '').replace(/\s+[0-9]+(?:\.[0-9]+)?[gG]$/, '')}</td>
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:left;">
+            ${(it.name || '').replace(/\s+[0-9]+(?:\.[0-9]+)?[gG]$/, '')}
+            ${(it as any).batchNo ? `<div style="font-size:8px;color:#555;margin-top:1px;">Batch: ${(it as any).batchNo}</div>` : ''}
+          </td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${it.hsnCode || ''}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${packing}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${qty}</td>
@@ -312,9 +315,25 @@ const printInvoice = (invoice: Invoice) => {
             <strong>Terms & Conditions</strong><br/>
             ${FIRM_DETAILS.defaultTerms ? FIRM_DETAILS.defaultTerms.replace(/\n/g, '<br/>') : ''}
           </td>
-          <td style="width:33%; text-align:center; padding:5px; vertical-align:bottom; height: 80px;">
-            <div style="font-weight:bold; margin-bottom: 40px; font-size: 11px;">For ${FIRM_DETAILS.name}</div>
-            <div>Authorised Signatory</div>
+          <td style="width:33%; text-align:center; padding:5px; vertical-align:${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? 'middle' : 'bottom'}; height: 80px;">
+            ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
+              <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 38px; width: auto; object-fit: contain; margin-bottom: 2px;" />
+              <div style="font-weight:bold; font-size: 10px; color: #15803d; margin-bottom: 4px;">
+                ✔ DIGITALLY SIGNED DOCUMENT
+              </div>
+              <div style="border: 1px dashed #16a34a; background-color: #f0fdf4; border-radius: 4px; padding: 5px; font-size: 8px; text-align: left; line-height: 1.3; display: flex; align-items: center; gap: 8px;">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`GST Digital Signature | Seller: ${FIRM_DETAILS.name} | GSTIN: ${FIRM_DETAILS.gstin || ''} | Inv: ${invoice.invoiceNo} | Date: ${new Date(invoice.date || Date.now()).toLocaleDateString('en-IN')} | Amt: ₹${finalGrandTotal.toFixed(2)} | Rule 46 CGST & Sec 5 IT Act Certified`)}" style="width: 48px; height: 48px; border: 1px solid #16a34a; padding: 2px; background: #fff; border-radius: 3px; flex-shrink: 0;" />
+                <div style="flex: 1;">
+                  <strong>Signed By:</strong> ${FIRM_DETAILS.name}<br/>
+                  <strong>Signatory:</strong> ${FIRM_DETAILS.dscSignatoryName}<br/>
+                  <strong>Date:</strong> ${new Date(invoice.date || Date.now()).toLocaleDateString('en-IN')}<br/>
+                  <span style="color: #15803d; font-weight: bold;">✔ Certified under Rule 46 CGST & Sec 5 IT Act.</span>
+                </div>
+              </div>
+            ` : `
+              <div style="font-weight:bold; margin-bottom: 40px; font-size: 11px;">For ${FIRM_DETAILS.name}</div>
+              <div>Authorised Signatory</div>
+            `}
           </td>
         </tr>
       </table>
@@ -428,6 +447,7 @@ interface ExtendedInvoiceItem extends InvoiceItem {
   rateText?: string;
   mrpText?: string;
   discountText?: string;
+  batchNo?: string;
 }
 
 const toTitleCase = (str?: string) => {
@@ -612,6 +632,14 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                     <Text style={styles.itemSubTextDetail}>
                       {it.hsnCode ? `HSN: ${it.hsnCode} | ` : ''}Rate: ₹{rate.toFixed(2)}/pc | Qty: {it.qty} boxes {it.packing !== undefined && it.packing > 1 ? `(${it.packing} pcs/box)` : ''}
                     </Text>
+                    {(it as any).batchNo ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                        <Ionicons name="barcode-outline" size={11} color={colors.primary} />
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace' }}>
+                          Batch: {(it as any).batchNo}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                   <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
                     <Text style={styles.itemQtyText}>₹{sub.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
@@ -865,7 +893,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const [activeItemDropdownIdx, setActiveItemDropdownIdx] = useState<number | null>(null);
   const [itemSearchText, setItemSearchText] = useState('');
 
-  const [items, setItems] = useState<ExtendedInvoiceItem[]>([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0 }]);
+  const [items, setItems] = useState<ExtendedInvoiceItem[]>([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '' }]);
 
   useEffect(() => {
     if (visible) {
@@ -899,7 +927,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           rateText: it.rate.toString(),
           packing: it.packing || 1,
           hsnCode: it.hsnCode || '',
-          gstRate: it.gstRate || 0
+          gstRate: it.gstRate || 0,
+          batchNo: (it as any).batchNo || ''
         })));
         setOverridePaymentTerms(true);
       } else {
@@ -1110,7 +1139,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       packing: entry.packing || 1,
       gstRate: gst,
       hsnCode: hsn,
-      maxQty: entry.qtyBoxes
+      maxQty: entry.qtyBoxes,
+      batchNo: entry.batchNo || ''
     };
     setItems(next);
     setActiveItemDropdownIdx(null);
@@ -1183,7 +1213,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     }
   };
 
-  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0 }, ...items]);
+  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '' }, ...items]);
   const removeItemRow = (idx: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== idx));
@@ -1736,9 +1766,25 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                 </View>
 
                 {it.productId ? (
-                  <Text style={{ fontSize: 10, color: hasError ? colors.danger : colors.text.muted, marginTop: 4, fontWeight: '600' }}>
-                    {hasError ? `Error: Exceeds stock limit of ${maxQty} boxes` : `Available stock: ${maxQty} boxes (Packing: ${it.packing || 1})`}
-                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                    <Text style={{ fontSize: 10, color: hasError ? colors.danger : colors.text.muted, fontWeight: '600' }}>
+                      {hasError ? `⚠ Exceeds stock: ${maxQty} boxes` : `Stock: ${maxQty} boxes (Pack: ${it.packing || 1})`}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="barcode-outline" size={11} color={colors.primary} />
+                      <TextInput
+                        style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace', borderBottomWidth: 1, borderBottomColor: colors.primary + '50', minWidth: 80, paddingVertical: 1 }}
+                        placeholder="Batch No."
+                        placeholderTextColor={colors.text.muted}
+                        value={it.batchNo || ''}
+                        onChangeText={(v) => {
+                          const next = [...items];
+                          next[idx].batchNo = v;
+                          setItems(next);
+                        }}
+                      />
+                    </View>
+                  </View>
                 ) : null}
               </View>
             );

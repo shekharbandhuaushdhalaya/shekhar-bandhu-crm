@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Pressable, FlatList } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Pressable, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
-import { api, DashboardStats, Activity, Contact, Product, Invoice, Challan, ConsolidatedInventory } from '../utils/api';
+import { api, DashboardStats, Activity, Contact, Product, Invoice, Challan, ConsolidatedInventory, MrDashboardSummary } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
@@ -567,10 +568,210 @@ function getItemTotalPieces(item: any): number {
   return qty === boxes * packing ? qty : qty * packing;
 }
 
+function FullMrAnalyticsTab() {
+  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const [mrDashboard, setMrDashboard] = useState<MrDashboardSummary | null>(null);
+  const [dateRange, setDateRange] = useState('thisMonth');
+
+  const loadData = useCallback(async () => {
+    try {
+      const now = new Date();
+      let from: string | undefined;
+      let to: string | undefined;
+      if (dateRange === 'thisMonth') {
+        from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        to = now.toISOString();
+      } else if (dateRange === 'lastMonth') {
+        from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+        to = new Date(now.getFullYear(), now.getMonth(), 0).toISOString();
+      } else if (dateRange === 'thisQuarter') {
+        const q = Math.floor(now.getMonth() / 3);
+        from = new Date(now.getFullYear(), q * 3, 1).toISOString();
+        to = now.toISOString();
+      }
+      const data = await api.getMrDashboard(from, to);
+      setMrDashboard(data);
+    } catch (_) {}
+  }, [dateRange]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  if (!mrDashboard) {
+    return (
+      <View style={{ padding: 24, alignItems: 'center' }}>
+        <Text style={{ color: colors.text.muted, fontSize: 13 }}>Loading MR Field Analytics...</Text>
+      </View>
+    );
+  }
+
+  const { mrs: mrData, totals } = mrDashboard;
+
+  return (
+    <View style={{ gap: 16 }}>
+      {/* Quick Navigation Banner to MR Attendance & Field Logs */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.primary + '10', padding: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.primary + '30', flexWrap: 'wrap', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 240 }}>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="location" size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>MR Daily Attendance & GPS Logs</Text>
+            <Text style={{ fontSize: 11, color: colors.text.secondary }}>Inspect live check-ins, check-outs, odometer distance & map coordinates</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={{
+            backgroundColor: colors.primary,
+            paddingHorizontal: 14,
+            paddingVertical: 9,
+            borderRadius: Radius.md,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6
+          }}
+          onPress={() => router.push('/medicalreps')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="footsteps-outline" size={16} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>View GPS Attendance</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Date Window Controls */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.card, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>Performance Window:</Text>
+        </View>
+        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.primary, padding: 2, borderRadius: Radius.sm, gap: 4 }}>
+          {[
+            { id: 'thisMonth', label: 'This Month' },
+            { id: 'lastMonth', label: 'Last Month' },
+            { id: 'thisQuarter', label: 'This Quarter' }
+          ].map(d => (
+            <Pressable
+              key={d.id}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: Radius.sm,
+                backgroundColor: dateRange === d.id ? colors.primary : 'transparent'
+              }}
+              onPress={() => setDateRange(d.id)}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: dateRange === d.id ? '#fff' : colors.text.secondary }}>
+                {d.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* KPI Cards */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.primary + '30' }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>DOCTOR VISITS</Text>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.primary, marginTop: 4 }}>{totals.visits}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.success + '30' }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>BOOKED ORDERS</Text>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.success, marginTop: 4 }}>{totals.orders}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.warning + '30' }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>TOTAL ORDER VALUE</Text>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.warning, marginTop: 4 }}>₹{(totals.orderValue || 0).toLocaleString('en-IN')}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.danger + '30' }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>EXPENSES SUBMITTED</Text>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.danger, marginTop: 4 }}>₹{(totals.expenses || 0).toLocaleString('en-IN')}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.info + '30' }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>DISTANCE COVERED</Text>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.info, marginTop: 4 }}>{(totals.distance || 0).toFixed(0)} <Text style={{ fontSize: 14 }}>km</Text></Text>
+        </View>
+      </View>
+
+      {/* Individual MR Performance Cards */}
+      <View style={{ gap: 12 }}>
+        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>
+          MR INDIVIDUAL PERFORMANCE & ROI ({mrData.length} ACTIVE REPS)
+        </Text>
+
+        {mrData.map(m => {
+          const roi = m.expenses > 0 ? (((m.orderValue - m.expenses) / m.expenses) * 100).toFixed(0) : '100+';
+          const targetAchievement = m.monthlyTarget > 0 ? Math.min(100, Math.round((m.orderValue / m.monthlyTarget) * 100)) : 0;
+
+          return (
+            <View key={m._id} style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>{m.name.charAt(0)}</Text>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>{m.name}</Text>
+                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>📍 {m.territory || 'Headquarters'} | Target: ₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
+                  </View>
+                </View>
+                <View style={{ backgroundColor: Number(roi) > 0 ? colors.success + '18' : colors.warning + '18', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: Number(roi) > 0 ? colors.success : colors.warning }}>
+                    ROI: {roi}%
+                  </Text>
+                </View>
+              </View>
+
+              {/* Progress Bar */}
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>MONTHLY TARGET PROGRESS</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>{targetAchievement}% Achieved</Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{ width: `${targetAchievement}%`, height: '100%', backgroundColor: targetAchievement >= 100 ? colors.success : colors.primary }} />
+                </View>
+              </View>
+
+              {/* Metrics Grid */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.bg.primary, padding: 10, borderRadius: Radius.md }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>{m.visits}</Text>
+                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Visits</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>{m.orders}</Text>
+                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Orders</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>₹{(m.orderValue || 0).toLocaleString('en-IN')}</Text>
+                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Sales</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.danger }}>₹{(m.expenses || 0).toLocaleString('en-IN')}</Text>
+                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Expenses</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.info }}>{m.totalDistance.toFixed(0)} km</Text>
+                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Distance</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
   const chartWidth = isDesktop ? (Math.min(winWidth, 1200) - 240 - 64) * 0.5 - 20 : winWidth - 64;
+  const [activeTab, setActiveTab] = useState<'overview' | 'mr_analytics'>('overview');
   const [stats, setStats] = useState<DashboardStats>({ totalPipeline: 0, closedWon: 0, activeLeadsCount: 0, pendingTasksCount: 0 });
   const [activities, setActivities] = useState<Activity[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -682,10 +883,53 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
-      {/* E-Commerce Performance Panel */}
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        🛒 E-Commerce Channel Stats
-      </Text>
+      {/* Main Top Dashboard Tab Navigation */}
+      <View style={{ flexDirection: 'row', backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: 4, marginBottom: Spacing.lg, borderWidth: 1, borderColor: colors.border }}>
+        <Pressable
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            paddingVertical: 10,
+            borderRadius: Radius.md,
+            backgroundColor: activeTab === 'overview' ? colors.primary : 'transparent'
+          }}
+          onPress={() => setActiveTab('overview')}
+        >
+          <Ionicons name="pie-chart-outline" size={16} color={activeTab === 'overview' ? '#fff' : colors.text.secondary} />
+          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'overview' ? '#fff' : colors.text.secondary }}>
+            Business Overview
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            paddingVertical: 10,
+            borderRadius: Radius.md,
+            backgroundColor: activeTab === 'mr_analytics' ? colors.primary : 'transparent'
+          }}
+          onPress={() => setActiveTab('mr_analytics')}
+        >
+          <Ionicons name="stats-chart-outline" size={16} color={activeTab === 'mr_analytics' ? '#fff' : colors.text.secondary} />
+          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'mr_analytics' ? '#fff' : colors.text.secondary }}>
+            MR Field Performance & ROI
+          </Text>
+        </Pressable>
+      </View>
+
+      {activeTab === 'overview' ? (
+        <>
+          {/* E-Commerce Performance Panel */}
+          <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            🛒 E-Commerce Channel Stats
+          </Text>
       <View style={[styles.metricsGrid, { marginBottom: Spacing.lg }]}>
         <MetricCard 
           title="E-COMM SALES" 
@@ -776,7 +1020,10 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-
+        </>
+      ) : (
+        <FullMrAnalyticsTab />
+      )}
     </ScrollView>
   );
 }

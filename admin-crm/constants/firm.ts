@@ -18,6 +18,10 @@ const DEFAULT_FIRM_DETAILS = {
   dispatchPrefix: "DP",
   defaultTerms: `1. All disputes are subject to "VARANASI" Jurisdiction only.\n2. Goods despatched at your risk and responsibility. Kindly retire the documents on presentation.\n3. We do not accept any responsibility for any loss/damages once the goods are delivered to the carriers.\n4. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.\n5. Goods once sold will not be taken back.`,
   defaultGstRate: 18,
+  signatureBase64: "",
+  signatureUrl: "",
+  dscSignatoryName: "Authorised Representative",
+  dscCertificateName: "eMudhra / Class 3 DSC",
 };
 
 let activeSettings = { ...DEFAULT_FIRM_DETAILS };
@@ -39,6 +43,10 @@ export const FIRM_DETAILS = {
   get dispatchPrefix() { return activeSettings.dispatchPrefix; },
   get defaultTerms() { return activeSettings.defaultTerms; },
   get defaultGstRate() { return Number(activeSettings.defaultGstRate) || 18; },
+  get signatureBase64() { return activeSettings.signatureBase64 || ''; },
+  get signatureUrl() { return activeSettings.signatureUrl || ''; },
+  get dscSignatoryName() { return activeSettings.dscSignatoryName || 'Authorised Representative'; },
+  get dscCertificateName() { return activeSettings.dscCertificateName || 'Govt Approved DSC'; },
 };
 
 export function updateActiveFirmDetails(newSettings: Partial<typeof DEFAULT_FIRM_DETAILS>) {

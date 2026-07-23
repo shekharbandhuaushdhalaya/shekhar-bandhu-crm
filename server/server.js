@@ -47,10 +47,7 @@ const batchProductionRoutes = require('./routes/manufacturing/batchProductions')
 const paymentRoutes = require('./routes/finance/payments');
 const paymentGatewayRoutes = require('./routes/finance/paymentGateway');
 const creditNoteRoutes = require('./routes/finance/creditNotes');
-const accountRoutes = require('./routes/finance/accounts');
-const journalEntryRoutes = require('./routes/finance/journalEntries');
 const gstReturnRoutes = require('./routes/finance/gstReturns');
-const bankReconciliationRoutes = require('./routes/finance/bankReconciliation');
 
 const dispatchRoutes = require('./routes/operations/dispatches');
 const complaintRoutes = require('./routes/operations/complaints');
@@ -199,10 +196,7 @@ mongoose
     app.use('/api/medical-reps', authenticateJWT, medicalRepRoutes);
     app.use('/api/campaigns', authenticateJWT, campaignRoutes);
     app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
-    app.use('/api/accounts', authenticateJWT, accountRoutes);
-    app.use('/api/journal-entries', authenticateJWT, journalEntryRoutes);
     app.use('/api/gst', authenticateJWT, gstReturnRoutes);
-    app.use('/api/bank-reconciliation', authenticateJWT, bankReconciliationRoutes);
 
     // Drop old unique products index if it exists before seeding duplicate specs
     try {

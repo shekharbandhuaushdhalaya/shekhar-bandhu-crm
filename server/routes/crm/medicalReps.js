@@ -9,6 +9,134 @@ const schemas = require('../../validation/schemas');
 
 const router = express.Router();
 
+// ─── Seed Demo Temporary MR Data ───
+router.post('/seed-demo', async (req, res) => {
+  try {
+    // 1. Create or find Medical Representatives
+    const sampleMrs = [
+      { name: 'Dr. Rajesh Sharma', phone: '+91 98390 12345', email: 'rajesh.sharma@shekharbandhu.in', code: 'MR-101', territory: 'Varanasi North', monthlyTarget: 500000, address: '12 Maldahiya, Varanasi', notes: 'Top performing Rep in Eastern UP', isActive: true },
+      { name: 'Anita Verma', phone: '+91 98390 67890', email: 'anita.verma@shekharbandhu.in', code: 'MR-102', territory: 'Prayagraj HQ', monthlyTarget: 450000, address: '45 Civil Lines, Prayagraj', notes: 'Specialist in Ayurvedic Doctor Clinics', isActive: true },
+      { name: 'Vikram Singh', phone: '+91 98390 54321', email: 'vikram.singh@shekharbandhu.in', code: 'MR-103', territory: 'Gorakhpur Central', monthlyTarget: 600000, address: '88 Town Hall, Gorakhpur', notes: 'Handling Dealer & Clinic distribution', isActive: true }
+    ];
+
+    const seededMrs = [];
+    for (const mrData of sampleMrs) {
+      let mr = await MedicalRepresentative.findOne({ phone: mrData.phone });
+      if (!mr) {
+        mr = await MedicalRepresentative.create(mrData);
+      } else {
+        await MedicalRepresentative.findByIdAndUpdate(mr._id, mrData);
+      }
+      seededMrs.push(mr);
+    }
+
+    const primaryMr = seededMrs[0];
+    const secondaryMr = seededMrs[1];
+
+    // 2. Create Attendance / GPS logs
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    await MrDailyLog.deleteMany({ mrId: { $in: seededMrs.map(m => m._id) } });
+
+    await MrDailyLog.create([
+      {
+        mrId: primaryMr._id,
+        date: today,
+        checkIn: { time: new Date(Date.now() - 6 * 3600 * 1000), location: 'Varanasi Cantt Station', startKmReading: 12450 },
+        checkOut: { time: new Date(Date.now() - 30 * 60 * 1000), location: 'Lanka Crossing, Varanasi', endKmReading: 12518 },
+        startKmReading: 12450,
+        endKmReading: 12518,
+        totalDistance: 68,
+        status: 'checked_out'
+      },
+      {
+        mrId: secondaryMr._id,
+        date: today,
+        checkIn: { time: new Date(Date.now() - 4 * 3600 * 1000), location: 'Civil Lines, Prayagraj', startKmReading: 8900 },
+        startKmReading: 8900,
+        status: 'checked_in'
+      }
+    ]);
+
+    // 3. Create Doctor Visits
+    await MrVisit.deleteMany({ mrId: { $in: seededMrs.map(m => m._id) } });
+
+    await MrVisit.create([
+      {
+        mrId: primaryMr._id,
+        doctorName: 'Dr. A. K. Gupta (BAMS, MD)',
+        clinicName: 'Gupta Ayurvedic Healing Centre',
+        specialization: 'Ayurvedic General Physician',
+        city: 'Varanasi',
+        purpose: 'promotion',
+        orderTaken: true,
+        orderAmount: 85000,
+        feedback: 'Dr. Gupta appreciated Shekhar Bandhu Amrit Ras syrup sample quality. Booked bulk order.',
+        date: new Date()
+      },
+      {
+        mrId: primaryMr._id,
+        doctorName: 'Dr. Meena Tripathi',
+        clinicName: 'Tripathi Clinic & Pharmacy',
+        specialization: 'Panchakarma Specialist',
+        city: 'Varanasi',
+        purpose: 'follow_up',
+        orderTaken: true,
+        orderAmount: 62000,
+        feedback: 'Re-ordered 50 boxes of Shekhar Bandhu Chyawanprash & Taila.',
+        date: new Date(Date.now() - 24 * 3600 * 1000)
+      },
+      {
+        mrId: secondaryMr._id,
+        doctorName: 'Dr. S. K. Rastogi',
+        clinicName: 'Rastogi Poly Clinic',
+        specialization: 'Senior Physician',
+        city: 'Prayagraj',
+        purpose: 'promotion',
+        orderTaken: true,
+        orderAmount: 110000,
+        feedback: 'Order booked for new retail distribution batch.',
+        date: new Date()
+      }
+    ]);
+
+    // 4. Create Expenses
+    await MrExpense.deleteMany({ mrId: { $in: seededMrs.map(m => m._id) } });
+
+    await MrExpense.create([
+      {
+        mrId: primaryMr._id,
+        category: 'travel',
+        amount: 850,
+        description: 'Fuel allowance & Toll for Lanka to Cantt field visits',
+        status: 'approved',
+        date: new Date()
+      },
+      {
+        mrId: primaryMr._id,
+        category: 'food',
+        amount: 450,
+        description: 'Lunch with Dr. Gupta during clinic consultation',
+        status: 'pending',
+        date: new Date()
+      },
+      {
+        mrId: secondaryMr._id,
+        category: 'conveyance',
+        amount: 1200,
+        description: 'Inter-city bus transport from Prayagraj to Phaphamau',
+        status: 'approved',
+        date: new Date()
+      }
+    ]);
+
+    res.json({ message: 'Demo data seeded successfully for Medical Representatives', mrsCount: seededMrs.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── MR Master CRUD ───
 
 router.get('/', authorize('mr:view'), async (req, res) => {
@@ -37,7 +165,12 @@ router.get('/', authorize('mr:view'), async (req, res) => {
 
 router.post('/', authorize('mr:create'), validate(schemas.medicalRepSchema), async (req, res) => {
   try {
-    const mr = await MedicalRepresentative.create(req.body);
+    const data = { ...req.body };
+    if (!data.code || !data.code.trim()) {
+      const count = await MedicalRepresentative.countDocuments();
+      data.code = `MR-${(count + 1).toString().padStart(3, '0')}`;
+    }
+    const mr = await MedicalRepresentative.create(data);
     res.status(201).json(mr);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -62,6 +195,15 @@ router.put('/:id', authorize('mr:edit'), validate(schemas.medicalRepSchema.parti
       req.params.id, req.body, { new: true, runValidators: true }
     );
     if (!mr) return res.status(404).json({ error: 'MR not found' });
+
+    // Revoke system user access if deactivated
+    if (req.body.isActive === false) {
+      const User = require('../../models/User');
+      if (mr.email) {
+        await User.updateMany({ email: mr.email.toLowerCase() }, { canAccessCash: false, role: 'disabled' });
+      }
+    }
+
     res.json(mr);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -72,10 +214,17 @@ router.delete('/:id', authorize('mr:delete'), async (req, res) => {
   try {
     const mr = await MedicalRepresentative.findByIdAndDelete(req.params.id);
     if (!mr) return res.status(404).json({ error: 'MR not found' });
+
+    // Revoke system access: Permanently delete associated login credentials
+    const User = require('../../models/User');
+    if (mr.email) {
+      await User.deleteMany({ email: mr.email.toLowerCase() });
+    }
+
     await MrDailyLog.deleteMany({ mrId: req.params.id });
     await MrVisit.deleteMany({ mrId: req.params.id });
     await MrExpense.deleteMany({ mrId: req.params.id });
-    res.json({ message: 'MR deleted' });
+    res.json({ message: 'MR deleted and system user access revoked' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -106,6 +255,8 @@ router.post('/:mrId/checkin', authorize('mr:attendance'), validate(schemas.mrChe
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const startKm = req.body.startKmReading ? Number(req.body.startKmReading) : 0;
+
     let log = await MrDailyLog.findOne({ mrId: req.params.mrId, date: today });
     if (log) {
       if (log.status === 'checked_in') {
@@ -114,6 +265,7 @@ router.post('/:mrId/checkin', authorize('mr:attendance'), validate(schemas.mrChe
       // Re-open if previously checked out
       log.status = 'checked_in';
       log.checkIn = { time: new Date(), ...req.body };
+      if (startKm > 0) log.startKmReading = startKm;
       await log.save();
       return res.json(log);
     }
@@ -121,6 +273,7 @@ router.post('/:mrId/checkin', authorize('mr:attendance'), validate(schemas.mrChe
       mrId: req.params.mrId,
       date: today,
       checkIn: { time: new Date(), ...req.body },
+      startKmReading: startKm,
       status: 'checked_in',
     });
     res.status(201).json(log);
@@ -136,10 +289,14 @@ router.post('/:mrId/checkout', authorize('mr:attendance'), async (req, res) => {
     const log = await MrDailyLog.findOne({ mrId: req.params.mrId, date: today });
     if (!log) return res.status(400).json({ error: 'No check-in found for today' });
     if (log.status === 'checked_out') return res.status(400).json({ error: 'Already checked out today' });
+    
+    const endKm = req.body.endKmReading ? Number(req.body.endKmReading) : 0;
     log.checkOut = { time: new Date(), ...req.body };
+    log.endKmReading = endKm;
     log.status = 'checked_out';
-    if (req.body.endKmReading && log.startKmReading) {
-      log.totalDistance = Math.max(0, req.body.endKmReading - log.startKmReading);
+
+    if (endKm > 0 && log.startKmReading > 0) {
+      log.totalDistance = Math.max(0, endKm - log.startKmReading);
     }
     await log.save();
     res.json(log);
@@ -175,6 +332,60 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
     const data = { ...req.body, mrId: req.params.mrId };
     if (!data.date) data.date = new Date();
     const visit = await MrVisit.create(data);
+
+    // If free samples were given, automatically generate a Doctor Sample Delivery Challan and update inventory!
+    if (data.sampleDetails && data.sampleDetails.length > 0) {
+      const MedicalRepresentative = require('../../models/MedicalRepresentative');
+      const StockMovement = require('../../models/StockMovement');
+      const Product = require('../../models/Product');
+
+      const mr = await MedicalRepresentative.findById(req.params.mrId);
+      const count = await StockMovement.countDocuments({ type: 'sample' });
+      const docNo = `DC-SMP-${(count + 1).toString().padStart(4, '0')}`;
+
+      const items = [];
+      for (const s of data.sampleDetails) {
+        let prodName = s.name;
+        let pId = s.productId;
+        if (pId) {
+          const p = await Product.findById(pId);
+          if (p) {
+            prodName = p.name;
+            // Deduct stock level in inventory
+            const qtyBoxes = Number(s.qty) || 1;
+            p.stockLevel = Math.max(0, (p.stockLevel || 0) - qtyBoxes);
+            await p.save();
+          }
+        }
+        items.push({
+          productId: pId || null,
+          productName: prodName || 'Doctor Sample',
+          qty: Number(s.qty) || 1,
+          packing: 1,
+          rate: 0,
+          mrp: 0
+        });
+      }
+
+      await StockMovement.create({
+        docNo,
+        direction: 'out',
+        type: 'sample',
+        date: data.date,
+        partyType: 'mr',
+        partyId: req.params.mrId,
+        partyName: data.doctorName ? `Dr. ${data.doctorName} (via ${mr ? mr.name : 'MR'})` : (mr ? mr.name : 'MR'),
+        medicalRepName: mr ? mr.name : '',
+        doctorName: data.doctorName || '',
+        items,
+        isFree: true,
+        status: 'dispatched',
+        sourceDocType: 'MrVisit',
+        sourceDocId: visit._id,
+        notes: `Free doctor samples given during clinic visit to Dr. ${data.doctorName || ''}`
+      });
+    }
+
     res.status(201).json(visit);
   } catch (err) {
     res.status(400).json({ error: err.message });

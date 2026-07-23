@@ -38,7 +38,11 @@ const invoiceItemSchema = new mongoose.Schema({
     default: 0,
     min: [0, 'GST rate cannot be negative'],
     max: [100, 'GST rate cannot exceed 100%']
-  }
+  },
+  // Batch traceability — required for pharma/AYUSH compliance
+  batchNo:    { type: String, default: '', trim: true },
+  mfgDate:    { type: Date, default: null },
+  expiryDate: { type: Date, default: null }
 }, { _id: false });
 
 const invoiceSchema = new mongoose.Schema({

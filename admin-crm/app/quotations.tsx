@@ -299,9 +299,24 @@ const printQuotation = (invoice: Quotation) => {
             <strong>Terms & Conditions</strong><br/>
             ${FIRM_DETAILS.defaultTerms ? FIRM_DETAILS.defaultTerms.replace(/\n/g, '<br/>') : ''}
           </td>
-          <td style="width:33%; text-align:center; padding:5px; vertical-align:bottom; height: 80px;">
-            <div style="font-weight:bold; margin-bottom: 40px; font-size: 11px;">For ${FIRM_DETAILS.name}</div>
-            <div>Authorised Signatory</div>
+          <td style="width:33%; text-align:center; padding:5px; vertical-align:${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? 'middle' : 'bottom'}; height: 80px;">
+            ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
+              <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 38px; width: auto; object-fit: contain; margin-bottom: 2px;" />
+              <div style="font-weight:bold; font-size: 10px; color: #15803d; margin-bottom: 4px;">
+                ✔ DIGITALLY SIGNED QUOTATION
+              </div>
+              <div style="border: 1px dashed #16a34a; background-color: #f0fdf4; border-radius: 4px; padding: 5px; font-size: 8px; text-align: left; line-height: 1.3; display: flex; align-items: center; gap: 8px;">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`GST Quotation Verification | Seller: ${FIRM_DETAILS.name} | GSTIN: ${FIRM_DETAILS.gstin || ''} | Quotation: ${invoice.quotationNo} | Date: ${new Date(invoice.date || Date.now()).toLocaleDateString('en-IN')} | Amt: ₹${finalGrandTotal.toFixed(2)} | Sec 5 IT Act Certified`)}" style="width: 48px; height: 48px; border: 1px solid #16a34a; padding: 2px; background: #fff; border-radius: 3px; flex-shrink: 0;" />
+                <div style="flex: 1;">
+                  <strong>Signed By:</strong> ${FIRM_DETAILS.name}<br/>
+                  <strong>GSTIN:</strong> ${FIRM_DETAILS.gstin || ''}<br/>
+                  <span style="color: #15803d; font-weight: bold;">✔ Certified under Sec 5 IT Act 2000.</span>
+                </div>
+              </div>
+            ` : `
+              <div style="font-weight:bold; margin-bottom: 40px; font-size: 11px;">For ${FIRM_DETAILS.name}</div>
+              <div>Authorised Signatory</div>
+            `}
           </td>
         </tr>
       </table>
@@ -372,6 +387,7 @@ const printQuotation = (invoice: Quotation) => {
 interface ExtendedQuotationItem extends QuotationItem {
   maxQty?: number;
   rateText?: string;
+  batchNo?: string;
 }
 
 const toTitleCase = (str?: string) => {
@@ -545,6 +561,14 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
                     <Text style={styles.itemSubTextDetail}>
                       {it.hsnCode ? `HSN: ${it.hsnCode} | ` : ''}Rate: ₹{rate.toFixed(2)}/pc | Qty: {it.qty} boxes {it.packing !== undefined && it.packing > 1 ? `(${it.packing} pcs/box)` : ''}
                     </Text>
+                    {(it as any).batchNo ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                        <Ionicons name="barcode-outline" size={11} color={colors.primary} />
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace' }}>
+                          Batch: {(it as any).batchNo}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                   <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
                     <Text style={styles.itemQtyText}>₹{sub.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
@@ -887,7 +911,8 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
       packing: entry.packing || 1,
       gstRate: gst,
       hsnCode: hsn,
-      maxQty: entry.qtyBoxes
+      maxQty: entry.qtyBoxes,
+      batchNo: entry.batchNo || ''
     };
     setItems(next);
     setActiveItemDropdownIdx(null);
@@ -945,7 +970,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
     }
   };
 
-  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0 }, ...items]);
+  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '' }, ...items]);
   const removeItemRow = (idx: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== idx));

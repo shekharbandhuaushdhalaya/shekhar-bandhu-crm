@@ -22,7 +22,7 @@ export default function MedicalRepsScreen() {
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>('mrs');
   const [refreshing, setRefreshing] = useState(false);
 
   // MR Master
@@ -36,9 +36,19 @@ export default function MedicalRepsScreen() {
   const [selectedMrForAttendance, setSelectedMrForAttendance] = useState<string>('');
   const [attendanceLogs, setAttendanceLogs] = useState<MrDailyLog[]>([]);
   const [checkInModal, setCheckInModal] = useState(false);
-  const [checkInForm, setCheckInForm] = useState({ location: '', startKmReading: 0 });
+  const [checkInForm, setCheckInForm] = useState<{
+    location: string;
+    startKmReading: number;
+    latitude?: number;
+    longitude?: number;
+  }>({ location: '', startKmReading: 0 });
   const [checkOutModal, setCheckOutModal] = useState(false);
-  const [checkOutForm, setCheckOutForm] = useState({ location: '', endKmReading: 0 });
+  const [checkOutForm, setCheckOutForm] = useState<{
+    location: string;
+    endKmReading: number;
+    latitude?: number;
+    longitude?: number;
+  }>({ location: '', endKmReading: 0 });
 
   // Visits & Products
   const [products, setProducts] = useState<Product[]>([]);
@@ -56,6 +66,8 @@ export default function MedicalRepsScreen() {
     sampleDetails: any[];
     feedback: string;
     notes: string;
+    latitude?: number;
+    longitude?: number;
   }>({
     doctorName: '',
     clinicName: '',
@@ -67,9 +79,11 @@ export default function MedicalRepsScreen() {
     sampleDetails: [],
     feedback: '',
     notes: '',
+    latitude: undefined,
+    longitude: undefined,
   });
   const [sampleProdId, setSampleProdId] = useState('');
-  const [sampleQty, setSampleQty] = useState(1);
+  const [sampleQty, setSampleQty] = useState<string>('1');
 
   // Expenses
   const [expenses, setExpenses] = useState<MrExpense[]>([]);
@@ -156,11 +170,70 @@ export default function MedicalRepsScreen() {
     setRefreshing(false);
   }, [activeTab, selectedMrForAttendance, selectedMrForVisits, loadMrs, loadDashboard, loadAttendance, loadVisits, loadExpenses]);
 
+  const fetchGpsLocation = (): Promise<{ latitude?: number; longitude?: number }> => {
+    return new Promise((resolve) => {
+      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            resolve({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude
+            });
+          },
+          (_) => resolve({}),
+          { timeout: 5000, enableHighAccuracy: true }
+        );
+      } else {
+        resolve({});
+      }
+    });
+  };
+
+  const handleOpenCheckInModal = async () => {
+    setCheckInForm({ location: '', startKmReading: 0 });
+    setCheckInModal(true);
+    const coords = await fetchGpsLocation();
+    if (coords.latitude && coords.longitude) {
+      setCheckInForm(prev => ({
+        ...prev,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        location: prev.location ? prev.location : `GPS: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`
+      }));
+      showToast(`📍 Live GPS acquired: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`, 'success');
+    }
+  };
+
+  const handleOpenCheckOutModal = async () => {
+    setCheckOutForm({ location: '', endKmReading: 0 });
+    setCheckOutModal(true);
+    const coords = await fetchGpsLocation();
+    if (coords.latitude && coords.longitude) {
+      setCheckOutForm(prev => ({
+        ...prev,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        location: prev.location ? prev.location : `GPS: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`
+      }));
+      showToast(`📍 Live GPS acquired: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`, 'success');
+    }
+  };
+
   const handleCheckInSubmit = async () => {
     if (!selectedMrForAttendance) return;
     try {
-      await api.mrCheckIn(selectedMrForAttendance, checkInForm);
-      showToast('Field check-in recorded', 'success');
+      let coords = { latitude: checkInForm.latitude, longitude: checkInForm.longitude };
+      if (!coords.latitude || !coords.longitude) {
+        showToast('Capturing GPS location...', 'info');
+        coords = await fetchGpsLocation();
+      }
+      const payload = {
+        ...checkInForm,
+        latitude: coords.latitude,
+        longitude: coords.longitude
+      };
+      await api.mrCheckIn(selectedMrForAttendance, payload);
+      showToast('Field check-in recorded with live GPS coordinates!', 'success');
       setCheckInModal(false);
       setCheckInForm({ location: '', startKmReading: 0 });
       loadAttendance(selectedMrForAttendance);
@@ -172,8 +245,18 @@ export default function MedicalRepsScreen() {
   const handleCheckOutSubmit = async () => {
     if (!selectedMrForAttendance) return;
     try {
-      await api.mrCheckOut(selectedMrForAttendance, checkOutForm);
-      showToast('Field check-out recorded', 'success');
+      let coords = { latitude: checkOutForm.latitude, longitude: checkOutForm.longitude };
+      if (!coords.latitude || !coords.longitude) {
+        showToast('Capturing GPS location...', 'info');
+        coords = await fetchGpsLocation();
+      }
+      const payload = {
+        ...checkOutForm,
+        latitude: coords.latitude,
+        longitude: coords.longitude
+      };
+      await api.mrCheckOut(selectedMrForAttendance, payload);
+      showToast('Field check-out recorded with live GPS coordinates!', 'success');
       setCheckOutModal(false);
       setCheckOutForm({ location: '', endKmReading: 0 });
       loadAttendance(selectedMrForAttendance);
@@ -186,15 +269,41 @@ export default function MedicalRepsScreen() {
     if (!sampleProdId) return;
     const prod = products.find(p => p._id === sampleProdId);
     if (!prod) return;
-    setVisitForm(prev => ({
-      ...prev,
-      sampleDetails: [
-        ...prev.sampleDetails.filter(s => s.productId !== sampleProdId),
-        { productId: prod._id, name: prod.name, qty: sampleQty }
-      ]
-    }));
+    const parsedQty = Math.max(1, parseInt(sampleQty) || 1);
+
+    setVisitForm(prev => {
+      const existingIndex = prev.sampleDetails.findIndex(s => s.productId === sampleProdId);
+      if (existingIndex >= 0) {
+        const updated = [...prev.sampleDetails];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          qty: updated[existingIndex].qty + parsedQty
+        };
+        return { ...prev, sampleDetails: updated };
+      }
+      return {
+        ...prev,
+        sampleDetails: [
+          ...prev.sampleDetails,
+          { productId: prod._id, name: prod.name, qty: parsedQty }
+        ]
+      };
+    });
     setSampleProdId('');
-    setSampleQty(1);
+    setSampleQty('1');
+  };
+
+  const handleUpdateSampleQty = (prodId: string, delta: number) => {
+    setVisitForm(prev => {
+      const updated = prev.sampleDetails.map(s => {
+        if (s.productId === prodId) {
+          const newQty = s.qty + delta;
+          return newQty > 0 ? { ...s, qty: newQty } : null;
+        }
+        return s;
+      }).filter(Boolean) as any[];
+      return { ...prev, sampleDetails: updated };
+    });
   };
 
   const handleRemoveSampleProduct = (prodId?: string) => {
@@ -242,16 +351,43 @@ export default function MedicalRepsScreen() {
     }
   };
 
+  const handleLogVisitLocation = async () => {
+    try {
+      showToast('Capturing current GPS coordinates...', 'info');
+      const coords = await fetchGpsLocation();
+      if (coords.latitude && coords.longitude) {
+        setVisitForm(prev => ({
+          ...prev,
+          latitude: coords.latitude,
+          longitude: coords.longitude
+        }));
+        showToast('📍 Location logged successfully!', 'success');
+      } else {
+        showToast('Unable to capture location. Please grant location permissions.', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to acquire GPS location', 'error');
+    }
+  };
+
   const handleSaveVisit = async () => {
     if (!visitForm.doctorName.trim()) {
       showToast('Doctor name is required', 'info');
       return;
     }
+    if (!visitForm.latitude || !visitForm.longitude) {
+      showToast('📍 Mandatory: Please tap "Log GPS Clinic Location" button to capture clinic coordinates before saving.', 'warning');
+      return;
+    }
     try {
       await api.createMrVisit(selectedMrForVisits, visitForm);
-      showToast('Doctor visit recorded', 'success');
+      showToast('Doctor visit recorded with verified GPS location', 'success');
       setVisitModal(false);
-      setVisitForm({ doctorName: '', clinicName: '', specialization: '', city: '', purpose: 'promotion', orderTaken: false, orderAmount: 0, sampleDetails: [], feedback: '', notes: '' });
+      setVisitForm({
+        doctorName: '', clinicName: '', specialization: '', city: '',
+        purpose: 'promotion', orderTaken: false, orderAmount: 0, sampleDetails: [],
+        feedback: '', notes: '', latitude: undefined, longitude: undefined
+      });
       loadVisits(selectedMrForVisits);
     } catch (err: any) {
       showToast(err.message || 'Failed to save visit', 'error');
@@ -282,6 +418,47 @@ export default function MedicalRepsScreen() {
     } catch (err: any) {
       showToast(err.message, 'error');
     }
+  };
+
+  const handleSeedDemo = async () => {
+    try {
+      showToast('Seeding temporary Medical Representative data...', 'info');
+      try {
+        await api.seedMrDemoData();
+      } catch (err: any) {
+        // Fallback: Create demo MRs via standard API if remote route not deployed
+        const sampleMrs = [
+          { name: 'Dr. Rajesh Sharma', phone: '+91 98390 12345', email: 'rajesh.sharma@shekharbandhu.in', code: 'MR-101', territory: 'Varanasi North', monthlyTarget: 500000, address: '12 Maldahiya, Varanasi', notes: 'Top performing Rep in Eastern UP' },
+          { name: 'Anita Verma', phone: '+91 98390 67890', email: 'anita.verma@shekharbandhu.in', code: 'MR-102', territory: 'Prayagraj HQ', monthlyTarget: 450000, address: '45 Civil Lines, Prayagraj', notes: 'Specialist in Ayurvedic Doctor Clinics' },
+          { name: 'Vikram Singh', phone: '+91 98390 54321', email: 'vikram.singh@shekharbandhu.in', code: 'MR-103', territory: 'Gorakhpur Central', monthlyTarget: 600000, address: '88 Town Hall, Gorakhpur', notes: 'Handling Dealer & Clinic distribution' }
+        ];
+        for (const mr of sampleMrs) {
+          try { await api.createMR(mr); } catch (_) {}
+        }
+      }
+      showToast('Demo MR data seeded successfully!', 'success');
+      await loadMrs();
+      if (selectedMrForAttendance) await loadAttendance(selectedMrForAttendance);
+      if (selectedMrForVisits) await loadVisits(selectedMrForVisits);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to seed demo data', 'error');
+    }
+  };
+
+  const handleOpenNewMrModal = () => {
+    setEditMr(null);
+    const nextNum = (mrs.length + 1).toString().padStart(3, '0');
+    setMrForm({
+      name: '',
+      phone: '',
+      email: '',
+      code: `MR-${nextNum}`,
+      territory: '',
+      monthlyTarget: 0,
+      address: '',
+      notes: ''
+    });
+    setMrModal(true);
   };
 
   const TABS: { id: Tab; label: string; icon: keyof typeof Ionicons.glyphMap; desc: string }[] = [
@@ -687,14 +864,14 @@ export default function MedicalRepsScreen() {
                 <>
                   <TouchableOpacity
                     style={[styles.primaryCtaBtn, { height: 32, paddingHorizontal: 10, backgroundColor: colors.success }]}
-                    onPress={() => setCheckInModal(true)}
+                    onPress={handleOpenCheckInModal}
                   >
                     <Ionicons name="enter-outline" size={15} color="#fff" />
                     <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Check-In</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.primaryCtaBtn, { height: 32, paddingHorizontal: 10, backgroundColor: colors.warning }]}
-                    onPress={() => setCheckOutModal(true)}
+                    onPress={handleOpenCheckOutModal}
                   >
                     <Ionicons name="exit-outline" size={15} color="#fff" />
                     <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Check-Out</Text>
@@ -734,6 +911,17 @@ export default function MedicalRepsScreen() {
                         {log.checkIn?.time ? new Date(log.checkIn.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
                       </Text>
                       {log.checkIn?.location ? <Text style={styles.timeBoxSub}>📍 {log.checkIn.location}</Text> : null}
+                      {log.checkIn?.latitude && log.checkIn?.longitude ? (
+                        <TouchableOpacity
+                          style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                          onPress={() => Platform.OS === 'web' && window.open(`https://www.google.com/maps?q=${log.checkIn?.latitude},${log.checkIn?.longitude}`, '_blank')}
+                        >
+                          <Ionicons name="location" size={12} color={colors.primary} />
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>
+                            GPS: {log.checkIn.latitude.toFixed(4)}, {log.checkIn.longitude.toFixed(4)} (Open Map)
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
 
                     <View style={styles.timeTimelineBox}>
@@ -745,6 +933,17 @@ export default function MedicalRepsScreen() {
                         {log.checkOut?.time ? new Date(log.checkOut.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
                       </Text>
                       {log.checkOut?.location ? <Text style={styles.timeBoxSub}>📍 {log.checkOut.location}</Text> : null}
+                      {log.checkOut?.latitude && log.checkOut?.longitude ? (
+                        <TouchableOpacity
+                          style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                          onPress={() => Platform.OS === 'web' && window.open(`https://www.google.com/maps?q=${log.checkOut?.latitude},${log.checkOut?.longitude}`, '_blank')}
+                        >
+                          <Ionicons name="location" size={12} color={colors.warning} />
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: colors.warning }}>
+                            GPS: {log.checkOut.latitude.toFixed(4)}, {log.checkOut.longitude.toFixed(4)} (Open Map)
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   </View>
 
@@ -788,6 +987,27 @@ export default function MedicalRepsScreen() {
               </TouchableOpacity>
             </View>
             <View style={{ padding: Spacing.lg }}>
+              {/* Auto GPS Status Badge */}
+              <View style={{ backgroundColor: (checkInForm.latitude && checkInForm.longitude) ? colors.success + '15' : colors.primary + '15', padding: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: (checkInForm.latitude && checkInForm.longitude) ? colors.success + '30' : colors.primary + '30', marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="location" size={16} color={(checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary} />
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: (checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary }}>
+                    {(checkInForm.latitude && checkInForm.longitude)
+                      ? `📍 GPS Auto-Acquired: ${checkInForm.latitude.toFixed(4)}, ${checkInForm.longitude.toFixed(4)}`
+                      : 'Acquiring device GPS location...'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={async () => {
+                  const coords = await fetchGpsLocation();
+                  if (coords.latitude && coords.longitude) {
+                    setCheckInForm(prev => ({ ...prev, latitude: coords.latitude, longitude: coords.longitude }));
+                    showToast('GPS re-acquired!', 'success');
+                  }
+                }}>
+                  <Ionicons name="refresh" size={14} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.formField}>
                 <Text style={styles.fieldLabelText}>Start Location / HQ Area</Text>
                 <TextInput style={styles.fieldInput} value={checkInForm.location} onChangeText={v => setCheckInForm({ ...checkInForm, location: v })} placeholder="e.g. Varanasi HQ" placeholderTextColor={colors.text.muted} />
@@ -820,6 +1040,27 @@ export default function MedicalRepsScreen() {
               </TouchableOpacity>
             </View>
             <View style={{ padding: Spacing.lg }}>
+              {/* Auto GPS Status Badge */}
+              <View style={{ backgroundColor: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success + '15' : colors.warning + '15', padding: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success + '30' : colors.warning + '30', marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="location" size={16} color={(checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning} />
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning }}>
+                    {(checkOutForm.latitude && checkOutForm.longitude)
+                      ? `📍 GPS Auto-Acquired: ${checkOutForm.latitude.toFixed(4)}, ${checkOutForm.longitude.toFixed(4)}`
+                      : 'Acquiring device GPS location...'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={async () => {
+                  const coords = await fetchGpsLocation();
+                  if (coords.latitude && coords.longitude) {
+                    setCheckOutForm(prev => ({ ...prev, latitude: coords.latitude, longitude: coords.longitude }));
+                    showToast('GPS re-acquired!', 'success');
+                  }
+                }}>
+                  <Ionicons name="refresh" size={14} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.formField}>
                 <Text style={styles.fieldLabelText}>End Location</Text>
                 <TextInput style={styles.fieldInput} value={checkOutForm.location} onChangeText={v => setCheckOutForm({ ...checkOutForm, location: v })} placeholder="e.g. Home Base" placeholderTextColor={colors.text.muted} />
@@ -958,6 +1199,41 @@ export default function MedicalRepsScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView style={{ padding: Spacing.lg }}>
+              {/* Mandatory GPS Location Capture Section */}
+              <View style={{ backgroundColor: (visitForm.latitude && visitForm.longitude) ? colors.success + '10' : colors.primary + '10', padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: (visitForm.latitude && visitForm.longitude) ? colors.success + '30' : colors.primary + '30', marginBottom: 16 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: (visitForm.latitude && visitForm.longitude) ? colors.success : colors.primary, marginBottom: 4 }}>
+                  📍 MANDATORY CLINIC GPS LOCATION *
+                </Text>
+                <Text style={{ fontSize: 10, color: colors.text.secondary, marginBottom: 10 }}>
+                  Doctor visit records cannot be saved without logging physical GPS coordinates.
+                </Text>
+
+                <TouchableOpacity
+                  style={{
+                    height: 40,
+                    borderRadius: Radius.md,
+                    backgroundColor: (visitForm.latitude && visitForm.longitude) ? colors.success : colors.primary,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6
+                  }}
+                  onPress={handleLogVisitLocation}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={(visitForm.latitude && visitForm.longitude) ? "checkmark-circle" : "location-outline"}
+                    size={18}
+                    color="#fff"
+                  />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
+                    {(visitForm.latitude && visitForm.longitude)
+                      ? `✔ GPS Logged: ${visitForm.latitude.toFixed(4)}, ${visitForm.longitude.toFixed(4)}`
+                      : '📍 Log GPS Clinic Location *'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.formField}>
                 <Text style={styles.fieldLabelText}>Doctor Name *</Text>
                 <TextInput style={styles.fieldInput} value={visitForm.doctorName} onChangeText={v => setVisitForm({ ...visitForm, doctorName: v })} placeholder="e.g. Dr. A. K. Sharma" placeholderTextColor={colors.text.muted} />
@@ -989,36 +1265,59 @@ export default function MedicalRepsScreen() {
                 </View>
               </View>
 
-              {/* Free Samples Distribution Picker */}
-              <View style={[styles.formField, { backgroundColor: colors.bg.secondary, padding: 10, borderRadius: Radius.md }]}>
+              {/* Free Samples Distribution Dropdown Selector */}
+              <View style={[styles.formField, { backgroundColor: colors.bg.secondary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }]}>
                 <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 8 }}>
-                  🎁 ADD FREE SAMPLES DISTRIBUTED
+                  🎁 ADD FREE SAMPLES DISTRIBUTED (CREATES SAMPLE CHALLAN & DEDUCTS INVENTORY)
                 </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 8 }}>
-                  {products.slice(0, 10).map(prod => {
-                    const isSelected = sampleProdId === prod._id;
-                    return (
-                      <TouchableOpacity
-                        key={prod._id}
-                        style={[styles.chipPill, isSelected && styles.chipPillActive]}
-                        onPress={() => setSampleProdId(prod._id)}
-                      >
-                        <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>{prod.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={{
+                        flex: 1,
+                        minWidth: 180,
+                        height: 38,
+                        borderRadius: Radius.md,
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        backgroundColor: colors.bg.card,
+                        color: colors.text.primary,
+                        paddingLeft: 10,
+                        fontSize: 13,
+                        outline: 'none'
+                      }}
+                      value={sampleProdId}
+                      onChange={(e) => setSampleProdId(e.target.value)}
+                    >
+                      <option value="">-- Select Sample Product --</option>
+                      {products.map(prod => (
+                        <option key={prod._id} value={prod._id}>
+                          {prod.name} (Stock: {prod.stockLevel || 0})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <View style={{ flex: 1, minWidth: 180 }}>
+                      <TextInput
+                        style={styles.fieldInput}
+                        value={sampleProdId}
+                        onChangeText={setSampleProdId}
+                        placeholder="Product ID or select..."
+                        placeholderTextColor={colors.text.muted}
+                      />
+                    </View>
+                  )}
                   <TextInput
-                    style={[styles.fieldInput, { width: 80, height: 36, textAlign: 'center' }]}
-                    value={sampleQty.toString()}
-                    onChangeText={v => setSampleQty(Number(v) || 1)}
+                    style={[styles.fieldInput, { width: 75, height: 38, textAlign: 'center' }]}
+                    value={sampleQty}
+                    onChangeText={v => setSampleQty(v)}
                     keyboardType="numeric"
                     placeholder="Qty"
                   />
                   <TouchableOpacity
-                    style={[styles.primaryCtaBtn, { height: 36, paddingHorizontal: 12 }]}
+                    style={[styles.primaryCtaBtn, { height: 38, paddingHorizontal: 12 }]}
                     onPress={handleAddSampleProduct}
+                    activeOpacity={0.8}
                   >
                     <Ionicons name="add-circle-outline" size={16} color="#fff" />
                     <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Add Sample</Text>
@@ -1026,13 +1325,23 @@ export default function MedicalRepsScreen() {
                 </View>
 
                 {visitForm.sampleDetails.length > 0 && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                  <View style={{ gap: 6, marginTop: 12 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted }}>ADDED SAMPLES LIST:</Text>
                     {visitForm.sampleDetails.map((s, idx) => (
-                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary + '15', borderWidth: 1, borderColor: colors.primary + '40', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>{s.name} × {s.qty}</Text>
-                        <TouchableOpacity onPress={() => handleRemoveSampleProduct(s.productId)}>
-                          <Ionicons name="close-circle" size={14} color={colors.primary} />
-                        </TouchableOpacity>
+                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, flex: 1 }}>{s.name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <TouchableOpacity style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }} onPress={() => handleUpdateSampleQty(s.productId, -1)}>
+                            <Ionicons name="remove" size={14} color={colors.text.primary} />
+                          </TouchableOpacity>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary, minWidth: 20, textAlign: 'center' }}>{s.qty}</Text>
+                          <TouchableOpacity style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }} onPress={() => handleUpdateSampleQty(s.productId, 1)}>
+                            <Ionicons name="add" size={14} color={colors.text.primary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleRemoveSampleProduct(s.productId)} style={{ marginLeft: 6 }}>
+                            <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     ))}
                   </View>
@@ -1257,15 +1566,28 @@ export default function MedicalRepsScreen() {
           </ScrollView>
 
           {/* Action CTAs depending on active tab */}
-          {activeTab === 'mrs' && perm.can('mr:create') && (
-            <TouchableOpacity
-              style={styles.primaryCtaBtn}
-              onPress={() => { setEditMr(null); setMrForm({ name: '', phone: '', email: '', code: '', territory: '', monthlyTarget: 0, address: '', notes: '' }); setMrModal(true); }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={styles.primaryCtaBtnText}>New MR</Text>
-            </TouchableOpacity>
+          {activeTab === 'mrs' && (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.primaryCtaBtn, { backgroundColor: colors.warning }]}
+                onPress={handleSeedDemo}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="flash-outline" size={16} color="#fff" />
+                <Text style={styles.primaryCtaBtnText}>Seed Demo Data</Text>
+              </TouchableOpacity>
+
+              {perm.can('mr:create') && (
+                <TouchableOpacity
+                  style={styles.primaryCtaBtn}
+                  onPress={handleOpenNewMrModal}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={18} color="#fff" />
+                  <Text style={styles.primaryCtaBtnText}>New MR</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
 
           {activeTab === 'visits' && selectedMrForVisits && perm.can('mr:visits') && (

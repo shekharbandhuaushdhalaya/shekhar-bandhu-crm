@@ -2,10 +2,10 @@ import { Tabs, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, useWindowDimensions, Modal, Pressable, ScrollView, Image, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, useWindowDimensions, Modal, Pressable, ScrollView, Image, DeviceEventEmitter, Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
-import { api } from '../utils/api';
+import { api, API_BASE } from '../utils/api';
 import { AuthProvider, useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { ThemeProvider, useTheme, useStyles } from '../utils/themeContext';
@@ -48,11 +48,9 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     if (path.startsWith('/stockmovements')) return 'Delivery Challans';
     if (path.startsWith('/profile')) return 'My Details';
     if (path.startsWith('/campaigns')) return 'Campaigns';
+    if (path.startsWith('/ai-analytics')) return 'AI Business Assistant';
     if (path.startsWith('/credit-notes')) return 'Credit / Debit Notes';
     if (path.startsWith('/gst-returns')) return 'GST Returns';
-    if (path.startsWith('/accounts')) return 'Chart of Accounts';
-    if (path.startsWith('/journal-entries')) return 'Journal Entries';
-    if (path.startsWith('/bank-reconciliation')) return 'Bank Reconciliation';
     if (path.startsWith('/medicalreps')) return 'Medical Representatives';
     return '';
   };
@@ -124,6 +122,53 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
 
       {/* Right Controls */}
       <View style={styles.headerControls}>
+        {/* Seed Demo Data Button */}
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: colors.primary + '18',
+            borderColor: colors.primary + '40',
+            borderWidth: 1,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 8,
+            marginRight: 8
+          }}
+          onPress={async () => {
+            try {
+              DeviceEventEmitter.emit('global_loader', { isLoading: true });
+              const host = (typeof window !== 'undefined' && window.location && window.location.hostname) ? window.location.hostname : 'localhost';
+              const targetUrl = `http://${host}:5000/api/system/seed-demo`;
+              const res = await fetch(targetUrl, { method: 'POST' });
+              const text = await res.text();
+              DeviceEventEmitter.emit('global_loader', { isLoading: false });
+              let data: any = {};
+              try { data = JSON.parse(text); } catch (e) { throw new Error(`Server returned HTML instead of JSON. Output: ${text.slice(0, 100)}`); }
+              if (res.ok && !data.error) {
+                alert('✅ Demo Data Seeded & Synced! Reloading app...');
+                if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                  window.location.reload();
+                } else {
+                  router.replace('/');
+                }
+              } else {
+                alert('Seeding Error: ' + (data.error || data.message || 'Server error'));
+              }
+            } catch (err: any) {
+              DeviceEventEmitter.emit('global_loader', { isLoading: false });
+              alert('Seeding Error: ' + (err.message || err));
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="leaf-outline" size={14} color={colors.primary} />
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+            {isDesktop ? 'Seed Demo Data' : 'Seed Data'}
+          </Text>
+        </TouchableOpacity>
+
         {/* User Card */}
         <TouchableOpacity style={styles.headerUser} onPress={() => router.push('/profile')} activeOpacity={0.7}>
           <View style={[styles.headerAvatar, { borderColor: roleColors[user.role] || colors.text.muted }]}>
@@ -198,7 +243,7 @@ function MainLayout() {
   }, []);
 
   if (loading) {
-    return <AyurvedicLoader message="Welcome to Shekhar Bandhu Aushadhalaya" />;
+    return <AyurvedicLoader message="शेखर बंधु औषधालय में आपका स्वागत है" />;
   }
 
   if (!user) {

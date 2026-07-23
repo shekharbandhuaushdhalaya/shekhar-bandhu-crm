@@ -139,69 +139,101 @@ ${dbContextStr}`;
   }
 });
 
-router.get('/manufacturing', async (req, res) => {
+const SystemSettings = require('../../models/SystemSettings');
+const RolePermission = require('../../models/RolePermission');
+const { authenticateToken } = require('../auth/auth');
+
+// Helper to check user permission from DB
+async function checkUserPermission(user, permName) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  const rp = await RolePermission.findOne({ role: user.role }).lean();
+  if (rp && rp.permissions && rp.permissions.includes(permName)) return true;
+  return false;
+}
+
+// POST /api/analytics/ask — Query Business AI with strict RBAC permission enforcement
+router.post('/ask', authenticateToken, async (req, res) => {
   try {
-    const RawMaterialEntry = require('../../models/RawMaterialEntry');
-    const BatchProduction = require('../../models/BatchProduction');
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
 
-    // 1. Raw Materials Valuation
-    const rmEntries = await RawMaterialEntry.find({ qty: { $gt: 0 } }).lean();
-    const netRawMaterialValue = rmEntries.reduce((acc, entry) => {
-      return acc + (entry.qty * (entry.purchaseRate || 0));
-    }, 0);
+    const q = prompt.toLowerCase();
 
-    // 2. Finished Goods Valuation
-    const fgEntries = await InventoryEntry.find({ qtyBoxes: { $gt: 0 } }).populate('productId').lean();
-    const netFinishedGoodsValue = fgEntries.reduce((acc, entry) => {
-      const price = entry.productId ? (entry.productId.price || 0) : 0;
-      const units = (entry.qtyBoxes || 0) * (entry.packing || 1);
-      return acc + (units * price);
-    }, 0);
+    // 1. Permission checks for Financial & Profit Queries
+    const isFinancialQuery = q.includes('sale') || q.includes('revenue') || q.includes('profit') || q.includes('turnover') || q.includes('income') || q.includes('gst') || q.includes('margin') || q.includes('earnings');
+    if (isFinancialQuery) {
+      const canViewFinancials = await checkUserPermission(req.user, 'report:view') || await checkUserPermission(req.user, 'invoice:view');
+      if (!canViewFinancials) {
+        return res.json({
+          answer: `🔒 Access Restricted: Your account role (${(req.user.role || 'user').toUpperCase()}) does not have financial reporting permissions (report:view) to view business profits, revenues, or sales data.`
+        });
+      }
+    }
 
-    // 3. Yield Performance of last 10 completed batches
-    const completedRuns = await BatchProduction.find({ status: 'completed' })
-      .sort({ endDate: -1 })
-      .limit(10)
-      .populate('productId')
-      .lean();
+    // 2. Permission checks for Customer & Outstanding Balances Queries
+    const isCustomerQuery = q.includes('customer') || q.includes('due') || q.includes('outstanding') || q.includes('balance') || q.includes('debt');
+    if (isCustomerQuery) {
+      const canViewCustomers = await checkUserPermission(req.user, 'customer:view') || await checkUserPermission(req.user, 'report:view');
+      if (!canViewCustomers) {
+        return res.json({
+          answer: `🔒 Access Restricted: Your account role (${(req.user.role || 'user').toUpperCase()}) does not have permissions to access customer ledgers or outstanding balance records.`
+        });
+      }
+    }
 
-    const yieldPerformance = completedRuns.map(run => ({
-      batchNo: run.batchNo,
-      productName: run.productId ? run.productId.name : 'Unknown Product',
-      plannedQty: run.plannedQty,
-      actualYieldQty: run.actualYieldQty || 0,
-      efficiency: run.plannedQty > 0 
-        ? Number(((run.actualYieldQty || 0) / run.plannedQty * 100).toFixed(1)) 
-        : 100
-    }));
+    // Fetch API key from DB SystemSettings or process.env
+    const sys = await SystemSettings.findOne({ key: 'company_config' }).lean();
+    const apiKey = (sys && sys.geminiApiKey && sys.geminiApiKey.trim()) ? sys.geminiApiKey.trim() : process.env.GEMINI_API_KEY;
 
-    // 4. Timeline (Gantt representation) of active and historical runs
-    const allRuns = await BatchProduction.find({})
-      .sort({ startDate: -1 })
-      .limit(20)
-      .populate('productId')
-      .lean();
+    let aiText = '';
+    let dataContext = [];
 
-    const timeline = allRuns.map(run => ({
-      id: run._id,
-      batchNo: run.batchNo,
-      productName: run.productId ? run.productId.name : 'Unknown Product',
-      plannedQty: run.plannedQty,
-      actualYieldQty: run.actualYieldQty || 0,
-      status: run.status,
-      startDate: run.startDate,
-      endDate: run.endDate,
-      stages: run.stages || []
-    }));
+    if (isFinancialQuery) {
+      const sales = await Invoice.aggregate([
+        { $match: { type: 'sale', isFinalized: true } },
+        {
+          $group: {
+            _id: { $month: "$date" },
+            totalRevenue: { $sum: "$amount" },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: -1 } },
+        { $limit: 6 }
+      ]);
+      dataContext = sales;
+    } else if (isCustomerQuery) {
+      const custs = await Customer.find({ regularBalance: { $gt: 0 } }).sort({ regularBalance: -1 }).limit(5).lean();
+      dataContext = custs.map(c => ({ customerName: c.company || c.name, outstandingBalance: c.regularBalance }));
+    } else if (q.includes('inventory') || q.includes('stock') || q.includes('raw') || q.includes('product') || q.includes('batch') || q.includes('yield')) {
+      const inv = await InventoryEntry.find({ qtyBoxes: { $gt: 0 } }).populate('productId', 'name sku').limit(8).lean();
+      dataContext = inv.map(i => ({ product: i.productId ? i.productId.name : i.productType, warehouse: i.warehouseName, boxes: i.qtyBoxes }));
+    }
 
-    res.json({
-      netRawMaterialValue: Number(netRawMaterialValue.toFixed(2)),
-      netFinishedGoodsValue: Number(netFinishedGoodsValue.toFixed(2)),
-      yieldPerformance,
-      timeline
-    });
+    if (apiKey) {
+      try {
+        const customGenAI = new GoogleGenerativeAI(apiKey);
+        const model = customGenAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const fullPrompt = `You are Shekhar Bandhu Aushadhalaya's official AI Business Intelligence Assistant. 
+User Role: ${req.user.role || 'employee'}
+User Question: "${prompt}"
+Verified Permission Context: ${JSON.stringify(dataContext)}
+
+Strict Security Rule: Answer the user's question accurately based ONLY on the provided context. If the user asks for unauthorized data, decline politely. Keep answer in 2-4 clear sentences.`;
+
+        const result = await model.generateContent(fullPrompt);
+        aiText = result.response.text();
+      } catch (genErr) {
+        aiText = `AI API Error: ${genErr.message || 'Invalid API Key'}`;
+      }
+    } else {
+      aiText = `[AI Key Required] Please enter your Gemini API Key in Profile > My Credentials to enable AI queries. Live CRM context found: ${JSON.stringify(dataContext)}`;
+    }
+
+    res.json({ answer: aiText, data: dataContext });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message || 'Failed to process AI query' });
   }
 });
 

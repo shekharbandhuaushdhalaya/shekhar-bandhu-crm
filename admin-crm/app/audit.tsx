@@ -18,6 +18,7 @@ import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { api } from '../utils/api';
 import { Spacing, Radius, LightColors } from '../constants/theme';
+import UnauthorizedScreen from '../components/UnauthorizedScreen';
 
 type AuditLogItem = {
   _id: string;
@@ -97,16 +98,11 @@ export default function AuditLogsScreen() {
   // Render Access Denied for non-admins
   if (!perm.can('audit:view')) {
     return (
-      <View style={styles.deniedContainer}>
-        <View style={styles.deniedCard}>
-          <Ionicons name="shield-alert" size={72} color={colors.danger} />
-          <Text style={styles.deniedTitle}>Access Denied</Text>
-          <Text style={styles.deniedText}>
-            You do not have administrative privileges to view the system audit trails. 
-            Please contact your system manager if you believe this is an error.
-          </Text>
-        </View>
-      </View>
+      <UnauthorizedScreen
+        title="Audit Logs Chamber Restricted"
+        description="Administrative credentials are required for inspecting security logs, system events & audit trails."
+        requiredPermission="audit:view"
+      />
     );
   }
 
@@ -186,13 +182,6 @@ export default function AuditLogsScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>System Audit Logs</Text>
-          <Text style={styles.subtitle}>Secured trail of modifications, creations, configurations, and logins.</Text>
-        </View>
-      </View>
-
       {/* Filter and Search Bar */}
       <View style={styles.searchBar}>
         <View style={styles.searchFieldContainer}>

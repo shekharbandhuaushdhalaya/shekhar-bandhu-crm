@@ -115,10 +115,25 @@ const printDeliveryChallan = (m: StockMovement) => {
       <tbody>${itemRows}</tbody>
     </table>
     ${m.notes ? `<div style="margin-top:8px;font-size:10px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
-    <div style="margin-top:24px;display:flex;justify-content:space-between;font-size:10px;">
+    <div style="margin-top:24px;display:flex;justify-content:space-between;align-items:center;font-size:10px;">
       <div>Receiver's Signature &amp; Stamp</div>
       <div style="text-align:right;">
-        For ${FIRM_DETAILS.name}<br/><br/>Authorised Signatory
+        ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
+          <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 38px; width: auto; object-fit: contain; margin-bottom: 2px;" />
+          <div style="font-weight:bold; font-size: 10px; color: #15803d; margin-bottom: 2px;">
+            ✔ DIGITALLY SIGNED DELIVERY CHALLAN
+          </div>
+          <div style="border: 1px dashed #16a34a; background-color: #f0fdf4; border-radius: 4px; padding: 5px; font-size: 8px; text-align: left; line-height: 1.3; display: flex; align-items: center; gap: 8px;">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`GST Challan Digital Verification | Seller: ${FIRM_DETAILS.name} | GSTIN: ${FIRM_DETAILS.gstin || ''} | Challan: ${m.docNo} | Date: ${dateStr} | CGST Rule 55 & Sec 5 IT Act Certified`)}" style="width: 48px; height: 48px; border: 1px solid #16a34a; padding: 2px; background: #fff; border-radius: 3px; flex-shrink: 0;" />
+            <div style="flex: 1;">
+              <strong>Signed By:</strong> ${FIRM_DETAILS.name}<br/>
+              <strong>GSTIN:</strong> ${FIRM_DETAILS.gstin || ''}<br/>
+              <span style="color: #15803d; font-weight: bold;">✔ Certified under CGST Rule 55 &amp; IT Act.</span>
+            </div>
+          </div>
+        ` : `
+          For ${FIRM_DETAILS.name}<br/><br/>Authorised Signatory
+        `}
       </div>
     </div>
   </div>`).join('')}

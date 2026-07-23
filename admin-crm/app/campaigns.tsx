@@ -46,6 +46,7 @@ export default function CampaignsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Create/Edit modal
@@ -240,21 +241,77 @@ export default function CampaignsScreen() {
             onChangeText={setSearch}
           />
 
-          <View style={{ flexDirection: 'row', gap: 4 }}>
-            {['', 'draft', 'running', 'completed'].map(s => (
-              <TouchableOpacity
-                key={s}
-                style={[
-                  { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border },
-                  statusFilter === s ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: colors.bg.secondary }
-                ]}
-                onPress={() => setStatusFilter(s)}
-              >
-                <Text style={[{ fontSize: 11, fontWeight: '600' }, statusFilter === s ? { color: '#fff', fontWeight: '700' } : { color: colors.text.secondary }]}>
-                  {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          {/* Status Dropdown */}
+          <View style={{ position: 'relative', zIndex: 100 }}>
+            <Pressable
+              onPress={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: Radius.sm,
+                backgroundColor: colors.bg.secondary,
+                borderWidth: 1,
+                borderColor: colors.border,
+                gap: 6,
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>
+                {statusFilter ? statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1) : 'All Statuses'}
+              </Text>
+              <Ionicons name={isStatusDropdownOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.secondary} />
+            </Pressable>
+
+            {isStatusDropdownOpen && (
+              <View style={{
+                position: 'absolute',
+                top: 38,
+                right: 0,
+                backgroundColor: colors.bg.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: Radius.md,
+                width: 130,
+                zIndex: 9999,
+                elevation: 8,
+                overflow: 'hidden',
+              }}>
+                {[
+                  { label: 'All Statuses', val: '' },
+                  { label: 'Draft', val: 'draft' },
+                  { label: 'Running', val: 'running' },
+                  { label: 'Paused', val: 'paused' },
+                  { label: 'Completed', val: 'completed' },
+                  { label: 'Cancelled', val: 'cancelled' },
+                ].map(item => (
+                  <Pressable
+                    key={item.val}
+                    onPress={() => {
+                      setStatusFilter(item.val);
+                      setIsStatusDropdownOpen(false);
+                    }}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      backgroundColor: statusFilter === item.val
+                        ? colors.primaryLight
+                        : (pressed ? colors.bg.secondary : colors.bg.card),
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border + '40',
+                    })}
+                  >
+                    <Text style={{
+                      fontSize: 11,
+                      fontWeight: statusFilter === item.val ? '700' : '600',
+                      color: statusFilter === item.val ? colors.primary : colors.text.secondary,
+                    }}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
 
           {perm.can('campaign:create') && (

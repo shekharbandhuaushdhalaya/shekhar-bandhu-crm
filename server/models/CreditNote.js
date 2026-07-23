@@ -7,7 +7,8 @@ const creditNoteItemSchema = new mongoose.Schema({
   boxes: { type: Number, default: 0 },
   packing: { type: Number, default: 1 },
   rate: { type: Number, default: 0 },
-  amount: { type: Number, default: 0 }
+  amount: { type: Number, default: 0 },
+  batchNo: { type: String, default: '', trim: true }
 }, { _id: false });
 
 const creditNoteSchema = new mongoose.Schema({

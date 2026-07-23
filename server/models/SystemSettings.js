@@ -21,10 +21,15 @@ const systemSettingsSchema = new mongoose.Schema({
     default: `1. All disputes are subject to "VARANASI" Jurisdiction only.\n2. Goods despatched at your risk and responsibility. Kindly retire the documents on presentation.\n3. We do not accept any responsibility for any loss/damages once the goods are delivered to the carriers.\n4. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.\n5. Goods once sold will not be taken back.` 
   },
   defaultGstRate: { type: Number, default: 18 },
+  signatureBase64: { type: String, default: '' },
+  signatureUrl: { type: String, default: '' },
+  dscSignatoryName: { type: String, default: 'Authorised Representative' },
+  dscCertificateName: { type: String, default: 'eMudhra / Class 3 DSC' },
   paymentGatewayEnabled: { type: Boolean, default: false },
   razorpayKeyId: { type: String, default: '' },
   razorpayKeySecret: { type: String, default: '' },
-  razorpayWebhookSecret: { type: String, default: '' }
+  razorpayWebhookSecret: { type: String, default: '' },
+  geminiApiKey: { type: String, default: '' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('SystemSettings', systemSettingsSchema);

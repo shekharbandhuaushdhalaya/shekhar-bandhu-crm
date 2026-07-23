@@ -73,7 +73,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Payments', route: 'payments', icon: 'cash-outline', activeIcon: 'cash' },
       { label: 'Credit / Debit Notes', route: 'credit-notes', icon: 'swap-horizontal-outline', activeIcon: 'swap-horizontal' },
-      { label: 'GST Returns', route: 'gst-returns', icon: 'document-attach-outline', activeIcon: 'document-attach' },
     ],
   },
   {
@@ -91,9 +90,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: 'settings-outline',
     items: [
       { label: 'Reports', route: 'reports', icon: 'bar-chart-outline', activeIcon: 'bar-chart', permission: 'report:view' },
-      { label: 'Chart of Accounts', route: 'accounts', icon: 'layers-outline', activeIcon: 'layers', permission: 'rbac:manage' },
-      { label: 'Journal Entries', route: 'journal-entries', icon: 'reader-outline', activeIcon: 'reader', permission: 'rbac:manage' },
-      { label: 'Bank Reconciliation', route: 'bank-reconciliation', icon: 'card-outline', activeIcon: 'card', permission: 'rbac:manage' },
+      { label: 'AI Assistant', route: 'ai-analytics', icon: 'sparkles-outline', activeIcon: 'sparkles' },
       { label: 'Access Control', route: 'rbac', icon: 'shield-checkmark-outline', activeIcon: 'shield-checkmark', permission: 'rbac:manage' },
       { label: 'Audit Logs', route: 'audit', icon: 'newspaper-outline', activeIcon: 'newspaper', permission: 'audit:view' },
       { label: 'My Details', route: 'profile', icon: 'person-outline', activeIcon: 'person' },

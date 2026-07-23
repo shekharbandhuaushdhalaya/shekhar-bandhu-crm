@@ -37,7 +37,9 @@ router.put('/settings', authenticateToken, authorize('settings:edit'), validate(
       'bankName', 'bankAccountNo', 'bankIfsc', 'bankBranch', 'bankUpi',
       'invoicePrefix', 'quotationPrefix', 'challanPrefix', 'dispatchPrefix',
       'defaultTerms', 'defaultGstRate',
-      'paymentGatewayEnabled', 'razorpayKeyId', 'razorpayKeySecret', 'razorpayWebhookSecret'
+      'signatureBase64', 'signatureUrl', 'dscSignatoryName', 'dscCertificateName',
+      'paymentGatewayEnabled', 'razorpayKeyId', 'razorpayKeySecret', 'razorpayWebhookSecret',
+      'geminiApiKey'
     ];
 
     fields.forEach(field => {
@@ -93,6 +95,17 @@ router.get('/audit-logs', authenticateToken, authorize('audit:view'), async (req
       pages: Math.ceil(total / parsedLimit),
       currentPage: parsedPage
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/system/seed-demo — Seed complete demo dataset
+router.post('/seed-demo', async (req, res) => {
+  try {
+    const { seedCompleteDemoData } = require('../../scripts/seedCompleteDemoData');
+    await seedCompleteDemoData();
+    res.json({ message: 'Complete demo dataset seeded successfully!' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

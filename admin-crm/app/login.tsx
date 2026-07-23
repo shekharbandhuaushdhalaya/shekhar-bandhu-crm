@@ -112,6 +112,35 @@ export default function LoginScreen() {
               </>
             )}
           </TouchableOpacity>
+
+          {/* Quick Demo Login Chips */}
+          <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted, textAlign: 'center', marginBottom: 10 }}>
+              QUICK DEMO ACCESSIBLE ACCOUNTS
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <TouchableOpacity
+                style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.primary + '40' }}
+                onPress={() => handleLogin('admin@shekharbandhu.com', 'admin123')}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>👑 Admin</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={{ backgroundColor: colors.info + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.info + '40' }}
+                onPress={() => handleLogin('rahul.mr@shekharbandhu.com', 'admin123')}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.info }}>👨‍⚕️ Medical Rep (MR)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ backgroundColor: colors.warning + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.warning + '40' }}
+                onPress={() => handleLogin('manager@shekharbandhu.com', 'manager123')}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.warning }}>💼 Manager</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

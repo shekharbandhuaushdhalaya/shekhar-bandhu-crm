@@ -99,6 +99,15 @@ const getProductSelectorDisplayName = (item: { size?: string; shape?: string; co
   return combined || 'Unnamed Product';
 };
 
+const formatVendorDisplay = (vName?: string) => {
+  if (!vName || vName.trim() === '') return 'Self (In-House)';
+  const lower = vName.toLowerCase();
+  if (lower.includes('in-house') || lower.includes('self') || lower.includes('shekhar bandhu')) {
+    return 'Self (In-House)';
+  }
+  return toTitleCase(vName);
+};
+
 
 // Helper to format stock in boxes & pieces
 const formatStock = (qtyBoxes: number, packing: number = 1, showSign: boolean = false, compact: boolean = false) => {
@@ -1010,7 +1019,7 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
           <ScrollView style={{ flex: 1, marginVertical: Spacing.md }} showsVerticalScrollIndicator={true}>
             {loading ? (
               <View style={{ padding: 40, alignItems: 'center' }}>
-                <Text style={{ color: colors.text.muted }}>Loading ledger logs...</Text>
+                <Text style={{ color: colors.text.muted }}>खाता बही लोड हो रहा है...</Text>
               </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={true}>
@@ -1153,6 +1162,7 @@ export default function InventoriesScreen() {
 
   // Selector Dropdowns visibility
   const [showWarehouseFilterDropdown, setShowWarehouseFilterDropdown] = useState(false);
+  const [showStockActionsDropdown, setShowStockActionsDropdown] = useState(false);
 
   // Visual Mode and Filters
   const [selectedVendorId, setSelectedVendorId] = useState('all');
@@ -1493,7 +1503,7 @@ export default function InventoriesScreen() {
 
         {/* Controls Action & Filter Bar */}
         <View style={{ zIndex: 1100, position: 'relative' }}>
-          {(showWarehouseFilterDropdown || showVendorFilterDropdown) && (
+          {(showWarehouseFilterDropdown || showVendorFilterDropdown || showStockActionsDropdown) && (
             <Pressable
               style={[
                 StyleSheet.absoluteFill,
@@ -1505,6 +1515,7 @@ export default function InventoriesScreen() {
               onPress={() => {
                 setShowWarehouseFilterDropdown(false);
                 setShowVendorFilterDropdown(false);
+                setShowStockActionsDropdown(false);
               }}
             />
           )}
@@ -1636,44 +1647,154 @@ export default function InventoriesScreen() {
                         </View>
                       ))}
                     </ScrollView>
+
+                    {/* Add Warehouse option inside Consolidated Warehouse dropdown */}
+                    {perm.can('inventory:edit') && (
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: 10,
+                          paddingHorizontal: 12,
+                          backgroundColor: colors.primary + '10',
+                          borderTopWidth: 1,
+                          borderTopColor: colors.border,
+                        }}
+                        onPress={() => {
+                          setEditingWarehouse(null);
+                          setAddWarehouseVisible(true);
+                          setShowWarehouseFilterDropdown(false);
+                        }}
+                      >
+                        <Ionicons name="add-circle" size={16} color={colors.primary} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                          Add New Warehouse
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </View>
-            {/* Action Buttons */}
-              {perm.can('inventory:edit') && (
-                <TouchableOpacity style={styles.headerBtnPrimary} onPress={() => setAddWarehouseVisible(true)}>
-                  <Ionicons name="business" size={16} color="#fff" />
-                  <Text style={styles.headerBtnText}>Add Warehouse</Text>
-                </TouchableOpacity>
-              )}
-              {perm.can('inventory:edit') && (
-                <TouchableOpacity style={styles.headerBtnPrimary} onPress={() => { setAddStockInitialProductId(''); setAddStockVisible(true); }}>
-                  <Ionicons name="cube-outline" size={16} color="#fff" />
-                  <Text style={styles.headerBtnText}>Add Stock</Text>
-                </TouchableOpacity>
-              )}
+
+            {/* Merged Stock Actions & Filters Dropdown */}
+            <View style={{ position: 'relative', zIndex: showStockActionsDropdown ? 1000 : 1 }}>
               <TouchableOpacity
-                style={[styles.headerBtnPrimary, {
-                  backgroundColor: showZero ? colors.warning : colors.bg.card,
-                  borderWidth: 1,
-                  borderColor: showZero ? colors.warning : colors.border,
-                }]}
-                onPress={() => setShowZero(p => !p)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: (showZero || showDeadStock) ? (showDeadStock ? colors.danger : colors.warning) : colors.primary,
+                  paddingHorizontal: 14,
+                  height: 40,
+                  borderRadius: Radius.md,
+                  gap: 6,
+                }}
+                onPress={() => {
+                  setShowStockActionsDropdown(!showStockActionsDropdown);
+                  setShowWarehouseFilterDropdown(false);
+                  setShowVendorFilterDropdown(false);
+                }}
               >
-                <Ionicons name={showZero ? "eye" : "eye-off-outline"} size={16} color={showZero ? '#fff' : colors.text.secondary} />
-                <Text style={[styles.headerBtnText, { color: showZero ? '#fff' : colors.text.secondary }]}>Zero Stock</Text>
+                <Ionicons name="cube-outline" size={16} color="#fff" />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
+                  {showDeadStock ? 'Dead Stock' : showZero ? 'Zero Stock' : 'Stock Actions'}
+                </Text>
+                <Ionicons name={showStockActionsDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#fff" />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.headerBtnPrimary, {
-                  backgroundColor: showDeadStock ? colors.danger : colors.bg.card,
+
+              {showStockActionsDropdown && (
+                <View style={{
+                  position: 'absolute',
+                  top: 44,
+                  right: 0,
+                  backgroundColor: colors.bg.card,
                   borderWidth: 1,
-                  borderColor: showDeadStock ? colors.danger : colors.border,
-                }]}
-                onPress={() => setShowDeadStock(p => !p)}
-              >
-                <Ionicons name={showDeadStock ? "alert-circle" : "alert-circle-outline"} size={16} color={showDeadStock ? '#fff' : colors.danger} />
-                <Text style={[styles.headerBtnText, { color: showDeadStock ? '#fff' : colors.danger }]}>Dead Stock (90+ Days)</Text>
-              </TouchableOpacity>
+                  borderColor: colors.border,
+                  borderRadius: Radius.md,
+                  width: 180,
+                  zIndex: 9999,
+                  elevation: 10,
+                  overflow: 'hidden',
+                  boxShadow: '0px 4px 12px rgba(0,0,0,0.15)',
+                }}>
+                  {perm.can('inventory:edit') && (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                        paddingVertical: 10,
+                        paddingHorizontal: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.border + '40',
+                      }}
+                      onPress={() => {
+                        setAddStockInitialProductId('');
+                        setAddStockVisible(true);
+                        setShowStockActionsDropdown(false);
+                      }}
+                    >
+                      <Ionicons name="add-circle" size={16} color={colors.primary} />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                        + Add Stock Entry
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Toggle Zero Stock */}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      backgroundColor: showZero ? colors.warning + '15' : 'transparent',
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border + '40',
+                    }}
+                    onPress={() => {
+                      setShowZero(p => !p);
+                      if (!showZero) setShowDeadStock(false);
+                      setShowStockActionsDropdown(false);
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name={showZero ? "eye" : "eye-off-outline"} size={16} color={showZero ? colors.warning : colors.text.secondary} />
+                      <Text style={{ fontSize: 12, fontWeight: showZero ? '700' : '600', color: showZero ? colors.warning : colors.text.secondary }}>
+                        Zero Stock View
+                      </Text>
+                    </View>
+                    {showZero && <Ionicons name="checkmark" size={14} color={colors.warning} />}
+                  </TouchableOpacity>
+
+                  {/* Toggle Dead Stock */}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      backgroundColor: showDeadStock ? colors.danger + '15' : 'transparent',
+                    }}
+                    onPress={() => {
+                      setShowDeadStock(p => !p);
+                      if (!showDeadStock) setShowZero(false);
+                      setShowStockActionsDropdown(false);
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="skull-outline" size={16} color={showDeadStock ? colors.danger : colors.text.secondary} />
+                      <Text style={{ fontSize: 12, fontWeight: showDeadStock ? '700' : '600', color: showDeadStock ? colors.danger : colors.text.secondary }}>
+                        Dead Stock (90+ Days)
+                      </Text>
+                    </View>
+                    {showDeadStock && <Ionicons name="checkmark" size={14} color={colors.danger} />}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </View>
         </View>
 
@@ -1762,10 +1883,17 @@ export default function InventoriesScreen() {
                     const isExpanded = !!expandedProducts[item.productId];
                     const uniqueVendors = Array.from(new Set(item.vendorDetails.map((v: any) => v.vendorName))) as string[];
                     
+                    const prodMatch = products.find(p => p._id === item.productId);
+                    const minReorderVal = prodMatch ? (prodMatch.minReorder || 0) : 0;
+                    const isLowStock = minReorderVal > 0 ? item.totalBoxes <= minReorderVal : item.totalBoxes <= 0;
+
                     return (
-                      <View key={item.productId} style={styles.expandableGroupContainer}>
+                      <View key={item.productId} style={[styles.expandableGroupContainer, { borderLeftWidth: 4, borderLeftColor: isLowStock ? colors.warning : 'transparent' }]}>
                         <Pressable
-                          style={({ pressed }) => [styles.tableBodyRow, pressed && { backgroundColor: colors.bg.secondary }]}
+                          style={({ pressed }) => [
+                            styles.tableBodyRow,
+                            isLowStock ? { backgroundColor: colors.warning + '12' } : (pressed ? { backgroundColor: colors.bg.secondary } : {})
+                          ]}
                           onPress={() => {
                             setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }));
                           }}
@@ -1780,12 +1908,21 @@ export default function InventoriesScreen() {
 
                           <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
                             <Text style={styles.primaryText}>{getDisplayName(item)}</Text>
-                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>HSN: {item.hsnCode}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                              <Text style={{ fontSize: 10, color: colors.text.muted }}>HSN: {item.hsnCode}</Text>
+                              {isLowStock && (
+                                <View style={{ backgroundColor: colors.warning + '20', borderColor: colors.warning + '60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: colors.warning }}>
+                                    ⚠️ LOW STOCK ({item.totalBoxes}/{minReorderVal})
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
                           </View>
 
                           <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
                             <Text style={styles.tableCell} numberOfLines={1}>
-                              {uniqueVendors.map(v => toTitleCase(v)).join(', ') || 'No Vendor'}
+                              {uniqueVendors.map(v => formatVendorDisplay(v)).join(', ')}
                             </Text>
                           </View>
 
@@ -1865,7 +2002,7 @@ export default function InventoriesScreen() {
                                       setLedgerVisible(true);
                                     }}
                                   >
-                                    <Text style={styles.breakdownVendorText}>↳ {toTitleCase(vd.vendorName) || 'Unknown Vendor'}</Text>
+                                    <Text style={styles.breakdownVendorText}>↳ {formatVendorDisplay(vd.vendorName)}</Text>
                                     <Text style={styles.breakdownPackingText}>Packing: {vd.packing} Pcs/Box</Text>
                                     {vd.batchNo ? (
                                       <Text style={[styles.breakdownPackingText, { color: colors.warning, fontWeight: '700', marginTop: 2 }]}>
@@ -1965,10 +2102,17 @@ export default function InventoriesScreen() {
                     const isExpanded = !!expandedProducts[item.productId];
                     const uniqueVendors = Array.from(new Set(item.vendorDetails.map((v: any) => v.vendorName))) as string[];
                     
+                    const prodMatch = products.find(p => p._id === item.productId);
+                    const minReorderVal = prodMatch ? (prodMatch.minReorder || 0) : 0;
+                    const isLowStock = minReorderVal > 0 ? item.totalBoxes <= minReorderVal : item.totalBoxes <= 0;
+
                     return (
-                      <View key={item.productId} style={styles.expandableGroupContainer}>
+                      <View key={item.productId} style={[styles.expandableGroupContainer, { borderLeftWidth: 4, borderLeftColor: isLowStock ? colors.warning : 'transparent' }]}>
                         <Pressable
-                          style={({ pressed }) => [styles.tableBodyRow, pressed && { backgroundColor: colors.bg.secondary }]}
+                          style={({ pressed }) => [
+                            styles.tableBodyRow,
+                            isLowStock ? { backgroundColor: colors.warning + '12' } : (pressed ? { backgroundColor: colors.bg.secondary } : {})
+                          ]}
                           onPress={() => {
                             setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }));
                           }}
@@ -1983,12 +2127,21 @@ export default function InventoriesScreen() {
 
                           <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
                             <Text style={styles.primaryText}>{getDisplayName(item)}</Text>
-                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>HSN: {item.hsnCode}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                              <Text style={{ fontSize: 10, color: colors.text.muted }}>HSN: {item.hsnCode}</Text>
+                              {isLowStock && (
+                                <View style={{ backgroundColor: colors.warning + '20', borderColor: colors.warning + '60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: colors.warning }}>
+                                    ⚠️ LOW STOCK ({item.totalBoxes}/{minReorderVal})
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
                           </View>
 
                           <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
                             <Text style={styles.tableCell} numberOfLines={1}>
-                              {uniqueVendors.map(v => toTitleCase(v)).join(', ') || 'No Vendor'}
+                              {uniqueVendors.map(v => formatVendorDisplay(v)).join(', ')}
                             </Text>
                           </View>
 
@@ -2227,7 +2380,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   vendorDropdownPanel: { position: 'absolute', top: 52, right: 180, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
 
   table: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden', flex: 1 },
-  tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, alignItems: 'center' },
+  tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: 'transparent' },
   tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },

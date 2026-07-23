@@ -126,14 +126,21 @@ class ApiClient {
         throw new Error(`Connection Error: Unable to reach backend server (${netErr?.message || 'Network Failure'}). Please ensure the server is running.`);
       });
       if (!res.ok) {
-          let errMsg = 'API Error';
-          try {
-              const errData = await res.json();
-              errMsg = errData.error || errData.message || res.statusText;
-          } catch {
-              errMsg = res.statusText;
-          }
-          throw new Error(errMsg);
+        let errMsg = 'API Error';
+        try {
+            const errData = await res.json();
+            errMsg = errData.error || errData.message || res.statusText;
+            if (errData.issues && Array.isArray(errData.issues) && errData.issues.length > 0) {
+              const details = errData.issues.map((i: any) => `${i.path || 'field'}: ${i.message}`).join(', ');
+              errMsg = `${errMsg} (${details})`;
+            } else if (errData.fields && typeof errData.fields === 'object') {
+              const details = Object.entries(errData.fields).map(([k, v]) => `${k}: ${v}`).join(', ');
+              if (details) errMsg = `${errMsg} (${details})`;
+            }
+        } catch {
+            errMsg = res.statusText;
+        }
+        throw new Error(errMsg);
       }
       return res;
     } finally {
@@ -1126,6 +1133,10 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/medical-reps/dashboard/summary?${params}`);
     return res.json();
   }
+  async seedMrDemoData(): Promise<any> {
+    const res = await this.request(`${API_BASE}/medical-reps/seed-demo`, { method: 'POST' });
+    return res.json();
+  }
 
   // ─── Campaigns ───
   async getCampaigns(search?: string, status?: string, platform?: string): Promise<Campaign[]> {
@@ -1164,8 +1175,8 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/campaigns/${id}/complete`, { method: 'POST' });
     return res.json();
   }
-  async deleteCampaign(id: string): Promise<{ message: string }> {
-    const res = await this.request(`${API_BASE}/campaigns/${id}`, { method: 'DELETE' });
+  async seedCompleteDemoData(): Promise<{ message: string }> {
+    const res = await this.request(`${API_BASE}/system/seed-demo`, { method: 'POST' });
     return res.json();
   }
 }

@@ -8,6 +8,131 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, CreditNote, Customer, Vendor } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { FIRM_DETAILS } from '../constants/firm';
+
+// ── Print CGST Rule 53 Compliant Credit / Debit Note ──────────────────────────
+const printCreditNote = (note: CreditNote) => {
+  if (Platform.OS !== 'web') {
+    alert('Print is available on web only.');
+    return;
+  }
+
+  const isCredit = note.type === 'credit_note';
+  const docTitle = isCredit ? 'CREDIT NOTE' : 'DEBIT NOTE';
+  const dateStr = new Date(note.date || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const baseAmt = note.baseAmount || note.totalAmount || 0;
+  const cgst = note.cgst || 0;
+  const sgst = note.sgst || 0;
+  const igst = note.igst || 0;
+  const totalTax = cgst + sgst + igst;
+  const grandTotal = note.totalAmount || (baseAmt + totalTax);
+
+  const signatureBlock = (FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
+    <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 38px; width: auto; object-fit: contain; margin-bottom: 2px;" />
+    <div style="font-weight:bold; font-size: 10px; color: #15803d; margin-bottom: 2px;">
+      ✔ DIGITALLY SIGNED ${docTitle}
+    </div>
+    <div style="border: 1px dashed #16a34a; background-color: #f0fdf4; border-radius: 4px; padding: 5px; font-size: 8px; text-align: left; line-height: 1.3; display: flex; align-items: center; gap: 8px;">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`GST ${docTitle} Verification | Seller: ${FIRM_DETAILS.name} | GSTIN: ${FIRM_DETAILS.gstin || ''} | Doc: ${note.noteNo} | InvRef: ${note.invoiceNo || 'N/A'} | Date: ${dateStr} | Amt: ₹${grandTotal.toFixed(2)} | CGST Rule 53 Compliant`)}" style="width: 48px; height: 48px; border: 1px solid #16a34a; padding: 2px; background: #fff; border-radius: 3px; flex-shrink: 0;" />
+      <div style="flex: 1;">
+        <strong>Signed By:</strong> ${FIRM_DETAILS.name}<br/>
+        <strong>GSTIN:</strong> ${FIRM_DETAILS.gstin || ''}<br/>
+        <span style="color: #15803d; font-weight: bold;">✔ Certified under CGST Rule 53 &amp; Sec 5 IT Act.</span>
+      </div>
+    </div>
+  ` : `
+    For ${FIRM_DETAILS.name}<br/><br/>Authorised Signatory
+  `;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>${docTitle} ${note.noteNo}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; color: #000; background: #fff; }
+    .page { width: 210mm; padding: 10mm; margin: 0 auto; }
+    table { border-collapse: collapse; width: 100%; }
+    @media print { @page { size: A4 portrait; margin: 0; } .page { page-break-after: always; padding: 10mm; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div style="text-align:center; border:2px solid #000; padding:8px; margin-bottom:10px;">
+      <div style="font-weight:bold; font-size:18px;">${FIRM_DETAILS.name}</div>
+      <div style="font-size:10px;">${FIRM_DETAILS.address}</div>
+      <div style="font-size:10px;">GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
+      <div style="font-size:14px; font-weight:bold; margin-top:6px; letter-spacing:1px; color: ${isCredit ? '#15803d' : '#b91c1c'};">
+        ${docTitle} — GST RULE 53 COMPLIANT
+      </div>
+      <div style="font-size:9px; color:#555;">(Issued under Section 34 of CGST Act, 2017)</div>
+    </div>
+
+    <table style="margin-bottom:10px; font-size:11px; border:1px solid #000;">
+      <tr>
+        <td style="width:50%; padding:6px; border-right:1px solid #000; vertical-align:top;">
+          <strong>Note Number:</strong> ${note.noteNo}<br/>
+          <strong>Date of Issue:</strong> ${dateStr}<br/>
+          <strong>Linked Original Invoice:</strong> ${note.invoiceNo || 'N/A'}<br/>
+          <strong>Reason for Issue:</strong> ${note.reason || 'Sales Adjustment'}
+        </td>
+        <td style="width:50%; padding:6px; vertical-align:top;">
+          <strong>Billed To Party:</strong> ${note.partyName}<br/>
+          <strong>Party Type:</strong> ${note.partyType}<br/>
+          <strong>Status:</strong> ${note.status.toUpperCase()}
+        </td>
+      </tr>
+    </table>
+
+    <table style="font-size:11px; margin-bottom:12px; border:1px solid #000;">
+      <thead>
+        <tr style="background:#f3f4f6; border-bottom:1px solid #000;">
+          <th style="padding:6px; border-right:1px solid #000; text-align:left;">Description / Particulars</th>
+          <th style="padding:6px; border-right:1px solid #000; width:20%; text-align:right;">Taxable Base (₹)</th>
+          <th style="padding:6px; border-right:1px solid #000; width:15%; text-align:right;">GST Rate</th>
+          <th style="padding:6px; width:25%; text-align:right;">Adjustment Value (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid #000;">
+          <td style="padding:8px; border-right:1px solid #000;">
+            Adjustment towards ${isCredit ? 'Credit (Discount / Return)' : 'Debit (Price Increase)'} for Invoice ${note.invoiceNo || 'Ref'}<br/>
+            <span style="font-size:9px; color:#666;">${note.reason || ''}</span>
+          </td>
+          <td style="padding:8px; border-right:1px solid #000; text-align:right;">${baseAmt.toFixed(2)}</td>
+          <td style="padding:8px; border-right:1px solid #000; text-align:right;">${note.gstRate || 0}%</td>
+          <td style="padding:8px; text-align:right; font-weight:bold;">${grandTotal.toFixed(2)}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        ${cgst > 0 ? `<tr><td colspan="3" style="text-align:right; padding:4px; border-right:1px solid #000;">CGST</td><td style="text-align:right; padding:4px;">${cgst.toFixed(2)}</td></tr>` : ''}
+        ${sgst > 0 ? `<tr><td colspan="3" style="text-align:right; padding:4px; border-right:1px solid #000;">SGST</td><td style="text-align:right; padding:4px;">${sgst.toFixed(2)}</td></tr>` : ''}
+        ${igst > 0 ? `<tr><td colspan="3" style="text-align:right; padding:4px; border-right:1px solid #000;">IGST</td><td style="text-align:right; padding:4px;">${igst.toFixed(2)}</td></tr>` : ''}
+        <tr style="border-top:1px solid #000; font-weight:bold; background:#f9fafb;">
+          <td colspan="3" style="text-align:right; padding:6px; border-right:1px solid #000;">Net Total Adjustment</td>
+          <td style="text-align:right; padding:6px; font-size:14px; color: ${isCredit ? '#15803d' : '#b91c1c'};">₹${grandTotal.toFixed(2)}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div style="margin-top:30px; display:flex; justify-content:space-between; align-items:center; font-size:10px;">
+      <div style="width:50%;">
+        <strong>Declaration:</strong><br/>
+        This document is issued under Section 34 of the CGST Act, 2017 & CGST Rule 53.
+      </div>
+      <div style="text-align:right;">
+        ${signatureBlock}
+      </div>
+    </div>
+  </div>
+  <script>window.print();</script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=800,height=900');
+  if (win) { win.document.write(html); win.document.close(); }
+};
 
 export default function CreditNotesPage() {
   const { colors } = useTheme();
@@ -183,7 +308,7 @@ export default function CreditNotesPage() {
         {/* Notes List */}
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 80 }}
+          contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: 80 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchNotes} tintColor={colors.primary} />}
         >
           {notes.map(note => {
@@ -232,6 +357,10 @@ export default function CreditNotesPage() {
                 {note.reason ? <Text style={styles.cardReason}>Reason: {note.reason}</Text> : null}
 
                 <View style={styles.cardActions}>
+                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.primary }]} onPress={() => printCreditNote(note)}>
+                    <Ionicons name="print-outline" size={14} color="#fff" />
+                    <Text style={styles.actionBtnText}>Print Document</Text>
+                  </TouchableOpacity>
                   {note.status === 'draft' && (
                     <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.success }]} onPress={() => handleFinalize(note._id)}>
                       <Ionicons name="checkmark-done" size={14} color="#fff" />
@@ -278,9 +407,12 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
   const [partyId, setPartyId] = useState('');
   const [partyName, setPartyName] = useState('');
   const [showPartyDropdown, setShowPartyDropdown] = useState(false);
+  const [customerInvoices, setCustomerInvoices] = useState<any[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [invoiceNo, setInvoiceNo] = useState('');
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState('01 - Sales Return / Goods Rejection');
   const [totalAmount, setTotalAmount] = useState('');
+  const [gstRate, setGstRate] = useState('18');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -291,8 +423,10 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
       setPartyId('');
       setPartyName('');
       setInvoiceNo('');
-      setReason('');
+      setCustomerInvoices([]);
+      setReason('01 - Sales Return / Goods Rejection');
       setTotalAmount('');
+      setGstRate('18');
       setError('');
       setShowPartyDropdown(false);
     }
@@ -318,32 +452,76 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
   }, [visible, partyType]);
 
   const filteredParties = partyName
-    ? parties.filter(p => (p.company || p.name).toLowerCase().includes(partyName.toLowerCase()))
+    ? parties.filter(p =>
+        (p.company || '').toLowerCase().includes(partyName.toLowerCase()) ||
+        (p.name || '').toLowerCase().includes(partyName.toLowerCase()) ||
+        (p.displayName || '').toLowerCase().includes(partyName.toLowerCase())
+      )
     : parties;
 
-  const handleSelectParty = (p: any) => {
+  const handleSelectParty = async (p: any) => {
+    const selectedName = p.company || p.displayName || p.name;
     setPartyId(p._id);
-    setPartyName(p.company || p.name);
+    setPartyName(selectedName);
     setShowPartyDropdown(false);
+
+    if (partyType === 'Customer') {
+      try {
+        setLoadingInvoices(true);
+        const invs = await api.getSaleInvoices(selectedName);
+        const matched = (invs || []).filter(inv =>
+          (inv.customerName || '').toLowerCase().includes(selectedName.toLowerCase()) ||
+          (p.company && (inv.customerName || '').toLowerCase().includes(p.company.toLowerCase())) ||
+          (p.name && (inv.customerName || '').toLowerCase().includes(p.name.toLowerCase()))
+        );
+        setCustomerInvoices(matched);
+        if (matched.length > 0) {
+          setInvoiceNo(matched[0].invoiceNo);
+          setTotalAmount((matched[0].baseAmount || matched[0].amount || 0).toString());
+        }
+      } catch (err) {
+        console.error('Failed to load customer invoices:', err);
+      } finally {
+        setLoadingInvoices(false);
+      }
+    }
   };
 
   const handleSave = async () => {
     if (!partyName.trim() || !totalAmount || isNaN(Number(totalAmount)) || Number(totalAmount) <= 0) {
-      setError('Please select a party and enter a valid amount.');
+      setError('Please select a party and enter a valid base amount.');
       return;
     }
 
     try {
       setSaving(true);
       setError('');
+
+      const base = parseFloat(totalAmount) || 0;
+      const rate = parseFloat(gstRate) || 0;
+      const tax = (base * rate) / 100;
+      const total = Math.round(base + tax);
+
+      const targetParty = parties.find(p => p._id === partyId || (p.company || p.name).toLowerCase() === partyName.trim().toLowerCase());
+      const gstin = targetParty?.gstin || '';
+      const isIntraState = gstin ? gstin.startsWith('09') : true;
+
+      const cgst = rate > 0 && isIntraState ? tax / 2 : 0;
+      const sgst = rate > 0 && isIntraState ? tax / 2 : 0;
+      const igst = rate > 0 && !isIntraState ? tax : 0;
+
       await api.createCreditNote({
         type,
         partyType,
         partyId: partyId || undefined,
         partyName: partyName.trim(),
         invoiceNo: invoiceNo.trim(),
-        totalAmount: Number(totalAmount),
-        baseAmount: Number(totalAmount),
+        baseAmount: base,
+        gstRate: rate,
+        cgst,
+        sgst,
+        igst,
+        totalAmount: total,
         reason: reason.trim(),
       });
       onClose();
@@ -444,46 +622,162 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
               )}
             </View>
 
-            {/* Amount */}
+            {/* GST Statutory Reason Selector */}
             <View style={{ marginBottom: Spacing.md }}>
-              <Text style={styles.label}>Amount *</Text>
-              <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0 }]}>
-                <Text style={{ paddingLeft: 12, paddingRight: 4, color: colors.text.secondary, fontWeight: '700' }}>₹</Text>
+              <Text style={styles.label}>GST Statutory Reason *</Text>
+              {Platform.OS === 'web' ? (
+                <select
+                  value={reason}
+                  onChange={(e: any) => setReason(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: `1px solid ${colors.border}`,
+                    backgroundColor: colors.bg.primary,
+                    color: colors.text.primary,
+                    fontSize: 13,
+                    outline: 'none',
+                  }}
+                >
+                  <option value="01 - Sales Return / Goods Rejection">01 - Sales Return / Goods Rejection</option>
+                  <option value="02 - Post Sale Discount / Rate Difference">02 - Post Sale Discount / Rate Difference</option>
+                  <option value="03 - Deficiency in Services / Shortage">03 - Deficiency in Services / Shortage</option>
+                  <option value="04 - Correction in Invoice / Tax Rate Adjustment">04 - Correction in Invoice / Tax Rate Adjustment</option>
+                  <option value="05 - Other Adjustment">05 - Other Adjustment</option>
+                </select>
+              ) : (
                 <TextInput
-                  style={{ flex: 1, height: '100%', color: colors.text.primary, fontSize: 14 }}
-                  placeholder="0.00"
+                  style={styles.input}
+                  placeholder="Reason for issuance..."
                   placeholderTextColor={colors.text.muted}
-                  value={totalAmount}
-                  onChangeText={setTotalAmount}
-                  keyboardType="numeric"
+                  value={reason}
+                  onChangeText={setReason}
                 />
+              )}
+            </View>
+
+            {/* Linked Invoice Reference */}
+            <View style={{ marginBottom: Spacing.md }}>
+              <Text style={styles.label}>Linked Original Invoice No. (Rule 53 Mandate)</Text>
+              {loadingInvoices ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 44 }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={{ fontSize: 12, color: colors.text.muted }}>Fetching customer invoices...</Text>
+                </View>
+              ) : (customerInvoices.length > 0 && Platform.OS === 'web') ? (
+                <select
+                  value={invoiceNo}
+                  onChange={(e: any) => {
+                    const selInvNo = e.target.value;
+                    setInvoiceNo(selInvNo);
+                    const selected = customerInvoices.find(inv => inv.invoiceNo === selInvNo);
+                    if (selected) {
+                      setTotalAmount((selected.baseAmount || selected.amount || 0).toString());
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: `1px solid ${colors.border}`,
+                    backgroundColor: colors.bg.primary,
+                    color: colors.text.primary,
+                    fontSize: 13,
+                    outline: 'none',
+                    height: 44,
+                  }}
+                >
+                  <option value="">-- Select Linked Invoice --</option>
+                  {customerInvoices.map((inv) => (
+                    <option key={inv._id} value={inv.invoiceNo}>
+                      {inv.invoiceNo} | {new Date(inv.date || Date.now()).toLocaleDateString('en-IN')} | ₹{(inv.amount || 0).toLocaleString('en-IN')}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. SB-2026-001"
+                  placeholderTextColor={colors.text.muted}
+                  value={invoiceNo}
+                  onChangeText={setInvoiceNo}
+                />
+              )}
+            </View>
+
+            {/* Amount & Tax Breakdown */}
+            <View style={{ backgroundColor: colors.bg.secondary, borderRadius: Radius.md, padding: 12, marginBottom: Spacing.md, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, marginBottom: 8, textTransform: 'uppercase' }}>
+                💰 GST Tax & Value Adjustment (Rule 53)
+              </Text>
+              
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Taxable Base Amount (₹) *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.bg.card }]}
+                    placeholder="0.00"
+                    placeholderTextColor={colors.text.muted}
+                    value={totalAmount}
+                    onChangeText={setTotalAmount}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>GST Rate (%)</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={gstRate}
+                      onChange={(e: any) => setGstRate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        border: `1px solid ${colors.border}`,
+                        backgroundColor: colors.bg.card,
+                        color: colors.text.primary,
+                        fontSize: 13,
+                        outline: 'none',
+                        height: 44,
+                      }}
+                    >
+                      <option value="0">0% (Nil / Exempt)</option>
+                      <option value="5">5% GST</option>
+                      <option value="12">12% GST</option>
+                      <option value="18">18% GST (Standard)</option>
+                      <option value="28">28% GST</option>
+                    </select>
+                  ) : (
+                    <TextInput
+                      style={[styles.input, { backgroundColor: colors.bg.card }]}
+                      placeholder="18"
+                      value={gstRate}
+                      onChangeText={setGstRate}
+                      keyboardType="numeric"
+                    />
+                  )}
+                </View>
               </View>
-            </View>
 
-            {/* Invoice Reference */}
-            <View style={{ marginBottom: Spacing.md }}>
-              <Text style={styles.label}>Linked Invoice No. (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. INV-2026-001"
-                placeholderTextColor={colors.text.muted}
-                value={invoiceNo}
-                onChangeText={setInvoiceNo}
-              />
-            </View>
-
-            {/* Reason */}
-            <View style={{ marginBottom: Spacing.md }}>
-              <Text style={styles.label}>Reason / Remarks</Text>
-              <TextInput
-                style={[styles.input, { height: 70, paddingTop: 10 }]}
-                placeholder="e.g. Goods return, price correction..."
-                placeholderTextColor={colors.text.muted}
-                value={reason}
-                onChangeText={setReason}
-                multiline
-                textAlignVertical="top"
-              />
+              {/* Calculated Tax Preview */}
+              {(() => {
+                const base = parseFloat(totalAmount) || 0;
+                const rate = parseFloat(gstRate) || 0;
+                const tax = (base * rate) / 100;
+                const total = base + tax;
+                return (
+                  <View style={{ marginTop: 4, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 11, color: colors.text.muted }}>
+                      Tax: ₹{tax.toFixed(2)} ({rate > 0 ? `CGST: ₹${(tax/2).toFixed(2)} | SGST: ₹${(tax/2).toFixed(2)}` : 'Nil'})
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: type === 'credit_note' ? colors.success : colors.danger }}>
+                      Total: ₹{total.toFixed(2)}
+                    </Text>
+                  </View>
+                );
+              })()}
             </View>
           </ScrollView>
 
@@ -516,8 +810,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   filterChipText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
 
-  summaryRow: { flexDirection: 'row', gap: 10, marginBottom: Spacing.md },
-  statCard: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1 },
+  summaryRow: { flexDirection: 'row', gap: 16, paddingHorizontal: Spacing.lg, marginTop: Spacing.xs, marginBottom: Spacing.md },
+  statCard: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1 },
   statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   statValue: { fontSize: 18, fontWeight: '800', marginTop: 2 },
 

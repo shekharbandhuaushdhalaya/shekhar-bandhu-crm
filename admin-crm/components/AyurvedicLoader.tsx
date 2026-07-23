@@ -4,11 +4,11 @@ import { useTheme } from '../utils/themeContext';
 import { LightColors, Radius, Shadows } from '../constants/theme';
 
 const AYURVEDIC_PHRASES = [
-  { text: 'सर्वे भवन्तु सुखिनः सर्वे सन्तु निरामयाः', subtext: 'May all beings be healthy & free from illness...', icon: '🌿' },
-  { text: 'Harmonizing Vata, Pitta & Kapha...', subtext: 'Balancing the vital energies of life', icon: '⚖️' },
-  { text: 'Aligning Natural Herbs & Pure Aushadhi Extracts...', subtext: 'Formulating authentic Ayurvedic wellness', icon: '🧪' },
-  { text: 'आयुः कामयमानेन धर्मार्थसुखसाधनम्', subtext: 'Nurturing longevity, health & vitality...', icon: '🍯' },
-  { text: 'Processing Batches with Purity & Care...', subtext: 'Preparing traditional herbal formulations', icon: '🍃' }
+  { text: 'सर्वे भवन्तु सुखिनः सर्वे सन्तु निरामयाः', subtext: 'सभी जीव स्वस्थ एवं रोगमुक्त रहें...', icon: '🌿' },
+  { text: 'वात, पित्त एवं कफ का प्राकृतिक संतुलन...', subtext: 'त्रिदोष एवं जीवन ऊर्जा का सुव्यवस्थित सामंजस्य', icon: '⚖️' },
+  { text: 'प्राकृतिक जड़ी-बूटियों एवं शुद्ध औषधियों का संकलन...', subtext: 'पारंपरिक आयुर्वेदिक औषधियों का निर्माण', icon: '🧪' },
+  { text: 'आयुः कामयमानेन धर्मार्थसुखसाधनम्', subtext: 'उत्कृष्ट स्वास्थ्य, दीर्घायु एवं आरोग्य संवर्धन...', icon: '🍯' },
+  { text: 'पूर्ण शुद्धता एवं सात्विकता से निर्माण कार्य...', subtext: 'शेखर बंधु औषधालय की प्रामाणिक परंपरा', icon: '🍃' }
 ];
 
 export default function AyurvedicLoader({ message, inline = false }: { message?: string; inline?: boolean }) {

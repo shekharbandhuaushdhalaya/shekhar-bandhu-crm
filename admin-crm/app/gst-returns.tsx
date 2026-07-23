@@ -101,6 +101,8 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
   const totalInvoices = data.totalInvoices || 0;
   const totalTaxable = data.totalTaxableValue || 0;
   const totalGst = data.totalGST || 0;
+  const table9B_CN = data.table9B_CreditNotes || {};
+  const table9B_DN = data.table9B_DebitNotes || {};
 
   return (
     <View>
@@ -111,12 +113,41 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
           <Text style={[styles.statValue, { color: colors.text.primary }]}>{totalInvoices}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: colors.info + '10', borderColor: colors.info + '30' }]}>
-          <Text style={[styles.statLabel, { color: colors.info }]}>TOTAL TAXABLE VALUE</Text>
+          <Text style={[styles.statLabel, { color: colors.info }]}>NET TAXABLE VALUE (AFTER NOTES)</Text>
           <Text style={[styles.statValue, { color: colors.text.primary }]}>₹{totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: colors.success + '10', borderColor: colors.success + '30' }]}>
-          <Text style={[styles.statLabel, { color: colors.success }]}>TOTAL OUTWARD GST</Text>
+          <Text style={[styles.statLabel, { color: colors.success }]}>NET OUTWARD GST</Text>
           <Text style={[styles.statValue, { color: colors.success }]}>₹{totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+        </View>
+      </View>
+
+      {/* Table 9B: Credit / Debit Notes Summary Card */}
+      <View style={[styles.summaryCard, { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, marginBottom: Spacing.lg }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={styles.sectionTitle}>Table 9B: Credit / Debit Notes (Registered & Unregistered)</Text>
+          <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.primary + '15' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>GSTR-1 Statutory Table 9B</Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginTop: 4 }}>
+          <View>
+            <Text style={styles.label}>Credit Notes Issued (-)</Text>
+            <Text style={[styles.value, { color: colors.danger }]}>- ₹{(table9B_CN.baseAmount || 0).toLocaleString('en-IN')}</Text>
+            <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>{table9B_CN.count || 0} Credit Notes</Text>
+          </View>
+          <View>
+            <Text style={styles.label}>Debit Notes Issued (+)</Text>
+            <Text style={[styles.value, { color: colors.success }]}>+ ₹{(table9B_DN.baseAmount || 0).toLocaleString('en-IN')}</Text>
+            <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>{table9B_DN.count || 0} Debit Notes</Text>
+          </View>
+          <View>
+            <Text style={styles.label}>Net Tax Adjustment</Text>
+            <Text style={[styles.value, { color: colors.primary }]}>
+              ₹{((table9B_DN.cgst + table9B_DN.sgst + table9B_DN.igst) - (table9B_CN.cgst + table9B_CN.sgst + table9B_CN.igst)).toLocaleString('en-IN')}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>Reflected in GSTR-1 & GSTR-3B</Text>
+          </View>
         </View>
       </View>
 
@@ -202,12 +233,14 @@ function Gstr3bView({ data, colors, styles }: { data: any; colors: any; styles: 
   return (
     <View style={{ gap: Spacing.lg }}>
       <View style={[styles.summaryCard, { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg }]}>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>3.1 Outward Taxable Supplies (Sales)</Text>
-        <InfoRow label="Total Taxable Value" value={`₹${(outward.taxableValue || 0).toLocaleString('en-IN')}`} />
-        <InfoRow label="CGST" value={`₹${(outward.cgst || 0).toLocaleString('en-IN')}`} />
-        <InfoRow label="SGST" value={`₹${(outward.sgst || 0).toLocaleString('en-IN')}`} />
-        <InfoRow label="IGST" value={`₹${(outward.igst || 0).toLocaleString('en-IN')}`} />
-        <InfoRow label="Total Tax Liability" value={`₹${(outward.totalTax || 0).toLocaleString('en-IN')}`} isBold />
+        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>3.1 Outward Taxable Supplies (Sales & Notes)</Text>
+        <InfoRow label="Net Taxable Base (Gross Sales - Credit Notes + Debit Notes)" value={`₹${(outward.taxableValue || 0).toLocaleString('en-IN')}`} />
+        <InfoRow label="Credit Notes Deductions (-)" value={`- ₹${(outward.creditNoteDeduction || 0).toLocaleString('en-IN')} (${outward.creditNotesCount || 0} Notes)`} />
+        <InfoRow label="Debit Notes Additions (+)" value={`+ ₹${(outward.debitNoteAddition || 0).toLocaleString('en-IN')} (${outward.debitNotesCount || 0} Notes)`} />
+        <InfoRow label="Net CGST Liability" value={`₹${(outward.cgst || 0).toLocaleString('en-IN')}`} />
+        <InfoRow label="Net SGST Liability" value={`₹${(outward.sgst || 0).toLocaleString('en-IN')}`} />
+        <InfoRow label="Net IGST Liability" value={`₹${(outward.igst || 0).toLocaleString('en-IN')}`} />
+        <InfoRow label="Total Net Output Tax Liability" value={`₹${(outward.totalTax || 0).toLocaleString('en-IN')}`} isBold />
         <InfoRow label="Total Invoices Count" value={String(outward.invoiceCount || 0)} />
       </View>
 

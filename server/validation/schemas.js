@@ -606,10 +606,7 @@ const dispatchSchema = z.object({
 });
 
 // ── SystemSettings ───────────────────────────────────────────
-const systemSettingsSchema = z.object({
-  key: z.string().min(1),
-  value: z.any(),
-});
+const systemSettingsSchema = z.object({}).passthrough();
 
 // ── RBAC ─────────────────────────────────────────────────────
 const rbacPermissionsSchema = z.object({
