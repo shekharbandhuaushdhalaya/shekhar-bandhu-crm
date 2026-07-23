@@ -1162,9 +1162,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
               marginBottom: 12,
               zIndex: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 1010 : 1
             }}
-            contentContainerStyle={{ minHeight: 250 }}
+            contentContainerStyle={{ minHeight: 250, flexGrow: 1 }}
           >
-            <View style={{ minWidth: 650, minHeight: 250 }}>
+            <View style={{ width: '100%', minWidth: 650, minHeight: 250 }}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 3.2 : 3.6 }]}>Raw Material Name *</Text>
                 <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.4 : 1.6, textAlign: 'center' }]}>Qty / Unit *</Text>
