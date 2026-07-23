@@ -308,6 +308,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           product ? api.getBOMForProduct(product._id).catch(() => null) : Promise.resolve(null)
         ]);
         setMaterials(rms);
+        console.log('AddEditProductModal - Fetched raw materials count:', rms.length, rms.map(r => ({ name: r.name, category: r.category })));
         if (existingBom) {
           setBomYield(existingBom.batchYieldSize ? existingBom.batchYieldSize.toString() : '100');
           setBomOverhead(existingBom.overheadCost ? existingBom.overheadCost.toString() : '0');
@@ -366,7 +367,11 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
 
   // Sync Key Ingredients summary text from BOM formulation ingredients ratio
   useEffect(() => {
-    const activeIngs = bomIngredients.filter(ing => ing.itemType !== 'packaging' && ing.rawMaterialId && ing.qtyRequired);
+    const activeIngs = bomIngredients.filter(ing => {
+      const mat = materials.find(m => m._id === ing.rawMaterialId);
+      const isPackaging = mat?.category === 'Packaging' || ing.itemType === 'packaging';
+      return !isPackaging && ing.rawMaterialId && ing.qtyRequired;
+    });
     if (activeIngs.length > 0) {
       const summary = activeIngs.map(ing => {
         const mat = materials.find(m => m._id === ing.rawMaterialId);
@@ -374,6 +379,8 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
         return `${name} (${ing.qtyRequired}%)`;
       }).join(', ');
       setIngredients(summary);
+    } else {
+      setIngredients('');
     }
   }, [bomIngredients, materials]);
 
@@ -1208,6 +1215,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           {bomIngredients.map((item, idx) => {
             if (item.itemType !== 'packaging') return null;
             const packagingMaterials = materials.filter(rm => !rm.category || rm.category === 'Packaging' || rm.category === 'General');
+            console.log('PACKAGING MATERIALS FILTERED:', packagingMaterials.map(p => p.name), 'from total:', materials.map(m => m.name + ':' + m.category));
             return (
               <View key={`ing-pkg-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                 <View style={[styles.formInput, { flex: 2, height: 42 }]}>
