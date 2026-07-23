@@ -92,12 +92,13 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
         stages: validatedStages || []
       });
     }
-    // Automatically update Product's ingredients field with percentage proportions
+    // Automatically update Product's ingredients field with percentage proportions (formulation materials only)
     const populatedBom = await BillOfMaterials.findById(bom._id).populate('ingredients.rawMaterialId', 'name');
     if (populatedBom && populatedBom.ingredients && populatedBom.ingredients.length > 0) {
-      const totalQty = populatedBom.ingredients.reduce((sum, ing) => sum + (ing.qtyRequired || 0), 0);
+      const formulationIngredients = populatedBom.ingredients.filter(ing => ing.itemType !== 'packaging');
+      const totalQty = formulationIngredients.reduce((sum, ing) => sum + (ing.qtyRequired || 0), 0);
       if (totalQty > 0) {
-        const ingredientsString = populatedBom.ingredients
+        const ingredientsString = formulationIngredients
           .map(ing => {
             const pct = ((ing.qtyRequired / totalQty) * 100).toFixed(1);
             const name = ing.rawMaterialId ? ing.rawMaterialId.name : 'Unknown Material';
@@ -105,6 +106,8 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
           })
           .join(', ');
         await Product.findByIdAndUpdate(productId, { ingredients: ingredientsString });
+      } else {
+        await Product.findByIdAndUpdate(productId, { ingredients: '' });
       }
     }
 
