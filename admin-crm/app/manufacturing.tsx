@@ -1080,7 +1080,7 @@ export default function ManufacturingScreen() {
                                   setTraceLoading(true);
                                   setTraceModalVisible(true);
                                   try {
-                                    const data = await api.traceBatch(e.batchNo);
+                                    const data = await api.traceBatch(e.batchNo.trim().toUpperCase());
                                     setTraceResult(data);
                                   } catch (err: any) {
                                     alert(err.message || 'Trace lookup failed');
@@ -1150,7 +1150,7 @@ export default function ManufacturingScreen() {
                           setTraceLoading(true);
                           setTraceModalVisible(true);
                           try {
-                            const data = await api.traceBatch(batch.batchNo);
+                            const data = await api.traceBatch(batch.batchNo.trim().toUpperCase());
                             setTraceResult(data);
                           } catch (err: any) {
                             alert(err.message || 'Trace lookup failed');
@@ -2718,10 +2718,16 @@ export default function ManufacturingScreen() {
                         {(() => {
                           const ledgerEntries: any[] = [];
                           
+                          const parseDate = (val: any) => {
+                            if (!val) return new Date();
+                            const d = new Date(val);
+                            return isNaN(d.getTime()) ? new Date() : d;
+                          };
+
                           // Raw Material Inwards (IN)
                           traceResult.rawMaterialEntries.forEach((e: any) => {
                             ledgerEntries.push({
-                              date: new Date(e.createdAt),
+                              date: parseDate(e.createdAt),
                               type: 'IN (Purchase)',
                               refNo: e.purchaseRef || 'Inward',
                               party: e.vendorName || 'Direct',
@@ -2735,7 +2741,7 @@ export default function ManufacturingScreen() {
                           (traceResult.productionBatches || []).forEach((b: any) => {
                             if (b.relation === 'raw_material_consumed_in') {
                               ledgerEntries.push({
-                                date: new Date(b.startDate || b.endDate),
+                                date: parseDate(b.startDate || b.endDate || b.createdAt),
                                 type: 'OUT (Production)',
                                 refNo: b.batchNo,
                                 party: `Product: ${b.productName}`,
