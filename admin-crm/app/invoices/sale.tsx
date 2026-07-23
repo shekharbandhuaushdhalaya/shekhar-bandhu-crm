@@ -628,7 +628,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
               </View>
               <View>
                 <Text style={styles.infoLabel}>Total Amount</Text>
-                <Text style={styles.infoValue}>₹{invoice.amount.toLocaleString()}</Text>
+                <Text style={styles.infoValue}>₹{invoice.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
               </View>
             </View>
 
@@ -641,15 +641,15 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                   <View>
                     <Text style={styles.infoLabel}>GST Breakdown</Text>
                     <Text style={styles.infoValue}>
-                      Base: ₹{invoice.baseAmount?.toLocaleString() || '0'} | Rate: {invoice.gstRate || 0}%
+                      Base: ₹{invoice.baseAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'} | Rate: {invoice.gstRate || 0}%
                     </Text>
                     {invoice.igst && invoice.igst > 0 ? (
                       <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                        IGST: ₹{invoice.igst.toLocaleString()} (Inter-state)
+                        IGST: ₹{invoice.igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Inter-state)
                       </Text>
                     ) : (
                       <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                        CGST: ₹{(invoice.cgst || 0).toLocaleString()} | SGST: ₹{(invoice.sgst || 0).toLocaleString()} (Intra-state)
+                        CGST: ₹{(invoice.cgst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | SGST: ₹{(invoice.sgst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Intra-state)
                       </Text>
                     )}
                   </View>
@@ -694,7 +694,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                 </View>
                 <View>
                   <Text style={styles.infoLabel}>Internal Freight Exp.</Text>
-                  <Text style={styles.infoValue}>₹{invoice.internalFreightExpense.toLocaleString()}</Text>
+                  <Text style={styles.infoValue}>₹{invoice.internalFreightExpense.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                 </View>
               </View>
             ) : null}
@@ -2152,7 +2152,7 @@ export default function SaleInvoicesScreen() {
                     <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
                   </View>
                   <View style={[styles.tableCellContainer, { width: 100 }]}>
-                    <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString()}</Text>
+                    <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                   </View>
                   <View style={[styles.tableCellContainer, { width: 100 }]}>
                     <View style={[styles.statusBadge, {

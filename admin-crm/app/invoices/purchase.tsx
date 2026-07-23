@@ -200,7 +200,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
               </View>
               <View>
                 <Text style={styles.infoLabel}>Outstanding Balance</Text>
-                <Text style={styles.infoValue}>₹{invoice.amount.toLocaleString()}</Text>
+                <Text style={styles.infoValue}>₹{invoice.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
               </View>
             </View>
 
@@ -213,15 +213,15 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                   <View>
                     <Text style={styles.infoLabel}>GST Breakdown</Text>
                     <Text style={styles.infoValue}>
-                      Base: ₹{invoice.baseAmount?.toLocaleString() || '0'} | Rate: {invoice.gstRate || 0}%
+                      Base: ₹{invoice.baseAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'} | Rate: {invoice.gstRate || 0}%
                     </Text>
                     {invoice.igst && invoice.igst > 0 ? (
                       <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                        IGST: ₹{invoice.igst.toLocaleString()} (Inter-state)
+                        IGST: ₹{invoice.igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Inter-state)
                       </Text>
                     ) : (
                       <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                        CGST: ₹{(invoice.cgst || 0).toLocaleString()} | SGST: ₹{(invoice.sgst || 0).toLocaleString()} (Intra-state)
+                        CGST: ₹{(invoice.cgst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | SGST: ₹{(invoice.sgst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Intra-state)
                       </Text>
                     )}
                   </View>
@@ -308,9 +308,9 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                     <View key={idx} style={styles.detailTableRow}>
                       <Text style={[styles.detailTableCell, { flex: 3.5, fontWeight: '600' }]} numberOfLines={2}>{item.name}</Text>
                       <Text style={[styles.detailTableCell, { flex: 1.2, textAlign: 'center' }]}>{qty} {item.unit || 'pcs'}</Text>
-                      <Text style={[styles.detailTableCell, { flex: 1.0, textAlign: 'right' }]}>₹{rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                      <Text style={[styles.detailTableCell, { flex: 1.0, textAlign: 'right' }]}>₹{rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                       <Text style={[styles.detailTableCell, { flex: 0.8, textAlign: 'center' }]}>{item.gstRate || 0}%</Text>
-                      <Text style={[styles.detailTableCell, { flex: 1.0, textAlign: 'right', fontWeight: '700' }]}>₹{itemTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                      <Text style={[styles.detailTableCell, { flex: 1.0, textAlign: 'right', fontWeight: '700' }]}>₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                     </View>
                   );
                 })}
@@ -1302,9 +1302,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
                     {/* Row Subtotal */}
                     <View style={{ flex: mode === 'regular' ? 1.0 : 1.2, justifyContent: 'center', alignItems: 'flex-end' }}>
-                      <Text style={styles.tableRowSubtotal} numberOfLines={1}>
-                        ₹{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                      </Text>
+                       <Text style={styles.tableRowSubtotal} numberOfLines={1}>
+                         ₹{rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                       </Text>
                     </View>
 
                     {/* Delete button */}
@@ -1387,50 +1387,50 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           {totalBase > 0 && (
             <View style={styles.gstCalculationPreview}>
               <Text style={styles.previewTitle}>Invoice Summary:</Text>
-              <View style={styles.previewRow}>
-                <Text style={styles.previewLabel}>Total Base Value:</Text>
-                <Text style={styles.previewValue}>₹{totalBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-              </View>
-              {freightVal > 0 && (
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Vendor Freight Added:</Text>
-                  <Text style={styles.previewValue}>₹{freightVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                </View>
-              )}
-              {cartageVal > 0 && (
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Vendor Cartage Added:</Text>
-                  <Text style={styles.previewValue}>₹{cartageVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                </View>
-              )}
-              {totalGstAmount > 0 && (
-                <>
-                  {isIntraState ? (
-                    <>
-                      <View style={styles.previewRow}>
-                        <Text style={styles.previewLabel}>CGST (State Intra):</Text>
-                        <Text style={styles.previewValue}>₹{computedCGST.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                      </View>
-                      <View style={styles.previewRow}>
-                        <Text style={styles.previewLabel}>SGST (State Intra):</Text>
-                        <Text style={styles.previewValue}>₹{computedSGST.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                      </View>
-                    </>
-                  ) : (
-                    <View style={styles.previewRow}>
-                      <Text style={styles.previewLabel}>IGST (Inter State):</Text>
-                      <Text style={styles.previewValue}>₹{computedIGST.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                    </View>
-                  )}
-                </>
-              )}
-              <View style={styles.previewDivider} />
-              <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { fontWeight: '800' }]}>Grand Total:</Text>
-                <Text style={[styles.previewValue, { fontWeight: '800', color: colors.success }]}>
-                  ₹{computedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </Text>
-              </View>
+               <View style={styles.previewRow}>
+                 <Text style={styles.previewLabel}>Total Base Value:</Text>
+                 <Text style={styles.previewValue}>₹{totalBase.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+               </View>
+               {freightVal > 0 && (
+                 <View style={styles.previewRow}>
+                   <Text style={styles.previewLabel}>Vendor Freight Added:</Text>
+                   <Text style={styles.previewValue}>₹{freightVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                 </View>
+               )}
+               {cartageVal > 0 && (
+                 <View style={styles.previewRow}>
+                   <Text style={styles.previewLabel}>Vendor Cartage Added:</Text>
+                   <Text style={styles.previewValue}>₹{cartageVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                 </View>
+               )}
+               {totalGstAmount > 0 && (
+                 <>
+                   {isIntraState ? (
+                     <>
+                       <View style={styles.previewRow}>
+                         <Text style={styles.previewLabel}>CGST (State Intra):</Text>
+                         <Text style={styles.previewValue}>₹{computedCGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                       </View>
+                       <View style={styles.previewRow}>
+                         <Text style={styles.previewLabel}>SGST (State Intra):</Text>
+                         <Text style={styles.previewValue}>₹{computedSGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                       </View>
+                     </>
+                   ) : (
+                     <View style={styles.previewRow}>
+                       <Text style={styles.previewLabel}>IGST (Inter State):</Text>
+                       <Text style={styles.previewValue}>₹{computedIGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                     </View>
+                   )}
+                 </>
+               )}
+               <View style={styles.previewDivider} />
+               <View style={styles.previewRow}>
+                 <Text style={[styles.previewLabel, { fontWeight: '800' }]}>Grand Total:</Text>
+                 <Text style={[styles.previewValue, { fontWeight: '800', color: colors.success }]}>
+                   ₹{computedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                 </Text>
+               </View>
             </View>
           )}
 
@@ -1662,7 +1662,7 @@ export default function PurchaseInvoicesScreen() {
                   <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
                 </View>
                 <View style={[styles.tableCellContainer, { width: 110 }]}>
-                  <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString()}</Text>
+                  <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                 </View>
                 <View style={[styles.tableCellContainer, { width: 120 }]}>
                   <View style={[styles.statusBadge, {
