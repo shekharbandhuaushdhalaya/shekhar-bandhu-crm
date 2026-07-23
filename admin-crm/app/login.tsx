@@ -21,31 +21,31 @@ interface HeritageTheme {
 
 const HERITAGE_THEMES: HeritageTheme[] = [
   {
-    title: 'LORD DHANVANTARI',
-    subtitle: 'THE GOD OF AYURVEDA',
-    quote: '“Physician of the Gods, bearer of the Amrita nectar of immortality.”',
-    description: 'Harnessing divine knowledge to restore cosmic balance, wellness, and vitality across generations.',
+    title: 'भगवान धन्वन्तरि',
+    subtitle: 'आयुर्वेद के देव (LORD DHANVANTARI)',
+    quote: '“देवताओं के चिकित्सक, अमृत कलश के धारक।”',
+    description: 'समस्त पीढ़ियों में स्वास्थ्य, जीवन शक्ति और संतुलन बहाल करने के लिए दिव्य ज्ञान का उपयोग।',
     icon: 'sparkles-outline'
   },
   {
-    title: 'ACHARYA SUSHRUTA',
-    subtitle: 'THE FATHER OF SURGERY',
-    quote: '“Precision in instruments, compassion in practice.”',
-    description: 'Pioneered ancient surgical science, anatomy, and holistic healing methodologies over 2,500 years ago.',
+    title: 'महर्षि सुश्रुत',
+    subtitle: 'शल्य चिकित्सा के जनक (ACHARYA SUSHRUTA)',
+    quote: '“उपकरणों में सटीकता, व्यवहार में करुणा।”',
+    description: '२५०० वर्ष पूर्व प्राचीन शल्य चिकित्सा, शरीर विज्ञान और समग्र उपचार पद्धतियों का सूत्रपात किया।',
     icon: 'bandage-outline'
   },
   {
-    title: 'ACHARYA CHARAKA',
-    subtitle: 'THE FATHER OF MEDICINE',
-    quote: '“A physician who fails to enter the patient with the lamp of knowledge cannot heal.”',
-    description: 'Systematized Rasayana (rejuvenation), dietetics, and the constitutional balance of Vata, Pitta, and Kapha.',
+    title: 'महर्षि चरक',
+    subtitle: 'चिकित्सा विज्ञान के प्रणेता (ACHARYA CHARAKA)',
+    quote: '“ज्ञान रूपी दीपक के बिना कोई भी चिकित्सक रोगी को ठीक नहीं कर सकता।”',
+    description: 'रसायन (कायाकल्प), आहार विज्ञान और वात, पित्त तथा कफ के संवैधानिक संतुलन को व्यवस्थित किया।',
     icon: 'book-outline'
   },
   {
-    title: 'RASAYANA & HERBS',
-    subtitle: 'THE ALCHEMY OF NATURE',
-    quote: '“Harnessing the pure essence of Earth to harmonize body, mind, and spirit.”',
-    description: 'Transforming natural roots, leaves, and minerals into potent healing remedies for ultimate longevity.',
+    title: 'रसायन और जड़ी-बूटियाँ',
+    subtitle: 'प्रकृति की कीमिया (RASAYANA & HERBS)',
+    quote: '“शरीर, मन और आत्मा को संतुलित करने के लिए पृथ्वी के शुद्ध तत्वों का उपयोग।”',
+    description: 'दीर्घायु और आरोग्यता के लिए प्राकृतिक जड़ों, पत्तियों और खनिजों का चमत्कारी मिश्रण।',
     icon: 'leaf-outline'
   }
 ];
