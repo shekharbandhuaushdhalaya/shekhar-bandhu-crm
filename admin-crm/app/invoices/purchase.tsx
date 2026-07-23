@@ -1154,8 +1154,13 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           {/* Tabular Items Section */}
           <Text style={[styles.formLabel, { marginTop: 12, marginBottom: 8, fontSize: 13, color: colors.text.primary }]}>Items Breakdown *</Text>
           
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%', marginBottom: 12 }}>
-            <View style={{ minWidth: 650 }}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={true} 
+            style={{ width: '100%', marginBottom: 12 }}
+            contentContainerStyle={{ minHeight: 250 }}
+          >
+            <View style={{ minWidth: 650, minHeight: 250 }}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 3.2 : 3.6 }]}>Raw Material Name *</Text>
                 <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.4 : 1.6, textAlign: 'center' }]}>Qty / Unit *</Text>
