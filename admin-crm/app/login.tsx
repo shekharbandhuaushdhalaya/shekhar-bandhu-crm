@@ -98,6 +98,18 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+      {Platform.OS === 'web' && (
+        <style dangerouslySetInnerHTML={{__html: `
+          input:-webkit-autofill,
+          input:-webkit-autofill:hover, 
+          input:-webkit-autofill:focus, 
+          input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+            -webkit-text-fill-color: ${colors.text.primary} !important;
+            transition: background-color 5000s ease-in-out 0s;
+          }
+        `}} />
+      )}
       <View style={[styles.mainWrapper, isDesktop && styles.desktopWrapper]}>
         
         {/* Left Side: Brand Heritage Art Panel (Visible on Desktop) */}
