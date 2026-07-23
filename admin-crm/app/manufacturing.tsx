@@ -1049,7 +1049,7 @@ export default function ManufacturingScreen() {
                       <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material / Batch</Text>
                       <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Qty</Text>
                       <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Rate</Text>
-                      <Text style={{ width: 40, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Void</Text>
+                      <Text style={{ width: 65, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
                     </View>
                     {/* Body */}
                     {filteredEntries.map((e, idx) => (
@@ -1066,9 +1066,27 @@ export default function ManufacturingScreen() {
                         <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
                           ₹{e.purchaseRate}
                         </Text>
-                        <TouchableOpacity style={{ width: 40, alignItems: 'center' }} onPress={() => handleVoidInward(e._id)}>
-                          <Ionicons name="trash-outline" size={14} color={colors.danger} />
-                        </TouchableOpacity>
+                        <View style={{ width: 65, flexDirection: 'row', justifyContent: 'center', gap: 10, alignItems: 'center' }}>
+                          <TouchableOpacity onPress={async () => {
+                            setTraceBatchNo(e.batchNo);
+                            setTraceLoading(true);
+                            setTraceModalVisible(true);
+                            try {
+                              const data = await api.traceBatch(e.batchNo);
+                              setTraceResult(data);
+                            } catch (err: any) {
+                              alert(err.message || 'Trace lookup failed');
+                              setTraceModalVisible(false);
+                            } finally {
+                              setTraceLoading(false);
+                            }
+                          }}>
+                            <Ionicons name="git-network-outline" size={14} color={colors.primary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleVoidInward(e._id)}>
+                            <Ionicons name="trash-outline" size={14} color={colors.danger} />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     ))}
                   </View>
@@ -1114,7 +1132,25 @@ export default function ManufacturingScreen() {
                       <Text style={styles.batchTitle}>
                         {batch.productId && typeof batch.productId === 'object' ? batch.productId.name : 'Product'}
                       </Text>
-                      <Text style={styles.batchSubNo}>Batch No: {batch.batchNo} {batch.manufacturingUnitName ? `· Unit: ${batch.manufacturingUnitName}` : ''}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.batchSubNo}>Batch No: {batch.batchNo} {batch.manufacturingUnitName ? `· Unit: ${batch.manufacturingUnitName}` : ''}</Text>
+                        <TouchableOpacity style={{ padding: 2 }} onPress={async () => {
+                          setTraceBatchNo(batch.batchNo);
+                          setTraceLoading(true);
+                          setTraceModalVisible(true);
+                          try {
+                            const data = await api.traceBatch(batch.batchNo);
+                            setTraceResult(data);
+                          } catch (err: any) {
+                            alert(err.message || 'Trace lookup failed');
+                            setTraceModalVisible(false);
+                          } finally {
+                            setTraceLoading(false);
+                          }
+                        }}>
+                          <Ionicons name="git-network-outline" size={13} color={colors.primary} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <View style={[styles.statusBadge, { borderColor: getStatusColor(batch.status), backgroundColor: getStatusColor(batch.status) + '10' }]}>
                       <Text style={[styles.statusBadgeText, { color: getStatusColor(batch.status) }]}>
