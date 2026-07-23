@@ -20,7 +20,8 @@ const vendorSchema = new mongoose.Schema({
   bankAccountNumber: { type: String, default: '', trim: true },
   bankIfsc: { type: String, default: '', trim: true },
   bankName: { type: String, default: '', trim: true },
-  bankBranch: { type: String, default: '', trim: true }
+  bankBranch: { type: String, default: '', trim: true },
+  recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' }
 }, { timestamps: true });
 
 vendorSchema.index({ name: 'text', company: 'text', email: 'text', productCategory: 'text' });

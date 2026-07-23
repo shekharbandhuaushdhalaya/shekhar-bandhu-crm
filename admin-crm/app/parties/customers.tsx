@@ -258,23 +258,23 @@ function CustomerDetailModal({
             <View style={styles.infoSectionHeader}>
               <Text style={styles.infoSectionTitle}>Outstanding Balances & Terms</Text>
             </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="cash" size={16} color={colors.success} style={styles.infoIcon} />
-              <View>
-                <Text style={styles.infoLabel}>Invoice Balance (GST)</Text>
-                <Text style={[styles.infoValue, { color: customer.regularBalance > 0 ? colors.success : colors.text.muted }]}>
-                  ₹{customer.regularBalance.toLocaleString()}
-                </Text>
-              </View>
-            </View>
-
-            {canAccessCash && (
+            {customer.recordTracking === 'cash_ledger' ? (
               <View style={styles.infoItem}>
                 <Ionicons name="wallet-outline" size={16} color={colors.warning} style={styles.infoIcon} />
                 <View>
-                  <Text style={styles.infoLabel}>Challan Balance (Cash/No GST)</Text>
-                  <Text style={[styles.infoValue, { color: customer.cashBalance > 0 ? colors.warning : colors.text.muted }]}>
+                  <Text style={styles.infoLabel}>Challan Balance (Cash/No GST) *Selected Ledger*</Text>
+                  <Text style={[styles.infoValue, { color: (customer.cashBalance || 0) > 0 ? colors.warning : colors.text.muted }]}>
                     ₹{(customer.cashBalance || 0).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.infoItem}>
+                <Ionicons name="cash" size={16} color={colors.success} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>Invoice Balance (GST) *Selected Ledger*</Text>
+                  <Text style={[styles.infoValue, { color: customer.regularBalance > 0 ? colors.success : colors.text.muted }]}>
+                    ₹{customer.regularBalance.toLocaleString()}
                   </Text>
                 </View>
               </View>
@@ -368,7 +368,7 @@ function AddEditCustomerModal({
   const canAccessCash = user?.canAccessCash ?? false;
 
   const [customerType, setCustomerType] = useState<'gst' | 'cash'>('gst');
-  const recordTracking = 'invoice_ledger' as const;
+  const [recordTracking, setRecordTracking] = useState<'invoice_ledger' | 'cash_ledger'>('invoice_ledger');
   const [company, setCompany] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
@@ -453,10 +453,12 @@ function AddEditCustomerModal({
 
       setRegularBalance(customer.regularBalance.toString());
       setCashBalance(customer.cashBalance ? customer.cashBalance.toString() : '0');
+      setRecordTracking(customer.recordTracking || 'invoice_ledger');
 
       setSalesVolume(customer.salesVolume.toString());
     } else {
       setCustomerType('gst');
+      setRecordTracking('invoice_ledger');
       setCompany('');
       setContactPerson('');
       setPhone('');
@@ -689,6 +691,34 @@ function AddEditCustomerModal({
                     <Ionicons name="cash-outline" size={16} color={customerType === 'cash' ? colors.warning : colors.text.muted} />
                     <Text style={[styles.typeSelectorText, { color: customerType === 'cash' ? colors.warning : colors.text.secondary }]}>
                       Cash / Unregistered
+                    </Text>
+                  </TouchableOpacity>
+              <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Ledger / Record Tracking style</Text></View>
+
+              <View style={styles.formGroup}>
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.typeSelectorBtn,
+                      recordTracking === 'invoice_ledger' && { backgroundColor: colors.primary + '18', borderColor: colors.primary }
+                    ]}
+                    onPress={() => setRecordTracking('invoice_ledger')}
+                  >
+                    <Ionicons name="receipt-outline" size={16} color={recordTracking === 'invoice_ledger' ? colors.primary : colors.text.muted} />
+                    <Text style={[styles.typeSelectorText, { color: recordTracking === 'invoice_ledger' ? colors.primary : colors.text.secondary }]}>
+                      GST / Regular Invoice Ledger
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.typeSelectorBtn,
+                      recordTracking === 'cash_ledger' && { backgroundColor: colors.warning + '18', borderColor: colors.warning }
+                    ]}
+                    onPress={() => setRecordTracking('cash_ledger')}
+                  >
+                    <Ionicons name="wallet-outline" size={16} color={recordTracking === 'cash_ledger' ? colors.warning : colors.text.muted} />
+                    <Text style={[styles.typeSelectorText, { color: recordTracking === 'cash_ledger' ? colors.warning : colors.text.secondary }]}>
+                      Cash / Challan Ledger
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1691,28 +1721,29 @@ export default function CustomersScreen() {
                       </View>
                     </View>
 
-                    {/* Dynamic Balance Badges */}
+                    {/* Dynamic Balance Badges based on selected recordTracking ledger */}
                     <View style={[styles.tableCellContainer, { width: 140, alignItems: 'flex-end', justifyContent: 'center', gap: 4 }]}>
-                      <View style={[styles.balanceBadge, { backgroundColor: balBg, borderColor: balColor + '30', borderWidth: 1 }]}>
-                        {drCrLabel && (
-                          <Text style={[styles.balanceBadgeLabel, { color: balColor }]}>{drCrLabel}</Text>
-                        )}
-                        <Text style={[styles.balanceText, { color: balColor, fontSize: 11 }]}>
-                          GST: ₹{Math.abs(bal).toLocaleString('en-IN')}
-                        </Text>
-                      </View>
-                      {canAccessCash && (
+                      {c.recordTracking === 'cash_ledger' ? (
                         <View style={[
                           styles.balanceBadge,
                           {
-                            backgroundColor: c.cashBalance > 0 ? colors.warning + '12' : colors.bg.secondary,
-                            borderColor: c.cashBalance > 0 ? colors.warning + '30' : colors.border,
+                            backgroundColor: (c.cashBalance || 0) > 0 ? colors.warning + '12' : colors.bg.secondary,
+                            borderColor: (c.cashBalance || 0) > 0 ? colors.warning + '30' : colors.border,
                             borderWidth: 1
                           }
                         ]}>
-                          {c.cashBalance > 0 && <Text style={[styles.balanceBadgeLabel, { color: colors.warning }]}>DR</Text>}
-                          <Text style={[styles.balanceText, { color: c.cashBalance > 0 ? colors.warning : colors.text.muted, fontSize: 11 }]}>
+                          {(c.cashBalance || 0) > 0 && <Text style={[styles.balanceBadgeLabel, { color: colors.warning }]}>DR</Text>}
+                          <Text style={[styles.balanceText, { color: (c.cashBalance || 0) > 0 ? colors.warning : colors.text.muted, fontSize: 11 }]}>
                             Cash: ₹{Math.abs(c.cashBalance || 0).toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.balanceBadge, { backgroundColor: balBg, borderColor: balColor + '30', borderWidth: 1 }]}>
+                          {drCrLabel && (
+                            <Text style={[styles.balanceBadgeLabel, { color: balColor }]}>{drCrLabel}</Text>
+                          )}
+                          <Text style={[styles.balanceText, { color: balColor, fontSize: 11 }]}>
+                            GST: ₹{Math.abs(bal).toLocaleString('en-IN')}
                           </Text>
                         </View>
                       )}

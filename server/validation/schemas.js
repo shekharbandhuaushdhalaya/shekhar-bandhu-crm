@@ -320,6 +320,7 @@ const vendorSchema = z.object({
   bankIfsc: z.string().default(''),
   bankName: z.string().default(''),
   bankBranch: z.string().default(''),
+  recordTracking: z.enum(['invoice_ledger', 'cash_ledger']).default('invoice_ledger'),
 });
 
 // ── InventoryEntry ───────────────────────────────────────────

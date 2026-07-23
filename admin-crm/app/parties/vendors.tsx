@@ -153,15 +153,27 @@ function VendorDetailModal({ vendor, visible, onClose, onDeleted, onEdit }: { ve
             <View style={styles.infoSectionHeader}>
               <Text style={styles.infoSectionTitle}>Outstanding Balances & Terms</Text>
             </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="cash" size={16} color={colors.success} style={styles.infoIcon} />
-              <View>
-                <Text style={styles.infoLabel}>Invoice Balance (GST)</Text>
-                <Text style={[styles.infoValue, { color: vendor.regularBalance > 0 ? colors.success : colors.text.muted }]}>
-                  ₹{vendor.regularBalance.toLocaleString()}
-                </Text>
+            {(vendor as any).recordTracking === 'cash_ledger' ? (
+              <View style={styles.infoItem}>
+                <Ionicons name="wallet-outline" size={16} color={colors.warning} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>Challan Balance (Cash/No GST) *Selected Ledger*</Text>
+                  <Text style={[styles.infoValue, { color: (vendor.cashBalance || 0) > 0 ? colors.warning : colors.text.muted }]}>
+                    ₹{(vendor.cashBalance || 0).toLocaleString()}
+                  </Text>
+                </View>
               </View>
-            </View>
+            ) : (
+              <View style={styles.infoItem}>
+                <Ionicons name="cash" size={16} color={colors.success} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>Invoice Balance (GST) *Selected Ledger*</Text>
+                  <Text style={[styles.infoValue, { color: vendor.regularBalance > 0 ? colors.success : colors.text.muted }]}>
+                    ₹{vendor.regularBalance.toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             <View style={styles.infoItem}>
               <Ionicons name="time" size={16} color={colors.primary} style={styles.infoIcon} />
@@ -203,6 +215,8 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState('');
   const [regularBalance, setRegularBalance] = useState('');
+  const [cashBalance, setCashBalance] = useState('');
+  const [recordTracking, setRecordTracking] = useState<'invoice_ledger' | 'cash_ledger'>('invoice_ledger');
 
   const [terms, setTerms] = useState('Net 30');
   const [selectedDropdownTerm, setSelectedDropdownTerm] = useState('Net 30');
@@ -245,6 +259,8 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setEmail(vendor.email || '');
       setCategory(vendor.productCategory || '');
       setRegularBalance(vendor.regularBalance.toString());
+      setCashBalance(vendor.cashBalance ? vendor.cashBalance.toString() : '0');
+      setRecordTracking((vendor as any).recordTracking || 'invoice_ledger');
 
       
       const currentTerms = vendor.paymentTerms || 'Net 30';
@@ -272,6 +288,8 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setEmail('');
       setCategory('');
       setRegularBalance('');
+      setCashBalance('');
+      setRecordTracking('invoice_ledger');
 
       setTerms('Net 30');
       setSelectedDropdownTerm('Net 30');
@@ -381,6 +399,8 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       email: email.trim(),
       productCategory: category || 'General',
       regularBalance: parseInt(regularBalance) || 0,
+      cashBalance: parseInt(cashBalance) || 0,
+      recordTracking,
 
       paymentTerms: terms,
       gstin: gstin.trim(),
@@ -551,13 +571,55 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
 
           <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Balances & Terms</Text></View>
 
+          {canAccessCash && (
+            <>
+              <View style={styles.formLabel}><Text style={styles.formLabel}>Ledger Tracking Style</Text></View>
+              <View style={[styles.formGroup, { flexDirection: 'row', gap: 12, marginTop: 4, marginBottom: 16 }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.typeSelectorBtn,
+                    recordTracking === 'invoice_ledger' && { backgroundColor: colors.primary + '18', borderColor: colors.primary }
+                  ]}
+                  onPress={() => setRecordTracking('invoice_ledger')}
+                >
+                  <Ionicons name="receipt-outline" size={16} color={recordTracking === 'invoice_ledger' ? colors.primary : colors.text.muted} />
+                  <Text style={[styles.typeSelectorText, { color: recordTracking === 'invoice_ledger' ? colors.primary : colors.text.secondary }]}>
+                    GST / Regular Invoice Ledger
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.typeSelectorBtn,
+                    recordTracking === 'cash_ledger' && { backgroundColor: colors.warning + '18', borderColor: colors.warning }
+                  ]}
+                  onPress={() => setRecordTracking('cash_ledger')}
+                >
+                  <Ionicons name="wallet-outline" size={16} color={recordTracking === 'cash_ledger' ? colors.warning : colors.text.muted} />
+                  <Text style={[styles.typeSelectorText, { color: recordTracking === 'cash_ledger' ? colors.warning : colors.text.secondary }]}>
+                    Cash / Challan Ledger
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Opening Invoice Balance (₹)</Text>
+            <Text style={styles.formLabel}>Opening Invoice Balance (GST) (₹)</Text>
             <View style={styles.formInput}>
               <Ionicons name="cash" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="0" placeholderTextColor={colors.text.muted} value={regularBalance} onChangeText={setRegularBalance} keyboardType="numeric" />
             </View>
           </View>
+
+          {canAccessCash && (
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Opening Cash/Challan Balance (₹)</Text>
+              <View style={styles.formInput}>
+                <Ionicons name="wallet-outline" size={16} color={colors.text.muted} />
+                <TextInput style={styles.formInputText} placeholder="0" placeholderTextColor={colors.text.muted} value={cashBalance} onChangeText={setCashBalance} keyboardType="numeric" />
+              </View>
+            </View>
+          )}
 
 
 
@@ -1262,16 +1324,32 @@ export default function VendorsScreen() {
                     </View>
                   </View>
 
-                  {/* Invoice Balance Badge */}
+                  {/* Dynamic Balance Badge based on recordTracking */}
                   <View style={[styles.tableCellContainer, { width: 140, alignItems: 'flex-end', justifyContent: 'center' }]}>
-                    <View style={[styles.balanceBadge, { backgroundColor: balBg, borderColor: balColor + '30', borderWidth: 1 }]}>
-                      {drCrLabel && (
-                        <Text style={[styles.balanceBadgeLabel, { color: balColor }]}>{drCrLabel}</Text>
-                      )}
-                      <Text style={[styles.balanceText, { color: balColor }]}>
-                        ₹{Math.abs(bal).toLocaleString('en-IN')}
-                      </Text>
-                    </View>
+                    {(v as any).recordTracking === 'cash_ledger' ? (
+                      <View style={[
+                        styles.balanceBadge,
+                        {
+                          backgroundColor: (v.cashBalance || 0) > 0 ? colors.warning + '12' : colors.bg.secondary,
+                          borderColor: (v.cashBalance || 0) > 0 ? colors.warning + '30' : colors.border,
+                          borderWidth: 1
+                        }
+                      ]}>
+                        {(v.cashBalance || 0) > 0 && <Text style={[styles.balanceBadgeLabel, { color: colors.warning }]}>DR</Text>}
+                        <Text style={[styles.balanceText, { color: (v.cashBalance || 0) > 0 ? colors.warning : colors.text.muted, fontSize: 11 }]}>
+                          Cash: ₹{Math.abs(v.cashBalance || 0).toLocaleString('en-IN')}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.balanceBadge, { backgroundColor: balBg, borderColor: balColor + '30', borderWidth: 1 }]}>
+                        {drCrLabel && (
+                          <Text style={[styles.balanceBadgeLabel, { color: balColor }]}>{drCrLabel}</Text>
+                        )}
+                        <Text style={[styles.balanceText, { color: balColor, fontSize: 11 }]}>
+                          GST: ₹{Math.abs(bal).toLocaleString('en-IN')}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Action: View Detail Button */}
@@ -1385,6 +1463,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   formLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
   formInputText: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+
+  typeSelectorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
+  typeSelectorText: { fontSize: 13, fontWeight: '700' },
 
   // Ledger modal
   ledgerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center' },
