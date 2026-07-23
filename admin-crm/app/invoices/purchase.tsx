@@ -1157,7 +1157,11 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={true} 
-            style={{ width: '100%', marginBottom: 12 }}
+            style={{ 
+              width: '100%', 
+              marginBottom: 12,
+              zIndex: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 1010 : 1
+            }}
             contentContainerStyle={{ minHeight: 250 }}
           >
             <View style={{ minWidth: 650, minHeight: 250 }}>
