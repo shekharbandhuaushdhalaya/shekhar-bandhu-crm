@@ -2691,66 +2691,151 @@ export default function ManufacturingScreen() {
               </View>
             ) : traceResult ? (
               <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ gap: 16 }}>
-                {/* Raw Material Entries */}
-                {traceResult.rawMaterialEntries?.length > 0 && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                    <View style={{ backgroundColor: colors.warning + '15', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>📦 Raw Material Inward ({traceResult.rawMaterialEntries.length})</Text>
+                {/* Raw Material Stock Ledger (IN/OUT) */}
+                {traceResult.rawMaterialEntries?.length > 0 ? (
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
+                    <View style={{ backgroundColor: colors.primary + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>
+                        📋 Raw Material Stock Ledger: {traceResult.rawMaterialEntries[0].materialName}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>
+                        SKU: {traceResult.rawMaterialEntries[0].materialSku}
+                      </Text>
                     </View>
-                    {traceResult.rawMaterialEntries.map((e: any) => (
-                      <View key={e._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{e.materialName} ({e.materialSku})</Text>
-                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                          Qty: {e.qty} {e.unit} • Vendor: {e.vendorName || 'Direct'} • Rate: ₹{e.purchaseRate}
-                          {e.expiryDate ? ` • Exp: ${new Date(e.expiryDate).toLocaleDateString()}` : ''}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {/* Production Batches */}
-                {traceResult.productionBatches?.length > 0 && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                    <View style={{ backgroundColor: colors.primary + '15', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>🏭 Production Batches ({traceResult.productionBatches.length})</Text>
-                    </View>
-                    {traceResult.productionBatches.map((b: any, idx: number) => (
-                      <View key={idx} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{b.productName}</Text>
-                          <View style={[styles.statusBadge, { borderColor: getStatusColor(b.status), backgroundColor: getStatusColor(b.status) + '10' }]}>
-                            <Text style={[styles.statusBadgeText, { color: getStatusColor(b.status) }]}>{b.status.toUpperCase()}</Text>
-                          </View>
+                    <ScrollView horizontal>
+                      <View style={{ minWidth: 650 }}>
+                        {/* Table Header */}
+                        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                          <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
+                          <Text style={{ width: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Type</Text>
+                          <Text style={{ width: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Ref / Voucher</Text>
+                          <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Party / Source</Text>
+                          <Text style={{ width: 75, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>IN (Qty)</Text>
+                          <Text style={{ width: 75, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>OUT (Qty)</Text>
+                          <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Balance</Text>
                         </View>
-                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                          {b.relation === 'raw_material_consumed_in' ? '→ Consumed in batch: ' : '→ Finished batch: '}
-                          {b.batchNo}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                          Planned: {b.plannedQty} • Yield: {b.actualYieldQty}
-                          {b.qtyConsumed ? ` • Qty Consumed: ${b.qtyConsumed}` : ''}
-                          {b.wasteQty > 0 ? ` • Waste: ${b.wasteQty} (${b.variancePercent}%)` : ''}
-                        </Text>
-                        
-                        {b.ingredientsConsumed && b.ingredientsConsumed.length > 0 && (
-                          <View style={{ marginTop: 8, padding: 8, backgroundColor: colors.bg.secondary, borderRadius: 6, gap: 4 }}>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 2 }}>🌿 Consumed Raw Materials & Trace to Vendor:</Text>
-                            {b.ingredientsConsumed.map((ing: any, idx2: number) => (
-                              <View key={idx2} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2, borderBottomWidth: idx2 < b.ingredientsConsumed.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
-                                <Text style={{ fontSize: 11, color: colors.text.primary }}>
-                                  {ing.materialName} ({ing.qtyConsumed} {ing.unit})
-                                </Text>
-                                <Text style={{ fontSize: 11, color: colors.warning, fontWeight: '600' }}>
-                                  Batch: {ing.batchNo} • Vendor: {ing.vendorName}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        )}
+                        {/* Table Body */}
+                        {(() => {
+                          const ledgerEntries: any[] = [];
+                          
+                          // Raw Material Inwards (IN)
+                          traceResult.rawMaterialEntries.forEach((e: any) => {
+                            ledgerEntries.push({
+                              date: new Date(e.createdAt),
+                              type: 'IN (Purchase)',
+                              refNo: e.purchaseRef || 'Inward',
+                              party: e.vendorName || 'Direct',
+                              inQty: e.qty,
+                              outQty: 0,
+                              unit: e.unit || ''
+                            });
+                          });
+
+                          // Production Consumptions (OUT)
+                          (traceResult.productionBatches || []).forEach((b: any) => {
+                            if (b.relation === 'raw_material_consumed_in') {
+                              ledgerEntries.push({
+                                date: new Date(b.startDate || b.endDate),
+                                type: 'OUT (Production)',
+                                refNo: b.batchNo,
+                                party: `Product: ${b.productName}`,
+                                inQty: 0,
+                                outQty: b.qtyConsumed,
+                                unit: traceResult.rawMaterialEntries[0].unit || ''
+                              });
+                            }
+                          });
+
+                          // Sort ascending for running balance calculation
+                          ledgerEntries.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+                          let runBal = 0;
+                          const finalRows = ledgerEntries.map(row => {
+                            if (row.inQty > 0) runBal += row.inQty;
+                            else if (row.outQty > 0) runBal -= row.outQty;
+                            return { ...row, balance: runBal };
+                          });
+
+                          // Show descending (latest first)
+                          finalRows.reverse();
+
+                          if (finalRows.length === 0) {
+                            return <Text style={{ padding: 16, textAlign: 'center', color: colors.text.secondary }}>No transactions in ledger.</Text>;
+                          }
+
+                          return finalRows.map((row, idx) => (
+                            <View key={idx} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < finalRows.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
+                              <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>
+                                {row.date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </Text>
+                              <Text style={{ width: 110, fontSize: 11, fontWeight: '700', color: row.inQty > 0 ? colors.success : colors.warning }}>
+                                {row.type}
+                              </Text>
+                              <Text style={{ width: 110, fontSize: 11, color: colors.text.primary, fontWeight: '600' }}>
+                                {row.refNo}
+                              </Text>
+                              <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
+                                {row.party}
+                              </Text>
+                              <Text style={{ width: 75, fontSize: 11, fontWeight: '700', color: colors.success, textAlign: 'right' }}>
+                                {row.inQty > 0 ? `${row.inQty.toFixed(1)}` : '-'}
+                              </Text>
+                              <Text style={{ width: 75, fontSize: 11, fontWeight: '700', color: colors.warning, textAlign: 'right' }}>
+                                {row.outQty > 0 ? `${row.outQty.toFixed(1)}` : '-'}
+                              </Text>
+                              <Text style={{ width: 90, fontSize: 11, fontWeight: '800', color: colors.text.primary, textAlign: 'right' }}>
+                                {row.balance.toFixed(1)} {row.unit}
+                              </Text>
+                            </View>
+                          ));
+                        })()}
                       </View>
-                    ))}
+                    </ScrollView>
                   </View>
+                ) : (
+                  /* Standard trace sections for Finished Goods batches */
+                  traceResult.productionBatches?.length > 0 && (
+                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                      <View style={{ backgroundColor: colors.primary + '15', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>🏭 Production Batches ({traceResult.productionBatches.length})</Text>
+                      </View>
+                      {traceResult.productionBatches.map((b: any, idx: number) => (
+                        <View key={idx} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{b.productName}</Text>
+                            <View style={[styles.statusBadge, { borderColor: getStatusColor(b.status), backgroundColor: getStatusColor(b.status) + '10' }]}>
+                              <Text style={[styles.statusBadgeText, { color: getStatusColor(b.status) }]}>{b.status.toUpperCase()}</Text>
+                            </View>
+                          </View>
+                          <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                            {b.relation === 'raw_material_consumed_in' ? '→ Consumed in batch: ' : '→ Finished batch: '}
+                            {b.batchNo}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                            Planned: {b.plannedQty} • Yield: {b.actualYieldQty}
+                            {b.qtyConsumed ? ` • Qty Consumed: ${b.qtyConsumed}` : ''}
+                            {b.wasteQty > 0 ? ` • Waste: ${b.wasteQty} (${b.variancePercent}%)` : ''}
+                          </Text>
+                          
+                          {b.ingredientsConsumed && b.ingredientsConsumed.length > 0 && (
+                            <View style={{ marginTop: 8, padding: 8, backgroundColor: colors.bg.secondary, borderRadius: 6, gap: 4 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 2 }}>🌿 Consumed Raw Materials & Trace to Vendor:</Text>
+                              {b.ingredientsConsumed.map((ing: any, idx2: number) => (
+                                <View key={idx2} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2, borderBottomWidth: idx2 < b.ingredientsConsumed.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+                                  <Text style={{ fontSize: 11, color: colors.text.primary }}>
+                                    {ing.materialName} ({ing.qtyConsumed} {ing.unit})
+                                  </Text>
+                                  <Text style={{ fontSize: 11, color: colors.warning, fontWeight: '600' }}>
+                                    Batch: {ing.batchNo} • Vendor: {ing.vendorName}
+                                  </Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )
                 )}
 
                 {/* Finished Goods Stock */}
