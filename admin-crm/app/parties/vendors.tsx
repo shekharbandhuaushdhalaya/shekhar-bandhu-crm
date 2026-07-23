@@ -720,10 +720,16 @@ function VendorLedgerModal({
   const [loading, setLoading]   = useState(false);
   const [initialBalance, setInitialBalance] = useState(0);
   const [closingBalance, setClosingBalance] = useState(0);
-  const activeLedgerMode = 'pakka';
+  const [activeLedgerMode, setActiveLedgerMode] = useState<'regular' | 'cash'>('regular');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  useEffect(() => {
+    if (visible && vendor) {
+      setActiveLedgerMode((vendor as any).recordTracking === 'cash_ledger' ? 'cash' : 'regular');
+    }
+  }, [visible, vendor]);
 
   const load = useCallback(async () => {
     if (!vendor) return;
@@ -737,10 +743,10 @@ function VendorLedgerModal({
       ]);
 
       const filteredInvoices = allInvoices.filter(i => 
-        (i.supplierName || '').toLowerCase().includes(name.toLowerCase())
+        (i.supplierName || '').toLowerCase().includes(name.toLowerCase()) && i.mode === activeLedgerMode
       );
       const filteredPayments = allPayments.filter(p => 
-        ((p.partyName || '').toLowerCase().includes(name.toLowerCase()) || p.partyId === vendor._id)
+        ((p.partyName || '').toLowerCase().includes(name.toLowerCase()) || p.partyId === vendor._id) && p.mode === activeLedgerMode
       );
 
       type Row = { _id: string; date: string; no: string; mode: string; status: string; amount: number; isInvoice: boolean; dueDate?: string };
@@ -775,7 +781,7 @@ function VendorLedgerModal({
       items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       // Compute Total Current Balance
-      const currentTotalBalance = vendor.regularBalance || 0;
+      const currentTotalBalance = activeLedgerMode === 'cash' ? (vendor.cashBalance || 0) : (vendor.regularBalance || 0);
       
       // Calculate Initial Balance
       const totalAmountChange = items.reduce((sum, item) => sum + item.amount, 0);
@@ -916,7 +922,7 @@ function VendorLedgerModal({
       <strong>Period:</strong><br/>
       ${periodStr}<br/><br/>
       <strong>Ledger Type:</strong><br/>
-      Invoice (GST) Ledger
+      ${activeLedgerMode === 'cash' ? 'Cash/Challan Ledger' : 'Invoice (GST) Ledger'}
     </div>
   </div>
 
@@ -1006,7 +1012,30 @@ function VendorLedgerModal({
             </View>
           </View>
 
-
+          {canAccessCash && (
+            <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, paddingHorizontal: Spacing.lg }}>
+              <TouchableOpacity
+                onPress={() => setActiveLedgerMode('regular')}
+                style={[
+                  { paddingVertical: 12, marginRight: 24, borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 6 },
+                  activeLedgerMode === 'regular' && { borderColor: colors.primary, backgroundColor: colors.primary + '0a' }
+                ]}
+              >
+                <Ionicons name="business" size={16} color={activeLedgerMode === 'regular' ? colors.primary : colors.text.muted} />
+                <Text style={[{ fontSize: 13, fontWeight: '700', color: colors.text.muted }, activeLedgerMode === 'regular' && { color: colors.primary }]}>Invoice (GST) Ledger</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveLedgerMode('cash')}
+                style={[
+                  { paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 6 },
+                  activeLedgerMode === 'cash' && { borderColor: colors.warning, backgroundColor: colors.warning + '0a' }
+                ]}
+              >
+                <Ionicons name="cash" size={16} color={activeLedgerMode === 'cash' ? colors.warning : colors.text.muted} />
+                <Text style={[{ fontSize: 13, fontWeight: '700', color: colors.text.muted }, activeLedgerMode === 'cash' && { color: colors.warning }]}>Cash Ledger</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Date Filter */}
           <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingVertical: 10, gap: 10, backgroundColor: colors.bg.primary, borderBottomWidth: 1, borderBottomColor: colors.border }}>

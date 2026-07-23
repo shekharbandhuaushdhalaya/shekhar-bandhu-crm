@@ -1020,6 +1020,12 @@ function CustomerLedgerModal({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  useEffect(() => {
+    if (visible && customer) {
+      setActiveLedgerMode(customer.recordTracking === 'cash_ledger' ? 'cash' : 'regular');
+    }
+  }, [visible, customer]);
+
   const load = useCallback(async () => {
     if (!customer) return;
     setLoading(true);
