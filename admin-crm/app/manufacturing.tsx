@@ -75,6 +75,7 @@ export default function ManufacturingScreen() {
   const [traceBatchNo, setTraceBatchNo] = useState('');
   const [traceResult, setTraceResult] = useState<any>(null);
   const [traceLoading, setTraceLoading] = useState(false);
+  const [expandedMaterials, setExpandedMaterials] = useState<Record<string, boolean>>({});
   const [currentInProgressStage, setCurrentInProgressStage] = useState<{ batchId: string; stageIndex: number } | null>(null);
   const [stageAction, setStageAction] = useState<'advance' | 'skip' | null>(null);
   const [stageBatchId, setStageBatchId] = useState<string | null>(null);
@@ -934,80 +935,102 @@ export default function ManufacturingScreen() {
               </View>
             )}
 
-            {/* Split Grid View (Side-by-side on desktop, stacked on mobile) */}
-            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16 }}>
-              {/* Column 1: Raw Stock Catalog */}
-              <View style={{ flex: 1 }}>
-                <View style={[styles.card, { padding: 10 }]}>
-                  <View style={{ flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, marginBottom: 12 }}>
-                    <Text style={[styles.cardSubTitle, { marginBottom: 0 }]}>Raw Stocks & Reorder Status</Text>
-                    
-                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, width: isDesktop ? 260 : undefined }}>
-                      <Ionicons name="search-outline" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
-                      <TextInput
-                        style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
-                        placeholder="Search stocks..."
-                        placeholderTextColor={colors.text.muted}
-                        value={materialSearch}
-                        onChangeText={setMaterialSearch}
-                      />
-                      {materialSearch.length > 0 && (
-                        <TouchableOpacity onPress={() => setMaterialSearch('')} style={{ marginRight: 6 }}>
-                          <Ionicons name="close-circle" size={14} color={colors.text.muted} />
-                        </TouchableOpacity>
-                      )}
-                      
-                      <View style={{ width: 1, height: 14, backgroundColor: colors.border, marginRight: 6 }} />
-
-                      {Platform.OS === 'web' ? (
-                        <select
-                          value={stockFilter}
-                          onChange={(e: any) => setStockFilter(e.target.value)}
-                          style={{
-                            borderWidth: 0,
-                            backgroundColor: 'transparent',
-                            color: colors.text.primary,
-                            fontSize: 11,
-                            fontWeight: '600',
-                            outlineWidth: 0,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <option value="all">All</option>
-                          <option value="low">Low</option>
-                          <option value="in_stock">In Stock</option>
-                        </select>
-                      ) : (
-                        <TouchableOpacity
-                          onPress={() => {
-                            const nextFilter = stockFilter === 'all' ? 'low' : (stockFilter === 'low' ? 'in_stock' : 'all');
-                            setStockFilter(nextFilter);
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>
-                            {stockFilter === 'all' ? 'All' : (stockFilter === 'low' ? 'Low' : 'In Stock')}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
+            {/* Single Unified Raw Material Stock & Batch Breakdown List */}
+            <View style={[styles.card, { padding: 10 }]}>
+              <View style={{ flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, marginBottom: 12 }}>
+                <Text style={[styles.cardSubTitle, { marginBottom: 0 }]}>Raw Stocks & Reorder Status (Click to view active batches)</Text>
+                
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, width: isDesktop ? 260 : undefined }}>
+                  <Ionicons name="search-outline" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
+                  <TextInput
+                    style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
+                    placeholder="Search stocks..."
+                    placeholderTextColor={colors.text.muted}
+                    value={materialSearch}
+                    onChangeText={setMaterialSearch}
+                  />
+                  {materialSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => setMaterialSearch('')} style={{ marginRight: 6 }}>
+                      <Ionicons name="close-circle" size={14} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  )}
                   
-                  <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    {/* Header */}
-                    <View style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
-                      <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
-                      <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
-                      <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
-                      <Text style={{ width: 65, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
-                    </View>
-                    {/* Body */}
-                    {filteredMaterials.map((rm, idx) => {
-                      const lowStock = (rm.stockLevel || 0) < rm.minReorder;
-                      return (
-                        <View key={rm._id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8, borderBottomWidth: idx === filteredMaterials.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
-                          <View style={{ flex: 2 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }} numberOfLines={1}>{rm.name}</Text>
+                  <View style={{ width: 1, height: 14, backgroundColor: colors.border, marginRight: 6 }} />
+
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={stockFilter}
+                      onChange={(e: any) => setStockFilter(e.target.value)}
+                      style={{
+                        borderWidth: 0,
+                        backgroundColor: 'transparent',
+                        color: colors.text.primary,
+                        fontSize: 11,
+                        fontWeight: '600',
+                        outlineWidth: 0,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="all">All</option>
+                      <option value="low">Low</option>
+                      <option value="in_stock">In Stock</option>
+                    </select>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => {
+                        const nextFilter = stockFilter === 'all' ? 'low' : (stockFilter === 'low' ? 'in_stock' : 'all');
+                        setStockFilter(nextFilter);
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>
+                        {stockFilter === 'all' ? 'All' : (stockFilter === 'low' ? 'Low' : 'In Stock')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+              
+              <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
+                  <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
+                  <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
+                  <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
+                  <Text style={{ width: 65, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
+                </View>
+                {/* Body */}
+                {filteredMaterials.map((rm, idx) => {
+                  const lowStock = (rm.stockLevel || 0) < rm.minReorder;
+                  const materialBatches = entries.filter(e => {
+                    const rmId = e.rawMaterialId && typeof e.rawMaterialId === 'object' ? e.rawMaterialId._id : e.rawMaterialId;
+                    return rmId === rm._id && e.qty > 0;
+                  });
+                  const isExpanded = expandedMaterials[rm._id];
+
+                  return (
+                    <View key={rm._id} style={{ borderBottomWidth: idx === filteredMaterials.length - 1 ? 0 : 0.5, borderBottomColor: colors.border, paddingVertical: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8 }}>
+                        <TouchableOpacity
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 2 }}
+                          onPress={() => {
+                            if (materialBatches.length > 0) {
+                              setExpandedMaterials(prev => ({ ...prev, [rm._id]: !prev[rm._id] }));
+                            }
+                          }}
+                          disabled={materialBatches.length === 0}
+                        >
+                          {materialBatches.length > 0 ? (
+                            <Ionicons
+                              name={isExpanded ? "chevron-down" : "chevron-forward"}
+                              size={14}
+                              color={colors.text.secondary}
+                            />
+                          ) : (
+                            <View style={{ width: 14 }} />
+                          )}
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }}>{rm.name}</Text>
                               <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
                                 <Text style={{ fontSize: 8.5, fontWeight: '700', color: colors.text.secondary }}>
                                   {rm.category === 'Packaging' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 Herb'))}
@@ -1016,83 +1039,68 @@ export default function ManufacturingScreen() {
                             </View>
                             <Text style={{ fontSize: 9.5, color: colors.text.muted }}>{rm.sku}</Text>
                           </View>
-                          <Text style={{ flex: 1.2, fontSize: 12, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
-                            {rm.stockLevel?.toFixed(1) || '0.0'} {rm.unit}
-                          </Text>
-                          <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
-                            {rm.minReorder} {rm.unit}
-                          </Text>
-                          <View style={{ width: 65, flexDirection: 'row', justifyContent: 'center', gap: 12, alignItems: 'center' }}>
-                            <TouchableOpacity onPress={() => handleEditMaterial(rm)}>
-                              <Ionicons name="pencil-outline" size={14} color={colors.primary} />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => handleOpenGenealogy('material', rm._id)}>
-                              <Ionicons name="git-network-outline" size={14} color={colors.text.muted} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                  {filteredMaterials.length === 0 && <Text style={styles.emptyText}>No matching materials found.</Text>}
-                </View>
-              </View>
-
-              {/* Column 2: Inward Stock Batches */}
-              <View style={{ flex: 1 }}>
-                <View style={[styles.card, { padding: 10 }]}>
-                  <Text style={[styles.cardTitle, { marginBottom: 12 }]}>Inward Batches currently in Stock</Text>
-                  
-                  <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    {/* Header */}
-                    <View style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
-                      <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material / Batch</Text>
-                      <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Qty</Text>
-                      <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Rate</Text>
-                      <Text style={{ width: 65, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
-                    </View>
-                    {/* Body */}
-                    {filteredEntries.map((e, idx) => (
-                      <View key={e._id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8, borderBottomWidth: idx === filteredEntries.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
-                        <View style={{ flex: 2 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }} numberOfLines={1}>
-                            {e.rawMaterialId && typeof e.rawMaterialId === 'object' ? e.rawMaterialId.name : 'Unknown Raw Material'}
-                          </Text>
-                          <Text style={{ fontSize: 9.5, color: colors.text.muted }}>Batch: {e.batchNo}</Text>
-                        </View>
-                        <Text style={{ flex: 1.2, fontSize: 12, fontWeight: '700', color: colors.text.primary, textAlign: 'right' }}>
-                          {e.qty.toFixed(1)} {e.rawMaterialId && typeof e.rawMaterialId === 'object' ? e.rawMaterialId.unit : ''}
+                        </TouchableOpacity>
+                        <Text style={{ flex: 1.2, fontSize: 12, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
+                          {rm.stockLevel?.toFixed(1) || '0.0'} {rm.unit}
                         </Text>
                         <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
-                          ₹{e.purchaseRate}
+                          {rm.minReorder} {rm.unit}
                         </Text>
-                        <View style={{ width: 65, flexDirection: 'row', justifyContent: 'center', gap: 10, alignItems: 'center' }}>
-                          <TouchableOpacity onPress={async () => {
-                            setTraceBatchNo(e.batchNo);
-                            setTraceLoading(true);
-                            setTraceModalVisible(true);
-                            try {
-                              const data = await api.traceBatch(e.batchNo);
-                              setTraceResult(data);
-                            } catch (err: any) {
-                              alert(err.message || 'Trace lookup failed');
-                              setTraceModalVisible(false);
-                            } finally {
-                              setTraceLoading(false);
-                            }
-                          }}>
-                            <Ionicons name="git-network-outline" size={14} color={colors.primary} />
+                        <View style={{ width: 65, flexDirection: 'row', justifyContent: 'center', gap: 12, alignItems: 'center' }}>
+                          <TouchableOpacity onPress={() => handleEditMaterial(rm)}>
+                            <Ionicons name="pencil-outline" size={14} color={colors.primary} />
                           </TouchableOpacity>
-                          <TouchableOpacity onPress={() => handleVoidInward(e._id)}>
-                            <Ionicons name="trash-outline" size={14} color={colors.danger} />
+                          <TouchableOpacity onPress={() => handleOpenGenealogy('material', rm._id)}>
+                            <Ionicons name="git-network-outline" size={14} color={colors.text.muted} />
                           </TouchableOpacity>
                         </View>
                       </View>
-                    ))}
-                  </View>
-                  {filteredEntries.length === 0 && <Text style={styles.emptyText}>No matching inward stock batches found.</Text>}
-                </View>
+
+                      {isExpanded && materialBatches.length > 0 && (
+                        <View style={{ backgroundColor: colors.bg.secondary, padding: 8, marginLeft: 20, marginRight: 8, borderRadius: 6, marginBottom: 6, borderLeftWidth: 3, borderLeftColor: colors.primary }}>
+                          <Text style={{ fontSize: 9, fontWeight: '800', color: colors.text.muted, marginBottom: 4, letterSpacing: 0.5 }}>ACTIVE INWARD BATCHES</Text>
+                          {materialBatches.map((e, batchIdx) => (
+                            <View key={e._id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: batchIdx < materialBatches.length - 1 ? 0.5 : 0, borderBottomColor: colors.border }}>
+                              <View style={{ flex: 2 }}>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Batch: {e.batchNo}</Text>
+                                {e.vendorName ? <Text style={{ fontSize: 9, color: colors.text.muted, marginTop: 1 }}>Vendor: {e.vendorName}</Text> : null}
+                              </View>
+                              <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.primary, textAlign: 'right' }}>
+                                {e.qty.toFixed(1)} {rm.unit}
+                              </Text>
+                              <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
+                                ₹{e.purchaseRate}
+                              </Text>
+                              <View style={{ width: 65, flexDirection: 'row', justifyContent: 'center', gap: 12, alignItems: 'center' }}>
+                                <TouchableOpacity onPress={async () => {
+                                  setTraceBatchNo(e.batchNo);
+                                  setTraceLoading(true);
+                                  setTraceModalVisible(true);
+                                  try {
+                                    const data = await api.traceBatch(e.batchNo);
+                                    setTraceResult(data);
+                                  } catch (err: any) {
+                                    alert(err.message || 'Trace lookup failed');
+                                    setTraceModalVisible(false);
+                                  } finally {
+                                    setTraceLoading(false);
+                                  }
+                                }}>
+                                  <Ionicons name="git-network-outline" size={13} color={colors.primary} />
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => handleVoidInward(e._id)}>
+                                  <Ionicons name="trash-outline" size={13} color={colors.danger} />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
+              {filteredMaterials.length === 0 && <Text style={styles.emptyText}>No matching materials found.</Text>}
             </View>
           </View>
         )}
