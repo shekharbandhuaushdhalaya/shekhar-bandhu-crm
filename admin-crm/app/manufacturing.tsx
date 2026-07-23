@@ -119,6 +119,18 @@ export default function ManufacturingScreen() {
   const [prodBatchNo, setProdBatchNo] = useState('');
   const [prodError, setProdError] = useState('');
 
+  // Form States — Manufacturing Unit Definition
+  const [unitModalVisible, setUnitModalVisible] = useState(false);
+  const [unitName, setUnitName] = useState('');
+  const [unitCode, setUnitCode] = useState('');
+  const [unitAddress, setUnitAddress] = useState('');
+  const [unitCity, setUnitCity] = useState('');
+  const [unitState, setUnitState] = useState('');
+  const [unitPincode, setUnitPincode] = useState('');
+  const [unitContact, setUnitContact] = useState('');
+  const [unitPhone, setUnitPhone] = useState('');
+  const [unitError, setUnitError] = useState('');
+
   // Form States — QC Signoff
   const [selectedBatchRun, setSelectedBatchRun] = useState<BatchProduction | null>(null);
   const [qcYieldQty, setQcYieldQty] = useState('');
@@ -355,6 +367,38 @@ export default function ManufacturingScreen() {
       loadData();
     } catch (err: any) {
       setProdError(err.message || 'Failed to launch production batch');
+    }
+  };
+
+  const handleSaveUnit = async () => {
+    if (!unitName.trim() || !unitCode.trim()) {
+      setUnitError('Name and Code are required.');
+      return;
+    }
+    setUnitError('');
+    try {
+      await api.createManufacturingUnit({
+        name: unitName.trim(),
+        code: unitCode.trim().toUpperCase(),
+        addressLine1: unitAddress.trim(),
+        city: unitCity.trim(),
+        state: unitState.trim(),
+        pincode: unitPincode.trim(),
+        contactPerson: unitContact.trim(),
+        phone: unitPhone.trim()
+      });
+      setUnitName('');
+      setUnitCode('');
+      setUnitAddress('');
+      setUnitCity('');
+      setUnitState('');
+      setUnitPincode('');
+      setUnitContact('');
+      setUnitPhone('');
+      setUnitModalVisible(false);
+      loadData();
+    } catch (err: any) {
+      setUnitError(err.message || 'Failed to save manufacturing unit');
     }
   };
 
@@ -804,6 +848,23 @@ export default function ManufacturingScreen() {
         >
           <Ionicons name="add-circle-outline" size={15} color={colors.primary} style={{ marginRight: 4 }} />
           <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Define Material</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            borderColor: colors.primary, 
+            borderWidth: 1, 
+            borderRadius: 6, 
+            paddingHorizontal: 12, 
+            paddingVertical: 8,
+            backgroundColor: colors.bg.primary
+          }} 
+          onPress={() => setUnitModalVisible(true)}
+        >
+          <Ionicons name="add-circle-outline" size={15} color={colors.primary} style={{ marginRight: 4 }} />
+          <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Define Unit</Text>
         </TouchableOpacity>
       </View>
 
@@ -1590,6 +1651,57 @@ export default function ManufacturingScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ======================================================== */}
+      {/* MODAL 0: ADD MANUFACTURING UNIT DEFINITION */}
+      {/* ======================================================== */}
+      <Modal visible={unitModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setUnitModalVisible(false)} />
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Define New Manufacturing Unit</Text>
+              <TouchableOpacity onPress={() => setUnitModalVisible(false)}>
+                <Ionicons name="close" size={20} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            {unitError ? <Text style={styles.modalError}>{unitError}</Text> : null}
+            <ScrollView style={styles.modalForm}>
+              <Text style={styles.inputLabel}>Unit Name *</Text>
+              <TextInput style={styles.input} placeholder="e.g. Varanasi Factory" placeholderTextColor={colors.text.muted} value={unitName} onChangeText={setUnitName} />
+              
+              <Text style={styles.inputLabel}>Unit Code / Abbreviation *</Text>
+              <TextInput style={styles.input} placeholder="e.g. MFG-VARANASI" placeholderTextColor={colors.text.muted} value={unitCode} onChangeText={setUnitCode} />
+
+              <Text style={styles.inputLabel}>Address Line 1</Text>
+              <TextInput style={styles.input} placeholder="e.g. Phase 2 Industrial Area" placeholderTextColor={colors.text.muted} value={unitAddress} onChangeText={setUnitAddress} />
+
+              <Text style={styles.inputLabel}>City</Text>
+              <TextInput style={styles.input} placeholder="e.g. Varanasi" placeholderTextColor={colors.text.muted} value={unitCity} onChangeText={setUnitCity} />
+
+              <Text style={styles.inputLabel}>State</Text>
+              <TextInput style={styles.input} placeholder="e.g. Uttar Pradesh" placeholderTextColor={colors.text.muted} value={unitState} onChangeText={setUnitState} />
+
+              <Text style={styles.inputLabel}>Pincode</Text>
+              <TextInput style={styles.input} placeholder="e.g. 221002" placeholderTextColor={colors.text.muted} value={unitPincode} onChangeText={setUnitPincode} keyboardType="numeric" />
+
+              <Text style={styles.inputLabel}>Contact Person</Text>
+              <TextInput style={styles.input} placeholder="Name" placeholderTextColor={colors.text.muted} value={unitContact} onChangeText={setUnitContact} />
+
+              <Text style={styles.inputLabel}>Phone Number</Text>
+              <TextInput style={styles.input} placeholder="Phone" placeholderTextColor={colors.text.muted} value={unitPhone} onChangeText={setUnitPhone} keyboardType="phone-pad" />
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setUnitModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitBtn} onPress={handleSaveUnit}>
+                <Text style={styles.submitBtnText}>Save Unit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ======================================================== */}
       {/* MODAL 1: ADD RAW MATERIAL DEFINITION */}
