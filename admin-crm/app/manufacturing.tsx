@@ -95,6 +95,7 @@ export default function ManufacturingScreen() {
   const [rmCategory, setRmCategory] = useState<'Herb' | 'Packaging' | 'Excipient' | 'General'>('Herb');
   const [rmMinReorder, setRmMinReorder] = useState('10');
   const [rmError, setRmError] = useState('');
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
 
 
 
@@ -217,23 +218,55 @@ export default function ManufacturingScreen() {
     }
     setRmError('');
     try {
-      await api.createRawMaterial({
-        name: rmName.trim(),
-        sku: rmSku.trim() || undefined,
-        unit: rmUnit,
-        category: rmCategory,
-        minReorder: Number(rmMinReorder) || 0
-      });
+      if (editingMaterialId) {
+        await api.updateRawMaterial(editingMaterialId, {
+          name: rmName.trim(),
+          unit: rmUnit,
+          category: rmCategory,
+          minReorder: Number(rmMinReorder) || 0
+        });
+      } else {
+        await api.createRawMaterial({
+          name: rmName.trim(),
+          sku: rmSku.trim() || undefined,
+          unit: rmUnit,
+          category: rmCategory,
+          minReorder: Number(rmMinReorder) || 0
+        });
+      }
       setRmName('');
       setRmSku('');
       setRmUnit('kg');
       setRmCategory('Herb');
       setRmMinReorder('10');
+      setEditingMaterialId(null);
       setMaterialModalVisible(false);
       loadData();
     } catch (err: any) {
       setRmError(err.message || 'Failed to save material definition');
     }
+  };
+
+  const handleEditMaterial = (rm: RawMaterial) => {
+    setEditingMaterialId(rm._id);
+    setRmName(rm.name);
+    setRmSku(rm.sku || '');
+    setRmUnit(rm.unit);
+    setRmCategory(rm.category || 'Herb');
+    setRmMinReorder(rm.minReorder ? rm.minReorder.toString() : '0');
+    setRmError('');
+    setMaterialModalVisible(true);
+  };
+
+  const handleCloseMaterialModal = () => {
+    setRmName('');
+    setRmSku('');
+    setRmUnit('kg');
+    setRmCategory('Herb');
+    setRmMinReorder('10');
+    setEditingMaterialId(null);
+    setRmError('');
+    setMaterialModalVisible(false);
   };
 
 
@@ -965,7 +998,7 @@ export default function ManufacturingScreen() {
                       <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
                       <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
                       <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
-                      <Text style={{ width: 40, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Trace</Text>
+                      <Text style={{ width: 65, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
                     </View>
                     {/* Body */}
                     {filteredMaterials.map((rm, idx) => {
@@ -977,7 +1010,7 @@ export default function ManufacturingScreen() {
                               <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }} numberOfLines={1}>{rm.name}</Text>
                               <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
                                 <Text style={{ fontSize: 8.5, fontWeight: '700', color: colors.text.secondary }}>
-                                  {rm.category === 'Packaging' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : '🌿 Herb')}
+                                  {rm.category === 'Packaging' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 Herb'))}
                                 </Text>
                               </View>
                             </View>
@@ -989,9 +1022,14 @@ export default function ManufacturingScreen() {
                           <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
                             {rm.minReorder} {rm.unit}
                           </Text>
-                          <TouchableOpacity style={{ width: 40, alignItems: 'center' }} onPress={() => handleOpenGenealogy('material', rm._id)}>
-                            <Ionicons name="git-network-outline" size={14} color={colors.text.muted} />
-                          </TouchableOpacity>
+                          <View style={{ width: 65, flexDirection: 'row', justifyContent: 'center', gap: 12, alignItems: 'center' }}>
+                            <TouchableOpacity onPress={() => handleEditMaterial(rm)}>
+                              <Ionicons name="pencil-outline" size={14} color={colors.primary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleOpenGenealogy('material', rm._id)}>
+                              <Ionicons name="git-network-outline" size={14} color={colors.text.muted} />
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       );
                     })}
@@ -1708,11 +1746,11 @@ export default function ManufacturingScreen() {
       {/* ======================================================== */}
       <Modal visible={materialModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setMaterialModalVisible(false)} />
+          <Pressable style={styles.modalBackdrop} onPress={handleCloseMaterialModal} />
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Define New Raw Material</Text>
-              <TouchableOpacity onPress={() => setMaterialModalVisible(false)}>
+              <Text style={styles.modalTitle}>{editingMaterialId ? 'Edit Raw Material' : 'Define New Raw Material'}</Text>
+              <TouchableOpacity onPress={handleCloseMaterialModal}>
                 <Ionicons name="close" size={20} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
@@ -1721,8 +1759,8 @@ export default function ManufacturingScreen() {
               <Text style={styles.inputLabel}>Ingredient Name *</Text>
               <TextInput style={styles.input} placeholder="e.g. Purified Guggulu" placeholderTextColor={colors.text.muted} value={rmName} onChangeText={setRmName} />
               
-              <Text style={styles.inputLabel}>SKU / Code (Auto-Generated)</Text>
-              <TextInput style={[styles.input, { backgroundColor: colors.bg.secondary, color: colors.text.muted }]} placeholder="Auto-generated on save" placeholderTextColor={colors.text.muted} value={rmSku} editable={false} />
+              <Text style={styles.inputLabel}>SKU / Code {editingMaterialId ? '' : '(Auto-Generated)'}</Text>
+              <TextInput style={[styles.input, { backgroundColor: colors.bg.secondary, color: colors.text.muted }]} placeholder={editingMaterialId ? "Material SKU" : "Auto-generated on save"} placeholderTextColor={colors.text.muted} value={rmSku} editable={false} />
 
               <Text style={styles.inputLabel}>Material Classification / Category *</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
@@ -1758,11 +1796,11 @@ export default function ManufacturingScreen() {
               <TextInput style={styles.input} placeholder="e.g. 10" placeholderTextColor={colors.text.muted} value={rmMinReorder} onChangeText={setRmMinReorder} keyboardType="numeric" />
             </ScrollView>
             <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setMaterialModalVisible(false)}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={handleCloseMaterialModal}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.submitBtn} onPress={handleSaveMaterial}>
-                <Text style={styles.submitBtnText}>Define Material</Text>
+                <Text style={styles.submitBtnText}>{editingMaterialId ? 'Save Changes' : 'Define Material'}</Text>
               </TouchableOpacity>
             </View>
           </View>
