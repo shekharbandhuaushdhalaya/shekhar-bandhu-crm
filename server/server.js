@@ -205,7 +205,7 @@ mongoose
       console.log('✅ Dropped unique product characteristics index');
     } catch (_) { }
 
-    await seedDatabase();
+    // await seedDatabase();
     await require('./models/RolePermission').seedDefaults();
     console.log('✅ Role permissions seeded');
 
