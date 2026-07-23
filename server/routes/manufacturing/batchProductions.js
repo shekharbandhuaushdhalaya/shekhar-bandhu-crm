@@ -800,14 +800,11 @@ router.patch('/:id/documents', async (req, res) => {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-    const ext = url.split('.').pop().split('?')[0] || 'pdf';
-    const cleanDocName = `BMR_Doc_${batch.batchNo || batch._id}_${Date.now().toString().slice(-4)}.${ext}`;
+    const { getRenamedFilename, appendDocument } = require('../../utils/documentHelper');
+    const cleanDocName = getRenamedFilename(name, 'batch', batch.batchNo || batch._id);
+    const updatedBatch = await appendDocument(BatchProduction, req.params.id, cleanDocName, url);
 
-    batch.supportingDocuments = batch.supportingDocuments || [];
-    batch.supportingDocuments.push({ name: cleanDocName, url, uploadedAt: new Date() });
-    await batch.save();
-
-    res.json(batch);
+    res.json(updatedBatch);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -819,13 +816,10 @@ router.delete('/:id/documents', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Document URL is required' });
 
-    const batch = await BatchProduction.findById(req.params.id);
-    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+    const { removeDocument } = require('../../utils/documentHelper');
+    const updatedBatch = await removeDocument(BatchProduction, req.params.id, url);
 
-    batch.supportingDocuments = (batch.supportingDocuments || []).filter(doc => doc.url !== url);
-    await batch.save();
-
-    res.json(batch);
+    res.json(updatedBatch);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

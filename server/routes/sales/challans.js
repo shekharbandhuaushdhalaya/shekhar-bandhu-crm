@@ -477,15 +477,11 @@ router.patch('/:id/documents', async (req, res) => {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found' });
 
-    const ext = url.split('.').pop().split('?')[0] || 'pdf';
-    const cleanChallanNo = (challan.challanNo || challan._id).toString().replace(/[^a-zA-Z0-9-]/g, '_');
-    const cleanDocName = `Challan_POD_${cleanChallanNo}_${Date.now().toString().slice(-4)}.${ext}`;
+    const { getRenamedFilename, appendDocument } = require('../../utils/documentHelper');
+    const cleanDocName = getRenamedFilename(name, 'challan', challan.challanNo || challan._id);
+    const updatedChallan = await appendDocument(Challan, req.params.id, cleanDocName, url);
 
-    challan.supportingDocuments = challan.supportingDocuments || [];
-    challan.supportingDocuments.push({ name: cleanDocName, url, uploadedAt: new Date() });
-    await challan.save();
-
-    res.json(challan);
+    res.json(updatedChallan);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -497,13 +493,10 @@ router.delete('/:id/documents', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Document URL is required' });
 
-    const challan = await Challan.findById(req.params.id);
-    if (!challan) return res.status(404).json({ error: 'Challan not found' });
+    const { removeDocument } = require('../../utils/documentHelper');
+    const updatedChallan = await removeDocument(Challan, req.params.id, url);
 
-    challan.supportingDocuments = (challan.supportingDocuments || []).filter(doc => doc.url !== url);
-    await challan.save();
-
-    res.json(challan);
+    res.json(updatedChallan);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

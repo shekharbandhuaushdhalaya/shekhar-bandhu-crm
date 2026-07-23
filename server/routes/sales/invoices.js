@@ -749,15 +749,11 @@ router.patch('/:id/documents', async (req, res) => {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
 
-    const ext = url.split('.').pop().split('?')[0] || 'pdf';
-    const cleanInvoiceNo = (invoice.invoiceNo || invoice._id).toString().replace(/[^a-zA-Z0-9-]/g, '_');
-    const cleanDocName = `Invoice_RecCopy_${cleanInvoiceNo}_${Date.now().toString().slice(-4)}.${ext}`;
+    const { getRenamedFilename, appendDocument } = require('../../utils/documentHelper');
+    const cleanDocName = getRenamedFilename(name, 'invoice', invoice.invoiceNo || invoice._id);
+    const updatedInvoice = await appendDocument(Invoice, req.params.id, cleanDocName, url);
 
-    invoice.supportingDocuments = invoice.supportingDocuments || [];
-    invoice.supportingDocuments.push({ name: cleanDocName, url, uploadedAt: new Date() });
-    await invoice.save();
-
-    res.json(invoice);
+    res.json(updatedInvoice);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -769,13 +765,10 @@ router.delete('/:id/documents', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Document URL is required' });
 
-    const invoice = await Invoice.findById(req.params.id);
-    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+    const { removeDocument } = require('../../utils/documentHelper');
+    const updatedInvoice = await removeDocument(Invoice, req.params.id, url);
 
-    invoice.supportingDocuments = (invoice.supportingDocuments || []).filter(doc => doc.url !== url);
-    await invoice.save();
-
-    res.json(invoice);
+    res.json(updatedInvoice);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
