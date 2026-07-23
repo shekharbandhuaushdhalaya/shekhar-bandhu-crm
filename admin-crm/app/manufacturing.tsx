@@ -2148,7 +2148,7 @@ export default function ManufacturingScreen() {
               </View>
 
               <Text style={styles.inputLabel}>QC Inspector Name *</Text>
-              <TextInput style={styles.input} placeholder="e.g. Dr. P. K. Sharma" placeholderTextColor={colors.text.muted} value={qcPassedBy} onChangeText={setQcPassedBy} />derTextColor={colors.text.muted} value={qcPassedBy} onChangeText={setQcPassedBy} />
+              <TextInput style={styles.input} placeholder="e.g. Dr. P. K. Sharma" placeholderTextColor={colors.text.muted} value={qcPassedBy} onChangeText={setQcPassedBy} />
 
               <Text style={styles.inputLabel}>Quality Check Notes / Lab Remarks</Text>
               <TextInput
