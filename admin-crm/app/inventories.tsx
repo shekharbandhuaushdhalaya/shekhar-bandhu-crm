@@ -1412,40 +1412,23 @@ export default function InventoriesScreen() {
   // Compute Metrics Summaries
   const totalWarehouses = warehouses.length;
   
-  let totalStockFullBoxes = 0;
-  let totalStockLoosePieces = 0;
+  let totalStockPieces = 0;
 
   if (selectedWarehouseId === 'all') {
     consolidatedItems
       .filter(item => selectedVendorId === 'all' || item.vendorId === selectedVendorId)
       .forEach(item => {
         const packing = item.packing || 1;
-        const totalPcs = Math.round(Math.abs(item.totalBoxes) * packing);
-        const b = Math.floor(totalPcs / packing);
-        const p = totalPcs % packing;
-        if (item.totalBoxes < 0) {
-          totalStockFullBoxes -= b;
-          totalStockLoosePieces -= p;
-        } else {
-          totalStockFullBoxes += b;
-          totalStockLoosePieces += p;
-        }
+        const totalPcs = Math.round(item.totalBoxes * packing);
+        totalStockPieces += totalPcs;
       });
   } else {
     warehouseEntries
       .filter(item => selectedVendorId === 'all' || item.vendorId === selectedVendorId)
       .forEach(item => {
         const packing = item.packing || 1;
-        const totalPcs = Math.round(Math.abs(item.qtyBoxes) * packing);
-        const b = Math.floor(totalPcs / packing);
-        const p = totalPcs % packing;
-        if (item.qtyBoxes < 0) {
-          totalStockFullBoxes -= b;
-          totalStockLoosePieces -= p;
-        } else {
-          totalStockFullBoxes += b;
-          totalStockLoosePieces += p;
-        }
+        const totalPcs = Math.round(item.qtyBoxes * packing);
+        totalStockPieces += totalPcs;
       });
   }
 
@@ -1472,26 +1455,9 @@ export default function InventoriesScreen() {
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Active Stock</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.summaryValue, { color: totalStockFullBoxes < 0 ? colors.danger : colors.success }]}>
-                {totalStockFullBoxes} Box{totalStockFullBoxes !== 1 && totalStockFullBoxes !== -1 ? 'es' : ''}
+              <Text style={[styles.summaryValue, { color: totalStockPieces < 0 ? colors.danger : colors.success }]}>
+                {totalStockPieces.toLocaleString('en-IN')} Pcs
               </Text>
-              {totalStockLoosePieces !== 0 && (
-                <View style={{
-                  backgroundColor: totalStockLoosePieces < 0 ? colors.danger + '15' : colors.success + '15',
-                  paddingHorizontal: 6,
-                  paddingVertical: 2,
-                  borderRadius: 4,
-                  marginLeft: 6,
-                }}>
-                  <Text style={{
-                    fontSize: 12,
-                    fontWeight: '800',
-                    color: totalStockLoosePieces < 0 ? colors.danger : colors.success
-                  }}>
-                    {totalStockLoosePieces > 0 ? '+' : ''}{totalStockLoosePieces} Pcs
-                  </Text>
-                </View>
-              )}
             </View>
           </View>
           <View style={styles.summaryDivider} />
