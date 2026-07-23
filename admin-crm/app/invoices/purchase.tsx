@@ -630,6 +630,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
   const addRow = () => {
     setRows(prev => [
+      ...prev,
       {
         id: Date.now().toString() + Math.random().toString(),
         productSearch: '',
@@ -640,8 +641,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         packing: '1',
         rate: '',
         gstRate: 18
-      },
-      ...prev
+      }
     ]);
   };
 
