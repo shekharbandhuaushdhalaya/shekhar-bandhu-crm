@@ -484,6 +484,79 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
 
   if (!invoice) return null;
 
+  const handleUploadInvoiceDoc = async () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*,application/pdf';
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            try {
+              const dataUrl = reader.result as string;
+              const uploadRes = await api.uploadFile(dataUrl, file.name);
+              await api.addDocument('invoice', invoice._id, {
+                name: uploadRes.name,
+                url: uploadRes.url
+              });
+              onDeleted();
+              onClose();
+            } catch (err: any) {
+              alert(err.message || 'Failed to upload document');
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err: any) {
+          alert('Failed to read file');
+        }
+      };
+      input.click();
+    } else {
+      Alert.prompt(
+        'Attach Document',
+        'Enter document or receiving copy URL:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Attach',
+            onPress: async (url) => {
+              if (!url) return;
+              try {
+                await api.addDocument('invoice', invoice._id, { name: 'Attached Receiving Copy', url });
+                onDeleted();
+                onClose();
+              } catch (err: any) {
+                alert(err.message || 'Failed to attach document');
+              }
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const handleDeleteInvoiceDoc = async (url: string) => {
+    const confirmed = Platform.OS === 'web'
+      ? confirm('Are you sure you want to delete this document?')
+      : await new Promise(resolve => {
+          Alert.alert('Delete Document', 'Are you sure?', [
+            { text: 'No', onPress: () => resolve(false) },
+            { text: 'Yes, Delete', onPress: () => resolve(true) }
+          ]);
+        });
+    if (!confirmed) return;
+    try {
+      await api.deleteDocument('invoice', invoice._id, url);
+      onDeleted();
+      onClose();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete document');
+    }
+  };
+
   const handleDelete = async () => {
     try {
       const success = await api.deleteSaleInvoice(invoice._id);
@@ -514,7 +587,26 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
             <View style={styles.profileAvatar}>
               <Ionicons name="receipt" size={36} color={colors.primary} />
             </View>
-            <Text style={styles.profileName}>{invoice.invoiceNo}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center', marginVertical: 4 }}>
+              <Text style={styles.profileName}>{invoice.invoiceNo}</Text>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.success + '15',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: colors.success,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+                onPress={handleUploadInvoiceDoc}
+              >
+                <Ionicons name="cloud-upload-outline" size={13} color={colors.success} />
+                <Text style={{ fontSize: 10, color: colors.success, fontWeight: '700' }}>Upload POD / Rec Copy</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.profileCustomer}>{invoice.customerName}</Text>
           </View>
 
@@ -836,6 +928,29 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
             </TouchableOpacity>
           )}
           
+          {/* Supporting Documents Vault */}
+          <View style={{ gap: 6, marginVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Receiving Copy:</Text>
+            
+            {invoice.supportingDocuments && invoice.supportingDocuments.length > 0 ? (
+              <View style={{ gap: 6, marginTop: 4 }}>
+                {invoice.supportingDocuments.map((doc: any, docIdx: number) => (
+                  <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                    <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                      <Ionicons name="document-attach" size={15} color={colors.primary} />
+                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDeleteInvoiceDoc(doc.url)} style={{ padding: 4 }}>
+                      <Ionicons name="trash-outline" size={14} color={colors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={{ fontSize: 11, color: colors.text.muted, fontStyle: 'italic', marginTop: 2 }}>No supporting documents uploaded.</Text>
+            )}
+          </View>
+
           <TouchableOpacity
             style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.primary }]}
             onPress={() => printInvoice(invoice)}
@@ -1664,8 +1779,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                 </View>
 
                 {/* Bottom line: Qty, MRP, Disc %, Net Rate, Subtotal, Remove */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
-                  <View style={{ flex: 0.9 }}>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <View style={{ flex: 1, minWidth: 70 }}>
                     <Text style={styles.itemSublabel}>Boxes</Text>
                     <TextInput
                       style={[styles.itemInput, hasError && { borderColor: colors.danger, borderWidth: 1 }]}
@@ -1683,7 +1798,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                     />
                   </View>
 
-                  <View style={{ flex: 1.1 }}>
+                  <View style={{ flex: 1.2, minWidth: 80 }}>
                     <Text style={styles.itemSublabel}>MRP (₹)</Text>
                     <TextInput
                       style={styles.itemInput}
@@ -1705,7 +1820,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                     />
                   </View>
 
-                  <View style={{ flex: 1.0 }}>
+                  <View style={{ flex: 1, minWidth: 70 }}>
                     <Text style={styles.itemSublabel}>Disc (%)</Text>
                     <TextInput
                       style={styles.itemInput}
@@ -1727,7 +1842,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                     />
                   </View>
 
-                  <View style={{ flex: 1.1 }}>
+                  <View style={{ flex: 1.2, minWidth: 80 }}>
                     <Text style={styles.itemSublabel}>Net Rate (₹)</Text>
                     <TextInput
                       style={styles.itemInput}
@@ -1751,7 +1866,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                     />
                   </View>
 
-                  <View style={{ flex: 1.4, alignItems: 'flex-end', justifyContent: 'center', minHeight: 40, marginTop: 12 }}>
+                  <View style={{ flex: 1.5, minWidth: 90, alignItems: 'flex-end', justifyContent: 'center', minHeight: 40, marginTop: 12 }}>
                     <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '600' }}>Amount</Text>
                     <Text style={{ fontSize: 12, color: colors.success, fontWeight: '800' }}>
                       ₹{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

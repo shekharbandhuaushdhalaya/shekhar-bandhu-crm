@@ -36,7 +36,14 @@ const challanSchema = new mongoose.Schema({
   convertedToInvoice: { type: Boolean, default: false },
   invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
   invoiceNo: { type: String, default: '' },
-  deductInventory: { type: Boolean, default: true }
+  deductInventory: { type: Boolean, default: true },
+  supportingDocuments: [
+    {
+      name: { type: String, required: true },
+      url: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now }
+    }
+  ]
 }, { timestamps: true });
 
 challanSchema.index({ challanNo: 'text', partyName: 'text', status: 'text' });

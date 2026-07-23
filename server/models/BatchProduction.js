@@ -14,7 +14,7 @@ const stageSchema = new mongoose.Schema({
   name: { type: String, required: true },
   status: {
     type: String,
-    enum: ['pending', 'in_progress', 'completed', 'skipped'],
+    enum: ['pending', 'in_progress', 'completed', 'skipped', 'failed'],
     default: 'pending'
   },
   startedAt: { type: Date, default: null },
@@ -36,7 +36,7 @@ const batchProductionSchema = new mongoose.Schema({
   actualYieldQty: { type: Number, default: 0 },
   status: {
     type: String,
-    enum: ['draft', 'in_progress', 'qc_hold', 'completed', 'cancelled'],
+    enum: ['draft', 'in_progress', 'qc_hold', 'completed', 'cancelled', 'rejected'],
     default: 'draft',
   },
   stages: { type: [stageSchema], default: () => MANUFACTURING_STAGES.map(name => ({ name, status: 'pending' })) },
@@ -64,9 +64,27 @@ const batchProductionSchema = new mongoose.Schema({
   endDate: { type: Date, default: null },
   qcNotes: { type: String, default: '' },
   qcPassedBy: { type: String, default: '' },
+  qcStatus: { type: String, enum: ['approved', 'rejected'], default: 'approved' },
+  qcParameters: {
+    organoleptic: { type: String, default: '' },
+    moistureContent: { type: Number, default: null },
+    ashValue: { type: Number, default: null },
+    pHValue: { type: Number, default: null },
+    disintegrationTime: { type: Number, default: null },
+    heavyMetals: { type: String, default: '' },
+    microbialLimit: { type: String, default: '' },
+    labReportRef: { type: String, default: '' }
+  },
   rawMaterialCost: { type: Number, default: 0 },
   overheadCost: { type: Number, default: 0 },
   unitProductionCost: { type: Number, default: 0 },
+  supportingDocuments: [
+    {
+      name: { type: String, required: true },
+      url: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now }
+    }
+  ]
 }, { timestamps: true });
 
 batchProductionSchema.index({ 'ingredientsConsumed.rawMaterialEntryId': 1 });

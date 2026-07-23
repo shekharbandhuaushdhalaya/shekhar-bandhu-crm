@@ -38,6 +38,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     if (path.startsWith('/invoices/sale')) return 'Sale Invoices';
     if (path.startsWith('/invoices/purchase')) return 'Purchase Invoices';
     if (path.startsWith('/payments')) return 'Payments';
+    if (path.startsWith('/ageing')) return 'Receivable Ageing';
     if (path.startsWith('/reports')) return 'Reports';
     if (path.startsWith('/rbac')) return 'Access Control';
     if (path.startsWith('/audit')) return 'System Audit Logs';
@@ -122,52 +123,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
 
       {/* Right Controls */}
       <View style={styles.headerControls}>
-        {/* Seed Demo Data Button */}
-        <TouchableOpacity
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            backgroundColor: colors.primary + '18',
-            borderColor: colors.primary + '40',
-            borderWidth: 1,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: 8,
-            marginRight: 8
-          }}
-          onPress={async () => {
-            try {
-              DeviceEventEmitter.emit('global_loader', { isLoading: true });
-              const host = (typeof window !== 'undefined' && window.location && window.location.hostname) ? window.location.hostname : 'localhost';
-              const targetUrl = `http://${host}:5000/api/system/seed-demo`;
-              const res = await fetch(targetUrl, { method: 'POST' });
-              const text = await res.text();
-              DeviceEventEmitter.emit('global_loader', { isLoading: false });
-              let data: any = {};
-              try { data = JSON.parse(text); } catch (e) { throw new Error(`Server returned HTML instead of JSON. Output: ${text.slice(0, 100)}`); }
-              if (res.ok && !data.error) {
-                alert('✅ Demo Data Seeded & Synced! Reloading app...');
-                if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                  window.location.reload();
-                } else {
-                  router.replace('/');
-                }
-              } else {
-                alert('Seeding Error: ' + (data.error || data.message || 'Server error'));
-              }
-            } catch (err: any) {
-              DeviceEventEmitter.emit('global_loader', { isLoading: false });
-              alert('Seeding Error: ' + (err.message || err));
-            }
-          }}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="leaf-outline" size={14} color={colors.primary} />
-          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-            {isDesktop ? 'Seed Demo Data' : 'Seed Data'}
-          </Text>
-        </TouchableOpacity>
+
 
         {/* User Card */}
         <TouchableOpacity style={styles.headerUser} onPress={() => router.push('/profile')} activeOpacity={0.7}>
@@ -303,6 +259,7 @@ function MainLayout() {
               tabBarActiveTintColor: colors.primary,
               tabBarInactiveTintColor: colors.text.muted,
               tabBarLabelStyle: { fontWeight: '600', fontSize: 11 },
+              lazy: true,
             }}
           >
             <Tabs.Screen
@@ -331,6 +288,7 @@ function MainLayout() {
             <Tabs.Screen name="parties/vendors" options={{ href: null }} />
             <Tabs.Screen name="products" options={{ href: null }} />
             <Tabs.Screen name="payments" options={{ href: null }} />
+            <Tabs.Screen name="ageing" options={{ href: null }} />
             <Tabs.Screen name="inventories" options={{ href: null }} />
             <Tabs.Screen name="invoices/sale" options={{ href: null }} />
             <Tabs.Screen name="invoices/purchase" options={{ href: null }} />

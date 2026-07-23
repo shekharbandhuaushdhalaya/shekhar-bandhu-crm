@@ -94,6 +94,20 @@ const invoiceSchema = new mongoose.Schema({
   medicalRepName: { type: String, default: '', trim: true },
   doctorName: { type: String, default: '', trim: true },
   damageReason: { type: String, default: '', trim: true },
+  supportingDocuments: [
+    {
+      name: { type: String, required: true },
+      url: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now }
+    }
+  ],
+  payments: [
+    {
+      paymentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment' },
+      amountAllocated: { type: Number, required: true },
+      allocatedAt: { type: Date, default: Date.now }
+    }
+  ],
   items: [invoiceItemSchema]
 }, { timestamps: true });
 

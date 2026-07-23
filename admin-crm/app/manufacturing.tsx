@@ -63,6 +63,8 @@ export default function ManufacturingScreen() {
   const [genealogyData, setGenealogyData] = useState<any>(null);
   const [genealogyLoading, setGenealogyLoading] = useState(false);
   const [genealogyType, setGenealogyType] = useState<'batch' | 'material'>('batch');
+  const [genealogySearchQuery, setGenealogySearchQuery] = useState('');
+  const [genealogySearchError, setGenealogySearchError] = useState('');
   const [traceModalVisible, setTraceModalVisible] = useState(false);
   const [traceBatchNo, setTraceBatchNo] = useState('');
   const [traceResult, setTraceResult] = useState<any>(null);
@@ -119,6 +121,15 @@ export default function ManufacturingScreen() {
   const [qcWasteReason, setQcWasteReason] = useState('');
   const [qcNotes, setQcNotes] = useState('');
   const [qcPassedBy, setQcPassedBy] = useState('');
+  const [qcStatus, setQcStatus] = useState<'approved' | 'rejected'>('approved');
+  const [qcOrganoleptic, setQcOrganoleptic] = useState('');
+  const [qcMoisture, setQcMoisture] = useState('');
+  const [qcAsh, setQcAsh] = useState('');
+  const [qcPh, setQcPh] = useState('');
+  const [qcDisintegration, setQcDisintegration] = useState('');
+  const [qcHeavyMetals, setQcHeavyMetals] = useState('Pass');
+  const [qcMicrobial, setQcMicrobial] = useState('Pass');
+  const [qcLabReportRef, setQcLabReportRef] = useState('');
   const [qcError, setQcError] = useState('');
   const [qcYields, setQcYields] = useState<{ productId: string; actualYieldQty: string; packing: string }[]>([
     { productId: '', actualYieldQty: '', packing: '' }
@@ -384,7 +395,16 @@ export default function ManufacturingScreen() {
         packing: Number(qcPacking) || undefined,
         qcNotes: qcNotes.trim(),
         qcPassedBy: qcPassedBy.trim(),
-        yields: yieldsPayload
+        yields: yieldsPayload,
+        qcStatus,
+        organoleptic: qcOrganoleptic.trim(),
+        moistureContent: qcMoisture ? parseFloat(qcMoisture) : null,
+        ashValue: qcAsh ? parseFloat(qcAsh) : null,
+        pHValue: qcPh ? parseFloat(qcPh) : null,
+        disintegrationTime: qcDisintegration ? parseInt(qcDisintegration) : null,
+        heavyMetals: qcHeavyMetals,
+        microbialLimit: qcMicrobial,
+        labReportRef: qcLabReportRef.trim()
       };
       if (qcWasteQty) payload.wasteQty = Number(qcWasteQty);
       if (qcWasteReason.trim()) payload.wasteReason = qcWasteReason.trim();
@@ -398,6 +418,15 @@ export default function ManufacturingScreen() {
       setQcWasteReason('');
       setQcNotes('');
       setQcPassedBy('');
+      setQcStatus('approved');
+      setQcOrganoleptic('');
+      setQcMoisture('');
+      setQcAsh('');
+      setQcPh('');
+      setQcDisintegration('');
+      setQcHeavyMetals('Pass');
+      setQcMicrobial('Pass');
+      setQcLabReportRef('');
       setQcEnableSplit(false);
       setQcYields([{ productId: '', actualYieldQty: '', packing: '1' }]);
       setQcModalVisible(false);
@@ -446,14 +475,24 @@ export default function ManufacturingScreen() {
     setStageModalVisible(true);
   };
 
+  const handleFailStage = (batchId: string, idx: number) => {
+    setStageAction('fail');
+    setStageBatchId(batchId);
+    setStageIndex(idx);
+    setStageOperator('QC Inspector');
+    setStageNotes('');
+    setStageError('');
+    setStageModalVisible(true);
+  };
+
   const handleSaveStageAction = async () => {
     if (!stageBatchId || stageIndex === null || !stageAction) return;
     if (!stageOperator.trim()) {
       setStageError('Operator name is required.');
       return;
     }
-    if (stageAction === 'skip' && !stageNotes.trim()) {
-      setStageError('Justification reason is required when skipping a stage.');
+    if ((stageAction === 'skip' || stageAction === 'fail') && !stageNotes.trim()) {
+      setStageError(`Justification / failure reason is required when ${stageAction === 'fail' ? 'rejecting the batch' : 'skipping a stage'}.`);
       return;
     }
     setStageError('');
@@ -462,8 +501,12 @@ export default function ManufacturingScreen() {
       if (stageAction === 'advance') {
         setCurrentInProgressStage({ batchId: stageBatchId, stageIndex: stageIndex });
       }
+      let statusVal = 'completed';
+      if (stageAction === 'skip') statusVal = 'skipped';
+      if (stageAction === 'fail') statusVal = 'failed';
+
       await api.advanceStage(stageBatchId, stageIndex, {
-        status: stageAction === 'advance' ? 'completed' : 'skipped',
+        status: statusVal,
         completedBy: stageOperator.trim(),
         notes: stageNotes.trim()
       });
@@ -484,6 +527,8 @@ export default function ManufacturingScreen() {
 
   const handleOpenGenealogy = async (type: 'batch' | 'material', id: string) => {
     try {
+      setGenealogySearchQuery('');
+      setGenealogySearchError('');
       setGenealogyType(type);
       setGenealogyLoading(true);
       setGenealogyModalVisible(true);
@@ -496,6 +541,97 @@ export default function ManufacturingScreen() {
       setGenealogyModalVisible(false);
     } finally {
       setGenealogyLoading(false);
+    }
+  };
+
+  const handleExecuteGenealogySearch = async () => {
+    if (!genealogySearchQuery.trim()) return;
+    try {
+      setGenealogyLoading(true);
+      setGenealogySearchError('');
+      const res = await api.searchGenealogy(genealogySearchQuery.trim());
+      if (res.type === 'batch') {
+        setGenealogyType('batch');
+        setGenealogyData(res.data);
+      } else {
+        setGenealogyType('material');
+        setGenealogyData(res.data);
+      }
+    } catch (err: any) {
+      setGenealogySearchError(err.message || 'No genealogy record found matching that search query');
+    } finally {
+      setGenealogyLoading(false);
+    }
+  };
+
+  const handleUploadBatchDoc = async (batchId: string) => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*,application/pdf';
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            try {
+              const dataUrl = reader.result as string;
+              // Upload file once to Cloudinary and link it to batch
+              const uploadRes = await api.uploadFile(dataUrl, file.name);
+              await api.addDocument('batch', batchId, {
+                name: uploadRes.name,
+                url: uploadRes.url
+              });
+              loadData();
+            } catch (err: any) {
+              alert(err.message || 'Failed to upload document');
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err: any) {
+          alert('Failed to read file');
+        }
+      };
+      input.click();
+    } else {
+      Alert.prompt(
+        'Attach Document',
+        'Enter document or certificate URL:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Attach',
+            onPress: async (url) => {
+              if (!url) return;
+              try {
+                await api.addDocument('batch', batchId, { name: 'Attached Certificate', url });
+                loadData();
+              } catch (err: any) {
+                alert(err.message || 'Failed to attach document');
+              }
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const handleDeleteBatchDoc = async (batchId: string, url: string) => {
+    const confirmed = Platform.OS === 'web'
+      ? confirm('Are you sure you want to delete this document?')
+      : await new Promise(resolve => {
+          Alert.alert('Delete Document', 'Are you sure?', [
+            { text: 'No', onPress: () => resolve(false) },
+            { text: 'Yes, Delete', onPress: () => resolve(true) }
+          ]);
+        });
+    if (!confirmed) return;
+    try {
+      await api.deleteDocument('batch', batchId, url);
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete document');
     }
   };
 
@@ -542,6 +678,7 @@ export default function ManufacturingScreen() {
       case 'qc_hold': return colors.warning;
       case 'completed': return colors.success;
       case 'cancelled': return colors.danger;
+      case 'rejected': return colors.danger;
       default: return colors.text.muted;
     }
   };
@@ -953,11 +1090,12 @@ export default function ManufacturingScreen() {
                           {batch.stages.map((stage, sIdx) => {
                             const isCompleted = stage.status === 'completed';
                             const isSkipped = stage.status === 'skipped';
+                            const isFailed = stage.status === 'failed';
                             const isActive = stage.status === 'in_progress';
                             const isInProgress = batch.status === 'in_progress' && stage.status === 'in_progress';
 
-                            const dotBgColor = isCompleted ? colors.success : (isSkipped ? colors.warning : (isActive ? colors.primary : colors.bg.card));
-                            const borderColor = isCompleted ? colors.success : (isSkipped ? colors.warning : (isActive ? colors.primary : colors.border));
+                            const dotBgColor = isCompleted ? colors.success : (isSkipped ? colors.warning : (isFailed ? colors.danger : (isActive ? colors.primary : colors.bg.card)));
+                            const borderColor = isCompleted ? colors.success : (isSkipped ? colors.warning : (isFailed ? colors.danger : (isActive ? colors.primary : colors.border)));
 
                             return (
                               <TouchableOpacity
@@ -975,7 +1113,7 @@ export default function ManufacturingScreen() {
                                   borderWidth: 2,
                                   borderColor: borderColor,
                                   alignItems: 'center',
-                                  justify: 'center',
+                                  justifyContent: 'center',
                                   boxShadow: isActive ? `0 0 6px ${colors.primary}60` : undefined,
                                   elevation: isActive ? 3 : 0
                                 }}>
@@ -983,6 +1121,8 @@ export default function ManufacturingScreen() {
                                     <Ionicons name="checkmark" size={12} color="#fff" />
                                   ) : isSkipped ? (
                                     <Ionicons name="play-forward" size={10} color="#fff" />
+                                  ) : isFailed ? (
+                                    <Ionicons name="close" size={12} color="#fff" />
                                   ) : isActive ? (
                                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />
                                   ) : null}
@@ -1011,9 +1151,9 @@ export default function ManufacturingScreen() {
                         if (activeIdx === -1) return null;
                         const activeStageName = batch.stages[activeIdx].name;
                         return (
-                          <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
+                          <View style={{ marginTop: 10, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
                             <TouchableOpacity
-                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.success }}
+                              style={{ flex: 2, minWidth: 140, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.success }}
                               onPress={() => handleAdvanceStage(batch._id, activeIdx)}
                             >
                               <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
@@ -1022,11 +1162,18 @@ export default function ManufacturingScreen() {
                               </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.warning + '20', borderWidth: 1, borderColor: colors.warning }}
+                              style={{ flex: 1, minWidth: 70, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.warning + '20', borderWidth: 1, borderColor: colors.warning }}
                               onPress={() => handleSkipStage(batch._id, activeIdx)}
                             >
                               <Ionicons name="play-forward-outline" size={14} color={colors.warning} />
                               <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '700' }}>Skip</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={{ flex: 1, minWidth: 70, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.danger + '20', borderWidth: 1, borderColor: colors.danger }}
+                              onPress={() => handleFailStage(batch._id, activeIdx)}
+                            >
+                              <Ionicons name="close-circle-outline" size={14} color={colors.danger} />
+                              <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>Fail</Text>
                             </TouchableOpacity>
                           </View>
                         );
@@ -1072,6 +1219,62 @@ export default function ManufacturingScreen() {
                           ))}
                         </View>
                       )}
+
+                      {/* QC Parameters Log */}
+                      {batch.qcParameters && (
+                        <View style={{ gap: 4, marginTop: 4, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>🔬 QC Testing Parameters Log:</Text>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
+                            {batch.qcParameters.organoleptic ? (
+                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Organoleptic: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.organoleptic}</Text></Text></View>
+                            ) : null}
+                            {batch.qcParameters.moistureContent !== null ? (
+                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Moisture: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.moistureContent}% w/w</Text></Text></View>
+                            ) : null}
+                            {batch.qcParameters.ashValue !== null ? (
+                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Ash Value: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.ashValue}% w/w</Text></Text></View>
+                            ) : null}
+                            {batch.qcParameters.pHValue !== null ? (
+                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>pH: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.pHValue}</Text></Text></View>
+                            ) : null}
+                            {batch.qcParameters.disintegrationTime !== null ? (
+                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Disintegration: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.disintegrationTime} mins</Text></Text></View>
+                            ) : null}
+                            {batch.qcParameters.heavyMetals ? (
+                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Heavy Metals: <Text style={{ color: batch.qcParameters.heavyMetals === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{batch.qcParameters.heavyMetals}</Text></Text></View>
+                            ) : null}
+                            {batch.qcParameters.microbialLimit ? (
+                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Microbial: <Text style={{ color: batch.qcParameters.microbialLimit === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{batch.qcParameters.microbialLimit}</Text></Text></View>
+                            ) : null}
+                            {batch.qcParameters.labReportRef ? (
+                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Lab Ref: <Text style={{ color: colors.primary, fontWeight: '700' }}>{batch.qcParameters.labReportRef}</Text></Text></View>
+                            ) : null}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Supporting Documents Vault */}
+                      <View style={{ gap: 6, marginTop: 8, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Certification:</Text>
+                        
+                        {batch.supportingDocuments && batch.supportingDocuments.length > 0 ? (
+                          <View style={{ gap: 4, marginTop: 2 }}>
+                            {batch.supportingDocuments.map((doc: any, docIdx: number) => (
+                              <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.primary, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                                <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                                  <Ionicons name="document-attach-outline" size={13} color={colors.primary} />
+                                  <Text style={{ fontSize: 10.5, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => handleDeleteBatchDoc(batch._id, doc.url)} style={{ padding: 2 }}>
+                                  <Ionicons name="trash-outline" size={12} color={colors.danger} />
+                                </TouchableOpacity>
+                              </View>
+                            ))}
+                          </View>
+                        ) : (
+                          <Text style={{ fontSize: 10, color: colors.text.muted, fontStyle: 'italic' }}>No supporting documents uploaded.</Text>
+                        )}
+                      </View>
                     </View>
                   )}
 
@@ -1091,54 +1294,61 @@ export default function ManufacturingScreen() {
                       <Text style={{ fontSize: 11, color: colors.text.secondary }}>All manufacturing stages are done. Complete QC inspection to inward finished stock into inventory.</Text>
                     </View>
                   )}
-                  {(isInProgress || isQcHold) && (
-                    <View style={styles.batchActionsRow}>
-                      <TouchableOpacity style={styles.cancelBatchBtn} onPress={() => handleCancelProduction(batch._id)}>
-                        <Ionicons name="close-circle-outline" size={15} color={colors.danger} />
-                        <Text style={styles.cancelBatchBtnText}>Cancel & Revert Stock</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.completeBatchBtn} onPress={() => {
-                        setSelectedBatchRun(batch);
-                        setQcYieldQty(batch.plannedQty.toString());
-                        setQcWasteQty('');
-                        setQcWasteReason('');
-                        setQcPassedBy('');
-                        setQcNotes('');
-                        setQcModalVisible(true);
-                      }}>
-                        <Ionicons name="checkmark-done-circle-outline" size={15} color="#fff" />
-                        <Text style={styles.completeBatchBtnText}>QC Sign-off & Inward Stock</Text>
-                      </TouchableOpacity>
+                  {/* Action Controls Row */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: 10 }}>
+                    {/* Left Side: Report & Genealogy Actions */}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {isFinished && (
+                        <TouchableOpacity 
+                          style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12 }]} 
+                          onPress={() => handleOpenBMR(batch._id)}
+                        >
+                          <Ionicons name="document-text-outline" size={15} color={colors.primary} />
+                          <Text style={styles.outlineBtnText}>BMR Report</Text>
+                        </TouchableOpacity>
+                      )}
+                      {!isCancelled && (
+                        <>
+                          <TouchableOpacity 
+                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.text.secondary }]} 
+                            onPress={() => handleOpenGenealogy('batch', batch._id)}
+                          >
+                            <Ionicons name="git-network-outline" size={15} color={colors.text.secondary} />
+                            <Text style={[styles.outlineBtnText, { color: colors.text.secondary }]}>Genealogy</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.success }]} 
+                            onPress={() => handleUploadBatchDoc(batch._id)}
+                          >
+                            <Ionicons name="cloud-upload-outline" size={15} color={colors.success} />
+                            <Text style={[styles.outlineBtnText, { color: colors.success }]}>Upload Doc</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
                     </View>
-                  )}
 
-                  {isFinished && (
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                      <TouchableOpacity 
-                        style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12 }]} 
-                        onPress={() => handleOpenBMR(batch._id)}
-                      >
-                        <Ionicons name="document-text-outline" size={15} color={colors.primary} />
-                        <Text style={styles.outlineBtnText}>BMR Report</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.text.secondary }]} 
-                        onPress={() => handleOpenGenealogy('batch', batch._id)}
-                      >
-                        <Ionicons name="git-network-outline" size={15} color={colors.text.secondary} />
-                        <Text style={[styles.outlineBtnText, { color: colors.text.secondary }]}>Genealogy</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                  {!isFinished && !isCancelled && (
-                    <TouchableOpacity 
-                      style={[styles.outlineBtn, { marginTop: 12, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start', borderColor: colors.text.secondary }]} 
-                      onPress={() => handleOpenGenealogy('batch', batch._id)}
-                    >
-                      <Ionicons name="git-network-outline" size={15} color={colors.text.secondary} />
-                      <Text style={[styles.outlineBtnText, { color: colors.text.secondary }]}>Genealogy</Text>
-                    </TouchableOpacity>
-                  )}
+                    {/* Right Side: Active Process State Actions */}
+                    {(isInProgress || isQcHold) && (
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity style={styles.cancelBatchBtn} onPress={() => handleCancelProduction(batch._id)}>
+                          <Ionicons name="close-circle-outline" size={15} color={colors.danger} />
+                          <Text style={styles.cancelBatchBtnText}>Cancel & Revert Stock</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.completeBatchBtn} onPress={() => {
+                          setSelectedBatchRun(batch);
+                          setQcYieldQty(batch.plannedQty.toString());
+                          setQcWasteQty('');
+                          setQcWasteReason('');
+                          setQcPassedBy('');
+                          setQcNotes('');
+                          setQcModalVisible(true);
+                        }}>
+                          <Ionicons name="checkmark-done-circle-outline" size={15} color="#fff" />
+                          <Text style={styles.completeBatchBtnText}>QC Sign-off & Inward Stock</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 </View>
               );
             })}
@@ -1233,9 +1443,11 @@ export default function ManufacturingScreen() {
                             {run.stages.map((st: any, idx: number) => {
                               const isDone = st.status === 'completed' || st.status === 'skipped';
                               const isCurrent = st.status === 'in_progress';
+                              const isFailed = st.status === 'failed';
                               let dotColor = colors.border;
                               if (isDone) dotColor = colors.success;
                               else if (isCurrent) dotColor = colors.primary;
+                              else if (isFailed) dotColor = colors.danger;
 
                               return (
                                 <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -1538,6 +1750,51 @@ export default function ManufacturingScreen() {
             </View>
             {qcError ? <Text style={styles.modalError}>{qcError}</Text> : null}
             <ScrollView style={styles.modalForm}>
+              <Text style={styles.inputLabel}>QC Decision *</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setQcStatus('approved')}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    paddingVertical: 10,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    backgroundColor: qcStatus === 'approved' ? colors.success : colors.bg.secondary,
+                    borderColor: qcStatus === 'approved' ? colors.success : colors.border
+                  }}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={16} color={qcStatus === 'approved' ? '#fff' : colors.success} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: qcStatus === 'approved' ? '#fff' : colors.text.secondary }}>
+                    APPROVE BATCH
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setQcStatus('rejected')}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    paddingVertical: 10,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    backgroundColor: qcStatus === 'rejected' ? colors.danger : colors.bg.secondary,
+                    borderColor: qcStatus === 'rejected' ? colors.danger : colors.border
+                  }}
+                >
+                  <Ionicons name="close-circle-outline" size={16} color={qcStatus === 'rejected' ? '#fff' : colors.danger} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: qcStatus === 'rejected' ? '#fff' : colors.text.secondary }}>
+                    REJECT BATCH
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.inputLabel}>Actual Output Yield Size (units) *</Text>
               <TextInput style={styles.input} placeholder="e.g. 498" placeholderTextColor={colors.text.muted} value={qcYieldQty} onChangeText={setQcYieldQty} keyboardType="numeric" />
 
@@ -1619,8 +1876,80 @@ export default function ManufacturingScreen() {
               <Text style={styles.inputLabel}>Waste / Variance Reason</Text>
               <TextInput style={styles.input} placeholder="e.g. Drying loss, spillage, QC rejects" placeholderTextColor={colors.text.muted} value={qcWasteReason} onChangeText={setQcWasteReason} />
 
+              {/* GMP Quality Parameters card section */}
+              <View style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, marginVertical: 14 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>🔬 GMP Lab Specifications & Testing</Text>
+                
+                <Text style={styles.inputLabel}>Organoleptic Description</Text>
+                <TextInput style={styles.input} placeholder="Color, odour, taste (e.g. Dark brown, herbal odour)" placeholderTextColor={colors.text.muted} value={qcOrganoleptic} onChangeText={setQcOrganoleptic} />
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Moisture Content (% w/w)</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 4.5" placeholderTextColor={colors.text.muted} value={qcMoisture} onChangeText={setQcMoisture} keyboardType="numeric" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Ash Value (% w/w)</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 6.2" placeholderTextColor={colors.text.muted} value={qcAsh} onChangeText={setQcAsh} keyboardType="numeric" />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>pH Value</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 5.5" placeholderTextColor={colors.text.muted} value={qcPh} onChangeText={setQcPh} keyboardType="numeric" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Disintegration Time (min)</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 15" placeholderTextColor={colors.text.muted} value={qcDisintegration} onChangeText={setQcDisintegration} keyboardType="numeric" />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 10, marginVertical: 6 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Heavy Metals Limit</Text>
+                    <View style={{ flexDirection: 'row', gap: 4 }}>
+                      {['Pass', 'Fail'].map(opt => (
+                        <TouchableOpacity
+                          key={opt}
+                          onPress={() => setQcHeavyMetals(opt)}
+                          style={{
+                            flex: 1, paddingVertical: 6, borderRadius: 6, borderWidth: 1, alignItems: 'center',
+                            backgroundColor: qcHeavyMetals === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.bg.primary,
+                            borderColor: qcHeavyMetals === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.border
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: qcHeavyMetals === opt ? '#fff' : colors.text.secondary }}>{opt.toUpperCase()}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Microbial Limit</Text>
+                    <View style={{ flexDirection: 'row', gap: 4 }}>
+                      {['Pass', 'Fail'].map(opt => (
+                        <TouchableOpacity
+                          key={opt}
+                          onPress={() => setQcMicrobial(opt)}
+                          style={{
+                            flex: 1, paddingVertical: 6, borderRadius: 6, borderWidth: 1, alignItems: 'center',
+                            backgroundColor: qcMicrobial === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.bg.primary,
+                            borderColor: qcMicrobial === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.border
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: qcMicrobial === opt ? '#fff' : colors.text.secondary }}>{opt.toUpperCase()}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                <Text style={styles.inputLabel}>Lab Report Reference No. / File Link</Text>
+                <TextInput style={styles.input} placeholder="e.g. LAB-2026-07-23-01" placeholderTextColor={colors.text.muted} value={qcLabReportRef} onChangeText={setQcLabReportRef} />
+              </View>
+
               <Text style={styles.inputLabel}>QC Inspector Name *</Text>
-              <TextInput style={styles.input} placeholder="e.g. Dr. P. K. Sharma" placeholderTextColor={colors.text.muted} value={qcPassedBy} onChangeText={setQcPassedBy} />
+              <TextInput style={styles.input} placeholder="e.g. Dr. P. K. Sharma" placeholderTextColor={colors.text.muted} value={qcPassedBy} onChangeText={setQcPassedBy} />derTextColor={colors.text.muted} value={qcPassedBy} onChangeText={setQcPassedBy} />
 
               <Text style={styles.inputLabel}>Quality Check Notes / Lab Remarks</Text>
               <TextInput
@@ -1825,10 +2154,52 @@ export default function ManufacturingScreen() {
 
                 {/* 6. QC Inspection Clearance Certification */}
                 <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section V: GMP Quality Assurance Sign-Off</Text>
+                    {bmrReport.qcStatus === 'rejected' ? (
+                      <View style={{ backgroundColor: colors.danger, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>REJECTED</Text>
+                      </View>
+                    ) : (
+                      <View style={{ backgroundColor: colors.success, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>APPROVED</Text>
+                      </View>
+                    )}
                   </View>
-                  <View style={{ padding: 12, gap: 6 }}>
+                  <View style={{ padding: 12, gap: 8 }}>
+                    {bmrReport.qcParameters ? (
+                      <View style={{ backgroundColor: colors.bg.primary, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border, gap: 6, marginBottom: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: colors.text.secondary, letterSpacing: 0.5 }}>🔬 LABORATORY TEST SPECIFICATIONS SUMMARY</Text>
+                        
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
+                          {bmrReport.qcParameters.organoleptic ? (
+                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Organoleptic Check: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.organoleptic}</Text></Text></View>
+                          ) : null}
+                          {bmrReport.qcParameters.moistureContent !== null ? (
+                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Moisture Content: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.moistureContent}% w/w</Text></Text></View>
+                          ) : null}
+                          {bmrReport.qcParameters.ashValue !== null ? (
+                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Ash Value: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.ashValue}% w/w</Text></Text></View>
+                          ) : null}
+                          {bmrReport.qcParameters.pHValue !== null ? (
+                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>pH Value: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.pHValue}</Text></Text></View>
+                          ) : null}
+                          {bmrReport.qcParameters.disintegrationTime !== null ? (
+                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Disintegration Time: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.disintegrationTime} mins</Text></Text></View>
+                          ) : null}
+                          {bmrReport.qcParameters.heavyMetals ? (
+                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Heavy Metals Limit: <Text style={{ color: bmrReport.qcParameters.heavyMetals === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{bmrReport.qcParameters.heavyMetals.toUpperCase()}</Text></Text></View>
+                          ) : null}
+                          {bmrReport.qcParameters.microbialLimit ? (
+                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Microbial Limits: <Text style={{ color: bmrReport.qcParameters.microbialLimit === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{bmrReport.qcParameters.microbialLimit.toUpperCase()}</Text></Text></View>
+                          ) : null}
+                          {bmrReport.qcParameters.labReportRef ? (
+                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Lab Report Ref No: <Text style={{ color: colors.primary, fontWeight: '800' }}>{bmrReport.qcParameters.labReportRef}</Text></Text></View>
+                          ) : null}
+                        </View>
+                      </View>
+                    ) : null}
+
                     <Text style={{ fontSize: 12, color: colors.text.primary }}><Text style={{ fontWeight: '700' }}>QC Inspector Remarks: </Text>{bmrReport.qcNotes}</Text>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10, marginTop: 8 }}>
                       <Text style={{ fontSize: 11, color: colors.text.secondary }}>Inspector: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{bmrReport.qcPassedBy}</Text></Text>
@@ -1878,6 +2249,38 @@ export default function ManufacturingScreen() {
                 <Ionicons name="close" size={20} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
+
+            {/* Genealogy Search Bar */}
+            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8, alignItems: 'center' }}>
+              <TextInput
+                style={[styles.input, { flex: 1, marginBottom: 0, fontSize: 13 }]}
+                placeholder="Search Finished Goods / Raw Material Batch No..."
+                placeholderTextColor={colors.text.muted}
+                value={genealogySearchQuery}
+                onChangeText={setGenealogySearchQuery}
+                onSubmitEditing={handleExecuteGenealogySearch}
+              />
+              <TouchableOpacity
+                onPress={handleExecuteGenealogySearch}
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 6,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+              >
+                <Ionicons name="search" size={14} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Search</Text>
+              </TouchableOpacity>
+            </View>
+            {genealogySearchError ? (
+              <Text style={{ color: colors.danger, fontSize: 11, fontWeight: '600', paddingHorizontal: 16, marginTop: 4 }}>
+                ⚠️ {genealogySearchError}
+              </Text>
+            ) : null}
 
             {genealogyLoading ? (
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

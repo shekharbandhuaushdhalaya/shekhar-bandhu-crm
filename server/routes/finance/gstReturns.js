@@ -125,6 +125,27 @@ router.get('/gstr1', async (req, res) => {
       },
     };
 
+    if (req.query.format === 'csv') {
+      let csv = 'Invoice No,Date,Customer Name,GSTIN,Taxable Value (₹),CGST (₹),SGST (₹),IGST (₹),Total Amount (₹)\n';
+      invoices.forEach(i => {
+        const row = [
+          i.invoiceNo || '',
+          new Date(i.date).toLocaleDateString('en-IN'),
+          `"${(i.customerName || 'Walk-in Customer').replace(/"/g, '""')}"`,
+          i.gstin || '',
+          (i.baseAmount || 0).toFixed(2),
+          (i.cgst || 0).toFixed(2),
+          (i.sgst || 0).toFixed(2),
+          (i.igst || 0).toFixed(2),
+          (i.amount || 0).toFixed(2)
+        ];
+        csv += row.join(',') + '\n';
+      });
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=GSTR1_${y}_${m}.csv`);
+      return res.send(csv);
+    }
+
     res.json(summary);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -190,7 +211,7 @@ router.get('/gstr3b', async (req, res) => {
     const inwardSGST = purchaseInvoices.reduce((s, i) => s + (i.sgst || 0), 0);
     const inwardIGST = purchaseInvoices.reduce((s, i) => s + (i.igst || 0), 0);
 
-    res.json({
+    const result = {
       month: m,
       year: y,
       outwardSupplies: {
@@ -214,7 +235,66 @@ router.get('/gstr3b', async (req, res) => {
         invoiceCount: purchaseInvoices.length,
       },
       netGSTPayable: (outwardCGST + outwardSGST + outwardIGST) - (inwardCGST + inwardSGST + inwardIGST),
-    });
+    };
+
+    if (req.query.format === 'csv') {
+      let csv = 'GST Table Section,Taxable Value (₹),Integrated Tax IGST (₹),Central Tax CGST (₹),State Tax SGST (₹),Total GST (₹)\n';
+      csv += `3.1 (a) Outward Taxable Supplies,${outwardTaxable.toFixed(2)},${outwardIGST.toFixed(2)},${outwardCGST.toFixed(2)},${outwardSGST.toFixed(2)},${(outwardIGST + outwardCGST + outwardSGST).toFixed(2)}\n`;
+      csv += `4 (A) Eligible ITC,${inwardTaxable.toFixed(2)},${inwardIGST.toFixed(2)},${inwardCGST.toFixed(2)},${inwardSGST.toFixed(2)},${(inwardIGST + inwardCGST + inwardSGST).toFixed(2)}\n`;
+      
+      const netIGST = outwardIGST - inwardIGST;
+      const netCGST = outwardCGST - inwardCGST;
+      const netSGST = outwardSGST - inwardSGST;
+      csv += `Net GST Payable/Refund,${(outwardTaxable - inwardTaxable).toFixed(2)},${netIGST.toFixed(2)},${netCGST.toFixed(2)},${netSGST.toFixed(2)},${(netIGST + netCGST + netSGST).toFixed(2)}\n`;
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=GSTR3B_${y}_${m}.csv`);
+      return res.send(csv);
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/gst/filing-status — Get ARN details for period
+router.get('/filing-status', async (req, res) => {
+  try {
+    const { period, returnType } = req.query;
+    if (!period || !returnType) {
+      return res.status(400).json({ error: 'period and returnType are required' });
+    }
+    const GstFiling = require('../../models/GstFiling');
+    const filing = await GstFiling.findOne({ period, returnType }).lean();
+    if (!filing) return res.json({ filed: false });
+    res.json({ filed: true, filing });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/gst/filing-status — Save ARN and mark month returns as filed
+router.post('/filing-status', async (req, res) => {
+  try {
+    const { period, returnType, arn, url, name } = req.body;
+    if (!period || !returnType || !arn) {
+      return res.status(400).json({ error: 'period, returnType, and arn are required' });
+    }
+    const GstFiling = require('../../models/GstFiling');
+    let filing = await GstFiling.findOne({ period, returnType });
+    if (!filing) {
+      filing = new GstFiling({ period, returnType, arn });
+    } else {
+      filing.arn = arn;
+    }
+    filing.filedDate = new Date();
+    filing.filedBy = req.user ? req.user.name : 'System Accountant';
+    if (url) {
+      filing.supportingDocuments = [{ name: name || 'Filing Receipt', url, uploadedAt: new Date() }];
+    }
+    await filing.save();
+    res.status(201).json({ filed: true, filing });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

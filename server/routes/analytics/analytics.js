@@ -237,4 +237,65 @@ Strict Security Rule: Answer the user's question accurately based ONLY on the pr
   }
 });
 
+// GET /api/analytics/manufacturing — Retrieve manufacturing analytics, stats, and visual timeline runs
+router.get('/manufacturing', async (req, res) => {
+  try {
+    const BatchProduction = require('../../models/BatchProduction');
+    const BillOfMaterials = require('../../models/BillOfMaterials');
+    const RawMaterial = require('../../models/RawMaterial');
+
+    const totalBatches = await BatchProduction.countDocuments({});
+    const completedBatches = await BatchProduction.countDocuments({ status: 'completed' });
+    const rejectedBatches = await BatchProduction.countDocuments({ status: 'rejected' });
+    const inProgressBatches = await BatchProduction.countDocuments({ status: 'in_progress' });
+    const qcHoldBatches = await BatchProduction.countDocuments({ status: 'qc_hold' });
+
+    const totalYield = await BatchProduction.aggregate([
+      { $match: { status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$actualYieldQty' } } }
+    ]);
+
+    const totalWaste = await BatchProduction.aggregate([
+      { $group: { _id: null, total: { $sum: '$wasteQty' } } }
+    ]);
+
+    const rawTimeline = await BatchProduction.find({})
+      .populate('productId', 'name sku')
+      .sort({ startDate: -1 })
+      .limit(10)
+      .lean();
+
+    const timeline = rawTimeline.map(run => ({
+      id: run._id,
+      batchNo: run.batchNo,
+      productName: run.productId ? run.productId.name : 'Unknown Product',
+      productSku: run.productId ? run.productId.sku : 'N/A',
+      plannedQty: run.plannedQty,
+      actualYieldQty: run.actualYieldQty,
+      startDate: run.startDate,
+      endDate: run.endDate,
+      status: run.status,
+      stages: run.stages || []
+    }));
+
+    res.json({
+      batchesCount: {
+        total: totalBatches,
+        completed: completedBatches,
+        rejected: rejectedBatches,
+        inProgress: inProgressBatches,
+        qcHold: qcHoldBatches
+      },
+      yieldStats: {
+        totalYield: totalYield[0] ? totalYield[0].total : 0,
+        totalWaste: totalWaste[0] ? totalWaste[0].total : 0
+      },
+      timeline
+    });
+  } catch (err) {
+    console.error('Mfg Analytics Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

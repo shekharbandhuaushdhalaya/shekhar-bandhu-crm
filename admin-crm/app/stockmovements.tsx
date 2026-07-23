@@ -248,6 +248,79 @@ export default function StockMovementsScreen() {
   const [detailMovement, setDetailMovement] = useState<StockMovement | null>(null);
   const [showDetail, setShowDetail] = useState(false);
 
+  const handleUploadChallanDoc = async (challanId: string) => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*,application/pdf';
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            try {
+              const dataUrl = reader.result as string;
+              const uploadRes = await api.uploadFile(dataUrl, file.name);
+              await api.addDocument('challan', challanId, {
+                name: uploadRes.name,
+                url: uploadRes.url
+              });
+              load();
+              setShowDetail(false);
+            } catch (err: any) {
+              alert(err.message || 'Failed to upload document');
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err: any) {
+          alert('Failed to read file');
+        }
+      };
+      input.click();
+    } else {
+      Alert.prompt(
+        'Attach Document',
+        'Enter document or delivery proof URL:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Attach',
+            onPress: async (url) => {
+              if (!url) return;
+              try {
+                await api.addDocument('challan', challanId, { name: 'Attached POD / Challan Proof', url });
+                load();
+                setShowDetail(false);
+              } catch (err: any) {
+                alert(err.message || 'Failed to attach document');
+              }
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const handleDeleteChallanDoc = async (challanId: string, url: string) => {
+    const confirmed = Platform.OS === 'web'
+      ? confirm('Are you sure you want to delete this document?')
+      : await new Promise(resolve => {
+          Alert.alert('Delete Document', 'Are you sure?', [
+            { text: 'No', onPress: () => resolve(false) },
+            { text: 'Yes, Delete', onPress: () => resolve(true) }
+          ]);
+        });
+    if (!confirmed) return;
+    try {
+      await api.deleteDocument('challan', challanId, url);
+      load();
+      setShowDetail(false);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete document');
+    }
+  };
+
   const load = useCallback(async () => {
     try {
       const data = await api.getStockMovements({
@@ -1061,9 +1134,14 @@ export default function StockMovementsScreen() {
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>{detailMovement.docNo}</Text>
-          <TouchableOpacity onPress={() => printDeliveryChallan(detailMovement)}>
-            <Ionicons name="print-outline" size={24} color={colors.primary} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity onPress={() => handleUploadChallanDoc(detailMovement._id)} style={{ padding: 4 }}>
+              <Ionicons name="cloud-upload" size={22} color={colors.success} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => printDeliveryChallan(detailMovement)}>
+              <Ionicons name="print-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
         <ScrollView style={styles.modalForm} contentContainerStyle={{ padding: 16 }}>
                 <View style={{ marginBottom: 12 }}>
@@ -1152,6 +1230,29 @@ export default function StockMovementsScreen() {
                     </View>
                   </View>
                 )}
+
+                {/* Supporting Documents Vault */}
+                <View style={{ gap: 6, marginVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Delivery Proof (POD):</Text>
+                  
+                  {(detailMovement as any).supportingDocuments && (detailMovement as any).supportingDocuments.length > 0 ? (
+                    <View style={{ gap: 6, marginTop: 4 }}>
+                      {(detailMovement as any).supportingDocuments.map((doc: any, docIdx: number) => (
+                        <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                          <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                            <Ionicons name="document-attach" size={15} color={colors.primary} />
+                            <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleDeleteChallanDoc(detailMovement._id, doc.url)} style={{ padding: 4 }}>
+                            <Ionicons name="trash-outline" size={14} color={colors.danger} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 11, color: colors.text.muted, fontStyle: 'italic', marginTop: 2 }}>No supporting documents uploaded.</Text>
+                  )}
+                </View>
 
                 <View style={{ gap: 10, marginTop: 20 }}>
                   {/* Row for Finalize, Edit, Delete */}

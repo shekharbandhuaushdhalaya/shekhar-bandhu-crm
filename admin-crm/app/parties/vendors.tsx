@@ -1326,30 +1326,25 @@ export default function VendorsScreen() {
 
                   {/* Dynamic Balance Badge based on recordTracking */}
                   <View style={[styles.tableCellContainer, { width: 140, alignItems: 'flex-end', justifyContent: 'center' }]}>
-                    {(v as any).recordTracking === 'cash_ledger' ? (
-                      <View style={[
-                        styles.balanceBadge,
-                        {
-                          backgroundColor: (v.cashBalance || 0) > 0 ? colors.warning + '12' : colors.bg.secondary,
-                          borderColor: (v.cashBalance || 0) > 0 ? colors.warning + '30' : colors.border,
-                          borderWidth: 1
-                        }
-                      ]}>
-                        {(v.cashBalance || 0) > 0 && <Text style={[styles.balanceBadgeLabel, { color: colors.warning }]}>DR</Text>}
-                        <Text style={[styles.balanceText, { color: (v.cashBalance || 0) > 0 ? colors.warning : colors.text.muted, fontSize: 11 }]}>
-                          Cash: ₹{Math.abs(v.cashBalance || 0).toLocaleString('en-IN')}
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={[styles.balanceBadge, { backgroundColor: balBg, borderColor: balColor + '30', borderWidth: 1 }]}>
-                        {drCrLabel && (
-                          <Text style={[styles.balanceBadgeLabel, { color: balColor }]}>{drCrLabel}</Text>
-                        )}
-                        <Text style={[styles.balanceText, { color: balColor, fontSize: 11 }]}>
-                          GST: ₹{Math.abs(bal).toLocaleString('en-IN')}
-                        </Text>
-                      </View>
-                    )}
+                    {(() => {
+                      const isCash = (v as any).recordTracking === 'cash_ledger';
+                      const amount = isCash ? (v.cashBalance || 0) : (v.regularBalance || 0);
+                      
+                      // For Vendors:
+                      // positive balance means we owe them (Credit / CR)
+                      // negative balance means they owe us (Debit / DR)
+                      const label = amount > 0 ? 'CR.' : amount < 0 ? 'DR.' : '';
+                      const color = amount > 0 ? colors.danger : amount < 0 ? colors.success : colors.text.muted;
+                      const bg = amount > 0 ? colors.danger + '12' : amount < 0 ? colors.success + '12' : colors.bg.secondary;
+
+                      return (
+                        <View style={[styles.balanceBadge, { backgroundColor: bg, borderColor: color + '30', borderWidth: 1 }]}>
+                          <Text style={[styles.balanceText, { color, fontSize: 13, fontWeight: '800' }]}>
+                            {label} {Math.abs(amount).toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+                      );
+                    })()}
                   </View>
 
                   {/* Action: View Detail Button */}

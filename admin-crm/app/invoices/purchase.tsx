@@ -56,6 +56,79 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
 
   if (!invoice) return null;
 
+  const handleUploadInvoiceDoc = async () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*,application/pdf';
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            try {
+              const dataUrl = reader.result as string;
+              const uploadRes = await api.uploadFile(dataUrl, file.name);
+              await api.addDocument('invoice', invoice._id, {
+                name: uploadRes.name,
+                url: uploadRes.url
+              });
+              onDeleted();
+              onClose();
+            } catch (err: any) {
+              alert(err.message || 'Failed to upload document');
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err: any) {
+          alert('Failed to read file');
+        }
+      };
+      input.click();
+    } else {
+      Alert.prompt(
+        'Attach Document',
+        'Enter document or receipt URL:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Attach',
+            onPress: async (url) => {
+              if (!url) return;
+              try {
+                await api.addDocument('invoice', invoice._id, { name: 'Attached Purchase Receipt', url });
+                onDeleted();
+                onClose();
+              } catch (err: any) {
+                alert(err.message || 'Failed to attach document');
+              }
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const handleDeleteInvoiceDoc = async (url: string) => {
+    const confirmed = Platform.OS === 'web'
+      ? confirm('Are you sure you want to delete this document?')
+      : await new Promise(resolve => {
+          Alert.alert('Delete Document', 'Are you sure?', [
+            { text: 'No', onPress: () => resolve(false) },
+            { text: 'Yes, Delete', onPress: () => resolve(true) }
+          ]);
+        });
+    if (!confirmed) return;
+    try {
+      await api.deleteDocument('invoice', invoice._id, url);
+      onDeleted();
+      onClose();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete document');
+    }
+  };
+
   const handleDelete = async () => {
     try {
       const success = await api.deletePurchaseInvoice(invoice._id);
@@ -86,7 +159,26 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
             <View style={styles.profileAvatar}>
               <Ionicons name="receipt" size={36} color={colors.purple} />
             </View>
-            <Text style={styles.profileName}>{invoice.invoiceNo}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center', marginVertical: 4 }}>
+              <Text style={styles.profileName}>{invoice.invoiceNo}</Text>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.success + '15',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: colors.success,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+                onPress={handleUploadInvoiceDoc}
+              >
+                <Ionicons name="cloud-upload-outline" size={13} color={colors.success} />
+                <Text style={{ fontSize: 10, color: colors.success, fontWeight: '700' }}>Upload Receipt</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.profileSupplier}>{invoice.supplierName}</Text>
           </View>
 
@@ -225,6 +317,29 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
               </View>
             </View>
           )}
+
+          {/* Supporting Documents Vault */}
+          <View style={{ gap: 6, marginVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Scanned Receipts:</Text>
+            
+            {invoice.supportingDocuments && invoice.supportingDocuments.length > 0 ? (
+              <View style={{ gap: 6, marginTop: 4 }}>
+                {invoice.supportingDocuments.map((doc: any, docIdx: number) => (
+                  <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                    <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                      <Ionicons name="document-attach" size={15} color={colors.primary} />
+                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDeleteInvoiceDoc(doc.url)} style={{ padding: 4 }}>
+                      <Ionicons name="trash-outline" size={14} color={colors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={{ fontSize: 11, color: colors.text.muted, fontStyle: 'italic', marginTop: 2 }}>No supporting documents uploaded.</Text>
+            )}
+          </View>
 
           {/* Finalize Button */}
           {!invoice.isFinalized && (
@@ -1039,158 +1154,162 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           {/* Tabular Items Section */}
           <Text style={[styles.formLabel, { marginTop: 12, marginBottom: 8, fontSize: 13, color: colors.text.primary }]}>Items Breakdown *</Text>
           
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 3.2 : 3.6 }]}>Raw Material Name *</Text>
-            <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.4 : 1.6, textAlign: 'center' }]}>Qty / Unit *</Text>
-            <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}>Rate (₹)</Text>
-            {mode === 'regular' && (
-              <Text style={[styles.tableHeaderLabel, { flex: 0.7, textAlign: 'center' }]}>GST</Text>
-            )}
-            <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}>Total</Text>
-            <View style={{ flex: 0.4 }} />
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%', marginBottom: 12 }}>
+            <View style={{ minWidth: 650 }}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 3.2 : 3.6 }]}>Raw Material Name *</Text>
+                <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.4 : 1.6, textAlign: 'center' }]}>Qty / Unit *</Text>
+                <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}>Rate (₹)</Text>
+                {mode === 'regular' && (
+                  <Text style={[styles.tableHeaderLabel, { flex: 0.7, textAlign: 'center' }]}>GST</Text>
+                )}
+                <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}>Total</Text>
+                <View style={{ flex: 0.4 }} />
+              </View>
 
-          {rows.map((row, index) => {
-            const qtyNum = parseFloat(row.boxes) || 0;
-            const subtotal = qtyNum * (parseFloat(row.rate) || 0);
-            const gstAmount = mode === 'regular' ? (subtotal * row.gstRate) / 100 : 0;
-            const rowTotal = subtotal + gstAmount;
+              {rows.map((row, index) => {
+                const qtyNum = parseFloat(row.boxes) || 0;
+                const subtotal = qtyNum * (parseFloat(row.rate) || 0);
+                const gstAmount = mode === 'regular' ? (subtotal * row.gstRate) / 100 : 0;
+                const rowTotal = subtotal + gstAmount;
 
-            const rowFilteredItems = row.productSearch
-              ? selectableItems.filter(item =>
-                  item.name.toLowerCase().includes(row.productSearch.toLowerCase()) ||
-                  item.sku.toLowerCase().includes(row.productSearch.toLowerCase())
-                )
-              : selectableItems;
+                const rowFilteredItems = row.productSearch
+                  ? selectableItems.filter(item =>
+                      item.name.toLowerCase().includes(row.productSearch.toLowerCase()) ||
+                      item.sku.toLowerCase().includes(row.productSearch.toLowerCase())
+                    )
+                  : selectableItems;
 
-            return (
-              <View key={row.id} style={[styles.tableRow, { zIndex: (row.showProductDropdown || row.showGstDropdown) ? 1000 : 100 - index }]}>
-                {/* Raw Material search */}
-                <View style={{ flex: mode === 'regular' ? 3.2 : 3.6, position: 'relative' }}>
-                  <TextInput
-                    style={styles.tableInput}
-                    placeholder="Search raw material..."
-                    placeholderTextColor={colors.text.muted}
-                    value={row.productSearch}
-                    onChangeText={(text) => updateRowProductSearch(row.id, text)}
-                    onFocus={() => {
-                      setRows(prev => prev.map(r => r.id === row.id ? { ...r, showProductDropdown: true } : { ...r, showProductDropdown: false }));
-                    }}
-                  />
-                  {row.showProductDropdown && (
-                    <View style={styles.rowDropdown}>
-                      <ScrollView nestedScrollEnabled style={{ maxHeight: 160 }} keyboardShouldPersistTaps="handled">
-                        {rowFilteredItems.map(item => (
-                          <TouchableOpacity
-                            key={`rm-${item.id}`}
-                            style={styles.rowDropdownItem}
-                            onPress={() => handleSelectRowItem(row.id, item)}
-                          >
-                            <Text style={styles.rowDropdownItemText}>
-                              🧪 {item.name}
-                            </Text>
-                            <Text style={styles.rowDropdownItemSubtext}>
-                              SKU: {item.sku || 'N/A'} | Unit: {item.unit || 'units'}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                        {rowFilteredItems.length === 0 && (
-                          <View style={{ padding: 8 }}>
-                            <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'center' }}>No raw materials found</Text>
+                return (
+                  <View key={row.id} style={[styles.tableRow, { zIndex: (row.showProductDropdown || row.showGstDropdown) ? 1000 : 100 - index }]}>
+                    {/* Raw Material search */}
+                    <View style={{ flex: mode === 'regular' ? 3.2 : 3.6, position: 'relative' }}>
+                      <TextInput
+                        style={styles.tableInput}
+                        placeholder="Search raw material..."
+                        placeholderTextColor={colors.text.muted}
+                        value={row.productSearch}
+                        onChangeText={(text) => updateRowProductSearch(row.id, text)}
+                        onFocus={() => {
+                          setRows(prev => prev.map(r => r.id === row.id ? { ...r, showProductDropdown: true } : { ...r, showProductDropdown: false }));
+                        }}
+                      />
+                      {row.showProductDropdown && (
+                        <View style={styles.rowDropdown}>
+                          <ScrollView nestedScrollEnabled style={{ maxHeight: 160 }} keyboardShouldPersistTaps="handled">
+                            {rowFilteredItems.map(item => (
+                              <TouchableOpacity
+                                key={`rm-${item.id}`}
+                                style={styles.rowDropdownItem}
+                                onPress={() => handleSelectRowItem(row.id, item)}
+                              >
+                                <Text style={styles.rowDropdownItemText}>
+                                  🧪 {item.name}
+                                </Text>
+                                <Text style={styles.rowDropdownItemSubtext}>
+                                  SKU: {item.sku || 'N/A'} | Unit: {item.unit || 'units'}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                            {rowFilteredItems.length === 0 && (
+                              <View style={{ padding: 8 }}>
+                                <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'center' }}>No raw materials found</Text>
+                              </View>
+                            )}
+                            <TouchableOpacity
+                              style={[styles.rowDropdownItem, { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary }]}
+                              onPress={() => setRows(prev => prev.map(r => r.id === row.id ? { ...r, showProductDropdown: false } : r))}
+                            >
+                              <Text style={{ fontSize: 11, color: colors.primary, textAlign: 'center', fontWeight: 'bold' }}>Close</Text>
+                            </TouchableOpacity>
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Qty (Unit) */}
+                    <View style={{ flex: mode === 'regular' ? 1.4 : 1.6, position: 'relative', justifyContent: 'center' }}>
+                      <TextInput
+                        style={[styles.tableInput, { width: '100%', textAlign: 'center', paddingRight: row.unit ? 36 : 8 }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.text.muted}
+                        keyboardType="numeric"
+                        value={row.boxes}
+                        onChangeText={(text) => {
+                          setRows(prev => prev.map(r => r.id === row.id ? { ...r, boxes: text } : r));
+                        }}
+                      />
+                      {row.unit ? (
+                        <View style={{ position: 'absolute', right: 4, backgroundColor: colors.primary + '18', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>{row.unit}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+
+                    {/* Rate */}
+                    <TextInput
+                      style={[styles.tableInput, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}
+                      placeholder="0.00"
+                      placeholderTextColor={colors.text.muted}
+                      keyboardType="numeric"
+                      value={row.rate}
+                      onChangeText={(text) => {
+                        setRows(prev => prev.map(r => r.id === row.id ? { ...r, rate: text } : r));
+                      }}
+                    />
+
+                    {/* GST (Only in Regular mode) */}
+                    {mode === 'regular' && (
+                      <View style={{ flex: 0.7, position: 'relative' }}>
+                        <TouchableOpacity
+                          style={[styles.tableInputBtn, { width: '100%', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 2 }]}
+                          onPress={() => {
+                            setRows(prev => prev.map(r => r.id === row.id ? { ...r, showGstDropdown: !r.showGstDropdown, showProductDropdown: false } : { ...r, showGstDropdown: false }));
+                          }}
+                        >
+                          <Text style={styles.tableInputBtnText}>{row.gstRate}%</Text>
+                          <Ionicons name={row.showGstDropdown ? "chevron-up" : "chevron-down"} size={12} color={colors.text.muted} />
+                        </TouchableOpacity>
+
+                        {row.showGstDropdown && (
+                          <View style={styles.rowGstDropdown}>
+                            {[0, 5, 12, 18, 28].map(rateVal => (
+                              <TouchableOpacity
+                                key={rateVal}
+                                style={[styles.rowGstDropdownItem, row.gstRate === rateVal && { backgroundColor: colors.primary + '15' }]}
+                                onPress={() => {
+                                  setRows(prev => prev.map(r => r.id === row.id ? { ...r, gstRate: rateVal, showGstDropdown: false } : r));
+                                }}
+                              >
+                                <Text style={[styles.rowGstDropdownItemText, row.gstRate === rateVal && { color: colors.primary, fontWeight: 'bold' }]}>
+                                  {rateVal}%
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
                           </View>
                         )}
-                        <TouchableOpacity
-                          style={[styles.rowDropdownItem, { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary }]}
-                          onPress={() => setRows(prev => prev.map(r => r.id === row.id ? { ...r, showProductDropdown: false } : r))}
-                        >
-                          <Text style={{ fontSize: 11, color: colors.primary, textAlign: 'center', fontWeight: 'bold' }}>Close</Text>
-                        </TouchableOpacity>
-                      </ScrollView>
-                    </View>
-                  )}
-                </View>
-
-                {/* Qty (Unit) */}
-                <View style={{ flex: mode === 'regular' ? 1.4 : 1.6, position: 'relative', justifyContent: 'center' }}>
-                  <TextInput
-                    style={[styles.tableInput, { width: '100%', textAlign: 'center', paddingRight: row.unit ? 36 : 8 }]}
-                    placeholder="0"
-                    placeholderTextColor={colors.text.muted}
-                    keyboardType="numeric"
-                    value={row.boxes}
-                    onChangeText={(text) => {
-                      setRows(prev => prev.map(r => r.id === row.id ? { ...r, boxes: text } : r));
-                    }}
-                  />
-                  {row.unit ? (
-                    <View style={{ position: 'absolute', right: 4, backgroundColor: colors.primary + '18', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>{row.unit}</Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                {/* Rate */}
-                <TextInput
-                  style={[styles.tableInput, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}
-                  placeholder="0.00"
-                  placeholderTextColor={colors.text.muted}
-                  keyboardType="numeric"
-                  value={row.rate}
-                  onChangeText={(text) => {
-                    setRows(prev => prev.map(r => r.id === row.id ? { ...r, rate: text } : r));
-                  }}
-                />
-
-                {/* GST (Only in Regular mode) */}
-                {mode === 'regular' && (
-                  <View style={{ flex: 0.7, position: 'relative' }}>
-                    <TouchableOpacity
-                      style={[styles.tableInputBtn, { width: '100%', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 2 }]}
-                      onPress={() => {
-                        setRows(prev => prev.map(r => r.id === row.id ? { ...r, showGstDropdown: !r.showGstDropdown, showProductDropdown: false } : { ...r, showGstDropdown: false }));
-                      }}
-                    >
-                      <Text style={styles.tableInputBtnText}>{row.gstRate}%</Text>
-                      <Ionicons name={row.showGstDropdown ? "chevron-up" : "chevron-down"} size={12} color={colors.text.muted} />
-                    </TouchableOpacity>
-
-                    {row.showGstDropdown && (
-                      <View style={styles.rowGstDropdown}>
-                        {[0, 5, 12, 18, 28].map(rateVal => (
-                          <TouchableOpacity
-                            key={rateVal}
-                            style={[styles.rowGstDropdownItem, row.gstRate === rateVal && { backgroundColor: colors.primary + '15' }]}
-                            onPress={() => {
-                              setRows(prev => prev.map(r => r.id === row.id ? { ...r, gstRate: rateVal, showGstDropdown: false } : r));
-                            }}
-                          >
-                            <Text style={[styles.rowGstDropdownItemText, row.gstRate === rateVal && { color: colors.primary, fontWeight: 'bold' }]}>
-                              {rateVal}%
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
                       </View>
                     )}
+
+                    {/* Row Subtotal */}
+                    <View style={{ flex: mode === 'regular' ? 1.0 : 1.2, justifyContent: 'center', alignItems: 'flex-end' }}>
+                      <Text style={styles.tableRowSubtotal} numberOfLines={1}>
+                        ₹{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </Text>
+                    </View>
+
+                    {/* Delete button */}
+                    <TouchableOpacity
+                      style={{ flex: 0.4, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={() => removeRow(row.id)}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                    </TouchableOpacity>
                   </View>
-                )}
-
-                {/* Row Subtotal */}
-                <View style={{ flex: mode === 'regular' ? 1.0 : 1.2, justifyContent: 'center', alignItems: 'flex-end' }}>
-                  <Text style={styles.tableRowSubtotal} numberOfLines={1}>
-                    ₹{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                  </Text>
-                </View>
-
-                {/* Delete button */}
-                <TouchableOpacity
-                  style={{ flex: 0.4, alignItems: 'center', justifyContent: 'center' }}
-                  onPress={() => removeRow(row.id)}
-                >
-                  <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                </TouchableOpacity>
-              </View>
-            );
-          })}
+                );
+              })}
+            </View>
+          </ScrollView>
 
           <TouchableOpacity style={styles.addItemBtn} onPress={addRow}>
             <Ionicons name="add-circle" size={18} color={colors.primary} />

@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Modal, TextInput, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
-import { api } from '../utils/api';
+import { api, getApiBaseUrl } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 
 function GstReturnsPage() {
@@ -13,6 +13,10 @@ function GstReturnsPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [filingStatus, setFilingStatus] = useState<any>(null);
+  const [arnModalVisible, setArnModalVisible] = useState(false);
+  const [arnInput, setArnInput] = useState('');
+  const [acknowledgementUrl, setAcknowledgementUrl] = useState('');
 
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -21,6 +25,9 @@ function GstReturnsPage() {
       setLoading(true);
       const res = await api.getGstReturn(view, month, year);
       setData(res);
+      const periodStr = `${year}-${month.toString().padStart(2, '0')}`;
+      const statusRes = await api.getGstFilingStatus(periodStr, view);
+      setFilingStatus(statusRes);
     } catch (err) {
       console.error(err);
       setData(null);
@@ -80,6 +87,88 @@ function GstReturnsPage() {
           </View>
         </View>
 
+        {/* Export Utility Row */}
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: Spacing.lg, flexWrap: 'wrap' }}>
+          <TouchableOpacity 
+            style={[styles.exportBtn, { borderColor: colors.primary, backgroundColor: colors.primary + '08' }]}
+            onPress={() => {
+              const url = `${getApiBaseUrl()}/gst/${view}?month=${month}&year=${year}&format=json`;
+              if (Platform.OS === 'web') {
+                window.open(url, '_blank');
+              } else {
+                Alert.alert('Download JSON Utility', `Offline JSON URL:\n${url}`);
+              }
+            }}
+          >
+            <Ionicons name="code-download-outline" size={15} color={colors.primary} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Download JSON Utility</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.exportBtn, { borderColor: colors.success, backgroundColor: colors.success + '08' }]}
+            onPress={() => {
+              const url = `${getApiBaseUrl()}/gst/${view}?month=${month}&year=${year}&format=csv`;
+              if (Platform.OS === 'web') {
+                window.open(url, '_blank');
+              } else {
+                Alert.alert('Download CSV Spreadsheet', `Offline CSV URL:\n${url}`);
+              }
+            }}
+          >
+            <Ionicons name="document-text-outline" size={15} color={colors.success} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>Download CSV / Excel</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Filing status card */}
+        <View style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.lg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: filingStatus?.filed ? colors.success + '15' : colors.warning + '15', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name={filingStatus?.filed ? "shield-checkmark" : "alert-circle"} size={20} color={filingStatus?.filed ? colors.success : colors.warning} />
+            </View>
+            <View>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>
+                Filing Status: {filingStatus?.filed ? 'FILED' : 'PENDING FILING'}
+              </Text>
+              {filingStatus?.filed ? (
+                <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>
+                  ARN: {filingStatus.filing.arn} | Date: {new Date(filingStatus.filing.filedDate).toLocaleDateString('en-IN')}
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>Download the JSON utility and upload to the GST portal</Text>
+              )}
+            </View>
+          </View>
+          
+          {filingStatus?.filed ? (
+            filingStatus.filing.supportingDocuments?.length > 0 ? (
+              <TouchableOpacity 
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary + '15', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}
+                onPress={() => Platform.OS === 'web' ? window.open(filingStatus.filing.supportingDocuments[0].url, '_blank') : Alert.alert('View Document', filingStatus.filing.supportingDocuments[0].url)}
+              >
+                <Ionicons name="document-attach" size={13} color={colors.primary} />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>View Receipt</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ backgroundColor: colors.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
+                <Text style={{ fontSize: 11, color: colors.text.muted }}>No Receipt Attached</Text>
+              </View>
+            )
+          ) : (
+            <TouchableOpacity 
+              style={{ backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              onPress={() => {
+                setArnInput('');
+                setAcknowledgementUrl('');
+                setArnModalVisible(true);
+              }}
+            >
+              <Ionicons name="checkmark-done" size={13} color="#fff" />
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>Record ARN</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
         ) : data && view === 'gstr1' ? (
@@ -93,6 +182,96 @@ function GstReturnsPage() {
           </View>
         )}
       </ScrollView>
+
+      {/* Record ARN Modal */}
+      <Modal animationType="slide" presentationStyle="formSheet" visible={arnModalVisible} onRequestClose={() => setArnModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setArnModalVisible(false)}>
+              <Ionicons name="close" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text.primary }}>Record Return Filing ARN</Text>
+            <TouchableOpacity onPress={async () => {
+              if (!arnInput.trim()) {
+                alert('Please enter the application reference number (ARN)');
+                return;
+              }
+              try {
+                const periodStr = `${year}-${month.toString().padStart(2, '0')}`;
+                await api.recordGstFiling({
+                  period: periodStr,
+                  returnType: view,
+                  arn: arnInput.trim(),
+                  url: acknowledgementUrl || undefined,
+                  name: 'GST Filing Receipt'
+                });
+                setArnModalVisible(false);
+                fetchData();
+              } catch (err: any) {
+                alert(err.message || 'Failed to save filing details');
+              }
+            }}>
+              <Ionicons name="checkmark" size={24} color={colors.success} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
+            <Text style={{ fontSize: 11, color: colors.text.muted, fontWeight: '800', textTransform: 'uppercase', marginBottom: 4 }}>Period</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text.primary, marginBottom: 14 }}>{months[month - 1]} {year} - {view.toUpperCase()}</Text>
+
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>Government ARN *</Text>
+            <TextInput 
+              style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, fontSize: 13, color: colors.text.primary, marginBottom: 16 }}
+              placeholder="e.g. AA090726123456F"
+              value={arnInput}
+              onChangeText={setArnInput}
+            />
+
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>Acknowledgement PDF Receipt (Optional)</Text>
+            {acknowledgementUrl ? (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}>
+                <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600', flex: 1 }} numberOfLines={1}>Filing_Receipt.pdf</Text>
+                <TouchableOpacity onPress={() => setAcknowledgementUrl('')}>
+                  <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity 
+                style={{ height: 45, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary + '05', marginBottom: 16 }}
+                onPress={async () => {
+                  if (Platform.OS === 'web') {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'application/pdf,image/*';
+                    input.onchange = async (e: any) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      try {
+                        const reader = new FileReader();
+                        reader.onload = async () => {
+                          try {
+                            const uploadRes = await api.uploadFile(reader.result as string, file.name);
+                            setAcknowledgementUrl(uploadRes.url);
+                          } catch (err: any) { alert(err.message || 'Upload failed'); }
+                        };
+                        reader.readAsDataURL(file);
+                      } catch { alert('File read failed'); }
+                    };
+                    input.click();
+                  } else {
+                    Alert.prompt('File URL', 'Enter PDF Receipt URL:', [
+                      { text: 'Cancel' },
+                      { text: 'Save', onPress: (url) => url && setAcknowledgementUrl(url) }
+                    ]);
+                  }
+                }}
+              >
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '700' }}>+ Upload Government PDF Receipt</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -288,6 +467,15 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   tableCell: { fontSize: 13, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   summaryCard: { padding: Spacing.md },
+  exportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radius.md,
+    borderWidth: 1
+  },
 });
 
 export default GstReturnsPage;

@@ -96,8 +96,32 @@ class ApiClient {
   }
 
   private activeRequests = 0;
+  private cacheStore: Record<string, { data: any, timestamp: number }> = {};
 
   private async request(url: string, options: RequestInit = {}): Promise<Response> {
+    const method = options.method || 'GET';
+    const isGet = method.toUpperCase() === 'GET';
+    const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase());
+
+    // SWR memory cache lookup
+    if (isGet) {
+      const cached = this.cacheStore[url];
+      if (cached && (Date.now() - cached.timestamp < 30000)) { // 30 seconds TTL
+        return {
+          ok: true,
+          status: 200,
+          json: async () => JSON.parse(JSON.stringify(cached.data)),
+          text: async () => JSON.stringify(cached.data),
+          clone: () => ({
+            json: async () => JSON.parse(JSON.stringify(cached.data))
+          })
+        } as any;
+      }
+    } else {
+      // Invalidate cache on mutations
+      this.cacheStore = {};
+    }
+
     const headers = {
       ...(options.headers || {}),
       'Content-Type': 'application/json',
@@ -112,9 +136,6 @@ class ApiClient {
     if (this.authToken) {
       headers['Authorization'] = `Bearer ${this.authToken}`;
     }
-
-    const method = options.method || 'GET';
-    const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase());
 
     if (isMutating) {
       this.activeRequests++;
@@ -142,6 +163,28 @@ class ApiClient {
         }
         throw new Error(errMsg);
       }
+
+      // Populate memory cache on successful GET responses
+      if (isGet) {
+        try {
+          const resClone = res.clone();
+          const data = await resClone.json();
+          this.cacheStore[url] = { data, timestamp: Date.now() };
+        } catch (e) {
+          // If clone fails, read directly and return custom response
+          try {
+            const data = await res.json();
+            this.cacheStore[url] = { data, timestamp: Date.now() };
+            return {
+              ok: true,
+              status: res.status,
+              json: async () => data,
+              text: async () => JSON.stringify(data)
+            } as any;
+          } catch (errInner) {}
+        }
+      }
+
       return res;
     } finally {
       if (isMutating) {
@@ -856,6 +899,10 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/raw-materials/${id}/genealogy`);
     return res.json();
   }
+  async searchGenealogy(query: string): Promise<{ type: 'batch' | 'material_batch'; data: any }> {
+    const res = await this.request(`${API_BASE}/batch-productions/genealogy/search?q=${encodeURIComponent(query)}`);
+    return res.json();
+  }
   async traceBatch(batchNo: string): Promise<TraceResult> {
     const res = await this.request(`${API_BASE}/trace/${encodeURIComponent(batchNo)}`);
     return res.json();
@@ -906,6 +953,158 @@ class ApiClient {
   }
   async getManufacturingAnalytics(): Promise<ManufacturingAnalytics> {
     const res = await this.request(`${API_BASE}/analytics/manufacturing`);
+    return res.json();
+  }
+
+  async uploadFile(fileUri: string, filename = 'document.pdf'): Promise<{ name: string, url: string }> {
+    let processedUri = fileUri;
+
+    // Client-side image compression on web
+    if (Platform.OS === 'web' && fileUri.startsWith('data:image/')) {
+      try {
+        processedUri = await new Promise<string>((resolve) => {
+          const img = new Image();
+          img.src = fileUri;
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            const maxWidth = 1600;
+            const maxHeight = 1600;
+
+            if (width > height) {
+              if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              }
+            } else {
+              if (height > maxHeight) {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return resolve(fileUri);
+
+            ctx.drawImage(img, 0, 0, width, height);
+            // Downscale and compress image to 70% quality JPEG
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+          img.onerror = () => resolve(fileUri);
+        });
+      } catch (e) {
+        console.warn('Failed to compress image client-side:', e);
+      }
+    }
+
+    const formData = new FormData();
+    let cleanFilename = filename;
+    let mimeType = 'application/pdf';
+
+    if (processedUri.startsWith('data:')) {
+      const match = processedUri.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-+.]+);base64,/);
+      if (match) {
+        mimeType = match[1];
+        const ext = mimeType.split('/')[1] || 'pdf';
+        cleanFilename = filename.endsWith('.pdf') ? `document.${ext}` : filename;
+      }
+    } else {
+      const fname = processedUri.split('/').pop() || filename;
+      cleanFilename = fname.split('?')[0];
+      const ext = cleanFilename.split('.').pop() || 'pdf';
+      mimeType = ext.toLowerCase() === 'pdf' ? 'application/pdf' : `image/${ext.toLowerCase() === 'png' ? 'png' : 'jpeg'}`;
+    }
+
+    if (Platform.OS === 'web') {
+      const response = await fetch(processedUri);
+      const blob = await response.blob();
+      formData.append('file', blob, cleanFilename);
+    } else {
+      formData.append('file', {
+        uri: processedUri,
+        name: cleanFilename,
+        type: mimeType,
+      } as any);
+    }
+
+    const headers: Record<string, string> = {};
+    if (!this.authToken) {
+      try { this.authToken = await authStorage.getItem('vp_crm_token'); } catch (e) {}
+    }
+    if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
+
+    this.activeRequests++;
+    DeviceEventEmitter.emit('global_loader', { isLoading: true });
+
+    try {
+      const res = await fetch(`${API_BASE}/system/upload`, {
+        method: 'POST',
+        body: formData,
+        headers
+      });
+      if (!res.ok) {
+        let errMsg = 'File upload failed';
+        try {
+          const errData = await res.json();
+          errMsg = errData.error || errData.message || res.statusText;
+        } catch { errMsg = res.statusText; }
+        throw new Error(errMsg);
+      }
+      return await res.json();
+    } finally {
+      this.activeRequests = Math.max(0, this.activeRequests - 1);
+      DeviceEventEmitter.emit('global_loader', { isLoading: this.activeRequests > 0 });
+    }
+  }
+
+  async addDocument(type: 'batch' | 'invoice' | 'challan', id: string, doc: { name: string, url: string }): Promise<any> {
+    const route = type === 'batch' ? 'batch-productions' : type === 'invoice' ? 'invoices' : 'challans';
+    const res = await this.request(`${API_BASE}/${route}/${id}/documents`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(doc)
+    });
+    return res.json();
+  }
+
+  async deleteDocument(type: 'batch' | 'invoice' | 'challan', id: string, url: string): Promise<any> {
+    const route = type === 'batch' ? 'batch-productions' : type === 'invoice' ? 'invoices' : 'challans';
+    const res = await this.request(`${API_BASE}/${route}/${id}/documents`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    return res.json();
+  }
+
+  async getReceivableAgeing(): Promise<{ summary: { b0_30: number, b31_60: number, b61_90: number, b90_plus: number }, customers: any[] }> {
+    const res = await this.request(`${API_BASE}/payments/ageing`);
+    return res.json();
+  }
+
+  async allocatePayment(paymentId: string, allocations: Array<{ invoiceId: string, amount: number }>): Promise<any> {
+    const res = await this.request(`${API_BASE}/payments/allocate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentId, allocations })
+    });
+    return res.json();
+  }
+
+  async getGstFilingStatus(period: string, returnType: 'gstr1' | 'gstr3b'): Promise<any> {
+    const res = await this.request(`${API_BASE}/gst/filing-status?period=${period}&returnType=${returnType}`);
+    return res.json();
+  }
+
+  async recordGstFiling(payload: { period: string, returnType: 'gstr1' | 'gstr3b', arn: string, url?: string, name?: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/gst/filing-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
     return res.json();
   }
 
@@ -1173,10 +1372,6 @@ class ApiClient {
   }
   async completeCampaign(id: string): Promise<Campaign> {
     const res = await this.request(`${API_BASE}/campaigns/${id}/complete`, { method: 'POST' });
-    return res.json();
-  }
-  async seedCompleteDemoData(): Promise<{ message: string }> {
-    const res = await this.request(`${API_BASE}/system/seed-demo`, { method: 'POST' });
     return res.json();
   }
 }

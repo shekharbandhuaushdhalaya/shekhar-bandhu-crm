@@ -434,6 +434,15 @@ const batchCompleteSchema = z.object({
   qcPassedBy: z.string().default(''),
   packing: z.number().int().min(1).default(1),
   yields: z.array(yieldItemSchema).optional(),
+  qcStatus: z.enum(['approved', 'rejected']).default('approved'),
+  organoleptic: z.string().optional(),
+  moistureContent: z.number().nullable().optional(),
+  ashValue: z.number().nullable().optional(),
+  pHValue: z.number().nullable().optional(),
+  disintegrationTime: z.number().nullable().optional(),
+  heavyMetals: z.string().optional(),
+  microbialLimit: z.string().optional(),
+  labReportRef: z.string().optional(),
 });
 
 // ── Challan ──────────────────────────────────────────────────

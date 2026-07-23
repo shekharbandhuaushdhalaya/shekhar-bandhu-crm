@@ -129,4 +129,109 @@ router.get('/public/track/:phone', async (req, res) => {
   }
 });
 
+// POST /api/orders/public/webhook/storefront — Receive payment webhooks from storefronts (Razorpay/Stripe/Shopify)
+router.post('/public/webhook/storefront', async (req, res) => {
+  try {
+    const Invoice = require('../../models/Invoice');
+    const { orderNo, customerName, amount, items } = req.body; 
+
+    // Handle WooCommerce / Shopify checkout style or generic payment webhook payload:
+    const targetOrderNo = orderNo || `WEB-${Date.now().toString().slice(-6)}`;
+    const targetCustomerName = customerName || 'Online Store Customer';
+    const targetAmount = parseFloat(amount) || 0;
+    const targetItems = items || []; // [{ productId, name, qty, price }]
+
+    const warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
+    if (!warehouse) {
+      return res.status(500).json({ error: 'No warehouse configured for inventory deduction.' });
+    }
+
+    // Deduct stock for all items
+    const invoiceItems = [];
+    for (const item of targetItems) {
+      const dbProd = await Product.findById(item.productId);
+      if (dbProd) {
+        const qty = parseInt(item.qty, 10) || 1;
+        const price = parseFloat(item.price) || dbProd.price || 0;
+
+        // FIFO Inventory deduction
+        const entries = await InventoryEntry.find({
+          warehouseId: warehouse._id,
+          productId: dbProd._id
+        }).sort({ mfgDate: 1, expiryDate: 1, createdAt: 1 });
+
+        let remainingQty = qty;
+        for (const entry of entries) {
+          if (remainingQty <= 0) break;
+          const packSize = entry.packing || 1;
+          const entryUnits = (entry.qtyBoxes || 0) * packSize;
+          if (entryUnits <= 0) continue;
+
+          const deductUnits = Math.min(remainingQty, entryUnits);
+          const deductBoxes = Math.floor(deductUnits / packSize);
+          entry.qtyBoxes -= deductBoxes;
+          await entry.save();
+
+          await StockLedger.create({
+            productId: dbProd._id,
+            warehouseId: warehouse._id,
+            warehouseName: warehouse.name,
+            type: 'OUT',
+            qtyBoxes: deductBoxes,
+            balanceBoxes: entry.qtyBoxes,
+            reference: `Storefront Webhook Order: #${targetOrderNo}`,
+            note: `Online Sale — ${dbProd.name}`,
+            createdBy: 'Storefront Webhook',
+            packing: packSize,
+            batchNo: entry.batchNo,
+          });
+
+          remainingQty -= (deductBoxes * packSize);
+        }
+
+        invoiceItems.push({
+          productId: dbProd._id,
+          name: dbProd.name,
+          qty,
+          boxes: qty,
+          unit: dbProd.unit || 'pcs',
+          packing: 1,
+          rate: price,
+          gstRate: dbProd.gstRate || 18,
+          hsnCode: dbProd.hsnCode || ''
+        });
+
+        dbProd.stockLevel = Math.max(0, dbProd.stockLevel - qty);
+        await dbProd.save();
+      }
+    }
+
+    // Auto-create a finalized paid Invoice
+    const invoice = await Invoice.create({
+      invoiceNo: `INV-${targetOrderNo}`,
+      date: new Date(),
+      customerName: targetCustomerName,
+      amount: targetAmount,
+      status: 'paid',
+      mode: 'cash',
+      type: 'sale',
+      isFinalized: true,
+      items: invoiceItems,
+      baseAmount: targetAmount / 1.18,
+      cgst: (targetAmount - targetAmount / 1.18) / 2,
+      sgst: (targetAmount - targetAmount / 1.18) / 2,
+      amountPaid: targetAmount
+    });
+
+    if (req.io) {
+      req.io.emit('new_web_order', { orderNo: targetOrderNo, customerName: targetCustomerName, amount: targetAmount });
+      req.io.emit('inventory_updated', { type: 'webhook', invoiceId: invoice._id });
+    }
+
+    res.status(201).json({ message: 'Storefront webhook processed and invoice generated successfully', invoice });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

@@ -15,6 +15,7 @@ const router = express.Router();
 // GET /api/batch-productions — List all batch production runs
 router.get('/', async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     const batches = await BatchProduction.find({})
       .populate('productId', 'name sku size packing')
       .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
@@ -183,7 +184,7 @@ router.patch('/:id/stage/:stageIndex', async (req, res) => {
       return res.status(400).json({ error: 'Invalid stage index' });
     }
 
-    const validStatuses = ['pending', 'in_progress', 'completed', 'skipped'];
+    const validStatuses = ['pending', 'in_progress', 'completed', 'skipped', 'failed'];
     if (status && !validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid stage status' });
     }
@@ -194,7 +195,7 @@ router.patch('/:id/stage/:stageIndex', async (req, res) => {
     if (newStatus === 'in_progress') {
       currentStage.startedAt = currentStage.startedAt || new Date();
     }
-    if (newStatus === 'completed' || newStatus === 'skipped') {
+    if (newStatus === 'completed' || newStatus === 'skipped' || newStatus === 'failed') {
       currentStage.completedAt = new Date();
       currentStage.completedBy = completedBy || '';
     }
@@ -203,7 +204,16 @@ router.patch('/:id/stage/:stageIndex', async (req, res) => {
     }
     currentStage.status = newStatus;
 
-    if ((newStatus === 'completed' || newStatus === 'skipped') && stageIndex + 1 < batch.stages.length) {
+    if (newStatus === 'failed') {
+      // If any stage fails, the entire batch run fails immediately
+      batch.status = 'rejected';
+      batch.qcStatus = 'rejected';
+      batch.actualYieldQty = 0;
+      batch.wasteQty = batch.plannedQty;
+      batch.variancePercent = -100;
+      batch.endDate = new Date();
+      batch.qcNotes = `Batch failed at stage [${currentStage.name}]${notes ? ` — Reason: ${notes}` : ''}. QC Inspector / Operator: ${completedBy || 'Operator'}`;
+    } else if ((newStatus === 'completed' || newStatus === 'skipped') && stageIndex + 1 < batch.stages.length) {
       const nextStage = batch.stages[stageIndex + 1];
       if (nextStage.status === 'pending') {
         nextStage.status = 'in_progress';
@@ -296,7 +306,25 @@ async function deductPackagingMaterials(batch, outputQty) {
 // PATCH /api/batch-productions/:id/complete — Complete batch, record QC and inward finished stock
 router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req, res) => {
   try {
-    const { actualYieldQty, wasteQty, wasteReason, qcNotes, qcPassedBy, packing, yields } = req.body;
+    const { 
+      actualYieldQty, 
+      wasteQty, 
+      wasteReason, 
+      qcNotes, 
+      qcPassedBy, 
+      packing, 
+      yields,
+      qcStatus,
+      organoleptic,
+      moistureContent,
+      ashValue,
+      pHValue,
+      disintegrationTime,
+      heavyMetals,
+      microbialLimit,
+      labReportRef
+    } = req.body;
+
     if (actualYieldQty === undefined || !qcPassedBy) {
       return res.status(400).json({ error: 'Actual yield quantity and QC inspector name are required' });
     }
@@ -309,8 +337,8 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
 
-    if (batch.status === 'completed') {
-      return res.status(400).json({ error: 'Batch is already completed' });
+    if (batch.status === 'completed' || batch.status === 'rejected') {
+      return res.status(400).json({ error: 'Batch is already completed or rejected' });
     }
     if (batch.status === 'cancelled') {
       return res.status(400).json({ error: 'Cannot complete a cancelled batch' });
@@ -330,6 +358,52 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
     const warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
     if (!warehouse) {
       return res.status(500).json({ error: 'No warehouse configured. Please create one in Settings.' });
+    }
+
+    // Save QC parameters
+    batch.qcStatus = qcStatus || 'approved';
+    batch.qcParameters = {
+      organoleptic: organoleptic || '',
+      moistureContent: moistureContent !== undefined ? moistureContent : null,
+      ashValue: ashValue !== undefined ? ashValue : null,
+      pHValue: pHValue !== undefined ? pHValue : null,
+      disintegrationTime: disintegrationTime !== undefined ? disintegrationTime : null,
+      heavyMetals: heavyMetals || '',
+      microbialLimit: microbialLimit || '',
+      labReportRef: labReportRef || ''
+    };
+
+    const totalCost = batch.rawMaterialCost + (batch.overheadCost || 0);
+
+    if (qcStatus === 'rejected') {
+      // Rejection logic: No stock added, full planned quantity is waste
+      batch.actualYieldQty = 0;
+      batch.wasteQty = batch.plannedQty;
+      batch.wasteReason = wasteReason || 'Failed Quality Control (QC) specifications';
+      batch.variancePercent = -100;
+      batch.unitProductionCost = 0;
+      batch.qcNotes = `${qcNotes ? qcNotes.trim() + '\n\n' : ''}BATCH REJECTED by QC Inspector: ${qcPassedBy.trim()}. QC Parameters failed specifications.`;
+      batch.qcPassedBy = qcPassedBy.trim();
+      batch.status = 'rejected';
+      batch.endDate = new Date();
+
+      const qcStage = batch.stages.find(s => s.name.toLowerCase().includes('qc'));
+      if (qcStage && qcStage.status !== 'completed') {
+        qcStage.status = 'completed';
+        qcStage.completedAt = new Date();
+        qcStage.completedBy = qcPassedBy.trim();
+        qcStage.notes = 'QC Failed - Batch Rejected';
+      }
+      const packagingStage = batch.stages.find(s => s.name.toLowerCase().includes('packaging') || s.name.toLowerCase().includes('label'));
+      if (packagingStage && packagingStage.status !== 'completed') {
+        packagingStage.status = 'skipped';
+        packagingStage.completedAt = new Date();
+        packagingStage.completedBy = qcPassedBy.trim();
+        packagingStage.notes = 'Skipped due to QC failure';
+      }
+
+      await batch.save();
+      return res.json(batch);
     }
 
     // Build the yields list (split or main single product)
@@ -371,7 +445,6 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       };
     });
 
-    const totalCost = batch.rawMaterialCost + (batch.overheadCost || 0);
     const createdEntries = [];
     const StockLedger = require('../../models/StockLedger');
     const InventoryEntry = require('../../models/InventoryEntry');
@@ -521,6 +594,100 @@ router.patch('/:id/cancel', async (req, res) => {
   }
 });
 
+// GET /api/batch-productions/genealogy/search — Search genealogy by Finished Goods Batch No or Raw Material Batch No
+router.get('/genealogy/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.status(400).json({ error: 'Search query is required' });
+
+    // 1. Check if it matches a Finished Goods Batch No
+    const fb = await BatchProduction.findOne({ batchNo: { $regex: new RegExp('^' + q + '$', 'i') } })
+      .populate('productId', 'name sku')
+      .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
+      .lean();
+
+    if (fb) {
+      const enrichedIngredients = [];
+      for (const ing of fb.ingredientsConsumed) {
+        const entry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).lean();
+        enrichedIngredients.push({
+          rawMaterialId: ing.rawMaterialId,
+          rawMaterialEntryId: ing.rawMaterialEntryId,
+          qtyConsumed: ing.qtyConsumed,
+          batchNo: ing.batchNo,
+          sourceBatch: entry ? {
+            vendorName: entry.vendorName || 'Direct',
+            purchaseRate: entry.purchaseRate || 0,
+            originalQty: (entry.qty || 0) + ing.qtyConsumed,
+            expiryDate: entry.expiryDate
+          } : null
+        });
+      }
+      return res.json({
+        type: 'batch',
+        data: {
+          batchNo: fb.batchNo,
+          productName: fb.productId ? fb.productId.name : 'Unknown',
+          productSku: fb.productId ? fb.productId.sku : '',
+          status: fb.status,
+          startDate: fb.startDate,
+          endDate: fb.endDate,
+          plannedQty: fb.plannedQty,
+          actualYieldQty: fb.actualYieldQty || 0,
+          wasteQty: fb.wasteQty || 0,
+          wasteReason: fb.wasteReason || '',
+          variancePercent: fb.variancePercent || 0,
+          qcStatus: fb.qcStatus || 'approved',
+          qcParameters: fb.qcParameters || null,
+          ingredients: enrichedIngredients
+        }
+      });
+    }
+
+    // 2. Otherwise, check if it matches a Consumed Raw Material Batch No
+    const matchingBatches = await BatchProduction.find({ 
+      'ingredientsConsumed.batchNo': { $regex: new RegExp('^' + q + '$', 'i') } 
+    })
+      .populate('productId', 'name sku')
+      .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
+      .lean();
+
+    if (matchingBatches.length > 0) {
+      const firstMatch = matchingBatches[0];
+      const matchedIng = firstMatch.ingredientsConsumed.find(i => i.batchNo.toLowerCase() === q.toLowerCase());
+      const rmName = matchedIng && matchedIng.rawMaterialId ? matchedIng.rawMaterialId.name : 'Raw Material';
+      const rmSku = matchedIng && matchedIng.rawMaterialId ? matchedIng.rawMaterialId.sku : '';
+      const rmUnit = matchedIng && matchedIng.rawMaterialId ? matchedIng.rawMaterialId.unit : '';
+
+      return res.json({
+        type: 'material_batch',
+        data: {
+          rawMaterialBatchNo: q,
+          rawMaterialName: rmName,
+          rawMaterialSku: rmSku,
+          totalBatchesUsedIn: matchingBatches.length,
+          batches: matchingBatches.map(b => {
+            const ingUsed = b.ingredientsConsumed.find(i => i.batchNo.toLowerCase() === q.toLowerCase());
+            return {
+              batchProductionId: b._id,
+              batchNo: b.batchNo,
+              productName: b.productId ? b.productId.name : 'Unknown',
+              productSku: b.productId ? b.productId.sku : '',
+              status: b.status,
+              totalConsumed: ingUsed ? ingUsed.qtyConsumed : 0,
+              unit: rmUnit
+            };
+          })
+        }
+      });
+    }
+
+    return res.status(404).json({ error: `No genealogy record found matching batch number "${q}"` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/batch-productions/:id/genealogy — Full genealogy with raw material entry details
 router.get('/:id/genealogy', async (req, res) => {
   try {
@@ -560,6 +727,8 @@ router.get('/:id/genealogy', async (req, res) => {
       wasteQty: batch.wasteQty || 0,
       wasteReason: batch.wasteReason || '',
       variancePercent: batch.variancePercent || 0,
+      qcStatus: batch.qcStatus || 'approved',
+      qcParameters: batch.qcParameters || null,
       ingredients: enrichedIngredients
     });
   } catch (err) {
@@ -609,12 +778,54 @@ router.get('/:id/bmr-report', async (req, res) => {
       endDate: batch.endDate,
       qcNotes: batch.qcNotes || 'N/A',
       qcPassedBy: batch.qcPassedBy || 'N/A',
+      qcStatus: batch.qcStatus || 'approved',
+      qcParameters: batch.qcParameters || null,
       rawMaterialCost: batch.rawMaterialCost || 0,
       overheadCost: batch.overheadCost || 0,
       unitProductionCost: batch.unitProductionCost || 0,
       stages: batch.stages || [],
       ingredients: enrichedIngredients
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/batch-productions/:id/documents — Add a supporting document
+router.patch('/:id/documents', async (req, res) => {
+  try {
+    const { name, url } = req.body;
+    if (!name || !url) return res.status(400).json({ error: 'Document name and url are required' });
+
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+    const ext = url.split('.').pop().split('?')[0] || 'pdf';
+    const cleanDocName = `BMR_Doc_${batch.batchNo || batch._id}_${Date.now().toString().slice(-4)}.${ext}`;
+
+    batch.supportingDocuments = batch.supportingDocuments || [];
+    batch.supportingDocuments.push({ name: cleanDocName, url, uploadedAt: new Date() });
+    await batch.save();
+
+    res.json(batch);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/batch-productions/:id/documents — Remove a supporting document
+router.delete('/:id/documents', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'Document URL is required' });
+
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+    batch.supportingDocuments = (batch.supportingDocuments || []).filter(doc => doc.url !== url);
+    await batch.save();
+
+    res.json(batch);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

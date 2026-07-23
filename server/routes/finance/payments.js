@@ -149,4 +149,109 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// GET /api/payments/ageing — Calculate receivable ageing brackets for B2B invoices
+router.get('/ageing', async (req, res) => {
+  try {
+    const Invoice = require('../../models/Invoice');
+    const unpaidInvoices = await Invoice.find({
+      type: 'sale',
+      isFinalized: true,
+      status: { $ne: 'paid' }
+    }).sort({ date: -1 }).lean();
+
+    const now = new Date();
+    const brackets = {
+      b0_30: 0,
+      b31_60: 0,
+      b61_90: 0,
+      b90_plus: 0
+    };
+
+    const customerMap = {};
+
+    unpaidInvoices.forEach(inv => {
+      const outstanding = inv.amount - (inv.amountPaid || 0);
+      if (outstanding <= 0) return;
+
+      const diffTime = Math.abs(now.getTime() - new Date(inv.date).getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      let bracket = 'b0_30';
+      if (diffDays <= 30) {
+        brackets.b0_30 += outstanding;
+        bracket = '0-30 Days';
+      } else if (diffDays <= 60) {
+        brackets.b31_60 += outstanding;
+        bracket = '31-60 Days';
+      } else if (diffDays <= 90) {
+        brackets.b61_90 += outstanding;
+        bracket = '61-90 Days';
+      } else {
+        brackets.b90_plus += outstanding;
+        bracket = '90+ Days';
+      }
+
+      const custName = inv.customerName || 'Walk-in Customer';
+      if (!customerMap[custName]) {
+        customerMap[custName] = {
+          customerName: custName,
+          totalOutstanding: 0,
+          invoices: []
+        };
+      }
+      customerMap[custName].totalOutstanding += outstanding;
+      customerMap[custName].invoices.push({
+        _id: inv._id,
+        invoiceNo: inv.invoiceNo,
+        date: inv.date,
+        amount: inv.amount,
+        amountPaid: inv.amountPaid || 0,
+        outstanding,
+        daysOld: diffDays,
+        bracket
+      });
+    });
+
+    res.json({
+      summary: brackets,
+      customers: Object.values(customerMap).sort((a, b) => b.totalOutstanding - a.totalOutstanding)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/payments/allocate — Match payment receipt against outstanding invoices (bill-wise)
+router.post('/allocate', async (req, res) => {
+  try {
+    const { paymentId, allocations } = req.body; // allocations: [{ invoiceId, amount }]
+    if (!paymentId || !allocations || !allocations.length) {
+      return res.status(400).json({ error: 'paymentId and allocations list are required' });
+    }
+
+    const payment = await Payment.findById(paymentId);
+    if (!payment) return res.status(404).json({ error: 'Payment receipt record not found' });
+
+    const Invoice = require('../../models/Invoice');
+    for (const alloc of allocations) {
+      const inv = await Invoice.findById(alloc.invoiceId);
+      if (inv) {
+        inv.payments = inv.payments || [];
+        inv.payments.push({
+          paymentId: payment._id,
+          amountAllocated: alloc.amount,
+          allocatedAt: new Date()
+        });
+        inv.amountPaid = (inv.amountPaid || 0) + alloc.amount;
+        inv.status = inv.amountPaid >= inv.amount ? 'paid' : 'partially_paid';
+        await inv.save();
+      }
+    }
+
+    res.json({ message: 'Payment successfully allocated bill-wise', payment });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

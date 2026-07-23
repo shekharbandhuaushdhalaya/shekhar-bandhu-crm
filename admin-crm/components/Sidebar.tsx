@@ -72,6 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: 'cash-outline',
     items: [
       { label: 'Payments', route: 'payments', icon: 'cash-outline', activeIcon: 'cash' },
+      { label: 'Receivable Ageing', route: 'ageing', icon: 'hourglass-outline', activeIcon: 'hourglass' },
       { label: 'Credit / Debit Notes', route: 'credit-notes', icon: 'swap-horizontal-outline', activeIcon: 'swap-horizontal' },
     ],
   },

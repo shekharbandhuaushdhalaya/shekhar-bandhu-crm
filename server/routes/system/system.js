@@ -100,13 +100,73 @@ router.get('/audit-logs', authenticateToken, authorize('audit:view'), async (req
   }
 });
 
-// POST /api/system/seed-demo — Seed complete demo dataset
-router.post('/seed-demo', async (req, res) => {
+
+
+// POST /api/system/reset-db — Reset entire database (keeps User collection untouched)
+router.post('/reset-db', async (req, res) => {
   try {
-    const { seedCompleteDemoData } = require('../../scripts/seedCompleteDemoData');
-    await seedCompleteDemoData();
-    res.json({ message: 'Complete demo dataset seeded successfully!' });
+    const models = [
+      'Account', 'Activity', 'AuditLog', 'BankStatement', 'BatchProduction',
+      'BillOfMaterials', 'Campaign', 'Challan', 'Complaint', 'Contact',
+      'CreditNote', 'Customer', 'CustomerPricing', 'Dispatch', 'GstFiling',
+      'Inventory', 'InventoryEntry', 'Invoice', 'LedgerEntry',
+      'MedicalRepresentative', 'MrDailyLog', 'MrExpense', 'MrVisit',
+      'Order', 'Otp', 'Payment', 'Product', 'ProductQuery', 'Quotation',
+      'RawMaterial', 'RawMaterialEntry', 'RolePermission', 'SalesTarget',
+      'Sample', 'StockLedger', 'StockMovement', 'SystemSettings',
+      'Task', 'Vendor', 'Warehouse'
+    ];
+
+    for (const m of models) {
+      const ModelClass = require(`../../models/${m}`);
+      await ModelClass.deleteMany({});
+    }
+
+    res.json({ message: 'Database reset successfully. Only users are retained.' });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const multer = require('multer');
+const path = require('path');
+const { Readable } = require('stream');
+const cloudinary = require('cloudinary').v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+function uploadFileToCloudinary(buffer, filename, folder = 'shekhar-bandhu/supporting-docs') {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'auto', public_id: path.parse(filename).name + '-' + Date.now() },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    Readable.from(buffer).pipe(stream);
+  });
+}
+
+// POST /api/system/upload — Upload a supporting document/image/pdf to Cloudinary
+router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+    const secureUrl = await uploadFileToCloudinary(req.file.buffer, req.file.originalname);
+    res.json({
+      name: req.file.originalname,
+      url: secureUrl
+    });
+  } catch (err) {
+    console.error('File Upload Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
