@@ -57,7 +57,29 @@ export default function LoginScreen() {
               <View style={styles.decoCircle1} />
               <View style={styles.decoCircle2} />
               <View style={styles.artContent}>
-                <Ionicons name="leaf-outline" size={72} color="#ffffff" style={{ opacity: 0.9, marginBottom: 20 }} />
+                {/* Logo Image with Golden/White circular container */}
+                <View style={{
+                  width: 140,
+                  height: 140,
+                  borderRadius: 70,
+                  backgroundColor: '#ffffff',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 30,
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 10,
+                  elevation: 5,
+                  borderWidth: 3,
+                  borderColor: 'rgba(255, 255, 255, 0.4)'
+                }}>
+                  <Image 
+                    source={require('../assets/logo.png')} 
+                    style={{ width: 100, height: 75 }}
+                    resizeMode="contain"
+                  />
+                </View>
                 <Text style={styles.artTitle}>SHEKHAR BANDHU</Text>
                 <Text style={styles.artSubtitle}>A U S H A D H A L A Y A</Text>
                 <View style={styles.artDivider} />
