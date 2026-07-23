@@ -5,6 +5,51 @@ import { useAuth } from '../utils/auth';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { useTheme, useStyles } from '../utils/themeContext';
 
+// Premium Ayurvedic Color Theme constants
+const BRAND_GREEN = '#1A3F24'; // Deep forest herbal green
+const BRAND_GOLD = '#C29F68';  // Warm golden highlight
+const CREAM_BG = '#FAF8F5';    // Herbal cream soft background
+
+// Ayurvedic Heritage Themes for the Left Pane
+interface HeritageTheme {
+  title: string;
+  subtitle: string;
+  quote: string;
+  description: string;
+  icon: string;
+}
+
+const HERITAGE_THEMES: HeritageTheme[] = [
+  {
+    title: 'LORD DHANVANTARI',
+    subtitle: 'THE GOD OF AYURVEDA',
+    quote: '“Physician of the Gods, bearer of the Amrita nectar of immortality.”',
+    description: 'Harnessing divine knowledge to restore cosmic balance, wellness, and vitality across generations.',
+    icon: 'sparkles-outline'
+  },
+  {
+    title: 'ACHARYA SUSHRUTA',
+    subtitle: 'THE FATHER OF SURGERY',
+    quote: '“Precision in instruments, compassion in practice.”',
+    description: 'Pioneered ancient surgical science, anatomy, and holistic healing methodologies over 2,500 years ago.',
+    icon: 'bandage-outline'
+  },
+  {
+    title: 'ACHARYA CHARAKA',
+    subtitle: 'THE FATHER OF MEDICINE',
+    quote: '“A physician who fails to enter the patient with the lamp of knowledge cannot heal.”',
+    description: 'Systematized Rasayana (rejuvenation), dietetics, and the constitutional balance of Vata, Pitta, and Kapha.',
+    icon: 'book-outline'
+  },
+  {
+    title: 'RASAYANA & HERBS',
+    subtitle: 'THE ALCHEMY OF NATURE',
+    quote: '“Harnessing the pure essence of Earth to harmonize body, mind, and spirit.”',
+    description: 'Transforming natural roots, leaves, and minerals into potent healing remedies for ultimate longevity.',
+    icon: 'leaf-outline'
+  }
+];
+
 export default function LoginScreen() {
   const { login } = useAuth();
   const { colors } = useTheme();
@@ -17,13 +62,18 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [greeting, setGreeting] = useState('Welcome Back');
+  const [theme, setTheme] = useState<HeritageTheme>(HERITAGE_THEMES[0]);
 
-  // Dynamic greeting based on time of day
+  // Dynamic greeting and random theme picker
   useEffect(() => {
     const hrs = new Date().getHours();
     if (hrs < 12) setGreeting('Good Morning');
     else if (hrs < 17) setGreeting('Good Afternoon');
     else setGreeting('Good Evening');
+
+    // Pick a random Ayurvedic heritage theme
+    const randomIndex = Math.floor(Math.random() * HERITAGE_THEMES.length);
+    setTheme(HERITAGE_THEMES[randomIndex]);
   }, []);
 
   const handleLogin = async () => {
@@ -80,11 +130,17 @@ export default function LoginScreen() {
                     resizeMode="contain"
                   />
                 </View>
-                <Text style={styles.artTitle}>SHEKHAR BANDHU</Text>
-                <Text style={styles.artSubtitle}>A U S H A D H A L A Y A</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <Ionicons name={theme.icon as any} size={24} color={BRAND_GOLD} />
+                  <Text style={styles.artTitle}>{theme.title}</Text>
+                </View>
+                <Text style={styles.artSubtitle}>{theme.subtitle}</Text>
                 <View style={styles.artDivider} />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: BRAND_GOLD, fontStyle: 'italic', marginBottom: 12, lineHeight: 22 }}>
+                  {theme.quote}
+                </Text>
                 <Text style={styles.artDescription}>
-                  Restoring health naturally since generations. Log in to manage production batches, trace material genealogy, and monitor business growth.
+                  {theme.description}
                 </Text>
               </View>
               <Text style={styles.artFooter}>© 2026 Shekhar Bandhu. All rights reserved.</Text>
