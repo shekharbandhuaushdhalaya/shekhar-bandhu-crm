@@ -428,6 +428,8 @@ export type RawMaterialEntry = {
   vendorName?: string;
   expiryDate?: string;
   createdAt: string;
+  warehouseId?: string;
+  warehouseName?: string;
 };
 
 export type BOMIngredient = {

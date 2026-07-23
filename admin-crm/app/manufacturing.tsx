@@ -1063,7 +1063,10 @@ export default function ManufacturingScreen() {
                             <View key={e._id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: batchIdx < materialBatches.length - 1 ? 0.5 : 0, borderBottomColor: colors.border }}>
                               <View style={{ flex: 2 }}>
                                 <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Batch: {e.batchNo}</Text>
-                                {e.vendorName ? <Text style={{ fontSize: 9, color: colors.text.muted, marginTop: 1 }}>Vendor: {e.vendorName}</Text> : null}
+                                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 1 }}>
+                                  {e.vendorName ? <Text style={{ fontSize: 9, color: colors.text.muted }}>Vendor: {e.vendorName}</Text> : null}
+                                  {e.warehouseName ? <Text style={{ fontSize: 9, color: colors.primary, fontWeight: '600' }}>• Wh: {e.warehouseName}</Text> : null}
+                                </View>
                               </View>
                               <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.primary, textAlign: 'right' }}>
                                 {e.qty.toFixed(1)} {rm.unit}

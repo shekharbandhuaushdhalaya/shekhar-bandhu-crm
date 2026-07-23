@@ -452,6 +452,10 @@ router.patch('/purchases/:id/finalize', authorize('invoice:markPaid'), async (re
               rmEntry.vendorName = resolvedVendorName;
             }
             rmEntry.purchaseRef = invoice.invoiceNo;
+            if (warehouse) {
+              rmEntry.warehouseId = warehouse._id;
+              rmEntry.warehouseName = warehouse.name;
+            }
             await rmEntry.save();
           } else {
             await RawMaterialEntry.create({
@@ -462,6 +466,8 @@ router.patch('/purchases/:id/finalize', authorize('invoice:markPaid'), async (re
               vendorId: resolvedVendorId || null,
               vendorName: resolvedVendorName || '',
               purchaseRef: invoice.invoiceNo,
+              warehouseId: warehouse ? warehouse._id : null,
+              warehouseName: warehouse ? warehouse.name : '',
             });
           }
           continue;

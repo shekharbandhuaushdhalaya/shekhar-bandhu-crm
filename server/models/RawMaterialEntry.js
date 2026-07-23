@@ -17,6 +17,12 @@ const rawMaterialEntrySchema = new mongoose.Schema({
   vendorName: { type: String, default: '' },
   expiryDate: { type: Date, default: null },
   purchaseRef: { type: String, default: '' },
+  warehouseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Warehouse',
+    default: null,
+  },
+  warehouseName: { type: String, default: '' },
 }, { timestamps: true });
 
 rawMaterialEntrySchema.index({ rawMaterialId: 1, batchNo: 1 }, { unique: true });
