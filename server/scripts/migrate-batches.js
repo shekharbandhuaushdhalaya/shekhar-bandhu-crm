@@ -1,7 +1,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const mongoose = require('mongoose');
 const BatchProduction = require('../models/BatchProduction');
-const Warehouse = require('../models/Warehouse');
+const ManufacturingUnit = require('../models/ManufacturingUnit');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -10,26 +10,29 @@ async function migrate() {
     await mongoose.connect(MONGODB_URI);
     console.log('🔌 Connected to MongoDB');
 
-    let defaultWarehouse = await Warehouse.findOne().sort({ createdAt: 1 });
-    if (!defaultWarehouse) {
-      console.log('⚠️ No warehouses found. Creating a default Varanasi Central Depot...');
-      const createdWh = await Warehouse.create({
-        name: "Varanasi Central Depot",
+    let defaultUnit = await ManufacturingUnit.findOne().sort({ createdAt: 1 });
+    if (!defaultUnit) {
+      console.log('⚠️ No manufacturing units found. Creating a default Plant...');
+      defaultUnit = await ManufacturingUnit.create({
+        name: "Shekhar Bandhu Manufacturing Plant 1",
+        code: "MFG-PLANT-1",
+        addressLine1: "Industrial Area Phase 2",
         city: "Varanasi",
-        state: "Uttar Pradesh"
+        state: "Uttar Pradesh",
+        pincode: "221002"
       });
-      console.log(`🏭 Created warehouse: ${createdWh.name}`);
-      defaultWarehouse = createdWh;
+      console.log(`🏭 Created manufacturing unit: ${defaultUnit.name}`);
     }
 
-    const batches = await BatchProduction.find({ warehouseId: { $exists: false } });
-    console.log(`🔍 Found ${batches.length} batches needing migration...`);
+    const batches = await BatchProduction.find({ manufacturingUnitId: { $exists: false } });
+    console.log(`🔍 Found ${batches.length} batches needing manufacturing unit migration...`);
 
     for (const batch of batches) {
-      batch.warehouseId = defaultWarehouse._id;
-      batch.warehouseName = defaultWarehouse.name;
+      batch.manufacturingUnitId = defaultUnit._id;
+      batch.manufacturingUnitName = defaultUnit.name;
+      // Remove deprecated warehouse fields from model if we want to, though Mongoose schema handles undefined/unmapped fields
       await batch.save();
-      console.log(`✅ Migrated batch ${batch.batchNo} to ${defaultWarehouse.name}`);
+      console.log(`✅ Migrated batch ${batch.batchNo} to ${defaultUnit.name}`);
     }
 
     console.log('🎉 Migration complete.');

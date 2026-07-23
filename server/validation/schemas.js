@@ -417,7 +417,7 @@ const batchProductionSchema = z.object({
   batchNo: z.string().min(1),
   productId: objectId,
   plannedQty: z.number().int().positive(),
-  warehouseId: objectId,
+  manufacturingUnitId: objectId,
   startDate: z.string().or(z.date()).optional(),
 });
 
@@ -444,6 +444,7 @@ const batchCompleteSchema = z.object({
   heavyMetals: z.string().optional(),
   microbialLimit: z.string().optional(),
   labReportRef: z.string().optional(),
+  warehouseId: objectId,
 });
 
 // ── Challan ──────────────────────────────────────────────────
@@ -616,6 +617,19 @@ const dispatchSchema = z.object({
   notes: z.string().default(''),
 });
 
+// ── ManufacturingUnit ────────────────────────────────────────
+const manufacturingUnitSchema = z.object({
+  name: z.string().min(1, 'Manufacturing unit name required'),
+  code: z.string().min(1, 'Manufacturing unit code required'),
+  addressLine1: z.string().default(''),
+  city: z.string().default(''),
+  state: z.string().default(''),
+  pincode: z.string().default(''),
+  contactPerson: z.string().default(''),
+  phone: z.string().default(''),
+  isActive: z.boolean().default(true),
+});
+
 // ── SystemSettings ───────────────────────────────────────────
 const systemSettingsSchema = z.object({}).passthrough();
 
@@ -664,6 +678,7 @@ module.exports = {
   stockMovementSchema,
   orderSchema,
   warehouseSchema,
+  manufacturingUnitSchema,
   userSchema,
   loginSchema,
   changePasswordSchema,

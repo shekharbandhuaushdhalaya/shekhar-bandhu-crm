@@ -218,6 +218,20 @@ export type Warehouse = {
   createdAt: string;
 };
 
+export type ManufacturingUnit = {
+  _id: string;
+  name: string;
+  code: string;
+  addressLine1: string;
+  city: string;
+  state: string;
+  pincode: string;
+  contactPerson: string;
+  phone: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
 export type InventoryEntry = {
   _id: string;
   warehouseId: string;
@@ -457,6 +471,8 @@ export type BatchProduction = {
   wasteReason: string;
   variancePercent: number;
   ingredientsConsumed: BatchProductionIngredient[];
+  manufacturingUnitId?: string;
+  manufacturingUnitName?: string;
   startDate?: string;
   endDate?: string;
   qcNotes?: string;

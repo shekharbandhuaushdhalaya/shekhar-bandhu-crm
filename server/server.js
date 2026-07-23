@@ -43,6 +43,7 @@ const inventoryEntryRoutes = require('./routes/inventory/inventory-entries');
 const rawMaterialRoutes = require('./routes/manufacturing/rawMaterials');
 const bomRoutes = require('./routes/manufacturing/bom');
 const batchProductionRoutes = require('./routes/manufacturing/batchProductions');
+const manufacturingUnitRoutes = require('./routes/manufacturing/manufacturingUnits');
 
 const paymentRoutes = require('./routes/finance/payments');
 const paymentGatewayRoutes = require('./routes/finance/paymentGateway');
@@ -183,6 +184,7 @@ mongoose
     app.use('/api/raw-materials', authenticateJWT, rawMaterialRoutes);
     app.use('/api/bom', authenticateJWT, bomRoutes);
     app.use('/api/batch-productions', authenticateJWT, batchProductionRoutes);
+    app.use('/api/manufacturing-units', authenticateJWT, manufacturingUnitRoutes);
     app.use('/api/complaints', authenticateJWT, complaintRoutes);
     app.use('/api/samples', authenticateJWT, sampleRoutes);
     app.use('/api/stock-movements', authenticateJWT, stockMovementRoutes);

@@ -30,9 +30,9 @@ router.get('/', async (req, res) => {
 // POST /api/batch-productions — Start a new batch production run
 router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
   try {
-    const { productId, plannedQty, batchNo, warehouseId } = req.body;
-    if (!productId || !plannedQty || !batchNo || !warehouseId) {
-      return res.status(400).json({ error: 'Product ID, planned quantity, batch number, and warehouse ID are required' });
+    const { productId, plannedQty, batchNo, manufacturingUnitId } = req.body;
+    if (!productId || !plannedQty || !batchNo || !manufacturingUnitId) {
+      return res.status(400).json({ error: 'Product ID, planned quantity, batch number, and manufacturing unit ID are required' });
     }
 
     const valPlanned = Number(plannedQty);
@@ -40,8 +40,9 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       return res.status(400).json({ error: 'Planned quantity must be a positive number' });
     }
 
-    const warehouse = await Warehouse.findById(warehouseId);
-    if (!warehouse) return res.status(404).json({ error: 'Manufacturing unit / warehouse not found' });
+    const ManufacturingUnit = require('../../models/ManufacturingUnit');
+    const mfgUnit = await ManufacturingUnit.findById(manufacturingUnitId);
+    if (!mfgUnit) return res.status(404).json({ error: 'Manufacturing unit not found' });
 
     const existingBatch = await BatchProduction.findOne({ batchNo: batchNo.trim().toUpperCase() });
     if (existingBatch) {
@@ -147,8 +148,8 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
     const newBatch = await BatchProduction.create({
       batchNo: batchNo.trim().toUpperCase(),
       productId,
-      warehouseId,
-      warehouseName: warehouse.name,
+      manufacturingUnitId,
+      manufacturingUnitName: mfgUnit.name,
       plannedQty: valPlanned,
       status: 'in_progress',
       stages: batchStages,
@@ -327,7 +328,8 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       disintegrationTime,
       heavyMetals,
       microbialLimit,
-      labReportRef
+      labReportRef,
+      warehouseId
     } = req.body;
 
     if (actualYieldQty === undefined || !qcPassedBy) {
@@ -360,9 +362,9 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       return res.status(400).json({ error: `Cannot complete batch. Pending stages: ${pending.join(', ')}` });
     }
 
-    const warehouse = await Warehouse.findById(batch.warehouseId);
+    const warehouse = await Warehouse.findById(warehouseId);
     if (!warehouse) {
-      return res.status(500).json({ error: 'Associated warehouse/manufacturing unit was not found.' });
+      return res.status(404).json({ error: 'Finished goods storage warehouse was not found.' });
     }
 
     // Save QC parameters

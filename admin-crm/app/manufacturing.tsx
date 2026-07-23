@@ -27,7 +27,8 @@ import {
   BatchProduction,
   Product,
   Vendor,
-  Warehouse
+  Warehouse,
+  ManufacturingUnit
 } from '../utils/api';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { FIRM_DETAILS } from '../constants/firm';
@@ -51,7 +52,9 @@ export default function ManufacturingScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [prodWarehouseId, setProdWarehouseId] = useState('');
+  const [qcWarehouseId, setQcWarehouseId] = useState('');
+  const [manufacturingUnits, setManufacturingUnits] = useState<ManufacturingUnit[]>([]);
+  const [prodManufacturingUnitId, setProdManufacturingUnitId] = useState('');
   const [expiryAlerts, setExpiryAlerts] = useState<RawMaterialEntry[]>([]);
   const [mfgAnalytics, setMfgAnalytics] = useState<any>(null);
   const [bmrReport, setBmrReport] = useState<any>(null);
@@ -144,7 +147,7 @@ export default function ManufacturingScreen() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [rmsData, entriesData, bomsData, batchesData, prodsData, vendsData, alertsData, analyticsData, whData] = await Promise.all([
+      const [rmsData, entriesData, bomsData, batchesData, prodsData, vendsData, alertsData, analyticsData, whData, mfgUnitsData] = await Promise.all([
         api.getRawMaterials(),
         api.getRawMaterialEntries(),
         api.getBOMs(),
@@ -153,7 +156,8 @@ export default function ManufacturingScreen() {
         api.getVendors(),
         api.getRawMaterialExpiryAlerts(),
         api.getManufacturingAnalytics(),
-        api.getWarehouses()
+        api.getWarehouses(),
+        api.getManufacturingUnits()
       ]);
 
       setMaterials(rmsData);
@@ -165,6 +169,7 @@ export default function ManufacturingScreen() {
       setExpiryAlerts(alertsData);
       setMfgAnalytics(analyticsData);
       setWarehouses(whData);
+      setManufacturingUnits(mfgUnitsData);
     } catch (err) {
       console.error('Failed to load manufacturing workspace data:', err);
     } finally {
@@ -328,9 +333,8 @@ export default function ManufacturingScreen() {
     }
   };
 
-  // --- Handlers: Batch Productions ---
   const handleStartProduction = async () => {
-    if (!prodProductId || !prodPlannedQty || !prodBatchNo.trim() || !prodWarehouseId) {
+    if (!prodProductId || !prodPlannedQty || !prodBatchNo.trim() || !prodManufacturingUnitId) {
       setProdError('Please fill in all launch requirements, including the manufacturing unit.');
       return;
     }
@@ -340,13 +344,13 @@ export default function ManufacturingScreen() {
         productId: prodProductId,
         plannedQty: Number(prodPlannedQty),
         batchNo: prodBatchNo.trim().toUpperCase(),
-        warehouseId: prodWarehouseId
+        manufacturingUnitId: prodManufacturingUnitId
       });
 
       setProdProductId('');
       setProdPlannedQty('');
       setProdBatchNo('');
-      setProdWarehouseId('');
+      setProdManufacturingUnitId('');
       setProductionModalVisible(false);
       loadData();
     } catch (err: any) {
@@ -371,8 +375,8 @@ export default function ManufacturingScreen() {
   };
 
   const handleCompleteProduction = async () => {
-    if (!selectedBatchRun || !qcYieldQty || !qcPassedBy.trim()) {
-      setQcError('Actual yield quantity and Inspector name are required.');
+    if (!selectedBatchRun || !qcYieldQty || !qcPassedBy.trim() || !qcWarehouseId) {
+      setQcError('Actual yield quantity, Inspector name, and target finished goods warehouse are required.');
       return;
     }
 
@@ -411,7 +415,8 @@ export default function ManufacturingScreen() {
         disintegrationTime: qcDisintegration ? parseInt(qcDisintegration) : null,
         heavyMetals: qcHeavyMetals,
         microbialLimit: qcMicrobial,
-        labReportRef: qcLabReportRef.trim()
+        labReportRef: qcLabReportRef.trim(),
+        warehouseId: qcWarehouseId
       };
       if (qcWasteQty) payload.wasteQty = Number(qcWasteQty);
       if (qcWasteReason.trim()) payload.wasteReason = qcWasteReason.trim();
@@ -421,6 +426,7 @@ export default function ManufacturingScreen() {
       setSelectedBatchRun(null);
       setQcYieldQty('');
       setQcPacking('');
+      setQcWarehouseId('');
       setQcWasteQty('');
       setQcWasteReason('');
       setQcNotes('');
@@ -1009,7 +1015,7 @@ export default function ManufacturingScreen() {
                       <Text style={styles.batchTitle}>
                         {batch.productId && typeof batch.productId === 'object' ? batch.productId.name : 'Product'}
                       </Text>
-                      <Text style={styles.batchSubNo}>Batch No: {batch.batchNo}</Text>
+                      <Text style={styles.batchSubNo}>Batch No: {batch.batchNo} {batch.manufacturingUnitName ? `· Unit: ${batch.manufacturingUnitName}` : ''}</Text>
                     </View>
                     <View style={[styles.statusBadge, { borderColor: getStatusColor(batch.status), backgroundColor: getStatusColor(batch.status) + '10' }]}>
                       <Text style={[styles.statusBadgeText, { color: getStatusColor(batch.status) }]}>
@@ -1686,21 +1692,21 @@ export default function ManufacturingScreen() {
                 )}
               </View>
 
-              <Text style={styles.inputLabel}>Manufacturing Unit / Target Warehouse *</Text>
+              <Text style={styles.inputLabel}>Manufacturing Unit *</Text>
               <View style={styles.pickerWrapper}>
                 {Platform.OS === 'web' ? (
                   <select
-                    value={prodWarehouseId}
-                    onChange={(e: any) => setProdWarehouseId(e.target.value)}
+                    value={prodManufacturingUnitId}
+                    onChange={(e: any) => setProdManufacturingUnitId(e.target.value)}
                     style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                   >
                     <option value="">-- Select Manufacturing Unit --</option>
-                    {warehouses.map(w => (
-                      <option key={w._id} value={w._id}>{w.name} ({w.city || 'Default'})</option>
+                    {manufacturingUnits.map(m => (
+                      <option key={m._id} value={m._id}>{m.name} ({m.city || 'Default'})</option>
                     ))}
                   </select>
                 ) : (
-                  <TextInput style={styles.input} placeholder="Warehouse ID" value={prodWarehouseId} onChangeText={setProdWarehouseId} />
+                  <TextInput style={styles.input} placeholder="Manufacturing Unit ID" value={prodManufacturingUnitId} onChangeText={setProdManufacturingUnitId} />
                 )}
               </View>
 
@@ -1894,6 +1900,24 @@ export default function ManufacturingScreen() {
                   </TouchableOpacity>
                 </View>
               )}
+
+              <Text style={styles.inputLabel}>Target Storage Warehouse (Finished Goods) *</Text>
+              <View style={styles.pickerWrapper}>
+                {Platform.OS === 'web' ? (
+                  <select
+                    value={qcWarehouseId}
+                    onChange={(e: any) => setQcWarehouseId(e.target.value)}
+                    style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                  >
+                    <option value="">-- Choose Warehouse --</option>
+                    {warehouses.map(w => (
+                      <option key={w._id} value={w._id}>{w.name} ({w.city || 'Default'})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <TextInput style={styles.input} placeholder="Warehouse ID" value={qcWarehouseId} onChangeText={setQcWarehouseId} />
+                )}
+              </View>
 
               <Text style={styles.inputLabel}>Waste / Shrinkage Quantity</Text>
               <TextInput style={styles.input} placeholder="e.g. 2 (leave empty to auto-calculate)" placeholderTextColor={colors.text.muted} value={qcWasteQty} onChangeText={setQcWasteQty} keyboardType="numeric" />

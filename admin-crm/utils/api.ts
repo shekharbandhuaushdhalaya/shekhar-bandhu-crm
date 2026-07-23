@@ -723,6 +723,24 @@ class ApiClient {
     return res.ok;
   }
 
+  // --- Manufacturing Units ---
+  async getManufacturingUnits(): Promise<ManufacturingUnit[]> {
+    const res = await this.request(`${API_BASE}/manufacturing-units`);
+    return res.json();
+  }
+  async createManufacturingUnit(data: Partial<ManufacturingUnit>): Promise<ManufacturingUnit> {
+    const res = await this.request(`${API_BASE}/manufacturing-units`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async updateManufacturingUnit(id: string, data: Partial<ManufacturingUnit>): Promise<ManufacturingUnit> {
+    const res = await this.request(`${API_BASE}/manufacturing-units/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteManufacturingUnit(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/manufacturing-units/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+
   // --- Inventory Entries (Direct Stock adjustments) ---
   async getInventoryEntries(warehouseId?: string, search = "", showZero = false): Promise<InventoryEntry[]> {
     let url = `${API_BASE}/inventory-entries?search=${encodeURIComponent(search)}`; 
@@ -875,7 +893,7 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`);
     return res.json();
   }
-  async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; warehouseId: string }): Promise<BatchProduction> {
+  async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; manufacturingUnitId: string }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
@@ -883,7 +901,7 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
-  async completeBatchProduction(id: string, data: { actualYieldQty: number; wasteQty?: number; wasteReason?: string; qcNotes: string; qcPassedBy: string }): Promise<BatchProduction> {
+  async completeBatchProduction(id: string, data: { actualYieldQty: number; wasteQty?: number; wasteReason?: string; qcNotes: string; qcPassedBy: string; warehouseId: string }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/complete`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
