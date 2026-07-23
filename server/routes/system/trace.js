@@ -67,8 +67,29 @@ router.get('/:batchNo', async (req, res) => {
     // 3. Search BatchProduction (as a finished goods batch)
     const prodBatchesAsFinished = await BatchProduction.find({ batchNo })
       .populate('productId', 'name sku')
+      .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
       .lean();
     for (const b of prodBatchesAsFinished) {
+      const ingredientsWithVendor = [];
+      if (b.ingredientsConsumed && b.ingredientsConsumed.length > 0) {
+        for (const ing of b.ingredientsConsumed) {
+          let vendorName = ing.vendorName || '';
+          if (!vendorName && ing.batchNo) {
+            const rmEntry = await RawMaterialEntry.findOne({ batchNo: ing.batchNo }).lean();
+            if (rmEntry) {
+              vendorName = rmEntry.vendorName;
+            }
+          }
+          ingredientsWithVendor.push({
+            materialName: ing.rawMaterialId ? ing.rawMaterialId.name : (ing.name || 'Unknown Material'),
+            batchNo: ing.batchNo,
+            qtyConsumed: ing.qtyConsumed,
+            unit: ing.rawMaterialId ? ing.rawMaterialId.unit : 'units',
+            vendorName: vendorName || 'Direct/Unknown',
+          });
+        }
+      }
+
       result.productionBatches.push({
         relation: 'finished_batch',
         batchProductionId: b._id,
@@ -86,6 +107,7 @@ router.get('/:batchNo', async (req, res) => {
         startDate: b.startDate,
         endDate: b.endDate,
         stages: b.stages || [],
+        ingredientsConsumed: ingredientsWithVendor,
       });
     }
 

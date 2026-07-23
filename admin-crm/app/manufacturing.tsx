@@ -2685,6 +2685,22 @@ export default function ManufacturingScreen() {
                           {b.qtyConsumed ? ` • Qty Consumed: ${b.qtyConsumed}` : ''}
                           {b.wasteQty > 0 ? ` • Waste: ${b.wasteQty} (${b.variancePercent}%)` : ''}
                         </Text>
+                        
+                        {b.ingredientsConsumed && b.ingredientsConsumed.length > 0 && (
+                          <View style={{ marginTop: 8, padding: 8, backgroundColor: colors.bg.secondary, borderRadius: 6, gap: 4 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 2 }}>🌿 Consumed Raw Materials & Trace to Vendor:</Text>
+                            {b.ingredientsConsumed.map((ing: any, idx2: number) => (
+                              <View key={idx2} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2, borderBottomWidth: idx2 < b.ingredientsConsumed.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+                                <Text style={{ fontSize: 11, color: colors.text.primary }}>
+                                  {ing.materialName} ({ing.qtyConsumed} {ing.unit})
+                                </Text>
+                                <Text style={{ fontSize: 11, color: colors.warning, fontWeight: '600' }}>
+                                  Batch: {ing.batchNo} • Vendor: {ing.vendorName}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
                       </View>
                     ))}
                   </View>
