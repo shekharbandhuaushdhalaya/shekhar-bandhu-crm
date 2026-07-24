@@ -457,6 +457,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const [warehouseId, setWarehouseId] = useState('');
   const [unitSearch, setUnitSearch] = useState('');
   const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Tabular items state
   const [rows, setRows] = useState<Array<{
@@ -1120,24 +1121,128 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
               </View>
             </View>
 
-            {/* Date */}
-            <View style={[styles.formGroup, { flex: 1, marginBottom: 0 }]}>
+            {/* Date with Custom Redesigned Calendar Popover */}
+            <View style={[styles.formGroup, { flex: 1, marginBottom: 0, zIndex: showDatePicker ? 3000 : 100 }]}>
               <Text style={styles.formLabel}>Purchase Date *</Text>
-              <View style={styles.formInput}>
-                <Ionicons name="calendar-outline" size={16} color={colors.text.muted} />
-                {Platform.OS === 'web' ? React.createElement('input', {
-                  type: 'date',
-                  value: date,
-                  onChange: (e: any) => setDate(e.target.value),
-                  style: { flex: 1, height: 46, padding: '0 8px', fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
-                }) : (
-                  <TextInput
-                    style={styles.formInputText}
-                    placeholder="YYYY-MM-DD"
-                    value={date}
-                    onChangeText={setDate}
-                  />
-                )}
+              <View style={styles.customSearchSelectContainer}>
+                <TouchableOpacity 
+                  style={[styles.formInput, { cursor: 'pointer' } as any]}
+                  onPress={() => setShowDatePicker(!showDatePicker)}
+                >
+                  <Ionicons name="calendar" size={16} color={colors.primary} />
+                  <Text style={[styles.formInputText, { color: colors.text.primary, fontWeight: '700', lineHeight: 44 }]}>
+                    {date ? new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Select Date'}
+                  </Text>
+                  <Ionicons name={showDatePicker ? "chevron-up" : "calendar-outline"} size={16} color={colors.text.muted} />
+                </TouchableOpacity>
+
+                {showDatePicker && (() => {
+                  const currentDateObj = date ? new Date(date) : new Date();
+                  const year = currentDateObj.getFullYear();
+                  const month = currentDateObj.getMonth();
+
+                  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                  const daysInMonth = new Date(year, month + 1, 0).getDate();
+                  const firstDayIndex = new Date(year, month, 1).getDay();
+
+                  const calendarDays = [];
+                  for (let i = 0; i < firstDayIndex; i++) {
+                    calendarDays.push(null);
+                  }
+                  for (let d = 1; d <= daysInMonth; d++) {
+                    calendarDays.push(d);
+                  }
+
+                  const handleMonthChange = (offset: number) => {
+                    const newDate = new Date(year, month + offset, 1);
+                    const formatted = newDate.toISOString().split('T')[0];
+                    setDate(formatted);
+                  };
+
+                  const handleSelectDay = (day: number) => {
+                    const selected = new Date(year, month, day);
+                    // Adjust timezone offset for ISO string
+                    const yyyy = selected.getFullYear();
+                    const mm = String(selected.getMonth() + 1).padStart(2, '0');
+                    const dd = String(selected.getDate()).padStart(2, '0');
+                    setDate(`${yyyy}-${mm}-${dd}`);
+                    setShowDatePicker(false);
+                  };
+
+                  return (
+                    <View style={[styles.customSelectPanel, { 
+                      padding: 14, 
+                      width: 280, 
+                      right: 0, 
+                      left: 'auto',
+                      backgroundColor: colors.bg.card,
+                      borderRadius: Radius.lg,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      boxShadow: '0px 10px 25px rgba(0,0,0,0.15)',
+                      elevation: 10
+                    }]}>
+                      {/* Calendar Header */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <TouchableOpacity onPress={() => handleMonthChange(-1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
+                          <Ionicons name="chevron-back" size={16} color={colors.text.primary} />
+                        </TouchableOpacity>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>
+                          {monthNames[month]} {year}
+                        </Text>
+                        <TouchableOpacity onPress={() => handleMonthChange(1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
+                          <Ionicons name="chevron-forward" size={16} color={colors.text.primary} />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Weekday Labels */}
+                      <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(w => (
+                          <Text key={w} style={{ flex: 1, textAlign: 'center', fontSize: 10, fontWeight: '800', color: colors.text.muted }}>{w}</Text>
+                        ))}
+                      </View>
+
+                      {/* Day Grid */}
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                        {calendarDays.map((dayNum, i) => {
+                          if (dayNum === null) {
+                            return <View key={`empty-${i}`} style={{ width: '14.28%', height: 32 }} />;
+                          }
+                          const isSelected = date && new Date(date).getDate() === dayNum && new Date(date).getMonth() === month && new Date(date).getFullYear() === year;
+                          const isToday = new Date().getDate() === dayNum && new Date().getMonth() === month && new Date().getFullYear() === year;
+
+                          return (
+                            <TouchableOpacity
+                              key={`day-${dayNum}`}
+                              style={[{
+                                width: '14.28%',
+                                height: 32,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                borderRadius: 8
+                              }, isSelected && { backgroundColor: colors.primary }, isToday && !isSelected && { borderWidth: 1, borderColor: colors.primary }]}
+                              onPress={() => handleSelectDay(dayNum)}
+                            >
+                              <Text style={[{ fontSize: 12, fontWeight: isSelected || isToday ? '800' : '500', color: isSelected ? '#fff' : colors.text.primary }]}>
+                                {dayNum}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Today Quick Select Footer */}
+                      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: 10, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <TouchableOpacity onPress={() => { setDate(new Date().toISOString().split('T')[0]); setShowDatePicker(false); }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>Today</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted }}>Close</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })()}
               </View>
             </View>
           </View>
