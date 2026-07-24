@@ -1997,14 +1997,9 @@ export default function ManufacturingScreen() {
                 </View>
               </View>
 
-              {!qcEnableSplit ? (
-                <>
-                  <Text style={styles.inputLabel}>Packing (pcs per box)</Text>
-                  <TextInput style={styles.input} placeholder="e.g. 10" placeholderTextColor={colors.text.muted} value={qcPacking} onChangeText={setQcPacking} keyboardType="numeric" />
-                </>
-              ) : (
+              {qcEnableSplit && (
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.formIngredientsTitle, { fontSize: 12, marginBottom: 8 }]}>Split Quantities & Packing Sizes:</Text>
+                  <Text style={[styles.formIngredientsTitle, { fontSize: 12, marginBottom: 8 }]}>Split Quantities across Products:</Text>
                   {qcYields.map((item, idx) => (
                     <View key={idx} style={[styles.bomIngredientInputRow, { gap: 6 }]}>
                       <View style={[styles.pickerWrapper, { flex: 2, marginBottom: 0 }]}>
@@ -2025,18 +2020,10 @@ export default function ManufacturingScreen() {
                       </View>
                       <TextInput
                         style={[styles.input, { flex: 1.2, marginBottom: 0 }]}
-                        placeholder="Qty units"
+                        placeholder="Qty (pcs)"
                         placeholderTextColor={colors.text.muted}
                         value={item.actualYieldQty}
                         onChangeText={(val) => handleQcYieldChange(idx, 'actualYieldQty', val)}
-                        keyboardType="numeric"
-                      />
-                      <TextInput
-                        style={[styles.input, { flex: 0.8, marginBottom: 0 }]}
-                        placeholder="Packing"
-                        placeholderTextColor={colors.text.muted}
-                        value={item.packing}
-                        onChangeText={(val) => handleQcYieldChange(idx, 'packing', val)}
                         keyboardType="numeric"
                       />
                       <TouchableOpacity style={styles.removeRowBtn} onPress={() => handleRemoveQcYieldRow(idx)}>
