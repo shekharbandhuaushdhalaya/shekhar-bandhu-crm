@@ -577,6 +577,18 @@ export default function StockMovementsScreen() {
       return;
     }
 
+    for (const item of items) {
+      if (item.productId) {
+        const availPcs = warehouseInventory
+          .filter(e => e.productId === item.productId)
+          .reduce((s, e) => s + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
+        if (availPcs > 0 && (item.qty || 0) > availPcs) {
+          setError(`Quantity for ${item.productName} (${item.qty} pcs) exceeds available warehouse stock (${availPcs} pcs).`);
+          return;
+        }
+      }
+    }
+
     const payload = {
       ...form,
       items: items.map(it => ({
@@ -1096,7 +1108,16 @@ export default function StockMovementsScreen() {
                         <View style={{ flex: 1 }}>
                           <Text style={styles.fieldLabel}>Qty (pcs)</Text>
                           <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.qty)} onChangeText={v => {
-                            const newQty = parseInt(v) || 0;
+                            let newQty = parseInt(v) || 0;
+                            if (item.productId) {
+                              const availPcs = warehouseInventory
+                                .filter(e => e.productId === item.productId)
+                                .reduce((s, e) => s + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
+                              if (availPcs > 0 && newQty > availPcs) {
+                                alert(`Cannot enter quantity (${newQty} pcs) exceeding available stock (${availPcs} pcs). Quantity capped to ${availPcs} pcs.`);
+                                newQty = availPcs;
+                              }
+                            }
                             const n = [...items];
                             n[idx].qty = newQty;
                             if (item.productId) {
