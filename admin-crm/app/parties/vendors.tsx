@@ -1286,8 +1286,8 @@ export default function VendorsScreen() {
               <View style={[styles.tableHeaderCellContainer, { width: 240 }]}><Text style={styles.tableHeaderCell}>Registered Name</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>GSTIN</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 150 }]}><Text style={styles.tableHeaderCell}>Contact Person</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Contact No.</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>City</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 150 }]}><Text style={styles.tableHeaderCell}>Contact No.</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>City</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Balance</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
             </View>
@@ -1353,7 +1353,7 @@ export default function VendorsScreen() {
                   </View>
 
                   {/* Contact No. */}
-                  <View style={[styles.tableCellContainer, { width: 145, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                  <View style={[styles.tableCellContainer, { width: 150, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                     <Ionicons name="call-outline" size={12} color={colors.success} />
                     <Text style={styles.monoText} numberOfLines={1}>
                       {formatPhoneWithCountryCode(v.phone)}
@@ -1361,7 +1361,7 @@ export default function VendorsScreen() {
                   </View>
 
                   {/* City + State */}
-                  <View style={[styles.tableCellContainer, { width: 130, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                  <View style={[styles.tableCellContainer, { width: 140, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                     <Ionicons name="location-outline" size={13} color={colors.danger} />
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>

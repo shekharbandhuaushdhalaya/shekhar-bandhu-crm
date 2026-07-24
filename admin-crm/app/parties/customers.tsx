@@ -1646,7 +1646,7 @@ export default function CustomersScreen() {
                 <View style={[styles.tableHeaderCellContainer, { width: 240 }]}><Text style={styles.tableHeaderCell}>Registered Name / Customer</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { width: 150 }]}><Text style={styles.tableHeaderCell}>GSTIN</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Contact Person</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>Phone</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { width: 150 }]}><Text style={styles.tableHeaderCell}>Phone</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>City</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Balance</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
@@ -1718,7 +1718,7 @@ export default function CustomersScreen() {
                     </View>
 
                     {/* Phone */}
-                    <View style={[styles.tableCellContainer, { width: 145, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                    <View style={[styles.tableCellContainer, { width: 150, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                       <Ionicons name="call-outline" size={12} color={colors.success} />
                       <Text style={styles.monoText} numberOfLines={1}>
                         {formatPhoneWithCountryCode(c.phone)}
