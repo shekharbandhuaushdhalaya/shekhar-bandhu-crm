@@ -790,6 +790,16 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       return;
     }
 
+    // Check if supplier is a Non-GST vendor
+    const targetVend = vendors.find(v => (v.company || v.name).toLowerCase() === supplierName.trim().toLowerCase() || (v.displayName || v.registeredName || '').toLowerCase() === supplierName.trim().toLowerCase());
+    const isNonGstVend = targetVend ? (!targetVend.gstin || !targetVend.gstin.trim() || (targetVend as any).recordTracking === 'cash_ledger') : false;
+
+    if (isNonGstVend && mode === 'regular') {
+      alert(`Cannot create a "Regular GST Purchase" for ${targetVend?.company || targetVend?.name}. This vendor is not registered for GST (no GSTIN provided). Please switch Billing Mode to "Non-GST / Cash Purchase".`);
+      setMode('cash');
+      return;
+    }
+
     if (!warehouseId) {
       alert('Please select a destination warehouse.');
       return;
@@ -910,30 +920,45 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
 
           {/* Billing Mode Switch */}
-          <View style={styles.modeSelector}>
-            <TouchableOpacity
-              style={[
-                styles.modeBtn,
-                mode === 'regular' && { backgroundColor: colors.primary + '18', borderColor: colors.primary }
-              ]}
-              onPress={() => setMode('regular')}
-            >
-              <Text style={[styles.modeBtnText, mode === 'regular' && { color: colors.primary, fontWeight: '700' }]}>
-                📄 Regular GST Purchase
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.modeBtn,
-                mode === 'cash' && { backgroundColor: colors.warning + '18', borderColor: colors.warning }
-              ]}
-              onPress={() => setMode('cash')}
-            >
-              <Text style={[styles.modeBtnText, mode === 'cash' && { color: colors.warning, fontWeight: '700' }]}>
-                💵 Non-GST / Cash Purchase
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {(() => {
+            const selectedVend = vendors.find(v => (v.company || v.name).toLowerCase() === supplierName.trim().toLowerCase() || (v.displayName || v.registeredName || '').toLowerCase() === supplierName.trim().toLowerCase());
+            const isNonGstVendor = selectedVend ? (!selectedVend.gstin || !selectedVend.gstin.trim() || (selectedVend as any).recordTracking === 'cash_ledger') : false;
+
+            return (
+              <View style={styles.modeSelector}>
+                <TouchableOpacity
+                  style={[
+                    styles.modeBtn,
+                    mode === 'regular' && { backgroundColor: colors.primary + '18', borderColor: colors.primary },
+                    isNonGstVendor && { opacity: 0.5, backgroundColor: colors.bg.secondary }
+                  ]}
+                  onPress={() => {
+                    if (isNonGstVendor) {
+                      alert(`"Regular GST Purchase" cannot be selected because ${selectedVend?.company || selectedVend?.name || 'this vendor'} is not registered for GST (no GSTIN provided). Non-GST / Cash Purchase will be used.`);
+                      setMode('cash');
+                      return;
+                    }
+                    setMode('regular');
+                  }}
+                >
+                  <Text style={[styles.modeBtnText, mode === 'regular' && { color: colors.primary, fontWeight: '700' }, isNonGstVendor && { color: colors.text.muted }]}>
+                    📄 Regular GST Purchase {isNonGstVendor ? '(Disabled for Non-GST Vendor)' : ''}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modeBtn,
+                    mode === 'cash' && { backgroundColor: colors.warning + '18', borderColor: colors.warning }
+                  ]}
+                  onPress={() => setMode('cash')}
+                >
+                  <Text style={[styles.modeBtnText, mode === 'cash' && { color: colors.warning, fontWeight: '700' }]}>
+                    💵 Non-GST / Cash Purchase
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={[styles.formGroup, { flex: 1 }]}>
