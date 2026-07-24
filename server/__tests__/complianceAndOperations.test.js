@@ -19,10 +19,13 @@ jest.mock('../models/Payment');
 jest.mock('../models/StockMovement');
 jest.mock('../models/MrDailyLog');
 jest.mock('../models/MrExpense');
+jest.mock('../models/RolePermission');
 
 const Customer = require('../models/Customer');
 const Vendor = require('../models/Vendor');
 const Product = require('../models/Product');
+const RolePermission = require('../models/RolePermission');
+RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue(['*']);
 const InventoryEntry = require('../models/InventoryEntry');
 const Notification = require('../models/Notification');
 const MedicalRepresentative = require('../models/MedicalRepresentative');
