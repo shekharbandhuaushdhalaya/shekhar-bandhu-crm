@@ -472,6 +472,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     gstRate: number;
   }>>([]);
 
+  const [manufacturingUnits, setManufacturingUnits] = useState<ManufacturingUnit[]>([]);
+
   useEffect(() => {
     if (visible) {
       if (invoiceToEdit) {
@@ -543,18 +545,24 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
       const loadData = async () => {
         try {
-          const [v, p, w, rm] = await Promise.all([
+          const [v, p, w, rm, mfg] = await Promise.all([
             api.getVendors(),
             api.getProducts(),
             api.getWarehouses(),
-            api.getRawMaterials().catch(() => [])
+            api.getRawMaterials().catch(() => []),
+            api.getManufacturingUnits().catch(() => [])
           ]);
           setVendors(v);
           setProducts(p);
           setWarehouses(w);
           setRawMaterials(rm);
-          if (w.length > 0 && !invoiceToEdit) {
-            setWarehouseId(w[0]._id);
+          setManufacturingUnits(mfg);
+          if (!invoiceToEdit) {
+            if (mfg.length > 0) {
+              setWarehouseId(mfg[0]._id);
+            } else if (w.length > 0) {
+              setWarehouseId(w[0]._id);
+            }
           }
           if (invoiceToEdit) {
             setRows((invoiceToEdit.items || []).map((it, idx) => {
@@ -1042,17 +1050,21 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             </View>
           )}
 
-          {/* Destination Warehouse */}
+          {/* Destination Facility / Warehouse */}
           <View style={[styles.formGroup, { zIndex: 1020 }]}>
-            <Text style={styles.formLabel}>Destination Warehouse *</Text>
+            <Text style={styles.formLabel}>Destination Facility / Warehouse *</Text>
             <View style={styles.customSearchSelectContainer}>
               <View style={styles.formInput}>
                 <Ionicons name="business" size={16} color={colors.text.muted} />
                 <TextInput
-                  style={[styles.formInputText, { color: colors.text.primary }]}
-                  placeholder="Select destination warehouse..."
+                  style={[styles.formInputText, { color: colors.text.primary, fontWeight: '700' }]}
+                  placeholder="Select destination facility..."
                   placeholderTextColor={colors.text.muted}
-                  value={warehouses.find(w => w._id === warehouseId)?.name || ''}
+                  value={
+                    manufacturingUnits.find(m => m._id === warehouseId) 
+                      ? `🏭 ${manufacturingUnits.find(m => m._id === warehouseId)?.name}` 
+                      : (warehouses.find(w => w._id === warehouseId)?.name ? `🏢 ${warehouses.find(w => w._id === warehouseId)?.name}` : '')
+                  }
                   editable={false}
                 />
                 <TouchableOpacity onPress={() => setShowWarehouseDropdown(!showWarehouseDropdown)}>
@@ -1063,7 +1075,33 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
             {showWarehouseDropdown && (
               <View style={styles.customSelectPanel}>
-                <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }} keyboardShouldPersistTaps="handled">
+                <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
+                  {/* Manufacturing Units */}
+                  {manufacturingUnits.length > 0 && (
+                    <View style={{ backgroundColor: colors.primary + '08', paddingHorizontal: 10, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 9.5, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' }}>🏭 Manufacturing / Factory Units</Text>
+                    </View>
+                  )}
+                  {manufacturingUnits.map(m => (
+                    <TouchableOpacity
+                      key={m._id}
+                      style={styles.customSelectItem}
+                      onPress={() => {
+                        setWarehouseId(m._id);
+                        setShowWarehouseDropdown(false);
+                      }}
+                    >
+                      <Text style={[styles.customSelectItemText, { color: colors.primary }]}>🏭 {m.name}</Text>
+                      <Text style={styles.customSelectItemSubtext}>{m.city ? `${m.city}, ${m.state || ''}` : 'Primary Factory'}</Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* Warehouses & Godowns */}
+                  {warehouses.length > 0 && (
+                    <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 10, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <Text style={{ fontSize: 9.5, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' }}>🏢 Warehouses &amp; Godowns</Text>
+                    </View>
+                  )}
                   {warehouses.map(w => (
                     <TouchableOpacity
                       key={w._id}
@@ -1073,8 +1111,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                         setShowWarehouseDropdown(false);
                       }}
                     >
-                      <Text style={styles.customSelectItemText}>{w.name}</Text>
-                      <Text style={styles.customSelectItemSubtext}>{w.city ? `${w.city}, ${w.state}` : 'Gotham Depot'}</Text>
+                      <Text style={styles.customSelectItemText}>🏢 {w.name}</Text>
+                      <Text style={styles.customSelectItemSubtext}>{w.city ? `${w.city}, ${w.state}` : 'Depot'}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
