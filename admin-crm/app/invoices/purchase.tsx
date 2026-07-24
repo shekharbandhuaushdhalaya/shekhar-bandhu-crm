@@ -1142,14 +1142,6 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             </View>
           </View>
 
-          {/* Tabular Items Section */}
-          <Text style={[styles.formLabel, { marginTop: 12, marginBottom: 8, fontSize: 13, color: colors.text.primary }]}>Items Breakdown *</Text>
-          
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={true} 
-            style={{ 
-              width: '100%', 
           {/* Items Breakdown Table Card */}
           <View style={{
             backgroundColor: colors.bg.card,
