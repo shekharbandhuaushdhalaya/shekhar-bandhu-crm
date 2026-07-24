@@ -1150,171 +1150,221 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             showsHorizontalScrollIndicator={true} 
             style={{ 
               width: '100%', 
-              marginBottom: 12,
-              zIndex: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 1010 : 1
-            }}
-            contentContainerStyle={{ minHeight: 250, flexGrow: 1 }}
-          >
-            <View style={{ width: '100%', minWidth: 650, minHeight: 250 }}>
-              <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 3.2 : 3.6 }]}>Raw Material Name *</Text>
-                <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.4 : 1.6, textAlign: 'center' }]}>Qty / Unit *</Text>
-                <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}>Rate (₹)</Text>
-                {mode === 'regular' && (
-                  <Text style={[styles.tableHeaderLabel, { flex: 0.7, textAlign: 'center' }]}>GST</Text>
-                )}
-                <Text style={[styles.tableHeaderLabel, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}>Total</Text>
-                <View style={{ flex: 0.4 }} />
+          {/* Items Breakdown Table Card */}
+          <View style={{
+            backgroundColor: colors.bg.card,
+            borderRadius: Radius.lg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            padding: Spacing.md,
+            marginBottom: 16,
+            boxShadow: '0px 2px 6px rgba(0,0,0,0.04)',
+            elevation: 2
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="cube-outline" size={18} color={colors.primary} />
+                <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>Items Breakdown *</Text>
               </View>
+              <View style={{ backgroundColor: colors.primary + '12', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary + '25' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>{rows.length} {rows.length === 1 ? 'Line Item' : 'Line Items'}</Text>
+              </View>
+            </View>
+            
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={true} 
+              style={{ 
+                width: '100%', 
+                zIndex: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 1010 : 1
+              }}
+              contentContainerStyle={{ minHeight: 220, flexGrow: 1 }}
+            >
+              <View style={{ width: '100%', minWidth: 680, minHeight: 220 }}>
+                {/* Header Row */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.border,
+                  paddingVertical: 10,
+                  paddingHorizontal: 8,
+                  backgroundColor: colors.bg.secondary,
+                  borderRadius: Radius.md,
+                  marginBottom: 8
+                }}>
+                  <Text style={{ flex: mode === 'regular' ? 3.2 : 3.6, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Raw Material Name *</Text>
+                  <Text style={{ flex: mode === 'regular' ? 1.4 : 1.6, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Qty / Unit *</Text>
+                  <Text style={{ flex: mode === 'regular' ? 1.0 : 1.2, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Rate (₹)</Text>
+                  {mode === 'regular' && (
+                    <Text style={{ flex: 0.8, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>GST Rate</Text>
+                  )}
+                  <Text style={{ flex: mode === 'regular' ? 1.2 : 1.4, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Line Total (₹)</Text>
+                  <View style={{ width: 36 }} />
+                </View>
 
-              {rows.map((row, index) => {
-                const qtyNum = parseFloat(row.boxes) || 0;
-                const subtotal = qtyNum * (parseFloat(row.rate) || 0);
-                const gstAmount = mode === 'regular' ? (subtotal * row.gstRate) / 100 : 0;
-                const rowTotal = subtotal + gstAmount;
+                {/* Rows */}
+                {rows.map((row, index) => {
+                  const qtyNum = parseFloat(row.boxes) || 0;
+                  const subtotal = qtyNum * (parseFloat(row.rate) || 0);
+                  const gstAmount = mode === 'regular' ? (subtotal * row.gstRate) / 100 : 0;
+                  const rowTotal = subtotal + gstAmount;
 
-                const rowFilteredItems = row.productSearch
-                  ? selectableItems.filter(item =>
-                      item.name.toLowerCase().includes(row.productSearch.toLowerCase()) ||
-                      item.sku.toLowerCase().includes(row.productSearch.toLowerCase())
-                    )
-                  : selectableItems;
+                  const rowFilteredItems = row.productSearch
+                    ? selectableItems.filter(item =>
+                        item.name.toLowerCase().includes(row.productSearch.toLowerCase()) ||
+                        item.sku.toLowerCase().includes(row.productSearch.toLowerCase())
+                      )
+                    : selectableItems;
 
-                return (
-                  <View key={row.id} style={[styles.tableRow, { zIndex: (row.showProductDropdown || row.showGstDropdown) ? 1000 : 100 - index }]}>
-                    {/* Raw Material search */}
-                    <View style={{ flex: mode === 'regular' ? 3.2 : 3.6, position: 'relative' }}>
-                      <TextInput
-                        style={styles.tableInput}
-                        placeholder="Search raw material..."
-                        placeholderTextColor={colors.text.muted}
-                        value={row.productSearch}
-                        onChangeText={(text) => updateRowProductSearch(row.id, text)}
-                        onFocus={() => {
-                          setRows(prev => prev.map(r => r.id === row.id ? { ...r, showProductDropdown: true } : { ...r, showProductDropdown: false }));
-                        }}
-                      />
-                      {row.showProductDropdown && (
-                        <View style={styles.rowDropdown}>
-                          <ScrollView nestedScrollEnabled style={{ maxHeight: 160 }} keyboardShouldPersistTaps="handled">
-                            {rowFilteredItems.map(item => (
-                              <TouchableOpacity
-                                key={`rm-${item.id}`}
-                                style={styles.rowDropdownItem}
-                                onPress={() => handleSelectRowItem(row.id, item)}
-                              >
-                                <Text style={styles.rowDropdownItemText}>
-                                  🧪 {item.name}
-                                </Text>
-                                <Text style={styles.rowDropdownItemSubtext}>
-                                  SKU: {item.sku || 'N/A'} | Unit: {item.unit || 'units'}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                            {rowFilteredItems.length === 0 && (
-                              <View style={{ padding: 8 }}>
-                                <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'center' }}>No raw materials found</Text>
-                              </View>
-                            )}
-                            <TouchableOpacity
-                              style={[styles.rowDropdownItem, { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary }]}
-                              onPress={() => setRows(prev => prev.map(r => r.id === row.id ? { ...r, showProductDropdown: false } : r))}
-                            >
-                              <Text style={{ fontSize: 11, color: colors.primary, textAlign: 'center', fontWeight: 'bold' }}>Close</Text>
-                            </TouchableOpacity>
-                          </ScrollView>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Qty (Unit) */}
-                    <View style={{ flex: mode === 'regular' ? 1.4 : 1.6, position: 'relative', justifyContent: 'center' }}>
-                      <TextInput
-                        style={[styles.tableInput, { width: '100%', textAlign: 'center', paddingRight: row.unit ? 36 : 8 }]}
-                        placeholder="0"
-                        placeholderTextColor={colors.text.muted}
-                        keyboardType="numeric"
-                        value={row.boxes}
-                        onChangeText={(text) => {
-                          setRows(prev => prev.map(r => r.id === row.id ? { ...r, boxes: text } : r));
-                        }}
-                      />
-                      {row.unit ? (
-                        <View style={{ position: 'absolute', right: 4, backgroundColor: colors.primary + '18', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>{row.unit}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-
-                    {/* Rate */}
-                    <TextInput
-                      style={[styles.tableInput, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right' }]}
-                      placeholder="0.00"
-                      placeholderTextColor={colors.text.muted}
-                      keyboardType="numeric"
-                      value={row.rate}
-                      onChangeText={(text) => {
-                        setRows(prev => prev.map(r => r.id === row.id ? { ...r, rate: text } : r));
-                      }}
-                    />
-
-                    {/* GST (Only in Regular mode) */}
-                    {mode === 'regular' && (
-                      <View style={{ flex: 0.7, position: 'relative' }}>
-                        <TouchableOpacity
-                          style={[styles.tableInputBtn, { width: '100%', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 2 }]}
-                          onPress={() => {
-                            setRows(prev => prev.map(r => r.id === row.id ? { ...r, showGstDropdown: !r.showGstDropdown, showProductDropdown: false } : { ...r, showGstDropdown: false }));
+                  return (
+                    <View key={row.id} style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      paddingVertical: 8,
+                      paddingHorizontal: 8,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border + '60',
+                      backgroundColor: index % 2 === 0 ? 'transparent' : colors.bg.secondary + '40',
+                      borderRadius: Radius.sm,
+                      zIndex: (row.showProductDropdown || row.showGstDropdown) ? 1000 : 100 - index
+                    }}>
+                      {/* Raw Material search */}
+                      <View style={{ flex: mode === 'regular' ? 3.2 : 3.6, position: 'relative' }}>
+                        <TextInput
+                          style={[styles.tableInput, { fontWeight: '600' }]}
+                          placeholder="Search raw material..."
+                          placeholderTextColor={colors.text.muted}
+                          value={row.productSearch}
+                          onChangeText={(text) => updateRowProductSearch(row.id, text)}
+                          onFocus={() => {
+                            setRows(prev => prev.map(r => r.id === row.id ? { ...r, showProductDropdown: true } : { ...r, showProductDropdown: false }));
                           }}
-                        >
-                          <Text style={styles.tableInputBtnText}>{row.gstRate}%</Text>
-                          <Ionicons name={row.showGstDropdown ? "chevron-up" : "chevron-down"} size={12} color={colors.text.muted} />
-                        </TouchableOpacity>
-
-                        {row.showGstDropdown && (
-                          <View style={styles.rowGstDropdown}>
-                            {[0, 5, 12, 18, 28].map(rateVal => (
+                        />
+                        {row.showProductDropdown && (
+                          <View style={styles.rowDropdown}>
+                            <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
+                              {rowFilteredItems.map(item => (
+                                <TouchableOpacity
+                                  key={`rm-${item.id}`}
+                                  style={styles.rowDropdownItem}
+                                  onPress={() => handleSelectRowItem(row.id, item)}
+                                >
+                                  <Text style={styles.rowDropdownItemText}>
+                                    🧪 {item.name}
+                                  </Text>
+                                  <Text style={styles.rowDropdownItemSubtext}>
+                                    SKU: {item.sku || 'N/A'} | Unit: {item.unit || 'units'}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                              {rowFilteredItems.length === 0 && (
+                                <View style={{ padding: 10 }}>
+                                  <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'center' }}>No raw materials found</Text>
+                                </View>
+                              )}
                               <TouchableOpacity
-                                key={rateVal}
-                                style={[styles.rowGstDropdownItem, row.gstRate === rateVal && { backgroundColor: colors.primary + '15' }]}
-                                onPress={() => {
-                                  setRows(prev => prev.map(r => r.id === row.id ? { ...r, gstRate: rateVal, showGstDropdown: false } : r));
-                                }}
+                                style={[styles.rowDropdownItem, { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary }]}
+                                onPress={() => setRows(prev => prev.map(r => r.id === row.id ? { ...r, showProductDropdown: false } : r))}
                               >
-                                <Text style={[styles.rowGstDropdownItemText, row.gstRate === rateVal && { color: colors.primary, fontWeight: 'bold' }]}>
-                                  {rateVal}%
-                                </Text>
+                                <Text style={{ fontSize: 11, color: colors.primary, textAlign: 'center', fontWeight: 'bold' }}>Close</Text>
                               </TouchableOpacity>
-                            ))}
+                            </ScrollView>
                           </View>
                         )}
                       </View>
-                    )}
 
-                    {/* Row Subtotal */}
-                    <View style={{ flex: mode === 'regular' ? 1.0 : 1.2, justifyContent: 'center', alignItems: 'flex-end' }}>
-                       <Text style={styles.tableRowSubtotal} numberOfLines={1}>
-                         ₹{rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                       </Text>
+                      {/* Qty (Unit) */}
+                      <View style={{ flex: mode === 'regular' ? 1.4 : 1.6, position: 'relative', justifyContent: 'center' }}>
+                        <TextInput
+                          style={[styles.tableInput, { width: '100%', textAlign: 'center', fontWeight: '700', paddingRight: row.unit ? 42 : 8 }]}
+                          placeholder="0"
+                          placeholderTextColor={colors.text.muted}
+                          keyboardType="numeric"
+                          value={row.boxes}
+                          onChangeText={(text) => {
+                            setRows(prev => prev.map(r => r.id === row.id ? { ...r, boxes: text } : r));
+                          }}
+                        />
+                        {row.unit ? (
+                          <View style={{ position: 'absolute', right: 5, backgroundColor: colors.primary + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.primary + '30' }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>{row.unit}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      {/* Rate */}
+                      <TextInput
+                        style={[styles.tableInput, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right', fontWeight: '600' }]}
+                        placeholder="0.00"
+                        placeholderTextColor={colors.text.muted}
+                        keyboardType="numeric"
+                        value={row.rate}
+                        onChangeText={(text) => {
+                          setRows(prev => prev.map(r => r.id === row.id ? { ...r, rate: text } : r));
+                        }}
+                      />
+
+                      {/* GST (Only in Regular mode) */}
+                      {mode === 'regular' && (
+                        <View style={{ flex: 0.8, position: 'relative' }}>
+                          <TouchableOpacity
+                            style={[styles.tableInputBtn, { width: '100%', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, backgroundColor: colors.primary + '0a', borderColor: colors.primary + '30' }]}
+                            onPress={() => {
+                              setRows(prev => prev.map(r => r.id === row.id ? { ...r, showGstDropdown: !r.showGstDropdown, showProductDropdown: false } : { ...r, showGstDropdown: false }));
+                            }}
+                          >
+                            <Text style={[styles.tableInputBtnText, { color: colors.primary, fontWeight: '800' }]}>{row.gstRate}%</Text>
+                            <Ionicons name={row.showGstDropdown ? "chevron-up" : "chevron-down"} size={12} color={colors.primary} />
+                          </TouchableOpacity>
+
+                          {row.showGstDropdown && (
+                            <View style={styles.rowGstDropdown}>
+                              {[0, 5, 12, 18, 28].map(rateVal => (
+                                <TouchableOpacity
+                                  key={rateVal}
+                                  style={[styles.rowGstDropdownItem, row.gstRate === rateVal && { backgroundColor: colors.primary + '18' }]}
+                                  onPress={() => {
+                                    setRows(prev => prev.map(r => r.id === row.id ? { ...r, gstRate: rateVal, showGstDropdown: false } : r));
+                                  }}
+                                >
+                                  <Text style={[styles.rowGstDropdownItemText, row.gstRate === rateVal && { color: colors.primary, fontWeight: 'bold' }]}>
+                                    {rateVal}%
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Row Subtotal */}
+                      <View style={{ flex: mode === 'regular' ? 1.2 : 1.4, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 4 }}>
+                         <Text style={[styles.tableRowSubtotal, { fontSize: 13, fontWeight: '800', color: colors.text.primary }]} numberOfLines={1}>
+                           ₹{rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                         </Text>
+                      </View>
+
+                      {/* Delete button */}
+                      <TouchableOpacity
+                        style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.danger + '12', alignItems: 'center', justifyContent: 'center' }}
+                        onPress={() => removeRow(row.id)}
+                      >
+                        <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                      </TouchableOpacity>
                     </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
 
-                    {/* Delete button */}
-                    <TouchableOpacity
-                      style={{ flex: 0.4, alignItems: 'center', justifyContent: 'center' }}
-                      onPress={() => removeRow(row.id)}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </View>
-          </ScrollView>
-
-          <TouchableOpacity style={styles.addItemBtn} onPress={addRow}>
-            <Ionicons name="add-circle" size={18} color={colors.primary} />
-            <Text style={styles.addItemBtnText}>Add Product Line</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.addItemBtn} onPress={addRow}>
+              <Ionicons name="add-circle" size={18} color={colors.primary} />
+              <Text style={styles.addItemBtnText}>+ Add Raw Material Line</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Freight & Logistics Details */}
           <View style={{ backgroundColor: '#fdfdfd', padding: 14, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginTop: 10, marginBottom: 10 }}>
