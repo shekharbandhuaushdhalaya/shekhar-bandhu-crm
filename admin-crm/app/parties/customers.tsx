@@ -682,7 +682,10 @@ function AddEditCustomerModal({
                       styles.typeSelectorBtn,
                       customerType === 'gst' && { backgroundColor: colors.primary + '18', borderColor: colors.primary }
                     ]}
-                    onPress={() => setCustomerType('gst')}
+                    onPress={() => {
+                      setCustomerType('gst');
+                      setRecordTracking('invoice_ledger');
+                    }}
                   >
                     <Ionicons name="business-outline" size={16} color={customerType === 'gst' ? colors.primary : colors.text.muted} />
                     <Text style={[styles.typeSelectorText, { color: customerType === 'gst' ? colors.primary : colors.text.secondary }]}>
@@ -694,7 +697,10 @@ function AddEditCustomerModal({
                       styles.typeSelectorBtn,
                       customerType === 'cash' && { backgroundColor: colors.warning + '18', borderColor: colors.warning }
                     ]}
-                    onPress={() => setCustomerType('cash')}
+                    onPress={() => {
+                      setCustomerType('cash');
+                      setRecordTracking('cash_ledger');
+                    }}
                   >
                     <Ionicons name="cash-outline" size={16} color={customerType === 'cash' ? colors.warning : colors.text.muted} />
                     <Text style={[styles.typeSelectorText, { color: customerType === 'cash' ? colors.warning : colors.text.secondary }]}>
