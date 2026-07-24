@@ -1176,20 +1176,25 @@ export default function InventoriesScreen() {
   const [showZero, setShowZero] = useState(false);
   const [showDeadStock, setShowDeadStock] = useState(false);
   const [deadStockItems, setDeadStockItems] = useState<DeadStockItem[]>([]);
+  const [showTransfers, setShowTransfers] = useState(false);
+  const [transfers, setTransfers] = useState<any[]>([]);
+  const [addTransferVisible, setAddTransferVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      // 1. Fetch Warehouses, Products, Vendors, and Dead Stock
-      const [ws, prods, vends, dead] = await Promise.all([
+      // 1. Fetch Warehouses, Products, Vendors, Dead Stock, and Transfers
+      const [ws, prods, vends, dead, trs] = await Promise.all([
         api.getWarehouses(),
         api.getProducts(),
         api.getVendors(),
-        api.getDeadStock().catch(() => [])
+        api.getDeadStock().catch(() => []),
+        api.getStockTransfers().catch(() => [])
       ]);
       setWarehouses(ws);
       setProducts(prods);
       setVendors(vends);
       setDeadStockItems(dead);
+      setTransfers(trs);
 
       // 2. Fetch inventory based on selected godown
       if (selectedWarehouseId === 'all') {
@@ -1667,7 +1672,7 @@ export default function InventoriesScreen() {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: (showZero || showDeadStock) ? (showDeadStock ? colors.danger : colors.warning) : colors.primary,
+                  backgroundColor: showDeadStock ? colors.danger : showZero ? colors.warning : showTransfers ? colors.primary : colors.primary,
                   paddingHorizontal: 14,
                   height: 40,
                   borderRadius: Radius.md,
@@ -1681,7 +1686,7 @@ export default function InventoriesScreen() {
               >
                 <Ionicons name="cube-outline" size={16} color="#fff" />
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
-                  {showDeadStock ? 'Dead Stock' : showZero ? 'Zero Stock' : 'Stock Actions'}
+                  {showDeadStock ? 'Dead Stock' : showZero ? 'Zero Stock' : showTransfers ? 'Transfers' : 'Stock Actions'}
                 </Text>
                 <Ionicons name={showStockActionsDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#fff" />
               </TouchableOpacity>
@@ -1733,23 +1738,24 @@ export default function InventoriesScreen() {
                       justifyContent: 'space-between',
                       paddingVertical: 10,
                       paddingHorizontal: 12,
-                      backgroundColor: (!showZero && !showDeadStock) ? colors.success + '15' : 'transparent',
+                      backgroundColor: (!showZero && !showDeadStock && !showTransfers) ? colors.success + '15' : 'transparent',
                       borderBottomWidth: 1,
                       borderBottomColor: colors.border + '40',
                     }}
                     onPress={() => {
                       setShowZero(false);
                       setShowDeadStock(false);
+                      setShowTransfers(false);
                       setShowStockActionsDropdown(false);
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Ionicons name="checkmark-circle-outline" size={16} color={(!showZero && !showDeadStock) ? colors.success : colors.text.secondary} />
-                      <Text style={{ fontSize: 12, fontWeight: (!showZero && !showDeadStock) ? '700' : '600', color: (!showZero && !showDeadStock) ? colors.success : colors.text.secondary }}>
+                      <Ionicons name="checkmark-circle-outline" size={16} color={(!showZero && !showDeadStock && !showTransfers) ? colors.success : colors.text.secondary} />
+                      <Text style={{ fontSize: 12, fontWeight: (!showZero && !showDeadStock && !showTransfers) ? '700' : '600', color: (!showZero && !showDeadStock && !showTransfers) ? colors.success : colors.text.secondary }}>
                         In-Stock View
                       </Text>
                     </View>
-                    {(!showZero && !showDeadStock) && <Ionicons name="checkmark" size={14} color={colors.success} />}
+                    {(!showZero && !showDeadStock && !showTransfers) && <Ionicons name="checkmark" size={14} color={colors.success} />}
                   </TouchableOpacity>
 
                   {/* Toggle Zero Stock */}
@@ -1766,7 +1772,10 @@ export default function InventoriesScreen() {
                     }}
                     onPress={() => {
                       setShowZero(p => !p);
-                      if (!showZero) setShowDeadStock(false);
+                      if (!showZero) {
+                        setShowDeadStock(false);
+                        setShowTransfers(false);
+                      }
                       setShowStockActionsDropdown(false);
                     }}
                   >
@@ -1788,10 +1797,15 @@ export default function InventoriesScreen() {
                       paddingVertical: 10,
                       paddingHorizontal: 12,
                       backgroundColor: showDeadStock ? colors.danger + '15' : 'transparent',
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border + '40',
                     }}
                     onPress={() => {
                       setShowDeadStock(p => !p);
-                      if (!showDeadStock) setShowZero(false);
+                      if (!showDeadStock) {
+                        setShowZero(false);
+                        setShowTransfers(false);
+                      }
                       setShowStockActionsDropdown(false);
                     }}
                   >
@@ -1802,6 +1816,32 @@ export default function InventoriesScreen() {
                       </Text>
                     </View>
                     {showDeadStock && <Ionicons name="checkmark" size={14} color={colors.danger} />}
+                  </TouchableOpacity>
+
+                  {/* Toggle Stock Transfers */}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      backgroundColor: showTransfers ? colors.primary + '15' : 'transparent',
+                    }}
+                    onPress={() => {
+                      setShowTransfers(true);
+                      setShowZero(false);
+                      setShowDeadStock(false);
+                      setShowStockActionsDropdown(false);
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="swap-horizontal" size={16} color={showTransfers ? colors.primary : colors.text.secondary} />
+                      <Text style={{ fontSize: 12, fontWeight: showTransfers ? '700' : '600', color: showTransfers ? colors.primary : colors.text.secondary }}>
+                        Stock Transfers
+                      </Text>
+                    </View>
+                    {showTransfers && <Ionicons name="checkmark" size={14} color={colors.primary} />}
                   </TouchableOpacity>
                 </View>
               )}
@@ -1822,7 +1862,214 @@ export default function InventoriesScreen() {
             contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg, flexGrow: 1 }}
           >
             <View style={[styles.table, { minWidth: 700 }]}>
-              {showDeadStock ? (
+              {showTransfers ? (
+                // --- STOCK TRANSFERS VIEW ---
+                <>
+                  <View style={styles.tableHeaderRow}>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2 }]}><Text style={styles.tableHeaderCell}>Transfer No</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.5 }]}><Text style={styles.tableHeaderCell}>From ➔ To</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 2 }]}><Text style={styles.tableHeaderCell}>Items</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1 }]}><Text style={styles.tableHeaderCell}>Status</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.8, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Actions</Text></View>
+                  </View>
+
+                  {transfers.map((item, idx) => (
+                    <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
+                      <View style={[styles.tableCellContainer, { flex: 1.2 }]}>
+                        <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.transferNo}</Text>
+                        <Text style={{ fontSize: 9, color: colors.text.muted }}>
+                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : ''}
+                        </Text>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1.5 }]}>
+                        <Text style={[styles.tableCell, { fontSize: 11, fontWeight: '700' }]}>{item.fromWarehouseName}</Text>
+                        <Text style={{ fontSize: 10, color: colors.text.muted }}>➔ {item.toWarehouseName}</Text>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 2 }]}>
+                        {(item.items || []).map((it: any, i: number) => (
+                          <Text key={i} style={{ fontSize: 10.5, color: colors.text.primary }} numberOfLines={1}>
+                            • {it.productName} ({it.qtyBoxes} Box{it.qtyBoxes !== 1 ? 'es' : ''})
+                          </Text>
+                        ))}
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1 }]}>
+                        <View style={{
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          backgroundColor: item.status === 'completed' ? colors.success + '20' : item.status === 'in_transit' ? colors.primary + '20' : item.status === 'cancelled' ? colors.danger + '20' : colors.warning + '20',
+                          alignSelf: 'flex-start'
+                        }}>
+                          <Text style={{
+                            fontSize: 10,
+                            fontWeight: '700',
+                            color: item.status === 'completed' ? colors.success : item.status === 'in_transit' ? colors.primary : item.status === 'cancelled' ? colors.danger : colors.warning
+                          }}>
+                            {item.status.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={[styles.tableCellContainer, { flex: 1.8, borderRightWidth: 0, flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }]}>
+                        {item.status === 'pending' && perm.can('inventory:edit') && (
+                          <TouchableOpacity
+                            style={{ backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                            onPress={async () => {
+                              if (!window.confirm('Ship this transfer? Stock will be deducted from source warehouse.')) return;
+                              try {
+                                await api.shipStockTransfer(item._id);
+                                loadData();
+                              } catch (err: any) {
+                                alert(err.message);
+                              }
+                            }}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>Ship</Text>
+                          </TouchableOpacity>
+                        )}
+                        {item.status === 'in_transit' && perm.can('inventory:edit') && (
+                          <TouchableOpacity
+                            style={{ backgroundColor: colors.success, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                            onPress={async () => {
+                              if (!window.confirm('Receive this transfer? Stock will be added to target warehouse.')) return;
+                              try {
+                                await api.receiveStockTransfer(item._id);
+                                loadData();
+                              } catch (err: any) {
+                                alert(err.message);
+                              }
+                            }}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>Receive</Text>
+                          </TouchableOpacity>
+                        )}
+                        {(item.status === 'in_transit' || item.status === 'completed') && Platform.OS === 'web' && (
+                          <TouchableOpacity
+                            style={{ backgroundColor: colors.text.muted, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                            onPress={() => {
+                              const printTransferChallan = (t: any) => {
+                                const dateStr = t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+                                const itemRows = (t.items || []).map((it: any, i: number) => `
+                                  <tr>
+                                    <td style="border:1px solid #000;padding:6px;text-align:center;">${i + 1}</td>
+                                    <td style="border:1px solid #000;padding:6px;">${it.productName}</td>
+                                    <td style="border:1px solid #000;padding:6px;text-align:center;font-weight:bold;">${it.batchNo || '—'}</td>
+                                    <td style="border:1px solid #000;padding:6px;text-align:center;">${it.qtyBoxes * it.packing} Pcs</td>
+                                  </tr>`).join('');
+
+                                const html = `<!DOCTYPE html>
+                              <html lang="en">
+                              <head>
+                                <meta charset="UTF-8"/>
+                                <title>Inter-Warehouse Delivery Challan ${t.transferNo}</title>
+                                <style>
+                                  * { box-sizing: border-box; margin: 0; padding: 0; }
+                                  body { font-family: Arial, sans-serif; color: #000; background: #fff; }
+                                  .page { width: 210mm; padding: 8mm; }
+                                  table { border-collapse: collapse; width: 100%; }
+                                  @media print { @page { size: A4 portrait; margin: 0; } .page { page-break-after: always; padding: 8mm; } }
+                                </style>
+                              </head>
+                              <body>
+                                <div class="page">
+                                  <div style="text-align:center;border:2px solid #000;padding:8px;margin-bottom:6px;">
+                                    <div style="font-weight:bold;font-size:18px;">SHEKHAR BANDHU AUSHADHALAYA</div>
+                                    <div style="font-size:13px;font-weight:bold;margin-top:4px;letter-spacing:1px;">
+                                      DELIVERY CHALLAN — STOCK TRANSFER
+                                    </div>
+                                    <div style="font-size:9px;color:#555;">(CGST Rule 55 — Inter-Warehouse Stock Transfer)</div>
+                                  </div>
+                                  <table style="margin-bottom:6px;font-size:10px;border:1px solid #000;">
+                                    <tr>
+                                      <td style="width:50%;padding:4px;border-right:1px solid #000;">
+                                        <strong>Challan No.:</strong> ${t.transferNo}<br/>
+                                        <strong>Date:</strong> ${dateStr}<br/>
+                                        <strong>From Warehouse:</strong> ${t.fromWarehouseName}
+                                      </td>
+                                      <td style="width:50%;padding:4px;">
+                                        <strong>To Warehouse:</strong> ${t.toWarehouseName}<br/>
+                                        <strong>Status:</strong> ${t.status.toUpperCase()}
+                                      </td>
+                                    </tr>
+                                  </table>
+                                  <table style="font-size:10px;margin-top:6px;width:100%;border:1px solid #000;border-collapse:collapse;">
+                                    <thead>
+                                      <tr style="background:#f3f4f6;">
+                                        <th style="border:1px solid #000;padding:6px;width:8%;">S.No.</th>
+                                        <th style="border:1px solid #000;padding:6px;">Description of Goods</th>
+                                        <th style="border:1px solid #000;padding:6px;width:20%;">Batch No.</th>
+                                        <th style="border:1px solid #000;padding:6px;width:20%;">Quantity (Pcs)</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>${itemRows}</tbody>
+                                  </table>
+                                  ${t.notes ? `<div style="margin-top:8px;font-size:10px;"><strong>Notes:</strong> ${t.notes}</div>` : ''}
+                                  <div style="margin-top:48px;display:flex;justify-content:space-between;align-items:center;font-size:10px;">
+                                    <div>Authorized Signatory (Source)</div>
+                                    <div>Receiver Signatory (Destination)</div>
+                                  </div>
+                                </div>
+                                <script>window.print();</script>
+                              </body>
+                              </html>`;
+
+                                const win = window.open('', '_blank', 'width=800,height=900');
+                                if (win) { win.document.write(html); win.document.close(); }
+                              };
+                              printTransferChallan(item);
+                            }}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>Print Challan</Text>
+                          </TouchableOpacity>
+                        )}
+                        {['pending', 'in_transit'].includes(item.status) && perm.can('inventory:edit') && (
+                          <TouchableOpacity
+                            style={{ backgroundColor: colors.danger, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                            onPress={async () => {
+                              if (!window.confirm('Cancel this transfer? Shipped stock will be returned to source warehouse.')) return;
+                              try {
+                                await api.cancelStockTransfer(item._id);
+                                loadData();
+                              } catch (err: any) {
+                                alert(err.message);
+                              }
+                            }}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>Cancel</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+
+                  {transfers.length === 0 && (
+                    <View style={{ padding: 40, alignItems: 'center' }}>
+                      <Ionicons name="swap-horizontal-outline" size={36} color={colors.text.muted} />
+                      <Text style={{ marginTop: 8, color: colors.text.muted, fontSize: 13 }}>No warehouse stock transfers found.</Text>
+                    </View>
+                  )}
+
+                  {perm.can('inventory:edit') && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: colors.primary,
+                        padding: 12,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginVertical: 16,
+                        marginHorizontal: 'auto',
+                        width: 200,
+                        flexDirection: 'row',
+                        gap: 8
+                      }}
+                      onPress={() => setAddTransferVisible(true)}
+                    >
+                      <Ionicons name="add-circle" size={16} color="#fff" />
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Request Stock Transfer</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              ) : showDeadStock ? (
                 // --- DEAD STOCK REPORT VIEW ---
                 <>
                   <View style={styles.tableHeaderRow}>
@@ -2365,7 +2612,209 @@ export default function InventoriesScreen() {
         warehouseId={selectedWarehouseId}
         onClose={() => { setSelectedLedgerProduct(null); setLedgerVisible(false); loadData(); }}
       />
+
+      <AddTransferModal
+        visible={addTransferVisible}
+        onClose={() => setAddTransferVisible(false)}
+        onSaved={loadData}
+        warehouses={warehouses}
+        products={products}
+      />
     </View>
+  );
+}
+
+// ── Add Transfer Modal Component ──
+function AddTransferModal({ visible, onClose, onSaved, warehouses, products }: { visible: boolean; onClose: () => void; onSaved: () => void; warehouses: Warehouse[]; products: Product[] }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+
+  const [fromWarehouseId, setFromWarehouseId] = useState('');
+  const [toWarehouseId, setToWarehouseId] = useState('');
+  const [items, setItems] = useState<{ productId: string; qtyBoxes: string; packing: string; batchNo: string }[]>([{ productId: '', qtyBoxes: '1', packing: '1', batchNo: '' }]);
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setFromWarehouseId(warehouses[0]?._id || '');
+      setToWarehouseId(warehouses[1]?._id || '');
+      setItems([{ productId: '', qtyBoxes: '1', packing: '1', batchNo: '' }]);
+      setNotes('');
+      setError('');
+    }
+  }, [visible, warehouses]);
+
+  const handleSave = async () => {
+    if (!fromWarehouseId || !toWarehouseId) {
+      setError('Both source and destination warehouses are required.');
+      return;
+    }
+    if (fromWarehouseId === toWarehouseId) {
+      setError('Source and Destination warehouse cannot be the same.');
+      return;
+    }
+    if (items.some(it => !it.productId)) {
+      setError('All transfer lines must specify a product.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await api.createStockTransfer({
+        fromWarehouseId,
+        toWarehouseId,
+        items: items.map(it => ({
+          productId: it.productId,
+          qtyBoxes: parseFloat(it.qtyBoxes) || 0,
+          packing: parseInt(it.packing, 10) || 1,
+          batchNo: it.batchNo.trim()
+        })),
+        notes
+      });
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to initiate transfer');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.dialogSheet, { maxWidth: 600 }]}>
+          <Pressable style={styles.dialogContainer}>
+            <View style={styles.dialogHeader}>
+              <Text style={styles.dialogTitle}>Initiate Inter-Warehouse Transfer</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={24} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1, marginVertical: Spacing.sm }} keyboardShouldPersistTaps="handled">
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>From Warehouse (Source) *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={fromWarehouseId}
+                      onChange={(e: any) => setFromWarehouseId(e.target.value)}
+                      style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, width: '100%', fontSize: 13 }}
+                    >
+                      {warehouses.map(w => <option key={w._id} value={w._id}>{w.name}</option>)}
+                    </select>
+                  ) : (
+                    <TextInput style={styles.formInput} value={fromWarehouseId} onChangeText={setFromWarehouseId} />
+                  )}
+                </View>
+
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>To Warehouse (Destination) *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={toWarehouseId}
+                      onChange={(e: any) => setToWarehouseId(e.target.value)}
+                      style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, width: '100%', fontSize: 13 }}
+                    >
+                      {warehouses.map(w => <option key={w._id} value={w._id}>{w.name}</option>)}
+                    </select>
+                  ) : (
+                    <TextInput style={styles.formInput} value={toWarehouseId} onChangeText={setToWarehouseId} />
+                  )}
+                </View>
+              </View>
+
+              <Text style={[styles.formLabel, { marginTop: 8 }]}>Transfer Items *</Text>
+              {items.map((item, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <View style={{ flex: 2 }}>
+                    {Platform.OS === 'web' ? (
+                      <select
+                        value={item.productId}
+                        onChange={(e: any) => {
+                          const next = [...items];
+                          next[idx].productId = e.target.value;
+                          setItems(next);
+                        }}
+                        style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, width: '100%', fontSize: 13 }}
+                      >
+                        <option value="">Select Product</option>
+                        {products.map(p => <option key={p._id} value={p._id}>{p.name} ({p.size})</option>)}
+                      </select>
+                    ) : (
+                      <TextInput style={styles.formInput} value={item.productId} placeholder="ProductID" />
+                    )}
+                  </View>
+                  <TextInput
+                    style={[styles.formInput, { flex: 1 }]}
+                    placeholder="Qty"
+                    keyboardType="numeric"
+                    value={item.qtyBoxes}
+                    onChangeText={(val) => {
+                      const next = [...items];
+                      next[idx].qtyBoxes = val;
+                      setItems(next);
+                    }}
+                  />
+                  <TextInput
+                    style={[styles.formInput, { flex: 1.2 }]}
+                    placeholder="Batch No"
+                    value={item.batchNo}
+                    onChangeText={(val) => {
+                      const next = [...items];
+                      next[idx].batchNo = val;
+                      setItems(next);
+                    }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (items.length === 1) return;
+                      setItems(items.filter((_, i) => i !== idx));
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: 12 }}
+                onPress={() => setItems([...items, { productId: '', qtyBoxes: '1', packing: '1', batchNo: '' }])}
+              >
+                <Ionicons name="add-circle" size={16} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Add Line Item</Text>
+              </TouchableOpacity>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Notes</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Additional transfer notes..."
+                  placeholderTextColor={colors.text.muted}
+                  value={notes}
+                  onChangeText={setNotes}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.dialogActions}>
+              <TouchableOpacity style={styles.dialogCancel} onPress={onClose} disabled={loading}>
+                <Text style={{ color: colors.text.secondary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.dialogSave, loading && { opacity: 0.7 }]} onPress={handleSave} disabled={loading}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{loading ? 'Submitting...' : 'Initiate'}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
+    </Modal>
   );
 }
 

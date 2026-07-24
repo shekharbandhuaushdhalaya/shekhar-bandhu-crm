@@ -1388,6 +1388,51 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/campaigns/${id}/complete`, { method: 'POST' });
     return res.json();
   }
+
+  // ─── Stock Transfers ───
+  async getStockTransfers(): Promise<StockTransfer[]> {
+    const res = await this.request(`${API_BASE}/inventory/transfers`);
+    return res.json();
+  }
+  async createStockTransfer(data: Partial<StockTransfer>): Promise<StockTransfer> {
+    const res = await this.request(`${API_BASE}/inventory/transfers`, {
+      method: 'POST', body: JSON.stringify(data)
+    });
+    return res.json();
+  }
+  async shipStockTransfer(id: string): Promise<StockTransfer> {
+    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/ship`, { method: 'PATCH' });
+    return res.json();
+  }
+  async receiveStockTransfer(id: string): Promise<StockTransfer> {
+    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/receive`, { method: 'PATCH' });
+    return res.json();
+  }
+  async cancelStockTransfer(id: string): Promise<StockTransfer> {
+    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/cancel`, { method: 'PATCH' });
+    return res.json();
+  }
+}
+
+export interface StockTransfer {
+  _id?: string;
+  transferNo: string;
+  fromWarehouseId: string;
+  fromWarehouseName: string;
+  toWarehouseId: string;
+  toWarehouseName: string;
+  items: {
+    productId: string;
+    productName: string;
+    qtyBoxes: number;
+    packing: number;
+    batchNo: string;
+  }[];
+  status: 'pending' | 'in_transit' | 'completed' | 'cancelled';
+  notes?: string;
+  createdBy?: string;
+  approvedBy?: string;
+  createdAt?: string;
 }
 
 export * from './api/types';
