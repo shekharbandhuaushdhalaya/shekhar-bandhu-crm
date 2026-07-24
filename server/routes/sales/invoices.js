@@ -434,7 +434,9 @@ router.patch('/sales/:id/finalize', authorize('invoice:markPaid'), async (req, r
       await deductInventoryForInvoice(invoice);
     }
 
-    if (invoice.status === 'Cancelled') invoice.status = 'unpaid';
+    if (invoice.status === 'draft' || invoice.status === 'Cancelled' || !invoice.status) {
+      invoice.status = 'unpaid';
+    }
     invoice.isFinalized = true;
     await invoice.save();
     res.json(invoice);
@@ -631,7 +633,9 @@ router.patch('/purchases/:id/finalize', authorize('invoice:markPaid'), async (re
       await vend.save();
     }
 
-    if (invoice.status === 'Cancelled') invoice.status = 'unpaid';
+    if (invoice.status === 'draft' || invoice.status === 'Cancelled' || !invoice.status) {
+      invoice.status = 'unpaid';
+    }
     invoice.isFinalized = true;
     await invoice.save();
     res.json(invoice);

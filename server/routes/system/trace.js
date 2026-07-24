@@ -238,6 +238,7 @@ router.get('/:batchNo', async (req, res) => {
       invoiceNo: inv.invoiceNo,
       customerName: inv.customerName || inv.supplierName,
       status: inv.status,
+      isFinalized: inv.isFinalized,
       type: inv.type,
       date: inv.date,
       amount: inv.amount,

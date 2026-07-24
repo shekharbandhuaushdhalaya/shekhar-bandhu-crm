@@ -2163,7 +2163,7 @@ export default function SaleInvoicesScreen() {
               <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Overdue Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 140, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Actions</Text></View>
+              <View style={[styles.tableHeaderCellContainer, { width: 160, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Actions</Text></View>
             </View>
 
             {/* Table Body Rows */}
@@ -2177,13 +2177,13 @@ export default function SaleInvoicesScreen() {
                   <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
                     <Text style={styles.tableCell} numberOfLines={1}>{item.customerName || 'N/A'}</Text>
                   </View>
-                  <View style={[styles.tableCellContainer, { width: 110 }]}>
+                  <View style={[styles.tableCellContainer, { width: 120 }]}>
                     <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
                   </View>
-                  <View style={[styles.tableCellContainer, { width: 100 }]}>
+                  <View style={[styles.tableCellContainer, { width: 120 }]}>
                     <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                   </View>
-                  <View style={[styles.tableCellContainer, { width: 100 }]}>
+                  <View style={[styles.tableCellContainer, { width: 120 }]}>
                     <View style={[styles.statusBadge, {
                       borderColor: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning),
                       backgroundColor: (item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)) + '12'

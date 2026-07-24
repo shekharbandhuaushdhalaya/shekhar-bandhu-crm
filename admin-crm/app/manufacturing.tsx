@@ -2176,16 +2176,16 @@ export default function ManufacturingScreen() {
                             <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>{new Date(inv.date).toLocaleDateString('en-IN')}</Text>
                             <Text style={{ flex: 1, minWidth: 220, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>{inv.customerName}</Text>
                             <Text style={{ width: 130, fontSize: 11, color: colors.text.secondary }} numberOfLines={1}>{inv.warehouseName || '—'}</Text>
-                            <View style={{ width: 100 }}>
+                             <View style={{ width: 100 }}>
                               <View style={[styles.statusBadge, { 
-                                borderColor: inv.status === 'paid' ? colors.success : colors.warning, 
-                                backgroundColor: (inv.status === 'paid' ? colors.success : colors.warning) + '10',
+                                borderColor: inv.status === 'Cancelled' ? colors.danger : (inv.isFinalized ? (inv.status === 'paid' ? colors.success : colors.success) : colors.warning), 
+                                backgroundColor: (inv.status === 'Cancelled' ? colors.danger : (inv.isFinalized ? (inv.status === 'paid' ? colors.success : colors.success) : colors.warning)) + '10',
                                 alignSelf: 'flex-start',
                                 paddingVertical: 2,
                                 paddingHorizontal: 6
                               }]}>
-                                <Text style={{ color: inv.status === 'paid' ? colors.success : colors.warning, fontSize: 9, fontWeight: '800' }}>
-                                  {inv.status.toUpperCase()}
+                                <Text style={{ color: inv.status === 'Cancelled' ? colors.danger : (inv.isFinalized ? (inv.status === 'paid' ? colors.success : colors.success) : colors.warning), fontSize: 9, fontWeight: '800' }}>
+                                  {inv.status === 'Cancelled' ? 'CANCELLED' : (inv.isFinalized ? (inv.status === 'paid' ? 'PAID' : 'FINALIZED') : 'DRAFT')}
                                 </Text>
                               </View>
                             </View>
