@@ -458,8 +458,20 @@ export default function ManufacturingScreen() {
   };
 
   const handleCompleteProduction = async () => {
-    if (!selectedBatchRun || !qcYieldQty || !qcPassedBy.trim() || !qcWarehouseId) {
-      setQcError('Actual yield quantity, Inspector name, and target finished goods warehouse are required.');
+    if (!selectedBatchRun) {
+      setQcError('No active batch selected.');
+      return;
+    }
+    if (!qcYieldQty || isNaN(Number(qcYieldQty)) || Number(qcYieldQty) <= 0) {
+      setQcError('Please enter a valid positive number for Actual Output Yield Size.');
+      return;
+    }
+    if (!qcPassedBy || !qcPassedBy.trim()) {
+      setQcError('QC Inspector Name is mandatory.');
+      return;
+    }
+    if (!qcWarehouseId) {
+      setQcError('Target Storage Warehouse selection is mandatory.');
       return;
     }
 
@@ -1451,10 +1463,12 @@ export default function ManufacturingScreen() {
                         <TouchableOpacity style={styles.completeBatchBtn} onPress={() => {
                           setSelectedBatchRun(batch);
                           setQcYieldQty(batch.plannedQty.toString());
+                          setQcWarehouseId(warehouses.length > 0 ? warehouses[0]._id : '');
                           setQcWasteQty('');
                           setQcWasteReason('');
                           setQcPassedBy('');
                           setQcNotes('');
+                          setQcError('');
                           setQcModalVisible(true);
                         }}>
                           <Ionicons name="checkmark-done-circle-outline" size={15} color="#fff" />
