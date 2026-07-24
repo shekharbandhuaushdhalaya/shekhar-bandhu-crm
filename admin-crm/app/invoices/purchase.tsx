@@ -1256,7 +1256,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             padding: Spacing.md,
             marginBottom: 16,
             boxShadow: '0px 2px 6px rgba(0,0,0,0.04)',
-            elevation: 2
+            elevation: 2,
+            zIndex: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 2500 : 50
           }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -1273,9 +1274,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
               showsHorizontalScrollIndicator={true} 
               style={{ 
                 width: '100%', 
-                zIndex: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 1010 : 1
+                zIndex: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 2600 : 1
               }}
-              contentContainerStyle={{ minHeight: 220, flexGrow: 1 }}
+              contentContainerStyle={{ minHeight: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 350 : 220, flexGrow: 1 }}
             >
               <View style={{ width: '100%', minWidth: 680, minHeight: 220 }}>
                 {/* Header Row */}
@@ -1326,10 +1327,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                       borderBottomColor: colors.border + '60',
                       backgroundColor: index % 2 === 0 ? 'transparent' : colors.bg.secondary + '40',
                       borderRadius: Radius.sm,
-                      zIndex: (row.showProductDropdown || row.showGstDropdown) ? 1000 : 100 - index
+                      zIndex: (row.showProductDropdown || row.showGstDropdown) ? 5000 : 100 - index
                     }}>
                       {/* Raw Material search */}
-                      <View style={{ flex: mode === 'regular' ? 3.2 : 3.6, position: 'relative' }}>
+                      <View style={{ flex: mode === 'regular' ? 3.2 : 3.6, position: 'relative', zIndex: row.showProductDropdown ? 5005 : 1 }}>
                         <TextInput
                           style={[styles.tableInput, { fontWeight: '600' }]}
                           placeholder="Search raw material..."
