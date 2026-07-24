@@ -48,7 +48,7 @@ const getProductSelectorDisplayName = (item: { size?: string; shape?: string; co
   return combined || item.name || 'Unnamed Product';
 };
 
-function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { invoice: Invoice | null; visible: boolean; onClose: () => void; onDeleted: () => void; onEdit: (invoice: Invoice) => void }) {
+function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawMaterials = [] }: { invoice: Invoice | null; visible: boolean; onClose: () => void; onDeleted: () => void; onEdit: (invoice: Invoice) => void; rawMaterials?: RawMaterial[] }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
@@ -1649,14 +1649,17 @@ export default function PurchaseInvoicesScreen() {
 
   const [modeFilter, setModeFilter] = useState<'regular' | 'cash' | 'all'>('all');
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
 
   const load = useCallback(async () => {
-    const [res, vends] = await Promise.all([
+    const [res, vends, rms] = await Promise.all([
       api.getPurchaseInvoices(search, modeFilter),
-      api.getVendors()
+      api.getVendors(),
+      api.getRawMaterials().catch(() => [])
     ]);
     setInvoices(res);
     setVendors(vends);
+    setRawMaterials(rms);
   }, [search, modeFilter]);
 
   useEffect(() => { load(); }, [load]);
@@ -1850,6 +1853,7 @@ export default function PurchaseInvoicesScreen() {
       <InvoiceDetailModal
         invoice={selectedInv}
         visible={detailVisible}
+        rawMaterials={rawMaterials}
         onClose={() => { setDetailVisible(false); load(); }}
         onDeleted={load}
         onEdit={(inv) => {
