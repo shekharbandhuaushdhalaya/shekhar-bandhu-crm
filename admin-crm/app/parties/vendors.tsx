@@ -765,7 +765,7 @@ function VendorLedgerModal({
       ]);
 
       const filteredInvoices = allInvoices.filter(i => 
-        (i.supplierName || '').toLowerCase().includes(name.toLowerCase()) && i.mode === activeLedgerMode
+        i.isFinalized && (i.supplierName || '').toLowerCase().includes(name.toLowerCase()) && i.mode === activeLedgerMode
       );
       const filteredPayments = allPayments.filter(p => 
         ((p.partyName || '').toLowerCase().includes(name.toLowerCase()) || p.partyId === vendor._id) && p.mode === activeLedgerMode
