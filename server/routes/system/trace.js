@@ -212,17 +212,18 @@ router.get('/:batchNo', async (req, res) => {
     }));
 
     // 5. Search Challans (items with this batchNo)
-    const challans = await Challan.find({
-      items: { $elemMatch: { batchNo } }
+    const StockMovement = require('../../models/StockMovement');
+    const challans = await StockMovement.find({
+      items: { $elemMatch: { batchNo: { $regex: new RegExp(safeRegex, 'i') } } }
     }).lean();
     result.challans = challans.map(c => ({
       _id: c._id,
-      challanNo: c.challanNo,
+      challanNo: c.docNo,
       partyName: c.partyName,
       status: c.status,
       date: c.date,
-      items: c.items.filter(i => i.batchNo === batchNo).map(i => ({
-        name: i.name,
+      items: c.items.filter(i => i.batchNo && new RegExp(safeRegex, 'i').test(i.batchNo)).map(i => ({
+        name: i.productName,
         qty: i.qty,
         packing: i.packing,
       })),
@@ -230,7 +231,7 @@ router.get('/:batchNo', async (req, res) => {
 
     // 6. Search Invoices (items with this batchNo)
     const invoices = await Invoice.find({
-      items: { $elemMatch: { batchNo } }
+      items: { $elemMatch: { batchNo: { $regex: new RegExp(safeRegex, 'i') } } }
     }).lean();
     result.invoices = invoices.map(inv => ({
       _id: inv._id,
@@ -241,7 +242,7 @@ router.get('/:batchNo', async (req, res) => {
       date: inv.date,
       amount: inv.amount,
       paymentTransactionId: inv.paymentTransactionId || '',
-      items: inv.items.filter(i => i.batchNo === batchNo).map(i => ({
+      items: inv.items.filter(i => i.batchNo && new RegExp(safeRegex, 'i').test(i.batchNo)).map(i => ({
         name: i.name,
         qty: i.qty,
         packing: i.packing,
@@ -250,7 +251,7 @@ router.get('/:batchNo', async (req, res) => {
 
     // 7. Search Dispatches (items with this batchNo)
     const dispatches = await Dispatch.find({
-      items: { $elemMatch: { batchNo } }
+      items: { $elemMatch: { batchNo: { $regex: new RegExp(safeRegex, 'i') } } }
     }).lean();
     result.dispatches = dispatches.map(d => ({
       _id: d._id,
@@ -261,7 +262,7 @@ router.get('/:batchNo', async (req, res) => {
       transporter: d.transporter,
       lrNo: d.lrNo,
       trackingId: d.trackingId,
-      items: d.items.filter(i => i.batchNo === batchNo).map(i => ({
+      items: d.items.filter(i => i.batchNo && new RegExp(safeRegex, 'i').test(i.batchNo)).map(i => ({
         name: i.name,
         qty: i.qty,
         packing: i.packing,
