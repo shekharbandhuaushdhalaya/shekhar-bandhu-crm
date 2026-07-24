@@ -1866,40 +1866,36 @@ export default function InventoriesScreen() {
                 // --- STOCK TRANSFERS VIEW ---
                 <>
                   <View style={styles.tableHeaderRow}>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2 }]}><Text style={styles.tableHeaderCell}>Transfer No</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.5 }]}><Text style={styles.tableHeaderCell}>From ➔ To</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 2 }]}><Text style={styles.tableHeaderCell}>Items</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1 }]}><Text style={styles.tableHeaderCell}>Status</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.8, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Actions</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, styles.col12]}><Text style={styles.tableHeaderCell}>Transfer No</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, styles.col15]}><Text style={styles.tableHeaderCell}>From ➔ To</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, styles.col20]}><Text style={styles.tableHeaderCell}>Items</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, styles.col10]}><Text style={styles.tableHeaderCell}>Status</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, styles.col18, styles.colNoBorder]}><Text style={styles.tableHeaderCell}>Actions</Text></View>
                   </View>
 
                   {transfers.map((item, idx) => (
                     <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
-                      <View style={[styles.tableCellContainer, { flex: 1.2 }]}>
+                      <View style={[styles.tableCellContainer, styles.col12]}>
                         <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.transferNo}</Text>
                         <Text style={{ fontSize: 9, color: colors.text.muted }}>
                           {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : ''}
                         </Text>
                       </View>
-                      <View style={[styles.tableCellContainer, { flex: 1.5 }]}>
+                      <View style={[styles.tableCellContainer, styles.col15]}>
                         <Text style={[styles.tableCell, { fontSize: 11, fontWeight: '700' }]}>{item.fromWarehouseName}</Text>
                         <Text style={{ fontSize: 10, color: colors.text.muted }}>➔ {item.toWarehouseName}</Text>
                       </View>
-                      <View style={[styles.tableCellContainer, { flex: 2 }]}>
+                      <View style={[styles.tableCellContainer, styles.col20]}>
                         {(item.items || []).map((it: any, i: number) => (
                           <Text key={i} style={{ fontSize: 10.5, color: colors.text.primary }} numberOfLines={1}>
                             • {it.productName} ({it.qtyBoxes} Box{it.qtyBoxes !== 1 ? 'es' : ''})
                           </Text>
                         ))}
                       </View>
-                      <View style={[styles.tableCellContainer, { flex: 1 }]}>
-                        <View style={{
-                          paddingHorizontal: 6,
-                          paddingVertical: 2,
-                          borderRadius: 4,
-                          backgroundColor: item.status === 'completed' ? colors.success + '20' : item.status === 'in_transit' ? colors.primary + '20' : item.status === 'cancelled' ? colors.danger + '20' : colors.warning + '20',
-                          alignSelf: 'flex-start'
-                        }}>
+                      <View style={[styles.tableCellContainer, styles.col10]}>
+                        <View style={[styles.statusBadgeContainer, {
+                          backgroundColor: item.status === 'completed' ? colors.success + '20' : item.status === 'in_transit' ? colors.primary + '20' : item.status === 'cancelled' ? colors.danger + '20' : colors.warning + '20'
+                        }]}>
                           <Text style={{
                             fontSize: 10,
                             fontWeight: '700',
@@ -1909,10 +1905,10 @@ export default function InventoriesScreen() {
                           </Text>
                         </View>
                       </View>
-                      <View style={[styles.tableCellContainer, { flex: 1.8, borderRightWidth: 0, flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }]}>
+                      <View style={[styles.tableCellContainer, styles.col18, styles.colNoBorder, styles.actionsCell]}>
                         {item.status === 'pending' && perm.can('inventory:edit') && (
                           <TouchableOpacity
-                            style={{ backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                            style={[styles.btnSmall, { backgroundColor: colors.primary }]}
                             onPress={async () => {
                               if (!window.confirm('Ship this transfer? Stock will be deducted from source warehouse.')) return;
                               try {
@@ -1928,7 +1924,7 @@ export default function InventoriesScreen() {
                         )}
                         {item.status === 'in_transit' && perm.can('inventory:edit') && (
                           <TouchableOpacity
-                            style={{ backgroundColor: colors.success, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                            style={[styles.btnSmall, { backgroundColor: colors.success }]}
                             onPress={async () => {
                               if (!window.confirm('Receive this transfer? Stock will be added to target warehouse.')) return;
                               try {
@@ -1944,7 +1940,7 @@ export default function InventoriesScreen() {
                         )}
                         {(item.status === 'in_transit' || item.status === 'completed') && Platform.OS === 'web' && (
                           <TouchableOpacity
-                            style={{ backgroundColor: colors.text.muted, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                            style={[styles.btnSmall, { backgroundColor: colors.text.muted }]}
                             onPress={() => {
                               const printTransferChallan = (t: any) => {
                                 const dateStr = t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
@@ -2023,7 +2019,7 @@ export default function InventoriesScreen() {
                         )}
                         {['pending', 'in_transit'].includes(item.status) && perm.can('inventory:edit') && (
                           <TouchableOpacity
-                            style={{ backgroundColor: colors.danger, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                            style={[styles.btnSmall, { backgroundColor: colors.danger }]}
                             onPress={async () => {
                               if (!window.confirm('Cancel this transfer? Shipped stock will be returned to source warehouse.')) return;
                               try {
@@ -2050,18 +2046,7 @@ export default function InventoriesScreen() {
 
                   {perm.can('inventory:edit') && (
                     <TouchableOpacity
-                      style={{
-                        backgroundColor: colors.primary,
-                        padding: 12,
-                        borderRadius: 8,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginVertical: 16,
-                        marginHorizontal: 'auto',
-                        width: 200,
-                        flexDirection: 'row',
-                        gap: 8
-                      }}
+                      style={styles.btnCenter}
                       onPress={() => setAddTransferVisible(true)}
                     >
                       <Ionicons name="add-circle" size={16} color="#fff" />
@@ -2917,5 +2902,17 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   typeBadgeText: { fontSize: 9, fontWeight: '800' },
   
   ledgerRefText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
-  ledgerNoteText: { fontSize: 10, color: colors.text.muted, marginTop: 1 }
+  ledgerNoteText: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
+
+  // Transfers Layout Overrides
+  col10: { flex: 1 },
+  col12: { flex: 1.2 },
+  col15: { flex: 1.5 },
+  col18: { flex: 1.8 },
+  col20: { flex: 2 },
+  colNoBorder: { borderRightWidth: 0 },
+  statusBadgeContainer: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
+  actionsCell: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' },
+  btnSmall: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  btnCenter: { padding: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginVertical: 16, alignSelf: 'center', width: 200, flexDirection: 'row', gap: 8 }
 });
