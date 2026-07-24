@@ -455,6 +455,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [warehouseId, setWarehouseId] = useState('');
+  const [unitSearch, setUnitSearch] = useState('');
   const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
 
   // Tabular items state
@@ -560,8 +561,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           if (!invoiceToEdit) {
             if (mfg.length > 0) {
               setWarehouseId(mfg[0]._id);
+              setUnitSearch(mfg[0].name);
             } else if (w.length > 0) {
               setWarehouseId(w[0]._id);
+              setUnitSearch(w[0].name);
             }
           }
           if (invoiceToEdit) {
@@ -594,6 +597,13 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         (v.displayName || v.registeredName || '').toLowerCase().includes(supplierName.toLowerCase())
       )
     : vendors;
+
+  const filteredUnits = unitSearch
+    ? manufacturingUnits.filter(m =>
+        (m.name || '').toLowerCase().includes(unitSearch.toLowerCase()) ||
+        (m.city || '').toLowerCase().includes(unitSearch.toLowerCase())
+      )
+    : manufacturingUnits;
 
   const handleSelectVendor = (v: Vendor) => {
     const finalName = v.company || v.name;
@@ -1003,31 +1013,38 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                 <View style={styles.formInput}>
                   <Ionicons name="business" size={16} color={colors.text.muted} />
                   <TextInput
-                    style={[styles.formInputText, { color: colors.text.primary, fontWeight: '700' }]}
-                    placeholder="Select destination manufacturing unit..."
+                    style={styles.formInputText}
+                    placeholder="Search and select manufacturing unit..."
                     placeholderTextColor={colors.text.muted}
-                    value={
-                      manufacturingUnits.find(m => m._id === warehouseId) 
-                        ? `🏭 ${manufacturingUnits.find(m => m._id === warehouseId)?.name}` 
-                        : (warehouses.find(w => w._id === warehouseId)?.name ? `🏭 ${warehouses.find(w => w._id === warehouseId)?.name}` : '')
-                    }
-                    editable={false}
+                    value={unitSearch}
+                    onChangeText={(val) => {
+                      setUnitSearch(val);
+                      setShowWarehouseDropdown(true);
+                    }}
+                    onFocus={() => setShowWarehouseDropdown(true)}
                   />
-                  <TouchableOpacity onPress={() => setShowWarehouseDropdown(!showWarehouseDropdown)}>
-                    <Ionicons name={showWarehouseDropdown ? "chevron-up" : "chevron-down"} size={18} color={colors.text.muted} />
-                  </TouchableOpacity>
+                  {unitSearch ? (
+                    <TouchableOpacity onPress={() => { setUnitSearch(''); setWarehouseId(''); setShowWarehouseDropdown(true); }}>
+                      <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity onPress={() => setShowWarehouseDropdown(!showWarehouseDropdown)}>
+                      <Ionicons name={showWarehouseDropdown ? "chevron-up" : "chevron-down"} size={18} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
 
               {showWarehouseDropdown && (
                 <View style={styles.customSelectPanel}>
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
-                    {manufacturingUnits.map(m => (
+                  <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
+                    {filteredUnits.map(m => (
                       <TouchableOpacity
                         key={m._id}
                         style={styles.customSelectItem}
                         onPress={() => {
                           setWarehouseId(m._id);
+                          setUnitSearch(m.name);
                           setShowWarehouseDropdown(false);
                         }}
                       >
@@ -1035,10 +1052,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                         <Text style={styles.customSelectItemSubtext}>{m.city ? `${m.city}, ${m.state || ''}` : 'Factory Unit'}</Text>
                       </TouchableOpacity>
                     ))}
-                    {manufacturingUnits.length === 0 && (
+                    {filteredUnits.length === 0 && (
                       <View style={{ padding: 12 }}>
                         <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>
-                          No manufacturing units defined. Please add one under My Details / Profile.
+                          No matching manufacturing units found
                         </Text>
                       </View>
                     )}
