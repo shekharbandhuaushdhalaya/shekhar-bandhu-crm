@@ -2645,75 +2645,145 @@ export default function ManufacturingScreen() {
 
                 {/* Finished Goods Stock */}
                 {!!traceResult?.finishedGoodsEntries?.length && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                    <View style={{ backgroundColor: colors.success + '15', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>📊 Finished Goods Stock ({traceResult.finishedGoodsEntries.length})</Text>
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
+                    <View style={{ backgroundColor: colors.success + '15', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>📊 Finished Goods Stock ({traceResult.finishedGoodsEntries.length})</Text>
                     </View>
-                    {traceResult.finishedGoodsEntries.map((e: any) => (
-                      <View key={e._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{e.productName}</Text>
-                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                          {e.qtyBoxes * (e.packing || 1)} pcs • {e.warehouseName} {e.manufacturingUnitName ? `• 🏭 ${e.manufacturingUnitName}` : ''}
-                          {e.mfgDate ? ` • Mfg: ${new Date(e.mfgDate).toLocaleDateString()}` : ''}
-                          {e.expiryDate ? ` • Exp: ${new Date(e.expiryDate).toLocaleDateString()}` : ''}
-                        </Text>
+                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
+                      <View style={{ minWidth: '100%', flex: 1 }}>
+                        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                          <Text style={{ flex: 1.5, minWidth: 150, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Product Name</Text>
+                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left' }}>In-Stock Qty</Text>
+                          <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Warehouse</Text>
+                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Mfg Date</Text>
+                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Exp Date</Text>
+                        </View>
+                        {traceResult.finishedGoodsEntries.map((e: any, idx: number) => (
+                          <View key={e._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.finishedGoodsEntries.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
+                            <Text style={{ flex: 1.5, minWidth: 150, fontSize: 11, fontWeight: '600', color: colors.text.primary }}>{e.productName}</Text>
+                            <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.success }}>{e.qtyBoxes * (e.packing || 1)} Pcs</Text>
+                            <Text style={{ width: 140, fontSize: 11, color: colors.primary, fontWeight: '600' }}>{e.warehouseName}</Text>
+                            <Text style={{ width: 100, fontSize: 11, color: colors.text.secondary }}>{e.mfgDate ? new Date(e.mfgDate).toLocaleDateString('en-IN') : '—'}</Text>
+                            <Text style={{ width: 100, fontSize: 11, color: colors.text.secondary }}>{e.expiryDate ? new Date(e.expiryDate).toLocaleDateString('en-IN') : '—'}</Text>
+                          </View>
+                        ))}
                       </View>
-                    ))}
+                    </ScrollView>
                   </View>
                 )}
 
                 {/* Challans */}
                 {!!traceResult?.challans?.length && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                    <View style={{ backgroundColor: colors.primary + '10', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>📋 Challans ({traceResult.challans.length})</Text>
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
+                    <View style={{ backgroundColor: colors.primary + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>📋 Challans / Delivery Challans ({traceResult.challans.length})</Text>
                     </View>
-                    {traceResult.challans.map((c: any) => (
-                      <View key={c._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{c.challanNo} — {c.partyName}</Text>
-                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                          {c.items.map((i: any) => `${i.name}: ${i.qty} pcs`).join(', ')}
-                        </Text>
+                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
+                      <View style={{ minWidth: '100%', flex: 1 }}>
+                        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                          <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
+                          <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Challan No</Text>
+                          <Text style={{ flex: 1.2, minWidth: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Customer / Consignee</Text>
+                          <Text style={{ flex: 1.5, minWidth: 150, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Items / Qty</Text>
+                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Status</Text>
+                        </View>
+                        {traceResult.challans.map((c: any, idx: number) => (
+                          <View key={c._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.challans.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
+                            <Text style={{ width: 95, fontSize: 11, color: colors.text.secondary }}>{new Date(c.date).toLocaleDateString('en-IN')}</Text>
+                            <Text style={{ width: 130, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>{c.challanNo}</Text>
+                            <Text style={{ flex: 1.2, minWidth: 140, fontSize: 11, color: colors.text.primary }}>{c.partyName}</Text>
+                            <Text style={{ flex: 1.5, minWidth: 150, fontSize: 11, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>
+                              {c.items.map((i: any) => `${i.name} (${i.qty} Pcs)`).join(', ')}
+                            </Text>
+                            <View style={{ width: 100 }}>
+                              <View style={[styles.statusBadge, { 
+                                borderColor: c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted), 
+                                backgroundColor: (c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted)) + '10',
+                                alignSelf: 'flex-start',
+                                paddingVertical: 2,
+                                paddingHorizontal: 6
+                              }]}>
+                                <Text style={{ color: c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted), fontSize: 9, fontWeight: '800' }}>
+                                  {c.status.toUpperCase()}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        ))}
                       </View>
-                    ))}
+                    </ScrollView>
                   </View>
                 )}
 
                 {/* Invoices */}
                 {!!traceResult?.invoices?.length && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                    <View style={{ backgroundColor: colors.success + '10', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>🧾 Invoices ({traceResult.invoices.length})</Text>
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
+                    <View style={{ backgroundColor: colors.success + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>🧾 Invoices / Customer Bills ({traceResult.invoices.length})</Text>
                     </View>
-                    {traceResult.invoices.map((inv: any) => (
-                      <View key={inv._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{inv.invoiceNo} — {inv.customerName}</Text>
-                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                          ₹{inv.amount} • {inv.status.toUpperCase()}
-                          {inv.paymentTransactionId ? ` • TXN: ${inv.paymentTransactionId}` : ''}
-                        </Text>
+                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
+                      <View style={{ minWidth: '100%', flex: 1 }}>
+                        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                          <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
+                          <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Invoice No</Text>
+                          <Text style={{ flex: 1.2, minWidth: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Customer Name</Text>
+                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Total Amt</Text>
+                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Status</Text>
+                        </View>
+                        {traceResult.invoices.map((inv: any, idx: number) => (
+                          <View key={inv._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.invoices.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
+                            <Text style={{ width: 95, fontSize: 11, color: colors.text.secondary }}>{new Date(inv.date).toLocaleDateString('en-IN')}</Text>
+                            <Text style={{ width: 130, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>{inv.invoiceNo}</Text>
+                            <Text style={{ flex: 1.2, minWidth: 140, fontSize: 11, color: colors.text.primary }}>{inv.customerName}</Text>
+                            <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>₹{inv.amount.toLocaleString('en-IN')}</Text>
+                            <View style={{ width: 100 }}>
+                              <View style={[styles.statusBadge, { 
+                                borderColor: inv.status === 'paid' ? colors.success : colors.warning, 
+                                backgroundColor: (inv.status === 'paid' ? colors.success : colors.warning) + '10',
+                                alignSelf: 'flex-start',
+                                paddingVertical: 2,
+                                paddingHorizontal: 6
+                              }]}>
+                                <Text style={{ color: inv.status === 'paid' ? colors.success : colors.warning, fontSize: 9, fontWeight: '800' }}>
+                                  {inv.status.toUpperCase()}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        ))}
                       </View>
-                    ))}
+                    </ScrollView>
                   </View>
                 )}
 
                 {/* Dispatches */}
                 {!!traceResult?.dispatches?.length && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                    <View style={{ backgroundColor: colors.warning + '10', padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>🚚 Dispatches ({traceResult.dispatches.length})</Text>
+                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
+                    <View style={{ backgroundColor: colors.warning + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.warning }}>🚚 Dispatch Logistics ({traceResult.dispatches.length})</Text>
                     </View>
-                    {traceResult.dispatches.map((d: any) => (
-                      <View key={d._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{d.dispatchNo} — {d.customerName}</Text>
-                        <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                          {d.transporter} • LR: {d.lrNo || '—'} • {d.status.toUpperCase()}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: colors.text.secondary }}>
-                          Items: {d.items.map((i: any) => `${i.name}: ${i.qty} pcs`).join(', ')}
-                        </Text>
+                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
+                      <View style={{ minWidth: '100%', flex: 1 }}>
+                        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                          <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
+                          <Text style={{ width: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Dispatch No</Text>
+                          <Text style={{ flex: 1.2, minWidth: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Consignee Name</Text>
+                          <Text style={{ flex: 1, minWidth: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Transporter / LR No</Text>
+                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Tracking ID</Text>
+                        </View>
+                        {traceResult.dispatches.map((d: any, idx: number) => (
+                          <View key={d._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.dispatches.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
+                            <Text style={{ width: 95, fontSize: 11, color: colors.text.secondary }}>{d.dispatchDate ? new Date(d.dispatchDate).toLocaleDateString('en-IN') : '—'}</Text>
+                            <Text style={{ width: 110, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>{d.dispatchNo}</Text>
+                            <Text style={{ flex: 1.2, minWidth: 140, fontSize: 11, color: colors.text.primary }}>{d.customerName}</Text>
+                            <Text style={{ flex: 1, minWidth: 110, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
+                              {d.transporter || '—'} {d.lrNo ? `| LR: ${d.lrNo}` : ''}
+                            </Text>
+                            <Text style={{ width: 100, fontSize: 11, color: colors.primary, fontWeight: '600' }} numberOfLines={1}>{d.trackingId || '—'}</Text>
+                          </View>
+                        ))}
                       </View>
-                    ))}
+                    </ScrollView>
                   </View>
                 )}
 
