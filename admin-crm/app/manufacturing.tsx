@@ -1025,10 +1025,12 @@ export default function ManufacturingScreen() {
                               setTraceResult(null);
                               try {
                                 const data = await api.traceBatch(rawName);
+                                if (data && !data.materialSku && rm.sku) data.materialSku = rm.sku;
                                 setTraceResult(data);
                               } catch (err: any) {
                                 try {
                                   const data = await api.traceBatch(rm._id);
+                                  if (data && !data.materialSku && rm.sku) data.materialSku = rm.sku;
                                   setTraceResult(data);
                                 } catch(e) {
                                   console.log('Trace fetch error', e);
@@ -2457,13 +2459,19 @@ export default function ManufacturingScreen() {
                 {/* Raw Material Stock Ledger (IN/OUT) */}
                 <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
                   {/* Header */}
-                  <View style={{ backgroundColor: colors.primary + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>
-                      📋 Raw Material Stock Ledger: {traceResult?.materialName || traceResult?.rawMaterialEntries?.[0]?.materialName || traceBatchNo || traceResult?.batchNo || 'Stock Trace'}
-                    </Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>
-                      SKU: {traceResult?.materialSku || traceResult?.rawMaterialEntries?.[0]?.materialSku || '-'}
-                    </Text>
+                  <View style={{ backgroundColor: colors.primary + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>
+                        📋 Raw Material Stock Ledger: {traceResult?.materialName || traceResult?.rawMaterialEntries?.[0]?.materialName || traceBatchNo || traceResult?.batchNo || 'Stock Trace'}
+                      </Text>
+                      {(traceResult?.materialSku || traceResult?.rawMaterialEntries?.[0]?.materialSku) && (
+                        <View style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.primary + '40' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>
+                            SKU: {traceResult?.materialSku || traceResult?.rawMaterialEntries?.[0]?.materialSku}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
 
                     {/* Search Bar */}
