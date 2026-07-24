@@ -451,6 +451,7 @@ export default function StockMovementsScreen() {
 
     // 1. Process warehouse inventory entries
     warehouseInventory.forEach(e => {
+      if ((e.qtyBoxes || 0) <= 0) return;
       const pId = e.productId;
       const totalPcs = (e.qtyBoxes || 0) * (e.packing || 1);
       if (!productMap[pId]) {
