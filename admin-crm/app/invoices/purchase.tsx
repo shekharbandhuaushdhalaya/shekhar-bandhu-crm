@@ -839,7 +839,6 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     });
 
     // Find vendor's GSTIN and State from CRM seeds
-    const targetVend = vendors.find(v => v.name.toLowerCase() === supplierName.toLowerCase() || v.company.toLowerCase() === supplierName.toLowerCase());
     const finalGstin = targetVend?.gstin || '';
 
     const targetWh = warehouses.find(w => w._id === warehouseId);
