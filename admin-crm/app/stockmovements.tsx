@@ -503,6 +503,32 @@ export default function StockMovementsScreen() {
     });
   };
 
+  const computeBatchAllocation = (productId: string, qty: number): string => {
+    if (!productId || qty <= 0) return '';
+    const entries = warehouseInventory
+      .filter(e => e.productId === productId && (e.qtyBoxes || 0) > 0)
+      .sort((a, b) => {
+        const da = a.mfgDate ? new Date(a.mfgDate).getTime() : 0;
+        const db = b.mfgDate ? new Date(b.mfgDate).getTime() : 0;
+        return da - db;
+      });
+
+    let needed = qty;
+    const batchesUsed: string[] = [];
+
+    for (const e of entries) {
+      if (needed <= 0) break;
+      const availPcs = (e.qtyBoxes || 0) * (e.packing || 1);
+      if (availPcs <= 0) continue;
+
+      const takePcs = Math.min(needed, availPcs);
+      needed -= takePcs;
+      batchesUsed.push(`${e.batchNo || 'NO-BATCH'} (${takePcs} Pcs)`);
+    }
+
+    return batchesUsed.length > 0 ? batchesUsed.join(', ') : '';
+  };
+
   const handleSelectInventoryEntry = (idx: number, entry: any) => {
     const next = [...items];
     const product = products.find(p => p._id === entry.productId);
@@ -515,16 +541,19 @@ export default function StockMovementsScreen() {
     const customerDisc = targetCustomer ? (targetCustomer.discountPercent || 0) : 0;
     const netRate = customerDisc > 0 && productMrp > 0 ? (productMrp * (1 - customerDisc / 100)) : basePrice;
 
+    const initialQty = 1;
+    const computedBatchNo = computeBatchAllocation(entry.productId, initialQty) || entry.batchNo || '';
+
     next[idx] = {
       productId: entry.productId,
       productName: getInventoryEntryDisplayName(entry),
-      qty: 1,
+      qty: initialQty,
       packing: entry.packing || 1,
       mrp: productMrp,
       discountPercent: customerDisc,
       rate: netRate,
       gstRate,
-      batchNo: entry.batchNo || '',
+      batchNo: computedBatchNo,
     };
     setItems(next);
     setActiveItemDropdownIdx(null);
@@ -1066,7 +1095,15 @@ export default function StockMovementsScreen() {
                       <View style={{ flexDirection: 'row', gap: 8 }}>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.fieldLabel}>Qty (pcs)</Text>
-                          <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.qty)} onChangeText={v => { const n = [...items]; n[idx].qty = parseInt(v) || 0; setItems(n); }} keyboardType="numeric" />
+                          <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.qty)} onChangeText={v => {
+                            const newQty = parseInt(v) || 0;
+                            const n = [...items];
+                            n[idx].qty = newQty;
+                            if (item.productId) {
+                              n[idx].batchNo = computeBatchAllocation(item.productId, newQty);
+                            }
+                            setItems(n);
+                          }} keyboardType="numeric" />
                         </View>
                         {!isSample && !isDamage && (
                           <>
