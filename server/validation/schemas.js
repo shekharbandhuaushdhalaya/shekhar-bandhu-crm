@@ -88,6 +88,10 @@ const customerSchema = z.object({
   customerType: z.enum(['gst', 'cash']).default('gst'),
   recordTracking: z.enum(['invoice_ledger', 'cash_ledger']).default('invoice_ledger'),
   discountPercent: z.number().min(0).max(100).default(0),
+  drugLicenseNo: z.string().optional().default(''),
+  drugLicenseExpiry: z.string().or(z.date()).nullable().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 // ── Invoice ──────────────────────────────────────────────────
@@ -546,6 +550,8 @@ const contactSchema = z.object({
   company: z.string().default(''),
   role: z.string().default(''),
   notes: z.string().default(''),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 const interactionSchema = z.object({
@@ -567,6 +573,9 @@ const medicalRepSchema = z.object({
 const mrCheckinSchema = z.object({
   location: z.string().default(''),
   notes: z.string().default(''),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  startKmReading: z.number().optional(),
 });
 
 const mrVisitSchema = z.object({
@@ -575,6 +584,13 @@ const mrVisitSchema = z.object({
   location: z.string().default(''),
   notes: z.string().default(''),
   date: z.string().or(z.date()).optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  sampleDetails: z.array(z.object({
+    productId: objectId.optional(),
+    name: z.string().optional(),
+    qty: z.number().default(1)
+  })).optional()
 });
 
 const mrExpenseSchema = z.object({

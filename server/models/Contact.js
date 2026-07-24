@@ -26,6 +26,8 @@ const contactSchema = new mongoose.Schema({
     default: 'Direct Walk-in',
   },
   interactions: [interactionSchema],
+  latitude: { type: Number },
+  longitude: { type: Number },
 }, { timestamps: true });
 
 contactSchema.index({ name: 'text', company: 'text', email: 'text' });

@@ -39,6 +39,9 @@ const productRoutes = require('./routes/inventory/products');
 const inventoryRoutes = require('./routes/inventory/inventories');
 const warehouseRoutes = require('./routes/inventory/warehouses');
 const inventoryEntryRoutes = require('./routes/inventory/inventory-entries');
+const complianceRoutes = require('./routes/inventory/compliance');
+const stockTransferRoutes = require('./routes/inventory/transfers');
+const notificationRoutes = require('./routes/system/notifications');
 
 const rawMaterialRoutes = require('./routes/manufacturing/rawMaterials');
 const bomRoutes = require('./routes/manufacturing/bom');
@@ -49,6 +52,7 @@ const paymentRoutes = require('./routes/finance/payments');
 const paymentGatewayRoutes = require('./routes/finance/paymentGateway');
 const creditNoteRoutes = require('./routes/finance/creditNotes');
 const gstReturnRoutes = require('./routes/finance/gstReturns');
+const tallyRoutes = require('./routes/finance/tally');
 
 const dispatchRoutes = require('./routes/operations/dispatches');
 const complaintRoutes = require('./routes/operations/complaints');
@@ -193,6 +197,9 @@ app.use('/api/invoices', authenticateJWT, invoiceRoutes);
 app.use('/api/quotations', authenticateJWT, quotationRoutes);
 app.use('/api/warehouses', authenticateJWT, warehouseRoutes);
 app.use('/api/inventory-entries', authenticateJWT, inventoryEntryRoutes);
+app.use('/api/inventory/compliance', authenticateJWT, complianceRoutes);
+app.use('/api/inventory/transfers', authenticateJWT, stockTransferRoutes);
+app.use('/api/notifications', authenticateJWT, notificationRoutes);
 app.use('/api/payments', authenticateJWT, paymentRoutes);
 app.use('/api/analytics', authenticateJWT, analyticsRoutes);
 app.use('/api/queries', authenticateJWT, queryRoutes);
@@ -215,6 +222,7 @@ app.use('/api/medical-reps', authenticateJWT, medicalRepRoutes);
 app.use('/api/campaigns', authenticateJWT, campaignRoutes);
 app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
+app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);
 
 // Global error handler (must be after all routes)
 app.use((err, req, res, next) => {

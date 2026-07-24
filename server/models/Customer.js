@@ -30,7 +30,11 @@ const customerSchema = new mongoose.Schema({
   shippingSameAsBilling: { type: Boolean, default: false },
   customerType: { type: String, enum: ['gst', 'cash'], default: 'gst' },
   recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' },
-  discountPercent: { type: Number, default: 0, min: 0, max: 100 }
+  discountPercent: { type: Number, default: 0, min: 0, max: 100 },
+  drugLicenseNo: { type: String, default: '', trim: true },
+  drugLicenseExpiry: { type: Date, default: null },
+  latitude: { type: Number },
+  longitude: { type: Number }
 }, { timestamps: true });
 
 customerSchema.index({ name: 'text', company: 'text', email: 'text' });

@@ -199,10 +199,46 @@ router.get('/:mrId/visits', authorize('mr:view'), async (req, res) => {
   }
 });
 
+function getHaversineDistanceInMeters(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371e3; // Earth radius in meters
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+}
+
 router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSchema), async (req, res) => {
   try {
     const data = { ...req.body, mrId: req.params.mrId };
     if (!data.date) data.date = new Date();
+
+    // Geofenced Checkin location validation
+    let doctorVerified = false;
+    if (data.latitude && data.longitude && data.doctorName) {
+      const Customer = require('../../models/Customer');
+      const Contact = require('../../models/Contact');
+      
+      const target = await Contact.findOne({ name: { $regex: new RegExp(data.doctorName.trim(), 'i') } }) ||
+                     await Customer.findOne({ $or: [{ name: { $regex: new RegExp(data.doctorName.trim(), 'i') } }, { company: { $regex: new RegExp(data.doctorName.trim(), 'i') } }] });
+      
+      if (target && target.latitude && target.longitude) {
+        const dist = getHaversineDistanceInMeters(data.latitude, data.longitude, target.latitude, target.longitude);
+        if (dist !== null && dist <= 200) { // 200 meters geofence threshold
+          doctorVerified = true;
+          data.doctorVerified = true;
+          data.doctorVerifiedAt = new Date();
+        }
+      }
+    }
+
     const visit = await MrVisit.create(data);
 
     // If free samples were given, automatically generate a Doctor Sample Delivery Challan and update inventory!
@@ -473,6 +509,82 @@ router.get('/visits/all', authorize('mr:view'), async (req, res) => {
       .populate('sampleDetails.productId', 'name')
       .lean();
     res.json(visits);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/medical-reps/samples/distribution — Track doctor sample distribution
+router.get('/samples/distribution', authorize('mr:view'), async (req, res) => {
+  try {
+    const visits = await MrVisit.find({ 'sampleDetails.0': { $exists: true } })
+      .sort({ date: -1 })
+      .populate('mrId', 'name code territory')
+      .populate('sampleDetails.productId', 'name sku')
+      .lean();
+    res.json(visits);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/medical-reps/commission/calculate — Calculate commissions based on MR sales targets achievement
+router.get('/commission/calculate', authorize('mr:view'), async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const now = new Date();
+    const queryMonth = month || (now.getMonth() + 1).toString().padStart(2, '0');
+    const queryYear = parseInt(year, 10) || now.getFullYear();
+
+    const startDate = new Date(queryYear, parseInt(queryMonth, 10) - 1, 1);
+    const endDate = new Date(queryYear, parseInt(queryMonth, 10), 0, 23, 59, 59, 999);
+
+    const mrs = await MedicalRepresentative.find({ isActive: true }).lean();
+    const mrIds = mrs.map(m => m._id);
+
+    // Sum order amounts from visits during the period
+    const visits = await MrVisit.find({
+      mrId: { $in: mrIds },
+      date: { $gte: startDate, $lte: endDate },
+      orderTaken: true
+    }).lean();
+
+    const salesMap = {};
+    visits.forEach(v => {
+      if (!salesMap[v.mrId]) salesMap[v.mrId] = 0;
+      salesMap[v.mrId] += (v.orderAmount || 0);
+    });
+
+    const report = mrs.map(mr => {
+      const sales = salesMap[mr._id] || 0;
+      const target = mr.monthlyTarget || 100000; // default fallback target
+      const achievementPct = target > 0 ? (sales / target) * 100 : 0;
+      
+      // Tiered commission rate: 5% if target achieved 100%+, 2.5% if 75%+, 1% otherwise
+      let rate = 0.01;
+      if (achievementPct >= 100) rate = 0.05;
+      else if (achievementPct >= 75) rate = 0.025;
+
+      const commission = sales * rate;
+
+      return {
+        mrId: mr._id,
+        name: mr.name,
+        code: mr.code,
+        territory: mr.territory,
+        monthlyTarget: target,
+        actualSales: sales,
+        achievementPct: Number(achievementPct.toFixed(1)),
+        commissionRatePct: rate * 100,
+        calculatedCommission: Number(commission.toFixed(2))
+      };
+    });
+
+    res.json({
+      month: queryMonth,
+      year: queryYear,
+      report
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
