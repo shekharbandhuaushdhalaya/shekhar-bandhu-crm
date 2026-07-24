@@ -113,3 +113,27 @@ export const validateGstinWithState = (gstin?: string, selectedStateName?: strin
     expectedState
   };
 };
+
+/**
+ * Formats a phone number with country code (+91 by default for 10-digit Indian numbers)
+ */
+export const formatPhoneWithCountryCode = (phone?: string, defaultCode = '+91') => {
+  if (!phone || !phone.trim()) return '—';
+  const clean = phone.trim();
+  
+  // If already starts with '+', return clean
+  if (clean.startsWith('+')) return clean;
+
+  // Extract digits
+  const digits = clean.replace(/\D/g, '');
+
+  if (digits.length === 10) {
+    return `${defaultCode} ${digits.substring(0, 5)} ${digits.substring(5)}`;
+  }
+
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+91 ${digits.substring(2, 7)} ${digits.substring(7)}`;
+  }
+
+  return clean;
+};

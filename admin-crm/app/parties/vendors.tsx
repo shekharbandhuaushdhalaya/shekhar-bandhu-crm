@@ -9,7 +9,7 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 
 import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
-import { validateGstinWithState } from '../../utils/gst';
+import { validateGstinWithState, formatPhoneWithCountryCode } from '../../utils/gst';
 
 const getAvatarColor = (name: string, colors: any) => {
   const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -1353,10 +1353,10 @@ export default function VendorsScreen() {
                   </View>
 
                   {/* Contact No. */}
-                  <View style={[styles.tableCellContainer, { width: 130, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                  <View style={[styles.tableCellContainer, { width: 145, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                     <Ionicons name="call-outline" size={12} color={colors.success} />
                     <Text style={styles.monoText} numberOfLines={1}>
-                      {v.phone || '—'}
+                      {formatPhoneWithCountryCode(v.phone)}
                     </Text>
                   </View>
 

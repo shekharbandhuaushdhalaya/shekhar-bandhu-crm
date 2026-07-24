@@ -9,7 +9,7 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 
 import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
-import { validateGstinWithState } from '../../utils/gst';
+import { validateGstinWithState, formatPhoneWithCountryCode } from '../../utils/gst';
 
 const GST_STATE_CODES: { [key: string]: string } = {
   '01': 'Jammu & Kashmir',
@@ -1718,10 +1718,10 @@ export default function CustomersScreen() {
                     </View>
 
                     {/* Phone */}
-                    <View style={[styles.tableCellContainer, { width: 140, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                    <View style={[styles.tableCellContainer, { width: 145, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                       <Ionicons name="call-outline" size={12} color={colors.success} />
                       <Text style={styles.monoText} numberOfLines={1}>
-                        {c.phone || '—'}
+                        {formatPhoneWithCountryCode(c.phone)}
                       </Text>
                     </View>
 
