@@ -804,167 +804,147 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
             )}
           </View>
 
-          {/* Finalize Button */}
-          {!invoice.isFinalized && (
-            <TouchableOpacity
-              style={[styles.printBtn, { marginTop: 24, backgroundColor: colors.success }]}
-              onPress={async () => {
-                try {
-                  const val = invoice.amount || invoice.baseAmount || 0;
-                  if (val > 49999 && !invoice.ewayBillNo) {
-                    alert('GST Compliance Error: E-Way Bill No. is mandatory for invoices exceeding ₹49,999.');
-                    return;
-                  }
-                  await api.finalizeSaleInvoice(invoice._id);
-                  onDeleted(); // Reload parent
-                  onClose();
-                } catch (err: any) {
-                  alert(err.message || 'Failed to finalize invoice');
-                }
-              }}
-            >
-              <Ionicons name="checkmark-done-circle" size={18} color="#fff" />
-              <Text style={styles.printBtnText}>Finalize Invoice</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Edit Button */}
-          {!invoice.isFinalized && (
-            <TouchableOpacity
-              style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.info }]}
-              onPress={() => {
-                onClose();
-                onEdit(invoice);
-              }}
-            >
-              <Ionicons name="create-outline" size={18} color="#fff" />
-              <Text style={styles.printBtnText}>Edit Draft Details</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Toggle Payment Status */}
-          {invoice.isFinalized && invoice.status?.toLowerCase() !== 'paid' && (
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+          {/* Action Buttons Row (Single row layout for Desktop) */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 24, marginBottom: 16 }}>
+            {/* Finalize Button */}
+            {!invoice.isFinalized && (
               <TouchableOpacity
-                style={[styles.printBtn, { flex: 1, backgroundColor: colors.success }]}
+                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.success }]}
                 onPress={async () => {
                   try {
-                    await api.updateSaleInvoice(invoice._id, { status: 'paid' });
-                    onDeleted();
+                    const val = invoice.amount || invoice.baseAmount || 0;
+                    if (val > 49999 && !invoice.ewayBillNo) {
+                      alert('GST Compliance Error: E-Way Bill No. is mandatory for invoices exceeding ₹49,999.');
+                      return;
+                    }
+                    await api.finalizeSaleInvoice(invoice._id);
+                    onDeleted(); // Reload parent
+                    onClose();
+                  } catch (err: any) {
+                    alert(err.message || 'Failed to finalize invoice');
+                  }
+                }}
+              >
+                <Ionicons name="checkmark-done-circle" size={18} color="#fff" />
+                <Text style={styles.printBtnText}>Finalize Invoice</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Edit Button */}
+            {!invoice.isFinalized && (
+              <TouchableOpacity
+                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.info }]}
+                onPress={() => {
+                  onClose();
+                  onEdit(invoice);
+                }}
+              >
+                <Ionicons name="create-outline" size={18} color="#fff" />
+                <Text style={styles.printBtnText}>Edit Draft</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Toggle Payment Status */}
+            {invoice.isFinalized && invoice.status?.toLowerCase() !== 'paid' && (
+              <>
+                <TouchableOpacity
+                  style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.success }]}
+                  onPress={async () => {
+                    try {
+                      await api.updateSaleInvoice(invoice._id, { status: 'paid' });
+                      onDeleted();
+                      onClose();
+                    } catch (err: any) {
+                      alert(err.message || 'Failed to update payment status');
+                    }
+                  }}
+                >
+                  <Ionicons name="cash-outline" size={18} color="#fff" />
+                  <Text style={styles.printBtnText}>Mark Paid</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.primary }]}
+                  onPress={async () => {
+                    try {
+                      const orderData = await api.createPaymentOrder(invoice._id);
+                      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                        const script = document.createElement('script');
+                        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+                        script.onload = () => {
+                          const options = {
+                            key: orderData.keyId,
+                            amount: orderData.amount,
+                            currency: orderData.currency,
+                            name: 'Shekhar Bandhu Aushadhalaya',
+                            description: `Invoice ${orderData.invoiceNo}`,
+                            order_id: orderData.orderId,
+                            prefill: { name: orderData.customerName, email: orderData.customerEmail, contact: orderData.customerPhone },
+                            handler: async (response: any) => {
+                              const verify = await api.verifyPayment({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                invoiceId: invoice._id,
+                              });
+                              if (verify.success) {
+                                alert('Payment successful! Invoice marked as paid.');
+                                onDeleted();
+                                onClose();
+                              }
+                            },
+                            modal: { ondismiss: () => {} },
+                          };
+                          const rzp = new (window as any).Razorpay(options);
+                          rzp.open();
+                        };
+                        document.body.appendChild(script);
+                      } else {
+                        alert('Online payment is available on web. Use Mark as Paid for manual recording.');
+                      }
+                    } catch (err: any) {
+                      alert(err.message || 'Failed to initiate payment');
+                    }
+                  }}
+                >
+                  <Ionicons name="globe-outline" size={18} color="#fff" />
+                  <Text style={styles.printBtnText}>Pay Online</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {invoice.isFinalized && invoice.status?.toLowerCase() === 'paid' && (
+              <TouchableOpacity
+                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.warning }]}
+                onPress={async () => {
+                  try {
+                    await api.updateSaleInvoice(invoice._id, { status: 'pending' });
+                    onDeleted(); // Reload parent
                     onClose();
                   } catch (err: any) {
                     alert(err.message || 'Failed to update payment status');
                   }
                 }}
               >
-                <Ionicons name="cash-outline" size={18} color="#fff" />
-                <Text style={styles.printBtnText}>Mark as Paid</Text>
+                <Ionicons name="alert-circle-outline" size={18} color="#fff" />
+                <Text style={styles.printBtnText}>Mark Unpaid</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.printBtn, { flex: 1, backgroundColor: colors.primary }]}
-                onPress={async () => {
-                  try {
-                    const orderData = await api.createPaymentOrder(invoice._id);
-                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                      const script = document.createElement('script');
-                      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-                      script.onload = () => {
-                        const options = {
-                          key: orderData.keyId,
-                          amount: orderData.amount,
-                          currency: orderData.currency,
-                          name: 'Shekhar Bandhu Aushadhalaya',
-                          description: `Invoice ${orderData.invoiceNo}`,
-                          order_id: orderData.orderId,
-                          prefill: { name: orderData.customerName, email: orderData.customerEmail, contact: orderData.customerPhone },
-                          handler: async (response: any) => {
-                            const verify = await api.verifyPayment({
-                              razorpay_order_id: response.razorpay_order_id,
-                              razorpay_payment_id: response.razorpay_payment_id,
-                              razorpay_signature: response.razorpay_signature,
-                              invoiceId: invoice._id,
-                            });
-                            if (verify.success) {
-                              alert('Payment successful! Invoice marked as paid.');
-                              onDeleted();
-                              onClose();
-                            }
-                          },
-                          modal: { ondismiss: () => {} },
-                        };
-                        const rzp = new (window as any).Razorpay(options);
-                        rzp.open();
-                      };
-                      document.body.appendChild(script);
-                    } else {
-                      alert('Online payment is available on web. Use Mark as Paid for manual recording.');
-                    }
-                  } catch (err: any) {
-                    alert(err.message || 'Failed to initiate payment');
-                  }
-                }}
-              >
-                <Ionicons name="globe-outline" size={18} color="#fff" />
-                <Text style={styles.printBtnText}>Pay Online</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            )}
 
-          {invoice.isFinalized && invoice.status?.toLowerCase() === 'paid' && (
             <TouchableOpacity
-              style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.warning }]}
-              onPress={async () => {
-                try {
-                  await api.updateSaleInvoice(invoice._id, { status: 'pending' });
-                  onDeleted(); // Reload parent
-                  onClose();
-                } catch (err: any) {
-                  alert(err.message || 'Failed to update payment status');
-                }
-              }}
+              style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.primary }]}
+              onPress={() => printInvoice(invoice)}
             >
-              <Ionicons name="alert-circle-outline" size={18} color="#fff" />
-              <Text style={styles.printBtnText}>Mark as Unpaid (Pending)</Text>
+              <Ionicons name="print-outline" size={18} color="#fff" />
+              <Text style={styles.printBtnText}>Print Invoice</Text>
             </TouchableOpacity>
-          )}
-          
-          {/* Supporting Documents Vault */}
-          <View style={{ gap: 6, marginVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Receiving Copy:</Text>
             
-            {invoice.supportingDocuments && invoice.supportingDocuments.length > 0 ? (
-              <View style={{ gap: 6, marginTop: 4 }}>
-                {invoice.supportingDocuments.map((doc: any, docIdx: number) => (
-                  <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
-                    <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                      <Ionicons name="document-attach" size={15} color={colors.primary} />
-                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDeleteInvoiceDoc(doc.url)} style={{ padding: 4 }}>
-                      <Ionicons name="trash-outline" size={14} color={colors.danger} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={{ fontSize: 11, color: colors.text.muted, fontStyle: 'italic', marginTop: 2 }}>No supporting documents uploaded.</Text>
+            {perm.can('invoice:delete') && invoice.status !== 'Cancelled' && (
+              <TouchableOpacity style={[styles.deleteBtn, { flex: 1, minWidth: 140, marginTop: 0, marginBottom: 0 }]} onPress={handleDelete}>
+                <Ionicons name="trash-outline" size={16} color="#fff" />
+                <Text style={styles.deleteBtnText}>Delete</Text>
+              </TouchableOpacity>
             )}
           </View>
-
-          <TouchableOpacity
-            style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.primary }]}
-            onPress={() => printInvoice(invoice)}
-          >
-            <Ionicons name="print-outline" size={18} color="#fff" />
-            <Text style={styles.printBtnText}>Print Invoice</Text>
-          </TouchableOpacity>
-          
-          {perm.can('invoice:delete') && invoice.status !== 'Cancelled' && (
-            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={16} color="#fff" />
-              <Text style={styles.deleteBtnText}>Delete Invoice</Text>
-            </TouchableOpacity>
-          )}
         </ScrollView>
       </View>
     </Modal>

@@ -346,82 +346,85 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
             )}
           </View>
 
-          {/* Finalize Button */}
-          {!invoice.isFinalized && (
-            <TouchableOpacity
-              style={[styles.printBtn, { marginTop: 24, backgroundColor: colors.success }]}
-              onPress={async () => {
-                try {
-                  await api.finalizePurchaseInvoice(invoice._id);
-                  onDeleted(); // Reload parent
+          {/* Action Buttons Row (Single row layout for Desktop) */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 24, marginBottom: 16 }}>
+            {/* Finalize Button */}
+            {!invoice.isFinalized && (
+              <TouchableOpacity
+                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.success }]}
+                onPress={async () => {
+                  try {
+                    await api.finalizePurchaseInvoice(invoice._id);
+                    onDeleted(); // Reload parent
+                    onClose();
+                  } catch (err: any) {
+                    alert(err.message || 'Failed to finalize invoice');
+                  }
+                }}
+              >
+                <Ionicons name="checkmark-done-circle" size={18} color="#fff" />
+                <Text style={styles.printBtnText}>Finalize Invoice</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Edit Button */}
+            {!invoice.isFinalized && (
+              <TouchableOpacity
+                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.info }]}
+                onPress={() => {
                   onClose();
-                } catch (err: any) {
-                  alert(err.message || 'Failed to finalize invoice');
-                }
-              }}
-            >
-              <Ionicons name="checkmark-done-circle" size={18} color="#fff" />
-              <Text style={styles.printBtnText}>Finalize Invoice</Text>
-            </TouchableOpacity>
-          )}
+                  onEdit(invoice);
+                }}
+              >
+                <Ionicons name="create-outline" size={18} color="#fff" />
+                <Text style={styles.printBtnText}>Edit Draft</Text>
+              </TouchableOpacity>
+            )}
 
-          {/* Edit Button */}
-          {!invoice.isFinalized && (
-            <TouchableOpacity
-              style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.info }]}
-              onPress={() => {
-                onClose();
-                onEdit(invoice);
-              }}
-            >
-              <Ionicons name="create-outline" size={18} color="#fff" />
-              <Text style={styles.printBtnText}>Edit Draft Details</Text>
-            </TouchableOpacity>
-          )}
+            {/* Toggle Payment Status */}
+            {invoice.isFinalized && invoice.status?.toLowerCase() !== 'paid' && (
+              <TouchableOpacity
+                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.success }]}
+                onPress={async () => {
+                  try {
+                    await api.updatePurchaseInvoice(invoice._id, { status: 'paid' });
+                    onDeleted(); // Reload parent
+                    onClose();
+                  } catch (err: any) {
+                    alert(err.message || 'Failed to update payment status');
+                  }
+                }}
+              >
+                <Ionicons name="cash-outline" size={18} color="#fff" />
+                <Text style={styles.printBtnText}>Mark Paid</Text>
+              </TouchableOpacity>
+            )}
 
-          {/* Toggle Payment Status */}
-          {invoice.isFinalized && invoice.status?.toLowerCase() !== 'paid' && (
-            <TouchableOpacity
-              style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.success }]}
-              onPress={async () => {
-                try {
-                  await api.updatePurchaseInvoice(invoice._id, { status: 'paid' });
-                  onDeleted(); // Reload parent
-                  onClose();
-                } catch (err: any) {
-                  alert(err.message || 'Failed to update payment status');
-                }
-              }}
-            >
-              <Ionicons name="cash-outline" size={18} color="#fff" />
-              <Text style={styles.printBtnText}>Mark as Paid</Text>
-            </TouchableOpacity>
-          )}
+            {invoice.isFinalized && invoice.status?.toLowerCase() === 'paid' && (
+              <TouchableOpacity
+                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.warning }]}
+                onPress={async () => {
+                  try {
+                    await api.updatePurchaseInvoice(invoice._id, { status: 'pending' });
+                    onDeleted(); // Reload parent
+                    onClose();
+                  } catch (err: any) {
+                    alert(err.message || 'Failed to update payment status');
+                  }
+                }}
+              >
+                <Ionicons name="alert-circle-outline" size={18} color="#fff" />
+                <Text style={styles.printBtnText}>Mark Unpaid</Text>
+              </TouchableOpacity>
+            )}
 
-          {invoice.isFinalized && invoice.status?.toLowerCase() === 'paid' && (
-            <TouchableOpacity
-              style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.warning }]}
-              onPress={async () => {
-                try {
-                  await api.updatePurchaseInvoice(invoice._id, { status: 'pending' });
-                  onDeleted(); // Reload parent
-                  onClose();
-                } catch (err: any) {
-                  alert(err.message || 'Failed to update payment status');
-                }
-              }}
-            >
-              <Ionicons name="alert-circle-outline" size={18} color="#fff" />
-              <Text style={styles.printBtnText}>Mark as Unpaid (Pending)</Text>
-            </TouchableOpacity>
-          )}
-
-          {perm.can('invoice:delete') && invoice.status !== 'Cancelled' && (
-            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={16} color="#fff" />
-              <Text style={styles.deleteBtnText}>Delete Invoice</Text>
-            </TouchableOpacity>
-          )}
+            {perm.can('invoice:delete') && invoice.status !== 'Cancelled' && (
+              <TouchableOpacity style={[styles.deleteBtn, { flex: 1, minWidth: 140, marginTop: 0, marginBottom: 0 }]} onPress={handleDelete}>
+                <Ionicons name="trash-outline" size={16} color="#fff" />
+                <Text style={styles.deleteBtnText}>Delete</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </ScrollView>
       </View>
     </Modal>
