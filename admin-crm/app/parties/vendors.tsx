@@ -384,6 +384,8 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
     }
   };
 
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async () => {
     const finalName = displayName.trim() || registeredName.trim();
     if (!finalName) return;
@@ -396,50 +398,61 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       }
     }
 
-    const payload = {
-      name: finalName,
-      company: registeredName.trim() || displayName.trim(),
-      registeredName: registeredName.trim(),
-      displayName: displayName.trim(),
-      contactPerson: contactPerson.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      productCategory: category || 'General',
-      regularBalance: parseInt(regularBalance) || 0,
-      cashBalance: parseInt(cashBalance) || 0,
-      recordTracking,
+    setSaving(true);
+    try {
+      const payload = {
+        name: finalName,
+        company: registeredName.trim() || displayName.trim(),
+        registeredName: registeredName.trim(),
+        displayName: displayName.trim(),
+        contactPerson: contactPerson.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        productCategory: category || 'General',
+        regularBalance: parseInt(regularBalance) || 0,
+        cashBalance: parseInt(cashBalance) || 0,
+        recordTracking,
 
-      paymentTerms: terms,
-      gstin: gstin.trim(),
-      pan: pan.trim(),
-      addressPin: addressPin.trim(),
-      addressCity: addressCity.trim(),
-      state,
-      bankAccountNumber: bankAccountNumber.trim(),
-      bankIfsc: bankIfsc.trim().toUpperCase(),
-      bankName: bankName.trim(),
-      bankBranch: bankBranch.trim()
-    };
+        paymentTerms: terms,
+        gstin: gstin.trim(),
+        pan: pan.trim(),
+        addressPin: addressPin.trim(),
+        addressCity: addressCity.trim(),
+        state,
+        bankAccountNumber: bankAccountNumber.trim(),
+        bankIfsc: bankIfsc.trim().toUpperCase(),
+        bankName: bankName.trim(),
+        bankBranch: bankBranch.trim()
+      };
 
-    if (vendor) {
-      await api.updateVendor(vendor._id, payload);
-    } else {
-      await api.createVendor(payload);
+      if (vendor) {
+        await api.updateVendor(vendor._id, payload);
+      } else {
+        await api.createVendor(payload);
+      }
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      alert(err.message || 'Failed to save vendor');
+    } finally {
+      setSaving(false);
     }
-    onSaved();
-    onClose();
   };
 
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity onPress={onClose} disabled={saving}>
             <Ionicons name="close" size={26} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>{vendor ? 'Edit Vendor' : 'New Vendor'}</Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Ionicons name="checkmark-circle" size={26} color={colors.success} />
+          <TouchableOpacity onPress={handleSave} disabled={saving}>
+            {saving ? (
+              <ActivityIndicator size="small" color={colors.success} />
+            ) : (
+              <Ionicons name="checkmark-circle" size={26} color={colors.success} />
+            )}
           </TouchableOpacity>
         </View>
 
