@@ -140,15 +140,6 @@ async function deductInventoryForInvoice(invoice) {
     await Invoice.findByIdAndUpdate(invoice._id, { items: invoice.items });
   }
 }
-      reference: invoice.invoiceNo,
-      note,
-      createdBy: 'System',
-      packing,
-      vendorId: entry ? entry.vendorId : '',
-      vendorName: entry ? entry.vendorName : '',
-    });
-  }
-}
 
 // Helper: revert inventory for a deleted/cancelled sale invoice
 async function revertInventoryForInvoice(invoice) {
