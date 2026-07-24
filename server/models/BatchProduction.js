@@ -84,6 +84,31 @@ const batchProductionSchema = new mongoose.Schema({
   rawMaterialCost: { type: Number, default: 0 },
   overheadCost: { type: Number, default: 0 },
   unitProductionCost: { type: Number, default: 0 },
+  productionType: {
+    type: String,
+    enum: ['in_house', 'job_work'],
+    default: 'in_house'
+  },
+  jobWorkMode: {
+    type: String,
+    enum: ['raw_materials_supplied', 'direct_purchase', 'none'],
+    default: 'none'
+  },
+  packagingMode: {
+    type: String,
+    enum: ['packed_by_vendor', 'self_packed'],
+    default: 'packed_by_vendor'
+  },
+  jobWorkerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    default: null
+  },
+  jobWorkerName: { type: String, default: '' },
+  jobWorkerChallanRef: { type: String, default: '' }, // Outward delivery challan reference
+  jobWorkerCertificateRef: { type: String, default: '' }, // Job Worker Batch Certificate number
+  coaDocumentRef: { type: String, default: '' }, // Certificate of Analysis uploaded reference
+  jobWorkCharges: { type: Number, default: 0 }, // Billable service charges for outsourcing
   supportingDocuments: [
     {
       name: { type: String, required: true },

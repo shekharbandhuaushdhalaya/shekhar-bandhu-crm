@@ -22,6 +22,10 @@ const billOfMaterialsSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   productionNotes: { type: String, default: "" },
   overheadCost: { type: Number, default: 0 },
+  defaultProductionType: { type: String, enum: ['in_house', 'job_work'], default: 'in_house' },
+  defaultJobWorkMode: { type: String, enum: ['raw_materials_supplied', 'direct_purchase', 'none'], default: 'none' },
+  defaultPackagingMode: { type: String, enum: ['packed_by_vendor', 'self_packed'], default: 'self_packed' },
+  defaultJobWorkerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
   stages: [
     {
       name: { type: String, required: true },

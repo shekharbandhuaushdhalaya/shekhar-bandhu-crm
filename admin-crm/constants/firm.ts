@@ -22,6 +22,7 @@ const DEFAULT_FIRM_DETAILS = {
   signatureUrl: "",
   dscSignatoryName: "Authorised Representative",
   dscCertificateName: "eMudhra / Class 3 DSC",
+  manufacturingLicenseNo: "",
 };
 
 let activeSettings = { ...DEFAULT_FIRM_DETAILS };
@@ -47,6 +48,7 @@ export const FIRM_DETAILS = {
   get signatureUrl() { return activeSettings.signatureUrl || ''; },
   get dscSignatoryName() { return activeSettings.dscSignatoryName || 'Authorised Representative'; },
   get dscCertificateName() { return activeSettings.dscCertificateName || 'Govt Approved DSC'; },
+  get manufacturingLicenseNo() { return (activeSettings as any).manufacturingLicenseNo || ''; },
 };
 
 export function updateActiveFirmDetails(newSettings: Partial<typeof DEFAULT_FIRM_DETAILS>) {

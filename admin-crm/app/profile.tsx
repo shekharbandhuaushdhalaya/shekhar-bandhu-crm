@@ -123,6 +123,7 @@ export default function ProfileScreen() {
   const [razorpayKeySecret, setRazorpayKeySecret] = useState('');
   const [razorpayWebhookSecret, setRazorpayWebhookSecret] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [manufacturingLicenseNo, setManufacturingLicenseNo] = useState('');
   const [companyLoading, setCompanyLoading] = useState(false);
 
   // User session states
@@ -185,6 +186,7 @@ export default function ProfileScreen() {
         setRazorpayKeySecret(config.razorpayKeySecret || '');
         setRazorpayWebhookSecret(config.razorpayWebhookSecret || '');
         setGeminiApiKey(config.geminiApiKey || '');
+        setManufacturingLicenseNo(config.manufacturingLicenseNo || '');
 
         // Instantly synchronize in-memory config on frontend
         updateActiveFirmDetails(config);
@@ -388,6 +390,7 @@ export default function ProfileScreen() {
         razorpayKeySecret: razorpayKeySecret.trim(),
         razorpayWebhookSecret: razorpayWebhookSecret.trim(),
         geminiApiKey: geminiApiKey.trim(),
+        manufacturingLicenseNo: manufacturingLicenseNo.trim(),
       };
       (payload as any).value = { ...payload };
 
@@ -963,6 +966,16 @@ export default function ProfileScreen() {
             placeholderTextColor={colors.text.muted}
             keyboardType="email-address"
             autoCapitalize="none"
+          />
+
+          <Text style={styles.label}>Manufacturing License Number</Text>
+          <TextInput
+            style={styles.input}
+            value={manufacturingLicenseNo}
+            onChangeText={setManufacturingLicenseNo}
+            placeholder="e.g. Mfg. Lic. No. 123/2026"
+            placeholderTextColor={colors.text.muted}
+            autoCapitalize="characters"
           />
         </View>
       </View>

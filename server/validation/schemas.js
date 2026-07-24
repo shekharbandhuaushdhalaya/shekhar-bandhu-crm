@@ -321,6 +321,8 @@ const vendorSchema = z.object({
   bankName: z.string().default(''),
   bankBranch: z.string().default(''),
   recordTracking: z.enum(['invoice_ledger', 'cash_ledger']).default('invoice_ledger'),
+  manufacturingLicenseNo: z.string().optional().default(''),
+  manufacturingLicenseExpiry: z.string().or(z.date()).nullable().optional()
 });
 
 // ── InventoryEntry ───────────────────────────────────────────
@@ -419,6 +421,12 @@ const batchProductionSchema = z.object({
   plannedQty: z.number().int().positive(),
   manufacturingUnitId: objectId,
   startDate: z.string().or(z.date()).optional(),
+  productionType: z.enum(['in_house', 'job_work']).default('in_house'),
+  jobWorkMode: z.enum(['raw_materials_supplied', 'direct_purchase', 'none']).default('none'),
+  packagingMode: z.enum(['packed_by_vendor', 'self_packed']).default('packed_by_vendor'),
+  jobWorkerId: objectId.nullable().optional(),
+  jobWorkerName: z.string().optional().default(''),
+  jobWorkerChallanRef: z.string().optional().default('')
 });
 
 const yieldItemSchema = z.object({
@@ -445,6 +453,9 @@ const batchCompleteSchema = z.object({
   microbialLimit: z.string().optional(),
   labReportRef: z.string().optional(),
   warehouseId: objectId,
+  jobWorkerCertificateRef: z.string().optional().default(''),
+  coaDocumentRef: z.string().optional().default(''),
+  jobWorkCharges: z.number().nonnegative().optional().default(0)
 });
 
 // ── Challan ──────────────────────────────────────────────────
@@ -521,6 +532,10 @@ const bomSchema = z.object({
   productionNotes: z.string().optional(),
   overheadCost: z.number().nonnegative().optional(),
   stages: z.array(bomStage).optional(),
+  defaultProductionType: z.enum(['in_house', 'job_work']).default('in_house'),
+  defaultJobWorkMode: z.enum(['raw_materials_supplied', 'direct_purchase', 'none']).default('none'),
+  defaultPackagingMode: z.enum(['packed_by_vendor', 'self_packed']).default('self_packed'),
+  defaultJobWorkerId: objectId.nullable().optional(),
 });
 
 // ── Contact ──────────────────────────────────────────────────

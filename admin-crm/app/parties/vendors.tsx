@@ -110,6 +110,22 @@ function VendorDetailModal({ vendor, visible, onClose, onDeleted, onEdit }: { ve
               </View>
             </View>
             <View style={styles.infoItem}>
+              <Ionicons name="ribbon" size={16} color={colors.primary} style={styles.infoIcon} />
+              <View>
+                <Text style={styles.infoLabel}>Manufacturing License (GMP)</Text>
+                <Text style={styles.infoValue}>{(vendor as any).manufacturingLicenseNo || 'N/A'}</Text>
+              </View>
+            </View>
+            {(vendor as any).manufacturingLicenseExpiry ? (
+              <View style={styles.infoItem}>
+                <Ionicons name="calendar" size={16} color={colors.danger} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>License Expiry Date</Text>
+                  <Text style={styles.infoValue}>{new Date((vendor as any).manufacturingLicenseExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                </View>
+              </View>
+            ) : null}
+            <View style={styles.infoItem}>
               <Ionicons name="map" size={16} color={colors.info} style={styles.infoIcon} />
               <View>
                 <Text style={styles.infoLabel}>State / UT (From PIN)</Text>
@@ -244,6 +260,8 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
   const [bankIfsc, setBankIfsc] = useState('');
   const [bankName, setBankName] = useState('');
   const [bankBranch, setBankBranch] = useState('');
+  const [manufacturingLicenseNo, setManufacturingLicenseNo] = useState('');
+  const [manufacturingLicenseExpiry, setManufacturingLicenseExpiry] = useState('');
 
   const [loadingPin, setLoadingPin] = useState(false);
   const [loadingIfsc, setLoadingIfsc] = useState(false);
@@ -279,6 +297,8 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setBankIfsc(vendor.bankIfsc || '');
       setBankName(vendor.bankName || '');
       setBankBranch(vendor.bankBranch || '');
+      setManufacturingLicenseNo((vendor as any).manufacturingLicenseNo || '');
+      setManufacturingLicenseExpiry((vendor as any).manufacturingLicenseExpiry ? new Date((vendor as any).manufacturingLicenseExpiry).toISOString().slice(0, 10) : '');
     } else {
       setRegisteredName('');
       setDisplayName('');
@@ -302,6 +322,8 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setBankIfsc('');
       setBankName('');
       setBankBranch('');
+      setManufacturingLicenseNo('');
+      setManufacturingLicenseExpiry('');
     }
   }, [vendor, visible]);
 
@@ -422,7 +444,9 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
         bankAccountNumber: bankAccountNumber.trim(),
         bankIfsc: bankIfsc.trim().toUpperCase(),
         bankName: bankName.trim(),
-        bankBranch: bankBranch.trim()
+        bankBranch: bankBranch.trim(),
+        manufacturingLicenseNo: manufacturingLicenseNo.trim(),
+        manufacturingLicenseExpiry: manufacturingLicenseExpiry ? new Date(manufacturingLicenseExpiry) : null
       };
 
       if (vendor) {
@@ -551,6 +575,22 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
             <View style={styles.formInput}>
               <Ionicons name="card" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="PAN details" placeholderTextColor={colors.text.muted} value={pan} onChangeText={setPan} autoCapitalize="characters" />
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Manufacturing License Number (Job Work GMP)</Text>
+            <View style={styles.formInput}>
+              <Ionicons name="ribbon-outline" size={16} color={colors.text.muted} />
+              <TextInput style={styles.formInputText} placeholder="e.g. AYUSH-GMP-2026/09" placeholderTextColor={colors.text.muted} value={manufacturingLicenseNo} onChangeText={setManufacturingLicenseNo} autoCapitalize="characters" />
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>License Expiry Date (YYYY-MM-DD)</Text>
+            <View style={styles.formInput}>
+              <Ionicons name="calendar-outline" size={16} color={colors.text.muted} />
+              <TextInput style={styles.formInputText} placeholder="e.g. 2029-12-31" placeholderTextColor={colors.text.muted} value={manufacturingLicenseExpiry} onChangeText={setManufacturingLicenseExpiry} />
             </View>
           </View>
 

@@ -79,7 +79,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     <div style="text-align:center;border:2px solid #000;padding:8px;margin-bottom:6px;">
       <div style="font-weight:bold;font-size:18px;">${FIRM_DETAILS.name}</div>
       <div style="font-size:9px;">${FIRM_DETAILS.address}</div>
-      <div style="font-size:9px;">GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
+      <div style="font-size:9px;">GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}${FIRM_DETAILS.manufacturingLicenseNo ? ` | Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}` : ''}</div>
       <div style="font-size:13px;font-weight:bold;margin-top:4px;letter-spacing:1px;">
         DELIVERY CHALLAN — NOT A TAX INVOICE
       </div>

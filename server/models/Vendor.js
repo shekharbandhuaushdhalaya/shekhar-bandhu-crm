@@ -21,7 +21,9 @@ const vendorSchema = new mongoose.Schema({
   bankIfsc: { type: String, default: '', trim: true },
   bankName: { type: String, default: '', trim: true },
   bankBranch: { type: String, default: '', trim: true },
-  recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' }
+  recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' },
+  manufacturingLicenseNo: { type: String, default: '', trim: true },
+  manufacturingLicenseExpiry: { type: Date, default: null }
 }, { timestamps: true });
 
 vendorSchema.index({ name: 'text', company: 'text', email: 'text', productCategory: 'text' });

@@ -35,7 +35,7 @@ router.get('/:productId', async (req, res) => {
 // POST /api/bom — Configure a BOM formulation
 router.post('/', validate(schemas.bomSchema), async (req, res) => {
   try {
-    const { productId, batchYieldSize, ingredients, isActive, productionNotes, overheadCost, stages } = req.body;
+    const { productId, batchYieldSize, ingredients, isActive, productionNotes, overheadCost, stages, defaultProductionType, defaultJobWorkMode, defaultPackagingMode, defaultJobWorkerId } = req.body;
     if (!productId || !batchYieldSize || !ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
       return res.status(400).json({ error: 'Missing required formulation fields' });
     }
@@ -81,6 +81,10 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
       if (productionNotes !== undefined) bom.productionNotes = productionNotes;
       if (overheadCost !== undefined) bom.overheadCost = Number(overheadCost);
       if (validatedStages !== undefined) bom.stages = validatedStages;
+      if (defaultProductionType !== undefined) bom.defaultProductionType = defaultProductionType;
+      if (defaultJobWorkMode !== undefined) bom.defaultJobWorkMode = defaultJobWorkMode;
+      if (defaultPackagingMode !== undefined) bom.defaultPackagingMode = defaultPackagingMode;
+      if (defaultJobWorkerId !== undefined) bom.defaultJobWorkerId = defaultJobWorkerId || null;
       await bom.save();
     } else {
       bom = await BillOfMaterials.create({
@@ -90,7 +94,11 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
         isActive: isActive !== undefined ? isActive : true,
         productionNotes: productionNotes || '',
         overheadCost: overheadCost !== undefined ? Number(overheadCost) : 0,
-        stages: validatedStages || []
+        stages: validatedStages || [],
+        defaultProductionType: defaultProductionType || 'in_house',
+        defaultJobWorkMode: defaultJobWorkMode || 'none',
+        defaultPackagingMode: defaultPackagingMode || 'self_packed',
+        defaultJobWorkerId: defaultJobWorkerId || null
       });
     }
     // Automatically update Product's ingredients field with percentage proportions (formulation materials only)

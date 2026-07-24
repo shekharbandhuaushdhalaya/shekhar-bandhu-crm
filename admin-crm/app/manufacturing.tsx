@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   TextInput,
@@ -32,6 +31,15 @@ import {
 } from '../utils/api';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { FIRM_DETAILS } from '../constants/firm';
+
+// ── Extracted Modal Components ─────────────────────────────────────────────
+import RawMaterialModal from './manufacturing/modals/RawMaterialModal';
+import BOMModal from './manufacturing/modals/BOMModal';
+import LaunchBatchModal from './manufacturing/modals/LaunchBatchModal';
+import QCSignoffModal from './manufacturing/modals/QCSignoffModal';
+import BMRReportModal from './manufacturing/modals/BMRReportModal';
+import ManufacturingUnitModal from './manufacturing/modals/ManufacturingUnitModal';
+import { createStyles } from './manufacturing/manufacturingStyles';
 
 export default function ManufacturingScreen() {
   const router = useRouter();
@@ -112,6 +120,10 @@ export default function ManufacturingScreen() {
   const [bomIsActive, setBomIsActive] = useState(true);
   const [bomNotes, setBomNotes] = useState('');
   const [bomOverhead, setBomOverhead] = useState('0');
+  const [bomDefaultProductionType, setBomDefaultProductionType] = useState<'in_house' | 'job_work'>('in_house');
+  const [bomDefaultJobWorkMode, setBomDefaultJobWorkMode] = useState<'raw_materials_supplied' | 'direct_purchase' | 'none'>('none');
+  const [bomDefaultPackagingMode, setBomDefaultPackagingMode] = useState<'packed_by_vendor' | 'self_packed'>('self_packed');
+  const [bomDefaultJobWorkerId, setBomDefaultJobWorkerId] = useState('');
   const [editingBomId, setEditingBomId] = useState<string | null>(null);
   const [bomStages, setBomStages] = useState<{ name: string; targetDurationDays: string }[]>([
     { name: '', targetDurationDays: '1' }
@@ -121,6 +133,12 @@ export default function ManufacturingScreen() {
   const [prodProductId, setProdProductId] = useState('');
   const [prodPlannedQty, setProdPlannedQty] = useState('');
   const [prodBatchNo, setProdBatchNo] = useState('');
+  const [prodProductionType, setProdProductionType] = useState<'in_house' | 'job_work'>('in_house');
+  const [prodJobWorkMode, setProdJobWorkMode] = useState<'raw_materials_supplied' | 'direct_purchase' | 'none'>('none');
+  const [prodPackagingMode, setProdPackagingMode] = useState<'packed_by_vendor' | 'self_packed'>('packed_by_vendor');
+  const [prodJobWorkerId, setProdJobWorkerId] = useState('');
+  const [prodJobWorkerName, setProdJobWorkerName] = useState('');
+  const [prodJobWorkerChallanRef, setProdJobWorkerChallanRef] = useState('');
   const [prodError, setProdError] = useState('');
 
   // Form States — Manufacturing Unit Definition
@@ -152,6 +170,9 @@ export default function ManufacturingScreen() {
   const [qcHeavyMetals, setQcHeavyMetals] = useState('Pass');
   const [qcMicrobial, setQcMicrobial] = useState('Pass');
   const [qcLabReportRef, setQcLabReportRef] = useState('');
+  const [qcJobWorkerCertificateRef, setQcJobWorkerCertificateRef] = useState('');
+  const [qcCoaDocumentRef, setQcCoaDocumentRef] = useState('');
+  const [qcJobWorkCharges, setQcJobWorkCharges] = useState('');
   const [qcError, setQcError] = useState('');
   const [qcYields, setQcYields] = useState<{ productId: string; actualYieldQty: string; packing: string }[]>([
     { productId: '', actualYieldQty: '', packing: '' }
@@ -366,7 +387,11 @@ export default function ManufacturingScreen() {
         isActive: bomIsActive,
         productionNotes: bomNotes.trim(),
         overheadCost: parseFloat(bomOverhead) || 0,
-        stages: filteredStages
+        stages: filteredStages,
+        defaultProductionType: bomDefaultProductionType,
+        defaultJobWorkMode: bomDefaultProductionType === 'job_work' ? bomDefaultJobWorkMode : 'none',
+        defaultPackagingMode: bomDefaultProductionType === 'job_work' ? bomDefaultPackagingMode : 'self_packed',
+        defaultJobWorkerId: bomDefaultProductionType === 'job_work' ? (bomDefaultJobWorkerId || null) : null
       });
 
       setSelectedProdId('');
@@ -375,6 +400,10 @@ export default function ManufacturingScreen() {
       setBomIsActive(true);
       setBomNotes('');
       setBomOverhead('0');
+      setBomDefaultProductionType('in_house');
+      setBomDefaultJobWorkMode('none');
+      setBomDefaultPackagingMode('self_packed');
+      setBomDefaultJobWorkerId('');
       setBomStages([{ name: '', targetDurationDays: '1' }]);
       setEditingBomId(null);
       setBomModalVisible(false);
@@ -395,13 +424,25 @@ export default function ManufacturingScreen() {
         productId: prodProductId,
         plannedQty: Number(prodPlannedQty),
         batchNo: prodBatchNo.trim().toUpperCase(),
-        manufacturingUnitId: prodManufacturingUnitId
+        manufacturingUnitId: prodManufacturingUnitId,
+        productionType: prodProductionType,
+        jobWorkMode: prodProductionType === 'job_work' ? prodJobWorkMode : 'none',
+        packagingMode: prodProductionType === 'in_house' ? 'self_packed' : prodPackagingMode,
+        jobWorkerId: prodProductionType === 'job_work' ? (prodJobWorkerId || null) : null,
+        jobWorkerName: prodProductionType === 'job_work' ? prodJobWorkerName : '',
+        jobWorkerChallanRef: prodProductionType === 'job_work' ? prodJobWorkerChallanRef : ''
       });
 
       setProdProductId('');
       setProdPlannedQty('');
       setProdBatchNo('');
       setProdManufacturingUnitId('');
+      setProdProductionType('in_house');
+      setProdJobWorkMode('none');
+      setProdPackagingMode('packed_by_vendor');
+      setProdJobWorkerId('');
+      setProdJobWorkerName('');
+      setProdJobWorkerChallanRef('');
       setProductionModalVisible(false);
       loadData();
     } catch (err: any) {
@@ -511,7 +552,10 @@ export default function ManufacturingScreen() {
         heavyMetals: qcHeavyMetals,
         microbialLimit: qcMicrobial,
         labReportRef: qcLabReportRef.trim(),
-        warehouseId: qcWarehouseId
+        warehouseId: qcWarehouseId,
+        jobWorkerCertificateRef: selectedBatchRun.productionType === 'job_work' ? qcJobWorkerCertificateRef.trim() : '',
+        coaDocumentRef: selectedBatchRun.productionType === 'job_work' ? qcCoaDocumentRef.trim() : '',
+        jobWorkCharges: selectedBatchRun.productionType === 'job_work' ? (parseFloat(qcJobWorkCharges) || 0) : 0
       };
       if (qcWasteQty) payload.wasteQty = Number(qcWasteQty);
       if (qcWasteReason.trim()) payload.wasteReason = qcWasteReason.trim();
@@ -535,6 +579,9 @@ export default function ManufacturingScreen() {
       setQcHeavyMetals('Pass');
       setQcMicrobial('Pass');
       setQcLabReportRef('');
+      setQcJobWorkerCertificateRef('');
+      setQcCoaDocumentRef('');
+      setQcJobWorkCharges('');
       setQcEnableSplit(false);
       setQcYields([{ productId: '', actualYieldQty: '', packing: '1' }]);
       setQcModalVisible(false);
@@ -797,7 +844,8 @@ export default function ManufacturingScreen() {
 
   const plannedVal = Number(prodPlannedQty);
   let previewIngredients: { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'formulation' | 'packaging' }[] = [];
-  if (matchingBom && !isNaN(plannedVal) && plannedVal > 0) {
+  const isDirectPurchaseJobWork = prodProductionType === 'job_work' && prodJobWorkMode === 'direct_purchase';
+  if (matchingBom && !isNaN(plannedVal) && plannedVal > 0 && !isDirectPurchaseJobWork) {
     const scale = plannedVal / (matchingBom.batchYieldSize || 100);
     previewIngredients = matchingBom.ingredients.map(ing => {
       const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
@@ -1697,740 +1745,131 @@ export default function ManufacturingScreen() {
 
       </ScrollView>
 
-      {/* ======================================================== */}
-      {/* MODAL 0: ADD MANUFACTURING UNIT DEFINITION */}
-      {/* ======================================================== */}
-      <Modal visible={unitModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setUnitModalVisible(false)} />
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Define New Manufacturing Unit</Text>
-              <TouchableOpacity onPress={() => setUnitModalVisible(false)}>
-                <Ionicons name="close" size={20} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-            {unitError ? <Text style={styles.modalError}>{unitError}</Text> : null}
-            <ScrollView style={styles.modalForm}>
-              <Text style={styles.inputLabel}>Unit Name *</Text>
-              <TextInput style={styles.input} placeholder="e.g. Varanasi Factory" placeholderTextColor={colors.text.muted} value={unitName} onChangeText={setUnitName} />
-              
-              <Text style={styles.inputLabel}>Unit Code / Abbreviation *</Text>
-              <TextInput style={styles.input} placeholder="e.g. MFG-VARANASI" placeholderTextColor={colors.text.muted} value={unitCode} onChangeText={setUnitCode} />
+      {/* ── Modals (extracted into focused components) ─────────────────────────── */}
 
-              <Text style={styles.inputLabel}>Address Line 1</Text>
-              <TextInput style={styles.input} placeholder="e.g. Phase 2 Industrial Area" placeholderTextColor={colors.text.muted} value={unitAddress} onChangeText={setUnitAddress} />
+      <ManufacturingUnitModal
+        visible={unitModalVisible}
+        unitName={unitName} setUnitName={setUnitName}
+        unitCode={unitCode} setUnitCode={setUnitCode}
+        unitAddress={unitAddress} setUnitAddress={setUnitAddress}
+        unitCity={unitCity} setUnitCity={setUnitCity}
+        unitState={unitState} setUnitState={setUnitState}
+        unitPincode={unitPincode} setUnitPincode={setUnitPincode}
+        unitContact={unitContact} setUnitContact={setUnitContact}
+        unitPhone={unitPhone} setUnitPhone={setUnitPhone}
+        unitError={unitError}
+        onClose={() => setUnitModalVisible(false)}
+        onSave={handleSaveUnit}
+      />
 
-              <Text style={styles.inputLabel}>City</Text>
-              <TextInput style={styles.input} placeholder="e.g. Varanasi" placeholderTextColor={colors.text.muted} value={unitCity} onChangeText={setUnitCity} />
+      <RawMaterialModal
+        visible={materialModalVisible}
+        editingMaterialId={editingMaterialId}
+        rmName={rmName} setRmName={setRmName}
+        rmSku={rmSku}
+        rmUnit={rmUnit} setRmUnit={setRmUnit}
+        rmCategory={rmCategory} setRmCategory={setRmCategory}
+        rmMinReorder={rmMinReorder} setRmMinReorder={setRmMinReorder}
+        rmError={rmError}
+        onClose={handleCloseMaterialModal}
+        onSave={handleSaveMaterial}
+      />
 
-              <Text style={styles.inputLabel}>State</Text>
-              <TextInput style={styles.input} placeholder="e.g. Uttar Pradesh" placeholderTextColor={colors.text.muted} value={unitState} onChangeText={setUnitState} />
+      <BOMModal
+        visible={bomModalVisible}
+        editingBomId={editingBomId}
+        selectedProdId={selectedProdId} setSelectedProdId={setSelectedProdId}
+        bomYield={bomYield} setBomYield={setBomYield}
+        bomIngredients={bomIngredients}
+        bomError={bomError}
+        bomIsActive={bomIsActive} setBomIsActive={setBomIsActive}
+        bomNotes={bomNotes} setBomNotes={setBomNotes}
+        bomOverhead={bomOverhead} setBomOverhead={setBomOverhead}
+        bomDefaultProductionType={bomDefaultProductionType} setBomDefaultProductionType={setBomDefaultProductionType}
+        bomDefaultJobWorkMode={bomDefaultJobWorkMode} setBomDefaultJobWorkMode={setBomDefaultJobWorkMode}
+        bomDefaultPackagingMode={bomDefaultPackagingMode} setBomDefaultPackagingMode={setBomDefaultPackagingMode}
+        bomDefaultJobWorkerId={bomDefaultJobWorkerId} setBomDefaultJobWorkerId={setBomDefaultJobWorkerId}
+        bomStages={bomStages}
+        products={products}
+        materials={materials}
+        vendors={vendors}
+        onClose={() => setBomModalVisible(false)}
+        onSave={handleSaveBOM}
+        onAddIngredient={handleAddIngredientRow}
+        onRemoveIngredient={handleRemoveIngredientRow}
+        onIngredientChange={handleIngredientChange}
+        onAddStage={handleAddStageRow}
+        onRemoveStage={handleRemoveStageRow}
+        onStageChange={handleStageChange}
+      />
 
-              <Text style={styles.inputLabel}>Pincode</Text>
-              <TextInput style={styles.input} placeholder="e.g. 221002" placeholderTextColor={colors.text.muted} value={unitPincode} onChangeText={setUnitPincode} keyboardType="numeric" />
+      <LaunchBatchModal
+        visible={productionModalVisible}
+        products={products}
+        vendors={vendors}
+        manufacturingUnits={manufacturingUnits}
+        boms={boms}
+        materials={materials}
+        prodProductId={prodProductId} setProdProductId={setProdProductId}
+        prodPlannedQty={prodPlannedQty} setProdPlannedQty={setProdPlannedQty}
+        prodBatchNo={prodBatchNo} setProdBatchNo={setProdBatchNo}
+        prodProductionType={prodProductionType} setProdProductionType={setProdProductionType}
+        prodJobWorkMode={prodJobWorkMode} setProdJobWorkMode={setProdJobWorkMode}
+        prodPackagingMode={prodPackagingMode} setProdPackagingMode={setProdPackagingMode}
+        prodJobWorkerId={prodJobWorkerId} setProdJobWorkerId={setProdJobWorkerId}
+        prodJobWorkerName={prodJobWorkerName} setProdJobWorkerName={setProdJobWorkerName}
+        prodJobWorkerChallanRef={prodJobWorkerChallanRef} setProdJobWorkerChallanRef={setProdJobWorkerChallanRef}
+        prodManufacturingUnitId={prodManufacturingUnitId} setProdManufacturingUnitId={setProdManufacturingUnitId}
+        prodError={prodError}
+        previewIngredients={previewIngredients}
+        onClose={() => setProductionModalVisible(false)}
+        onLaunch={handleStartProduction}
+      />
 
-              <Text style={styles.inputLabel}>Contact Person</Text>
-              <TextInput style={styles.input} placeholder="Name" placeholderTextColor={colors.text.muted} value={unitContact} onChangeText={setUnitContact} />
+      <QCSignoffModal
+        visible={qcModalVisible}
+        selectedBatchRun={selectedBatchRun}
+        warehouses={warehouses}
+        products={products}
+        qcYieldQty={qcYieldQty} setQcYieldQty={setQcYieldQty}
+        qcPacking={qcPacking} setQcPacking={setQcPacking}
+        qcWasteQty={qcWasteQty} setQcWasteQty={setQcWasteQty}
+        qcWasteReason={qcWasteReason} setQcWasteReason={setQcWasteReason}
+        qcNotes={qcNotes} setQcNotes={setQcNotes}
+        qcPassedBy={qcPassedBy} setQcPassedBy={setQcPassedBy}
+        qcStatus={qcStatus} setQcStatus={setQcStatus}
+        qcOrganoleptic={qcOrganoleptic} setQcOrganoleptic={setQcOrganoleptic}
+        qcMoisture={qcMoisture} setQcMoisture={setQcMoisture}
+        qcAsh={qcAsh} setQcAsh={setQcAsh}
+        qcPh={qcPh} setQcPh={setQcPh}
+        qcDisintegration={qcDisintegration} setQcDisintegration={setQcDisintegration}
+        qcHeavyMetals={qcHeavyMetals} setQcHeavyMetals={setQcHeavyMetals}
+        qcMicrobial={qcMicrobial} setQcMicrobial={setQcMicrobial}
+        qcLabReportRef={qcLabReportRef} setQcLabReportRef={setQcLabReportRef}
+        qcJobWorkerCertificateRef={qcJobWorkerCertificateRef} setQcJobWorkerCertificateRef={setQcJobWorkerCertificateRef}
+        qcCoaDocumentRef={qcCoaDocumentRef} setQcCoaDocumentRef={setQcCoaDocumentRef}
+        qcJobWorkCharges={qcJobWorkCharges} setQcJobWorkCharges={setQcJobWorkCharges}
+        qcWarehouseId={qcWarehouseId} setQcWarehouseId={setQcWarehouseId}
+        qcError={qcError}
+        qcEnableSplit={qcEnableSplit} setQcEnableSplit={setQcEnableSplit}
+        qcYields={qcYields}
+        onClose={() => setQcModalVisible(false)}
+        onComplete={handleCompleteProduction}
+        onAddQcYieldRow={handleAddQcYieldRow}
+        onRemoveQcYieldRow={handleRemoveQcYieldRow}
+        onQcYieldChange={handleQcYieldChange}
+      />
 
-              <Text style={styles.inputLabel}>Phone Number</Text>
-              <TextInput style={styles.input} placeholder="Phone" placeholderTextColor={colors.text.muted} value={unitPhone} onChangeText={setUnitPhone} keyboardType="phone-pad" />
-            </ScrollView>
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setUnitModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSaveUnit}>
-                <Text style={styles.submitBtnText}>Save Unit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <BMRReportModal
+        visible={bmrModalVisible}
+        loadingBmr={loadingBmr}
+        bmrReport={bmrReport}
+        onClose={() => setBmrModalVisible(false)}
+        onPrint={handlePrintBMR}
+      />
 
-      {/* ======================================================== */}
-      {/* MODAL 1: ADD RAW MATERIAL DEFINITION */}
-      {/* ======================================================== */}
-      <Modal visible={materialModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={handleCloseMaterialModal} />
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editingMaterialId ? 'Edit Raw Material' : 'Define New Raw Material'}</Text>
-              <TouchableOpacity onPress={handleCloseMaterialModal}>
-                <Ionicons name="close" size={20} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-            {rmError ? <Text style={styles.modalError}>{rmError}</Text> : null}
-            <ScrollView style={styles.modalForm}>
-              <Text style={styles.inputLabel}>Ingredient Name *</Text>
-              <TextInput style={styles.input} placeholder="e.g. Purified Guggulu" placeholderTextColor={colors.text.muted} value={rmName} onChangeText={setRmName} />
-              
-              <Text style={styles.inputLabel}>SKU / Code {editingMaterialId ? '' : '(Auto-Generated)'}</Text>
-              <TextInput style={[styles.input, { backgroundColor: colors.bg.secondary, color: colors.text.muted }]} placeholder={editingMaterialId ? "Material SKU" : "Auto-generated on save"} placeholderTextColor={colors.text.muted} value={rmSku} editable={false} />
-
-              <Text style={styles.inputLabel}>Material Classification / Category *</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                {[
-                  { key: 'Herb', label: '🌿 Herb / Extract' },
-                  { key: 'Packaging', label: '📦 Bottle / Label / Box' },
-                  { key: 'Excipient', label: '💧 Liquid / Base' },
-                  { key: 'General', label: '⚙️ General Material' }
-                ].map(c => (
-                  <TouchableOpacity
-                    key={c.key}
-                    onPress={() => setRmCategory(c.key)}
-                    style={{
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: 6,
-                      borderWidth: 1,
-                      backgroundColor: rmCategory === c.key ? colors.primary : colors.bg.secondary,
-                      borderColor: rmCategory === c.key ? colors.primary : colors.border
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: rmCategory === c.key ? '#fff' : colors.text.secondary }}>
-                      {c.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TextInput
-                style={[styles.input, { marginBottom: 12 }]}
-                placeholder="Or enter custom classification (e.g. Mineral, Solvent, Preservative)..."
-                placeholderTextColor={colors.text.muted}
-                value={rmCategory}
-                onChangeText={setRmCategory}
-              />
-
-              <Text style={styles.inputLabel}>Measurement Unit *</Text>
-              <TextInput style={styles.input} placeholder="e.g. kg, liters, g, units" placeholderTextColor={colors.text.muted} value={rmUnit} onChangeText={setRmUnit} />
-
-              <Text style={styles.inputLabel}>Min Reorder Stock level</Text>
-              <TextInput style={styles.input} placeholder="e.g. 10" placeholderTextColor={colors.text.muted} value={rmMinReorder} onChangeText={setRmMinReorder} keyboardType="numeric" />
-            </ScrollView>
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={handleCloseMaterialModal}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSaveMaterial}>
-                <Text style={styles.submitBtnText}>{editingMaterialId ? 'Save Changes' : 'Define Material'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-
-
-      {/* ======================================================== */}
-      {/* MODAL 4: START PRODUCTION BATCH */}
-      {/* ======================================================== */}
-      <Modal visible={productionModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setProductionModalVisible(false)} />
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Launch Production Batch</Text>
-              <TouchableOpacity onPress={() => setProductionModalVisible(false)}>
-                <Ionicons name="close" size={20} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-            {prodError ? <Text style={styles.modalError}>{prodError}</Text> : null}
-            <ScrollView style={styles.modalForm}>
-              <Text style={styles.inputLabel}>Select Finished Goods Product *</Text>
-              <View style={styles.pickerWrapper}>
-                {Platform.OS === 'web' ? (
-                  <select
-                    value={prodProductId}
-                    onChange={(e: any) => setProdProductId(e.target.value)}
-                    style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
-                  >
-                    <option value="">-- Choose Product --</option>
-                    {products.map(p => (
-                      <option key={p._id} value={p._id}>{p.name} ({p.size || 'Standard'})</option>
-                    ))}
-                  </select>
-                ) : (
-                  <TextInput style={styles.input} placeholder="Product ID" value={prodProductId} onChangeText={setProdProductId} />
-                )}
-              </View>
-
-              <Text style={styles.inputLabel}>Manufacturing Unit *</Text>
-              <View style={styles.pickerWrapper}>
-                {Platform.OS === 'web' ? (
-                  <select
-                    value={prodManufacturingUnitId}
-                    onChange={(e: any) => setProdManufacturingUnitId(e.target.value)}
-                    style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
-                  >
-                    <option value="">-- Select Manufacturing Unit --</option>
-                    {manufacturingUnits.map(m => (
-                      <option key={m._id} value={m._id}>{m.name} ({m.city || 'Default'})</option>
-                    ))}
-                  </select>
-                ) : (
-                  <TextInput style={styles.input} placeholder="Manufacturing Unit ID" value={prodManufacturingUnitId} onChangeText={setProdManufacturingUnitId} />
-                )}
-              </View>
-
-              <Text style={styles.inputLabel}>Planned Yield Quantity (units) *</Text>
-              <TextInput style={styles.input} placeholder="Planned output units (e.g. 500)" placeholderTextColor={colors.text.muted} value={prodPlannedQty} onChangeText={setProdPlannedQty} keyboardType="numeric" />
-
-              <Text style={styles.inputLabel}>Finished Goods Production Batch No. *</Text>
-              <TextInput style={styles.input} placeholder="e.g. ABH-JUL26-01" placeholderTextColor={colors.text.muted} value={prodBatchNo} onChangeText={setProdBatchNo} />
-              
-              <Text style={styles.warningDisclaimer}>
-                ⚠️ Starting this batch will automatically deduct the corresponding raw material quantities from active stock batches (FIFO). If stocks are insufficient, the launch will be blocked.
-              </Text>
-
-              {/* Recipe preview checklist */}
-              {previewIngredients.length > 0 && (
-                <View style={{ marginTop: 16, padding: 12, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>
-                    📋 Auto-Deduction Ingredients Preview:
-                  </Text>
-                  {previewIngredients.map((item, idx) => {
-                    const isShortage = item.available < item.qtyNeeded;
-                    return (
-                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: idx === previewIngredients.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
-                        <View style={{ flex: 1, marginRight: 8 }}>
-                          <Text style={{ fontSize: 12, color: colors.text.primary }}>
-                            {item.itemType === 'packaging' ? '📦' : '🌿'} {item.name} {item.itemType === 'packaging' ? `(${item.ratioPct} Pcs/unit)` : `(${item.ratioPct}%)`}
-                          </Text>
-                          <Text style={{ fontSize: 10.5, color: isShortage ? colors.danger : colors.text.secondary, marginTop: 2 }}>
-                            Available: {item.available.toFixed(2)} {item.unit}
-                          </Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: isShortage ? colors.danger : colors.text.primary }}>
-                            {item.qtyNeeded.toFixed(2)} {item.unit}
-                          </Text>
-                          {isShortage && (
-                            <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
-                              <Text style={{ fontSize: 9, color: colors.danger, fontWeight: '800' }}>SHORTAGE</Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-            </ScrollView>
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setProductionModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.submitBtn} onPress={handleStartProduction}>
-                <Text style={styles.submitBtnText}>Launch Batch</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ======================================================== */}
-      {/* MODAL 5: QC SIGNOFF & COMPLETION */}
-      {/* ======================================================== */}
-      <Modal visible={qcModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setQcModalVisible(false)} />
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Quality Control Sign-Off</Text>
-              <TouchableOpacity onPress={() => setQcModalVisible(false)}>
-                <Ionicons name="close" size={20} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-            {qcError ? <Text style={styles.modalError}>{qcError}</Text> : null}
-            <ScrollView style={styles.modalForm}>
-              <Text style={styles.inputLabel}>QC Decision *</Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-                <TouchableOpacity
-                  onPress={() => setQcStatus('approved')}
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    paddingVertical: 10,
-                    borderRadius: 6,
-                    borderWidth: 1,
-                    backgroundColor: qcStatus === 'approved' ? colors.success : colors.bg.secondary,
-                    borderColor: qcStatus === 'approved' ? colors.success : colors.border
-                  }}
-                >
-                  <Ionicons name="checkmark-circle-outline" size={16} color={qcStatus === 'approved' ? '#fff' : colors.success} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: qcStatus === 'approved' ? '#fff' : colors.text.secondary }}>
-                    APPROVE BATCH
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setQcStatus('rejected')}
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    paddingVertical: 10,
-                    borderRadius: 6,
-                    borderWidth: 1,
-                    backgroundColor: qcStatus === 'rejected' ? colors.danger : colors.bg.secondary,
-                    borderColor: qcStatus === 'rejected' ? colors.danger : colors.border
-                  }}
-                >
-                  <Ionicons name="close-circle-outline" size={16} color={qcStatus === 'rejected' ? '#fff' : colors.danger} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: qcStatus === 'rejected' ? '#fff' : colors.text.secondary }}>
-                    REJECT BATCH
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.inputLabel}>Actual Output Yield Size (units) *</Text>
-              <TextInput style={styles.input} placeholder="e.g. 498" placeholderTextColor={colors.text.muted} value={qcYieldQty} onChangeText={setQcYieldQty} keyboardType="numeric" />
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 12 }}>
-                <Text style={[styles.inputLabel, { marginBottom: 0 }]}>Split Yield into Multiple Sizes / Packages?</Text>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  <TouchableOpacity
-                    onPress={() => setQcEnableSplit(true)}
-                    style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: qcEnableSplit ? colors.primary : colors.bg.secondary, borderWidth: 1, borderColor: qcEnableSplit ? colors.primary : colors.border }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: qcEnableSplit ? '#fff' : colors.text.secondary }}>Yes</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setQcEnableSplit(false)}
-                    style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: !qcEnableSplit ? colors.text.muted : colors.bg.secondary, borderWidth: 1, borderColor: !qcEnableSplit ? colors.text.muted : colors.border }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: !qcEnableSplit ? '#fff' : colors.text.secondary }}>No</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {qcEnableSplit && (
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.formIngredientsTitle, { fontSize: 12, marginBottom: 8 }]}>Split Quantities across Products:</Text>
-                  {qcYields.map((item, idx) => (
-                    <View key={idx} style={[styles.bomIngredientInputRow, { gap: 6 }]}>
-                      <View style={[styles.pickerWrapper, { flex: 2, marginBottom: 0 }]}>
-                        {Platform.OS === 'web' ? (
-                          <select
-                            value={item.productId}
-                            onChange={(e: any) => handleQcYieldChange(idx, 'productId', e.target.value)}
-                            style={{ flex: 1, padding: 8, fontSize: 11, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
-                          >
-                            <option value="">-- Choose Product/Size --</option>
-                            {products.map(p => (
-                              <option key={p._id} value={p._id}>{p.name} ({p.size || 'Std'})</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <TextInput style={styles.input} placeholder="Product ID" value={item.productId} onChangeText={(val) => handleQcYieldChange(idx, 'productId', val)} />
-                        )}
-                      </View>
-                      <TextInput
-                        style={[styles.input, { flex: 1.2, marginBottom: 0 }]}
-                        placeholder="Qty (pcs)"
-                        placeholderTextColor={colors.text.muted}
-                        value={item.actualYieldQty}
-                        onChangeText={(val) => handleQcYieldChange(idx, 'actualYieldQty', val)}
-                        keyboardType="numeric"
-                      />
-                      <TouchableOpacity style={styles.removeRowBtn} onPress={() => handleRemoveQcYieldRow(idx)}>
-                        <Ionicons name="remove-circle" size={20} color={colors.danger} />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                  <TouchableOpacity style={[styles.addIngredientRowBtn, { marginTop: 8 }]} onPress={handleAddQcYieldRow}>
-                    <Ionicons name="add" size={16} color={colors.primary} />
-                    <Text style={styles.addIngredientRowBtnText}>Add Split Package</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              <Text style={styles.inputLabel}>Target Storage Warehouse (Finished Goods) *</Text>
-              <View style={styles.pickerWrapper}>
-                {Platform.OS === 'web' ? (
-                  <select
-                    value={qcWarehouseId}
-                    onChange={(e: any) => setQcWarehouseId(e.target.value)}
-                    style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
-                  >
-                    <option value="">-- Choose Warehouse --</option>
-                    {warehouses.map(w => (
-                      <option key={w._id} value={w._id}>{w.name} ({w.city || 'Default'})</option>
-                    ))}
-                  </select>
-                ) : (
-                  <TextInput style={styles.input} placeholder="Warehouse ID" value={qcWarehouseId} onChangeText={setQcWarehouseId} />
-                )}
-              </View>
-
-              <Text style={styles.inputLabel}>Waste / Shrinkage Quantity</Text>
-              <TextInput style={styles.input} placeholder="e.g. 2 (leave empty to auto-calculate)" placeholderTextColor={colors.text.muted} value={qcWasteQty} onChangeText={setQcWasteQty} keyboardType="numeric" />
-
-              <Text style={styles.inputLabel}>Waste / Variance Reason</Text>
-              <TextInput style={styles.input} placeholder="e.g. Drying loss, spillage, QC rejects" placeholderTextColor={colors.text.muted} value={qcWasteReason} onChangeText={setQcWasteReason} />
-
-              {/* GMP Quality Parameters card section */}
-              <View style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, marginVertical: 14 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>🔬 GMP Lab Specifications & Testing</Text>
-                
-                <Text style={styles.inputLabel}>Organoleptic Description</Text>
-                <TextInput style={styles.input} placeholder="Color, odour, taste (e.g. Dark brown, herbal odour)" placeholderTextColor={colors.text.muted} value={qcOrganoleptic} onChangeText={setQcOrganoleptic} />
-
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Moisture Content (% w/w)</Text>
-                    <TextInput style={styles.input} placeholder="e.g. 4.5" placeholderTextColor={colors.text.muted} value={qcMoisture} onChangeText={setQcMoisture} keyboardType="numeric" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Ash Value (% w/w)</Text>
-                    <TextInput style={styles.input} placeholder="e.g. 6.2" placeholderTextColor={colors.text.muted} value={qcAsh} onChangeText={setQcAsh} keyboardType="numeric" />
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>pH Value</Text>
-                    <TextInput style={styles.input} placeholder="e.g. 5.5" placeholderTextColor={colors.text.muted} value={qcPh} onChangeText={setQcPh} keyboardType="numeric" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Disintegration Time (min)</Text>
-                    <TextInput style={styles.input} placeholder="e.g. 15" placeholderTextColor={colors.text.muted} value={qcDisintegration} onChangeText={setQcDisintegration} keyboardType="numeric" />
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', gap: 10, marginVertical: 6 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Heavy Metals Limit</Text>
-                    <View style={{ flexDirection: 'row', gap: 4 }}>
-                      {['Pass', 'Fail'].map(opt => (
-                        <TouchableOpacity
-                          key={opt}
-                          onPress={() => setQcHeavyMetals(opt)}
-                          style={{
-                            flex: 1, paddingVertical: 6, borderRadius: 6, borderWidth: 1, alignItems: 'center',
-                            backgroundColor: qcHeavyMetals === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.bg.primary,
-                            borderColor: qcHeavyMetals === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.border
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: qcHeavyMetals === opt ? '#fff' : colors.text.secondary }}>{opt.toUpperCase()}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Microbial Limit</Text>
-                    <View style={{ flexDirection: 'row', gap: 4 }}>
-                      {['Pass', 'Fail'].map(opt => (
-                        <TouchableOpacity
-                          key={opt}
-                          onPress={() => setQcMicrobial(opt)}
-                          style={{
-                            flex: 1, paddingVertical: 6, borderRadius: 6, borderWidth: 1, alignItems: 'center',
-                            backgroundColor: qcMicrobial === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.bg.primary,
-                            borderColor: qcMicrobial === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.border
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: qcMicrobial === opt ? '#fff' : colors.text.secondary }}>{opt.toUpperCase()}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={styles.inputLabel}>Lab Report Reference No. / File Link</Text>
-                <TextInput style={styles.input} placeholder="e.g. LAB-2026-07-23-01" placeholderTextColor={colors.text.muted} value={qcLabReportRef} onChangeText={setQcLabReportRef} />
-              </View>
-
-              <Text style={styles.inputLabel}>QC Inspector Name *</Text>
-              <TextInput style={styles.input} placeholder="e.g. Dr. P. K. Sharma" placeholderTextColor={colors.text.muted} value={qcPassedBy} onChangeText={setQcPassedBy} />
-
-              <Text style={styles.inputLabel}>Quality Check Notes / Lab Remarks</Text>
-              <TextInput
-                style={[styles.input, { height: 80, paddingVertical: 8 }]}
-                placeholder="Enter quality verification notes..."
-                placeholderTextColor={colors.text.muted}
-                value={qcNotes}
-                onChangeText={setQcNotes}
-                multiline
-                numberOfLines={3}
-              />
-              
-              <Text style={styles.warningDisclaimer}>
-                ✅ Submitting this approval will officially complete the batch, close the manufacturing run, and add the actual yield stock to the Finished Goods Warehouse.
-              </Text>
-            </ScrollView>
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setQcModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.submitBtn} onPress={handleCompleteProduction}>
-                <Text style={styles.submitBtnText}>Approve & Stock</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ======================================================== */}
-      {/* MODAL 6: PRINTABLE BMR COMPLIANCE REPORT */}
-      {/* ======================================================== */}
-      <Modal visible={bmrModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setBmrModalVisible(false)} />
-          <View style={[styles.modalContainer, { maxWidth: 800, width: '90%', height: '85%' }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Batch Manufacturing Record (BMR)</Text>
-                <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>GMP Quality Compliance & Costing Audit</Text>
-              </View>
-              <TouchableOpacity onPress={() => setBmrModalVisible(false)}>
-                <Ionicons name="close" size={20} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {loadingBmr ? (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            ) : bmrReport ? (
-              <ScrollView style={[styles.modalForm, { padding: 16 }]} contentContainerStyle={{ gap: 16 }}>
-                
-                {/* 1. Header branding for printing */}
-                <View style={{ alignItems: 'center', borderBottomWidth: 2, borderBottomColor: colors.primary, paddingBottom: 12, marginBottom: 12 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>{FIRM_DETAILS.name}</Text>
-                  <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 2 }}>{FIRM_DETAILS.address}</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, marginTop: 8, letterSpacing: 0.5 }}>OFFICIAL BATCH RECORD SUMMARY</Text>
-                </View>
-
-                {/* 2. Batch Identification Metadata */}
-                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section I: Batch Identification</Text>
-                  </View>
-                  <View style={{ padding: 12, gap: 8 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Batch Reference No:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{bmrReport.batchNo}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Product Name / Sku:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{bmrReport.productName} ({bmrReport.productSku})</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Planned Run Qty:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{bmrReport.plannedQty} bottles</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Actual Yield Output:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.success }}>{bmrReport.actualYieldQty} bottles</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Manufacturing Timeline:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>
-                        {new Date(bmrReport.startDate).toLocaleDateString('en-IN')} ➔ {bmrReport.endDate ? new Date(bmrReport.endDate).toLocaleDateString('en-IN') : 'Ongoing'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* 3. Batch Costing & Profit Margins Analysis */}
-                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section II: Financial Audit & Production Costing</Text>
-                  </View>
-                  <View style={{ padding: 12, gap: 8 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Total Raw Material Input Cost:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>₹{(bmrReport.rawMaterialCost || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-                    </View>
-                    {bmrReport.overheadCost !== undefined && bmrReport.overheadCost > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 13, color: colors.text.secondary }}>Allocated Process Overhead Cost:</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>₹{bmrReport.overheadCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-                      </View>
-                    )}
-                    {bmrReport.overheadCost !== undefined && bmrReport.overheadCost > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 13, color: colors.text.secondary }}>Total Batch Production Cost:</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>₹{(bmrReport.rawMaterialCost + bmrReport.overheadCost).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-                      </View>
-                    )}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Calculated Production Unit Cost:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>₹{(bmrReport.unitProductionCost || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / unit</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Product MSRP Retail Price:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>₹{(bmrReport.productPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / unit</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8, marginTop: 4 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>Gross Manufacturing Profit Margin:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>
-                        {bmrReport.productPrice > 0 && bmrReport.unitProductionCost > 0
-                          ? (((bmrReport.productPrice - bmrReport.unitProductionCost) / bmrReport.productPrice) * 100).toFixed(1)
-                          : 0}%
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* 4. Consumed Ingredients Details List */}
-                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section III: Consumed Raw Ingredients Details</Text>
-                  </View>
-                  <View style={{ padding: 8 }}>
-                    <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
-                      <Text style={{ flex: 2, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>Ingredient</Text>
-                      <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>Batch No</Text>
-                      <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Qty</Text>
-                      <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Rate</Text>
-                      <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Total Cost</Text>
-                    </View>
-                    {bmrReport.ingredients.map((ing: any, idx: number) => (
-                      <View key={idx} style={{ flexDirection: 'row', paddingVertical: 4 }}>
-                        <Text style={{ flex: 2, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>{ing.name}</Text>
-                        <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }}>{ing.batchNo}</Text>
-                        <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{ing.qtyConsumed} {ing.unit}</Text>
-                        <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>₹{ing.purchaseRate}</Text>
-                        <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '600', color: colors.text.primary, textAlign: 'right' }}>₹{ing.itemCost.toFixed(2)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
-                {/* 5. Process Execution Log (Timeline & SOP Sign-off) */}
-                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section IV: Detailed Process Execution Log</Text>
-                  </View>
-                  <View style={{ padding: 8 }}>
-                    <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
-                      <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>Stage / Process Step</Text>
-                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>Status</Text>
-                      <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>Operator Sign-Off</Text>
-                      <Text style={{ flex: 2, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>Notes / Justification</Text>
-                    </View>
-                    {bmrReport.stages && bmrReport.stages.map((st: any, idx: number) => {
-                      const start = st.startedAt ? new Date(st.startedAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : '—';
-                      const end = st.completedAt ? new Date(st.completedAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : '—';
-                      
-                      return (
-                        <View key={idx} style={{ paddingVertical: 6, borderBottomWidth: idx === bmrReport.stages.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: colors.text.primary }} numberOfLines={1}>
-                              {st.name}
-                            </Text>
-                            <Text style={{ flex: 1, fontSize: 11, color: st.status === 'completed' ? colors.success : st.status === 'skipped' ? colors.warning : colors.text.muted, fontWeight: '600' }}>
-                              {st.status.toUpperCase()}
-                            </Text>
-                            <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }}>
-                              {st.completedBy || '—'}
-                            </Text>
-                            <Text style={{ flex: 2, fontSize: 10, color: colors.text.secondary, fontStyle: 'italic' }}>
-                              {st.notes || 'No remarks recorded'}
-                            </Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
-                            <Text style={{ fontSize: 9, color: colors.text.muted }}>
-                              Started: {start}
-                            </Text>
-                            <Text style={{ fontSize: 9, color: colors.text.muted }}>
-                              Finished: {end}
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {/* 6. QC Inspection Clearance Certification */}
-                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section V: GMP Quality Assurance Sign-Off</Text>
-                    {bmrReport.qcStatus === 'rejected' ? (
-                      <View style={{ backgroundColor: colors.danger, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>REJECTED</Text>
-                      </View>
-                    ) : (
-                      <View style={{ backgroundColor: colors.success, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>APPROVED</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={{ padding: 12, gap: 8 }}>
-                    {bmrReport.qcParameters ? (
-                      <View style={{ backgroundColor: colors.bg.primary, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border, gap: 6, marginBottom: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: colors.text.secondary, letterSpacing: 0.5 }}>🔬 LABORATORY TEST SPECIFICATIONS SUMMARY</Text>
-                        
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
-                          {bmrReport.qcParameters.organoleptic ? (
-                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Organoleptic Check: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.organoleptic}</Text></Text></View>
-                          ) : null}
-                          {bmrReport.qcParameters.moistureContent !== null ? (
-                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Moisture Content: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.moistureContent}% w/w</Text></Text></View>
-                          ) : null}
-                          {bmrReport.qcParameters.ashValue !== null ? (
-                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Ash Value: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.ashValue}% w/w</Text></Text></View>
-                          ) : null}
-                          {bmrReport.qcParameters.pHValue !== null ? (
-                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>pH Value: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.pHValue}</Text></Text></View>
-                          ) : null}
-                          {bmrReport.qcParameters.disintegrationTime !== null ? (
-                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Disintegration Time: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{bmrReport.qcParameters.disintegrationTime} mins</Text></Text></View>
-                          ) : null}
-                          {bmrReport.qcParameters.heavyMetals ? (
-                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Heavy Metals Limit: <Text style={{ color: bmrReport.qcParameters.heavyMetals === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{bmrReport.qcParameters.heavyMetals.toUpperCase()}</Text></Text></View>
-                          ) : null}
-                          {bmrReport.qcParameters.microbialLimit ? (
-                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Microbial Limits: <Text style={{ color: bmrReport.qcParameters.microbialLimit === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{bmrReport.qcParameters.microbialLimit.toUpperCase()}</Text></Text></View>
-                          ) : null}
-                          {bmrReport.qcParameters.labReportRef ? (
-                            <View style={{ minWidth: 160, flex: 1 }}><Text style={{ fontSize: 11, color: colors.text.secondary }}>Lab Report Ref No: <Text style={{ color: colors.primary, fontWeight: '800' }}>{bmrReport.qcParameters.labReportRef}</Text></Text></View>
-                          ) : null}
-                        </View>
-                      </View>
-                    ) : null}
-
-                    <Text style={{ fontSize: 12, color: colors.text.primary }}><Text style={{ fontWeight: '700' }}>QC Inspector Remarks: </Text>{bmrReport.qcNotes}</Text>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10, marginTop: 8 }}>
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>Inspector: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{bmrReport.qcPassedBy}</Text></Text>
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>Signature: <Text style={{ fontFamily: 'serif', fontStyle: 'italic', fontWeight: '700', color: colors.primary }}>{bmrReport.qcPassedBy}</Text></Text>
-                    </View>
-                  </View>
-                </View>
-              </ScrollView>
-            ) : (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ color: colors.text.secondary }}>Failed to display report details.</Text>
-              </View>
-            )}
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setBmrModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Close</Text>
-              </TouchableOpacity>
-              {bmrReport && (
-                <TouchableOpacity style={styles.submitBtn} onPress={handlePrintBMR}>
-                  <Ionicons name="print-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                  <Text style={styles.submitBtnText}>Print PDF Record</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-
-
+      {/* ── Genealogy / Trace / Stage Modals (unchanged inline) ────────────────── */}
+      {/* MODAL 7: BATCH GENEALOGY */}
       {/* ======================================================== */}
       {/* MODAL 8: END-TO-END BATCH TRACE */}
       {/* ======================================================== */}
@@ -2876,560 +2315,3 @@ export default function ManufacturingScreen() {
   );
 }
 
-const createStyles = (colors: typeof LightColors) =>
-  StyleSheet.create({
-    screen: {
-      flex: 1,
-      backgroundColor: colors.bg.primary,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors.bg.primary,
-    },
-    loadingText: {
-      marginTop: 12,
-      fontSize: 14,
-      color: colors.text.secondary,
-      fontWeight: '600',
-    },
-    tabRow: {
-      flexDirection: 'row',
-      backgroundColor: colors.bg.secondary,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    tabButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 14,
-      gap: 6,
-      borderBottomWidth: 3,
-      borderBottomColor: 'transparent',
-    },
-    tabText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.text.secondary,
-    },
-    scrollContent: {
-      padding: Spacing.lg,
-    },
-    tabContent: {
-      gap: 16,
-    },
-    sectionHeaderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 4,
-    },
-    sectionTitle: {
-      fontSize: 15,
-      fontWeight: '800',
-      color: colors.text.primary,
-    },
-    outlineBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderWidth: 1.5,
-      borderColor: colors.primary,
-      borderRadius: Radius.md,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      gap: 4,
-    },
-    outlineBtnText: {
-      color: colors.primary,
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    primaryBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.primary,
-      borderRadius: Radius.md,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      gap: 4,
-    },
-    primaryBtnText: {
-      color: '#fff',
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    card: {
-      backgroundColor: colors.bg.card,
-      borderRadius: Radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: Spacing.lg,
-    },
-    cardTitle: {
-      fontSize: 13,
-      fontWeight: '800',
-      color: colors.text.primary,
-      marginBottom: 12,
-    },
-    cardSubTitle: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.text.secondary,
-      marginBottom: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      paddingBottom: 4,
-    },
-    materialRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    rmName: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.text.primary,
-    },
-    rmSku: {
-      fontSize: 10,
-      color: colors.text.muted,
-      marginTop: 2,
-    },
-    rmStock: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.text.primary,
-    },
-    rmMin: {
-      fontSize: 10,
-      color: colors.text.muted,
-      marginTop: 2,
-    },
-    batchRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    batchRmName: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.text.primary,
-    },
-    batchNoLabel: {
-      fontSize: 11,
-      color: colors.text.secondary,
-      marginTop: 2,
-    },
-    batchExpLabel: {
-      fontSize: 10,
-      color: colors.danger,
-      marginTop: 2,
-    },
-    batchStock: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.text.primary,
-    },
-    batchRate: {
-      fontSize: 10,
-      color: colors.text.muted,
-      marginTop: 2,
-    },
-    voidBtn: {
-      padding: 6,
-      marginLeft: 12,
-    },
-    emptyText: {
-      fontSize: 12.5,
-      color: colors.text.muted,
-      fontStyle: 'italic',
-      textAlign: 'center',
-      paddingVertical: 20,
-    },
-    emptyContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 40,
-      gap: 12,
-    },
-    // Recipe BOM styles
-    recipeHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      paddingBottom: 10,
-      marginBottom: 10,
-    },
-    recipeTitle: {
-      fontSize: 14,
-      fontWeight: '800',
-      color: colors.text.primary,
-    },
-    recipeYield: {
-      fontSize: 11,
-      color: colors.text.muted,
-      marginTop: 2,
-    },
-    deleteRecipeBtn: {
-      padding: 6,
-    },
-    ingredientsList: {
-      gap: 6,
-    },
-    ingredientsHeaderLabel: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: colors.text.secondary,
-      marginBottom: 4,
-    },
-    ingredientItem: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      paddingVertical: 4,
-    },
-    ingredientName: {
-      fontSize: 12,
-      color: colors.text.primary,
-    },
-    ingredientQty: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.text.primary,
-    },
-    // Production batches styles
-    batchCardHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      paddingBottom: 10,
-      marginBottom: 10,
-    },
-    batchTitle: {
-      fontSize: 14,
-      fontWeight: '800',
-      color: colors.text.primary,
-    },
-    batchSubNo: {
-      fontSize: 11,
-      color: colors.text.muted,
-      marginTop: 2,
-    },
-    statusBadge: {
-      borderWidth: 1,
-      borderRadius: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-    },
-    statusBadgeText: {
-      fontSize: 9,
-      fontWeight: '800',
-    },
-    batchMetaGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 16,
-      marginBottom: 12,
-    },
-    metaLabel: {
-      fontSize: 11.5,
-      color: colors.text.secondary,
-    },
-    metaVal: {
-      fontWeight: '700',
-      color: colors.text.primary,
-    },
-    batchIngredientsConsumedSection: {
-      backgroundColor: colors.bg.secondary,
-      borderRadius: Radius.md,
-      padding: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-      gap: 4,
-      marginBottom: 12,
-    },
-    consumedIngItem: {
-      fontSize: 11,
-      color: colors.text.secondary,
-    },
-    qcBox: {
-      backgroundColor: colors.success + '0a',
-      borderColor: colors.success + '20',
-      borderWidth: 1,
-      borderRadius: Radius.md,
-      padding: 10,
-      gap: 2,
-      marginBottom: 8,
-    },
-    qcBoxTitle: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: colors.success,
-    },
-    qcBoxText: {
-      fontSize: 11,
-      color: colors.text.secondary,
-    },
-    batchActionsRow: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      gap: 10,
-      marginTop: 4,
-    },
-    cancelBatchBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      borderWidth: 1,
-      borderColor: colors.danger + '30',
-      borderRadius: Radius.sm,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-    },
-    cancelBatchBtnText: {
-      color: colors.danger,
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    completeBatchBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: colors.success,
-      borderRadius: Radius.sm,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-    },
-    completeBatchBtnText: {
-      color: '#fff',
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    // Modal layout
-    modalOverlay: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    modalBackdrop: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    modalContainer: {
-      width: '90%',
-      maxWidth: 520,
-      maxHeight: '90%',
-      backgroundColor: colors.bg.card,
-      borderRadius: Radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
-      overflow: 'hidden',
-      elevation: 20,
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: Spacing.lg,
-      paddingVertical: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      backgroundColor: colors.bg.secondary,
-    },
-    modalTitle: {
-      fontSize: 15,
-      fontWeight: '800',
-      color: colors.text.primary,
-    },
-    modalError: {
-      backgroundColor: colors.danger + '10',
-      borderColor: colors.danger + '35',
-      borderWidth: 1,
-      color: colors.danger,
-      fontSize: 12,
-      fontWeight: '600',
-      padding: 10,
-      marginHorizontal: Spacing.lg,
-      marginTop: Spacing.md,
-      borderRadius: Radius.sm,
-    },
-    modalForm: {
-      padding: Spacing.lg,
-    },
-    inputLabel: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: colors.text.secondary,
-      marginBottom: 6,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    input: {
-      backgroundColor: colors.bg.primary,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: Radius.md,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      fontSize: 13,
-      color: colors.text.primary,
-      marginBottom: 16,
-    },
-    pickerWrapper: {
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: Radius.md,
-      backgroundColor: colors.bg.primary,
-      marginBottom: 16,
-      height: 40,
-      justifyContent: 'center',
-    },
-    formIngredientsTitle: {
-      fontSize: 12,
-      fontWeight: '800',
-      color: colors.text.primary,
-      marginTop: 8,
-      marginBottom: 12,
-    },
-    bomIngredientInputRow: {
-      flexDirection: 'row',
-      gap: 10,
-      marginBottom: 10,
-      alignItems: 'center',
-    },
-    removeRowBtn: {
-      padding: 4,
-    },
-    addIngredientRowBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      alignSelf: 'flex-start',
-      gap: 4,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-      borderWidth: 1,
-      borderColor: colors.primary + '30',
-      borderRadius: Radius.sm,
-      marginTop: 4,
-      marginBottom: 16,
-    },
-    addIngredientRowBtnText: {
-      color: colors.primary,
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    warningDisclaimer: {
-      fontSize: 11,
-      color: colors.text.muted,
-      lineHeight: 14,
-      backgroundColor: colors.bg.secondary,
-      padding: 10,
-      borderRadius: Radius.sm,
-      borderWidth: 1,
-      borderColor: colors.border,
-      marginBottom: 16,
-    },
-    modalFooter: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      paddingHorizontal: Spacing.lg,
-      paddingVertical: 14,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      gap: 12,
-      backgroundColor: colors.bg.secondary,
-    },
-    cancelBtn: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: Radius.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    cancelBtnText: {
-      color: colors.text.secondary,
-      fontSize: 12.5,
-      fontWeight: '700',
-    },
-    submitBtn: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: Radius.md,
-    },
-    submitBtnText: {
-      color: '#fff',
-      fontSize: 12.5,
-      fontWeight: '700',
-    },
-    // Stage Stepper Styles
-    stageStepperContainer: {
-      marginBottom: 12,
-    },
-    stageStepperRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 4,
-      marginTop: 4,
-    },
-    stageStep: {
-      alignItems: 'center',
-      width: 80,
-      paddingVertical: 4,
-    },
-    stageDot: {
-      width: 18,
-      height: 18,
-      borderRadius: 9,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 3,
-    },
-    stageLabel: {
-      fontSize: 8,
-      fontWeight: '600',
-      textAlign: 'center',
-      lineHeight: 10,
-    },
-    stageSkipBtn: {
-      marginTop: 2,
-      paddingHorizontal: 4,
-      paddingVertical: 1,
-      backgroundColor: 'transparent',
-    },
-    stageSkipText: {
-      fontSize: 8,
-      color: '#888',
-      textDecorationLine: 'underline',
-    },
-    // Waste Box Styles
-    wasteBox: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      backgroundColor: colors.warning + '0a',
-      borderColor: colors.warning + '30',
-      borderWidth: 1,
-      borderRadius: Radius.md,
-      padding: 8,
-    },
-    wasteText: {
-      fontSize: 11,
-      color: colors.text.secondary,
-      flex: 1,
-    },
-  }); // End of style sheet

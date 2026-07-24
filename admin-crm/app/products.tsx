@@ -298,6 +298,11 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   const [bomOverhead, setBomOverhead] = useState('0');
   const [bomNotes, setBomNotes] = useState('');
   const [bomIsActive, setBomIsActive] = useState(true);
+  const [bomDefaultProductionType, setBomDefaultProductionType] = useState<'in_house' | 'job_work'>('in_house');
+  const [bomDefaultJobWorkMode, setBomDefaultJobWorkMode] = useState<'raw_materials_supplied' | 'direct_purchase' | 'none'>('none');
+  const [bomDefaultPackagingMode, setBomDefaultPackagingMode] = useState<'packed_by_vendor' | 'self_packed'>('self_packed');
+  const [bomDefaultJobWorkerId, setBomDefaultJobWorkerId] = useState('');
+  const [vendors, setVendors] = useState<any[]>([]);
   const [bomIngredients, setBomIngredients] = useState<{ rawMaterialId: string; qtyRequired: string; itemType: 'formulation' | 'packaging' }[]>([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
   const [bomStages, setBomStages] = useState<{ name: string; targetDurationDays: string }[]>([{ name: '', targetDurationDays: '1' }]);
 
@@ -305,17 +310,23 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   useEffect(() => {
     async function fetchBOMAndMaterials() {
       try {
-        const [rms, existingBom] = await Promise.all([
+        const [rms, vends, existingBom] = await Promise.all([
           api.getRawMaterials(),
+          api.getVendors(),
           product ? api.getBOMForProduct(product._id).catch(() => null) : Promise.resolve(null)
         ]);
         setMaterials(rms);
+        setVendors(vends);
         console.log('AddEditProductModal - Fetched raw materials count:', rms.length, rms.map(r => ({ name: r.name, category: r.category })));
         if (existingBom) {
           setBomYield(existingBom.batchYieldSize ? existingBom.batchYieldSize.toString() : '100');
           setBomOverhead(existingBom.overheadCost ? existingBom.overheadCost.toString() : '0');
           setBomNotes(existingBom.productionNotes || '');
           setBomIsActive(existingBom.isActive !== undefined ? existingBom.isActive : true);
+          setBomDefaultProductionType((existingBom as any).defaultProductionType || 'in_house');
+          setBomDefaultJobWorkMode((existingBom as any).defaultJobWorkMode || 'none');
+          setBomDefaultPackagingMode((existingBom as any).defaultPackagingMode || 'self_packed');
+          setBomDefaultJobWorkerId((existingBom as any).defaultJobWorkerId ? (((existingBom as any).defaultJobWorkerId as any)._id || (existingBom as any).defaultJobWorkerId) : '');
           if (existingBom.ingredients && existingBom.ingredients.length > 0) {
             setBomIngredients(existingBom.ingredients.map(ing => {
               const rId = (ing.rawMaterialId as any)?._id || ing.rawMaterialId;
@@ -345,6 +356,10 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           setBomOverhead('0');
           setBomNotes('');
           setBomIsActive(true);
+          setBomDefaultProductionType('in_house');
+          setBomDefaultJobWorkMode('none');
+          setBomDefaultPackagingMode('self_packed');
+          setBomDefaultJobWorkerId('');
           setBomIngredients([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
           setBomStages([{ name: '', targetDurationDays: '1' }]);
         }
@@ -649,7 +664,11 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           isActive: bomIsActive,
           productionNotes: bomNotes.trim(),
           overheadCost: parseFloat(bomOverhead) || 0,
-          stages: filteredStages
+          stages: filteredStages,
+          defaultProductionType: bomDefaultProductionType,
+          defaultJobWorkMode: bomDefaultProductionType === 'job_work' ? bomDefaultJobWorkMode : 'none',
+          defaultPackagingMode: bomDefaultProductionType === 'job_work' ? bomDefaultPackagingMode : 'self_packed',
+          defaultJobWorkerId: bomDefaultProductionType === 'job_work' ? (bomDefaultJobWorkerId || null) : null
         });
       }
 
@@ -1116,6 +1135,84 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
               </TouchableOpacity>
             </View>
           </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Default Production Execution Route *</Text>
+            <View style={styles.formInput}>
+              {Platform.OS === 'web' ? (
+                <select
+                  value={bomDefaultProductionType}
+                  onChange={(e: any) => setBomDefaultProductionType(e.target.value)}
+                  style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
+                >
+                  <option value="in_house">In-House Manufacturing</option>
+                  <option value="job_work">Third-Party Job Work (Outsourced)</option>
+                </select>
+              ) : (
+                <TextInput style={styles.formInputText} value={bomDefaultProductionType} onChangeText={(val: any) => setBomDefaultProductionType(val)} />
+              )}
+            </View>
+          </View>
+
+          {bomDefaultProductionType === 'job_work' && (
+            <>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Default Job Worker Vendor *</Text>
+                <View style={styles.formInput}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={bomDefaultJobWorkerId}
+                      onChange={(e: any) => setBomDefaultJobWorkerId(e.target.value)}
+                      style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
+                    >
+                      <option value="">-- Choose Default Contract Manufacturer --</option>
+                      {vendors.map(v => (
+                        <option key={v._id} value={v._id}>{v.company || v.name} {v.manufacturingLicenseNo ? `(Lic: ${v.manufacturingLicenseNo})` : ''}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TextInput style={styles.formInputText} value={bomDefaultJobWorkerId} onChangeText={setBomDefaultJobWorkerId} />
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Default Job Work Mode *</Text>
+                <View style={styles.formInput}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={bomDefaultJobWorkMode}
+                      onChange={(e: any) => setBomDefaultJobWorkMode(e.target.value)}
+                      style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
+                    >
+                      <option value="raw_materials_supplied">Raw Materials Supplied (We Provide Ingredients)</option>
+                      <option value="direct_purchase">Direct Purchase of Finished Bulk (Vendor Raw Materials)</option>
+                    </select>
+                  ) : (
+                    <TextInput style={styles.formInputText} value={bomDefaultJobWorkMode} onChangeText={(val: any) => setBomDefaultJobWorkMode(val)} />
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Default Packaging & Labeling *</Text>
+                <View style={styles.formInput}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={bomDefaultPackagingMode}
+                      onChange={(e: any) => setBomDefaultPackagingMode(e.target.value)}
+                      style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
+                    >
+                      <option value="self_packed">Self-Packed (Deduct Bottles/Labels/Caps from our Stock)</option>
+                      <option value="packed_by_vendor">Packed by Vendor (Finished Goods Received fully Boxed)</option>
+                    </select>
+                  ) : (
+                    <TextInput style={styles.formInputText} value={bomDefaultPackagingMode} onChangeText={(val: any) => setBomDefaultPackagingMode(val)} />
+                  )}
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Section 1: Formulation Ingredients */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>

@@ -139,7 +139,7 @@ const printInvoice = (invoice: Invoice) => {
               <div style="font-size:10px; margin-top:2px;">${FIRM_DETAILS.address}</div>
               <div style="font-size:10px;">email: ${FIRM_DETAILS.email}</div>
               <div style="font-size:10px;">Phone : ${FIRM_DETAILS.phone}</div>
-              <div style="font-size:11px; margin-top: 2px;"><strong>GSTIN : ${FIRM_DETAILS.gstin}</strong></div>
+              <div style="font-size:11px; margin-top: 2px;"><strong>GSTIN : ${FIRM_DETAILS.gstin}</strong>${FIRM_DETAILS.manufacturingLicenseNo ? ` &nbsp;|&nbsp; <strong>Mfg. Lic. No : ${FIRM_DETAILS.manufacturingLicenseNo}</strong>` : ''}</div>
             </div>
           </div>
           <div style="text-align:right;">

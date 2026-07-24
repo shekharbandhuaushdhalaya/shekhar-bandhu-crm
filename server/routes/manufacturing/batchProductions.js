@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 // POST /api/batch-productions — Start a new batch production run
 router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
   try {
-    const { productId, plannedQty, batchNo, manufacturingUnitId } = req.body;
+    const { productId, plannedQty, batchNo, manufacturingUnitId, productionType, jobWorkMode, packagingMode, jobWorkerId, jobWorkerName, jobWorkerChallanRef } = req.body;
     if (!productId || !plannedQty || !batchNo || !manufacturingUnitId) {
       return res.status(400).json({ error: 'Product ID, planned quantity, batch number, and manufacturing unit ID are required' });
     }
@@ -57,62 +57,70 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       return res.status(400).json({ error: `No Bill of Materials configured for product: ${prod.name}` });
     }
 
+    const isDirectPurchase = jobWorkMode === 'direct_purchase';
     const ingredientsRequired = [];
-    for (const ing of bom.ingredients) {
-      const rm = await RawMaterial.findById(ing.rawMaterialId);
-      const isPackaging = ing.itemType === 'packaging' || (rm && rm.category === 'Packaging');
-      if (!isPackaging) {
-        const scaleBase = bom.batchYieldSize && bom.batchYieldSize > 0 ? bom.batchYieldSize : 100;
-        const scale = valPlanned / scaleBase;
-        const qtyNeeded = ing.qtyRequired * scale;
-        ingredientsRequired.push({ rawMaterialId: ing.rawMaterialId, qtyNeeded });
+
+    if (!isDirectPurchase) {
+      for (const ing of bom.ingredients) {
+        const rm = await RawMaterial.findById(ing.rawMaterialId);
+        const isPackaging = ing.itemType === 'packaging' || (rm && rm.category === 'Packaging');
+        if (!isPackaging) {
+          const scaleBase = bom.batchYieldSize && bom.batchYieldSize > 0 ? bom.batchYieldSize : 100;
+          const scale = valPlanned / scaleBase;
+          const qtyNeeded = ing.qtyRequired * scale;
+          ingredientsRequired.push({ rawMaterialId: ing.rawMaterialId, qtyNeeded });
+        }
       }
     }
 
     const verifiedDeductions = [];
-    for (const reqIng of ingredientsRequired) {
-      const rm = await RawMaterial.findById(reqIng.rawMaterialId);
-      const entries = await RawMaterialEntry.find({ rawMaterialId: reqIng.rawMaterialId });
+    if (!isDirectPurchase) {
+      for (const reqIng of ingredientsRequired) {
+        const rm = await RawMaterial.findById(reqIng.rawMaterialId);
+        const entries = await RawMaterialEntry.find({ rawMaterialId: reqIng.rawMaterialId });
 
-      entries.sort((a, b) => {
-        if (a.expiryDate && b.expiryDate) {
-          return new Date(a.expiryDate) - new Date(b.expiryDate);
-        }
-        if (a.expiryDate && !b.expiryDate) return -1;
-        if (!a.expiryDate && b.expiryDate) return 1;
-        return new Date(a.createdAt) - new Date(b.createdAt);
-      });
-
-      const totalAvailable = entries.reduce((acc, e) => acc + (e.qty || 0), 0);
-      if (totalAvailable < reqIng.qtyNeeded) {
-        return res.status(400).json({
-          error: `Insufficient stock for raw material: ${rm.name}. Needed: ${reqIng.qtyNeeded.toFixed(2)} ${rm.unit}, Available: ${totalAvailable.toFixed(2)} ${rm.unit}`
+        entries.sort((a, b) => {
+          if (a.expiryDate && b.expiryDate) {
+            return new Date(a.expiryDate) - new Date(b.expiryDate);
+          }
+          if (a.expiryDate && !b.expiryDate) return -1;
+          if (!a.expiryDate && b.expiryDate) return 1;
+          return new Date(a.createdAt) - new Date(b.createdAt);
         });
-      }
 
-      let needed = reqIng.qtyNeeded;
-      for (const entry of entries) {
-        if (needed <= 0) break;
-        if ((entry.qty || 0) <= 0) continue;
-        const deduct = Math.min(needed, entry.qty);
-        verifiedDeductions.push({ entry, deductQty: deduct, rawMaterialId: reqIng.rawMaterialId });
-        needed -= deduct;
+        const totalAvailable = entries.reduce((acc, e) => acc + (e.qty || 0), 0);
+        if (totalAvailable < reqIng.qtyNeeded) {
+          return res.status(400).json({
+            error: `Insufficient stock for raw material: ${rm.name}. Needed: ${reqIng.qtyNeeded.toFixed(2)} ${rm.unit}, Available: ${totalAvailable.toFixed(2)} ${rm.unit}`
+          });
+        }
+
+        let needed = reqIng.qtyNeeded;
+        for (const entry of entries) {
+          if (needed <= 0) break;
+          if ((entry.qty || 0) <= 0) continue;
+          const deduct = Math.min(needed, entry.qty);
+          verifiedDeductions.push({ entry, deductQty: deduct, rawMaterialId: reqIng.rawMaterialId });
+          needed -= deduct;
+        }
       }
     }
 
     const ingredientsConsumed = [];
     let rawMaterialCost = 0;
-    for (const dec of verifiedDeductions) {
-      const { entry, deductQty, rawMaterialId } = dec;
-      entry.qty = Math.max(0, entry.qty - deductQty);
-      await entry.save();
-      rawMaterialCost += deductQty * (entry.purchaseRate || 0);
-      ingredientsConsumed.push({
-        rawMaterialId,
-        rawMaterialEntryId: entry._id,
-        qtyConsumed: deductQty,
-        batchNo: entry.batchNo
-      });
+    if (!isDirectPurchase) {
+      for (const dec of verifiedDeductions) {
+        const { entry, deductQty, rawMaterialId } = dec;
+        entry.qty = Math.max(0, entry.qty - deductQty);
+        await entry.save();
+        rawMaterialCost += deductQty * (entry.purchaseRate || 0);
+        ingredientsConsumed.push({
+          rawMaterialId,
+          rawMaterialEntryId: entry._id,
+          qtyConsumed: deductQty,
+          batchNo: entry.batchNo
+        });
+      }
     }
 
     // Scaled overhead calculation based on yield size
@@ -159,6 +167,12 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       ingredientsConsumed,
       rawMaterialCost: Number(rawMaterialCost.toFixed(2)),
       overheadCost: Number(computedOverhead.toFixed(2)),
+      productionType: productionType || 'in_house',
+      jobWorkMode: jobWorkMode || 'none',
+      packagingMode: packagingMode || 'packed_by_vendor',
+      jobWorkerId: jobWorkerId || null,
+      jobWorkerName: jobWorkerName || '',
+      jobWorkerChallanRef: jobWorkerChallanRef || '',
       startDate: new Date()
     });
 
@@ -236,7 +250,11 @@ router.patch('/:id/stage/:stageIndex', async (req, res) => {
     // Auto-deduct packaging materials (bottles, caps, labels) when advancing past packaging stage
     const isPackagingStage = (currentStage.name || '').toLowerCase().includes('packag') || (currentStage.name || '').toLowerCase().includes('label');
     if (isPackagingStage && (newStatus === 'completed' || newStatus === 'skipped')) {
-      await deductPackagingMaterials(batch, batch.plannedQty);
+      if (batch.packagingMode === 'self_packed') {
+        await deductPackagingMaterials(batch, batch.plannedQty);
+      } else {
+        batch.packagingDeducted = true;
+      }
     }
 
     const allDone = batch.stages.every(s => s.status === 'completed' || s.status === 'skipped');
@@ -354,7 +372,10 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       heavyMetals,
       microbialLimit,
       labReportRef,
-      warehouseId
+      warehouseId,
+      jobWorkerCertificateRef,
+      coaDocumentRef,
+      jobWorkCharges
     } = req.body;
 
     if (actualYieldQty === undefined || !qcPassedBy) {
@@ -378,7 +399,11 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
 
     // Ensure packaging materials are deducted if not already deducted during stage advance
     if (!batch.packagingDeducted) {
-      await deductPackagingMaterials(batch, valYield);
+      if (batch.packagingMode === 'self_packed') {
+        await deductPackagingMaterials(batch, valYield);
+      } else {
+        batch.packagingDeducted = true;
+      }
     }
 
     const allDone = batch.stages.every(s => s.status === 'completed' || s.status === 'skipped');
@@ -394,6 +419,9 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
 
     // Save QC parameters
     batch.qcStatus = qcStatus || 'approved';
+    batch.jobWorkerCertificateRef = jobWorkerCertificateRef || '';
+    batch.coaDocumentRef = coaDocumentRef || '';
+    batch.jobWorkCharges = Number(jobWorkCharges) || 0;
     batch.qcParameters = {
       organoleptic: organoleptic || '',
       moistureContent: moistureContent !== undefined ? moistureContent : null,
@@ -405,7 +433,7 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       labReportRef: labReportRef || ''
     };
 
-    const totalCost = batch.rawMaterialCost + (batch.overheadCost || 0);
+    const totalCost = batch.rawMaterialCost + (batch.overheadCost || 0) + batch.jobWorkCharges;
 
     if (qcStatus === 'rejected') {
       // Rejection logic: No stock added, full planned quantity is waste
