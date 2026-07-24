@@ -1174,7 +1174,8 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
                   />
                   {(() => {
                     const val = parseFloat(item.qtyRequired) || 0;
-                    const pct = totalFormulaQty > 0 ? ((val / totalFormulaQty) * 100).toFixed(1) : '0.0';
+                    const yieldVal = parseFloat(bomYield) || 100;
+                    const pct = yieldVal > 0 ? ((val / yieldVal) * 100).toFixed(1) : '0.0';
                     return (
                       <Text style={{ fontSize: 10, color: colors.primary, marginRight: 8, fontWeight: '700' }}>
                         {pct}%
