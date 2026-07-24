@@ -2529,10 +2529,11 @@ export default function ManufacturingScreen() {
                             <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                               <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
                               <Text style={{ width: 125, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Batch No</Text>
-                              <Text style={{ width: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Purchase Ref</Text>
-                              <Text style={{ flex: 1.5, minWidth: 120, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Vendor / Source</Text>
-                              <Text style={{ width: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left', paddingLeft: 8 }}>IN Qty</Text>
-                              <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left' }}>Warehouse</Text>
+                              <Text style={{ flex: 1.2, minWidth: 120, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Raw Material</Text>
+                              <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Purchase Ref</Text>
+                              <Text style={{ flex: 1.2, minWidth: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Vendor / Source</Text>
+                              <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left', paddingLeft: 8 }}>IN Qty</Text>
+                              <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left' }}>Warehouse</Text>
                             </View>
                             {/* Table Body for IN */}
                             {(() => {
@@ -2545,6 +2546,7 @@ export default function ManufacturingScreen() {
                               const filtered = inEntries.filter((e: any) => {
                                 if (!traceSearch) return true;
                                 return e.batchNo?.toLowerCase().includes(traceSearch.toLowerCase()) ||
+                                       e.materialName?.toLowerCase().includes(traceSearch.toLowerCase()) ||
                                        e.purchaseRef?.toLowerCase().includes(traceSearch.toLowerCase());
                               });
 
@@ -2560,16 +2562,19 @@ export default function ManufacturingScreen() {
                                   <Text style={{ width: 125, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
                                     {row.batchNo}
                                   </Text>
-                                  <Text style={{ width: 110, fontSize: 11, color: colors.text.primary, fontWeight: '600' }}>
+                                  <Text style={{ flex: 1.2, minWidth: 120, fontSize: 11, fontWeight: '600', color: colors.text.primary }} numberOfLines={1}>
+                                    🌿 {row.materialName || 'Raw Material'}
+                                  </Text>
+                                  <Text style={{ width: 100, fontSize: 11, color: colors.text.primary, fontWeight: '600' }}>
                                     {row.purchaseRef || 'Inward'}
                                   </Text>
-                                  <Text style={{ flex: 1.5, minWidth: 120, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
+                                  <Text style={{ flex: 1.2, minWidth: 110, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
                                     {row.vendorName || 'Direct'}
                                   </Text>
-                                  <Text style={{ width: 110, fontSize: 11, fontWeight: '700', color: colors.success, textAlign: 'left', paddingLeft: 8 }} numberOfLines={1}>
+                                  <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.success, textAlign: 'left', paddingLeft: 8 }} numberOfLines={1}>
                                     {row.qty.toFixed(1)} {row.unit}
                                   </Text>
-                                  <Text style={{ width: 140, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'left' }} numberOfLines={1}>
+                                  <Text style={{ width: 130, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'left' }} numberOfLines={1}>
                                     {row.warehouseName || '-'}
                                   </Text>
                                 </View>

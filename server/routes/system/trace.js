@@ -123,21 +123,44 @@ router.get('/:batchNo', async (req, res) => {
     }
 
     // 3. Search BatchProduction (as a finished goods batch)
-    const prodBatchesAsFinished = await BatchProduction.find({ batchNo })
+    const prodBatchesAsFinished = await BatchProduction.find({ batchNo: new RegExp(safeRegex, 'i') })
       .populate('productId', 'name sku')
       .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
       .lean();
+
     for (const b of prodBatchesAsFinished) {
       const ingredientsWithVendor = [];
       if (b.ingredientsConsumed && b.ingredientsConsumed.length > 0) {
         for (const ing of b.ingredientsConsumed) {
           let vendorName = ing.vendorName || '';
-          if (!vendorName && ing.batchNo) {
-            const rmEntry = await RawMaterialEntry.findOne({ batchNo: ing.batchNo }).lean();
-            if (rmEntry) {
-              vendorName = rmEntry.vendorName;
+          let rmEntry = null;
+          if (ing.rawMaterialEntryId) {
+            rmEntry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).populate('rawMaterialId', 'name sku unit').lean();
+          } else if (ing.batchNo) {
+            rmEntry = await RawMaterialEntry.findOne({ batchNo: ing.batchNo }).populate('rawMaterialId', 'name sku unit').lean();
+          }
+
+          if (rmEntry) {
+            vendorName = rmEntry.vendorName || vendorName;
+            // Push into rawMaterialEntries so Incoming Stock (IN) tab displays raw material inward details
+            if (!result.rawMaterialEntries.some(e => e._id.toString() === rmEntry._id.toString())) {
+              result.rawMaterialEntries.push({
+                _id: rmEntry._id,
+                materialName: rmEntry.rawMaterialId ? rmEntry.rawMaterialId.name : (ing.rawMaterialId ? ing.rawMaterialId.name : 'Raw Material'),
+                materialSku: rmEntry.rawMaterialId ? rmEntry.rawMaterialId.sku : (ing.rawMaterialId ? ing.rawMaterialId.sku : ''),
+                unit: rmEntry.rawMaterialId ? rmEntry.rawMaterialId.unit : (ing.rawMaterialId ? ing.rawMaterialId.unit : ''),
+                qty: rmEntry.qty,
+                batchNo: rmEntry.batchNo || ing.batchNo,
+                purchaseRate: rmEntry.purchaseRate,
+                purchaseRef: rmEntry.purchaseRef,
+                vendorName: rmEntry.vendorName || 'Direct',
+                warehouseName: rmEntry.warehouseName || 'Factory Warehouse',
+                expiryDate: rmEntry.expiryDate,
+                createdAt: rmEntry.createdAt,
+              });
             }
           }
+
           ingredientsWithVendor.push({
             materialName: ing.rawMaterialId ? ing.rawMaterialId.name : (ing.name || 'Unknown Material'),
             batchNo: ing.batchNo,
