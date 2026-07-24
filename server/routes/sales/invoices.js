@@ -445,6 +445,7 @@ router.patch('/purchases/:id/finalize', authorize('invoice:markPaid'), async (re
           });
 
           if (rmEntry) {
+            rmEntry.initialQty = (rmEntry.initialQty || rmEntry.qty || 0) + qtyToAdd;
             rmEntry.qty += qtyToAdd;
             if (rate > 0) rmEntry.purchaseRate = rate;
             if (resolvedVendorId) {
@@ -461,6 +462,7 @@ router.patch('/purchases/:id/finalize', authorize('invoice:markPaid'), async (re
             await RawMaterialEntry.create({
               rawMaterialId: rawMaterial._id,
               batchNo: batchNo,
+              initialQty: qtyToAdd,
               qty: qtyToAdd,
               purchaseRate: rate,
               vendorId: resolvedVendorId || null,

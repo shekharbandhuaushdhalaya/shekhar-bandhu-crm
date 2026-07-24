@@ -2571,9 +2571,16 @@ export default function ManufacturingScreen() {
                                   <Text style={{ flex: 1.2, minWidth: 110, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
                                     {row.vendorName || 'Direct'}
                                   </Text>
-                                  <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.success, textAlign: 'left', paddingLeft: 8 }} numberOfLines={1}>
-                                    {row.qty.toFixed(1)} {row.unit}
-                                  </Text>
+                                  <View style={{ width: 130, paddingLeft: 8 }}>
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>
+                                      {(row.initialQty !== undefined ? row.initialQty : row.qty).toFixed(1)} {row.unit}
+                                    </Text>
+                                    {row.initialQty !== undefined && row.initialQty !== row.qty && (
+                                      <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>
+                                        ({row.qty.toFixed(1)} remaining)
+                                      </Text>
+                                    )}
+                                  </View>
                                   <Text style={{ width: 130, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'left' }} numberOfLines={1}>
                                     {row.warehouseName || '-'}
                                   </Text>

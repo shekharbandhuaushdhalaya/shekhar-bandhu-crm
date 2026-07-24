@@ -7,7 +7,8 @@ const rawMaterialEntrySchema = new mongoose.Schema({
     required: true,
   },
   batchNo: { type: String, required: true, trim: true }, // vendor batch number
-  qty: { type: Number, required: true, default: 0 }, // remaining stock in kg/l/units
+  initialQty: { type: Number, default: 0 }, // original inward qty from purchase bill
+  qty: { type: Number, required: true, default: 0 }, // current remaining available stock
   purchaseRate: { type: Number, required: true, default: 0 },
   vendorId: {
     type: mongoose.Schema.Types.ObjectId,

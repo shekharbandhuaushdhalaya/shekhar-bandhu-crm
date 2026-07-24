@@ -165,6 +165,7 @@ router.post('/entries', validate(schemas.rawMaterialEntrySchema), async (req, re
     let entry = await RawMaterialEntry.findOne({ rawMaterialId, batchNo });
     if (entry) {
       // Add to existing quantity
+      entry.initialQty = (entry.initialQty || entry.qty || 0) + valQty;
       entry.qty += valQty;
       entry.purchaseRate = valRate; // overwrite rate or average it
       if (expiryDate) entry.expiryDate = new Date(expiryDate);
@@ -173,6 +174,7 @@ router.post('/entries', validate(schemas.rawMaterialEntrySchema), async (req, re
       entry = await RawMaterialEntry.create({
         rawMaterialId,
         batchNo: batchNo.trim().toUpperCase(),
+        initialQty: valQty,
         qty: valQty,
         purchaseRate: valRate,
         vendorId: vendorId || null,
@@ -304,6 +306,7 @@ router.post('/purchase', async (req, res) => {
       const entry = await RawMaterialEntry.create({
         rawMaterialId: item.rawMaterialId,
         batchNo: item.batchNo.trim().toUpperCase(),
+        initialQty: Number(item.qty),
         qty: Number(item.qty),
         purchaseRate: Number(item.purchaseRate) || 0,
         vendorId: vendorId || undefined,
