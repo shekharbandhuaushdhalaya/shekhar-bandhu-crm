@@ -593,6 +593,15 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     if (v.state) {
       setStateOfSupply(v.state);
     }
+
+    // Auto-detect non-GST / Cash vendor
+    const isNonGstVendor = !v.gstin || !v.gstin.trim() || (v as any).recordTracking === 'cash_ledger';
+    if (isNonGstVendor) {
+      setMode('cash');
+      setRows(prev => prev.map(r => ({ ...r, gstRate: 0 })));
+    } else {
+      setMode('regular');
+    }
     
     // Auto-calculate Due Date
     if (v.paymentTerms) {
@@ -1117,15 +1126,27 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                 <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
                   {filteredVendors.map(v => {
                     const vName = v.company || v.name;
+                    const isNonGst = !v.gstin || !v.gstin.trim() || (v as any).recordTracking === 'cash_ledger';
                     return (
                       <TouchableOpacity
                         key={v._id}
                         style={styles.customSelectItem}
                         onPress={() => handleSelectVendor(v)}
                       >
-                        <Text style={styles.customSelectItemText}>{vName}</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={styles.customSelectItemText}>{vName}</Text>
+                          {isNonGst ? (
+                            <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.warning }}>
+                              <Text style={{ fontSize: 9, fontWeight: '700', color: colors.warning }}>💵 Non-GST</Text>
+                            </View>
+                          ) : (
+                            <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
+                              <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📄 GST Vendor</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text style={styles.customSelectItemSubtext}>
-                          {v.gstin ? `GSTIN: ${v.gstin}` : 'Cash Supplier'}
+                          {v.gstin ? `GSTIN: ${v.gstin}` : 'Non-GST Supplier'}
                           {v.state ? ` | State: ${v.state}` : ''}
                         </Text>
                       </TouchableOpacity>
