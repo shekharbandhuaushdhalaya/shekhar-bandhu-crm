@@ -157,6 +157,8 @@ interface FormState {
   partyName: string;
   partyGstin: string;
   partyAddress: string;
+  billingAddress: string;
+  shippingAddress: string;
   warehouseId: string;
   warehouseName: string;
   isFree: boolean;
@@ -179,6 +181,7 @@ const DEFAULT_FORM: FormState = {
   direction: 'out', type: 'sale', billingMode: 'regular',
   date: new Date().toISOString().split('T')[0],
   partyType: '', partyId: '', partyName: '', partyGstin: '', partyAddress: '',
+  billingAddress: '', shippingAddress: '',
   warehouseId: '', warehouseName: '',
   isFree: false, notes: '', status: 'draft',
   medicalRepName: '', doctorName: '', damageReason: '',
@@ -850,15 +853,16 @@ export default function StockMovementsScreen() {
                                         const billingAddr = c.billingAddress;
                                         const billingAddrStr = billingAddr ? [billingAddr.street, billingAddr.city, billingAddr.state, billingAddr.pin].filter(Boolean).join(', ') : '';
                                         const shippingAddr = c.shippingAddress;
-                                        const shippingAddrStr = shippingAddr ? [shippingAddr.street, shippingAddr.city, shippingAddr.state, shippingAddr.pin].filter(Boolean).join(', ') : '';
-                                        const finalAddrStr = `Billing Address:\n${billingAddrStr.trim()}\n\nShipping Address:\n${shippingAddrStr.trim() || billingAddrStr.trim()}`;
+                                        const shippingAddrStr = shippingAddr ? [shippingAddr.street, shippingAddr.city, shippingAddr.state, shippingAddr.pin].filter(Boolean).join(', ') : (billingAddrStr.trim());
                                         const isCashCustomer = c.customerType === 'cash' || c.recordTracking === 'cash_ledger';
                                         setForm(f => ({
                                           ...f,
                                           partyId: c._id,
                                           partyName: finalName,
                                           partyGstin: c.gstin || '',
-                                          partyAddress: finalAddrStr
+                                          billingAddress: billingAddrStr.trim(),
+                                          shippingAddress: shippingAddrStr.trim(),
+                                          partyAddress: `Billing Address:\n${billingAddrStr.trim()}\n\nShipping Address:\n${shippingAddrStr.trim()}`
                                         }));
                                         setCustomerSearch(finalName);
                                         setShowCustomerDropdown(false);
@@ -894,8 +898,40 @@ export default function StockMovementsScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={styles.inputLabel}>Address (Billing &amp; Shipping)</Text>
-                    <TextInput style={[styles.input, { height: 72, textAlignVertical: 'top', backgroundColor: colors.bg.primary, marginBottom: 2 }]} value={form.partyAddress} onChangeText={v => setForm(f => ({ ...f, partyAddress: v }))} placeholder="Billing &amp; Shipping Address details" placeholderTextColor={colors.text.muted} multiline />
+
+                    {/* Side-by-side Billing & Shipping Address Fields */}
+                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 2 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.inputLabel}>Billing Address</Text>
+                        <TextInput
+                          style={[styles.input, { height: 60, textAlignVertical: 'top', backgroundColor: colors.bg.primary, marginBottom: 0 }]}
+                          value={form.billingAddress}
+                          onChangeText={v => setForm(f => {
+                            const newForm = { ...f, billingAddress: v };
+                            newForm.partyAddress = `Billing Address:\n${v}\n\nShipping Address:\n${newForm.shippingAddress}`;
+                            return newForm;
+                          })}
+                          placeholder="Enter Billing Address..."
+                          placeholderTextColor={colors.text.muted}
+                          multiline
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.inputLabel}>Shipping Address</Text>
+                        <TextInput
+                          style={[styles.input, { height: 60, textAlignVertical: 'top', backgroundColor: colors.bg.primary, marginBottom: 0 }]}
+                          value={form.shippingAddress}
+                          onChangeText={v => setForm(f => {
+                            const newForm = { ...f, shippingAddress: v };
+                            newForm.partyAddress = `Billing Address:\n${newForm.billingAddress}\n\nShipping Address:\n${v}`;
+                            return newForm;
+                          })}
+                          placeholder="Enter Shipping Address..."
+                          placeholderTextColor={colors.text.muted}
+                          multiline
+                        />
+                      </View>
+                    </View>
                   </View>
                 )}
               </View>
