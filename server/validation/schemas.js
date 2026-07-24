@@ -604,18 +604,26 @@ const complaintSchema = z.object({
 // ── Dispatch ─────────────────────────────────────────────────
 const dispatchSchema = z.object({
   dispatchNo: z.string().optional(),
-  warehouseId: objectId.optional(),
-  warehouseName: z.string().default(''),
+  invoiceId: objectId.optional(),
+  invoiceNo: z.string().default(''),
+  customerName: z.string().min(1, 'Customer name required'),
+  customerPhone: z.string().default(''),
+  shippingAddress: z.string().default(''),
   items: z.array(z.object({
     productId: objectId.optional(),
-    productName: z.string().min(1),
-    qtyBoxes: z.number().int().positive(),
+    name: z.string().min(1, 'Item name required'),
+    qty: z.number().int().nonnegative(),
     packing: z.number().int().min(1).default(1),
+    batchNo: z.string().default(''),
   })).min(1),
   transporter: z.string().default(''),
   vehicleNo: z.string().default(''),
   date: z.string().or(z.date()).optional(),
   notes: z.string().default(''),
+  totalBoxes: z.number().default(0),
+  totalWeight: z.string().default(''),
+  freightCharge: z.number().default(0),
+  status: z.enum(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned']).default('dispatched'),
 });
 
 // ── ManufacturingUnit ────────────────────────────────────────
