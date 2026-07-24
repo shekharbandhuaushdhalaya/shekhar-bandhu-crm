@@ -1018,13 +1018,13 @@ export default function ManufacturingScreen() {
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={async () => {
-                              const searchTerm = rm.name ? rm.name.trim() : rm._id;
-                              setTraceBatchNo(searchTerm);
+                              const rawName = rm.name ? rm.name.trim() : rm._id;
+                              setTraceBatchNo(rawName);
                               setTraceModalVisible(true);
                               setTraceLoading(true);
                               setTraceResult(null);
                               try {
-                                const data = await api.traceBatch(encodeURIComponent(searchTerm));
+                                const data = await api.traceBatch(rawName);
                                 setTraceResult(data);
                               } catch (err: any) {
                                 try {
@@ -2434,7 +2434,7 @@ export default function ManufacturingScreen() {
       <Modal visible={traceModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={() => setTraceModalVisible(false)} />
-          <View style={[styles.modalContainer, { maxWidth: 800, width: '92%', height: '90%' }]}>
+          <View style={[styles.modalContainer, { maxWidth: 1200, width: '98%', height: '90%' }]}>
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>End-to-End Batch Trace</Text>
@@ -2512,8 +2512,8 @@ export default function ManufacturingScreen() {
                     </View>
 
                     {/* Table View */}
-                    <ScrollView horizontal>
-                      <View style={{ minWidth: 650 }}>
+                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
+                      <View style={{ minWidth: '100%', flex: 1 }}>
                         {traceSubTab === 'in' ? (
                           <>
                             {/* Table Header for IN */}
@@ -2702,7 +2702,7 @@ export default function ManufacturingScreen() {
                   <View style={{ alignItems: 'center', padding: 24 }}>
                     <Ionicons name="search-outline" size={40} color={colors.text.muted} />
                     <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 8 }}>
-                      No trace records found for "{traceResult?.batchNo || traceBatchNo}"
+                      No trace records found for "{decodeURIComponent(traceResult?.materialName || traceResult?.batchNo || traceBatchNo || '')}"
                     </Text>
                   </View>
                 )}

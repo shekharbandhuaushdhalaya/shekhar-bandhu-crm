@@ -1022,18 +1022,18 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
                 <Text style={{ color: colors.text.muted }}>खाता बही लोड हो रहा है...</Text>
               </View>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-                <View style={[styles.ledgerTable, { minWidth: 740 }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1 }}>
+                <View style={[styles.ledgerTable, { width: '100%', minWidth: '100%' }]}>
                 {/* Headers */}
                 <View style={styles.ledgerHeaderRow}>
-                  <Text style={[styles.ledgerHeaderCell, { width: 100 }]}>Date & Time</Text>
-                  <Text style={[styles.ledgerHeaderCell, { width: 110 }]}>Godown</Text>
-                  <Text style={[styles.ledgerHeaderCell, { width: 80 }]}>Tx Type</Text>
-                  <Text style={[styles.ledgerHeaderCell, { width: 80, textAlign: 'center' }]}>Packing</Text>
-                  <Text style={[styles.ledgerHeaderCell, { width: 70, textAlign: 'right' }]}>Qty Change</Text>
-                  <Text style={[styles.ledgerHeaderCell, { width: 70, textAlign: 'right' }]}>Balance</Text>
-                  <Text style={[styles.ledgerHeaderCell, { width: 140 }]}>Ref / Note</Text>
-                  <Text style={[styles.ledgerHeaderCell, { width: 90 }]}>User</Text>
+                  <Text style={[styles.ledgerHeaderCell, { flex: 1.2 }]}>Date &amp; Time</Text>
+                  <Text style={[styles.ledgerHeaderCell, { flex: 1.5 }]}>Godown</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 90 }]}>Tx Type</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 90, textAlign: 'center' }]}>Packing</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 100, textAlign: 'right' }]}>Qty Change</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 100, textAlign: 'right' }]}>Balance</Text>
+                  <Text style={[styles.ledgerHeaderCell, { flex: 2.5 }]}>Ref / Note / Mfg Unit</Text>
+                  <Text style={[styles.ledgerHeaderCell, { flex: 1 }]}>User</Text>
                 </View>
 
                 {/* Rows */}
@@ -1062,23 +1062,23 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
 
                   return (
                     <View key={log._id} style={styles.ledgerBodyRow}>
-                      <Text style={[styles.ledgerCell, { width: 100, fontSize: 11 }]}>{txDate}</Text>
-                      <Text style={[styles.ledgerCell, { width: 110 }]} numberOfLines={1}>{log.warehouseName}</Text>
-                      <View style={[styles.ledgerCell, { width: 80 }]}>
+                      <Text style={[styles.ledgerCell, { flex: 1.2, fontSize: 11 }]}>{txDate}</Text>
+                      <Text style={[styles.ledgerCell, { flex: 1.5 }]} numberOfLines={1}>{log.warehouseName}</Text>
+                      <View style={[styles.ledgerCell, { width: 90 }]}>
                         <View style={[styles.typeBadge, { backgroundColor: badgeBg }]}>
                           <Text style={[styles.typeBadgeText, { color: badgeText }]}>{log.type}</Text>
                         </View>
                       </View>
-                      <Text style={[styles.ledgerCell, { width: 80, textAlign: 'center', color: colors.text.secondary }]}>
+                      <Text style={[styles.ledgerCell, { width: 90, textAlign: 'center', color: colors.text.secondary }]}>
                         {log.packing || 0} Pcs
                       </Text>
-                      <Text style={[styles.ledgerCell, { width: 70, textAlign: 'right', fontWeight: '700', color: log.type === 'IN' ? colors.success : log.type === 'OUT' ? colors.danger : colors.text.primary }]}>
+                      <Text style={[styles.ledgerCell, { width: 100, textAlign: 'right', fontWeight: '700', color: log.type === 'IN' ? colors.success : log.type === 'OUT' ? colors.danger : colors.text.primary }]}>
                         {formatStock(log.qtyBoxes, log.packing || 1, true, true)}
                       </Text>
-                      <Text style={[styles.ledgerCell, { width: 70, textAlign: 'right', fontWeight: '700' }]}>
+                      <Text style={[styles.ledgerCell, { width: 100, textAlign: 'right', fontWeight: '700' }]}>
                         {formatStock(log.balanceBoxes, log.packing || 1, false, true)}
                       </Text>
-                      <View style={[styles.ledgerCell, { width: 140 }]}>
+                      <View style={[styles.ledgerCell, { flex: 2.5 }]}>
                         {log.reference ? <Text style={styles.ledgerRefText}>Ref: {log.reference}</Text> : null}
                         {log.note ? <Text style={styles.ledgerNoteText}>{log.note}</Text> : null}
                         {log.manufacturingUnitName ? (
@@ -1088,7 +1088,7 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
                         ) : null}
                         {!log.reference && !log.note && !log.manufacturingUnitName ? <Text style={{ color: colors.text.muted, fontSize: 11 }}>—</Text> : null}
                       </View>
-                      <Text style={[styles.ledgerCell, { width: 90 }]} numberOfLines={1}>{log.createdBy || 'System'}</Text>
+                      <Text style={[styles.ledgerCell, { flex: 1 }]} numberOfLines={1}>{log.createdBy || 'System'}</Text>
                     </View>
                   );
                 })}
@@ -2457,7 +2457,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   adjustmentTypeBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
 
   // Ledger sheets (Wider modal for ledger logs)
-  ledgerSheet: { width: '95%', maxWidth: 750, height: '80%', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
+  ledgerSheet: { width: '98%', maxWidth: 1200, height: '88%', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
   ledgerTable: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
   ledgerHeaderCell: { fontSize: 10, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
