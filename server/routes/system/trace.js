@@ -178,6 +178,7 @@ router.get('/:batchNo', async (req, res) => {
       productName: e.productId ? e.productId.name : 'Unknown',
       productSku: e.productId ? e.productId.sku : '',
       warehouseName: e.warehouseName,
+      manufacturingUnitName: e.manufacturingUnitName || '',
       qtyBoxes: e.qtyBoxes,
       packing: e.packing,
       vendorName: e.vendorName,

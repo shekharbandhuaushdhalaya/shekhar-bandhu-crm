@@ -2583,7 +2583,7 @@ export default function ManufacturingScreen() {
                               <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Production Batch No</Text>
                               <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Product Name</Text>
                               <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Consumed Qty</Text>
-                              <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Unit / Warehouse</Text>
+                              <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Manufacturing Unit</Text>
                             </View>
                             {/* Table Body for OUT */}
                             {(() => {
@@ -2618,8 +2618,8 @@ export default function ManufacturingScreen() {
                                   <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.warning, textAlign: 'right' }}>
                                     {row.qtyConsumed.toFixed(1)} {traceResult.rawMaterialEntries?.[0]?.unit || ''}
                                   </Text>
-                                  <Text style={{ width: 130, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'right' }} numberOfLines={1}>
-                                    {row.warehouseName || 'Factory Unit'}
+                                  <Text style={{ width: 140, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'right' }} numberOfLines={1}>
+                                    🏭 {row.warehouseName || 'Factory Unit'}
                                   </Text>
                                 </View>
                               ));
@@ -2640,7 +2640,7 @@ export default function ManufacturingScreen() {
                       <View key={e._id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                         <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{e.productName}</Text>
                         <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                          {e.qtyBoxes * (e.packing || 1)} pcs • {e.warehouseName}
+                          {e.qtyBoxes * (e.packing || 1)} pcs • {e.warehouseName} {e.manufacturingUnitName ? `• 🏭 ${e.manufacturingUnitName}` : ''}
                           {e.mfgDate ? ` • Mfg: ${new Date(e.mfgDate).toLocaleDateString()}` : ''}
                           {e.expiryDate ? ` • Exp: ${new Date(e.expiryDate).toLocaleDateString()}` : ''}
                         </Text>
