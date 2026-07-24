@@ -1050,20 +1050,20 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             </View>
           )}
 
-          {/* Destination Facility / Warehouse */}
+          {/* Destination Manufacturing Unit */}
           <View style={[styles.formGroup, { zIndex: 1020 }]}>
-            <Text style={styles.formLabel}>Destination Facility / Warehouse *</Text>
+            <Text style={styles.formLabel}>Destination Manufacturing Unit *</Text>
             <View style={styles.customSearchSelectContainer}>
               <View style={styles.formInput}>
                 <Ionicons name="business" size={16} color={colors.text.muted} />
                 <TextInput
                   style={[styles.formInputText, { color: colors.text.primary, fontWeight: '700' }]}
-                  placeholder="Select destination facility..."
+                  placeholder="Select destination manufacturing unit..."
                   placeholderTextColor={colors.text.muted}
                   value={
                     manufacturingUnits.find(m => m._id === warehouseId) 
                       ? `🏭 ${manufacturingUnits.find(m => m._id === warehouseId)?.name}` 
-                      : (warehouses.find(w => w._id === warehouseId)?.name ? `🏢 ${warehouses.find(w => w._id === warehouseId)?.name}` : '')
+                      : (warehouses.find(w => w._id === warehouseId)?.name ? `🏭 ${warehouses.find(w => w._id === warehouseId)?.name}` : '')
                   }
                   editable={false}
                 />
@@ -1076,12 +1076,6 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             {showWarehouseDropdown && (
               <View style={styles.customSelectPanel}>
                 <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
-                  {/* Manufacturing Units */}
-                  {manufacturingUnits.length > 0 && (
-                    <View style={{ backgroundColor: colors.primary + '08', paddingHorizontal: 10, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 9.5, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' }}>🏭 Manufacturing / Factory Units</Text>
-                    </View>
-                  )}
                   {manufacturingUnits.map(m => (
                     <TouchableOpacity
                       key={m._id}
@@ -1091,30 +1085,17 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                         setShowWarehouseDropdown(false);
                       }}
                     >
-                      <Text style={[styles.customSelectItemText, { color: colors.primary }]}>🏭 {m.name}</Text>
-                      <Text style={styles.customSelectItemSubtext}>{m.city ? `${m.city}, ${m.state || ''}` : 'Primary Factory'}</Text>
+                      <Text style={[styles.customSelectItemText, { color: colors.primary, fontWeight: '700' }]}>🏭 {m.name}</Text>
+                      <Text style={styles.customSelectItemSubtext}>{m.city ? `${m.city}, ${m.state || ''}` : 'Factory Unit'}</Text>
                     </TouchableOpacity>
                   ))}
-
-                  {/* Warehouses & Godowns */}
-                  {warehouses.length > 0 && (
-                    <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 10, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border, borderTopWidth: 1, borderTopColor: colors.border }}>
-                      <Text style={{ fontSize: 9.5, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' }}>🏢 Warehouses &amp; Godowns</Text>
+                  {manufacturingUnits.length === 0 && (
+                    <View style={{ padding: 12 }}>
+                      <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>
+                        No manufacturing units defined. Please add one under My Details / Profile.
+                      </Text>
                     </View>
                   )}
-                  {warehouses.map(w => (
-                    <TouchableOpacity
-                      key={w._id}
-                      style={styles.customSelectItem}
-                      onPress={() => {
-                        setWarehouseId(w._id);
-                        setShowWarehouseDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.customSelectItemText}>🏢 {w.name}</Text>
-                      <Text style={styles.customSelectItemSubtext}>{w.city ? `${w.city}, ${w.state}` : 'Depot'}</Text>
-                    </TouchableOpacity>
-                  ))}
                 </ScrollView>
               </View>
             )}
