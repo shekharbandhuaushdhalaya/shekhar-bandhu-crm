@@ -445,12 +445,32 @@ export default function StockMovementsScreen() {
 
   const getFilteredInventoryEntries = (searchText: string) => {
     const s = searchText ? searchText.toLowerCase() : '';
-    const allDropdownItems: any[] = [...warehouseInventory];
     
+    // Group all warehouse inventory entries and master products by productId to deduplicate
+    const productMap: Record<string, any> = {};
+
+    // 1. Process warehouse inventory entries
+    warehouseInventory.forEach(e => {
+      const pId = e.productId;
+      const totalPcs = (e.qtyBoxes || 0) * (e.packing || 1);
+      if (!productMap[pId]) {
+        productMap[pId] = {
+          ...e,
+          totalAvailablePcs: totalPcs,
+          batches: e.batchNo ? [e.batchNo] : []
+        };
+      } else {
+        productMap[pId].totalAvailablePcs += totalPcs;
+        if (e.batchNo && !productMap[pId].batches.includes(e.batchNo)) {
+          productMap[pId].batches.push(e.batchNo);
+        }
+      }
+    });
+
+    // 2. Add products that have 0 inventory entries
     products.forEach(p => {
-      const hasEntry = warehouseInventory.some(e => e.productId === p._id);
-      if (!hasEntry) {
-        allDropdownItems.push({
+      if (!productMap[p._id]) {
+        productMap[p._id] = {
           _id: p._id,
           productId: p._id,
           productType: p.productType || '',
@@ -464,14 +484,18 @@ export default function StockMovementsScreen() {
           qtyBoxes: 0,
           packing: 1,
           warehouseId: form.warehouseId,
-          warehouseName: ''
-        });
+          warehouseName: '',
+          totalAvailablePcs: 0,
+          batches: []
+        };
       }
     });
 
-    if (!s) return allDropdownItems;
+    const uniqueProducts = Object.values(productMap);
 
-    return allDropdownItems.filter(entry => {
+    if (!s) return uniqueProducts;
+
+    return uniqueProducts.filter(entry => {
       const displayName = getInventoryEntryDisplayName(entry).toLowerCase();
       const colour = (entry.colour || '').toLowerCase();
       const shape = (entry.shape || '').toLowerCase();
@@ -1032,7 +1056,7 @@ export default function StockMovementsScreen() {
                                 onPress={() => handleSelectInventoryEntry(idx, entry)}>
                                 <Text style={styles.customSelectItemText}>{getInventoryEntryDisplayName(entry)}</Text>
                                 <Text style={styles.customSelectItemSubtext}>
-                                  Available: {entry.qtyBoxes * (entry.packing || 1)} pcs {entry.batchNo ? `| Batch: ${entry.batchNo}` : ''}
+                                  Available: {entry.totalAvailablePcs !== undefined ? entry.totalAvailablePcs : entry.qtyBoxes * (entry.packing || 1)} pcs {entry.batches?.length > 0 ? `| Batches: ${entry.batches.join(', ')}` : (entry.batchNo ? `| Batch: ${entry.batchNo}` : '')}
                                 </Text>
                               </TouchableOpacity>
                             ))}
