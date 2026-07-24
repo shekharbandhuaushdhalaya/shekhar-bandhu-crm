@@ -918,58 +918,64 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           )}
 
 
-          {/* Billing Mode Switch */}
-          {(() => {
-            const selectedVend = vendors.find(v => (v.company || v.name).toLowerCase() === supplierName.trim().toLowerCase() || (v.displayName || v.registeredName || '').toLowerCase() === supplierName.trim().toLowerCase());
-            const isNonGstVendor = selectedVend ? (!selectedVend.gstin || !selectedVend.gstin.trim() || (selectedVend as any).recordTracking === 'cash_ledger') : false;
+          {/* Ledger Mode, Invoice Number, Date in 1 Row */}
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+            {/* Billing Mode Switch */}
+            {(() => {
+              const selectedVend = vendors.find(v => (v.company || v.name).toLowerCase() === supplierName.trim().toLowerCase() || (v.displayName || v.registeredName || '').toLowerCase() === supplierName.trim().toLowerCase());
+              const isNonGstVendor = selectedVend ? (!selectedVend.gstin || !selectedVend.gstin.trim() || (selectedVend as any).recordTracking === 'cash_ledger') : false;
 
-            return (
-              <View style={styles.modeSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.modeBtn,
-                    mode === 'regular' && { backgroundColor: colors.primary + '18', borderColor: colors.primary },
-                    isNonGstVendor && { opacity: 0.5, backgroundColor: colors.bg.secondary }
-                  ]}
-                  onPress={() => {
-                    if (isNonGstVendor) {
-                      alert(`"Regular GST Purchase" cannot be selected because ${selectedVend?.company || selectedVend?.name || 'this vendor'} is not registered for GST (no GSTIN provided). Non-GST / Cash Purchase will be used.`);
-                      setMode('cash');
-                      return;
-                    }
-                    setMode('regular');
-                  }}
-                >
-                  <Text style={[styles.modeBtnText, mode === 'regular' && { color: colors.primary, fontWeight: '700' }, isNonGstVendor && { color: colors.text.muted }]}>
-                    📄 Regular GST Purchase {isNonGstVendor ? '(Disabled for Non-GST Vendor)' : ''}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.modeBtn,
-                    mode === 'cash' && { backgroundColor: colors.warning + '18', borderColor: colors.warning }
-                  ]}
-                  onPress={() => setMode('cash')}
-                >
-                  <Text style={[styles.modeBtnText, mode === 'cash' && { color: colors.warning, fontWeight: '700' }]}>
-                    💵 Non-GST / Cash Purchase
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })()}
+              return (
+                <View style={[styles.formGroup, { flex: 1.2, marginBottom: 0 }]}>
+                  <Text style={styles.formLabel}>Ledger Purchase Mode *</Text>
+                  <View style={[styles.modeSelector, { marginTop: 0, marginBottom: 0 }]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.modeBtn,
+                        mode === 'regular' && { backgroundColor: colors.primary + '18', borderColor: colors.primary },
+                        isNonGstVendor && { opacity: 0.5, backgroundColor: colors.bg.secondary }
+                      ]}
+                      onPress={() => {
+                        if (isNonGstVendor) {
+                          alert(`"Regular GST Purchase" cannot be selected because ${selectedVend?.company || selectedVend?.name || 'this vendor'} is not registered for GST (no GSTIN provided). Non-GST / Cash Purchase will be used.`);
+                          setMode('cash');
+                          return;
+                        }
+                        setMode('regular');
+                      }}
+                    >
+                      <Text style={[styles.modeBtnText, { fontSize: 11 }, mode === 'regular' && { color: colors.primary, fontWeight: '700' }, isNonGstVendor && { color: colors.text.muted }]} numberOfLines={1}>
+                        📄 Regular GST {isNonGstVendor ? '(Off)' : ''}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.modeBtn,
+                        mode === 'cash' && { backgroundColor: colors.warning + '18', borderColor: colors.warning }
+                      ]}
+                      onPress={() => setMode('cash')}
+                    >
+                      <Text style={[styles.modeBtnText, { fontSize: 11 }, mode === 'cash' && { color: colors.warning, fontWeight: '700' }]} numberOfLines={1}>
+                        💵 Non-GST / Cash
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })()}
 
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>{mode === 'regular' ? 'Invoice Number *' : 'Ref / Bill Number (Optional)'}</Text>
+            {/* Invoice / Bill Ref No */}
+            <View style={[styles.formGroup, { flex: 1, marginBottom: 0 }]}>
+              <Text style={styles.formLabel}>{mode === 'regular' ? 'Invoice Number *' : 'Ref / Bill Number'}</Text>
               <View style={styles.formInput}>
                 <Ionicons name="barcode" size={16} color={colors.text.muted} />
-                <TextInput style={styles.formInputText} placeholder={mode === 'regular' ? "e.g. INV-PURCH-8012" : "e.g. CASH-BILL-01 (Optional)"} placeholderTextColor={colors.text.muted} value={invoiceNo} onChangeText={setInvoiceNo} />
+                <TextInput style={styles.formInputText} placeholder={mode === 'regular' ? "e.g. INV-PURCH-8012" : "e.g. CASH-BILL-01"} placeholderTextColor={colors.text.muted} value={invoiceNo} onChangeText={setInvoiceNo} />
               </View>
             </View>
 
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>Date</Text>
+            {/* Date */}
+            <View style={[styles.formGroup, { flex: 1, marginBottom: 0 }]}>
+              <Text style={styles.formLabel}>Purchase Date *</Text>
               <View style={styles.formInput}>
                 <Ionicons name="calendar-outline" size={16} color={colors.text.muted} />
                 {Platform.OS === 'web' ? React.createElement('input', {
