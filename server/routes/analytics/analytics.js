@@ -242,13 +242,40 @@ router.get('/manufacturing', async (req, res) => {
   try {
     const BatchProduction = require('../../models/BatchProduction');
     const BillOfMaterials = require('../../models/BillOfMaterials');
-    const RawMaterial = require('../../models/RawMaterial');
+    const RawMaterialEntry = require('../../models/RawMaterialEntry');
+    const InventoryEntry = require('../../models/InventoryEntry');
 
     const totalBatches = await BatchProduction.countDocuments({});
     const completedBatches = await BatchProduction.countDocuments({ status: 'completed' });
     const rejectedBatches = await BatchProduction.countDocuments({ status: 'rejected' });
     const inProgressBatches = await BatchProduction.countDocuments({ status: 'in_progress' });
     const qcHoldBatches = await BatchProduction.countDocuments({ status: 'qc_hold' });
+
+    // Calculate Raw Stock Valuation
+    const rawEntries = await RawMaterialEntry.find({ qty: { $gt: 0 } }).lean();
+    const netRawMaterialValue = rawEntries.reduce((sum, e) => sum + ((e.qty || 0) * (e.purchaseRate || 0)), 0);
+
+    // Calculate Finished Goods Valuation
+    const finEntries = await InventoryEntry.find({ qtyBoxes: { $gt: 0 } }).lean();
+    const netFinishedGoodsValue = finEntries.reduce((sum, e) => sum + ((e.qtyBoxes || 0) * (e.purchaseRate || 0)), 0);
+
+    // Yield Performance of completed batches
+    const completedBatchList = await BatchProduction.find({ status: 'completed' })
+      .populate('productId', 'name sku')
+      .sort({ endDate: -1 })
+      .limit(10)
+      .lean();
+
+    const yieldPerformance = completedBatchList.map(b => {
+      const efficiency = b.plannedQty > 0 ? Number(((b.actualYieldQty / b.plannedQty) * 100).toFixed(1)) : 100;
+      return {
+        batchNo: b.batchNo,
+        productName: b.productId ? b.productId.name : 'Finished Product',
+        plannedQty: b.plannedQty,
+        actualYieldQty: b.actualYieldQty,
+        efficiency
+      };
+    });
 
     const totalYield = await BatchProduction.aggregate([
       { $match: { status: 'completed' } },
@@ -279,6 +306,9 @@ router.get('/manufacturing', async (req, res) => {
     }));
 
     res.json({
+      netRawMaterialValue,
+      netFinishedGoodsValue,
+      yieldPerformance,
       batchesCount: {
         total: totalBatches,
         completed: completedBatches,
