@@ -542,17 +542,28 @@ router.get('/commission/calculate', authorize('mr:view'), async (req, res) => {
     const mrs = await MedicalRepresentative.find({ isActive: true }).lean();
     const mrIds = mrs.map(m => m._id);
 
-    // Sum order amounts from visits during the period
-    const visits = await MrVisit.find({
-      mrId: { $in: mrIds },
-      date: { $gte: startDate, $lte: endDate },
-      orderTaken: true
-    }).lean();
+    // Sum order amounts from visits during the period using MongoDB aggregation
+    const salesData = await MrVisit.aggregate([
+      {
+        $match: {
+          mrId: { $in: mrIds },
+          date: { $gte: startDate, $lte: endDate },
+          orderTaken: true
+        }
+      },
+      {
+        $group: {
+          _id: "$mrId",
+          totalSales: { $sum: "$orderAmount" }
+        }
+      }
+    ]);
 
     const salesMap = {};
-    visits.forEach(v => {
-      if (!salesMap[v.mrId]) salesMap[v.mrId] = 0;
-      salesMap[v.mrId] += (v.orderAmount || 0);
+    salesData.forEach(item => {
+      if (item._id) {
+        salesMap[item._id.toString()] = item.totalSales;
+      }
     });
 
     const report = mrs.map(mr => {

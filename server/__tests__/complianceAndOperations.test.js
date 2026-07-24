@@ -176,8 +176,8 @@ describe('Compliance and Operations Features', () => {
     });
 
     test('GET /medical-reps/commission/calculate computes commission payouts', async () => {
-      MedicalRepresentative.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([{ name: 'Rajesh', monthlyTarget: 10000 }]) });
-      MrVisit.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([{ orderTaken: true, orderAmount: 12000 }]) });
+      MedicalRepresentative.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: 'mr_001', name: 'Rajesh', monthlyTarget: 10000 }]) });
+      MrVisit.aggregate.mockResolvedValue([{ _id: 'mr_001', totalSales: 12000 }]);
 
       const response = await request(app).get('/api/medical-reps/commission/calculate?month=07&year=2026');
       expect(response.status).toBe(200);

@@ -2122,215 +2122,25 @@ export default function InventoriesScreen() {
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Total Stock</Text></View>
                   </View>
 
-                  {processedItems.map((item: any) => {
-                    const isExpanded = !!expandedProducts[item.productId];
-                    const uniqueVendors = Array.from(new Set(item.vendorDetails.map((v: any) => v.vendorName))) as string[];
-                    
-                    const prodMatch = products.find(p => p._id === item.productId);
-                    const minReorderVal = prodMatch ? (prodMatch.minReorder || 0) : 0;
-                    const isLowStock = minReorderVal > 0 ? item.totalBoxes <= minReorderVal : item.totalBoxes <= 0;
-
-                    return (
-                      <View key={item.productId} style={[styles.expandableGroupContainer, { borderLeftWidth: 4, borderLeftColor: isLowStock ? colors.warning : 'transparent' }]}>
-                        <Pressable
-                          style={({ pressed }) => [
-                            styles.tableBodyRow,
-                            isLowStock ? { backgroundColor: colors.warning + '12' } : (pressed ? { backgroundColor: colors.bg.secondary } : {})
-                          ]}
-                          onPress={() => {
-                            setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }));
-                          }}
-                        >
-                          <View style={[styles.tableCellContainer, { width: 40, alignItems: 'center', justifyContent: 'center' }]}>
-                            <Ionicons 
-                              name={isExpanded ? 'chevron-down-circle' : 'chevron-forward-circle'} 
-                              size={18} 
-                              color={colors.primary} 
-                            />
-                          </View>
-
-                          <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
-                            <Text style={styles.primaryText}>{getDisplayName(item)}</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-                              <Text style={{ fontSize: 10, color: colors.text.muted }}>HSN: {item.hsnCode}</Text>
-                              {isLowStock && (
-                                <View style={{ backgroundColor: colors.warning + '20', borderColor: colors.warning + '60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '800', color: colors.warning }}>
-                                    ⚠️ LOW STOCK ({item.totalBoxes}/{minReorderVal})
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                          </View>
-
-                          <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
-                            <Text style={styles.tableCell} numberOfLines={1}>
-                              {uniqueVendors.map(v => formatVendorDisplay(v)).join(', ')}
-                            </Text>
-                          </View>
-
-                          <View style={[styles.tableCellContainer, { flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }]}>
-                            {item.warehouses.map((w: any, idx: number) => (
-                              <View key={idx} style={[styles.warehouseBadge, { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 }]}>
-                                <Text style={styles.warehouseBadgeText}>
-                                  {w.warehouseName}: 
-                                </Text>
-                                <View style={{ marginLeft: 4 }}>
-                                  <StockDisplay qtyBoxes={w.qtyBoxes} packing={item.vendorDetails[0]?.packing || 1} textStyle={{ fontSize: 10, color: colors.text.primary }} />
-                                </View>
-                              </View>
-                            ))}
-                          </View>
-
-                          <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]}>
-                            <StockDisplay 
-                              qtyBoxes={item.totalBoxes} 
-                              packing={item.vendorDetails[0]?.packing || 1} 
-                              textStyle={{ fontWeight: '700', fontSize: 13 }} 
-                            />
-                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
-                              across {item.vendorDetails.length} batch{item.vendorDetails.length !== 1 ? 'es' : ''}
-                            </Text>
-                          </View>
-                        </Pressable>
-
-                        {isExpanded && (
-                          <View style={styles.expandedBreakdownArea}>
-                            {item.vendorDetails.length === 0 ? (
-                              <View style={styles.expandedBreakdownRow}>
-                                <View style={{ width: 40 }} />
-                                <Pressable
-                                  style={{ flex: 2.5, paddingLeft: 10 }}
-                                  onPress={() => {
-                                    setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item), vendorId: '' });
-                                    setLedgerVisible(true);
-                                  }}
-                                >
-                                  <Text style={styles.breakdownVendorText}>↳ No Stock History</Text>
-                                </Pressable>
-                                <View style={{ flex: 1.8 }} />
-                                <View style={{ flex: 2.2 }} />
-                                <Pressable
-                                  style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 8 }}
-                                  onPress={() => {
-                                    setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item), vendorId: '' });
-                                    setLedgerVisible(true);
-                                  }}
-                                >
-                                  <View>
-                                    <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>0 Boxes</Text>
-                                  </View>
-                                  <View style={styles.breakdownActionBadge}>
-                                    <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
-                                    <Text style={styles.breakdownActionText}>Ledger</Text>
-                                  </View>
-                                </Pressable>
-                              </View>
-                            ) : (
-                              item.vendorDetails.map((vd: any, idx: number) => (
-                                <View
-                                  key={idx}
-                                  style={[
-                                    styles.expandedBreakdownRow,
-                                    idx !== item.vendorDetails.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border + '30' }
-                                  ]}
-                                >
-                                  <View style={{ width: 40 }} />
-
-                                  {/* Align under Item Name (Vendor + Packing + Ledger action trigger) */}
-                                  <Pressable
-                                    style={{ flex: 2.5, paddingLeft: 10 }}
-                                    onPress={() => {
-                                      setSelectedLedgerProduct({ id: item.productId, name: `${getDisplayName(item)} (${vd.vendorName})`, packing: vd.packing, vendorId: vd.vendorId });
-                                      setLedgerVisible(true);
-                                    }}
-                                  >
-                                    <Text style={styles.breakdownVendorText}>↳ {formatVendorDisplay(vd.vendorName)}</Text>
-                                    <Text style={styles.breakdownPackingText}>Packing: {vd.packing} Pcs/Box</Text>
-                                    {vd.batchNo ? (
-                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-                                        <Text style={[styles.breakdownPackingText, { color: colors.warning, fontWeight: '700' }]}>
-                                          Batch: {vd.batchNo}
-                                        </Text>
-                                        {vd.manufacturingUnitName ? (
-                                          <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                                            <Text style={{ fontSize: 9, fontWeight: '800', color: colors.primary }}>
-                                              🏭 {vd.manufacturingUnitName}
-                                            </Text>
-                                          </View>
-                                        ) : null}
-                                      </View>
-                                    ) : null}
-                                    {(vd.mfgDate || vd.expiryDate) ? (() => {
-                                      const now = new Date();
-                                      const expDate = vd.expiryDate ? new Date(vd.expiryDate) : null;
-                                      const daysLeft = expDate ? Math.floor((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                                      const expiryColor = daysLeft === null ? colors.text.muted
-                                        : daysLeft < 0 ? '#ef4444'
-                                        : daysLeft <= 30 ? '#f97316'
-                                        : daysLeft <= 90 ? '#eab308'
-                                        : colors.text.muted;
-                                      const expiryLabel = daysLeft === null ? ''
-                                        : daysLeft < 0 ? ' ⚠ EXPIRED'
-                                        : daysLeft <= 30 ? ` ⚠ ${daysLeft}d left`
-                                        : daysLeft <= 90 ? ` (${daysLeft}d)`
-                                        : '';
-                                      return (
-                                        <Text style={{ fontSize: 9, color: expiryColor, marginTop: 2, fontWeight: daysLeft !== null && daysLeft <= 30 ? '700' : '400' }}>
-                                          {vd.mfgDate ? `Mfg: ${new Date(vd.mfgDate).toLocaleDateString('en-IN')}` : ''}
-                                          {vd.mfgDate && vd.expiryDate ? ' | ' : ''}
-                                          {vd.expiryDate ? `Exp: ${new Date(vd.expiryDate).toLocaleDateString('en-IN')}${expiryLabel}` : ''}
-                                        </Text>
-                                      );
-                                    })() : null}
-                                  </Pressable>
-
-                                  {/* Align under Vendors (Empty space) */}
-                                  <View style={{ flex: 1.8 }} />
-
-                                  {/* Align under Godowns */}
-                                  <View style={{ flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                                    {vd.warehouses.map((w: any, wIdx: number) => (
-                                      <View key={wIdx} style={[styles.warehouseBadge, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20', flexDirection: 'row', alignItems: 'center', paddingVertical: 2 }]}>
-                                        <Text style={[styles.warehouseBadgeText, { color: colors.primary }]}>
-                                          {w.warehouseName}: 
-                                        </Text>
-                                        <View style={{ marginLeft: 4 }}>
-                                          <StockDisplay qtyBoxes={w.qtyBoxes} packing={vd.packing} textStyle={{ fontSize: 10, color: colors.primary }} />
-                                        </View>
-                                      </View>
-                                    ))}
-                                  </View>
-
-                                  {/* Align under Total Stock (Ledger shortcut) */}
-                                  <Pressable
-                                    style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 8 }}
-                                    onPress={() => {
-                                      setSelectedLedgerProduct({ id: item.productId, name: `${getDisplayName(item)} (${vd.vendorName})`, packing: vd.packing, vendorId: vd.vendorId });
-                                      setLedgerVisible(true);
-                                    }}
-                                  >
-                                    <View>
-                                      <StockDisplay 
-                                        qtyBoxes={vd.qtyBoxes} 
-                                        packing={vd.packing} 
-                                        textStyle={{ fontWeight: '700', fontSize: 13 }} 
-                                      />
-                                      <Text style={{ fontSize: 9, color: colors.text.muted }}>Subtotal</Text>
-                                    </View>
-                                    <View style={styles.breakdownActionBadge}>
-                                      <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
-                                      <Text style={styles.breakdownActionText}>Ledger</Text>
-                                    </View>
-                                  </Pressable>
-                                </View>
-                              ))
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })}
+                  {processedItems.map((item: any) => (
+                    <InventoryRow
+                      key={item.productId}
+                      item={item}
+                      isExpanded={!!expandedProducts[item.productId]}
+                      onToggleExpand={() => setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }))}
+                      isConsolidated={true}
+                      products={products}
+                      colors={colors}
+                      styles={styles}
+                      perm={perm}
+                      onAddStock={(id: string) => { setAddStockInitialProductId(id); setAddStockVisible(true); }}
+                      onAdjustStock={(vd: any) => { setSelectedEntry(vd); setAdjustStockVisible(true); }}
+                      onShowLedger={(prodInfo: any) => { setSelectedLedgerProduct(prodInfo); setLedgerVisible(true); }}
+                      formatVendorDisplay={formatVendorDisplay}
+                      getDisplayName={getDisplayName}
+                      currentWarehouseName={currentWarehouseName}
+                    />
+                  ))}
 
                   {processedItems.length === 0 && (
                     <View style={styles.emptyTableContainer}>
@@ -2350,207 +2160,25 @@ export default function InventoriesScreen() {
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Total Stock</Text></View>
                   </View>
 
-                  {processedItems.map((item: any) => {
-                    const isExpanded = !!expandedProducts[item.productId];
-                    const uniqueVendors = Array.from(new Set(item.vendorDetails.map((v: any) => v.vendorName))) as string[];
-                    
-                    const prodMatch = products.find(p => p._id === item.productId);
-                    const minReorderVal = prodMatch ? (prodMatch.minReorder || 0) : 0;
-                    const isLowStock = minReorderVal > 0 ? item.totalBoxes <= minReorderVal : item.totalBoxes <= 0;
-
-                    return (
-                      <View key={item.productId} style={[styles.expandableGroupContainer, { borderLeftWidth: 4, borderLeftColor: isLowStock ? colors.warning : 'transparent' }]}>
-                        <Pressable
-                          style={({ pressed }) => [
-                            styles.tableBodyRow,
-                            isLowStock ? { backgroundColor: colors.warning + '12' } : (pressed ? { backgroundColor: colors.bg.secondary } : {})
-                          ]}
-                          onPress={() => {
-                            setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }));
-                          }}
-                        >
-                          <View style={[styles.tableCellContainer, { width: 40, alignItems: 'center', justifyContent: 'center' }]}>
-                            <Ionicons 
-                              name={isExpanded ? 'chevron-down-circle' : 'chevron-forward-circle'} 
-                              size={18} 
-                              color={colors.primary} 
-                            />
-                          </View>
-
-                          <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
-                            <Text style={styles.primaryText}>{getDisplayName(item)}</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-                              <Text style={{ fontSize: 10, color: colors.text.muted }}>HSN: {item.hsnCode}</Text>
-                              {isLowStock && (
-                                <View style={{ backgroundColor: colors.warning + '20', borderColor: colors.warning + '60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '800', color: colors.warning }}>
-                                    ⚠️ LOW STOCK ({item.totalBoxes}/{minReorderVal})
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                          </View>
-
-                          <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
-                            <Text style={styles.tableCell} numberOfLines={1}>
-                              {uniqueVendors.map(v => formatVendorDisplay(v)).join(', ')}
-                            </Text>
-                          </View>
-
-                          <View style={[styles.tableCellContainer, { flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }]}>
-                            <View style={styles.warehouseBadge}>
-                              <Text style={styles.warehouseBadgeText}>
-                                {currentWarehouseName}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]}>
-                            <StockDisplay 
-                              qtyBoxes={item.totalBoxes} 
-                              packing={item.vendorDetails[0]?.packing || 1} 
-                              textStyle={{ fontWeight: '700', fontSize: 13 }} 
-                            />
-                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
-                              across {item.vendorDetails.length} batch{item.vendorDetails.length !== 1 ? 'es' : ''}
-                            </Text>
-                          </View>
-                        </Pressable>
-
-                        {isExpanded && (
-                          <View style={styles.expandedBreakdownArea}>
-                            {item.vendorDetails.length === 0 ? (
-                              <View style={styles.expandedBreakdownRow}>
-                                <View style={{ width: 40 }} />
-                                <Pressable
-                                  style={{ flex: 2.5, paddingLeft: 10 }}
-                                  onPress={() => {
-                                    setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item), vendorId: '' });
-                                    setLedgerVisible(true);
-                                  }}
-                                >
-                                  <Text style={styles.breakdownVendorText}>↳ No Stock History</Text>
-                                </Pressable>
-                                <View style={{ flex: 1.8 }} />
-                                <View style={{ flex: 2.2, justifyContent: 'center', alignItems: 'flex-start' }}>
-                                  {perm.can('inventory:edit') && (
-                                    <TouchableOpacity
-                                      style={styles.actionBtnSecondary}
-                                      onPress={() => {
-                                        setAddStockInitialProductId(item.productId);
-                                        setAddStockVisible(true);
-                                      }}
-                                    >
-                                      <Ionicons name="options-outline" size={14} color={colors.primary} />
-                                      <Text style={styles.actionBtnSecondaryText}>Adjust Stock</Text>
-                                    </TouchableOpacity>
-                                  )}
-                                </View>
-                                <Pressable
-                                  style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 8 }}
-                                  onPress={() => {
-                                    setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item), vendorId: '' });
-                                    setLedgerVisible(true);
-                                  }}
-                                >
-                                  <View>
-                                    <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>0 Boxes</Text>
-                                  </View>
-                                  <View style={styles.breakdownActionBadge}>
-                                    <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
-                                    <Text style={styles.breakdownActionText}>Ledger</Text>
-                                  </View>
-                                </Pressable>
-                              </View>
-                            ) : (
-                              item.vendorDetails.map((vd: any, idx: number) => (
-                                <View
-                                  key={idx}
-                                  style={[
-                                    styles.expandedBreakdownRow,
-                                    idx !== item.vendorDetails.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border + '30' }
-                                  ]}
-                                >
-                                  <View style={{ width: 40 }} />
-
-                                  {/* Align under Item Name (Vendor + Packing + Ledger action trigger) */}
-                                  <Pressable
-                                    style={{ flex: 2.5, paddingLeft: 10 }}
-                                    onPress={() => {
-                                      setSelectedLedgerProduct({ id: item.productId, name: `${getDisplayName(item)} (${vd.vendorName})`, packing: vd.packing, vendorId: vd.vendorId });
-                                      setLedgerVisible(true);
-                                    }}
-                                  >
-                                    <Text style={styles.breakdownVendorText}>↳ {toTitleCase(vd.vendorName) || 'Unknown Vendor'}</Text>
-                                    <Text style={styles.breakdownPackingText}>Packing: {vd.packing} Pcs/Box</Text>
-                                    {vd.batchNo ? (
-                                      <Text style={[styles.breakdownPackingText, { color: colors.warning, fontWeight: '700', marginTop: 2 }]}>
-                                        Batch: {vd.batchNo}
-                                      </Text>
-                                    ) : null}
-                                    {(vd.mfgDate || vd.expiryDate) ? (() => {
-                                      const now = new Date();
-                                      const expDate = vd.expiryDate ? new Date(vd.expiryDate) : null;
-                                      const daysLeft = expDate ? Math.floor((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                                      const expiryColor = daysLeft === null ? colors.text.muted
-                                        : daysLeft < 0 ? '#ef4444'
-                                        : daysLeft <= 30 ? '#f97316'
-                                        : daysLeft <= 90 ? '#eab308'
-                                        : colors.text.muted;
-                                      const expiryLabel = daysLeft === null ? ''
-                                        : daysLeft < 0 ? ' ⚠ EXPIRED'
-                                        : daysLeft <= 30 ? ` ⚠ ${daysLeft}d left`
-                                        : daysLeft <= 90 ? ` (${daysLeft}d)`
-                                        : '';
-                                      return (
-                                        <Text style={{ fontSize: 9, color: expiryColor, marginTop: 2, fontWeight: daysLeft !== null && daysLeft <= 30 ? '700' : '400' }}>
-                                          {vd.mfgDate ? `Mfg: ${new Date(vd.mfgDate).toLocaleDateString('en-IN')}` : ''}
-                                          {vd.mfgDate && vd.expiryDate ? ' | ' : ''}
-                                          {vd.expiryDate ? `Exp: ${new Date(vd.expiryDate).toLocaleDateString('en-IN')}${expiryLabel}` : ''}
-                                        </Text>
-                                      );
-                                    })() : null}
-                                  </Pressable>
-
-                                  {/* Align under Vendors (Empty space) */}
-                                  <View style={{ flex: 1.8 }} />
-
-                                  {/* Align under Godowns (Adjust Stock Button) */}
-                                  <View style={{ flex: 2.2, justifyContent: 'center', alignItems: 'flex-start' }}>
-                                    {perm.can('inventory:edit') && (
-                                      <TouchableOpacity
-                                        style={styles.actionBtnSecondary}
-                                        onPress={() => {
-                                          const entry = warehouseEntries.find(e => e._id === vd._id);
-                                          if (entry) {
-                                            setSelectedEntry(entry);
-                                            setAdjustStockVisible(true);
-                                          }
-                                        }}
-                                      >
-                                        <Ionicons name="options-outline" size={14} color={colors.primary} />
-                                        <Text style={styles.actionBtnSecondaryText}>Adjust Stock</Text>
-                                      </TouchableOpacity>
-                                    )}
-                                  </View>
-
-                                  {/* Align under Total Stock */}
-                                  <View style={{ flex: 1.2 }}>
-                                    <StockDisplay 
-                                      qtyBoxes={vd.qtyBoxes} 
-                                      packing={vd.packing} 
-                                      textStyle={{ fontWeight: '700', fontSize: 13 }} 
-                                    />
-                                    <Text style={{ fontSize: 9, color: colors.text.muted }}>Subtotal</Text>
-                                  </View>
-                                </View>
-                              ))
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })}
+                  {processedItems.map((item: any) => (
+                    <InventoryRow
+                      key={item.productId}
+                      item={item}
+                      isExpanded={!!expandedProducts[item.productId]}
+                      onToggleExpand={() => setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }))}
+                      isConsolidated={false}
+                      products={products}
+                      colors={colors}
+                      styles={styles}
+                      perm={perm}
+                      onAddStock={(id: string) => { setAddStockInitialProductId(id); setAddStockVisible(true); }}
+                      onAdjustStock={(vd: any) => { setSelectedEntry(vd); setAdjustStockVisible(true); }}
+                      onShowLedger={(prodInfo: any) => { setSelectedLedgerProduct(prodInfo); setLedgerVisible(true); }}
+                      formatVendorDisplay={formatVendorDisplay}
+                      getDisplayName={getDisplayName}
+                      currentWarehouseName={currentWarehouseName}
+                    />
+                  ))}
 
                   {processedItems.length === 0 && (
                     <View style={styles.emptyTableContainer}>
@@ -2802,6 +2430,228 @@ function AddTransferModal({ visible, onClose, onSaved, warehouses, products }: {
     </Modal>
   );
 }
+
+// ── Memoized Inventory Row Component for Performance ──
+const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolidated, products, colors, styles, perm, onAddStock, onAdjustStock, onShowLedger, formatVendorDisplay, getDisplayName, currentWarehouseName }: any) => {
+  const uniqueVendors = Array.from(new Set(item.vendorDetails.map((v: any) => v.vendorName))) as string[];
+  const prodMatch = products.find((p: any) => p._id === item.productId);
+  const minReorderVal = prodMatch ? (prodMatch.minReorder || 0) : 0;
+  const isLowStock = minReorderVal > 0 ? item.totalBoxes <= minReorderVal : item.totalBoxes <= 0;
+
+  return (
+    <View style={[styles.expandableGroupContainer, { borderLeftWidth: 4, borderLeftColor: isLowStock ? colors.warning : 'transparent' }]}>
+      <Pressable
+        style={({ pressed }) => [
+          styles.tableBodyRow,
+          isLowStock ? { backgroundColor: colors.warning + '12' } : (pressed ? { backgroundColor: colors.bg.secondary } : {})
+        ]}
+        onPress={onToggleExpand}
+      >
+        <View style={[styles.tableCellContainer, { width: 40, alignItems: 'center', justifyContent: 'center' }]}>
+          <Ionicons 
+            name={isExpanded ? 'chevron-down-circle' : 'chevron-forward-circle'} 
+            size={18} 
+            color={colors.primary} 
+          />
+        </View>
+
+        <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
+          <Text style={styles.primaryText}>{getDisplayName(item)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+            <Text style={{ fontSize: 10, color: colors.text.muted }}>HSN: {item.hsnCode}</Text>
+            {isLowStock && (
+              <View style={{ backgroundColor: colors.warning + '20', borderColor: colors.warning + '60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                <Text style={{ fontSize: 9, fontWeight: '800', color: colors.warning }}>
+                  ⚠️ LOW STOCK ({item.totalBoxes}/{minReorderVal})
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
+          <Text style={styles.tableCell} numberOfLines={1}>
+            {uniqueVendors.map(v => formatVendorDisplay(v)).join(', ')}
+          </Text>
+        </View>
+
+        <View style={[styles.tableCellContainer, { flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }]}>
+          {isConsolidated ? (
+            item.warehouses.map((w: any, idx: number) => (
+              <View key={idx} style={[styles.warehouseBadge, { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 }]}>
+                <Text style={styles.warehouseBadgeText}>
+                  {w.warehouseName}: 
+                </Text>
+                <View style={{ marginLeft: 4 }}>
+                  <StockDisplay qtyBoxes={w.qtyBoxes} packing={item.vendorDetails[0]?.packing || 1} textStyle={{ fontSize: 10, color: colors.text.primary }} />
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.warehouseBadge}>
+              <Text style={styles.warehouseBadgeText}>
+                {currentWarehouseName}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]}>
+          <StockDisplay 
+            qtyBoxes={item.totalBoxes} 
+            packing={item.vendorDetails[0]?.packing || 1} 
+            textStyle={{ fontWeight: '700', fontSize: 13 }} 
+          />
+          <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
+            across {item.vendorDetails.length} batch{item.vendorDetails.length !== 1 ? 'es' : ''}
+          </Text>
+        </View>
+      </Pressable>
+
+      {isExpanded && (
+        <View style={styles.expandedBreakdownArea}>
+          {item.vendorDetails.length === 0 ? (
+            <View style={styles.expandedBreakdownRow}>
+              <View style={{ width: 40 }} />
+              <Pressable
+                style={{ flex: 2.5, paddingLeft: 10 }}
+                onPress={() => onShowLedger({ id: item.productId, name: getDisplayName(item), vendorId: '' })}
+              >
+                <Text style={styles.breakdownVendorText}>↳ No Stock History</Text>
+              </Pressable>
+              <View style={{ flex: 1.8 }} />
+              <View style={{ flex: 2.2 }} />
+              <Pressable
+                style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 8 }}
+                onPress={() => onShowLedger({ id: item.productId, name: getDisplayName(item), vendorId: '' })}
+              >
+                <View>
+                  <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>0 Boxes</Text>
+                </View>
+                <View style={styles.breakdownActionBadge}>
+                  <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
+                  <Text style={styles.breakdownActionText}>Ledger</Text>
+                </View>
+              </Pressable>
+            </View>
+          ) : (
+            item.vendorDetails.map((vd: any, idx: number) => (
+              <View
+                key={idx}
+                style={[
+                  styles.expandedBreakdownRow,
+                  idx !== item.vendorDetails.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border + '30' }
+                ]}
+              >
+                <View style={{ width: 40 }} />
+
+                <Pressable
+                  style={{ flex: 2.5, paddingLeft: 10 }}
+                  onPress={() => onShowLedger({ id: item.productId, name: `${getDisplayName(item)} (${vd.vendorName})`, packing: vd.packing, vendorId: vd.vendorId })}
+                >
+                  <Text style={styles.breakdownVendorText}>↳ {formatVendorDisplay(vd.vendorName)}</Text>
+                  <Text style={styles.breakdownPackingText}>Packing: {vd.packing} Pcs/Box</Text>
+                  {vd.batchNo ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                      <Text style={[styles.breakdownPackingText, { color: colors.warning, fontWeight: '700' }]}>
+                        Batch: {vd.batchNo}
+                      </Text>
+                      {vd.manufacturingUnitName ? (
+                        <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '800', color: colors.primary }}>
+                            🏭 {vd.manufacturingUnitName}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
+                  {(vd.mfgDate || vd.expiryDate) ? (() => {
+                    const now = new Date();
+                    const expDate = vd.expiryDate ? new Date(vd.expiryDate) : null;
+                    const daysLeft = expDate ? Math.floor((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                    const expiryColor = daysLeft === null ? colors.text.muted
+                      : daysLeft < 0 ? '#ef4444'
+                      : daysLeft <= 30 ? '#f97316'
+                      : daysLeft <= 90 ? '#eab308'
+                      : colors.text.muted;
+                    const expiryLabel = daysLeft === null ? ''
+                      : daysLeft < 0 ? ' ⚠ EXPIRED'
+                      : daysLeft <= 30 ? ` ⚠ ${daysLeft}d left`
+                      : daysLeft <= 90 ? ` (${daysLeft}d)`
+                      : '';
+                    return (
+                      <Text style={{ fontSize: 9, color: expiryColor, marginTop: 2, fontWeight: daysLeft !== null && daysLeft <= 30 ? '700' : '400' }}>
+                        {vd.mfgDate ? `Mfg: ${new Date(vd.mfgDate).toLocaleDateString('en-IN')}` : ''}
+                        {vd.mfgDate && vd.expiryDate ? ' | ' : ''}
+                        {vd.expiryDate ? `Exp: ${new Date(vd.expiryDate).toLocaleDateString('en-IN')}${expiryLabel}` : ''}
+                      </Text>
+                    );
+                  })() : null}
+                </Pressable>
+
+                <View style={{ flex: 1.8 }} />
+
+                <View style={{ flex: 2.2, flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-start', alignItems: 'center' }}>
+                  {isConsolidated ? (
+                    vd.warehouses.map((w: any, wIdx: number) => (
+                      <View key={wIdx} style={[styles.warehouseBadge, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20', flexDirection: 'row', alignItems: 'center', paddingVertical: 2 }]}>
+                        <Text style={[styles.warehouseBadgeText, { color: colors.primary }]}>
+                          {w.warehouseName}: 
+                        </Text>
+                        <View style={{ marginLeft: 4 }}>
+                          <StockDisplay qtyBoxes={w.qtyBoxes} packing={vd.packing} textStyle={{ fontSize: 10, color: colors.primary }} />
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <>
+                      {vd.warehouses.map((wh: any, wIdx: number) => (
+                        <View key={wIdx} style={styles.warehouseBadge}>
+                          <Text style={styles.warehouseBadgeText}>
+                            {wh.warehouseName}
+                          </Text>
+                        </View>
+                      ))}
+                      {perm.can('inventory:edit') && (
+                        <TouchableOpacity
+                          style={styles.actionBtnSecondary}
+                          onPress={() => onAdjustStock(vd)}
+                        >
+                          <Ionicons name="options-outline" size={14} color={colors.primary} />
+                          <Text style={styles.actionBtnSecondaryText}>Adjust Stock</Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                </View>
+
+                <Pressable
+                  style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 8 }}
+                  onPress={() => onShowLedger({ id: item.productId, name: `${getDisplayName(item)} (${vd.vendorName})`, packing: vd.packing, vendorId: vd.vendorId })}
+                >
+                  <View>
+                    <StockDisplay 
+                      qtyBoxes={vd.qtyBoxes} 
+                      packing={vd.packing} 
+                      textStyle={{ fontWeight: '700', fontSize: 13 }} 
+                    />
+                    <Text style={{ fontSize: 9, color: colors.text.muted }}>Subtotal</Text>
+                  </View>
+                  <View style={styles.breakdownActionBadge}>
+                    <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
+                    <Text style={styles.breakdownActionText}>Ledger</Text>
+                  </View>
+                </Pressable>
+              </View>
+            ))
+          )}
+        </View>
+      )}
+    </View>
+  );
+}, (prev, next) => {
+  return prev.isExpanded === next.isExpanded && prev.item.totalBoxes === next.item.totalBoxes && prev.item.productId === next.item.productId && prev.isConsolidated === next.isConsolidated;
+});
 
 // Styling creator
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({

@@ -24,5 +24,6 @@ const inventoryEntrySchema = new mongoose.Schema({
 
 // Unique stock slot = product + vendor + warehouse + packing size + batch number
 inventoryEntrySchema.index({ warehouseId: 1, productId: 1, vendorId: 1, packing: 1, batchNo: 1 }, { unique: true });
+inventoryEntrySchema.index({ expiryDate: 1, qtyBoxes: 1 });
 
 module.exports = mongoose.model('InventoryEntry', inventoryEntrySchema);
