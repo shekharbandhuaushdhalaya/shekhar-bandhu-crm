@@ -2681,20 +2681,20 @@ export default function ManufacturingScreen() {
                     <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
                       <View style={{ minWidth: '100%', flex: 1 }}>
                         <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                          <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                          <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Challan No</Text>
-                          <Text style={{ flex: 1.2, minWidth: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Customer / Consignee</Text>
-                          <Text style={{ flex: 1.5, minWidth: 150, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Items / Qty</Text>
+                          <Text style={{ width: 120, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Doc No</Text>
+                          <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
+                          <Text style={{ flex: 1, minWidth: 220, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Party</Text>
+                          <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Warehouse</Text>
+                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Type</Text>
                           <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Status</Text>
                         </View>
                         {traceResult.challans.map((c: any, idx: number) => (
                           <View key={c._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.challans.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                            <Text style={{ width: 95, fontSize: 11, color: colors.text.secondary }}>{new Date(c.date).toLocaleDateString('en-IN')}</Text>
-                            <Text style={{ width: 130, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>{c.challanNo}</Text>
-                            <Text style={{ flex: 1.2, minWidth: 140, fontSize: 11, color: colors.text.primary }}>{c.partyName}</Text>
-                            <Text style={{ flex: 1.5, minWidth: 150, fontSize: 11, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>
-                              {c.items.map((i: any) => `${i.name} (${i.qty} Pcs)`).join(', ')}
-                            </Text>
+                            <Text style={{ width: 120, fontSize: 11, fontWeight: '700', color: colors.primary }}>{c.challanNo}</Text>
+                            <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>{new Date(c.date).toLocaleDateString('en-IN')}</Text>
+                            <Text style={{ flex: 1, minWidth: 220, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>{c.partyName}</Text>
+                            <Text style={{ width: 130, fontSize: 11, color: colors.text.secondary }} numberOfLines={1}>{c.warehouseName || '—'}</Text>
+                            <Text style={{ width: 100, fontSize: 11, color: colors.text.secondary }}>{c.type ? (c.type.charAt(0).toUpperCase() + c.type.slice(1)) : 'Sale'}</Text>
                             <View style={{ width: 100 }}>
                               <View style={[styles.statusBadge, { 
                                 borderColor: c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted), 
@@ -2724,18 +2724,19 @@ export default function ManufacturingScreen() {
                     <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
                       <View style={{ minWidth: '100%', flex: 1 }}>
                         <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                          <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                          <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Invoice No</Text>
-                          <Text style={{ flex: 1.2, minWidth: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Customer Name</Text>
-                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Total Amt</Text>
+                          <Text style={{ width: 120, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Doc No</Text>
+                          <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
+                          <Text style={{ flex: 1, minWidth: 220, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Party</Text>
+                          <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Warehouse</Text>
                           <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Status</Text>
+                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Amount</Text>
                         </View>
                         {traceResult.invoices.map((inv: any, idx: number) => (
                           <View key={inv._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.invoices.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                            <Text style={{ width: 95, fontSize: 11, color: colors.text.secondary }}>{new Date(inv.date).toLocaleDateString('en-IN')}</Text>
-                            <Text style={{ width: 130, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>{inv.invoiceNo}</Text>
-                            <Text style={{ flex: 1.2, minWidth: 140, fontSize: 11, color: colors.text.primary }}>{inv.customerName}</Text>
-                            <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>₹{inv.amount.toLocaleString('en-IN')}</Text>
+                            <Text style={{ width: 120, fontSize: 11, fontWeight: '700', color: colors.primary }}>{inv.invoiceNo}</Text>
+                            <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>{new Date(inv.date).toLocaleDateString('en-IN')}</Text>
+                            <Text style={{ flex: 1, minWidth: 220, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>{inv.customerName}</Text>
+                            <Text style={{ width: 130, fontSize: 11, color: colors.text.secondary }} numberOfLines={1}>{inv.warehouseName || '—'}</Text>
                             <View style={{ width: 100 }}>
                               <View style={[styles.statusBadge, { 
                                 borderColor: inv.status === 'paid' ? colors.success : colors.warning, 
@@ -2749,6 +2750,7 @@ export default function ManufacturingScreen() {
                                 </Text>
                               </View>
                             </View>
+                            <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.text.primary, textAlign: 'right' }}>₹{inv.amount.toLocaleString('en-IN')}</Text>
                           </View>
                         ))}
                       </View>
