@@ -31,9 +31,38 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// POST /api/auth/register — Create a user (Admin/system route)
+// POST /api/auth/register — Create a user (Admin/system route with bootstrap protection)
 router.post('/register', validate(schemas.userSchema), async (req, res) => {
   try {
+    const adminExists = await User.exists({ role: 'admin' });
+    
+    if (adminExists) {
+      // Authenticate token manually
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ error: 'Authentication required. Admin registration is locked.' });
+      }
+      
+      let decoded;
+      try {
+        decoded = jwt.verify(token, JWT_SECRET);
+      } catch (err) {
+        return res.status(403).json({ error: 'Invalid or expired token' });
+      }
+      
+      req.user = decoded;
+      trackAgentActivity(decoded.id, req);
+
+      // Check role permissions: require 'user:create' or admin role
+      const { getRolePermissions } = require('../../middleware/authorize');
+      const rolePermissions = await getRolePermissions(req.user.role);
+      const { hasPermission } = require('../../utils/permissions');
+      if (!hasPermission(rolePermissions, 'user:create')) {
+        return res.status(403).json({ error: 'Access denied. Required permission: user:create' });
+      }
+    }
+
     const { name, email, password, role, canAccessCash } = req.body;
     
     // Check if user already exists

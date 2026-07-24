@@ -6,7 +6,20 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
+    required: true,
     default: 'agent',
+    validate: {
+      validator: async function(value) {
+        const BUILTIN_ROLES = ['admin', 'manager', 'agent'];
+        if (BUILTIN_ROLES.includes(value)) {
+          return true;
+        }
+        const RolePermission = mongoose.model('RolePermission');
+        const roleExists = await RolePermission.exists({ role: value });
+        return !!roleExists;
+      },
+      message: props => `${props.value} is not a valid role.`
+    }
   },
   canAccessCash: {
     type: Boolean,

@@ -68,8 +68,15 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: (origin, callback) => {
+      if (!origin || config.allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
+    credentials: true,
   },
 });
 
@@ -114,8 +121,21 @@ function authenticateJWT(req, res, next) {
 
 // Middleware
 app.use(compression());
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || config.allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 app.use(morgan('short'));
 
@@ -156,93 +176,102 @@ const authLimiter = rateLimit({
 // ─── Try MongoDB connection & start server ───
 const { seedDatabase } = require('./utils/seed');
 
+// Register all routes synchronously
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/system', systemRoutes);
+
+app.use('/api/contacts', authenticateJWT, contactRoutes);
+app.use('/api/tasks', authenticateJWT, taskRoutes);
+app.use('/api/dashboard', authenticateJWT, dashboardRoutes);
+app.use('/api/customers', authenticateJWT, customerRoutes);
+app.use('/api/customer-pricing', authenticateJWT, customerPricingRoutes);
+app.use('/api/vendors', authenticateJWT, vendorRoutes);
+app.use('/api/products', authenticateJWT, productRoutes);
+app.use('/api/challans', authenticateJWT, challanRoutes);
+app.use('/api/inventories', authenticateJWT, inventoryRoutes);
+app.use('/api/invoices', authenticateJWT, invoiceRoutes);
+app.use('/api/quotations', authenticateJWT, quotationRoutes);
+app.use('/api/warehouses', authenticateJWT, warehouseRoutes);
+app.use('/api/inventory-entries', authenticateJWT, inventoryEntryRoutes);
+app.use('/api/payments', authenticateJWT, paymentRoutes);
+app.use('/api/analytics', authenticateJWT, analyticsRoutes);
+app.use('/api/queries', authenticateJWT, queryRoutes);
+app.use('/api/orders', authenticateJWT, orderRoutes);
+app.use('/api/raw-materials', authenticateJWT, rawMaterialRoutes);
+app.use('/api/bom', authenticateJWT, bomRoutes);
+app.use('/api/batch-productions', authenticateJWT, batchProductionRoutes);
+app.use('/api/manufacturing-units', authenticateJWT, manufacturingUnitRoutes);
+app.use('/api/complaints', authenticateJWT, complaintRoutes);
+app.use('/api/samples', authenticateJWT, sampleRoutes);
+app.use('/api/stock-movements', authenticateJWT, stockMovementRoutes);
+app.use('/api/sales-targets', authenticateJWT, salesTargetRoutes);
+app.use('/api/dispatches', authenticateJWT, dispatchRoutes);
+app.use('/api/parties', authenticateJWT, partiesRoutes);
+app.use('/api/trace', authenticateJWT, traceRoutes);
+app.use('/api/payments/gateway', authenticateJWT, paymentGatewayRoutes);
+app.use('/api/payments/gateway/webhook', paymentGatewayRoutes);
+app.use('/api/rbac', authenticateJWT, rbacRoutes);
+app.use('/api/medical-reps', authenticateJWT, medicalRepRoutes);
+app.use('/api/campaigns', authenticateJWT, campaignRoutes);
+app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
+app.use('/api/gst', authenticateJWT, gstReturnRoutes);
+
+// Global error handler (must be after all routes)
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.message, err.stack);
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+});
+
+// Start Express / Socket.IO server immediately
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Shekhar Bandhu CRM Server running on port ${PORT} with WebSockets enabled (bound to 0.0.0.0)`);
+});
+
+// Define startup migrations helper
+async function runStartupMigrations() {
+  // Drop old unique products index if it exists before seeding duplicate specs
+  try {
+    const Product = require('./models/Product');
+    await Product.collection.dropIndex('productType_1_size_1_colour_1_shape_1_weight_1');
+    console.log('✅ Dropped unique product characteristics index');
+  } catch (_) { }
+
+  // await seedDatabase();
+  await require('./models/RolePermission').seedDefaults();
+  console.log('✅ Role permissions seeded');
+
+  try {
+    const InventoryEntry = require('./models/InventoryEntry');
+    await InventoryEntry.collection.dropIndex('warehouseId_1_productId_1_packing_1');
+    console.log('✅ Dropped old inventory index — new vendorId-aware index will be created');
+  } catch (_) { }
+  try {
+    const InventoryEntry = require('./models/InventoryEntry');
+    await InventoryEntry.collection.dropIndex('warehouseId_1_productId_1_vendorId_1_packing_1');
+    console.log('✅ Dropped 4-field inventory index — new batchNo-aware index will be created');
+  } catch (_) { }
+  try {
+    const Payment = require('./models/Payment');
+    await Payment.collection.dropIndex('paymentNo_1');
+    console.log('✅ Dropped old paymentNo index from payments collection');
+  } catch (_) { }
+  await require('./models/InventoryEntry').syncIndexes();
+  console.log('✅ Using MongoDB for data');
+}
+
+// Connect to MongoDB asynchronously
 mongoose
   .connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
-  .then(async () => {
+  .then(() => {
     console.log('🔌 Connected to MongoDB');
-
-    app.use('/api/auth', authLimiter, authRoutes);
-    app.use('/api/system', systemRoutes);
-
-    app.use('/api/contacts', authenticateJWT, contactRoutes);
-    app.use('/api/tasks', authenticateJWT, taskRoutes);
-    app.use('/api/dashboard', authenticateJWT, dashboardRoutes);
-    app.use('/api/customers', authenticateJWT, customerRoutes);
-    app.use('/api/customer-pricing', authenticateJWT, customerPricingRoutes);
-    app.use('/api/vendors', authenticateJWT, vendorRoutes);
-    app.use('/api/products', authenticateJWT, productRoutes);
-    app.use('/api/challans', authenticateJWT, challanRoutes);
-    app.use('/api/inventories', authenticateJWT, inventoryRoutes);
-    app.use('/api/invoices', authenticateJWT, invoiceRoutes);
-    app.use('/api/quotations', authenticateJWT, quotationRoutes);
-    app.use('/api/warehouses', authenticateJWT, warehouseRoutes);
-    app.use('/api/inventory-entries', authenticateJWT, inventoryEntryRoutes);
-    app.use('/api/payments', authenticateJWT, paymentRoutes);
-    app.use('/api/analytics', authenticateJWT, analyticsRoutes);
-    app.use('/api/queries', authenticateJWT, queryRoutes);
-    app.use('/api/orders', authenticateJWT, orderRoutes);
-    app.use('/api/raw-materials', authenticateJWT, rawMaterialRoutes);
-    app.use('/api/bom', authenticateJWT, bomRoutes);
-    app.use('/api/batch-productions', authenticateJWT, batchProductionRoutes);
-    app.use('/api/manufacturing-units', authenticateJWT, manufacturingUnitRoutes);
-    app.use('/api/complaints', authenticateJWT, complaintRoutes);
-    app.use('/api/samples', authenticateJWT, sampleRoutes);
-    app.use('/api/stock-movements', authenticateJWT, stockMovementRoutes);
-    app.use('/api/sales-targets', authenticateJWT, salesTargetRoutes);
-    app.use('/api/dispatches', authenticateJWT, dispatchRoutes);
-    app.use('/api/parties', authenticateJWT, partiesRoutes);
-    app.use('/api/trace', authenticateJWT, traceRoutes);
-    app.use('/api/payments/gateway', authenticateJWT, paymentGatewayRoutes);
-    app.use('/api/payments/gateway/webhook', paymentGatewayRoutes);
-    app.use('/api/rbac', authenticateJWT, rbacRoutes);
-    app.use('/api/medical-reps', authenticateJWT, medicalRepRoutes);
-    app.use('/api/campaigns', authenticateJWT, campaignRoutes);
-    app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
-    app.use('/api/gst', authenticateJWT, gstReturnRoutes);
-
-    // Drop old unique products index if it exists before seeding duplicate specs
-    try {
-      const Product = require('./models/Product');
-      await Product.collection.dropIndex('productType_1_size_1_colour_1_shape_1_weight_1');
-      console.log('✅ Dropped unique product characteristics index');
-    } catch (_) { }
-
-    // await seedDatabase();
-    await require('./models/RolePermission').seedDefaults();
-    console.log('✅ Role permissions seeded');
-
-    try {
-      const InventoryEntry = require('./models/InventoryEntry');
-      await InventoryEntry.collection.dropIndex('warehouseId_1_productId_1_packing_1');
-      console.log('✅ Dropped old inventory index — new vendorId-aware index will be created');
-    } catch (_) { }
-    try {
-      const InventoryEntry = require('./models/InventoryEntry');
-      await InventoryEntry.collection.dropIndex('warehouseId_1_productId_1_vendorId_1_packing_1');
-      console.log('✅ Dropped 4-field inventory index — new batchNo-aware index will be created');
-    } catch (_) { }
-    try {
-      const Payment = require('./models/Payment');
-      await Payment.collection.dropIndex('paymentNo_1');
-      console.log('✅ Dropped old paymentNo index from payments collection');
-    } catch (_) { }
-    await require('./models/InventoryEntry').syncIndexes();
-    console.log('✅ Using MongoDB for data');
-
-    // Global error handler (must be after all routes)
-    app.use((err, req, res, next) => {
-      console.error('Unhandled error:', err.message, err.stack);
-      res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-    });
-
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Shekhar Bandhu CRM Server running on port ${PORT} with WebSockets enabled (bound to 0.0.0.0)`);
+    // Run startup migrations asynchronously out of the request path
+    runStartupMigrations().catch(err => {
+      console.error('❌ Failed running startup migrations:', err.message);
     });
   })
   .catch(err => {
-    console.error('❌ Critical Error: MongoDB connection failed! Exiting server...');
+    console.error('❌ Error: MongoDB connection failed!');
     console.error(err.message);
-    process.exit(1);
   });
 
 // ─── Process-level error handling ───

@@ -110,7 +110,8 @@ router.post('/webhook', async (req, res) => {
     if (!secret) return res.status(200).json({ status: 'ignored', reason: 'Webhook not configured' });
 
     const crypto = require('crypto');
-    const shasum = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex');
+    const bodyToSign = req.rawBody ? req.rawBody : JSON.stringify(req.body);
+    const shasum = crypto.createHmac('sha256', secret).update(bodyToSign).digest('hex');
     if (shasum !== req.headers['x-razorpay-signature']) {
       return res.status(400).json({ error: 'Invalid webhook signature' });
     }

@@ -277,7 +277,7 @@ const userSchema = z.object({
   name: z.string().min(1, 'Name required'),
   email: z.string().email('Valid email required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  role: z.string().default('agent'),
+  role: z.string().regex(/^[a-z0-9_]+$/, 'Invalid role format').default('agent'),
   canAccessCash: z.boolean().default(false),
 });
 
@@ -294,7 +294,7 @@ const changePasswordSchema = z.object({
 const updateProfileSchema = z.object({
   name: z.string().min(1).optional(),
   email: z.string().email().optional(),
-  role: z.string().optional(),
+  role: z.string().regex(/^[a-z0-9_]+$/, 'Invalid role format').optional(),
   canAccessCash: z.boolean().optional(),
 });
 
