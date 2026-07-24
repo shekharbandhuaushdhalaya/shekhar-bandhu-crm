@@ -918,7 +918,137 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           )}
 
 
-          {/* Ledger Mode, Invoice Number, Date in 1 Row */}
+          {/* 1. Supplier Name & Destination Unit in 1 Row */}
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+            {/* Supplier Name */}
+            <View style={[styles.formGroup, { flex: 1, zIndex: 1025, marginBottom: 0 }]}>
+              <Text style={styles.formLabel}>Supplier Name *</Text>
+              <View style={styles.customSearchSelectContainer}>
+                <View style={styles.formInput}>
+                  <Ionicons name="person" size={16} color={colors.text.muted} />
+                  <TextInput
+                    style={styles.formInputText}
+                    placeholder="Search and select supplier..."
+                    placeholderTextColor={colors.text.muted}
+                    value={supplierName}
+                    onChangeText={(val) => {
+                      setSupplierName(val);
+                      setShowVendorDropdown(true);
+                    }}
+                    onFocus={() => setShowVendorDropdown(true)}
+                  />
+                  {supplierName ? (
+                    <TouchableOpacity onPress={() => { setSupplierName(''); setShowVendorDropdown(true); }}>
+                      <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+
+              {showVendorDropdown && (
+                <View style={styles.customSelectPanel}>
+                  <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
+                    {filteredVendors.map(v => {
+                      const vName = v.company || v.name;
+                      const isNonGst = !v.gstin || !v.gstin.trim() || (v as any).recordTracking === 'cash_ledger';
+                      return (
+                        <TouchableOpacity
+                          key={v._id}
+                          style={styles.customSelectItem}
+                          onPress={() => handleSelectVendor(v)}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={styles.customSelectItemText}>{vName}</Text>
+                            {isNonGst ? (
+                              <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.warning }}>
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: colors.warning }}>💵 Non-GST</Text>
+                              </View>
+                            ) : (
+                              <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📄 GST Vendor</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.customSelectItemSubtext}>
+                            {v.gstin ? `GSTIN: ${v.gstin}` : 'Non-GST Supplier'}
+                            {v.state ? ` | State: ${v.state}` : ''}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {filteredVendors.length === 0 && (
+                      <View style={{ padding: 12 }}>
+                        <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>
+                          No suppliers found (typing custom name)
+                        </Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.customSelectItem, { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary }]}
+                      onPress={() => setShowVendorDropdown(false)}
+                    >
+                      <Text style={[styles.customSelectItemText, { color: colors.primary, textAlign: 'center' }]}>
+                        ✓ Use typed custom name
+                      </Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+
+            {/* Destination Manufacturing Unit */}
+            <View style={[styles.formGroup, { flex: 1, zIndex: 1020, marginBottom: 0 }]}>
+              <Text style={styles.formLabel}>Destination Manufacturing Unit *</Text>
+              <View style={styles.customSearchSelectContainer}>
+                <View style={styles.formInput}>
+                  <Ionicons name="business" size={16} color={colors.text.muted} />
+                  <TextInput
+                    style={[styles.formInputText, { color: colors.text.primary, fontWeight: '700' }]}
+                    placeholder="Select destination manufacturing unit..."
+                    placeholderTextColor={colors.text.muted}
+                    value={
+                      manufacturingUnits.find(m => m._id === warehouseId) 
+                        ? `🏭 ${manufacturingUnits.find(m => m._id === warehouseId)?.name}` 
+                        : (warehouses.find(w => w._id === warehouseId)?.name ? `🏭 ${warehouses.find(w => w._id === warehouseId)?.name}` : '')
+                    }
+                    editable={false}
+                  />
+                  <TouchableOpacity onPress={() => setShowWarehouseDropdown(!showWarehouseDropdown)}>
+                    <Ionicons name={showWarehouseDropdown ? "chevron-up" : "chevron-down"} size={18} color={colors.text.muted} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {showWarehouseDropdown && (
+                <View style={styles.customSelectPanel}>
+                  <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
+                    {manufacturingUnits.map(m => (
+                      <TouchableOpacity
+                        key={m._id}
+                        style={styles.customSelectItem}
+                        onPress={() => {
+                          setWarehouseId(m._id);
+                          setShowWarehouseDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.customSelectItemText, { color: colors.primary, fontWeight: '700' }]}>🏭 {m.name}</Text>
+                        <Text style={styles.customSelectItemSubtext}>{m.city ? `${m.city}, ${m.state || ''}` : 'Factory Unit'}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    {manufacturingUnits.length === 0 && (
+                      <View style={{ padding: 12 }}>
+                        <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>
+                          No manufacturing units defined. Please add one under My Details / Profile.
+                        </Text>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* 2. Ledger Mode, Invoice Number, Date in 1 Row */}
           <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
             {/* Billing Mode Switch */}
             {(() => {
@@ -993,232 +1123,6 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                 )}
               </View>
             </View>
-          </View>
-
-          {/* Option to override default vendor payment terms */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16, marginTop: 4 }}
-            onPress={() => setOverridePaymentTerms(!overridePaymentTerms)}
-          >
-            <Ionicons 
-              name={overridePaymentTerms ? "checkbox" : "square-outline"} 
-              size={18} 
-              color={overridePaymentTerms ? colors.primary : colors.text.muted} 
-            />
-            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.secondary }}>
-              Override default vendor payment terms
-            </Text>
-          </TouchableOpacity>
-
-          {overridePaymentTerms && (
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: -8, marginBottom: 12 }}>
-              <View style={[styles.formGroup, { flex: 1, zIndex: 1015 }]}>
-                <Text style={styles.formLabel}>Payment Terms</Text>
-                <View style={styles.formInput}>
-                  <Ionicons name="time-outline" size={16} color={colors.text.muted} />
-                  {Platform.OS === 'web' ? React.createElement('select', {
-                    value: paymentTermsDays,
-                    onChange: (e: any) => handlePaymentTermsChange(e.target.value),
-                    style: { flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
-                  }, [
-                    React.createElement('option', { value: '', key: 'none' }, 'Custom / Select...'),
-                    React.createElement('option', { value: '0', key: '0' }, 'Due on Receipt'),
-                    React.createElement('option', { value: '15', key: '15' }, '15 Days'),
-                    React.createElement('option', { value: '30', key: '30' }, '30 Days'),
-                    React.createElement('option', { value: '45', key: '45' }, '45 Days'),
-                    React.createElement('option', { value: '60', key: '60' }, '60 Days'),
-                    React.createElement('option', { value: '90', key: '90' }, '90 Days')
-                  ]) : (
-                    <>
-                      <TouchableOpacity style={{ flex: 1, height: '100%', justifyContent: 'center' }} onPress={() => setShowTermsDropdown(!showTermsDropdown)}>
-                        <Text style={{ color: paymentTermsDays ? colors.text.primary : colors.text.muted, fontSize: 14 }}>
-                          {paymentTermsDays ? (paymentTermsDays === '0' ? 'Due on Receipt' : `${paymentTermsDays} Days`) : 'Select Terms...'}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setShowTermsDropdown(!showTermsDropdown)}>
-                        <Ionicons name={showTermsDropdown ? "chevron-up" : "chevron-down"} size={16} color={colors.text.muted} />
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
-                
-                {showTermsDropdown && Platform.OS !== 'web' && (
-                  <View style={[styles.customSelectPanel, { top: 75 }]}>
-                    <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }} keyboardShouldPersistTaps="handled">
-                      {[
-                        { val: '', label: 'Custom / Select...' },
-                        { val: '0', label: 'Due on Receipt' },
-                        { val: '15', label: '15 Days' },
-                        { val: '30', label: '30 Days' },
-                        { val: '45', label: '45 Days' },
-                        { val: '60', label: '60 Days' },
-                        { val: '90', label: '90 Days' },
-                      ].map(t => (
-                        <TouchableOpacity
-                          key={t.val}
-                          style={styles.customSelectItem}
-                          onPress={() => {
-                            handlePaymentTermsChange(t.val);
-                            setShowTermsDropdown(false);
-                          }}
-                        >
-                          <Text style={styles.customSelectItemText}>{t.label}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
-              </View>
-
-              <View style={[styles.formGroup, { flex: 1 }]}>
-                <Text style={styles.formLabel}>Calculated Due Date</Text>
-                <View style={[styles.formInput, { backgroundColor: colors.bg.secondary, borderColor: colors.border }]}>
-                  <Ionicons name="calendar" size={16} color={colors.text.muted} />
-                  <TextInput style={[styles.formInputText, { color: colors.text.muted }]} value={dueDate} editable={false} placeholder="Select terms..." />
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Destination Manufacturing Unit */}
-          <View style={[styles.formGroup, { zIndex: 1020 }]}>
-            <Text style={styles.formLabel}>Destination Manufacturing Unit *</Text>
-            <View style={styles.customSearchSelectContainer}>
-              <View style={styles.formInput}>
-                <Ionicons name="business" size={16} color={colors.text.muted} />
-                <TextInput
-                  style={[styles.formInputText, { color: colors.text.primary, fontWeight: '700' }]}
-                  placeholder="Select destination manufacturing unit..."
-                  placeholderTextColor={colors.text.muted}
-                  value={
-                    manufacturingUnits.find(m => m._id === warehouseId) 
-                      ? `🏭 ${manufacturingUnits.find(m => m._id === warehouseId)?.name}` 
-                      : (warehouses.find(w => w._id === warehouseId)?.name ? `🏭 ${warehouses.find(w => w._id === warehouseId)?.name}` : '')
-                  }
-                  editable={false}
-                />
-                <TouchableOpacity onPress={() => setShowWarehouseDropdown(!showWarehouseDropdown)}>
-                  <Ionicons name={showWarehouseDropdown ? "chevron-up" : "chevron-down"} size={18} color={colors.text.muted} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {showWarehouseDropdown && (
-              <View style={styles.customSelectPanel}>
-                <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
-                  {manufacturingUnits.map(m => (
-                    <TouchableOpacity
-                      key={m._id}
-                      style={styles.customSelectItem}
-                      onPress={() => {
-                        setWarehouseId(m._id);
-                        setShowWarehouseDropdown(false);
-                      }}
-                    >
-                      <Text style={[styles.customSelectItemText, { color: colors.primary, fontWeight: '700' }]}>🏭 {m.name}</Text>
-                      <Text style={styles.customSelectItemSubtext}>{m.city ? `${m.city}, ${m.state || ''}` : 'Factory Unit'}</Text>
-                    </TouchableOpacity>
-                  ))}
-                  {manufacturingUnits.length === 0 && (
-                    <View style={{ padding: 12 }}>
-                      <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>
-                        No manufacturing units defined. Please add one under My Details / Profile.
-                      </Text>
-                    </View>
-                  )}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.formLabel}>Status</Text>
-              <View style={styles.formInput}>
-                <Ionicons name="information-circle" size={16} color={colors.text.muted} />
-                <TextInput
-                  style={styles.formInputText}
-                  value={status}
-                  editable={false}
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* Supplier Name */}
-          <View style={[styles.formGroup, { zIndex: 1010 }]}>
-            <Text style={styles.formLabel}>Supplier Name *</Text>
-            <View style={styles.customSearchSelectContainer}>
-              <View style={styles.formInput}>
-                <Ionicons name="person" size={16} color={colors.text.muted} />
-                <TextInput
-                  style={styles.formInputText}
-                  placeholder="Search and select supplier..."
-                  placeholderTextColor={colors.text.muted}
-                  value={supplierName}
-                  onChangeText={(val) => {
-                    setSupplierName(val);
-                    setShowVendorDropdown(true);
-                  }}
-                  onFocus={() => setShowVendorDropdown(true)}
-                />
-                {supplierName ? (
-                  <TouchableOpacity onPress={() => { setSupplierName(''); setShowVendorDropdown(true); }}>
-                    <Ionicons name="close-circle" size={18} color={colors.text.muted} />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </View>
-
-            {showVendorDropdown && (
-              <View style={styles.customSelectPanel}>
-                <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
-                  {filteredVendors.map(v => {
-                    const vName = v.company || v.name;
-                    const isNonGst = !v.gstin || !v.gstin.trim() || (v as any).recordTracking === 'cash_ledger';
-                    return (
-                      <TouchableOpacity
-                        key={v._id}
-                        style={styles.customSelectItem}
-                        onPress={() => handleSelectVendor(v)}
-                      >
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={styles.customSelectItemText}>{vName}</Text>
-                          {isNonGst ? (
-                            <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.warning }}>
-                              <Text style={{ fontSize: 9, fontWeight: '700', color: colors.warning }}>💵 Non-GST</Text>
-                            </View>
-                          ) : (
-                            <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
-                              <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📄 GST Vendor</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.customSelectItemSubtext}>
-                          {v.gstin ? `GSTIN: ${v.gstin}` : 'Non-GST Supplier'}
-                          {v.state ? ` | State: ${v.state}` : ''}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                  {filteredVendors.length === 0 && (
-                    <View style={{ padding: 12 }}>
-                      <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>
-                        No suppliers found (typing custom name)
-                      </Text>
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    style={[styles.customSelectItem, { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary }]}
-                    onPress={() => setShowVendorDropdown(false)}
-                  >
-                    <Text style={[styles.customSelectItemText, { color: colors.primary, textAlign: 'center' }]}>
-                      ✓ Use typed custom name
-                    </Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </View>
-            )}
           </View>
 
           {/* Tabular Items Section */}
