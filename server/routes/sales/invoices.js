@@ -232,7 +232,24 @@ router.get('/sales', async (req, res) => {
     filter.mode = 'regular';
 
     const invoices = await Invoice.find(filter).sort({ date: -1, createdAt: -1 }).lean();
-    res.json(invoices);
+    
+    // Fetch associated dispatches
+    const Dispatch = require('../../models/Dispatch');
+    const invoiceIds = invoices.map(inv => inv._id);
+    const dispatches = await Dispatch.find({ invoiceId: { $in: invoiceIds } }).lean();
+    const dispatchMap = {};
+    for (const d of dispatches) {
+      if (d.invoiceId) {
+        dispatchMap[d.invoiceId.toString()] = d;
+      }
+    }
+
+    const enrichedInvoices = invoices.map(inv => ({
+      ...inv,
+      dispatch: dispatchMap[inv._id.toString()] || null
+    }));
+
+    res.json(enrichedInvoices);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

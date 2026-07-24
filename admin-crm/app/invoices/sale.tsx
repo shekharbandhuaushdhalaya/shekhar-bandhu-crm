@@ -709,6 +709,55 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                 </Text>
               </View>
             </View>
+            
+            {/* Dispatch Record Reference Info */}
+            {(invoice as any).dispatch && (
+              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 12, marginTop: 4, borderWidth: 1, borderColor: colors.border, width: '100%' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <Ionicons name="bus-outline" size={16} color={colors.primary} />
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>🚚 DISPATCH & COURIER INFORMATION</Text>
+                </View>
+                
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, rowGap: 6 }}>
+                  <Text style={{ fontSize: 12, color: colors.text.secondary }}>Dispatch No: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.dispatchNo}</Text></Text>
+                  <Text style={{ fontSize: 12, color: colors.text.secondary }}>Status: <Text style={{ fontWeight: '700', color: colors.success }}>{(invoice as any).dispatch.status.toUpperCase()}</Text></Text>
+                  
+                  {((invoice as any).dispatch.transporter || (invoice as any).dispatch.courierName) ? (
+                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Carrier: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.transporter || (invoice as any).dispatch.courierName}</Text></Text>
+                  ) : null}
+                  
+                  {(invoice as any).dispatch.lrNo ? (
+                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>LR/GR No: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.lrNo}</Text></Text>
+                  ) : null}
+                  
+                  {(invoice as any).dispatch.vehicleNo ? (
+                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Vehicle: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.vehicleNo}</Text></Text>
+                  ) : null}
+                  
+                  {(invoice as any).dispatch.trackingId ? (
+                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Tracking ID: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.trackingId}</Text></Text>
+                  ) : null}
+                  
+                  {(invoice as any).dispatch.totalBoxes ? (
+                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Boxes: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.totalBoxes}</Text></Text>
+                  ) : null}
+                  
+                  {(invoice as any).dispatch.totalWeight ? (
+                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Weight: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.totalWeight}</Text></Text>
+                  ) : null}
+                </View>
+
+                {Platform.OS === 'web' && (invoice as any).dispatch.trackingUrl ? (
+                  <TouchableOpacity 
+                    onPress={() => window.open((invoice as any).dispatch.trackingUrl, '_blank')} 
+                    style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+                  >
+                    <Ionicons name="open-outline" size={13} color={colors.primary} />
+                    <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700', textDecorationLine: 'underline' }}>Track shipment online</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            )}
           </View>
 
           <Text style={styles.sectionTitle}>Items Details</Text>
