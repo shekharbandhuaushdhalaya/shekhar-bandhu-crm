@@ -489,7 +489,7 @@ const rawMaterialSchema = z.object({
   name: z.string().min(1),
   sku: z.string().optional(),
   unit: z.string().min(1),
-  category: z.enum(['Herb', 'Packaging', 'Excipient', 'General']).default('Herb'),
+  category: z.string().default('Herb'),
   minReorder: z.number().default(0),
 });
 

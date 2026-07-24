@@ -419,7 +419,7 @@ export type RawMaterial = {
   name: string;
   sku: string;
   unit: string;
-  category?: 'Herb' | 'Packaging' | 'Excipient' | 'General';
+  category?: string;
   minReorder: number;
   stockLevel?: number;
 };

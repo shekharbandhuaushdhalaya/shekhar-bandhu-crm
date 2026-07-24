@@ -95,7 +95,7 @@ export default function ManufacturingScreen() {
   const [rmName, setRmName] = useState('');
   const [rmSku, setRmSku] = useState('');
   const [rmUnit, setRmUnit] = useState('kg');
-  const [rmCategory, setRmCategory] = useState<'Herb' | 'Packaging' | 'Excipient' | 'General'>('Herb');
+  const [rmCategory, setRmCategory] = useState<string>('Herb');
   const [rmMinReorder, setRmMinReorder] = useState('10');
   const [rmError, setRmError] = useState('');
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
@@ -1754,7 +1754,7 @@ export default function ManufacturingScreen() {
               <TextInput style={[styles.input, { backgroundColor: colors.bg.secondary, color: colors.text.muted }]} placeholder={editingMaterialId ? "Material SKU" : "Auto-generated on save"} placeholderTextColor={colors.text.muted} value={rmSku} editable={false} />
 
               <Text style={styles.inputLabel}>Material Classification / Category *</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                 {[
                   { key: 'Herb', label: '🌿 Herb / Extract' },
                   { key: 'Packaging', label: '📦 Bottle / Label / Box' },
@@ -1763,7 +1763,7 @@ export default function ManufacturingScreen() {
                 ].map(c => (
                   <TouchableOpacity
                     key={c.key}
-                    onPress={() => setRmCategory(c.key as any)}
+                    onPress={() => setRmCategory(c.key)}
                     style={{
                       paddingHorizontal: 10,
                       paddingVertical: 6,
@@ -1779,6 +1779,13 @@ export default function ManufacturingScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+              <TextInput
+                style={[styles.input, { marginBottom: 12 }]}
+                placeholder="Or enter custom classification (e.g. Mineral, Solvent, Preservative)..."
+                placeholderTextColor={colors.text.muted}
+                value={rmCategory}
+                onChangeText={setRmCategory}
+              />
 
               <Text style={styles.inputLabel}>Measurement Unit *</Text>
               <TextInput style={styles.input} placeholder="e.g. kg, liters, g, units" placeholderTextColor={colors.text.muted} value={rmUnit} onChangeText={setRmUnit} />
