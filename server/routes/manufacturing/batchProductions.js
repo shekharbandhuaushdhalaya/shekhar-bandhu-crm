@@ -271,14 +271,31 @@ async function deductPackagingMaterials(batch, outputQty) {
     return;
   }
 
-  const pkgIngs = bom.ingredients.filter(ing => ing.itemType === 'packaging');
+  const pkgIngs = bom.ingredients.filter(ing => {
+    const isExplicitPkg = ing.itemType === 'packaging';
+    return isExplicitPkg;
+  });
+
+  // Also include any raw materials that have category === 'Packaging'
+  for (const ing of bom.ingredients) {
+    if (ing.itemType !== 'packaging') {
+      const rm = await RawMaterial.findById(ing.rawMaterialId);
+      if (rm && rm.category === 'Packaging' && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
+        pkgIngs.push(ing);
+      }
+    }
+  }
+
   if (!pkgIngs || pkgIngs.length === 0) {
     batch.packagingDeducted = true;
     return;
   }
 
+  const scaleBase = bom.batchYieldSize && bom.batchYieldSize > 0 ? bom.batchYieldSize : 100;
+  const scale = outputQty / scaleBase;
+
   for (const ing of pkgIngs) {
-    const qtyNeeded = ing.qtyRequired * outputQty;
+    const qtyNeeded = ing.qtyRequired * scale;
     const rm = await RawMaterial.findById(ing.rawMaterialId);
     if (!rm) continue;
 
