@@ -418,7 +418,9 @@ router.patch('/sales/:id/finalize', authorize('invoice:markPaid'), async (req, r
         { company: invoice.customerName }
       ]
     });
-    if (cust && invoice.saleType !== 'doctor_sampling' && invoice.saleType !== 'damage') {
+    // If the invoice was converted from a delivery challan (has a reference), the balance has already been debited by the challan dispatch
+    const isFromChallan = !!invoice.reference;
+    if (cust && invoice.saleType !== 'doctor_sampling' && invoice.saleType !== 'damage' && !isFromChallan) {
       if (invoice.mode === 'cash') {
         cust.cashBalance += invoice.amount;
       } else {
@@ -661,7 +663,9 @@ router.delete('/sales/:id', authorize('invoice:delete'), async (req, res) => {
           { company: invoice.customerName }
         ]
       });
-      if (cust && invoice.saleType !== 'doctor_sampling' && invoice.saleType !== 'damage') {
+      // If the invoice was converted from a delivery challan (has a reference), the balance rollback is handled by the challan deletion/cancellation
+      const isFromChallan = !!invoice.reference;
+      if (cust && invoice.saleType !== 'doctor_sampling' && invoice.saleType !== 'damage' && !isFromChallan) {
         if (invoice.mode === 'cash') {
           cust.cashBalance = Math.max(0, cust.cashBalance - invoice.amount);
         } else {
