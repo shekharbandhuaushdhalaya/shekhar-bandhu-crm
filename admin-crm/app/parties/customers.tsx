@@ -9,7 +9,7 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 
 import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
-import { validateGstinWithState, formatPhoneWithCountryCode } from '../../utils/gst';
+import { validateGstinWithState, formatPhoneWithCountryCode, toTitleCase } from '../../utils/gst';
 
 const GST_STATE_CODES: { [key: string]: string } = {
   '01': 'Jammu & Kashmir',
@@ -1664,7 +1664,7 @@ export default function CustomersScreen() {
 
 
                 const billing = c.billingAddress || { city: '', state: '', street: '' };
-                const compName = c.company || c.name || 'N/A';
+                const compName = toTitleCase(c.company || c.name) || 'N/A';
                 const avatar = getAvatarColor(compName, colors);
 
                 return (
@@ -1686,7 +1686,7 @@ export default function CustomersScreen() {
                         </Text>
                         {c.name && c.company ? (
                           <Text style={styles.secondaryText} numberOfLines={1}>
-                            {c.name}
+                            {toTitleCase(c.name)}
                           </Text>
                         ) : null}
                       </View>
@@ -1713,7 +1713,7 @@ export default function CustomersScreen() {
                     <View style={[styles.tableCellContainer, { width: 160, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                       <Ionicons name="person-outline" size={12} color={colors.text.muted} />
                       <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
-                        {c.contactPerson || c.name || '—'}
+                        {toTitleCase(c.contactPerson || c.name) || '—'}
                       </Text>
                     </View>
 
@@ -1730,10 +1730,10 @@ export default function CustomersScreen() {
                       <Ionicons name="location-outline" size={13} color={colors.danger} />
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
-                          {billing.city || '—'}
+                          {toTitleCase(billing.city) || '—'}
                         </Text>
                         {c.state || billing.state ? (
-                          <Text style={styles.secondaryText} numberOfLines={1}>{c.state || billing.state}</Text>
+                          <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(c.state || billing.state)}</Text>
                         ) : null}
                       </View>
                     </View>

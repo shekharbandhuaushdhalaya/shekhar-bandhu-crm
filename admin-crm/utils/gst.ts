@@ -137,3 +137,17 @@ export const formatPhoneWithCountryCode = (phone?: string, defaultCode = '+91') 
 
   return clean;
 };
+
+/**
+ * Converts text string to Upper Camel Case (Title Case with Capitalized Words)
+ * e.g. "shekhar bandhu crm" -> "Shekhar Bandhu Crm"
+ */
+export const toTitleCase = (str?: string | null): string => {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .split(/[\s_]+/)
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};

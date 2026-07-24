@@ -9,7 +9,7 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 
 import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
-import { validateGstinWithState, formatPhoneWithCountryCode } from '../../utils/gst';
+import { validateGstinWithState, formatPhoneWithCountryCode, toTitleCase } from '../../utils/gst';
 
 const getAvatarColor = (name: string, colors: any) => {
   const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -1299,8 +1299,8 @@ export default function VendorsScreen() {
               const balColor  = bal > 0 ? colors.danger : bal < 0 ? colors.success : colors.text.muted;
               const balBg = bal > 0 ? colors.danger + '12' : bal < 0 ? colors.success + '12' : colors.bg.secondary;
 
-              const compName = v.company || v.registeredName || v.name || 'N/A';
-              const subName = (v.displayName && v.displayName !== compName) ? v.displayName : (v.name && v.name !== compName) ? v.name : '';
+              const compName = toTitleCase(v.company || v.registeredName || v.name) || 'N/A';
+              const subName = (v.displayName && v.displayName !== compName) ? toTitleCase(v.displayName) : (v.name && v.name !== compName) ? toTitleCase(v.name) : '';
               const avatar = getAvatarColor(compName, colors);
               const isUnregistered = !v.gstin || !v.gstin.trim();
 
@@ -1348,7 +1348,7 @@ export default function VendorsScreen() {
                   <View style={[styles.tableCellContainer, { width: 150, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                     <Ionicons name="person-outline" size={12} color={colors.text.muted} />
                     <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
-                      {v.contactPerson || '—'}
+                      {toTitleCase(v.contactPerson) || '—'}
                     </Text>
                   </View>
 
@@ -1365,10 +1365,10 @@ export default function VendorsScreen() {
                     <Ionicons name="location-outline" size={13} color={colors.danger} />
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
-                        {v.addressCity || '—'}
+                        {toTitleCase(v.addressCity) || '—'}
                       </Text>
                       {v.state ? (
-                        <Text style={styles.secondaryText} numberOfLines={1}>{v.state}</Text>
+                        <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(v.state)}</Text>
                       ) : null}
                     </View>
                   </View>
