@@ -101,7 +101,7 @@ const printInvoice = (invoice: Invoice) => {
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${i + 1}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:left;">
             ${(it.name || '').replace(/\s+[0-9]+(?:\.[0-9]+)?[gG]$/, '')}
-            ${(it as any).batchNo ? `<div style="font-size:8px;color:#555;margin-top:1px;">Batch: ${(it as any).batchNo}</div>` : ''}
+            ${(it as any).batchNo ? `<div style="font-size:8.5px;font-weight:bold;color:#111827;margin-top:1px;">Batch No: ${(it as any).batchNo}</div>` : ''}
           </td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${it.hsnCode || ''}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${packing}</td>

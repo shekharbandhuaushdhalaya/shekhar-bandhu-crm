@@ -39,7 +39,8 @@ const printDeliveryChallan = (m: StockMovement) => {
   const itemRows = (m.items || []).map((it, i) => `
     <tr>
       <td style="border:1px solid #000;padding:4px;text-align:center;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:4px;">${it.productName}${it.batchNo ? ` (Batch: ${it.batchNo})` : ''}</td>
+      <td style="border:1px solid #000;padding:4px;">${it.productName}</td>
+      <td style="border:1px solid #000;padding:4px;text-align:center;font-weight:bold;">${it.batchNo || '—'}</td>
       <td style="border:1px solid #000;padding:4px;text-align:center;">${(it.qty || 0) * (it.packing || 1)} Pcs</td>
     </tr>`).join('');
 
@@ -108,9 +109,10 @@ const printDeliveryChallan = (m: StockMovement) => {
     <table style="font-size:10px;margin-top:6px;">
       <thead>
         <tr style="background:#f3f4f6;">
-          <th style="border:1px solid #000;padding:4px;width:10%;">S.No.</th>
+          <th style="border:1px solid #000;padding:4px;width:8%;">S.No.</th>
           <th style="border:1px solid #000;padding:4px;">Description of Goods</th>
-          <th style="border:1px solid #000;padding:4px;width:25%;">Quantity (Pcs)</th>
+          <th style="border:1px solid #000;padding:4px;width:20%;">Batch No.</th>
+          <th style="border:1px solid #000;padding:4px;width:20%;">Quantity (Pcs)</th>
         </tr>
       </thead>
       <tbody>${itemRows}</tbody>
