@@ -11,6 +11,7 @@ import { api, StockMovement, StockMovementItem, Product, Warehouse, Customer, In
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { FIRM_DETAILS } from '../constants/firm';
+import InventoryDispatchScreen from './inventorydispatch';
 
 // ── Movement Type Config ────────────────────────────────────────────────────────
 const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string; dir: 'out' }> = {
@@ -320,6 +321,9 @@ export default function StockMovementsScreen() {
       alert(err.message || 'Failed to delete document');
     }
   };
+
+  // Main screen tab state
+  const [topTab, setTopTab] = useState<'challans' | 'dispatches'>('challans');
 
   const load = useCallback(async () => {
     try {
@@ -1327,9 +1331,34 @@ export default function StockMovementsScreen() {
   // ── Main List View ────────────────────────────────────────────────────────────
   return (
     <View style={styles.screen}>
+      {/* Sub-tab pills */}
+      <View style={{ flexDirection: 'row', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 4, marginHorizontal: Spacing.lg, marginTop: Spacing.md }}>
+        <TouchableOpacity
+          style={[{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: Radius.sm }, topTab === 'challans' && { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border }]}
+          onPress={() => setTopTab('challans')}
+        >
+          <Ionicons name="bus-outline" size={16} color={topTab === 'challans' ? colors.primary : colors.text.secondary} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: topTab === 'challans' ? colors.primary : colors.text.secondary }}>
+            Delivery Challans
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: Radius.sm }, topTab === 'dispatches' && { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border }]}
+          onPress={() => setTopTab('dispatches')}
+        >
+          <Ionicons name="navigate-outline" size={16} color={topTab === 'dispatches' ? colors.primary : colors.text.secondary} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: topTab === 'dispatches' ? colors.primary : colors.text.secondary }}>
+            Courier &amp; Dispatch Tracking
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* Search Bar Container with Type/Status Dropdowns and New Challan Button Inside */}
-      <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
+      {topTab === 'dispatches' ? (
+        <InventoryDispatchScreen />
+      ) : (
+        <>
+          {/* Search Bar Container with Type/Status Dropdowns and New Challan Button Inside */}
+          <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.sm, marginBottom: Spacing.xs }}>
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -1540,6 +1569,8 @@ export default function StockMovementsScreen() {
           </ScrollView>
         )}
       </ScrollView>
+        </>
+      )}
     </View>
   );
 }

@@ -9,6 +9,7 @@ import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { DataTable, Column } from '../components/DataTable';
+import PricingScreen from './pricing';
 
 const normalizeTitleCase = (str?: string) => {
   if (!str) return '';
@@ -1342,6 +1343,7 @@ const toTitleCase = (str?: string | null): string => {
 };
 
 export default function ProductsScreen() {
+  const [topTab, setTopTab] = useState<'products' | 'pricing'>('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -1464,6 +1466,32 @@ export default function ProductsScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* Top Sub-tab pills */}
+      <View style={{ flexDirection: 'row', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 4, marginHorizontal: Spacing.lg, marginTop: Spacing.md }}>
+        <TouchableOpacity
+          style={[{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: Radius.sm }, topTab === 'products' && { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border }]}
+          onPress={() => setTopTab('products')}
+        >
+          <Ionicons name="cube-outline" size={16} color={topTab === 'products' ? colors.primary : colors.text.secondary} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: topTab === 'products' ? colors.primary : colors.text.secondary }}>
+            Product Catalog
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: Radius.sm }, topTab === 'pricing' && { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border }]}
+          onPress={() => setTopTab('pricing')}
+        >
+          <Ionicons name="pricetag-outline" size={16} color={topTab === 'pricing' ? colors.primary : colors.text.secondary} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: topTab === 'pricing' ? colors.primary : colors.text.secondary }}>
+            Pricing &amp; Discounts
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {topTab === 'pricing' ? (
+        <PricingScreen />
+      ) : (
+        <>
       <View style={styles.innerContainer}>
         <View style={{ zIndex: 1100, position: 'relative' }}>
           {showFilterDropdown && (
@@ -1573,6 +1601,8 @@ export default function ProductsScreen() {
         product={isEditing ? selectedProd : null}
         products={products}
       />
+        </>
+      )}
     </View>
   );
 }

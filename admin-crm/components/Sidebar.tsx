@@ -25,31 +25,23 @@ type NavItem = {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    key: 'online',
-    label: 'Online Store',
-    icon: 'globe-outline',
-    items: [
-      { label: 'Orders', route: 'orders', icon: 'cart-outline', activeIcon: 'cart' },
-      { label: 'Web Queries', route: 'queries', icon: 'mail-unread-outline', activeIcon: 'mail-unread' },
-      { label: 'Pricing & Discounts', route: 'pricing', icon: 'pricetag-outline', activeIcon: 'pricetag', permission: 'product:editPricing' },
-      { label: 'Campaigns', route: 'campaigns', icon: 'megaphone-outline', activeIcon: 'megaphone', permission: 'campaign:view' },
-    ],
-  },
-  {
     key: 'sales',
-    label: 'Sales & CRM',
+    label: 'Sales & Store',
     icon: 'trending-up-outline',
     items: [
       { label: 'Customers', route: 'parties/customers', icon: 'people-outline', activeIcon: 'people' },
       { label: 'Leads', route: 'leads', icon: 'git-branch-outline', activeIcon: 'git-branch' },
+      { label: 'Orders & Web Queries', route: 'orders', icon: 'cart-outline', activeIcon: 'cart' },
       { label: 'Quotations', route: 'quotations', icon: 'document-text-outline', activeIcon: 'document-text' },
-      { label: 'Delivery Challan', route: 'stockmovements', icon: 'bus-outline', activeIcon: 'bus', permission: 'stockmovement:view' },
+      { label: 'Delivery Challan & Dispatch', route: 'stockmovements', icon: 'bus-outline', activeIcon: 'bus', permission: 'stockmovement:view' },
       { label: 'Sales Invoices', route: 'invoices/sale', icon: 'receipt-outline', activeIcon: 'receipt' },
+      { label: 'Medical Reps & Targets', route: 'medicalreps', icon: 'briefcase-outline', activeIcon: 'briefcase', permission: 'mr:view' },
+      { label: 'Campaigns', route: 'campaigns', icon: 'megaphone-outline', activeIcon: 'megaphone', permission: 'campaign:view' },
     ],
   },
   {
     key: 'purchases',
-    label: 'Purchase & Logistics',
+    label: 'Purchase & Vendors',
     icon: 'bag-handle-outline',
     items: [
       { label: 'Vendors', route: 'parties/vendors', icon: 'storefront-outline', activeIcon: 'storefront' },
@@ -61,9 +53,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Inventory & Production',
     icon: 'cube-outline',
     items: [
-      { label: 'Products', route: 'products', icon: 'cube-outline', activeIcon: 'cube' },
-      { label: 'Inventories', route: 'inventories', icon: 'home-outline', activeIcon: 'home' },
-      { label: 'Manufacturing', route: 'manufacturing', icon: 'hammer-outline', activeIcon: 'hammer' },
+      { label: 'Products & Pricing', route: 'products', icon: 'cube-outline', activeIcon: 'cube' },
+      { label: 'Inventories & Warehouses', route: 'inventories', icon: 'home-outline', activeIcon: 'home' },
+      { label: 'Manufacturing & BMR', route: 'manufacturing', icon: 'hammer-outline', activeIcon: 'hammer' },
     ],
   },
   {
@@ -77,23 +69,13 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    key: 'marketing',
-    label: 'Field Reps & Targets',
-    icon: 'briefcase-outline',
-    items: [
-      { label: 'Medical Reps', route: 'medicalreps', icon: 'people-outline', activeIcon: 'people', permission: 'mr:view' },
-      { label: 'Sales Targets', route: 'salescrm', icon: 'trophy-outline', activeIcon: 'trophy' },
-    ],
-  },
-  {
     key: 'system',
-    label: 'Administration & System',
+    label: 'Reports & Administration',
     icon: 'settings-outline',
     items: [
-      { label: 'Reports', route: 'reports', icon: 'bar-chart-outline', activeIcon: 'bar-chart', permission: 'report:view' },
-      { label: 'AI Assistant', route: 'ai-analytics', icon: 'sparkles-outline', activeIcon: 'sparkles' },
+      { label: 'Reports & Audits', route: 'reports', icon: 'bar-chart-outline', activeIcon: 'bar-chart', permission: 'report:view' },
+      { label: 'AI Business Assistant', route: 'ai-analytics', icon: 'sparkles-outline', activeIcon: 'sparkles' },
       { label: 'Access Control', route: 'rbac', icon: 'shield-checkmark-outline', activeIcon: 'shield-checkmark', permission: 'rbac:manage' },
-      { label: 'Audit Logs', route: 'audit', icon: 'newspaper-outline', activeIcon: 'newspaper', permission: 'audit:view' },
       { label: 'My Details', route: 'profile', icon: 'person-outline', activeIcon: 'person' },
     ],
   },
