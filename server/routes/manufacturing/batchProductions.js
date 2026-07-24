@@ -309,10 +309,14 @@ async function deductPackagingMaterials(batch, outputQty) {
 
     let needed = qtyNeeded;
     for (const entry of entries) {
-      if (needed <= 0) break;
+      if (needed <= 0.0001) break;
       if ((entry.qty || 0) <= 0) continue;
-      const deduct = Math.min(needed, entry.qty);
-      entry.qty = Math.max(0, entry.qty - deduct);
+      const rawDeduct = Math.min(needed, entry.qty);
+      // Round to 2 decimal places to avoid floating point micro-fractions (e.g. 0.10000000000000009)
+      const deduct = Number(rawDeduct.toFixed(2));
+      if (deduct <= 0) continue;
+
+      entry.qty = Math.max(0, Number((entry.qty - deduct).toFixed(2)));
       await entry.save();
 
       batch.rawMaterialCost += deduct * (entry.purchaseRate || 0);
