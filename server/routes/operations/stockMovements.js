@@ -118,43 +118,86 @@ async function deductInventory(movement) {
   const warehouse = await Warehouse.findById(movement.warehouseId);
   if (!warehouse) return;
 
+  let isUpdatedItems = false;
+
   for (const item of movement.items) {
     if (!item.productId) continue;
     const product = await Product.findById(item.productId);
     if (!product) continue;
 
-    const boxes = item.qty || 0;
+    const neededBoxes = item.qty || 0;
     const packing = item.packing || 1;
 
-    product.stockLevel = Math.max(0, product.stockLevel - boxes);
+    product.stockLevel = Math.max(0, product.stockLevel - neededBoxes);
     await product.save();
 
-    const entryQuery = {
+    // Query inventory entries for this product in warehouse (sorted FIFO by mfgDate/expiryDate/createdAt)
+    const entries = await InventoryEntry.find({
       warehouseId: warehouse._id,
       productId: product._id,
-      packing,
-    };
-    if (item.batchNo) entryQuery.batchNo = item.batchNo;
+      packing
+    }).sort({ mfgDate: 1, expiryDate: 1, createdAt: 1 });
 
-    let entry = await InventoryEntry.findOne(entryQuery);
-    if (entry) {
-      entry.qtyBoxes = Math.max(0, entry.qtyBoxes - boxes);
-      await entry.save();
+    // Check if user selected a specific batch with enough quantity
+    const exactEntry = item.batchNo ? entries.find(e => e.batchNo === item.batchNo && e.qtyBoxes >= neededBoxes) : null;
+
+    if (exactEntry) {
+      exactEntry.qtyBoxes = Math.max(0, exactEntry.qtyBoxes - neededBoxes);
+      await exactEntry.save();
+
+      await StockLedger.create({
+        productId: product._id,
+        warehouseId: warehouse._id,
+        warehouseName: warehouse.name,
+        type: 'OUT',
+        qtyBoxes: -neededBoxes,
+        balanceBoxes: exactEntry.qtyBoxes,
+        reference: movement.docNo,
+        note: `${movement.type.toUpperCase()} — ${movement.docNo}`,
+        createdBy: movement.createdBy || 'System',
+        packing,
+        batchNo: item.batchNo || '',
+      });
+    } else {
+      // FIFO Multi-batch deduction across available batches
+      let remainingNeeded = neededBoxes;
+      const batchesUsed = [];
+
+      for (const entry of entries) {
+        if (remainingNeeded <= 0) break;
+        if (entry.qtyBoxes <= 0) continue;
+
+        const deduct = Math.min(remainingNeeded, entry.qtyBoxes);
+        entry.qtyBoxes -= deduct;
+        await entry.save();
+
+        remainingNeeded -= deduct;
+        batchesUsed.push(`${entry.batchNo || 'NO-BATCH'} (${deduct} Pcs)`);
+
+        await StockLedger.create({
+          productId: product._id,
+          warehouseId: warehouse._id,
+          warehouseName: warehouse.name,
+          type: 'OUT',
+          qtyBoxes: -deduct,
+          balanceBoxes: entry.qtyBoxes,
+          reference: movement.docNo,
+          note: `${movement.type.toUpperCase()} — ${movement.docNo} (Batch ${entry.batchNo || 'N/A'})`,
+          createdBy: movement.createdBy || 'System',
+          packing,
+          batchNo: entry.batchNo || '',
+        });
+      }
+
+      if (batchesUsed.length > 0) {
+        item.batchNo = batchesUsed.join(', ');
+        isUpdatedItems = true;
+      }
     }
+  }
 
-    await StockLedger.create({
-      productId: product._id,
-      warehouseId: warehouse._id,
-      warehouseName: warehouse.name,
-      type: 'OUT',
-      qtyBoxes: -boxes,
-      balanceBoxes: entry ? entry.qtyBoxes : 0,
-      reference: movement.docNo,
-      note: `${movement.type.toUpperCase()} — ${movement.docNo}`,
-      createdBy: movement.createdBy || 'System',
-      packing,
-      batchNo: item.batchNo || '',
-    });
+  if (isUpdatedItems) {
+    await StockMovement.findByIdAndUpdate(movement._id, { items: movement.items });
   }
 }
 

@@ -44,45 +44,102 @@ async function deductInventoryForInvoice(invoice) {
   const warehouse = await Warehouse.findById(invoice.warehouseId);
   if (!warehouse) return;
 
+  let isUpdatedItems = false;
+
   for (const item of invoice.items) {
     if (!item.productId) continue;
     const product = await Product.findById(item.productId);
     if (!product) continue;
 
-    const qty = item.qty || 0;
+    const neededQty = item.qty || item.boxes || 0;
     const packing = item.packing || 1;
 
     // 1. Decrement Product stock level
-    product.stockLevel = Math.max(0, product.stockLevel - qty);
+    product.stockLevel = Math.max(0, product.stockLevel - neededQty);
     await product.save();
 
-    // 2. Decrement specific InventoryEntry in warehouse
-    let entry = await InventoryEntry.findOne({
+    // 2. Query inventory entries sorted FIFO
+    const entries = await InventoryEntry.find({
       warehouseId: warehouse._id,
       productId: product._id,
-      packing,
-    });
+      packing
+    }).sort({ mfgDate: 1, expiryDate: 1, createdAt: 1 });
 
-    if (entry) {
-      entry.qtyBoxes = Math.max(0, entry.qtyBoxes - qty);
-      await entry.save();
+    const exactEntry = item.batchNo ? entries.find(e => e.batchNo === item.batchNo && e.qtyBoxes >= neededQty) : null;
+
+    if (exactEntry) {
+      exactEntry.qtyBoxes = Math.max(0, exactEntry.qtyBoxes - neededQty);
+      await exactEntry.save();
+
+      let note = `Sold via Sale Invoice ${invoice.invoiceNo} (Finalized)`;
+      if (invoice.saleType === 'doctor_sampling') {
+        note = `Doctor Sample: MR ${invoice.medicalRepName || 'N/A'} to Dr. ${invoice.doctorName || 'N/A'}`;
+      } else if (invoice.saleType === 'damage') {
+        note = `Damaged Goods Write-off: ${invoice.damageReason || 'No details'}`;
+      }
+
+      await StockLedger.create({
+        productId: product._id,
+        warehouseId: warehouse._id,
+        warehouseName: warehouse.name,
+        type: 'OUT',
+        qtyBoxes: -neededQty,
+        balanceBoxes: exactEntry.qtyBoxes,
+        reference: invoice.invoiceNo,
+        note,
+        createdBy: 'System',
+        packing,
+        batchNo: item.batchNo || '',
+      });
+    } else {
+      // FIFO Multi-batch deduction
+      let remainingNeeded = neededQty;
+      const batchesUsed = [];
+
+      for (const entry of entries) {
+        if (remainingNeeded <= 0) break;
+        if (entry.qtyBoxes <= 0) continue;
+
+        const deduct = Math.min(remainingNeeded, entry.qtyBoxes);
+        entry.qtyBoxes -= deduct;
+        await entry.save();
+
+        remainingNeeded -= deduct;
+        batchesUsed.push(`${entry.batchNo || 'NO-BATCH'} (${deduct} Pcs)`);
+
+        let note = `Sold via Sale Invoice ${invoice.invoiceNo} (Batch ${entry.batchNo || 'N/A'})`;
+        if (invoice.saleType === 'doctor_sampling') {
+          note = `Doctor Sample: MR ${invoice.medicalRepName || 'N/A'} to Dr. ${invoice.doctorName || 'N/A'} (Batch ${entry.batchNo || 'N/A'})`;
+        } else if (invoice.saleType === 'damage') {
+          note = `Damaged Goods Write-off (Batch ${entry.batchNo || 'N/A'})`;
+        }
+
+        await StockLedger.create({
+          productId: product._id,
+          warehouseId: warehouse._id,
+          warehouseName: warehouse.name,
+          type: 'OUT',
+          qtyBoxes: -deduct,
+          balanceBoxes: entry.qtyBoxes,
+          reference: invoice.invoiceNo,
+          note,
+          createdBy: 'System',
+          packing,
+          batchNo: entry.batchNo || '',
+        });
+      }
+
+      if (batchesUsed.length > 0) {
+        item.batchNo = batchesUsed.join(', ');
+        isUpdatedItems = true;
+      }
     }
+  }
 
-    // 3. Record stock ledger entry (OUT movement)
-    let note = `Sold via Sale Invoice ${invoice.invoiceNo} (Finalized)`;
-    if (invoice.saleType === 'doctor_sampling') {
-      note = `Doctor Sample: MR ${invoice.medicalRepName || 'N/A'} to Dr. ${invoice.doctorName || 'N/A'}`;
-    } else if (invoice.saleType === 'damage') {
-      note = `Damaged Goods Write-off: ${invoice.damageReason || 'No details'}`;
-    }
-
-    await StockLedger.create({
-      productId: product._id,
-      warehouseId: warehouse._id,
-      warehouseName: warehouse.name,
-      type: 'OUT',
-      qtyBoxes: -qty,
-      balanceBoxes: entry ? entry.qtyBoxes : 0,
+  if (isUpdatedItems) {
+    await Invoice.findByIdAndUpdate(invoice._id, { items: invoice.items });
+  }
+}
       reference: invoice.invoiceNo,
       note,
       createdBy: 'System',
