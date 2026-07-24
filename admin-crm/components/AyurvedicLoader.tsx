@@ -42,8 +42,8 @@ export default function AyurvedicLoader({ message, inline = false }: { message?:
   }
 
   return (
-    <View style={[styles.fullContainer, { backgroundColor: colors.bg.primary }]}>
-      <View style={[styles.card, { backgroundColor: colors.bg.secondary, borderColor: colors.primary + '30' }]}>
+    <View style={[styles.fullContainer, { backgroundColor: 'rgba(0, 0, 0, 0.45)' }]}>
+      <View style={[styles.card, { backgroundColor: colors.bg.card, borderColor: colors.primary + '40' }]}>
         {message ? (
           <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
             {message}
@@ -66,7 +66,12 @@ export default function AyurvedicLoader({ message, inline = false }: { message?:
 
 const styles = StyleSheet.create({
   fullContainer: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 99999,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
