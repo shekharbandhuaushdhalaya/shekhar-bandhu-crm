@@ -773,13 +773,6 @@ export default function StockMovementsScreen() {
                           <Text style={[styles.toggleChipText, form.billingMode === 'cash' && { color: '#fff', fontWeight: '700' }]}>Cash (No GST)</Text>
                         </TouchableOpacity>
                       </View>
-                      <View style={{ backgroundColor: form.billingMode === 'cash' ? '#fef3c7' : '#eff6ff', borderRadius: 8, padding: 10 }}>
-                        <Text style={{ fontSize: 11, color: form.billingMode === 'cash' ? '#92400e' : '#1e40af', lineHeight: 15 }}>
-                          {form.billingMode === 'cash'
-                            ? '⚠️ Cash sale: Updates customer cash balance. Does NOT appear in GSTR-1.'
-                            : '✓ Regular sale: Will generate tax invoice. Updates customer GST balance. Appears in GSTR-1.'}
-                        </Text>
-                      </View>
                     </View>
                   );
                 })()}
