@@ -73,6 +73,12 @@ export default function InventoryDispatchScreen() {
         customerName: selectedInvoice.customerName,
         customerPhone: selectedInvoice.gstin || '', // fall back to gstin or dummy
         shippingAddress: selectedInvoice.shippingAddress || selectedInvoice.partyAddress,
+        items: (selectedInvoice.items || []).map((it: any) => ({
+          productId: it.productId,
+          productName: it.name,
+          qtyBoxes: it.qty || it.boxes || 1,
+          packing: it.packing || 1,
+        })),
         transporter, lrNo, vehicleNo, courierName, trackingId, trackingUrl,
         totalBoxes: parseInt(totalBoxes) || 1, totalWeight, freightCharge: parseFloat(freightCharge) || 0,
         notes: dispNotes, status: 'dispatched'
