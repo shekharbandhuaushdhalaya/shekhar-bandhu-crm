@@ -17,7 +17,9 @@ const inventoryEntrySchema = new mongoose.Schema({
   packing:       { type: Number, required: true, default: 0 }, // pcs/box
   batchNo:       { type: String, default: '', trim: true },
   mfgDate:       { type: Date },
-  expiryDate:    { type: Date }
+  expiryDate:    { type: Date },
+  manufacturingUnitId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit' },
+  manufacturingUnitName: { type: String, default: '', trim: true }
 }, { timestamps: true });
 
 // Unique stock slot = product + vendor + warehouse + packing size + batch number

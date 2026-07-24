@@ -33,6 +33,7 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
     try {
       const success = await api.deleteProduct(product._id);
       if (success) {
+        showToast('Product deleted successfully. Inventory ledger preserved.', 'success');
         onDeleted();
         onClose();
       }

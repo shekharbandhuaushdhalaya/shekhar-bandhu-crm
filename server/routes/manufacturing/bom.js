@@ -94,9 +94,13 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
       });
     }
     // Automatically update Product's ingredients field with percentage proportions (formulation materials only)
-    const populatedBom = await BillOfMaterials.findById(bom._id).populate('ingredients.rawMaterialId', 'name');
+    const populatedBom = await BillOfMaterials.findById(bom._id).populate('ingredients.rawMaterialId', 'name category');
     if (populatedBom && populatedBom.ingredients && populatedBom.ingredients.length > 0) {
-      const formulationIngredients = populatedBom.ingredients.filter(ing => ing.itemType !== 'packaging');
+      const formulationIngredients = populatedBom.ingredients.filter(ing => {
+        const mat = ing.rawMaterialId;
+        const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+        return !isPkg;
+      });
       const totalQty = formulationIngredients.reduce((sum, ing) => sum + (ing.qtyRequired || 0), 0);
       if (totalQty > 0) {
         const ingredientsString = formulationIngredients

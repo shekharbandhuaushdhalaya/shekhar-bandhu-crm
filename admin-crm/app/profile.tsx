@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   RefreshControl,
-  Platform
+  Platform,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -34,8 +35,30 @@ export default function ProfileScreen() {
 
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Tab State for Admin
-  const [activeTab, setActiveTab] = useState<'profile' | 'company'>('profile');
+  // Tab State for Admin & Profile
+  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'units'>('profile');
+
+  // Manufacturing Units state
+  const [manufacturingUnits, setManufacturingUnits] = useState<any[]>([]);
+  const [unitModalVisible, setUnitModalVisible] = useState(false);
+  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
+  const [unitName, setUnitName] = useState('');
+  const [unitCode, setUnitCode] = useState('');
+  const [unitAddress, setUnitAddress] = useState('');
+  const [unitCity, setUnitCity] = useState('');
+  const [unitState, setUnitState] = useState('');
+  const [unitPincode, setUnitPincode] = useState('');
+  const [unitContact, setUnitContact] = useState('');
+  const [unitPhone, setUnitPhone] = useState('');
+  const [unitError, setUnitError] = useState('');
+  const [savingUnit, setSavingUnit] = useState(false);
+
+  const loadManufacturingUnits = async () => {
+    try {
+      const units = await api.getManufacturingUnits();
+      setManufacturingUnits(units);
+    } catch (_) {}
+  };
 
   // Form states for profile details
   const [name, setName] = useState(user?.name || '');
@@ -174,7 +197,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     const init = async () => {
       setInitialLoading(true);
-      await Promise.all([loadSessionDetails(), loadCompanyConfig()]);
+      await Promise.all([loadSessionDetails(), loadCompanyConfig(), loadManufacturingUnits()]);
       setInitialLoading(false);
     };
     init();
@@ -184,7 +207,81 @@ export default function ProfileScreen() {
     setRefreshing(true);
     await loadSessionDetails();
     await loadCompanyConfig();
+    await loadManufacturingUnits();
     setRefreshing(false);
+  };
+
+  const handleOpenAddUnit = () => {
+    setEditingUnitId(null);
+    setUnitName('');
+    setUnitCode('');
+    setUnitAddress('');
+    setUnitCity('');
+    setUnitState('');
+    setUnitPincode('');
+    setUnitContact('');
+    setUnitPhone('');
+    setUnitError('');
+    setUnitModalVisible(true);
+  };
+
+  const handleOpenEditUnit = (unit: any) => {
+    setEditingUnitId(unit._id);
+    setUnitName(unit.name || '');
+    setUnitCode(unit.code || '');
+    setUnitAddress(unit.addressLine1 || '');
+    setUnitCity(unit.city || '');
+    setUnitState(unit.state || '');
+    setUnitPincode(unit.pincode || '');
+    setUnitContact(unit.contactPerson || '');
+    setUnitPhone(unit.phone || '');
+    setUnitError('');
+    setUnitModalVisible(true);
+  };
+
+  const handleSaveUnit = async () => {
+    if (!unitName.trim() || !unitCode.trim()) {
+      setUnitError('Unit Name and Code are required.');
+      return;
+    }
+    setSavingUnit(true);
+    setUnitError('');
+    try {
+      const payload = {
+        name: unitName.trim(),
+        code: unitCode.trim().toUpperCase(),
+        addressLine1: unitAddress.trim(),
+        city: unitCity.trim(),
+        state: unitState.trim(),
+        pincode: unitPincode.trim(),
+        contactPerson: unitContact.trim(),
+        phone: unitPhone.trim()
+      };
+
+      if (editingUnitId) {
+        await api.updateManufacturingUnit(editingUnitId, payload);
+        showToast('Manufacturing Unit updated successfully!', 'success');
+      } else {
+        await api.createManufacturingUnit(payload);
+        showToast('Manufacturing Unit created successfully!', 'success');
+      }
+
+      setEditingUnitId(null);
+      setUnitName('');
+      setUnitCode('');
+      setUnitAddress('');
+      setUnitCity('');
+      setUnitState('');
+      setUnitPincode('');
+      setUnitContact('');
+      setUnitPhone('');
+      setUnitModalVisible(false);
+      await loadManufacturingUnits();
+    } catch (err: any) {
+      setUnitError(err.message || 'Failed to save manufacturing unit');
+    } finally {
+      setSavingUnit(false);
+    }
   };
 
   // Profile update handler
@@ -1107,6 +1204,97 @@ export default function ProfileScreen() {
     </View>
   );
 
+  const renderManufacturingUnits = () => (
+    <View style={styles.formContainer}>
+      <View style={[styles.card, { padding: 16 }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="business-outline" size={20} color={colors.primary} />
+            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary }}>Manufacturing Facilities & Units</Text>
+          </View>
+          {canEdit && (
+            <TouchableOpacity
+              style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 14, height: 38, marginTop: 0 }]}
+              onPress={() => setUnitModalVisible(true)}
+            >
+              <Ionicons name="add-circle-outline" size={16} color="#fff" />
+              <Text style={styles.btnText}>+ Define Unit</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {manufacturingUnits.length > 0 ? (
+          <View style={{ gap: 12 }}>
+            {manufacturingUnits.map((unit: any) => (
+              <View key={unit._id} style={{ backgroundColor: colors.bg.primary, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftColor: colors.primary, borderLeftWidth: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>{unit.name}</Text>
+                    {unit.code ? (
+                      <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>{unit.code}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.sm }}>
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: colors.success }}>OPERATIONAL</Text>
+                    </View>
+                    {canEdit && (
+                      <TouchableOpacity
+                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, backgroundColor: colors.primary + '15', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        onPress={() => handleOpenEditUnit(unit)}
+                      >
+                        <Ionicons name="pencil" size={12} color={colors.primary} />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Edit Unit</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
+                  <View style={{ flex: 1, minWidth: 120 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>LOCATION</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
+                      {[unit.addressLine1, unit.city, unit.state, unit.pincode].filter(Boolean).join(', ') || 'No address specified'}
+                    </Text>
+                  </View>
+                  {unit.contactPerson ? (
+                    <View style={{ flex: 1, minWidth: 120 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>CONTACT</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
+                        👤 {unit.contactPerson} {unit.phone ? `(${unit.phone})` : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={{ padding: 24, alignItems: 'center' }}>
+            <Ionicons name="business-outline" size={40} color={colors.text.muted} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.secondary, marginTop: 8 }}>No Manufacturing Units Configured</Text>
+            {canEdit && (
+              <TouchableOpacity
+                style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 16, marginTop: 12 }]}
+                onPress={() => setUnitModalVisible(true)}
+              >
+                <Text style={styles.btnText}>+ Define First Unit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderActiveTabContent = () => {
+    if (activeTab === 'profile') return renderForms();
+    if (activeTab === 'company') return renderCompanySettings();
+    return renderManufacturingUnits();
+  };
+
   if (initialLoading) {
     return <AyurvedicLoader />;
   }
@@ -1138,7 +1326,18 @@ export default function ProfileScreen() {
           <Ionicons name="business-outline" size={16} color={activeTab === 'company' ? colors.primary : colors.text.secondary} />
           <Text style={[styles.tabText, activeTab === 'company' && styles.tabActiveText]}>Company Configuration</Text>
           <View style={{ backgroundColor: colors.primary + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 6 }}>
-            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>✔ GST & Firm Verified</Text>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>✔ GST Verified</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'units' && styles.tabActiveButton]}
+          onPress={() => setActiveTab('units')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="hammer-outline" size={16} color={activeTab === 'units' ? colors.primary : colors.text.secondary} />
+          <Text style={[styles.tabText, activeTab === 'units' && styles.tabActiveText]}>Manufacturing Facilities</Text>
+          <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 6 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.warning }}>{manufacturingUnits.length} Units</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -1147,17 +1346,86 @@ export default function ProfileScreen() {
         {isDesktop ? (
           <>
             <View style={{ flex: 2, marginRight: Spacing.lg }}>
-              {activeTab === 'profile' ? renderForms() : renderCompanySettings()}
+              {renderActiveTabContent()}
             </View>
             <View style={{ flex: 1 }}>{renderSidebar()}</View>
           </>
         ) : (
           <>
             {renderSidebar()}
-            {activeTab === 'profile' ? renderForms() : renderCompanySettings()}
+            {renderActiveTabContent()}
           </>
         )}
       </View>
+
+      {/* Modal: Define Manufacturing Unit */}
+      {canEdit && (
+        <Modal visible={unitModalVisible} transparent animationType="fade" onRequestClose={() => setUnitModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+            <View style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, width: '100%', maxWidth: 500, padding: 20, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary }}>
+                  {editingUnitId ? 'Edit Manufacturing Unit' : 'Define New Manufacturing Unit'}
+                </Text>
+                <TouchableOpacity onPress={() => setUnitModalVisible(false)}>
+                  <Ionicons name="close" size={22} color={colors.text.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {unitError ? (
+                <View style={{ backgroundColor: colors.danger + '15', padding: 10, borderRadius: Radius.sm, marginBottom: 12 }}>
+                  <Text style={{ color: colors.danger, fontSize: 11, fontWeight: '700' }}>{unitError}</Text>
+                </View>
+              ) : null}
+
+              <ScrollView style={{ maxHeight: 400 }}>
+                <Text style={styles.label}>Unit Name *</Text>
+                <TextInput style={styles.input} placeholder="e.g. Varanasi Main Factory" placeholderTextColor={colors.text.muted} value={unitName} onChangeText={setUnitName} />
+
+                <Text style={styles.label}>Unit Code / Abbreviation *</Text>
+                <TextInput style={styles.input} placeholder="e.g. MFG-VARANASI" placeholderTextColor={colors.text.muted} value={unitCode} onChangeText={setUnitCode} />
+
+                <Text style={styles.label}>Address Line 1</Text>
+                <TextInput style={styles.input} placeholder="Address..." placeholderTextColor={colors.text.muted} value={unitAddress} onChangeText={setUnitAddress} />
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>City</Text>
+                    <TextInput style={styles.input} placeholder="City" placeholderTextColor={colors.text.muted} value={unitCity} onChangeText={setUnitCity} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>State</Text>
+                    <TextInput style={styles.input} placeholder="State" placeholderTextColor={colors.text.muted} value={unitState} onChangeText={setUnitState} />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Pincode</Text>
+                    <TextInput style={styles.input} placeholder="Pincode" placeholderTextColor={colors.text.muted} value={unitPincode} onChangeText={setUnitPincode} keyboardType="numeric" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Phone</Text>
+                    <TextInput style={styles.input} placeholder="Phone" placeholderTextColor={colors.text.muted} value={unitPhone} onChangeText={setUnitPhone} keyboardType="phone-pad" />
+                  </View>
+                </View>
+
+                <Text style={styles.label}>Contact Person</Text>
+                <TextInput style={styles.input} placeholder="Contact Person Name" placeholderTextColor={colors.text.muted} value={unitContact} onChangeText={setUnitContact} />
+              </ScrollView>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                <TouchableOpacity style={[styles.btnPrimary, { flex: 1, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border }]} onPress={() => setUnitModalVisible(false)}>
+                  <Text style={[styles.btnText, { color: colors.text.primary }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.btnPrimary, { flex: 1 }]} onPress={handleSaveUnit} disabled={savingUnit}>
+                  {savingUnit ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.btnText}>Save Unit</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </ScrollView>
   );
 }

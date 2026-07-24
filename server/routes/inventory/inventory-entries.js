@@ -67,6 +67,8 @@ router.get('/consolidated', async (req, res) => {
           batchNo:     { $first: '$batchNo' },
           mfgDate:     { $first: '$mfgDate' },
           expiryDate:  { $first: '$expiryDate' },
+          manufacturingUnitId:   { $first: '$manufacturingUnitId' },
+          manufacturingUnitName: { $first: '$manufacturingUnitName' },
           productType: { $first: '$productType' },
           size:        { $first: '$size' },
           colour:      { $first: '$colour' },

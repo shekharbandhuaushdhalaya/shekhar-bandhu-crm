@@ -16,7 +16,9 @@ const stockLedgerSchema = new mongoose.Schema({
   vendorName:    { type: String, default: '', trim: true },
   batchNo:       { type: String, default: '', trim: true },
   mfgDate:       { type: Date },
-  expiryDate:    { type: Date }
+  expiryDate:    { type: Date },
+  manufacturingUnitId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit' },
+  manufacturingUnitName: { type: String, default: '', trim: true }
 }, { timestamps: true });
 
 stockLedgerSchema.index({ productId: 1, createdAt: -1 });

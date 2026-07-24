@@ -420,31 +420,6 @@ export default function MedicalRepsScreen() {
     }
   };
 
-  const handleSeedDemo = async () => {
-    try {
-      showToast('Seeding temporary Medical Representative data...', 'info');
-      try {
-        await api.seedMrDemoData();
-      } catch (err: any) {
-        // Fallback: Create demo MRs via standard API if remote route not deployed
-        const sampleMrs = [
-          { name: 'Dr. Rajesh Sharma', phone: '+91 98390 12345', email: 'rajesh.sharma@shekharbandhu.in', code: 'MR-101', territory: 'Varanasi North', monthlyTarget: 500000, address: '12 Maldahiya, Varanasi', notes: 'Top performing Rep in Eastern UP' },
-          { name: 'Anita Verma', phone: '+91 98390 67890', email: 'anita.verma@shekharbandhu.in', code: 'MR-102', territory: 'Prayagraj HQ', monthlyTarget: 450000, address: '45 Civil Lines, Prayagraj', notes: 'Specialist in Ayurvedic Doctor Clinics' },
-          { name: 'Vikram Singh', phone: '+91 98390 54321', email: 'vikram.singh@shekharbandhu.in', code: 'MR-103', territory: 'Gorakhpur Central', monthlyTarget: 600000, address: '88 Town Hall, Gorakhpur', notes: 'Handling Dealer & Clinic distribution' }
-        ];
-        for (const mr of sampleMrs) {
-          try { await api.createMR(mr); } catch (_) {}
-        }
-      }
-      showToast('Demo MR data seeded successfully!', 'success');
-      await loadMrs();
-      if (selectedMrForAttendance) await loadAttendance(selectedMrForAttendance);
-      if (selectedMrForVisits) await loadVisits(selectedMrForVisits);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to seed demo data', 'error');
-    }
-  };
-
   const handleOpenNewMrModal = () => {
     setEditMr(null);
     const nextNum = (mrs.length + 1).toString().padStart(3, '0');
@@ -1566,28 +1541,15 @@ export default function MedicalRepsScreen() {
           </ScrollView>
 
           {/* Action CTAs depending on active tab */}
-          {activeTab === 'mrs' && (
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity
-                style={[styles.primaryCtaBtn, { backgroundColor: colors.warning }]}
-                onPress={handleSeedDemo}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="flash-outline" size={16} color="#fff" />
-                <Text style={styles.primaryCtaBtnText}>Seed Demo Data</Text>
-              </TouchableOpacity>
-
-              {perm.can('mr:create') && (
-                <TouchableOpacity
-                  style={styles.primaryCtaBtn}
-                  onPress={handleOpenNewMrModal}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="add" size={18} color="#fff" />
-                  <Text style={styles.primaryCtaBtnText}>New MR</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+          {activeTab === 'mrs' && perm.can('mr:create') && (
+            <TouchableOpacity
+              style={styles.primaryCtaBtn}
+              onPress={handleOpenNewMrModal}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={18} color="#fff" />
+              <Text style={styles.primaryCtaBtnText}>New MR</Text>
+            </TouchableOpacity>
           )}
 
           {activeTab === 'visits' && selectedMrForVisits && perm.can('mr:visits') && (

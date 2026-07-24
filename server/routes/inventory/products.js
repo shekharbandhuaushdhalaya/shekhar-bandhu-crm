@@ -1,5 +1,6 @@
 const express = require('express');
 const Product = require('../../models/Product');
+const InventoryEntry = require('../../models/InventoryEntry');
 const multer = require('multer');
 const { Readable } = require('stream');
 const cloudinary = require('cloudinary').v2;
@@ -156,16 +157,27 @@ router.put('/:id', validate(schemas.productSchema.partial()), authorize('product
   }
 });
 
-// DELETE /api/products/:id — Remove product and its associated inventory entries
+// DELETE /api/products/:id — Remove product when total inventory stock is 0 (preserves stock ledger and zero-qty inventory history)
 router.delete('/:id', authorize('product:delete'), async (req, res) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const productId = req.params.id;
+    
+    // Check current stock across all inventory entries for this product
+    const inventoryEntries = await InventoryEntry.find({ productId }).lean();
+    const totalStock = inventoryEntries.reduce((sum, entry) => sum + (entry.qtyBoxes || 0), 0);
+
+    if (totalStock > 0) {
+      return res.status(400).json({ 
+        error: `Cannot delete product. Remaining stock is ${totalStock} box(es). Please clear stock before deletion.` 
+      });
+    }
+
+    const product = await Product.findByIdAndDelete(productId);
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    await InventoryEntry.deleteMany({ productId: product._id });
-    await StockLedger.deleteMany({ productId: product._id });
+    // Preserve InventoryEntry records (which now have 0 stock) and StockLedger records for audit/ledger history
 
-    res.json({ message: 'Product deleted' });
+    res.json({ message: 'Product deleted successfully. Inventory ledger records preserved.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1350,10 +1350,6 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/medical-reps/dashboard/summary?${params}`);
     return res.json();
   }
-  async seedMrDemoData(): Promise<any> {
-    const res = await this.request(`${API_BASE}/medical-reps/seed-demo`, { method: 'POST' });
-    return res.json();
-  }
 
   // ─── Campaigns ───
   async getCampaigns(search?: string, status?: string, platform?: string): Promise<Campaign[]> {

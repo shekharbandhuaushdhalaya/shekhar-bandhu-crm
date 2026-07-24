@@ -476,6 +476,10 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
 
       if (finEntry) {
         finEntry.qtyBoxes += actualQty;
+        if (batch.manufacturingUnitName && !finEntry.manufacturingUnitName) {
+          finEntry.manufacturingUnitId = batch.manufacturingUnitId;
+          finEntry.manufacturingUnitName = batch.manufacturingUnitName;
+        }
         await finEntry.save();
       } else {
         finEntry = await InventoryEntry.create({
@@ -495,7 +499,9 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
           batchNo:     batch.batchNo,
           mfgDate:     new Date(),
           expiryDate:  new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000),
-          purchaseRate: Number(unitCost.toFixed(2))
+          purchaseRate: Number(unitCost.toFixed(2)),
+          manufacturingUnitId: batch.manufacturingUnitId,
+          manufacturingUnitName: batch.manufacturingUnitName
         });
       }
 
@@ -510,10 +516,12 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
         qtyBoxes: boxes,
         balanceBoxes: finEntry.qtyBoxes,
         reference: `Production Batch ${batch.batchNo}`,
-        note: `Inwarded from Batch Production run by QC Inspector ${qcPassedBy}`,
+        note: `Inwarded from Batch Production run by QC Inspector ${qcPassedBy}${batch.manufacturingUnitName ? ` (Mfg Unit: ${batch.manufacturingUnitName})` : ''}`,
         createdBy: qcPassedBy,
         packing: packingSize,
-        batchNo: batch.batchNo
+        batchNo: batch.batchNo,
+        manufacturingUnitId: batch.manufacturingUnitId,
+        manufacturingUnitName: batch.manufacturingUnitName
       });
 
       createdEntries.push({

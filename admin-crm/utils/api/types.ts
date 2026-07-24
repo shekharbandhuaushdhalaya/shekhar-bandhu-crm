@@ -251,6 +251,8 @@ export type InventoryEntry = {
   batchNo?: string;
   mfgDate?: string;
   expiryDate?: string;
+  manufacturingUnitId?: string;
+  manufacturingUnitName?: string;
 };
 
 export type ConsolidatedInventory = {
@@ -271,6 +273,8 @@ export type ConsolidatedInventory = {
   batchNo?: string;
   mfgDate?: string;
   expiryDate?: string;
+  manufacturingUnitId?: string;
+  manufacturingUnitName?: string;
 };
 
 export type StockLedger = {
@@ -291,6 +295,8 @@ export type StockLedger = {
   batchNo?: string;
   mfgDate?: string;
   expiryDate?: string;
+  manufacturingUnitId?: string;
+  manufacturingUnitName?: string;
 };
 
 export type InvoiceItem = {

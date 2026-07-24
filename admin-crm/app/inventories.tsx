@@ -1081,7 +1081,12 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
                       <View style={[styles.ledgerCell, { width: 140 }]}>
                         {log.reference ? <Text style={styles.ledgerRefText}>Ref: {log.reference}</Text> : null}
                         {log.note ? <Text style={styles.ledgerNoteText}>{log.note}</Text> : null}
-                        {!log.reference && !log.note ? <Text style={{ color: colors.text.muted, fontSize: 11 }}>—</Text> : null}
+                        {log.manufacturingUnitName ? (
+                          <Text style={{ fontSize: 9.5, fontWeight: '700', color: colors.primary, marginTop: 1 }}>
+                            🏭 {log.manufacturingUnitName}
+                          </Text>
+                        ) : null}
+                        {!log.reference && !log.note && !log.manufacturingUnitName ? <Text style={{ color: colors.text.muted, fontSize: 11 }}>—</Text> : null}
                       </View>
                       <Text style={[styles.ledgerCell, { width: 90 }]} numberOfLines={1}>{log.createdBy || 'System'}</Text>
                     </View>
@@ -1386,7 +1391,8 @@ export default function InventoriesScreen() {
           _id: entry._id,
           batchNo: entry.batchNo || '',
           mfgDate: entry.mfgDate || '',
-          expiryDate: entry.expiryDate || ''
+          expiryDate: entry.expiryDate || '',
+          manufacturingUnitName: entry.manufacturingUnitName || ''
         });
       });
 
@@ -2010,9 +2016,18 @@ export default function InventoriesScreen() {
                                     <Text style={styles.breakdownVendorText}>↳ {formatVendorDisplay(vd.vendorName)}</Text>
                                     <Text style={styles.breakdownPackingText}>Packing: {vd.packing} Pcs/Box</Text>
                                     {vd.batchNo ? (
-                                      <Text style={[styles.breakdownPackingText, { color: colors.warning, fontWeight: '700', marginTop: 2 }]}>
-                                        Batch: {vd.batchNo}
-                                      </Text>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                                        <Text style={[styles.breakdownPackingText, { color: colors.warning, fontWeight: '700' }]}>
+                                          Batch: {vd.batchNo}
+                                        </Text>
+                                        {vd.manufacturingUnitName ? (
+                                          <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                                            <Text style={{ fontSize: 9, fontWeight: '800', color: colors.primary }}>
+                                              🏭 {vd.manufacturingUnitName}
+                                            </Text>
+                                          </View>
+                                        ) : null}
+                                      </View>
                                     ) : null}
                                     {(vd.mfgDate || vd.expiryDate) ? (() => {
                                       const now = new Date();
