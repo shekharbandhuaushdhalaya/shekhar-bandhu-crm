@@ -620,6 +620,11 @@ export default function StockMovementsScreen() {
       } else {
         await api.createStockMovement(payload);
       }
+      // Reload warehouse inventory entries in state to reflect the transaction without requiring manual reload
+      if (form.warehouseId) {
+        const updatedInventory = await api.getInventoryEntries(form.warehouseId, "", true);
+        setWarehouseInventory(updatedInventory);
+      }
       setShowModal(false);
       resetForm();
       load();
@@ -648,6 +653,10 @@ export default function StockMovementsScreen() {
     if (!ok) return;
     try {
       await api.cancelStockMovement(id);
+      if (form.warehouseId) {
+        const updatedInventory = await api.getInventoryEntries(form.warehouseId, "", true);
+        setWarehouseInventory(updatedInventory);
+      }
       load();
     } catch (e: any) {
       if (Platform.OS === 'web') window.alert(e.message);
@@ -664,6 +673,10 @@ export default function StockMovementsScreen() {
     if (!ok) return;
     try {
       await api.deleteStockMovement(id);
+      if (form.warehouseId) {
+        const updatedInventory = await api.getInventoryEntries(form.warehouseId, "", true);
+        setWarehouseInventory(updatedInventory);
+      }
       load();
     } catch (e: any) {
       if (Platform.OS === 'web') window.alert(e.message);
@@ -683,6 +696,10 @@ export default function StockMovementsScreen() {
         await api.dispatchStockMovement(m._id);
       } else {
         await api.receiveStockMovement(m._id);
+      }
+      if (form.warehouseId) {
+        const updatedInventory = await api.getInventoryEntries(form.warehouseId, "", true);
+        setWarehouseInventory(updatedInventory);
       }
       if (Platform.OS === 'web') window.alert('Challan finalized successfully!');
       load();
