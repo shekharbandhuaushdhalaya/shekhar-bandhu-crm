@@ -150,13 +150,13 @@ describe('Compliance and Operations Features', () => {
     test('POST /medical-reps/:id/visits calculates distance and auto-verifies geofenced clinics', async () => {
       const mockDocLoc = { name: 'Dr. Ramesh', latitude: 25.3176, longitude: 82.9739 }; // Varanasi Coordinates
       Customer.findOne.mockResolvedValue(null);
-      Contact.findOne = jest.fn().mockResolvedValue(mockDocLoc);
+      Contact.findOne.mockResolvedValue(mockDocLoc);
 
       MrVisit.create.mockImplementation(data => Promise.resolve({ _id: 'visit_99', ...data }));
-      MedicalRepresentative.findById = jest.fn().mockResolvedValue({ name: 'Rajesh' });
-      StockMovement.countDocuments = jest.fn().mockResolvedValue(0);
-      StockMovement.create = jest.fn().mockResolvedValue({});
-      Product.findById = jest.fn().mockResolvedValue({ name: 'Test Product', save: jest.fn().mockResolvedValue(true) });
+      MedicalRepresentative.findById.mockResolvedValue({ name: 'Rajesh' });
+      StockMovement.countDocuments.mockResolvedValue(0);
+      StockMovement.create.mockResolvedValue({});
+      Product.findById.mockResolvedValue({ name: 'Test Product', save: jest.fn().mockResolvedValue(true) });
 
       // Checkin at close location (Varanasi Ghats ~150 meters away)
       const response = await request(app)
