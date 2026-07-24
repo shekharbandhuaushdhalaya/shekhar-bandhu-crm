@@ -295,7 +295,8 @@ async function deductPackagingMaterials(batch, outputQty) {
   const scale = outputQty / scaleBase;
 
   for (const ing of pkgIngs) {
-    const qtyNeeded = ing.qtyRequired * scale;
+    // Packaging items are specified as direct per-unit pieces (e.g. 1 cap per unit produced, 1 box per unit produced)
+    const qtyNeeded = ing.qtyRequired * outputQty;
     const rm = await RawMaterial.findById(ing.rawMaterialId);
     if (!rm) continue;
 
