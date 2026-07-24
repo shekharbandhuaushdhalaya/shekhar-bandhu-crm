@@ -919,9 +919,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
 
           {/* 1. Supplier Name & Destination Unit in 1 Row */}
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16, zIndex: (showVendorDropdown || showWarehouseDropdown) ? 3000 : 100 }}>
             {/* Supplier Name */}
-            <View style={[styles.formGroup, { flex: 1, zIndex: 1025, marginBottom: 0 }]}>
+            <View style={[styles.formGroup, { flex: 1, zIndex: showVendorDropdown ? 3005 : 100, marginBottom: 0 }]}>
               <Text style={styles.formLabel}>Supplier Name *</Text>
               <View style={styles.customSearchSelectContainer}>
                 <View style={styles.formInput}>
@@ -997,7 +997,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             </View>
 
             {/* Destination Manufacturing Unit */}
-            <View style={[styles.formGroup, { flex: 1, zIndex: 1020, marginBottom: 0 }]}>
+            <View style={[styles.formGroup, { flex: 1, zIndex: showWarehouseDropdown ? 3005 : 100, marginBottom: 0 }]}>
               <Text style={styles.formLabel}>Destination Manufacturing Unit *</Text>
               <View style={styles.customSearchSelectContainer}>
                 <View style={styles.formInput}>
@@ -1049,7 +1049,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           </View>
 
           {/* 2. Ledger Mode, Invoice Number, Date in 1 Row */}
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16, zIndex: 10 }}>
             {/* Billing Mode Switch */}
             {(() => {
               const selectedVend = vendors.find(v => (v.company || v.name).toLowerCase() === supplierName.trim().toLowerCase() || (v.displayName || v.registeredName || '').toLowerCase() === supplierName.trim().toLowerCase());
