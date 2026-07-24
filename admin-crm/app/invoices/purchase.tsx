@@ -304,10 +304,15 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                   const itemSubtotal = qty * rate;
                   const gstVal = (itemSubtotal * (item.gstRate || 0)) / 100;
                   const itemTotal = itemSubtotal + gstVal;
+                  
+                  // Look up unit dynamically from raw materials if missing on invoice item
+                  const matchedRawMat = rawMaterials.find(rm => rm.name.toLowerCase() === item.name.toLowerCase() || rm._id === item.rawMaterialId);
+                  const unitDisplay = item.unit || matchedRawMat?.unit || 'units';
+
                   return (
                     <View key={idx} style={styles.detailTableRow}>
                       <Text style={[styles.detailTableCell, { flex: 3.5, fontWeight: '600' }]} numberOfLines={2}>{item.name}</Text>
-                      <Text style={[styles.detailTableCell, { flex: 1.2, textAlign: 'center' }]}>{qty} {item.unit || 'pcs'}</Text>
+                      <Text style={[styles.detailTableCell, { flex: 1.2, textAlign: 'center' }]}>{qty} {unitDisplay}</Text>
                       <Text style={[styles.detailTableCell, { flex: 1.0, textAlign: 'right' }]}>₹{rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                       <Text style={[styles.detailTableCell, { flex: 0.8, textAlign: 'center' }]}>{item.gstRate || 0}%</Text>
                       <Text style={[styles.detailTableCell, { flex: 1.0, textAlign: 'right', fontWeight: '700' }]}>₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
@@ -571,12 +576,14 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           if (invoiceToEdit) {
             setRows((invoiceToEdit.items || []).map((it, idx) => {
               const matchedProd = p.find(prod => prod._id === it.productId) || null;
+              const matchedRawMat = rm.find(r => r.name.toLowerCase() === (it.name || '').toLowerCase() || r._id === it.rawMaterialId);
               return {
                 id: idx.toString(),
                 productSearch: it.name || '',
                 showProductDropdown: false,
                 showGstDropdown: false,
                 selectedProduct: matchedProd,
+                unit: it.unit || matchedRawMat?.unit || '',
                 boxes: it.boxes !== undefined ? it.boxes.toString() : (it.qty || 0).toString(),
                 packing: (it.packing || 1).toString(),
                 rate: (it.rate || 0).toString(),
