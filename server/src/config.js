@@ -10,5 +10,10 @@ module.exports = {
   },
   allowedOrigins: process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : ['http://localhost:3000', 'http://localhost:8081', 'http://localhost:19006'],
+    : [
+        'http://localhost:3000',
+        'http://localhost:8081',
+        'http://localhost:19006',
+        'https://shekhar-bandhu-crm.vercel.app',
+      ],
 };
