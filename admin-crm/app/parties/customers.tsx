@@ -717,13 +717,15 @@ function AddEditCustomerModal({
                   <TouchableOpacity
                     style={[
                       styles.typeSelectorBtn,
-                      recordTracking === 'invoice_ledger' && { backgroundColor: colors.primary + '18', borderColor: colors.primary }
+                      recordTracking === 'invoice_ledger' && { backgroundColor: colors.primary + '18', borderColor: colors.primary },
+                      customerType === 'cash' && { opacity: 0.4 }
                     ]}
+                    disabled={customerType === 'cash'}
                     onPress={() => setRecordTracking('invoice_ledger')}
                   >
                     <Ionicons name="receipt-outline" size={16} color={recordTracking === 'invoice_ledger' ? colors.primary : colors.text.muted} />
                     <Text style={[styles.typeSelectorText, { color: recordTracking === 'invoice_ledger' ? colors.primary : colors.text.secondary }]}>
-                      GST / Regular Invoice Ledger
+                      GST / Regular Invoice Ledger {customerType === 'cash' ? '(Disabled)' : ''}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
