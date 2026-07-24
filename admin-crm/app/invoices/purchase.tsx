@@ -1129,7 +1129,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   type: 'date',
                   value: date,
                   onChange: (e: any) => setDate(e.target.value),
-                  style: { flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
+                  style: { flex: 1, height: 46, padding: '0 8px', fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
                 }) : (
                   <TextInput
                     style={styles.formInputText}
