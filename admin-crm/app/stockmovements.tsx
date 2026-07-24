@@ -745,28 +745,44 @@ export default function StockMovementsScreen() {
                 <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 8 }]}>👤 Party / Clinic Information</Text>
 
                 {/* Billing Mode (sale only) */}
-                {isSale && (
-                  <View style={{ marginBottom: 12 }}>
-                    <Text style={styles.inputLabel}>Billing Mode *</Text>
-                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                      <TouchableOpacity style={[styles.toggleChip, form.billingMode === 'regular' && { backgroundColor: '#3b82f6', borderColor: '#3b82f6' }]}
-                        onPress={() => setForm(f => ({ ...f, billingMode: 'regular' }))}>
-                        <Text style={[styles.toggleChipText, form.billingMode === 'regular' && { color: '#fff', fontWeight: '700' }]}>Regular (GST Invoice)</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.toggleChip, form.billingMode === 'cash' && { backgroundColor: '#f59e0b', borderColor: '#f59e0b' }]}
-                        onPress={() => setForm(f => ({ ...f, billingMode: 'cash' }))}>
-                        <Text style={[styles.toggleChipText, form.billingMode === 'cash' && { color: '#fff', fontWeight: '700' }]}>Cash (No GST)</Text>
-                      </TouchableOpacity>
+                {isSale && (() => {
+                  const selectedCustomer = customers.find(c => c._id === form.partyId);
+                  const isCashCust = selectedCustomer && (selectedCustomer.customerType === 'cash' || selectedCustomer.recordTracking === 'cash_ledger');
+
+                  return (
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={styles.inputLabel}>Billing Mode *</Text>
+                      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                        <TouchableOpacity
+                          style={[
+                            styles.toggleChip,
+                            form.billingMode === 'regular' && { backgroundColor: '#3b82f6', borderColor: '#3b82f6' },
+                            isCashCust && { opacity: 0.4 }
+                          ]}
+                          disabled={isCashCust}
+                          onPress={() => setForm(f => ({ ...f, billingMode: 'regular' }))}
+                        >
+                          <Text style={[styles.toggleChipText, form.billingMode === 'regular' && { color: '#fff', fontWeight: '700' }]}>
+                            Regular (GST Invoice) {isCashCust ? '(Disabled for Non-GST)' : ''}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.toggleChip, form.billingMode === 'cash' && { backgroundColor: '#f59e0b', borderColor: '#f59e0b' }]}
+                          onPress={() => setForm(f => ({ ...f, billingMode: 'cash' }))}
+                        >
+                          <Text style={[styles.toggleChipText, form.billingMode === 'cash' && { color: '#fff', fontWeight: '700' }]}>Cash (No GST)</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={{ backgroundColor: form.billingMode === 'cash' ? '#fef3c7' : '#eff6ff', borderRadius: 8, padding: 10 }}>
+                        <Text style={{ fontSize: 11, color: form.billingMode === 'cash' ? '#92400e' : '#1e40af', lineHeight: 15 }}>
+                          {form.billingMode === 'cash'
+                            ? '⚠️ Cash sale: Updates customer cash balance. Does NOT appear in GSTR-1.'
+                            : '✓ Regular sale: Will generate tax invoice. Updates customer GST balance. Appears in GSTR-1.'}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={{ backgroundColor: form.billingMode === 'cash' ? '#fef3c7' : '#eff6ff', borderRadius: 8, padding: 10 }}>
-                      <Text style={{ fontSize: 11, color: form.billingMode === 'cash' ? '#92400e' : '#1e40af', lineHeight: 15 }}>
-                        {form.billingMode === 'cash'
-                          ? '⚠️ Cash sale: Updates customer cash balance. Does NOT appear in GSTR-1.'
-                          : '✓ Regular sale: Will generate tax invoice. Updates customer GST balance. Appears in GSTR-1.'}
-                      </Text>
-                    </View>
-                  </View>
-                )}
+                  );
+                })()}
 
                 {/* Sample-specific fields (MR and Doctor Name Side-by-Side) */}
                 {isSample && (
@@ -843,6 +859,7 @@ export default function StockMovementsScreen() {
                                         const shippingAddr = c.shippingAddress;
                                         const shippingAddrStr = shippingAddr ? [shippingAddr.street, shippingAddr.city, shippingAddr.state, shippingAddr.pin].filter(Boolean).join(', ') : '';
                                         const finalAddrStr = `Billing Address:\n${billingAddrStr.trim()}\n\nShipping Address:\n${shippingAddrStr.trim() || billingAddrStr.trim()}`;
+                                        const isCashCustomer = c.customerType === 'cash' || c.recordTracking === 'cash_ledger';
                                         setForm(f => ({
                                           ...f,
                                           partyId: c._id,
