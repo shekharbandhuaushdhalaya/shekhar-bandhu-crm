@@ -9,6 +9,7 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 
 import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
+import { validateGstinWithState } from '../../utils/gst';
 
 const getAvatarColor = (name: string, colors: any) => {
   const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -386,6 +387,14 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
   const handleSave = async () => {
     const finalName = displayName.trim() || registeredName.trim();
     if (!finalName) return;
+
+    if (gstin.trim()) {
+      const gstCheck = validateGstinWithState(gstin.trim(), state);
+      if (!gstCheck.valid) {
+        alert(gstCheck.error);
+        return;
+      }
+    }
 
     const payload = {
       name: finalName,

@@ -9,6 +9,7 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 
 import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
+import { validateGstinWithState } from '../../utils/gst';
 
 const GST_STATE_CODES: { [key: string]: string } = {
   '01': 'Jammu & Kashmir',
@@ -600,6 +601,15 @@ function AddEditCustomerModal({
     if (!primaryName) {
       alert(isCash ? 'Customer / Contact Name is required' : 'Company Name is required');
       return;
+    }
+
+    if (!isCash && gstin.trim()) {
+      const targetState = placeOfSupply.trim() || billingState.trim();
+      const gstCheck = validateGstinWithState(gstin.trim(), targetState);
+      if (!gstCheck.valid) {
+        alert(gstCheck.error);
+        return;
+      }
     }
 
     const payload = {

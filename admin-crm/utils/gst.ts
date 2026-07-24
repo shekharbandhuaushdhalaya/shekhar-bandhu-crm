@@ -55,3 +55,61 @@ export const getStateStrWithCode = (stateName?: string) => {
   
   return stateName; // Fallback if no match
 };
+
+/**
+ * Validates a GSTIN string and cross-checks state code compatibility.
+ * Returns { valid: boolean, stateCode?: string, expectedState?: string, error?: string }
+ */
+export const validateGstinWithState = (gstin?: string, selectedStateName?: string): { valid: boolean; stateCode?: string; expectedState?: string; error?: string } => {
+  if (!gstin || !gstin.trim()) {
+    return { valid: true }; // Empty GSTIN is allowed for unregistered/cash parties
+  }
+
+  const clean = gstin.trim().toUpperCase();
+
+  // 1. Standard Indian 15-digit GSTIN Regex
+  const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+  if (!gstinRegex.test(clean)) {
+    return {
+      valid: false,
+      error: `Invalid GSTIN format "${clean}". Must be 15 characters (e.g. 09AAAAA1111A1Z1).`
+    };
+  }
+
+  // 2. Extract State Code (First 2 digits)
+  const stateCode = clean.substring(0, 2);
+  const expectedState = GST_STATE_CODES[stateCode];
+
+  if (!expectedState) {
+    return {
+      valid: false,
+      stateCode,
+      error: `Invalid GST State Code "${stateCode}" in GSTIN.`
+    };
+  }
+
+  // 3. Cross-validate state code against selected State Name if provided
+  if (selectedStateName && selectedStateName.trim()) {
+    const normSelected = selectedStateName.trim().toLowerCase();
+    const normExpected = expectedState.toLowerCase();
+
+    // Alias mapping checks
+    const isUpMatch = (normSelected === 'up' || normSelected === 'u.p.' || normSelected === 'uttar pradesh') && stateCode === '09';
+    const isExactMatch = normExpected === normSelected || normSelected.includes(normExpected) || normExpected.includes(normSelected);
+
+    if (!isUpMatch && !isExactMatch) {
+      return {
+        valid: false,
+        stateCode,
+        expectedState,
+        error: `GSTIN state code "${stateCode}" belongs to ${expectedState}, but the state is set to "${selectedStateName}". (e.g. Code "09" is for Uttar Pradesh, not ${selectedStateName}).`
+      };
+    }
+  }
+
+  return {
+    valid: true,
+    stateCode,
+    expectedState
+  };
+};
