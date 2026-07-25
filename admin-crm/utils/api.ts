@@ -14,7 +14,8 @@ import type {
   TraceChallan, TraceInvoice, TraceDispatch, TraceResult, RolePermissionConfig,
   RBACPermissionsResponse, PaymentOrderResponse, PaymentVerifyResponse,
   ManufacturingAnalytics, OrderItem, Order, MedicalRepresentative, MrDailyLog,
-  MrVisit, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics
+  MrVisit, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics,
+  ManufacturingUnit
 } from './api/types';
 
 export * from './api/types';
@@ -831,8 +832,9 @@ class ApiClient {
   }
 
   // --- Raw Materials ---
-  async getRawMaterials(): Promise<RawMaterial[]> {
-    const res = await this.request(`${API_BASE}/raw-materials`);
+  async getRawMaterials(warehouseId?: string): Promise<RawMaterial[]> {
+    const url = warehouseId ? `${API_BASE}/raw-materials?warehouseId=${encodeURIComponent(warehouseId)}` : `${API_BASE}/raw-materials`;
+    const res = await this.request(url);
     return res.json();
   }
   async getRawMaterialExpiryAlerts(): Promise<RawMaterialEntry[]> {
@@ -879,7 +881,7 @@ class ApiClient {
       return null;
     }
   }
-  async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number; itemType?: string }[]; isActive?: boolean; productionNotes?: string; overheadCost?: number; stages?: any[] }): Promise<BillOfMaterials> {
+  async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number; itemType?: string }[]; isActive?: boolean; productionNotes?: string; overheadCost?: number; stages?: any[]; defaultProductionType?: string; defaultJobWorkMode?: string; defaultPackagingMode?: string; defaultJobWorkerId?: string | null }): Promise<BillOfMaterials> {
     const res = await this.request(`${API_BASE}/bom`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
@@ -893,7 +895,7 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`);
     return res.json();
   }
-  async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; manufacturingUnitId: string }): Promise<BatchProduction> {
+  async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; manufacturingUnitId: string; productionType?: string; jobWorkMode?: string; packagingMode?: string; jobWorkerId?: string | null; jobWorkerName?: string; jobWorkerChallanRef?: string }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }

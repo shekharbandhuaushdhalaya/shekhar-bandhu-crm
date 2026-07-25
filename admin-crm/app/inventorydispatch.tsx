@@ -9,15 +9,12 @@ import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Dispatch, DeadStockItem, Invoice } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 
-type InvTab = 'dispatches' | 'deadstock';
-
 export default function InventoryDispatchScreen() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
-  const [activeTab, setActiveTab] = useState<InvTab>('dispatches');
   const [refreshing, setRefreshing] = useState(false);
 
   // ── Dispatches ──
@@ -115,41 +112,12 @@ export default function InventoryDispatchScreen() {
     returned: colors.danger,
   };
 
-  const TABS = [
-    { id: 'dispatches', label: 'Dispatches & Courier Tracking', icon: 'bus-outline' },
-    { id: 'deadstock',  label: 'Dead Stock Report',            icon: 'alert-circle-outline' },
-  ] as const;
-
   return (
     <View style={styles.screen}>
-      {/* Header */}
-      <View style={styles.pageHeader}>
-        <View>
-          <Text style={styles.pageTitle}>Inventory & Dispatch</Text>
-          <Text style={styles.pageSubtitle}>Track dispatches, couriers, LR receipts, and slow-moving stock</Text>
-        </View>
-      </View>
-
-      {/* Tab bar */}
-      <View style={styles.tabBarScroll}>
-        <View style={styles.tabBarContent}>
-          {TABS.map(tab => {
-            const active = activeTab === tab.id;
-            return (
-              <TouchableOpacity key={tab.id} style={[styles.tabPill, active && styles.tabPillActive]} onPress={() => setActiveTab(tab.id)} activeOpacity={0.7}>
-                <Ionicons name={tab.icon as any} size={15} color={active ? '#fff' : colors.text.secondary} />
-                <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>{tab.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
 
-        {/* ===== TAB 1: DISPATCHES & COURIER TRACKING ===== */}
-        {activeTab === 'dispatches' && (
           <View>
             {/* Stats Row */}
             <View style={styles.statsRow}>
@@ -229,55 +197,6 @@ export default function InventoryDispatchScreen() {
               </View>
             ))}
           </View>
-        )}
-
-        {/* ===== TAB 2: DEAD STOCK REPORT ===== */}
-        {activeTab === 'deadstock' && (
-          <View>
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Slow Moving &amp; Dead Stock Report</Text>
-              <Text style={{ fontSize: 12, color: colors.text.muted, marginBottom: 16 }}>Shows finished goods products with NO stock movement (inward or dispatch) in the last 90+ days</Text>
-
-              {deadStock.length === 0 ? (
-                <View style={styles.emptyBox}><Ionicons name="checkmark-circle-outline" size={40} color={colors.success} /><Text style={styles.emptyText}>All stock has active movement!</Text></View>
-              ) : (
-                <View>
-                  {/* Table Header */}
-                  <View style={styles.tableHeader}>
-                    <Text style={[styles.th, { flex: 2 }]}>PRODUCT</Text>
-                    <Text style={[styles.th, { flex: 1.2 }]}>WAREHOUSE</Text>
-                    <Text style={[styles.th, { flex: 0.8, textAlign: 'right' }]}>QTY (BOXES)</Text>
-                    <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>VALUE (₹)</Text>
-                    <Text style={[styles.th, { flex: 1, textAlign: 'right' }]}>INACTIVE</Text>
-                  </View>
-
-                  {/* Rows */}
-                  {deadStock.map((item, i) => (
-                    <View key={i} style={[styles.tableRow, i % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
-                      <View style={{ flex: 2 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{item.productName}</Text>
-                        <Text style={{ fontSize: 10, color: colors.text.muted }}>SKU: {item.productSku} · Size: {item.size}</Text>
-                      </View>
-                      <Text style={[styles.td, { flex: 1.2 }]}>{item.warehouseName}</Text>
-                      <Text style={[styles.td, { flex: 0.8, textAlign: 'right', fontWeight: '700' }]}>{item.qtyBoxes}</Text>
-                      <Text style={[styles.td, { flex: 1.2, textAlign: 'right', color: colors.success, fontWeight: '700' }]}>₹{item.stockValue.toLocaleString()}</Text>
-                      <Text style={[styles.td, { flex: 1, textAlign: 'right', color: colors.danger, fontWeight: '700' }]}>{item.daysSinceMovement} Days</Text>
-                    </View>
-                  ))}
-
-                  {/* Totals */}
-                  <View style={[styles.tableRow, { backgroundColor: colors.danger + '08', borderTopWidth: 2, borderTopColor: colors.danger, marginTop: 4 }]}>
-                    <Text style={{ flex: 2, fontSize: 12, fontWeight: '800', color: colors.danger }}>TOTAL DEAD STOCK</Text>
-                    <Text style={{ flex: 1.2 }} />
-                    <Text style={[styles.td, { flex: 0.8, textAlign: 'right', fontWeight: '800', color: colors.danger }]}>{deadStock.reduce((s, a) => s + a.qtyBoxes, 0)}</Text>
-                    <Text style={[styles.td, { flex: 1.2, textAlign: 'right', fontWeight: '800', color: colors.danger }]}>₹{deadStock.reduce((s, a) => s + a.stockValue, 0).toLocaleString()}</Text>
-                    <Text style={{ flex: 1 }} />
-                  </View>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>

@@ -1254,6 +1254,7 @@ export default function InventoriesScreen() {
           mfgDate?: string;
           expiryDate?: string;
           _id?: string;
+          manufacturingUnitName?: string;
         }[];
       }> = {};
 
@@ -1354,6 +1355,7 @@ export default function InventoriesScreen() {
           batchNo?: string;
           mfgDate?: string;
           expiryDate?: string;
+          manufacturingUnitName?: string;
         }[];
       }> = {};
 
@@ -2060,9 +2062,9 @@ export default function InventoriesScreen() {
                   <View style={styles.tableHeaderRow}>
                     <View style={[styles.tableHeaderCellContainer, { flex: 2.5 }]}><Text style={styles.tableHeaderCell}>Product</Text></View>
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.8 }]}><Text style={styles.tableHeaderCell}>Warehouse</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2, textAlign: 'right' }]}><Text style={styles.tableHeaderCell}>Qty (Boxes)</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.5, textAlign: 'right' }]}><Text style={styles.tableHeaderCell}>Stock Value (₹)</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0, textAlign: 'right' }]}><Text style={styles.tableHeaderCell}>Inactive Days</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Qty (Boxes)</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.5 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Stock Value (₹)</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Inactive Days</Text></View>
                   </View>
 
                   {deadStockItems.map((item, idx) => (
@@ -2279,12 +2281,16 @@ function AddTransferModal({ visible, onClose, onSaved, warehouses, products }: {
       await api.createStockTransfer({
         fromWarehouseId,
         toWarehouseId,
-        items: items.map(it => ({
-          productId: it.productId,
-          qtyBoxes: parseFloat(it.qtyBoxes) || 0,
-          packing: parseInt(it.packing, 10) || 1,
-          batchNo: it.batchNo.trim()
-        })),
+        items: items.map(it => {
+          const match = products.find(p => p._id === it.productId);
+          return {
+            productId: it.productId,
+            productName: match ? match.name : 'Unknown Product',
+            qtyBoxes: parseFloat(it.qtyBoxes) || 0,
+            packing: parseInt(it.packing, 10) || 1,
+            batchNo: it.batchNo.trim()
+          };
+        }),
         notes
       });
       onSaved();

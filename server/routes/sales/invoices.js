@@ -12,6 +12,16 @@ const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
+async function resolveWarehouse(warehouseId) {
+  if (!warehouseId) return null;
+  let warehouse = await Warehouse.findById(warehouseId);
+  if (!warehouse) {
+    const ManufacturingUnit = require('../../models/ManufacturingUnit');
+    warehouse = await ManufacturingUnit.findById(warehouseId);
+  }
+  return warehouse;
+}
+
 function getFinancialYearString(date = new Date()) {
   const year = date.getFullYear();
   const month = date.getMonth(); // 0-indexed, 0 = Jan, 3 = Apr
@@ -41,7 +51,7 @@ async function validateSaleInvoiceDate(dateToCheck) {
 async function deductInventoryForInvoice(invoice) {
   if (!invoice.items || invoice.items.length === 0 || !invoice.warehouseId) return;
 
-  const warehouse = await Warehouse.findById(invoice.warehouseId);
+  const warehouse = await resolveWarehouse(invoice.warehouseId);
   if (!warehouse) return;
 
   let isUpdatedItems = false;
@@ -145,7 +155,7 @@ async function deductInventoryForInvoice(invoice) {
 async function revertInventoryForInvoice(invoice) {
   if (!invoice.items || invoice.items.length === 0 || !invoice.warehouseId) return;
 
-  const warehouse = await Warehouse.findById(invoice.warehouseId);
+  const warehouse = await resolveWarehouse(invoice.warehouseId);
   if (!warehouse) return;
 
   for (const item of invoice.items) {
@@ -418,8 +428,8 @@ router.patch('/sales/:id/finalize', authorize('invoice:markPaid'), async (req, r
         { company: invoice.customerName }
       ]
     });
-    // If the invoice was converted from a delivery challan (has a reference), the balance has already been debited by the challan dispatch
-    const isFromChallan = !!invoice.reference;
+    // If the invoice was converted from a delivery challan (has a reference/sourceDocId), the balance has already been debited by the challan dispatch
+    const isFromChallan = !!(invoice.reference || invoice.sourceDocId);
     if (cust && invoice.saleType !== 'doctor_sampling' && invoice.saleType !== 'damage' && !isFromChallan) {
       if (invoice.mode === 'cash') {
         cust.cashBalance += invoice.amount;
@@ -468,7 +478,7 @@ router.patch('/purchases/:id/finalize', authorize('invoice:markPaid'), async (re
     // Resolve selected warehouse or default to first
     let warehouse;
     if (invoice.warehouseId) {
-      warehouse = await Warehouse.findById(invoice.warehouseId);
+      warehouse = await resolveWarehouse(invoice.warehouseId);
     }
     if (!warehouse) {
       warehouse = await Warehouse.findOne();
@@ -667,8 +677,8 @@ router.delete('/sales/:id', authorize('invoice:delete'), async (req, res) => {
           { company: invoice.customerName }
         ]
       });
-      // If the invoice was converted from a delivery challan (has a reference), the balance rollback is handled by the challan deletion/cancellation
-      const isFromChallan = !!invoice.reference;
+      // If the invoice was converted from a delivery challan (has a reference/sourceDocId), the balance rollback is handled by the challan deletion/cancellation
+      const isFromChallan = !!(invoice.reference || invoice.sourceDocId);
       if (cust && invoice.saleType !== 'doctor_sampling' && invoice.saleType !== 'damage' && !isFromChallan) {
         if (invoice.mode === 'cash') {
           cust.cashBalance = Math.max(0, cust.cashBalance - invoice.amount);
@@ -731,7 +741,7 @@ router.delete('/purchases/:id', authorize('invoice:delete'), async (req, res) =>
 
       // Revert inventory added by purchase invoice
       if (invoice.items && invoice.items.length > 0) {
-        let warehouse = await Warehouse.findById(invoice.warehouseId);
+        let warehouse = await resolveWarehouse(invoice.warehouseId);
         if (!warehouse) warehouse = await Warehouse.findOne();
         if (warehouse) {
           const resolvedVendorId = vend ? vend._id.toString() : '';

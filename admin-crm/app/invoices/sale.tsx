@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Linking, Pressable } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Linking, Pressable, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
 import { api, Invoice, Product, Customer, Warehouse, InventoryEntry, InvoiceItem } from '../../utils/api';
@@ -35,7 +35,7 @@ const printInvoice = (invoice: Invoice) => {
 
 
 
-  const isPakka = invoice.mode === 'pakka';
+  const isPakka = true;
   let totalTaxable = 0;
   let totalCGST = 0;
   let totalSGST = 0;
@@ -44,12 +44,28 @@ const printInvoice = (invoice: Invoice) => {
   
   let totalBoxes = 0;
   let totalGoodsQty = 0;
-  const hsnSummary: Record<string, { taxable: number, cgst: number, sgst: number, igst: number, totalTax: number }> = {};
-  
   const numItems = invoice.items?.length || 0;
   const fillerHeight = Math.max(0, 200 - (numItems * 18));
+  const isAllPieces = (invoice.items || []).every(it => (it.packing || 1) === 1);
+  
+  let billingAddressToShow = invoice.partyAddress || '';
+  let shippingAddressToShow = invoice.shippingAddress || '';
 
+  if (invoice.partyAddress && invoice.partyAddress.includes('Billing Address:') && invoice.partyAddress.includes('Shipping Address:')) {
+    const parts = invoice.partyAddress.split('Shipping Address:');
+    const billingPart = parts[0].replace('Billing Address:', '').trim();
+    const shippingPart = parts[1] ? parts[1].trim() : '';
+    if (billingPart) billingAddressToShow = billingPart;
+    if (shippingPart) shippingAddressToShow = shippingPart;
+  } else if (invoice.shippingAddress && invoice.shippingAddress.includes('Billing Address:') && invoice.shippingAddress.includes('Shipping Address:')) {
+    const parts = invoice.shippingAddress.split('Shipping Address:');
+    const billingPart = parts[0].replace('Billing Address:', '').trim();
+    const shippingPart = parts[1] ? parts[1].trim() : '';
+    if (billingPart) billingAddressToShow = billingPart;
+    if (shippingPart) shippingAddressToShow = shippingPart;
+  }
 
+  const hsnSummary: Record<string, { taxable: number, cgst: number, sgst: number, igst: number, totalTax: number }> = {};
   
   const itemRows = (invoice.items || [])
     .map((it, i) => {
@@ -101,12 +117,17 @@ const printInvoice = (invoice: Invoice) => {
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${i + 1}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:left;">
             ${(it.name || '').replace(/\s+[0-9]+(?:\.[0-9]+)?[gG]$/, '')}
-            ${(it as any).batchNo ? `<div style="font-size:8.5px;font-weight:bold;color:#111827;margin-top:1px;">Batch No: ${(it as any).batchNo}</div>` : ''}
           </td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${it.hsnCode || ''}</td>
-          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${packing}</td>
-          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${qty}</td>
-          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${rate.toFixed(2)}</td>
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center; font-family: monospace; font-size: 9px; font-weight: bold;">${(it as any).batchNo || '—'}</td>
+          ${isAllPieces ? `
+            <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${qty}</td>
+          ` : `
+            <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${packing}</td>
+            <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${qty}</td>
+          `}
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${(it.mrp && it.mrp > 0 ? it.mrp : rate).toFixed(2)}</td>
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${it.discountPercent && it.discountPercent > 0 ? it.discountPercent + '%' : '—'}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${taxable.toFixed(2)}</td>
           
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${cRate > 0 ? cRate.toFixed(2)+'%' : ''}</td>
@@ -153,7 +174,7 @@ const printInvoice = (invoice: Invoice) => {
           <td style="width:50%; border-right: 1px solid #000; border-bottom: 1px solid #000; padding:5px; vertical-align:top;">
             <strong>Billed to :</strong><br/>
             <strong style="font-size:14px;">${invoice.customerName}</strong><br/>
-            ${invoice.partyAddress ? invoice.partyAddress.replace(/\n/g, '<br/>') : ''}<br/>
+            ${billingAddressToShow ? billingAddressToShow.replace(/\n/g, '<br/>') : ''}<br/>
             ${invoice.gstin ? `<strong>GSTIN:</strong> ${invoice.gstin}<br/>` : ''}
             <strong>State:</strong> ${getStateStrWithCode(invoice.stateOfSupply)}
           </td>
@@ -184,7 +205,7 @@ const printInvoice = (invoice: Invoice) => {
           <td style="width:50%; border-right: 1px solid #000; padding:5px; vertical-align:top;">
             <strong>Shipped to :</strong><br/>
             <strong style="font-size:14px;">${invoice.customerName}</strong><br/>
-            ${invoice.shippingAddress ? invoice.shippingAddress.replace(/\n/g, '<br/>') : (invoice.partyAddress || '')}<br/>
+            ${shippingAddressToShow ? shippingAddressToShow.replace(/\n/g, '<br/>') : (billingAddressToShow || '')}<br/>
             <strong>State:</strong> ${getStateStrWithCode(invoice.stateOfSupply)}
           </td>
         </tr>
@@ -194,11 +215,17 @@ const printInvoice = (invoice: Invoice) => {
         <thead>
           <tr style="border-bottom: 1px solid #000; border-top: 1px solid #000; background-color: #f9fafb;">
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:4%;">S.No.</th>
-            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:24%;">Description of Goods</th>
+            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:22%;">Description of Goods</th>
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">HSN/SAC</th>
-            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">Packing/Box</th>
-            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">No. of Boxes</th>
+            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:8%;">Batch No.</th>
+            ${isAllPieces ? `
+              <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">Qty</th>
+            ` : `
+              <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">Packing/Box</th>
+              <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">No. of Boxes</th>
+            `}
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:5%;">Price</th>
+            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:5%;">Disc %</th>
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:8%;">Taxable Amt</th>
             <th colspan="2" style="border-right: 1px solid #000; padding:4px; width:10%;">CGST</th>
             <th colspan="2" style="border-right: 1px solid #000; padding:4px; width:10%;">SGST</th>
@@ -220,7 +247,9 @@ const printInvoice = (invoice: Invoice) => {
             <td style="border-right: 1px solid #000; height: ${fillerHeight}px;"></td>
             <td style="border-right: 1px solid #000;"></td>
             <td style="border-right: 1px solid #000;"></td>
+            <td style="border-right: 1px solid #000;"></td> <!-- Batch No -->
             <td style="border-right: 1px solid #000;"></td>
+            ${isAllPieces ? '' : '<td style="border-right: 1px solid #000;"></td>'}
             <td style="border-right: 1px solid #000;"></td>
             <td style="border-right: 1px solid #000;"></td>
             <td style="border-right: 1px solid #000;"></td>
@@ -235,9 +264,14 @@ const printInvoice = (invoice: Invoice) => {
         </tbody>
         <tfoot>
           <tr style="border-bottom: 1px solid #000;">
-            <td colspan="3" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>Sub-Total / Total Qty</strong></td>
-            <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalGoodsQty} Pcs.</strong></td>
-            <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalBoxes}</strong></td>
+            <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>Sub-Total / Total Qty</strong></td>
+            ${isAllPieces ? `
+              <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalGoodsQty} Pcs.</strong></td>
+            ` : `
+              <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalGoodsQty} Pcs.</strong></td>
+              <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalBoxes}</strong></td>
+            `}
+            <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px;"></td>
             <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px;"></td>
             <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalTaxable.toFixed(2)}</strong></td>
             <td colspan="2" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalCGST > 0 ? totalCGST.toFixed(2) : ''}</strong></td>
@@ -418,7 +452,7 @@ const shareInvoiceOnWhatsApp = (invoice: Invoice, customers: Customer[]) => {
 
   const amount = invoice.amount || invoice.baseAmount || 0;
   const dateStr = new Date(invoice.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  const docType = invoice.mode === 'pakka' ? 'Tax Invoice' : 'Sale Invoice';
+  const docType = 'Tax Invoice';
   const message = `Dear ${invoice.customerName},\n\nPlease find attached your ${docType}.\n\n🧾 Invoice No: ${invoice.invoiceNo}\n📅 Date: ${dateStr}\n💰 Amount: ₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\nThank you for your business!\n\n— ${FIRM_DETAILS.name}`;
 
   // First open the PDF in a new window
@@ -632,7 +666,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
               </View>
             </View>
 
-            {invoice.mode === 'pakka' && (
+            {invoice.mode === 'regular' && (
               <>
                 <View style={styles.infoItem}>
                   <View style={[styles.infoIcon, { backgroundColor: colors.primaryLight }]}>
@@ -771,7 +805,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                   <View style={{ flex: 2 }}>
                     <Text style={styles.itemNameText}>{it.name}</Text>
                     <Text style={styles.itemSubTextDetail}>
-                      {it.hsnCode ? `HSN: ${it.hsnCode} | ` : ''}Rate: ₹{rate.toFixed(2)}/pc | Qty: {it.qty} boxes {it.packing !== undefined && it.packing > 1 ? `(${it.packing} pcs/box)` : ''}
+                      {it.hsnCode ? `HSN: ${it.hsnCode} | ` : ''}{it.discountPercent && it.discountPercent > 0 ? `MRP: ₹${(it.mrp || rate).toFixed(2)} (Disc: ${it.discountPercent}%) | Net: ` : ''}Rate: ₹{rate.toFixed(2)}/pc | Qty: {it.qty} boxes {it.packing !== undefined && it.packing > 1 ? `(${it.packing} pcs/box)` : ''}
                     </Text>
                     {(it as any).batchNo ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
@@ -789,7 +823,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
               );
             })}
             
-            {invoice.mode === 'pakka' && ((invoice.cgst || 0) > 0 || (invoice.sgst || 0) > 0 || (invoice.igst || 0) > 0) ? (
+            {invoice.mode === 'regular' && ((invoice.cgst || 0) > 0 || (invoice.sgst || 0) > 0 || (invoice.igst || 0) > 0) ? (
               <View style={{ borderTopWidth: 2, borderTopColor: colors.border, paddingTop: 10, marginTop: 4, gap: 6, paddingBottom: 10 }}>
                 {(invoice.totalMrp || 0) > 0 && (
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -1025,7 +1059,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseInventory, setWarehouseInventory] = useState<InventoryEntry[]>([]);
   const [status, setStatus] = useState('draft');
-  const mode = 'pakka';
+  const mode = 'regular';
   const [internalFreightExpense, setInternalFreightExpense] = useState('');
   const [customerState, setCustomerState] = useState('Uttar Pradesh');
   const [overridePaymentTerms, setOverridePaymentTerms] = useState(false);
@@ -1389,16 +1423,16 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       totalBase += itemBase;
 
       const gst = it.gstRate || 0;
-      if (mode === 'pakka') {
+      if (mode === 'regular') {
         const itemTax = (itemBase * gst) / 100;
         totalTax += itemTax;
       }
     }
   });
 
-  const cgst = mode === 'pakka' && isIntraState ? totalTax / 2 : 0;
-  const sgst = mode === 'pakka' && isIntraState ? totalTax / 2 : 0;
-  const igst = mode === 'pakka' && !isIntraState ? totalTax : 0;
+  const cgst = mode === 'regular' && isIntraState ? totalTax / 2 : 0;
+  const sgst = mode === 'regular' && isIntraState ? totalTax / 2 : 0;
+  const igst = mode === 'regular' && !isIntraState ? totalTax : 0;
   const rawTotal = totalBase + cgst + sgst + igst;
   const nettTotal = Math.round(rawTotal);
   const roundOff = nettTotal - rawTotal;
@@ -1934,7 +1968,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             );
           })}
 
-          {mode === 'pakka' ? (
+          {mode === 'regular' ? (
             <View style={[styles.grandTotalContainer, { flexDirection: 'column', alignItems: 'stretch', gap: 6 }]}>
               {totalMrpValue > 0 && (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
@@ -2058,7 +2092,7 @@ export default function SaleInvoicesScreen() {
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
 
-  const modeFilter = 'pakka';
+  const modeFilter = 'regular';
 
   const load = useCallback(async () => {
     const [resInvoices, resCustomers] = await Promise.all([
@@ -2069,7 +2103,13 @@ export default function SaleInvoicesScreen() {
     setCustomers(resCustomers);
   }, [search, modeFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const sub = DeviceEventEmitter.addListener('invoice_updated_event', () => {
+      load();
+    });
+    return () => sub.remove();
+  }, [load]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

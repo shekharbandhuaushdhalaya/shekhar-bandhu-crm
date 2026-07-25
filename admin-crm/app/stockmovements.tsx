@@ -249,6 +249,7 @@ export default function StockMovementsScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Detail modal
   const [detailMovement, setDetailMovement] = useState<StockMovement | null>(null);
@@ -292,7 +293,7 @@ export default function StockMovementsScreen() {
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Attach',
-            onPress: async (url) => {
+            onPress: async (url?: string) => {
               if (!url) return;
               try {
                 await api.addDocument('challan', challanId, { name: 'Attached POD / Challan Proof', url });
@@ -366,7 +367,15 @@ export default function StockMovementsScreen() {
     } catch {}
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const sub1 = DeviceEventEmitter.addListener('challan_updated_event', () => load());
+    const sub2 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
+    return () => {
+      sub1.remove();
+      sub2.remove();
+    };
+  }, [load]);
   useEffect(() => {
     if (showModal) {
       loadWarehouses();
@@ -602,6 +611,7 @@ export default function StockMovementsScreen() {
         gstRate: (form.type === 'sample' || form.type === 'damage' || (form as any).billingMode === 'cash') ? 0 : (it.gstRate || 0),
         batchNo: it.batchNo || '',
         mrp: it.mrp || 0,
+        hsnCode: it.hsnCode || '',
       })),
       status: 'draft',
       baseAmount: showFinancials ? totalBase : 0,
@@ -712,6 +722,7 @@ export default function StockMovementsScreen() {
   const isSale = form.type === 'sale';
   const isSample = form.type === 'sample';
   const isDamage = form.type === 'damage';
+  const isTransfer = form.type === 'transfer_out';
 
   // Calculate Totals and Bifurcation
   const isCash = (form as any).billingMode === 'cash';
@@ -765,13 +776,13 @@ export default function StockMovementsScreen() {
         </View>
         {error ? <Text style={styles.modalError}>{error}</Text> : null}
         <ScrollView style={styles.modalForm} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16 }}>
-            <Pressable onPress={() => { setShowCustomerDropdown(false); setActiveItemDropdownIdx(null); }} style={{ flex: 1 }}>
+            <Pressable onPress={() => { setShowCustomerDropdown(false); setActiveItemDropdownIdx(null); setShowDatePicker(false); }} style={{ flex: 1 }}>
               {/* Card Section 1: General Details */}
-              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border, zIndex: showDatePicker ? 5000 : 100, overflow: 'visible' }}>
                 <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 8 }]}>📋 Document Details</Text>
                 
                 {/* Movement Type + Warehouse + Date — single row */}
-                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12, zIndex: showDatePicker ? 5100 : 10, overflow: 'visible' }}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.inputLabel}>Movement Type *</Text>
                     {Platform.OS === 'web' ? (
@@ -809,17 +820,130 @@ export default function StockMovementsScreen() {
                       <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.primary }]} value={form.warehouseName} onChangeText={v => setForm(f => ({ ...f, warehouseName: v }))} placeholder="Warehouse" placeholderTextColor={colors.text.muted} />
                     )}
                   </View>
-                  <View style={{ flex: 0.8, minWidth: 0 }}>
+                  <View style={{ flex: 0.8, minWidth: 0, zIndex: showDatePicker ? 3000 : 100, position: 'relative' }}>
                     <Text style={styles.inputLabel}>Date *</Text>
-                    {Platform.OS === 'web' ? (
-                      React.createElement('input', {
-                        type: 'date', value: form.date,
-                        onChange: (e: any) => setForm(f => ({ ...f, date: e.target.value })),
-                        style: { padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, fontSize: 13, height: 35, width: '100%', outline: 'none', boxSizing: 'border-box', minWidth: 0 }
-                      })
-                    ) : (
-                      <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.primary }]} value={form.date} onChangeText={v => setForm(f => ({ ...f, date: v }))} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.muted} />
-                    )}
+                    <View style={styles.customSearchSelectContainer}>
+                      <TouchableOpacity 
+                        style={[styles.input, { height: 35, justifyContent: 'center', cursor: 'pointer', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 0 } as any]}
+                        onPress={() => setShowDatePicker(!showDatePicker)}
+                      >
+                        <Ionicons name="calendar-outline" size={14} color={colors.text.muted} />
+                        <Text style={{ flex: 1, color: colors.text.primary, fontWeight: '700', fontSize: 13 }}>
+                          {form.date ? new Date(form.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Select Date'}
+                        </Text>
+                        <Ionicons name={showDatePicker ? "chevron-up" : "chevron-down"} size={14} color={colors.text.muted} />
+                      </TouchableOpacity>
+
+                      {showDatePicker && (() => {
+                        const currentDateObj = form.date ? new Date(form.date) : new Date();
+                        const year = currentDateObj.getFullYear();
+                        const month = currentDateObj.getMonth();
+
+                        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                        const daysInMonth = new Date(year, month + 1, 0).getDate();
+                        const firstDayIndex = new Date(year, month, 1).getDay();
+
+                        const calendarDays = [];
+                        for (let i = 0; i < firstDayIndex; i++) {
+                          calendarDays.push(null);
+                        }
+                        for (let d = 1; d <= daysInMonth; d++) {
+                          calendarDays.push(d);
+                        }
+
+                        const handleMonthChange = (offset: number) => {
+                          const newDate = new Date(year, month + offset, 1);
+                          const formatted = newDate.toISOString().split('T')[0];
+                          setForm(f => ({ ...f, date: formatted }));
+                        };
+
+                        const handleSelectDay = (day: number) => {
+                          const selected = new Date(year, month, day);
+                          const yyyy = selected.getFullYear();
+                          const mm = String(selected.getMonth() + 1).padStart(2, '0');
+                          const dd = String(selected.getDate()).padStart(2, '0');
+                          setForm(f => ({ ...f, date: `${yyyy}-${mm}-${dd}` }));
+                          setShowDatePicker(false);
+                        };
+
+                        return (
+                          <View style={[styles.customSelectPanel, { 
+                            padding: 14, 
+                            width: '100%', 
+                            left: 0, 
+                            right: 0,
+                            backgroundColor: colors.bg.card,
+                            borderRadius: Radius.lg,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            boxShadow: '0px 10px 25px rgba(0,0,0,0.15)',
+                            elevation: 10,
+                            top: 40,
+                            position: 'absolute',
+                            zIndex: 4000
+                          }]}>
+                            {/* Calendar Header */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                              <TouchableOpacity onPress={() => handleMonthChange(-1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
+                                <Ionicons name="chevron-back" size={14} color={colors.text.primary} />
+                              </TouchableOpacity>
+                              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text.primary }}>
+                                {monthNames[month]} {year}
+                              </Text>
+                              <TouchableOpacity onPress={() => handleMonthChange(1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
+                                <Ionicons name="chevron-forward" size={14} color={colors.text.primary} />
+                              </TouchableOpacity>
+                            </View>
+
+                            {/* Weekday Labels */}
+                            <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+                              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(w => (
+                                <Text key={w} style={{ flex: 1, textAlign: 'center', fontSize: 9, fontWeight: '800', color: colors.text.muted }}>{w}</Text>
+                              ))}
+                            </View>
+
+                            {/* Day Grid */}
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                              {calendarDays.map((dayNum, i) => {
+                                if (dayNum === null) {
+                                  return <View key={`empty-${i}`} style={{ width: '14.28%', height: 26 }} />;
+                                }
+                                const isSelected = form.date && new Date(form.date).getDate() === dayNum && new Date(form.date).getMonth() === month && new Date(form.date).getFullYear() === year;
+                                const isToday = new Date().getDate() === dayNum && new Date().getMonth() === month && new Date().getFullYear() === year;
+
+                                return (
+                                  <TouchableOpacity
+                                    key={`day-${dayNum}`}
+                                    style={[{
+                                      width: '14.28%',
+                                      height: 26,
+                                      justifyContent: 'center',
+                                      alignItems: 'center',
+                                      borderRadius: 6
+                                    }, isSelected && { backgroundColor: colors.primary }, isToday && !isSelected && { borderWidth: 1, borderColor: colors.primary }]}
+                                    onPress={() => handleSelectDay(dayNum)}
+                                  >
+                                    <Text style={[{ fontSize: 11, fontWeight: isSelected || isToday ? '800' : '500', color: isSelected ? '#fff' : colors.text.primary }]}>
+                                      {dayNum}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+
+                            {/* Today Quick Select Footer */}
+                            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: 10, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <TouchableOpacity onPress={() => { setForm(f => ({ ...f, date: new Date().toISOString().split('T')[0] })); setShowDatePicker(false); }}>
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>Today</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>Close</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      })()}
+                    </View>
                   </View>
                 </View>
 
@@ -891,8 +1015,77 @@ export default function StockMovementsScreen() {
                   </View>
                 )}
 
+                 {/* Transfer-specific fields */}
+                {isTransfer && (
+                  <View style={{ backgroundColor: colors.bg.primary, borderRadius: 10, padding: 12, marginBottom: 2, borderWidth: 1, borderColor: colors.border }}>
+                    <Text style={{ fontSize: 11, color: '#f59e0b', marginBottom: 8, fontWeight: '700' }}>🔄 Stock Transfer — Outward movement to another warehouse/unit.</Text>
+                    <Text style={styles.inputLabel}>Destination Warehouse / Unit *</Text>
+                    {Platform.OS === 'web' ? (
+                      <select
+                        value={form.partyId || ''}
+                        onChange={(e: any) => {
+                          const w = warehouses.find(x => x._id === e.target.value);
+                          setForm(f => ({
+                            ...f,
+                            partyId: e.target.value,
+                            partyName: w?.name || '',
+                            partyAddress: w ? `Warehouse Address:\n${w.name}` : ''
+                          }));
+                        }}
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: 8,
+                          border: `1px solid ${colors.border}`,
+                          backgroundColor: colors.bg.secondary,
+                          color: colors.text.primary,
+                          fontSize: 13,
+                          height: 35,
+                          width: '100%',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <option value="">Select Destination Warehouse</option>
+                        {warehouses
+                          .filter(w => w._id !== form.warehouseId)
+                          .map(w => (
+                            <option key={w._id} value={w._id}>{w.name}</option>
+                          ))
+                        }
+                      </select>
+                    ) : (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        {warehouses
+                          .filter(w => w._id !== form.warehouseId)
+                          .map(w => (
+                            <TouchableOpacity
+                              key={w._id}
+                              style={[
+                                styles.toggleChip,
+                                form.partyId === w._id && { backgroundColor: '#f59e0b', borderColor: '#f59e0b' }
+                              ]}
+                              onPress={() => {
+                                setForm(f => ({
+                                  ...f,
+                                  partyId: w._id,
+                                  partyName: w.name,
+                                  partyAddress: `Warehouse Address:\n${w.name}`
+                                }));
+                              }}
+                            >
+                              <Text style={[styles.toggleChipText, form.partyId === w._id && { color: '#fff', fontWeight: '700' }]}>
+                                {w.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))
+                        }
+                      </View>
+                    )}
+                  </View>
+                )}
+
                 {/* Party Information (dropdown fetched from customers) */}
-                {!isDamage && (
+                {!isDamage && !isTransfer && (
                   <View style={{ zIndex: 1000, position: 'relative' }}>
                     <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10, zIndex: 1001, position: 'relative' }}>
                       <View style={{ flex: 1.2, position: 'relative', zIndex: 1002 }}>
@@ -929,6 +1122,7 @@ export default function StockMovementsScreen() {
                                 .slice(0, 8)
                                 .map(c => {
                                   const displayName = c.company ? `${c.company} (${c.name})` : c.name;
+                                  const hasGst = !!(c.gstin && c.gstin.trim());
                                   return (
                                     <TouchableOpacity
                                       key={c._id}
@@ -939,7 +1133,6 @@ export default function StockMovementsScreen() {
                                         const billingAddrStr = billingAddr ? [billingAddr.street, billingAddr.city, billingAddr.state, billingAddr.pin].filter(Boolean).join(', ') : '';
                                         const shippingAddr = c.shippingAddress;
                                         const shippingAddrStr = shippingAddr ? [shippingAddr.street, shippingAddr.city, shippingAddr.state, shippingAddr.pin].filter(Boolean).join(', ') : (billingAddrStr.trim());
-                                        const isCashCustomer = c.customerType === 'cash' || c.recordTracking === 'cash_ledger';
                                         setForm(f => ({
                                           ...f,
                                           partyId: c._id,
@@ -953,11 +1146,21 @@ export default function StockMovementsScreen() {
                                         setShowCustomerDropdown(false);
                                       }}
                                     >
-                                      <Text style={styles.customSelectItemText}>{displayName}</Text>
-                                      <Text style={styles.customSelectItemSubtext}>
-                                        {c.gstin ? `GSTIN: ${c.gstin}` : 'Cash / Unregistered'}
-                                        {c.phone ? ` | Phone: ${c.phone}` : ''}
-                                      </Text>
+                                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <View style={{ flex: 1, paddingRight: 8 }}>
+                                          <Text style={styles.customSelectItemText}>{displayName}</Text>
+                                          {c.phone ? <Text style={styles.customSelectItemSubtext}>📞 {c.phone}</Text> : null}
+                                        </View>
+                                        {hasGst ? (
+                                          <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
+                                            <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📄 GST ({c.gstin})</Text>
+                                          </View>
+                                        ) : (
+                                          <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.warning }}>
+                                            <Text style={{ fontSize: 9, fontWeight: '700', color: colors.warning }}>💵 Cash</Text>
+                                          </View>
+                                        )}
+                                      </View>
                                     </TouchableOpacity>
                                   );
                                 })
@@ -979,7 +1182,7 @@ export default function StockMovementsScreen() {
                       {(isSale && form.billingMode === 'regular') && (
                         <View style={{ flex: 0.8 }}>
                           <Text style={styles.inputLabel}>Party GSTIN</Text>
-                          <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.primary }]} value={form.partyGstin} onChangeText={v => setForm(f => ({ ...f, partyGstin: v }))} placeholder="GSTIN" placeholderTextColor={colors.text.muted} autoCapitalize="characters" />
+                          <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.secondary, color: colors.text.muted }]} value={form.partyGstin} editable={false} placeholder="GSTIN" placeholderTextColor={colors.text.muted} autoCapitalize="characters" />
                         </View>
                       )}
                     </View>
@@ -989,14 +1192,10 @@ export default function StockMovementsScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.inputLabel}>Billing Address</Text>
                         <TextInput
-                          style={[styles.input, { height: 60, textAlignVertical: 'top', backgroundColor: colors.bg.primary, marginBottom: 0 }]}
+                          style={[styles.input, { height: 60, textAlignVertical: 'top', backgroundColor: colors.bg.secondary, color: colors.text.muted, marginBottom: 0 }]}
                           value={form.billingAddress}
-                          onChangeText={v => setForm(f => {
-                            const newForm = { ...f, billingAddress: v };
-                            newForm.partyAddress = `Billing Address:\n${v}\n\nShipping Address:\n${newForm.shippingAddress}`;
-                            return newForm;
-                          })}
-                          placeholder="Enter Billing Address..."
+                          editable={false}
+                          placeholder="No Billing Address specified"
                           placeholderTextColor={colors.text.muted}
                           multiline
                         />
@@ -1067,9 +1266,10 @@ export default function StockMovementsScreen() {
                   const filtered = getFilteredInventoryEntries(isDropdownOpen ? itemSearchText : '');
                   return (
                     <View key={idx} style={{ marginBottom: 10, padding: 10, borderRadius: 8, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border }}>
-                      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-start', marginBottom: isDropdownOpen && filtered.length > 0 ? 0 : 8 }}>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: isDropdownOpen ? colors.primary : colors.border, borderRadius: 8, paddingHorizontal: 10, height: 34, backgroundColor: colors.bg.secondary }}>
+                      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <View style={{ flex: 3.5, minWidth: 160 }}>
+                          <Text style={styles.fieldLabel}>Product Name</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: isDropdownOpen ? colors.primary : colors.border, borderRadius: 8, paddingHorizontal: 10, height: 32, backgroundColor: colors.bg.secondary }}>
                             <Ionicons name="cube-outline" size={14} color={colors.text.muted} />
                             <TextInput
                               style={{ flex: 1, fontSize: 13, color: colors.text.primary, height: '100%', paddingLeft: 6 }}
@@ -1100,30 +1300,8 @@ export default function StockMovementsScreen() {
                             ) : null}
                           </View>
                         </View>
-                        {items.length > 1 && (
-                          <TouchableOpacity style={{ marginTop: 6 }} onPress={() => { setItems(items.filter((_, i) => i !== idx)); setActiveItemDropdownIdx(null); }}>
-                            <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                      {/* Inline dropdown — no absolute positioning, never clipped by ScrollView */}
-                      {isDropdownOpen && filtered.length > 0 && (
-                        <View style={{ backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.primary, borderRadius: 8, marginBottom: 8, marginTop: 2, overflow: 'hidden' }}>
-                          <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
-                            {filtered.slice(0, 10).map(entry => (
-                              <TouchableOpacity key={entry._id} style={styles.customSelectItem}
-                                onPress={() => handleSelectInventoryEntry(idx, entry)}>
-                                <Text style={styles.customSelectItemText}>{getInventoryEntryDisplayName(entry)}</Text>
-                                <Text style={styles.customSelectItemSubtext}>
-                                  Available: {entry.totalAvailablePcs !== undefined ? entry.totalAvailablePcs : entry.qtyBoxes * (entry.packing || 1)} pcs {entry.batches?.length > 0 ? `| Batches: ${entry.batches.join(', ')}` : (entry.batchNo ? `| Batch: ${entry.batchNo}` : '')}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </ScrollView>
-                        </View>
-                      )}
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <View style={{ flex: 1 }}>
+
+                        <View style={{ flex: 1, minWidth: 60 }}>
                           <Text style={styles.fieldLabel}>Qty (pcs)</Text>
                           <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.qty)} onChangeText={v => {
                             let newQty = parseInt(v) || 0;
@@ -1144,9 +1322,10 @@ export default function StockMovementsScreen() {
                             setItems(n);
                           }} keyboardType="numeric" />
                         </View>
+
                         {!isSample && !isDamage && (
                           <>
-                            <View style={{ flex: 1.1 }}>
+                            <View style={{ flex: 1.1, minWidth: 70 }}>
                               <Text style={styles.fieldLabel}>MRP (₹)</Text>
                               <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.mrp || 0)} onChangeText={v => {
                                 const n = [...items];
@@ -1159,7 +1338,7 @@ export default function StockMovementsScreen() {
                               }} keyboardType="numeric" />
                             </View>
 
-                            <View style={{ flex: 0.9 }}>
+                            <View style={{ flex: 0.9, minWidth: 60 }}>
                               <Text style={styles.fieldLabel}>Disc (%)</Text>
                               <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.discountPercent || 0)} onChangeText={v => {
                                 const n = [...items];
@@ -1172,7 +1351,7 @@ export default function StockMovementsScreen() {
                               }} keyboardType="numeric" />
                             </View>
 
-                            <View style={{ flex: 1.1 }}>
+                            <View style={{ flex: 1.1, minWidth: 75 }}>
                               <Text style={styles.fieldLabel}>Net Rate (₹)</Text>
                               <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.rate || 0)} onChangeText={v => {
                                 const n = [...items];
@@ -1187,17 +1366,64 @@ export default function StockMovementsScreen() {
                             </View>
                           </>
                         )}
+
                         {isSale && (form as any).billingMode !== 'cash' && !form.isFree && (
-                          <View style={{ flex: 1 }}>
+                          <View style={{ flex: 1, minWidth: 60 }}>
                             <Text style={styles.fieldLabel}>GST %</Text>
                             <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.gstRate || 0)} onChangeText={v => { const n = [...items]; n[idx].gstRate = parseFloat(v) || 0; setItems(n); }} keyboardType="numeric" />
                           </View>
                         )}
+
+                        {items.length > 1 && (
+                          <TouchableOpacity style={{ marginBottom: 6 }} onPress={() => { setItems(items.filter((_, i) => i !== idx)); setActiveItemDropdownIdx(null); }}>
+                            <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                          </TouchableOpacity>
+                        )}
                       </View>
-                      <View style={{ marginTop: 6 }}>
-                        <Text style={styles.fieldLabel}>Batch Number</Text>
-                        <TextInput style={[styles.smallInput, { height: 32 }]} value={item.batchNo || ''} onChangeText={v => { const n = [...items]; n[idx].batchNo = v; setItems(n); }} placeholder="Batch No (auto-filled from stock)" placeholderTextColor={colors.text.muted} />
-                      </View>
+
+                      {/* Inline dropdown — no absolute positioning, never clipped by ScrollView */}
+                      {isDropdownOpen && filtered.length > 0 && (() => {
+                        const selectedOtherProductIds = items
+                          .filter((_, i) => i !== idx && _.productId)
+                          .map(_ => _.productId);
+                        const allowedFiltered = filtered.filter(entry => !selectedOtherProductIds.includes(entry.productId));
+                        
+                        if (allowedFiltered.length === 0) return null;
+
+                        return (
+                          <View style={{ backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.primary, borderRadius: 8, marginBottom: 8, marginTop: 8, overflow: 'hidden' }}>
+                            <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
+                              {allowedFiltered.slice(0, 10).map(entry => {
+                                const displayName = getInventoryEntryDisplayName(entry);
+                                const availPcs = entry.totalAvailablePcs !== undefined ? entry.totalAvailablePcs : entry.qtyBoxes * (entry.packing || 1);
+                                const batchStr = entry.batches?.length > 0 ? entry.batches[0] : (entry.batchNo || 'N/A');
+                                return (
+                                  <TouchableOpacity key={entry._id} style={styles.customSelectItem}
+                                    onPress={() => handleSelectInventoryEntry(idx, entry)}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <View style={{ flex: 1, paddingRight: 8 }}>
+                                        <Text style={styles.customSelectItemText}>{displayName}</Text>
+                                        <Text style={styles.customSelectItemSubtext}>
+                                          Available: {availPcs} pcs {batchStr !== 'N/A' ? `| Batch: ${batchStr}` : ''}
+                                        </Text>
+                                      </View>
+                                      {availPcs > 0 ? (
+                                        <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
+                                          <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📦 In Stock</Text>
+                                        </View>
+                                      ) : (
+                                        <View style={{ backgroundColor: colors.danger + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.danger }}>
+                                          <Text style={{ fontSize: 9, fontWeight: '700', color: colors.danger }}>⚠️ Out of Stock</Text>
+                                        </View>
+                                      )}
+                                    </View>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </ScrollView>
+                          </View>
+                        );
+                      })()}
                     </View>
                   );
                 })}
@@ -1285,13 +1511,10 @@ export default function StockMovementsScreen() {
           <TouchableOpacity onPress={() => setShowDetail(false)}>
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.modalTitle}>{detailMovement.docNo}</Text>
+          <Text style={styles.modalTitle}>{detailMovement.docNo.split('/').pop()}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <TouchableOpacity onPress={() => handleUploadChallanDoc(detailMovement._id)} style={{ padding: 4 }}>
               <Ionicons name="cloud-upload" size={22} color={colors.success} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => printDeliveryChallan(detailMovement)}>
-              <Ionicons name="print-outline" size={24} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1406,54 +1629,51 @@ export default function StockMovementsScreen() {
                   )}
                 </View>
 
-                <View style={{ gap: 10, marginTop: 20 }}>
-                  {/* Row for Finalize, Edit, Delete */}
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {/* Finalize */}
-                    {detailMovement.status === 'draft' && (
-                      <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.success }]} onPress={() => { setShowDetail(false); handleFinalize(detailMovement); }}>
-                        <Ionicons name="checkmark-done-outline" size={16} color="#fff" />
-                        <Text style={styles.detailActionBtnText}>Finalize</Text>
-                      </TouchableOpacity>
-                    )}
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
+                  {/* Finalize */}
+                  {detailMovement.status === 'draft' && (
+                    <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.success }]} onPress={() => { setShowDetail(false); handleFinalize(detailMovement); }}>
+                      <Ionicons name="checkmark-done-outline" size={16} color="#fff" />
+                      <Text style={styles.detailActionBtnText}>Finalize</Text>
+                    </TouchableOpacity>
+                  )}
 
-                    {/* Edit */}
-                    {detailMovement.status === 'draft' && (
-                      <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.info }]} onPress={() => {
-                        setShowDetail(false);
-                        setEditId(detailMovement._id);
-                        const foundCust = customers.find(c => c.company === detailMovement.partyName || c.name === detailMovement.partyName);
-                        setForm({ ...DEFAULT_FORM, ...(detailMovement as any), partyId: detailMovement.partyId || foundCust?._id || '' });
-                        setItems((detailMovement.items || []).map((it: any) => {
-                          const mrpVal = it.mrp || it.rate || 0;
-                          const netRate = it.rate || 0;
-                          let discPct = it.discountPercent || 0;
-                          if (!discPct && mrpVal > 0 && mrpVal > netRate) {
-                            discPct = parseFloat((((mrpVal - netRate) / mrpVal) * 100).toFixed(1));
-                          }
-                          return {
-                            ...it,
-                            mrp: mrpVal,
-                            discountPercent: discPct,
-                            rate: netRate
-                          };
-                        }));
-                        setCustomerSearch(detailMovement.partyName || '');
-                        setShowModal(true);
-                      }}>
-                        <Ionicons name="create-outline" size={16} color="#fff" />
-                        <Text style={styles.detailActionBtnText}>Edit</Text>
-                      </TouchableOpacity>
-                    )}
+                  {/* Edit */}
+                  {detailMovement.status === 'draft' && (
+                    <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.info }]} onPress={() => {
+                      setShowDetail(false);
+                      setEditId(detailMovement._id);
+                      const foundCust = customers.find(c => c.company === detailMovement.partyName || c.name === detailMovement.partyName);
+                      setForm({ ...DEFAULT_FORM, ...(detailMovement as any), partyId: detailMovement.partyId || foundCust?._id || '' });
+                      setItems((detailMovement.items || []).map((it: any) => {
+                        const mrpVal = it.mrp || it.rate || 0;
+                        const netRate = it.rate || 0;
+                        let discPct = it.discountPercent || 0;
+                        if (!discPct && mrpVal > 0 && mrpVal > netRate) {
+                          discPct = parseFloat((((mrpVal - netRate) / mrpVal) * 100).toFixed(1));
+                        }
+                        return {
+                          ...it,
+                          mrp: mrpVal,
+                          discountPercent: discPct,
+                          rate: netRate
+                        };
+                      }));
+                      setCustomerSearch(detailMovement.partyName || '');
+                      setShowModal(true);
+                    }}>
+                      <Ionicons name="create-outline" size={16} color="#fff" />
+                      <Text style={styles.detailActionBtnText}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
 
-                    {/* Delete */}
-                    {detailMovement.status !== 'dispatched' && detailMovement.status !== 'received' && (
-                      <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.danger }]} onPress={() => { setShowDetail(false); handleDelete(detailMovement._id); }}>
-                        <Ionicons name="trash-outline" size={16} color="#fff" />
-                        <Text style={styles.detailActionBtnText}>Delete</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                  {/* Delete */}
+                  {detailMovement.status !== 'dispatched' && detailMovement.status !== 'received' && (
+                    <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.danger }]} onPress={() => { setShowDetail(false); handleDelete(detailMovement._id); }}>
+                      <Ionicons name="trash-outline" size={16} color="#fff" />
+                      <Text style={styles.detailActionBtnText}>Delete</Text>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Convert to Invoice */}
                   {detailMovement.type === 'sale' && (detailMovement as any).billingMode !== 'cash' && detailMovement.direction === 'out' && detailMovement.partyGstin && !detailMovement.convertedToInvoice && detailMovement.status === 'dispatched' && (
@@ -1470,6 +1690,12 @@ export default function StockMovementsScreen() {
                       <Text style={styles.detailActionBtnText}>Cancel Challan</Text>
                     </TouchableOpacity>
                   )}
+
+                  {/* Print */}
+                  <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.primary }]} onPress={() => printDeliveryChallan(detailMovement)}>
+                    <Ionicons name="print-outline" size={16} color="#fff" />
+                    <Text style={styles.detailActionBtnText}>Print</Text>
+                  </TouchableOpacity>
                 </View>
         </ScrollView>
       </View>
@@ -1629,8 +1855,8 @@ export default function StockMovementsScreen() {
                   <Pressable key={m._id} style={styles.tableBodyRow} onPress={() => { setDetailMovement(m); setShowDetail(true); }}>
                     {/* Doc No */}
                     <View style={[styles.tableCellContainer, { width: 120 }]}>
-                      <Text style={[styles.primaryText, { color: colors.primary }]} numberOfLines={1}>{m.docNo}</Text>
-                      {m.billingMode && <Text style={{ fontSize: 9, color: m.billingMode === 'cash' ? '#f59e0b' : '#3b82f6', fontWeight: '700' }}>{m.billingMode.toUpperCase()}</Text>}
+                      <Text style={[styles.primaryText, { color: colors.primary }]} numberOfLines={1}>{m.docNo.split('/').pop()}</Text>
+                      {m.billingMode === 'cash' && <Text style={{ fontSize: 9, color: '#f59e0b', fontWeight: '700' }}>CASH</Text>}
                     </View>
 
                     {/* Date */}
@@ -1641,7 +1867,6 @@ export default function StockMovementsScreen() {
                     {/* Party */}
                     <View style={[styles.tableCellContainer, { flex: 1, minWidth: 220, gap: 2 }]}>
                       <Text style={[styles.primaryText, { fontSize: 13 }]} numberOfLines={1}>{m.partyName || '—'}</Text>
-                      {m.partyGstin ? <Text style={{ fontSize: 10, color: colors.text.muted }} numberOfLines={1}>GST: {m.partyGstin}</Text> : null}
                       {m.type === 'sample' && ((m as any).medicalRepName || (m as any).doctorName) && (
                         <Text style={{ fontSize: 10, color: '#8b5cf6', fontWeight: '600' }} numberOfLines={1}>MR: {(m as any).medicalRepName || '—'} · Dr: {(m as any).doctorName || '—'}</Text>
                       )}
@@ -1789,6 +2014,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   info: { color: (LightColors as any).info },
   warning: { color: (LightColors as any).warning },
   danger: { color: (LightColors as any).danger },
+  customSearchSelectContainer: { position: 'relative', width: '100%' },
   customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.primary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, elevation: 4 },
   customSelectItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   customSelectItemText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },

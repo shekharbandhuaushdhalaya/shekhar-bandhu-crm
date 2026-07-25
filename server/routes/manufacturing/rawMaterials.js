@@ -8,10 +8,15 @@ const router = express.Router();
 // GET /api/raw-materials — List all raw materials
 router.get('/', async (req, res) => {
   try {
+    const { warehouseId } = req.query;
     const rawMaterials = await RawMaterial.find({}).sort({ name: 1 }).lean();
     
     // Enrich with aggregated live stock level
-    const entries = await RawMaterialEntry.find({}).lean();
+    const entryFilter = {};
+    if (warehouseId && warehouseId !== 'all') {
+      entryFilter.warehouseId = warehouseId;
+    }
+    const entries = await RawMaterialEntry.find(entryFilter).lean();
     const stockMap = {};
     entries.forEach(e => {
       const rId = e.rawMaterialId.toString();

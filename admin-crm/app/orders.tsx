@@ -52,6 +52,12 @@ export default function OrdersScreen() {
 
   useEffect(() => {
     load();
+    const sub1 = DeviceEventEmitter.addListener('new_web_order_event', () => load());
+    const sub2 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
+    return () => {
+      sub1.remove();
+      sub2.remove();
+    };
   }, [load]);
 
   const onRefresh = useCallback(async () => {

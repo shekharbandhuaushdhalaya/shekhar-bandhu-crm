@@ -27,5 +27,6 @@ const rawMaterialEntrySchema = new mongoose.Schema({
 }, { timestamps: true });
 
 rawMaterialEntrySchema.index({ rawMaterialId: 1, batchNo: 1 }, { unique: true });
+rawMaterialEntrySchema.index({ rawMaterialId: 1, warehouseId: 1, expiryDate: 1, createdAt: 1 });
 
 module.exports = mongoose.model('RawMaterialEntry', rawMaterialEntrySchema);

@@ -457,6 +457,11 @@ router.post('/', authorize('stockmovement:create'), validate(schemas.stockMoveme
       await increaseInventory(movement);
     }
 
+    if (req.io) {
+      req.io.emit('challan_updated', movement);
+      req.io.emit('inventory_updated', { type: 'challan', movementId: movement._id });
+    }
+
     res.status(201).json(movement);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -475,6 +480,9 @@ router.put('/:id', authorize('stockmovement:edit'), validate(schemas.stockMoveme
     movement.createdBy = req.user?.name || movement.createdBy;
     await movement.save();
     await syncOrderLogistics(movement);
+    if (req.io) {
+      req.io.emit('challan_updated', movement);
+    }
     res.json(movement);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -495,6 +503,11 @@ router.patch('/:id/dispatch', authorize('stockmovement:edit'), async (req, res) 
     await syncCustomerLedger(movement, req.user?.name);
     await syncOrderLogistics(movement);
 
+    if (req.io) {
+      req.io.emit('challan_updated', movement);
+      req.io.emit('inventory_updated', { type: 'dispatch', movementId: movement._id });
+    }
+
     res.json(movement);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -512,6 +525,11 @@ router.patch('/:id/receive', authorize('stockmovement:edit'), async (req, res) =
     movement.status = 'received';
     await movement.save();
     await increaseInventory(movement);
+
+    if (req.io) {
+      req.io.emit('challan_updated', movement);
+      req.io.emit('inventory_updated', { type: 'receive', movementId: movement._id });
+    }
 
     res.json(movement);
   } catch (err) {
@@ -533,6 +551,11 @@ router.patch('/:id/cancel', authorize('stockmovement:delete'), async (req, res) 
     if (wasDispatched && movement.direction === 'out') {
       await revertInventory(movement);
       await revertCustomerLedger(movement);
+    }
+
+    if (req.io) {
+      req.io.emit('challan_updated', movement);
+      req.io.emit('inventory_updated', { type: 'cancel', movementId: movement._id });
     }
 
     res.json(movement);
@@ -611,6 +634,9 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
         rate: it.rate || 0,
         gstRate: it.gstRate || 0,
         batchNo: it.batchNo || '',
+        hsnCode: it.hsnCode || '',
+        mrp: it.mrp || 0,
+        discountPercent: it.discountPercent || 0,
       };
     });
 
@@ -621,12 +647,23 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
     const nettTotal = Math.round(rawTotal);
     const roundOff = nettTotal - rawTotal;
 
+    // Parse Billing and Shipping addresses from the concatenated partyAddress string
+    let billingAddress = movement.partyAddress || '';
+    let shippingAddress = movement.partyAddress || '';
+    if (movement.partyAddress && movement.partyAddress.includes('Billing Address:') && movement.partyAddress.includes('Shipping Address:')) {
+      const parts = movement.partyAddress.split('Shipping Address:');
+      const billingPart = parts[0].replace('Billing Address:', '').trim();
+      const shippingPart = parts[1] ? parts[1].trim() : '';
+      if (billingPart) billingAddress = billingPart;
+      if (shippingPart) shippingAddress = shippingPart;
+    }
+
     // Create draft tax invoice — inventory already deducted when DC was dispatched
     const invoice = await Invoice.create({
       invoiceNo,
       customerName: movement.partyName,
-      partyAddress: movement.partyAddress,
-      shippingAddress: movement.partyAddress,
+      partyAddress: billingAddress,
+      shippingAddress: shippingAddress,
       date: movement.date || new Date(),
       amount: nettTotal,
       status: 'draft',          // created in draft mode
@@ -642,6 +679,7 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
       type: 'sale',
       items: invoiceItems,
       // Link back to source DC
+      reference: movement._id ? movement._id.toString() : '',
       sourceDocType: 'StockMovement',
       sourceDocId: movement._id,
     });

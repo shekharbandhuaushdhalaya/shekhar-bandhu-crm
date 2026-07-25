@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, Alert, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, Alert, useWindowDimensions, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Payment, Customer, Vendor } from '../utils/api';
@@ -406,6 +406,8 @@ export default function PaymentsScreen() {
 
   useEffect(() => {
     load();
+    const sub = DeviceEventEmitter.addListener('payment_updated_event', () => load());
+    return () => sub.remove();
   }, [search, filterType]);
 
   const onRefresh = async () => {
@@ -617,6 +619,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   td: { fontSize: 13, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  badgeText: { fontSize: 10, fontWeight: '700' },
   statCard: { flex: 1, minWidth: 130, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1 },
   statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   statValue: { fontSize: 16, fontWeight: '800', marginTop: 2 },

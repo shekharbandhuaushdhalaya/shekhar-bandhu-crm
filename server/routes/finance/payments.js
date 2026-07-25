@@ -84,6 +84,10 @@ router.post('/', validate(schemas.paymentSchema), async (req, res) => {
       }
     }
 
+    if (req.io) {
+      req.io.emit('payment_updated', payment);
+    }
+
     res.status(201).json(payment);
 
     const { logAction } = require('../../utils/auditLogger');
@@ -135,6 +139,9 @@ router.delete('/:id', async (req, res) => {
     }
 
     await Payment.findByIdAndDelete(req.params.id);
+    if (req.io) {
+      req.io.emit('payment_updated', { id: req.params.id, deleted: true });
+    }
     res.json({ message: 'Payment deleted and balance reverted' });
 
     const { logAction } = require('../../utils/auditLogger');
@@ -246,6 +253,11 @@ router.post('/allocate', async (req, res) => {
         inv.status = inv.amountPaid >= inv.amount ? 'paid' : 'partially_paid';
         await inv.save();
       }
+    }
+
+    if (req.io) {
+      req.io.emit('payment_updated', payment);
+      req.io.emit('invoice_updated', { type: 'allocate', paymentId });
     }
 
     res.json({ message: 'Payment successfully allocated bill-wise', payment });

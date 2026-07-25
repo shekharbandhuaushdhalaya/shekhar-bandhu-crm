@@ -356,6 +356,7 @@ export type Invoice = {
   irn?: string;
   internalFreightExpense?: number;
   qrCode?: string;
+  supportingDocuments?: any[];
 };
 
 export type QuotationItem = {
@@ -449,11 +450,19 @@ export type BillOfMaterials = {
   productId: string | { _id: string; name: string; sku: string; size?: string };
   batchYieldSize: number;
   ingredients: BOMIngredient[];
+  isActive?: boolean;
+  productionNotes?: string;
+  overheadCost?: number;
+  stages?: any[];
+  defaultProductionType?: string;
+  defaultJobWorkMode?: string;
+  defaultPackagingMode?: string;
+  defaultJobWorkerId?: string | null;
 };
 
 export type ManufacturingStage = {
   name: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'failed';
   startedAt?: string;
   completedAt?: string;
   completedBy?: string;
@@ -488,6 +497,19 @@ export type BatchProduction = {
   rawMaterialCost?: number;
   unitProductionCost?: number;
   createdAt: string;
+  productionType?: string;
+  overheadCost?: number;
+  qcParameters?: {
+    organoleptic?: string;
+    moistureContent?: number;
+    ashValue?: number;
+    pHValue?: number;
+    disintegrationTime?: number;
+    heavyMetals?: string;
+    microbialLimit?: string;
+    labReportRef?: string;
+  };
+  supportingDocuments?: { name: string; url: string; uploadedAt?: string }[];
 };
 
 export type Complaint = {
@@ -567,6 +589,7 @@ export type StockMovementItem = {
   gstRate?: number;
   batchNo?: string;
   mrp?: number;
+  hsnCode?: string;
 };
 
 export type StockMovement = {
@@ -772,6 +795,8 @@ export type TraceResult = {
   challans: TraceChallan[];
   invoices: TraceInvoice[];
   dispatches: TraceDispatch[];
+  materialSku?: string;
+  materialName?: string;
 };
 
 export type RolePermissionConfig = {

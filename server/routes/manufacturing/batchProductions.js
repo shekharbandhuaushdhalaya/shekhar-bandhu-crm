@@ -40,140 +40,144 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       return res.status(400).json({ error: 'Planned quantity must be a positive number' });
     }
 
-    const ManufacturingUnit = require('../../models/ManufacturingUnit');
-    const mfgUnit = await ManufacturingUnit.findById(manufacturingUnitId);
-    if (!mfgUnit) return res.status(404).json({ error: 'Manufacturing unit not found' });
+    const { runWithTransaction } = require('../../utils/transactionHelper');
 
-    const existingBatch = await BatchProduction.findOne({ batchNo: batchNo.trim().toUpperCase() });
-    if (existingBatch) {
-      return res.status(400).json({ error: `Production batch number ${batchNo} already exists` });
-    }
+    const newBatch = await runWithTransaction(async (session) => {
+      const ManufacturingUnit = require('../../models/ManufacturingUnit');
+      const mfgUnit = await ManufacturingUnit.findById(manufacturingUnitId).session(session);
+      if (!mfgUnit) throw new Error('Manufacturing unit not found');
 
-    const prod = await Product.findById(productId);
-    if (!prod) return res.status(404).json({ error: 'Finished product not found' });
+      const existingBatch = await BatchProduction.findOne({ batchNo: batchNo.trim().toUpperCase() }).session(session);
+      if (existingBatch) {
+        throw new Error(`Production batch number ${batchNo} already exists`);
+      }
 
-    const bom = await BillOfMaterials.findOne({ productId });
-    if (!bom) {
-      return res.status(400).json({ error: `No Bill of Materials configured for product: ${prod.name}` });
-    }
+      const prod = await Product.findById(productId).session(session);
+      if (!prod) throw new Error('Finished product not found');
 
-    const isDirectPurchase = jobWorkMode === 'direct_purchase';
-    const ingredientsRequired = [];
+      const bom = await BillOfMaterials.findOne({ productId }).session(session);
+      if (!bom) {
+        throw new Error(`No Bill of Materials configured for product: ${prod.name}`);
+      }
 
-    if (!isDirectPurchase) {
-      for (const ing of bom.ingredients) {
-        const rm = await RawMaterial.findById(ing.rawMaterialId);
-        const isPackaging = ing.itemType === 'packaging' || (rm && rm.category === 'Packaging');
-        if (!isPackaging) {
-          const scaleBase = bom.batchYieldSize && bom.batchYieldSize > 0 ? bom.batchYieldSize : 100;
-          const scale = valPlanned / scaleBase;
-          const qtyNeeded = ing.qtyRequired * scale;
-          ingredientsRequired.push({ rawMaterialId: ing.rawMaterialId, qtyNeeded });
+      const isDirectPurchase = jobWorkMode === 'direct_purchase';
+      const ingredientsRequired = [];
+
+      if (!isDirectPurchase) {
+        for (const ing of bom.ingredients) {
+          const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
+          const isPackaging = ing.itemType === 'packaging' || (rm && rm.category === 'Packaging');
+          if (!isPackaging) {
+            const scaleBase = bom.batchYieldSize && bom.batchYieldSize > 0 ? bom.batchYieldSize : 100;
+            const scale = valPlanned / scaleBase;
+            const qtyNeeded = ing.qtyRequired * scale;
+            ingredientsRequired.push({ rawMaterialId: ing.rawMaterialId, qtyNeeded });
+          }
         }
       }
-    }
 
-    const verifiedDeductions = [];
-    if (!isDirectPurchase) {
-      for (const reqIng of ingredientsRequired) {
-        const rm = await RawMaterial.findById(reqIng.rawMaterialId);
-        const entries = await RawMaterialEntry.find({ rawMaterialId: reqIng.rawMaterialId });
+      const verifiedDeductions = [];
+      if (!isDirectPurchase) {
+        for (const reqIng of ingredientsRequired) {
+          const rm = await RawMaterial.findById(reqIng.rawMaterialId).session(session);
+          const entries = await RawMaterialEntry.find({ rawMaterialId: reqIng.rawMaterialId, warehouseId: manufacturingUnitId }).session(session);
 
-        entries.sort((a, b) => {
-          if (a.expiryDate && b.expiryDate) {
-            return new Date(a.expiryDate) - new Date(b.expiryDate);
+          entries.sort((a, b) => {
+            if (a.expiryDate && b.expiryDate) {
+              return new Date(a.expiryDate) - new Date(b.expiryDate);
+            }
+            if (a.expiryDate && !b.expiryDate) return -1;
+            if (!a.expiryDate && b.expiryDate) return 1;
+            return new Date(a.createdAt) - new Date(b.createdAt);
+          });
+
+          const totalAvailable = entries.reduce((acc, e) => acc + (e.qty || 0), 0);
+          if (totalAvailable < reqIng.qtyNeeded) {
+            throw new Error(`Insufficient stock for raw material: ${rm.name}. Needed: ${reqIng.qtyNeeded.toFixed(2)} ${rm.unit}, Available: ${totalAvailable.toFixed(2)} ${rm.unit}`);
           }
-          if (a.expiryDate && !b.expiryDate) return -1;
-          if (!a.expiryDate && b.expiryDate) return 1;
-          return new Date(a.createdAt) - new Date(b.createdAt);
-        });
 
-        const totalAvailable = entries.reduce((acc, e) => acc + (e.qty || 0), 0);
-        if (totalAvailable < reqIng.qtyNeeded) {
-          return res.status(400).json({
-            error: `Insufficient stock for raw material: ${rm.name}. Needed: ${reqIng.qtyNeeded.toFixed(2)} ${rm.unit}, Available: ${totalAvailable.toFixed(2)} ${rm.unit}`
+          let needed = reqIng.qtyNeeded;
+          for (const entry of entries) {
+            if (needed <= 0) break;
+            if ((entry.qty || 0) <= 0) continue;
+            const deduct = Math.min(needed, entry.qty);
+            verifiedDeductions.push({ entry, deductQty: deduct, rawMaterialId: reqIng.rawMaterialId });
+            needed -= deduct;
+          }
+        }
+      }
+
+      const ingredientsConsumed = [];
+      let rawMaterialCost = 0;
+      if (!isDirectPurchase) {
+        for (const dec of verifiedDeductions) {
+          const { entry, deductQty, rawMaterialId } = dec;
+          entry.qty = Math.max(0, entry.qty - deductQty);
+          await entry.save({ session });
+          rawMaterialCost += deductQty * (entry.purchaseRate || 0);
+          ingredientsConsumed.push({
+            rawMaterialId,
+            rawMaterialEntryId: entry._id,
+            qtyConsumed: deductQty,
+            batchNo: entry.batchNo
           });
         }
+      }
 
-        let needed = reqIng.qtyNeeded;
-        for (const entry of entries) {
-          if (needed <= 0) break;
-          if ((entry.qty || 0) <= 0) continue;
-          const deduct = Math.min(needed, entry.qty);
-          verifiedDeductions.push({ entry, deductQty: deduct, rawMaterialId: reqIng.rawMaterialId });
-          needed -= deduct;
+      // Scaled overhead calculation based on yield size
+      const scale = valPlanned / bom.batchYieldSize;
+      const computedOverhead = (bom.overheadCost || 0) * scale;
+
+      // Configure Custom Stages or fallback to default manufacturing stages
+      const customStages = bom.stages && bom.stages.length > 0
+        ? bom.stages
+        : [
+            { name: 'Raw Material Verification & Weighing', targetDurationDays: 1 },
+            { name: 'Primary Processing (Swasan/Mardan)', targetDurationDays: 1 },
+            { name: 'Mixing & Blending', targetDurationDays: 1 },
+            { name: 'Forming (Vati/Gutika)', targetDurationDays: 1 },
+            { name: 'Drying', targetDurationDays: 1 },
+            { name: 'QC Testing', targetDurationDays: 1 },
+            { name: 'Packaging & Labeling', targetDurationDays: 1 }
+          ];
+
+      const batchStages = customStages.map((st, i) => {
+        const startedAt = i === 0 ? new Date() : null;
+        const targetDurationDays = st.targetDurationDays || 1;
+        let targetCompletionDate = null;
+        if (startedAt) {
+          targetCompletionDate = new Date(startedAt.getTime() + targetDurationDays * 24 * 60 * 60 * 1000);
         }
-      }
-    }
+        return {
+          name: st.name,
+          targetDurationDays,
+          status: i === 0 ? 'in_progress' : 'pending',
+          startedAt,
+          targetCompletionDate
+        };
+      });
 
-    const ingredientsConsumed = [];
-    let rawMaterialCost = 0;
-    if (!isDirectPurchase) {
-      for (const dec of verifiedDeductions) {
-        const { entry, deductQty, rawMaterialId } = dec;
-        entry.qty = Math.max(0, entry.qty - deductQty);
-        await entry.save();
-        rawMaterialCost += deductQty * (entry.purchaseRate || 0);
-        ingredientsConsumed.push({
-          rawMaterialId,
-          rawMaterialEntryId: entry._id,
-          qtyConsumed: deductQty,
-          batchNo: entry.batchNo
-        });
-      }
-    }
+      const [newBatchDoc] = await BatchProduction.create([{
+        batchNo: batchNo.trim().toUpperCase(),
+        productId,
+        manufacturingUnitId,
+        manufacturingUnitName: mfgUnit.name,
+        plannedQty: valPlanned,
+        status: 'in_progress',
+        stages: batchStages,
+        ingredientsConsumed,
+        rawMaterialCost: Number(rawMaterialCost.toFixed(2)),
+        overheadCost: Number(computedOverhead.toFixed(2)),
+        productionType: productionType || 'in_house',
+        jobWorkMode: jobWorkMode || 'none',
+        packagingMode: packagingMode || 'packed_by_vendor',
+        jobWorkerId: jobWorkerId || null,
+        jobWorkerName: jobWorkerName || '',
+        jobWorkerChallanRef: jobWorkerChallanRef || '',
+        startDate: new Date()
+      }], { session });
 
-    // Scaled overhead calculation based on yield size
-    const scale = valPlanned / bom.batchYieldSize;
-    const computedOverhead = (bom.overheadCost || 0) * scale;
-
-    // Configure Custom Stages or fallback to default manufacturing stages
-    const customStages = bom.stages && bom.stages.length > 0
-      ? bom.stages
-      : [
-          { name: 'Raw Material Verification & Weighing', targetDurationDays: 1 },
-          { name: 'Primary Processing (Swasan/Mardan)', targetDurationDays: 1 },
-          { name: 'Mixing & Blending', targetDurationDays: 1 },
-          { name: 'Forming (Vati/Gutika)', targetDurationDays: 1 },
-          { name: 'Drying', targetDurationDays: 1 },
-          { name: 'QC Testing', targetDurationDays: 1 },
-          { name: 'Packaging & Labeling', targetDurationDays: 1 }
-        ];
-
-    const batchStages = customStages.map((st, i) => {
-      const startedAt = i === 0 ? new Date() : null;
-      const targetDurationDays = st.targetDurationDays || 1;
-      let targetCompletionDate = null;
-      if (startedAt) {
-        targetCompletionDate = new Date(startedAt.getTime() + targetDurationDays * 24 * 60 * 60 * 1000);
-      }
-      return {
-        name: st.name,
-        targetDurationDays,
-        status: i === 0 ? 'in_progress' : 'pending',
-        startedAt,
-        targetCompletionDate
-      };
-    });
-
-    const newBatch = await BatchProduction.create({
-      batchNo: batchNo.trim().toUpperCase(),
-      productId,
-      manufacturingUnitId,
-      manufacturingUnitName: mfgUnit.name,
-      plannedQty: valPlanned,
-      status: 'in_progress',
-      stages: batchStages,
-      ingredientsConsumed,
-      rawMaterialCost: Number(rawMaterialCost.toFixed(2)),
-      overheadCost: Number(computedOverhead.toFixed(2)),
-      productionType: productionType || 'in_house',
-      jobWorkMode: jobWorkMode || 'none',
-      packagingMode: packagingMode || 'packed_by_vendor',
-      jobWorkerId: jobWorkerId || null,
-      jobWorkerName: jobWorkerName || '',
-      jobWorkerChallanRef: jobWorkerChallanRef || '',
-      startDate: new Date()
+      return newBatchDoc;
     });
 
     if (req.io) {
@@ -318,7 +322,7 @@ async function deductPackagingMaterials(batch, outputQty) {
     const rm = await RawMaterial.findById(ing.rawMaterialId);
     if (!rm) continue;
 
-    const entries = await RawMaterialEntry.find({ rawMaterialId: ing.rawMaterialId });
+    const entries = await RawMaterialEntry.find({ rawMaterialId: ing.rawMaterialId, warehouseId: batch.manufacturingUnitId });
     entries.sort((a, b) => {
       if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
       if (a.expiryDate && !b.expiryDate) return -1;

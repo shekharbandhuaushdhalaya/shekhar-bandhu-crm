@@ -188,6 +188,18 @@ function MainLayout() {
       DeviceEventEmitter.emit('inventory_updated_event', data);
     });
 
+    socket.on('invoice_updated', (data) => {
+      DeviceEventEmitter.emit('invoice_updated_event', data);
+    });
+
+    socket.on('challan_updated', (data) => {
+      DeviceEventEmitter.emit('challan_updated_event', data);
+    });
+
+    socket.on('payment_updated', (data) => {
+      DeviceEventEmitter.emit('payment_updated_event', data);
+    });
+
     return () => {
       unsubscribeNetInfo();
       sub.remove();
@@ -195,6 +207,9 @@ function MainLayout() {
       socket.off('mfg_batch_created');
       socket.off('new_web_order');
       socket.off('inventory_updated');
+      socket.off('invoice_updated');
+      socket.off('challan_updated');
+      socket.off('payment_updated');
     };
   }, []);
 

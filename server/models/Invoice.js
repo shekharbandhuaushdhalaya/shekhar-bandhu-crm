@@ -94,6 +94,9 @@ const invoiceSchema = new mongoose.Schema({
   medicalRepName: { type: String, default: '', trim: true },
   doctorName: { type: String, default: '', trim: true },
   damageReason: { type: String, default: '', trim: true },
+  reference: { type: String, default: '', trim: true },
+  sourceDocType: { type: String, default: '', trim: true },
+  sourceDocId: { type: mongoose.Schema.Types.ObjectId, refPath: 'sourceDocType' },
   supportingDocuments: [
     {
       name: { type: String, required: true },

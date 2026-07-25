@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Alert, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
-import { api, Invoice, Product, RawMaterial, Vendor, Warehouse } from '../../utils/api';
+import { api, Invoice, Product, RawMaterial, Vendor, Warehouse, ManufacturingUnit } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
@@ -94,7 +94,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Attach',
-            onPress: async (url) => {
+            onPress: async (url?: string) => {
               if (!url) return;
               try {
                 await api.addDocument('invoice', invoice._id, { name: 'Attached Purchase Receipt', url });
@@ -772,7 +772,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   rows.forEach(r => {
     const qty = parseFloat(r.boxes) || 0;
     const rate = parseFloat(r.rate) || 0;
-    const gstRate = (mode === 'regular' || (mode as string) === 'pakka') ? (parseFloat(r.gstRate) || 0) : 0;
+    const gstRate = (mode === 'regular' || (mode as string) === 'pakka') ? (r.gstRate || 0) : 0;
     const itemBase = qty * rate;
     const itemGst = itemBase * (gstRate / 100);
     totalBase += itemBase;
@@ -826,7 +826,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       return;
     }
 
-    if (mode === 'pakka' && !invoiceNo.trim()) {
+    if (mode === 'regular' && !invoiceNo.trim()) {
       alert('Invoice Number is mandatory for GST purchases.');
       return;
     }
@@ -844,7 +844,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     }
 
     const finalItems = validRows.map(r => {
-      const qty = parseFloat(r.boxes) || 0;
+      const isPcs = r.unit && (r.unit.toLowerCase().startsWith('pc') || r.unit.toLowerCase().startsWith('unit'));
+      const qty = isPcs ? (parseInt(r.boxes, 10) || 0) : (parseFloat(r.boxes) || 0);
       return {
         productId: r.selectedProduct ? r.selectedProduct._id : undefined,
         rawMaterialId: r.rawMaterialId,
@@ -1077,7 +1078,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           </View>
 
           {/* 2. Ledger Mode, Invoice Number, Date in 1 Row */}
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16, zIndex: 10 }}>
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16, zIndex: showDatePicker ? 3100 : 10 }}>
             {/* Billing Mode Switch */}
             {(() => {
               const selectedVend = vendors.find(v => (v.company || v.name).toLowerCase() === supplierName.trim().toLowerCase() || (v.displayName || v.registeredName || '').toLowerCase() === supplierName.trim().toLowerCase());
@@ -1140,7 +1141,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   onPress={() => setShowDatePicker(!showDatePicker)}
                 >
                   <Ionicons name="calendar" size={16} color={colors.primary} />
-                  <Text style={[styles.formInputText, { color: colors.text.primary, fontWeight: '700', lineHeight: 44 }]}>
+                  <Text style={{ flex: 1, color: colors.text.primary, fontWeight: '700', fontSize: 14, paddingVertical: 12 }}>
                     {date ? new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Select Date'}
                   </Text>
                   <Ionicons name={showDatePicker ? "chevron-up" : "calendar-outline"} size={16} color={colors.text.muted} />
@@ -1286,7 +1287,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                 width: '100%', 
                 zIndex: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 2600 : 1
               }}
-              contentContainerStyle={{ minHeight: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 350 : 220, flexGrow: 1 }}
+              contentContainerStyle={{ minHeight: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? Math.max(350, rows.length * 55 + 180) : 220, flexGrow: 1 }}
             >
               <View style={{ width: '100%', minWidth: 680, minHeight: 220 }}>
                 {/* Header Row */}
@@ -1319,12 +1320,20 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   const gstAmount = mode === 'regular' ? (subtotal * row.gstRate) / 100 : 0;
                   const rowTotal = subtotal + gstAmount;
 
-                  const rowFilteredItems = row.productSearch
-                    ? selectableItems.filter(item =>
+                  const selectedOtherRawMaterialIds = rows
+                    .filter(r => r.id !== row.id && r.rawMaterialId)
+                    .map(r => r.rawMaterialId);
+
+                  const rowFilteredItems = selectableItems.filter(item => {
+                    if (selectedOtherRawMaterialIds.includes(item.id)) return false;
+                    if (row.productSearch) {
+                      return (
                         item.name.toLowerCase().includes(row.productSearch.toLowerCase()) ||
                         item.sku.toLowerCase().includes(row.productSearch.toLowerCase())
-                      )
-                    : selectableItems;
+                      );
+                    }
+                    return true;
+                  });
 
                   return (
                     <View key={row.id} style={{
@@ -1393,7 +1402,17 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                           keyboardType="numeric"
                           value={row.boxes}
                           onChangeText={(text) => {
-                            setRows(prev => prev.map(r => r.id === row.id ? { ...r, boxes: text } : r));
+                            let sanitized = text;
+                            if (row.unit && (row.unit.toLowerCase().startsWith('pc') || row.unit.toLowerCase().startsWith('unit'))) {
+                              sanitized = text.replace(/[^0-9]/g, '');
+                            } else {
+                              sanitized = text.replace(/[^0-9.]/g, '');
+                              const parts = sanitized.split('.');
+                              if (parts.length > 2) {
+                                sanitized = parts[0] + '.' + parts.slice(1).join('');
+                              }
+                            }
+                            setRows(prev => prev.map(r => r.id === row.id ? { ...r, boxes: sanitized } : r));
                           }}
                         />
                         {row.unit ? (
@@ -1665,7 +1684,13 @@ export default function PurchaseInvoicesScreen() {
     setRawMaterials(rms);
   }, [search, modeFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const sub = DeviceEventEmitter.addListener('invoice_updated_event', () => {
+      load();
+    });
+    return () => sub.remove();
+  }, [load]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -1901,6 +1926,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   outstandingText: { fontSize: 13, fontWeight: '800' },
   actionIconButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' },
   emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { fontSize: 13, color: colors.text.muted, marginTop: 8 },
 
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, alignSelf: 'flex-start' },
   statusText: { fontSize: 10, fontWeight: '800' },

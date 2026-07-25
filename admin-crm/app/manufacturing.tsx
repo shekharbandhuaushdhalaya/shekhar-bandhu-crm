@@ -87,10 +87,11 @@ export default function ManufacturingScreen() {
   const [traceSearch, setTraceSearch] = useState('');
   const [expandedMaterials, setExpandedMaterials] = useState<Record<string, boolean>>({});
   const [currentInProgressStage, setCurrentInProgressStage] = useState<{ batchId: string; stageIndex: number } | null>(null);
-  const [stageAction, setStageAction] = useState<'advance' | 'skip' | null>(null);
+  const [stageAction, setStageAction] = useState<'advance' | 'skip' | 'fail' | null>(null);
   const [stageBatchId, setStageBatchId] = useState<string | null>(null);
   const [stageIndex, setStageIndex] = useState<number | null>(null);
   const [stageOperator, setStageOperator] = useState('Operator');
+  const [mfgUnitFilter, setMfgUnitFilter] = useState('all');
   const [stageNotes, setStageNotes] = useState('');
   const [stageModalVisible, setStageModalVisible] = useState(false);
   const [stageError, setStageError] = useState('');
@@ -185,7 +186,7 @@ export default function ManufacturingScreen() {
     try {
       setLoading(true);
       const [rmsData, entriesData, bomsData, batchesData, prodsData, vendsData, alertsData, analyticsData, whData, mfgUnitsData] = await Promise.all([
-        api.getRawMaterials(),
+        api.getRawMaterials(mfgUnitFilter === 'all' ? undefined : mfgUnitFilter),
         api.getRawMaterialEntries(),
         api.getBOMs(),
         api.getBatchProductions(),
@@ -216,7 +217,7 @@ export default function ManufacturingScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [mfgUnitFilter]);
 
   useEffect(() => {
     loadData();
@@ -757,7 +758,7 @@ export default function ManufacturingScreen() {
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Attach',
-            onPress: async (url) => {
+            onPress: async (url?: string) => {
               if (!url) return;
               try {
                 await api.addDocument('batch', batchId, { name: 'Attached Certificate', url });
@@ -986,55 +987,98 @@ export default function ManufacturingScreen() {
               <View style={{ flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, marginBottom: 12 }}>
                 <Text style={[styles.cardSubTitle, { marginBottom: 0 }]}>Raw Stocks & Reorder Status (Click to view active batches)</Text>
                 
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, width: isDesktop ? 260 : undefined }}>
-                  <Ionicons name="search-outline" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
-                  <TextInput
-                    style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
-                    placeholder="Search stocks..."
-                    placeholderTextColor={colors.text.muted}
-                    value={materialSearch}
-                    onChangeText={setMaterialSearch}
-                  />
-                  {materialSearch.length > 0 && (
-                    <TouchableOpacity onPress={() => setMaterialSearch('')} style={{ marginRight: 6 }}>
-                      <Ionicons name="close-circle" size={14} color={colors.text.muted} />
-                    </TouchableOpacity>
-                  )}
-                  
-                  <View style={{ width: 1, height: 14, backgroundColor: colors.border, marginRight: 6 }} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {/* Manufacturing Unit Filter Dropdown */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                    <Ionicons name="business" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
+                    {Platform.OS === 'web' ? (
+                      <select
+                        value={mfgUnitFilter}
+                        onChange={(e: any) => setMfgUnitFilter(e.target.value)}
+                        style={{
+                          borderWidth: 0,
+                          backgroundColor: 'transparent',
+                          color: colors.text.primary,
+                          fontSize: 11,
+                          fontWeight: '600',
+                          outlineWidth: 0,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="all">All Units</option>
+                        {manufacturingUnits.map(unit => (
+                          <option key={unit._id} value={unit._id}>{unit.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => {
+                          const options = ['all', ...manufacturingUnits.map(u => u._id)];
+                          const currentIdx = options.indexOf(mfgUnitFilter);
+                          const nextIdx = (currentIdx + 1) % options.length;
+                          setMfgUnitFilter(options[nextIdx]);
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>
+                          {mfgUnitFilter === 'all' ? 'All Units' : (manufacturingUnits.find(u => u._id === mfgUnitFilter)?.name || 'Unit')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
 
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={stockFilter}
-                      onChange={(e: any) => setStockFilter(e.target.value)}
-                      style={{
-                        borderWidth: 0,
-                        backgroundColor: 'transparent',
-                        color: colors.text.primary,
-                        fontSize: 11,
-                        fontWeight: '600',
-                        outlineWidth: 0,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="all">All</option>
-                      <option value="low">Low</option>
-                      <option value="in_stock">In Stock</option>
-                    </select>
-                  ) : (
-                    <TouchableOpacity
-                      onPress={() => {
-                        const nextFilter = stockFilter === 'all' ? 'low' : (stockFilter === 'low' ? 'in_stock' : 'all');
-                        setStockFilter(nextFilter);
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>
-                        {stockFilter === 'all' ? 'All' : (stockFilter === 'low' ? 'Low' : 'In Stock')}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                  {/* Search Stocks Box */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, width: isDesktop ? 220 : undefined }}>
+                    <Ionicons name="search-outline" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
+                      placeholder="Search stocks..."
+                      placeholderTextColor={colors.text.muted}
+                      value={materialSearch}
+                      onChangeText={setMaterialSearch}
+                    />
+                    {materialSearch.length > 0 && (
+                      <TouchableOpacity onPress={() => setMaterialSearch('')} style={{ marginRight: 6 }}>
+                        <Ionicons name="close-circle" size={14} color={colors.text.muted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Stock Status Filter Dropdown */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                    <Ionicons name="funnel-outline" size={12} color={colors.text.muted} style={{ marginRight: 4 }} />
+                    {Platform.OS === 'web' ? (
+                      <select
+                        value={stockFilter}
+                        onChange={(e: any) => setStockFilter(e.target.value)}
+                        style={{
+                          borderWidth: 0,
+                          backgroundColor: 'transparent',
+                          color: colors.text.primary,
+                          fontSize: 11,
+                          fontWeight: '600',
+                          outlineWidth: 0,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="all">All Stocks</option>
+                        <option value="low">Low Stock</option>
+                        <option value="in_stock">In Stock</option>
+                      </select>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => {
+                          const nextFilter = stockFilter === 'all' ? 'low' : (stockFilter === 'low' ? 'in_stock' : 'all');
+                          setStockFilter(nextFilter);
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>
+                          {stockFilter === 'all' ? 'All Stocks' : (stockFilter === 'low' ? 'Low Stock' : 'In Stock')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
               </View>
+            </View>
               
               <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
                 {/* Header */}
