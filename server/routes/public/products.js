@@ -48,8 +48,12 @@ router.get('/:id', async (req, res) => {
       return acc + (qty * packing);
     }, 0);
 
+    const parentId = product.parentId || product._id;
     const variants = await Product.find({
-      name: { $regex: new RegExp(`^${product.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+      $or: [
+        { _id: parentId },
+        { parentId: parentId }
+      ]
     }).lean();
 
     const allEntries = await InventoryEntry.find({ productId: { $in: variants.map(v => v._id) } }).lean();

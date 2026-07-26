@@ -5,8 +5,9 @@ const billOfMaterialsSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
     required: true,
-    unique: true,
   },
+  recipeName: { type: String, required: true, default: 'Standard Recipe', trim: true },
+  isDefault: { type: Boolean, default: false },
   batchYieldSize: { type: Number, required: true, default: 1 }, // standard size of output batch (e.g. 100 bottles)
   ingredients: [
     {
@@ -33,5 +34,7 @@ const billOfMaterialsSchema = new mongoose.Schema({
     }
   ],
 }, { timestamps: true });
+
+billOfMaterialsSchema.index({ productId: 1, recipeName: 1 }, { unique: true });
 
 module.exports = mongoose.model('BillOfMaterials', billOfMaterialsSchema);

@@ -57,6 +57,7 @@ const productSchema = z.object({
   ingredients: z.string().default(''),
   rating: z.number().default(0),
   ratingCount: z.number().int().default(0),
+  parentId: objectId.optional().nullable(),
 });
 
 // ── Customer ─────────────────────────────────────────────────
@@ -422,6 +423,7 @@ const sampleSchema = z.object({
 const batchProductionSchema = z.object({
   batchNo: z.string().min(1),
   productId: objectId,
+  bomId: objectId.optional().nullable(),
   plannedQty: z.number().int().positive(),
   manufacturingUnitId: objectId,
   startDate: z.string().or(z.date()).optional(),
@@ -530,6 +532,8 @@ const bomStage = z.object({
 
 const bomSchema = z.object({
   productId: objectId,
+  recipeName: z.string().default('Standard Recipe'),
+  isDefault: z.boolean().default(false),
   batchYieldSize: z.number().int().positive(),
   ingredients: z.array(bomIngredient).min(1),
   isActive: z.boolean().optional(),

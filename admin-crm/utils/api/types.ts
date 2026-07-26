@@ -125,6 +125,7 @@ export type Product = {
   description?: string;
   disease?: string;
   ingredients?: string;
+  parentId?: string | null;
 };
 
 export type ChallanItem = {
@@ -458,6 +459,8 @@ export type BillOfMaterials = {
   defaultJobWorkMode?: string;
   defaultPackagingMode?: string;
   defaultJobWorkerId?: string | null;
+  recipeName?: string;
+  isDefault?: boolean;
 };
 
 export type ManufacturingStage = {
@@ -480,6 +483,7 @@ export type BatchProduction = {
   _id: string;
   batchNo: string;
   productId: string | { _id: string; name: string; sku: string; size?: string; packing?: number; price?: number };
+  bomId?: string;
   plannedQty: number;
   actualYieldQty: number;
   status: 'draft' | 'in_progress' | 'qc_hold' | 'completed' | 'cancelled';

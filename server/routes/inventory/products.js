@@ -90,13 +90,31 @@ router.post('/', validate(schemas.productSchema), authorize('product:create'), a
       return res.status(400).json({ error: 'A product with this combination of Type, Size, Colour, Shape, and Weight already exists.' });
     }
 
-    Object.assign(req.body, specs);
-    if (!req.body.name) {
-      const nameParts = [];
-      if (req.body.size) nameParts.push(req.body.size);
-      if (req.body.shape) nameParts.push(req.body.shape);
-      if (req.body.colour) nameParts.push(req.body.colour);
-      req.body.name = nameParts.length > 0 ? nameParts.join(' ') : 'Unnamed Product';
+    if (req.body.parentId) {
+      const parent = await Product.findById(req.body.parentId).lean();
+      if (parent) {
+        req.body.name = parent.name;
+        req.body.category = parent.category;
+        req.body.description = parent.description;
+        req.body.disease = parent.disease;
+        req.body.ingredients = parent.ingredients;
+        req.body.image = parent.image;
+        req.body.productType = parent.productType;
+        req.body.colour = parent.colour;
+        req.body.shape = parent.shape;
+        req.body.weight = parent.weight;
+        req.body.hsnCode = parent.hsnCode;
+        req.body.gstRate = parent.gstRate;
+      }
+    } else {
+      Object.assign(req.body, specs);
+      if (!req.body.name) {
+        const nameParts = [];
+        if (req.body.size) nameParts.push(req.body.size);
+        if (req.body.shape) nameParts.push(req.body.shape);
+        if (req.body.colour) nameParts.push(req.body.colour);
+        req.body.name = nameParts.length > 0 ? nameParts.join(' ') : 'Unnamed Product';
+      }
     }
 
     let computedSku = generateSku(req.body);
@@ -150,6 +168,21 @@ router.put('/:id', validate(schemas.productSchema.partial()), authorize('product
       req.body,
       { new: true }
     );
+
+    if (updatedProduct && !updatedProduct.parentId) {
+      const sharedFields = ['name', 'category', 'description', 'disease', 'ingredients', 'image', 'productType', 'colour', 'shape', 'weight', 'hsnCode', 'gstRate'];
+      const syncUpdate = {};
+      let hasSharedUpdate = false;
+      for (const field of sharedFields) {
+        if (req.body[field] !== undefined) {
+          syncUpdate[field] = req.body[field];
+          hasSharedUpdate = true;
+        }
+      }
+      if (hasSharedUpdate) {
+        await Product.updateMany({ parentId: updatedProduct._id }, { $set: syncUpdate });
+      }
+    }
 
     res.json(updatedProduct);
   } catch (err) {

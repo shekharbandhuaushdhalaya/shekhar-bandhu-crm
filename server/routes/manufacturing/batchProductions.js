@@ -55,9 +55,21 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       const prod = await Product.findById(productId).session(session);
       if (!prod) throw new Error('Finished product not found');
 
-      const bom = await BillOfMaterials.findOne({ productId }).session(session);
+      let bom;
+      if (req.body.bomId) {
+        bom = await BillOfMaterials.findById(req.body.bomId).session(session);
+        if (!bom) throw new Error('Selected recipe formulation was not found');
+      } else {
+        bom = await BillOfMaterials.findOne({ productId, isDefault: true }).session(session);
+        if (!bom) {
+          bom = await BillOfMaterials.findOne({ productId }).session(session);
+        }
+      }
       if (!bom) {
         throw new Error(`No Bill of Materials configured for product: ${prod.name}`);
+      }
+      if (bom.isActive === false) {
+        throw new Error(`The Bill of Materials recipe "${bom.recipeName}" for "${prod.name}" is currently inactive.`);
       }
 
       const isDirectPurchase = jobWorkMode === 'direct_purchase';
@@ -160,6 +172,7 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       const [newBatchDoc] = await BatchProduction.create([{
         batchNo: batchNo.trim().toUpperCase(),
         productId,
+        bomId: bom._id,
         manufacturingUnitId,
         manufacturingUnitName: mfgUnit.name,
         plannedQty: valPlanned,
@@ -280,76 +293,86 @@ router.patch('/:id/stage/:stageIndex', async (req, res) => {
 });
 
 // Helper: Auto-deduct packaging materials (bottles, labels, boxes) when reaching packaging stage or completion
-async function deductPackagingMaterials(batch, outputQty) {
+async function deductPackagingMaterials(batch, outputQtyOrYields) {
   if (batch.packagingDeducted) return;
 
   const BillOfMaterials = require('../../models/BillOfMaterials');
   const RawMaterial = require('../../models/RawMaterial');
   const RawMaterialEntry = require('../../models/RawMaterialEntry');
 
-  const bom = await BillOfMaterials.findOne({ productId: batch.productId });
-  if (!bom) {
-    batch.packagingDeducted = true;
-    return;
+  let itemsToProcess = [];
+  if (Array.isArray(outputQtyOrYields)) {
+    itemsToProcess = outputQtyOrYields;
+  } else {
+    itemsToProcess = [{
+      productId: batch.productId.toString(),
+      actualYieldQty: Number(outputQtyOrYields) || 0
+    }];
   }
 
-  const pkgIngs = bom.ingredients.filter(ing => {
-    const isExplicitPkg = ing.itemType === 'packaging';
-    return isExplicitPkg;
-  });
+  for (const item of itemsToProcess) {
+    const qty = Number(item.actualYieldQty);
+    if (qty <= 0) continue;
 
-  // Also include any raw materials that have category === 'Packaging'
-  for (const ing of bom.ingredients) {
-    if (ing.itemType !== 'packaging') {
-      const rm = await RawMaterial.findById(ing.rawMaterialId);
-      if (rm && rm.category === 'Packaging' && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
-        pkgIngs.push(ing);
-      }
+    // Find BOM for this specific variant (size) or fallback to batch's BOM
+    let bom = await BillOfMaterials.findOne({ productId: item.productId, isActive: true });
+    if (!bom) {
+      bom = await BillOfMaterials.findById(batch.bomId);
     }
-  }
+    if (!bom) continue;
 
-  if (!pkgIngs || pkgIngs.length === 0) {
-    batch.packagingDeducted = true;
-    return;
-  }
-
-  const scaleBase = bom.batchYieldSize && bom.batchYieldSize > 0 ? bom.batchYieldSize : 100;
-  const scale = outputQty / scaleBase;
-
-  for (const ing of pkgIngs) {
-    // Packaging items are specified as direct per-unit pieces (e.g. 1 cap per unit produced, 1 box per unit produced)
-    const qtyNeeded = ing.qtyRequired * outputQty;
-    const rm = await RawMaterial.findById(ing.rawMaterialId);
-    if (!rm) continue;
-
-    const entries = await RawMaterialEntry.find({ rawMaterialId: ing.rawMaterialId, warehouseId: batch.manufacturingUnitId });
-    entries.sort((a, b) => {
-      if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
-      if (a.expiryDate && !b.expiryDate) return -1;
-      if (!a.expiryDate && b.expiryDate) return 1;
-      return new Date(a.createdAt) - new Date(b.createdAt);
+    const pkgIngs = bom.ingredients.filter(ing => {
+      const isExplicitPkg = ing.itemType === 'packaging';
+      return isExplicitPkg;
     });
 
-    let needed = qtyNeeded;
-    for (const entry of entries) {
-      if (needed <= 0.0001) break;
-      if ((entry.qty || 0) <= 0) continue;
-      const rawDeduct = Math.min(needed, entry.qty);
-      // Round to 2 decimal places to avoid floating point micro-fractions (e.g. 0.10000000000000009)
-      const deduct = Number(rawDeduct.toFixed(2));
-      if (deduct <= 0) continue;
+    // Also include any raw materials that have category === 'Packaging'
+    for (const ing of bom.ingredients) {
+      if (ing.itemType !== 'packaging') {
+        const rm = await RawMaterial.findById(ing.rawMaterialId);
+        if (rm && rm.category === 'Packaging' && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
+          pkgIngs.push(ing);
+        }
+      }
+    }
 
-      entry.qty = Math.max(0, Number((entry.qty - deduct).toFixed(2)));
-      await entry.save();
+    if (!pkgIngs || pkgIngs.length === 0) continue;
 
-      batch.rawMaterialCost += deduct * (entry.purchaseRate || 0);
-      batch.ingredientsConsumed.push({
-        rawMaterialId: ing.rawMaterialId,
-        rawMaterialEntryId: entry._id,
-        qtyConsumed: deduct,
-        batchNo: entry.batchNo
+    for (const ing of pkgIngs) {
+      // Packaging items are specified as direct per-unit pieces (e.g. 1 cap per unit produced, 1 box per unit produced)
+      const qtyNeeded = ing.qtyRequired * qty;
+      const rm = await RawMaterial.findById(ing.rawMaterialId);
+      if (!rm) continue;
+
+      const entries = await RawMaterialEntry.find({ rawMaterialId: ing.rawMaterialId, warehouseId: batch.manufacturingUnitId });
+      entries.sort((a, b) => {
+        if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
+        if (a.expiryDate && !b.expiryDate) return -1;
+        if (!a.expiryDate && b.expiryDate) return 1;
+        return new Date(a.createdAt) - new Date(b.createdAt);
       });
-      needed -= deduct;
+
+      let needed = qtyNeeded;
+      for (const entry of entries) {
+        if (needed <= 0.0001) break;
+        if ((entry.qty || 0) <= 0) continue;
+        const rawDeduct = Math.min(needed, entry.qty);
+        // Round to 2 decimal places to avoid floating point micro-fractions
+        const deduct = Number(rawDeduct.toFixed(2));
+        if (deduct <= 0) continue;
+
+        entry.qty = Math.max(0, Number((entry.qty - deduct).toFixed(2)));
+        await entry.save();
+
+        batch.rawMaterialCost += deduct * (entry.purchaseRate || 0);
+        batch.ingredientsConsumed.push({
+          rawMaterialId: ing.rawMaterialId,
+          rawMaterialEntryId: entry._id,
+          qtyConsumed: deduct,
+          batchNo: entry.batchNo
+        });
+        needed -= deduct;
+      }
     }
   }
 
@@ -401,10 +424,34 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       return res.status(400).json({ error: 'Cannot complete a cancelled batch' });
     }
 
+    // Build the yields list (split or main single product)
+    const yieldsList = yields && Array.isArray(yields) && yields.length > 0 ? yields : [{
+      productId: batch.productId.toString(),
+      actualYieldQty: valYield,
+      packing: packing || 1
+    }];
+
+    // Validate products exist
+    const Product = require('../../models/Product');
+    const productIds = yieldsList.map(y => y.productId);
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productMap = {};
+    products.forEach(p => { productMap[p._id.toString()] = p; });
+
+    for (const y of yieldsList) {
+      if (!productMap[y.productId]) {
+        return res.status(404).json({ error: `Yield product not found: ${y.productId}` });
+      }
+      const yQty = Number(y.actualYieldQty);
+      if (isNaN(yQty) || yQty < 0) {
+        return res.status(400).json({ error: 'Yield quantity must be a non-negative number' });
+      }
+    }
+
     // Ensure packaging materials are deducted if not already deducted during stage advance
     if (!batch.packagingDeducted) {
       if (batch.packagingMode === 'self_packed') {
-        await deductPackagingMaterials(batch, valYield);
+        await deductPackagingMaterials(batch, yieldsList);
       } else {
         batch.packagingDeducted = true;
       }
@@ -470,30 +517,7 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       return res.json(batch);
     }
 
-    // Build the yields list (split or main single product)
-    const yieldsList = yields && Array.isArray(yields) && yields.length > 0 ? yields : [{
-      productId: batch.productId.toString(),
-      actualYieldQty: valYield,
-      packing: packing || 1
-    }];
 
-    // Fetch products
-    const productIds = yieldsList.map(y => y.productId);
-    const Product = require('../../models/Product');
-    const products = await Product.find({ _id: { $in: productIds } });
-    const productMap = {};
-    products.forEach(p => { productMap[p._id.toString()] = p; });
-
-    // Validate products exist
-    for (const y of yieldsList) {
-      if (!productMap[y.productId]) {
-        return res.status(404).json({ error: `Yield product not found: ${y.productId}` });
-      }
-      const yQty = Number(y.actualYieldQty);
-      if (isNaN(yQty) || yQty < 0) {
-        return res.status(400).json({ error: 'Yield quantity must be a non-negative number' });
-      }
-    }
 
     // Compute cost allocation weight for each yield item
     let totalAllocWeight = 0;

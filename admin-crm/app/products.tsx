@@ -21,7 +21,7 @@ const normalizeWhitespace = (str?: string) => {
   return str.trim().replace(/\s+/g, ' ');
 };
 
-function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { product: Product | null; visible: boolean; onClose: () => void; onDeleted: () => void; onEdit: () => void }) {
+function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit, onAddSizeVariant, products }: { product: Product | null; visible: boolean; onClose: () => void; onDeleted: () => void; onEdit: () => void; onAddSizeVariant: (id: string) => void; products: Product[] }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { user } = useAuth();
@@ -44,6 +44,8 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
   };
 
   const isLowStock = product.stockLevel <= product.minReorder;
+  const children = products.filter(p => p.parentId === product._id);
+  const allVariants = [product, ...children];
 
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
@@ -128,9 +130,9 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
                   <Ionicons name="options" size={16} color={colors.info} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.infoLabel}>Product Type & Size</Text>
+                  <Text style={styles.infoLabel}>Product Type</Text>
                   <Text style={styles.infoValue}>
-                    {product.productType} {product.size ? `(${product.size})` : ''}
+                    {product.productType}
                   </Text>
                 </View>
               </View>
@@ -207,7 +209,35 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit }: { 
             ) : null}
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 16 }}>
+          <View style={{ marginTop: 20 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>Available Sizes & Pricing:</Text>
+            <View style={{ borderRadius: 6, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}>
+              <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, padding: 8 }}>
+                <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: colors.text.muted }}>Size</Text>
+                <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.muted }}>B2B Price</Text>
+                <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.muted }}>MRP</Text>
+                <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.text.muted }}>Stock</Text>
+              </View>
+              {allVariants.map((v, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', padding: 8, borderTopWidth: 1, borderTopColor: colors.border, alignItems: 'center' }}>
+                  <Text style={{ flex: 1.5, fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>{v.size || 'N/A'}</Text>
+                  <Text style={{ flex: 1.2, fontSize: 12, color: colors.text.primary }}>₹{v.price}</Text>
+                  <Text style={{ flex: 1.2, fontSize: 12, color: colors.text.primary }}>{v.mrp ? `₹${v.mrp}` : '—'}</Text>
+                  <Text style={{ flex: 1, fontSize: 12, color: v.stockLevel <= v.minReorder ? colors.danger : colors.text.primary, fontWeight: v.stockLevel <= v.minReorder ? '700' : 'normal' }}>
+                    {v.stockLevel} units
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 16, flexWrap: 'wrap' }}>
+            {!product.parentId && perm.can('product:editPricing') && (
+              <TouchableOpacity style={[styles.editBtn, { backgroundColor: colors.info }]} onPress={() => onAddSizeVariant(product._id)}>
+                <Ionicons name="git-branch-outline" size={16} color="#fff" />
+                <Text style={styles.editBtnText}>Add Size</Text>
+              </TouchableOpacity>
+            )}
             {perm.can('product:editPricing') && (
               <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
                 <Ionicons name="create-outline" size={16} color="#fff" />
@@ -234,8 +264,17 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
 
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
-  const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  
+  const [variantsList, setVariantsList] = useState<{
+    _id?: string;
+    size: string;
+    price: string;
+    mrp: string;
+    packaging: { rawMaterialId: string; qtyRequired: string }[];
+  }[]>([
+    { size: '', price: '', mrp: '', packaging: [{ rawMaterialId: '', qtyRequired: '1' }] }
+  ]);
 
   const [minReorder, setMinReorder] = useState('5');
   const [hsnCode, setHsnCode] = useState('');
@@ -278,7 +317,6 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   const [showTypeInput, setShowTypeInput] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
 
-  const [size, setSize] = useState('');
   const [colour, setColour] = useState('');
   const [shape, setShape] = useState('');
   const [weight, setWeight] = useState('');
@@ -305,78 +343,6 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   const [vendors, setVendors] = useState<any[]>([]);
   const [bomIngredients, setBomIngredients] = useState<{ rawMaterialId: string; qtyRequired: string; itemType: 'formulation' | 'packaging' }[]>([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
   const [bomStages, setBomStages] = useState<{ name: string; targetDurationDays: string }[]>([{ name: '', targetDurationDays: '1' }]);
-
-  // Load raw materials & existing BOM when product is set
-  useEffect(() => {
-    async function fetchBOMAndMaterials() {
-      try {
-        const [rms, vends, existingBom] = await Promise.all([
-          api.getRawMaterials(),
-          api.getVendors(),
-          product ? api.getBOMForProduct(product._id).catch(() => null) : Promise.resolve(null)
-        ]);
-        setMaterials(rms);
-        setVendors(vends);
-        console.log('AddEditProductModal - Fetched raw materials count:', rms.length, rms.map(r => ({ name: r.name, category: r.category })));
-        if (existingBom) {
-          setBomYield(existingBom.batchYieldSize ? existingBom.batchYieldSize.toString() : '100');
-          setBomOverhead(existingBom.overheadCost ? existingBom.overheadCost.toString() : '0');
-          setBomNotes(existingBom.productionNotes || '');
-          setBomIsActive(existingBom.isActive !== undefined ? existingBom.isActive : true);
-          setBomDefaultProductionType((existingBom as any).defaultProductionType || 'in_house');
-          setBomDefaultJobWorkMode((existingBom as any).defaultJobWorkMode || 'none');
-          setBomDefaultPackagingMode((existingBom as any).defaultPackagingMode || 'self_packed');
-          setBomDefaultJobWorkerId((existingBom as any).defaultJobWorkerId ? (((existingBom as any).defaultJobWorkerId as any)._id || (existingBom as any).defaultJobWorkerId) : '');
-          if (existingBom.ingredients && existingBom.ingredients.length > 0) {
-            setBomIngredients(existingBom.ingredients.map(ing => {
-              const rId = (ing.rawMaterialId as any)?._id || ing.rawMaterialId;
-              const matchedMat = rms.find((r: any) => r._id === rId);
-              const isPackagingCategory = matchedMat && matchedMat.category === 'Packaging';
-              const resolvedType = ing.itemType === 'packaging' || isPackagingCategory ? 'packaging' : 'formulation';
-              return {
-                rawMaterialId: rId,
-                qtyRequired: ing.qtyRequired.toString(),
-                itemType: resolvedType
-              };
-            }));
-          } else {
-            setBomIngredients([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
-          }
-          if (existingBom.stages && existingBom.stages.length > 0) {
-            setBomStages(existingBom.stages.map(st => ({
-              name: st.name,
-              targetDurationDays: st.targetDurationDays.toString()
-            })));
-          } else {
-            setBomStages([{ name: '', targetDurationDays: '1' }]);
-          }
-        } else {
-          // Defaults for new product / no configured BOM
-          setBomYield('100');
-          setBomOverhead('0');
-          setBomNotes('');
-          setBomIsActive(true);
-          setBomDefaultProductionType('in_house');
-          setBomDefaultJobWorkMode('none');
-          setBomDefaultPackagingMode('self_packed');
-          setBomDefaultJobWorkerId('');
-          setBomIngredients([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
-          setBomStages([{ name: '', targetDurationDays: '1' }]);
-        }
-      } catch (err) {
-        console.error('Failed to load raw materials or BOM in AddEditProductModal:', err);
-      }
-    }
-    if (visible) {
-      fetchBOMAndMaterials();
-    }
-  }, [visible, product]);
-
-  const handleIngredientChange = (index: number, field: string, value: string) => {
-    const list = [...bomIngredients];
-    (list[index] as any)[field] = value;
-    setBomIngredients(list);
-  };
 
   // Compute live total formula quantity (for formulation items only)
   const totalFormulaQty = useMemo(() => {
@@ -410,6 +376,209 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
     }
   }, [bomIngredients, materials]);
 
+  // Load raw materials & existing BOM when product is set
+  useEffect(() => {
+    async function loadAllData() {
+      try {
+        const [rms, vends] = await Promise.all([
+          api.getRawMaterials(),
+          api.getVendors()
+        ]);
+        setMaterials(rms);
+        setVendors(vends);
+
+        if (product) {
+          setName(product.name || '');
+          setSku(product.sku || '');
+          setStock(product.stockLevel !== undefined && product.stockLevel !== null ? product.stockLevel.toString() : '');
+          setMinReorder(product.minReorder !== undefined && product.minReorder !== null ? product.minReorder.toString() : '5');
+          setHsnCode(product.hsnCode || '');
+          setGstRate(product.gstRate !== undefined ? product.gstRate.toString() : '18');
+          setProductType(product.productType || '');
+          setColour(product.colour || '');
+          setShape(product.shape || '');
+          const weightVal = product.weight || '';
+          setWeight(weightVal.replace(/g$/i, '').trim());
+          setDescription(product.description || '');
+          setDisease(product.disease || '');
+          setIngredients(product.ingredients || '');
+          setImagesList(product.image ? product.image.split(',').map(s => s.trim()).filter(Boolean) : []);
+          setLocalNewImages([]);
+
+          // Find all variant children
+          const children = products.filter(p => p.parentId === product._id);
+
+          // Fetch BOMs for parent and all child variants in parallel
+          const [parentBom, ...childBoms] = await Promise.all([
+            api.getBOMForProduct(product._id).catch(() => null),
+            ...children.map(c => api.getBOMForProduct(c._id).catch(() => null))
+          ]);
+
+          // Helper to extract packaging ingredients from a BOM
+          const extractPackaging = (bomObj: any) => {
+            if (!bomObj || !bomObj.ingredients) return [{ rawMaterialId: '', qtyRequired: '1' }];
+            const pkgIngs = bomObj.ingredients.filter((ing: any) => {
+              const rId = ing.rawMaterialId?._id || ing.rawMaterialId;
+              const matchedMat = rms.find((r: any) => r._id === rId);
+              return ing.itemType === 'packaging' || (matchedMat && matchedMat.category === 'Packaging');
+            });
+            if (pkgIngs.length === 0) return [{ rawMaterialId: '', qtyRequired: '1' }];
+            return pkgIngs.map((ing: any) => ({
+              rawMaterialId: ing.rawMaterialId?._id || ing.rawMaterialId,
+              qtyRequired: ing.qtyRequired.toString()
+            }));
+          };
+
+          // Populate variantsList with their respective packaging items
+          setVariantsList([
+            {
+              _id: product._id,
+              size: product.size ? product.size.replace(/\s*(ml|mm|pcs|Tablets|Capsules|g)$/i, '').trim() : '',
+              price: product.price !== undefined && product.price !== null ? product.price.toString() : '',
+              mrp: product.mrp !== undefined && product.mrp !== null ? product.mrp.toString() : '',
+              packaging: extractPackaging(parentBom)
+            },
+            ...children.map((c, idx) => ({
+              _id: c._id,
+              size: c.size ? c.size.replace(/\s*(ml|mm|pcs|Tablets|Capsules|g)$/i, '').trim() : '',
+              price: c.price !== undefined && c.price !== null ? c.price.toString() : '',
+              mrp: c.mrp !== undefined && c.mrp !== null ? c.mrp.toString() : '',
+              packaging: extractPackaging(childBoms[idx])
+            }))
+          ]);
+
+          // Populate the formulation ingredients (non-packaging) for parent BOM tab
+          if (parentBom) {
+            setBomYield(parentBom.batchYieldSize ? parentBom.batchYieldSize.toString() : '100');
+            setBomOverhead(parentBom.overheadCost ? parentBom.overheadCost.toString() : '0');
+            setBomNotes(parentBom.productionNotes || '');
+            setBomIsActive(parentBom.isActive !== undefined ? parentBom.isActive : true);
+            setBomDefaultProductionType((parentBom as any).defaultProductionType || 'in_house');
+            setBomDefaultJobWorkMode((parentBom as any).defaultJobWorkMode || 'none');
+            setBomDefaultPackagingMode((parentBom as any).defaultPackagingMode || 'self_packed');
+            setBomDefaultJobWorkerId((parentBom as any).defaultJobWorkerId ? (((parentBom as any).defaultJobWorkerId as any)._id || (parentBom as any).defaultJobWorkerId) : '');
+            
+            const formulationIngs = parentBom.ingredients.filter((ing: any) => {
+              const rId = ing.rawMaterialId?._id || ing.rawMaterialId;
+              const matchedMat = rms.find((r: any) => r._id === rId);
+              return ing.itemType !== 'packaging' && !(matchedMat && matchedMat.category === 'Packaging');
+            });
+            if (formulationIngs.length > 0) {
+              setBomIngredients(formulationIngs.map((ing: any) => ({
+                rawMaterialId: ing.rawMaterialId?._id || ing.rawMaterialId,
+                qtyRequired: ing.qtyRequired.toString(),
+                itemType: 'formulation'
+              })));
+            } else {
+              setBomIngredients([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
+            }
+
+            if (parentBom.stages && parentBom.stages.length > 0) {
+              setBomStages(parentBom.stages.map((st: any) => ({
+                name: st.name,
+                targetDurationDays: st.targetDurationDays.toString()
+              })));
+            } else {
+              setBomStages([{ name: '', targetDurationDays: '1' }]);
+            }
+          } else {
+            setBomYield('100');
+            setBomOverhead('0');
+            setBomNotes('');
+            setBomIsActive(true);
+            setBomDefaultProductionType('in_house');
+            setBomDefaultJobWorkMode('none');
+            setBomDefaultPackagingMode('self_packed');
+            setBomDefaultJobWorkerId('');
+            setBomIngredients([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
+            setBomStages([{ name: '', targetDurationDays: '1' }]);
+          }
+
+          if (product.productType) {
+            const norm = normalizeTitleCase(product.productType);
+            if (norm && !types.map(t => normalizeTitleCase(t)).includes(norm)) {
+              setTypes(prev => [...prev, norm]);
+            }
+          }
+
+          if (product.shape) {
+            const s = product.shape.toLowerCase();
+            if (s && !shapes.includes(s)) {
+              setShapes(prev => [...prev, s]);
+            }
+          }
+        } else {
+          setName('');
+          setSku('');
+          setStock('');
+          setVariantsList([{ size: '', price: '', mrp: '', packaging: [{ rawMaterialId: '', qtyRequired: '1' }] }]);
+          setHsnCode('');
+          setGstRate('18');
+          setProductType('');
+          setColour('');
+          setShape('');
+          setWeight('');
+          setDescription('');
+          setDisease('');
+          setIngredients('');
+          setImagesList([]);
+          setLocalNewImages([]);
+          setBomYield('100');
+          setBomOverhead('0');
+          setBomNotes('');
+          setBomIsActive(true);
+          setBomDefaultProductionType('in_house');
+          setBomDefaultJobWorkMode('none');
+          setBomDefaultPackagingMode('self_packed');
+          setBomDefaultJobWorkerId('');
+          setBomIngredients([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
+          setBomStages([{ name: '', targetDurationDays: '1' }]);
+        }
+        setShowTypeInput(false);
+        setNewTypeName('');
+        setShowShapeInput(false);
+        setNewShapeName('');
+        setActiveFormTab('basic');
+      } catch (err) {
+        console.error('Failed to load raw materials, BOM, or product data in AddEditProductModal:', err);
+      }
+    }
+
+    if (visible) {
+      loadAllData();
+    }
+  }, [visible, product]);
+
+  const handleAddCustomType = () => {
+    const val = normalizeTitleCase(newTypeName);
+    if (val) {
+      if (!types.map(t => normalizeTitleCase(t)).includes(val)) {
+        setTypes([...types, val]);
+      }
+      setProductType(val);
+      setNewTypeName('');
+      setShowTypeInput(false);
+    }
+  };
+
+  const handleAddCustomShape = () => {
+    const val = newShapeName.trim().toLowerCase();
+    if (val) {
+      if (!shapes.includes(val)) {
+        setShapes([...shapes, val]);
+      }
+      setShape(val);
+      setNewShapeName('');
+      setShowShapeInput(false);
+    }
+  };
+
+  const handleIngredientChange = (index: number, field: string, value: string) => {
+    const list = [...bomIngredients];
+    (list[index] as any)[field] = value;
+    setBomIngredients(list);
+  };
+
   const handleAddIngredientRow = (type: 'formulation' | 'packaging' = 'formulation') => {
     setBomIngredients([...bomIngredients, { rawMaterialId: '', qtyRequired: '', itemType: type }]);
   };
@@ -436,92 +605,29 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
     setBomStages(list.length > 0 ? list : [{ name: '', targetDurationDays: '1' }]);
   };
 
-  useEffect(() => {
-    if (product) {
-      setName(product.name || '');
-      setSku(product.sku || '');
-      setPrice(product.price !== undefined && product.price !== null ? product.price.toString() : '');
-      setStock(product.stockLevel !== undefined && product.stockLevel !== null ? product.stockLevel.toString() : '');
-      setMinReorder(product.minReorder !== undefined && product.minReorder !== null ? product.minReorder.toString() : '5');
-      setHsnCode(product.hsnCode || '');
-      setGstRate(product.gstRate !== undefined ? product.gstRate.toString() : '18');
-      setProductType(product.productType || '');
-      // Strip the unit suffix from size (e.g. '100 ml' → '100')
-      const sizeVal = product.size || '';
-      const sizeNumber = sizeVal.replace(/\s*(ml|mm|pcs)$/i, '').trim();
-      setSize(sizeNumber);
-      setColour(product.colour || '');
-      setShape(product.shape || '');
-      // Strip 'g' suffix from weight (e.g. '24g' → '24')
-      const weightVal = product.weight || '';
-      setWeight(weightVal.replace(/g$/i, '').trim());
-      setDescription(product.description || '');
-      setDisease(product.disease || '');
-      setIngredients(product.ingredients || '');
-      
-      setImagesList(product.image ? product.image.split(',').map(s => s.trim()).filter(Boolean) : []);
-      setLocalNewImages([]);
-
-      if (product.productType) {
-        const norm = normalizeTitleCase(product.productType);
-        if (norm && !types.map(t => normalizeTitleCase(t)).includes(norm)) {
-          setTypes(prev => [...prev, norm]);
-        }
-      }
-
-      if (product.shape) {
-        const s = product.shape.toLowerCase();
-        if (s && !shapes.includes(s)) {
-          setShapes(prev => [...prev, s]);
-        }
-      }
-    } else {
-      setName('');
-      setSku('');
-      setPrice('');
-      setStock('');
-
-      setHsnCode('');
-      setGstRate('18');
-      setProductType('');
-      setSize('');
-      setColour('');
-      setShape('');
-      setWeight('');
-      setDescription('');
-      setDisease('');
-      setIngredients('');
-      setImagesList([]);
-      setLocalNewImages([]);
+  const handleVariantPackagingChange = (variantIndex: number, pkgIndex: number, field: string, value: string) => {
+    const list = [...variantsList];
+    if (!list[variantIndex].packaging) {
+      list[variantIndex].packaging = [];
     }
-    setShowTypeInput(false);
-    setNewTypeName('');
-    setShowShapeInput(false);
-    setNewShapeName('');
-    setActiveFormTab('basic');
-  }, [product, visible]);
-
-  const handleAddCustomType = () => {
-    const val = normalizeTitleCase(newTypeName);
-    if (val) {
-      if (!types.map(t => normalizeTitleCase(t)).includes(val)) {
-        setTypes([...types, val]);
-      }
-      setProductType(val);
-      setNewTypeName('');
-      setShowTypeInput(false);
-    }
+    (list[variantIndex].packaging[pkgIndex] as any)[field] = value;
+    setVariantsList(list);
   };
 
-  const handleAddCustomShape = () => {
-    const val = newShapeName.trim().toLowerCase();
-    if (val) {
-      if (!shapes.includes(val)) {
-        setShapes([...shapes, val]);
-      }
-      setShape(val);
-      setNewShapeName('');
-      setShowShapeInput(false);
+  const handleAddVariantPackagingRow = (variantIndex: number) => {
+    const list = [...variantsList];
+    if (!list[variantIndex].packaging) {
+      list[variantIndex].packaging = [];
+    }
+    list[variantIndex].packaging.push({ rawMaterialId: '', qtyRequired: '1' });
+    setVariantsList(list);
+  };
+
+  const handleRemoveVariantPackagingRow = (variantIndex: number, pkgIndex: number) => {
+    const list = [...variantsList];
+    if (list[variantIndex].packaging) {
+      list[variantIndex].packaging.splice(pkgIndex, 1);
+      setVariantsList(list);
     }
   };
 
@@ -582,10 +688,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
 
   const handleSave = async () => {
     let finalName = name.trim();
-    let finalSku = sku.trim();
     let finalCategory = productType || 'General';
-    let finalPrice = price.trim() !== '' ? parseFloat(price) : 0;
-    let finalStock = stock.trim() !== '' ? parseInt(stock) : 0;
     let finalMinReorder = minReorder.trim() !== '' ? parseInt(minReorder) : 5;
 
     if (!finalName) {
@@ -593,13 +696,10 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       return;
     }
 
-    const sizeUnit = getSizeUnit();
-    let formattedSize = '';
-    if (size.trim()) {
-      const trimmedSize = size.trim();
-      formattedSize = trimmedSize.toLowerCase().endsWith(sizeUnit.toLowerCase()) 
-        ? trimmedSize 
-        : `${trimmedSize} ${sizeUnit}`;
+    const activeVariants = variantsList.filter(v => v.size.trim() && v.price.trim());
+    if (activeVariants.length === 0) {
+      showToast('At least one size and B2B price must be specified!', 'error');
+      return;
     }
 
     if (!hsnCode.trim()) {
@@ -607,61 +707,138 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       return;
     }
 
-    const payload = {
-      name: finalName,
-      sku: sku.trim() || undefined,
-      price: finalPrice,
-      stockLevel: product ? product.stockLevel : 0,
-      category: finalCategory,
-      minReorder: finalMinReorder,
-      hsnCode: hsnCode.trim().toUpperCase(),
-      gstRate: parseInt(gstRate) || 18,
-      productType: productType,
-      size: formattedSize,
-      colour: colour.trim(),
-      shape: shape.trim(),
-      weight: weight.trim(),
-      description: description.trim(),
-      disease: disease.trim(),
-      ingredients: ingredients.trim(),
-      vendorId: product?.vendorId || '',
-      vendorName: product?.vendorName || ''
-    };
+    const sizeUnit = getSizeUnit();
 
     try {
-      let savedProduct;
+      // Save Parent (First Variant in list)
+      const parentVar = activeVariants[0];
+      const parentSize = parentVar.size.trim();
+      const parentFormattedSize = parentSize.toLowerCase().endsWith(sizeUnit.toLowerCase()) 
+        ? parentSize 
+        : `${parentSize} ${sizeUnit}`;
+
+      const parentPayload = {
+        name: finalName,
+        sku: product ? product.sku : undefined,
+        price: parseFloat(parentVar.price) || 0,
+        mrp: parentVar.mrp ? parseFloat(parentVar.mrp) : undefined,
+        stockLevel: product ? product.stockLevel : 0,
+        category: finalCategory,
+        minReorder: finalMinReorder,
+        hsnCode: hsnCode.trim().toUpperCase(),
+        gstRate: parseInt(gstRate) || 18,
+        productType: productType,
+        size: parentFormattedSize,
+        colour: colour.trim(),
+        shape: shape.trim(),
+        weight: weight.trim(),
+        description: description.trim(),
+        disease: disease.trim(),
+        ingredients: ingredients.trim(),
+        vendorId: product?.vendorId || '',
+        vendorName: product?.vendorName || '',
+        parentId: null
+      };
+
+      let savedParent;
       if (product) {
-        savedProduct = await api.updateProduct(product._id, payload);
+        savedParent = await api.updateProduct(product._id, parentPayload);
       } else {
-        savedProduct = await api.createProduct(payload);
+        savedParent = await api.createProduct(parentPayload);
         // Upload staged local new images
         for (const localImg of localNewImages) {
-          savedProduct = await api.appendProductImage(savedProduct._id, localImg);
+          savedParent = await api.appendProductImage(savedParent._id, localImg);
         }
       }
 
-      // Configure BOM recipe/stages
-      const hasIngredients = bomIngredients.some(ing => ing.rawMaterialId && ing.qtyRequired);
-      const hasStages = bomStages.some(st => st.name.trim().length > 0);
-      if (hasIngredients || hasStages || bomYield !== '100' || bomOverhead !== '0' || bomNotes.trim() !== '') {
-        const filteredStages = bomStages
-          .filter(st => st.name.trim().length > 0)
-          .map(st => ({
-            name: st.name.trim(),
-            targetDurationDays: parseFloat(st.targetDurationDays) || 1
-          }));
+      // Save Children (Remaining Variants in list)
+      const existingChildren = products.filter(p => p.parentId === savedParent._id);
+      const activeChildIds = new Set<string>();
+      const resolvedChildIds: string[] = [];
 
+      for (let i = 1; i < activeVariants.length; i++) {
+        const item = activeVariants[i];
+        const childSize = item.size.trim();
+        const childFormattedSize = childSize.toLowerCase().endsWith(sizeUnit.toLowerCase()) 
+          ? childSize 
+          : `${childSize} ${sizeUnit}`;
+
+        const childPayload = {
+          name: finalName,
+          price: parseFloat(item.price) || 0,
+          mrp: item.mrp ? parseFloat(item.mrp) : undefined,
+          stockLevel: item._id ? (products.find(p => p._id === item._id)?.stockLevel || 0) : 0,
+          category: finalCategory,
+          minReorder: finalMinReorder,
+          hsnCode: hsnCode.trim().toUpperCase(),
+          gstRate: parseInt(gstRate) || 18,
+          productType: productType,
+          size: childFormattedSize,
+          colour: colour.trim(),
+          shape: shape.trim(),
+          weight: weight.trim(),
+          description: description.trim(),
+          disease: disease.trim(),
+          ingredients: ingredients.trim(),
+          vendorId: product?.vendorId || '',
+          vendorName: product?.vendorName || '',
+          parentId: savedParent._id
+        };
+
+        let childId = item._id;
+        if (childId) {
+          activeChildIds.add(childId);
+          await api.updateProduct(childId, childPayload);
+        } else {
+          const newChild = await api.createProduct(childPayload);
+          childId = newChild._id;
+          activeChildIds.add(childId);
+        }
+        resolvedChildIds.push(childId);
+      }
+
+      // Delete child variants that were removed from the variants list
+      for (const child of existingChildren) {
+        if (!activeChildIds.has(child._id)) {
+          await api.deleteProduct(child._id).catch(e => console.error("Failed to delete removed variant:", e));
+        }
+      }
+
+      // Save Parent Product BOM (Formulation Ingredients + Packaging Materials)
+      const parentPackagingIngs = (parentVar.packaging || [])
+        .filter(p => p.rawMaterialId && p.qtyRequired)
+        .map(p => ({
+          rawMaterialId: p.rawMaterialId,
+          qtyRequired: parseFloat(p.qtyRequired) || 1,
+          itemType: 'packaging' as const
+        }));
+
+      const mergedParentIngredients = [
+        ...bomIngredients
+          .filter(ing => ing.rawMaterialId && ing.qtyRequired)
+          .map(ing => ({
+            rawMaterialId: ing.rawMaterialId,
+            qtyRequired: parseFloat(ing.qtyRequired) || 0,
+            itemType: ing.itemType || 'formulation'
+          })),
+        ...parentPackagingIngs
+      ];
+
+      const filteredStages = bomStages
+        .filter(st => st.name.trim().length > 0)
+        .map(st => ({
+          name: st.name.trim(),
+          targetDurationDays: parseFloat(st.targetDurationDays) || 1
+        }));
+
+      if (mergedParentIngredients.length > 0 || filteredStages.length > 0 || bomNotes.trim() !== '') {
         await api.configureBOM({
-          productId: savedProduct._id,
+          productId: savedParent._id,
           batchYieldSize: Number(bomYield) || 100,
-          ingredients: bomIngredients
-            .filter(ing => ing.rawMaterialId && ing.qtyRequired)
-            .map(ing => ({
-              rawMaterialId: ing.rawMaterialId,
-              qtyRequired: Number(ing.qtyRequired),
-              itemType: ing.itemType || 'formulation'
-            })),
+          ingredients: mergedParentIngredients,
           isActive: bomIsActive,
+          isDefault: true,
+          recipeName: 'Standard Recipe',
           productionNotes: bomNotes.trim(),
           overheadCost: parseFloat(bomOverhead) || 0,
           stages: filteredStages,
@@ -670,6 +847,40 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           defaultPackagingMode: bomDefaultProductionType === 'job_work' ? bomDefaultPackagingMode : 'self_packed',
           defaultJobWorkerId: bomDefaultProductionType === 'job_work' ? (bomDefaultJobWorkerId || null) : null
         });
+      }
+
+      // Save Packaging BOMs for child variants (contains ONLY their packaging materials)
+      for (let i = 1; i < activeVariants.length; i++) {
+        const item = activeVariants[i];
+        const childId = resolvedChildIds[i - 1];
+        if (!childId) continue;
+
+        const childPackagingIngs = (item.packaging || [])
+          .filter(p => p.rawMaterialId && p.qtyRequired)
+          .map(p => ({
+            rawMaterialId: p.rawMaterialId,
+            qtyRequired: parseFloat(p.qtyRequired) || 1,
+            itemType: 'packaging' as const
+          }));
+
+        // Configure a simplified packaging-only BOM for the child variant (batchYieldSize = 1 since packaging is counted per bottle)
+        if (childPackagingIngs.length > 0) {
+          await api.configureBOM({
+            productId: childId,
+            batchYieldSize: 1,
+            ingredients: childPackagingIngs,
+            isActive: true,
+            isDefault: true,
+            recipeName: 'Packaging BOM',
+            productionNotes: 'Auto-configured packaging recipe',
+            overheadCost: 0,
+            stages: [],
+            defaultProductionType: 'in_house',
+            defaultJobWorkMode: 'none',
+            defaultPackagingMode: 'self_packed',
+            defaultJobWorkerId: null
+          });
+        }
       }
 
       onSaved();
@@ -835,24 +1046,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
                 />
               </View>
             </View>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>B2B Price (₹) <Text style={{ color: 'red' }}>*</Text></Text>
-              <View style={styles.formInput}>
-                <Ionicons name="cash-outline" size={16} color={colors.text.muted} />
-                <TextInput 
-                  style={styles.formInputText} 
-                  placeholder="e.g. 120" 
-                  placeholderTextColor={colors.text.muted} 
-                  value={price} 
-                  onChangeText={setPrice} 
-                  keyboardType="numeric" 
-                />
-              </View>
-            </View>
-
+          </View>          <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={[styles.formGroup, { flex: 1 }]}>
               <Text style={styles.formLabel}>Minimum Alert Level</Text>
               <View style={styles.formInput}>
@@ -868,6 +1062,85 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
               </View>
             </View>
           </View>
+
+          <View style={[styles.formSectionHeader, { marginTop: 12 }]}><Text style={styles.formSectionTitle}>Product Sizes & Pricing</Text></View>
+          <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
+            Define the sizes/packaging units for this formulation. At least one size is required.
+          </Text>
+
+          {variantsList.map((variant, index) => (
+            <View key={index} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: Platform.OS === 'web' ? 'nowrap' : 'wrap' }}>
+              <View style={[styles.formInput, { flex: 1, minWidth: 90 }]}>
+                <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>Size:</Text>
+                <TextInput
+                  style={styles.formInputText}
+                  placeholder={`e.g. 250`}
+                  placeholderTextColor={colors.text.muted}
+                  value={variant.size}
+                  onChangeText={(val) => {
+                    const list = [...variantsList];
+                    list[index].size = val;
+                    setVariantsList(list);
+                  }}
+                  keyboardType="numeric"
+                />
+                <Text style={{ fontSize: 11, color: colors.text.muted, marginLeft: 2 }}>{getSizeUnit()}</Text>
+              </View>
+
+              <View style={[styles.formInput, { flex: 1.2, minWidth: 100 }]}>
+                <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>B2B ₹:</Text>
+                <TextInput
+                  style={styles.formInputText}
+                  placeholder="Price"
+                  placeholderTextColor={colors.text.muted}
+                  value={variant.price}
+                  onChangeText={(val) => {
+                    const list = [...variantsList];
+                    list[index].price = val;
+                    setVariantsList(list);
+                  }}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={[styles.formInput, { flex: 1.2, minWidth: 100 }]}>
+                <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>MRP ₹:</Text>
+                <TextInput
+                  style={styles.formInputText}
+                  placeholder="MRP"
+                  placeholderTextColor={colors.text.muted}
+                  value={variant.mrp}
+                  onChangeText={(val) => {
+                    const list = [...variantsList];
+                    list[index].mrp = val;
+                    setVariantsList(list);
+                  }}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              {variantsList.length > 1 && (
+                <TouchableOpacity
+                  onPress={() => {
+                    const list = [...variantsList];
+                    list.splice(index, 1);
+                    setVariantsList(list);
+                  }}
+                  style={{ width: 34, height: 34, borderRadius: 6, backgroundColor: colors.danger + '15', justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+
+          <TouchableOpacity
+            onPress={() => setVariantsList([...variantsList, { size: '', price: '', mrp: '', packaging: [{ rawMaterialId: '', qtyRequired: '1' }] }])}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10', marginTop: 6, marginBottom: 16 }}
+          >
+            <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Add Size Variant</Text>
+          </TouchableOpacity>
 
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>HSN Code <Text style={{ color: 'red' }}>*</Text></Text>
@@ -1028,19 +1301,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
                 )}
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Size / Quantity (in {getSizeUnit()})</Text>
-                <View style={styles.formInput}>
-                  <Ionicons name="expand" size={16} color={colors.text.muted} />
-                  <TextInput
-                    style={styles.formInputText}
-                    placeholder={`e.g. 250 (unit: ${getSizeUnit()})`}
-                    placeholderTextColor={colors.text.muted}
-                    value={size}
-                    onChangeText={setSize}
-                  />
-                </View>
-              </View>
+
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Formulation Color</Text>
@@ -1295,64 +1556,74 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
             <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Formulation Raw Material</Text>
           </TouchableOpacity>
 
-          {/* Section 2: Packaging Materials */}
-          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>📦 Packaging & Primary Materials (Per-Unit Pcs):</Text>
-          <Text style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 8 }}>
-            Bottles, caps, labels, outer cartons (e.g. 1 bottle per unit produced, 0.1 box per unit).
+          {/* Section 2: Packaging Materials per Size Variant */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 16, marginBottom: 4 }}>📦 Packaging Materials per Size Variant (Per-Unit Pcs):</Text>
+          <Text style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 12 }}>
+            Define container, cap, label, or boxes required for each specific size variant of this formulation.
           </Text>
-          {bomIngredients.map((item, idx) => {
-            if (item.itemType !== 'packaging') return null;
-            const packagingMaterials = materials.filter(rm => !rm.category || rm.category === 'Packaging' || rm.category === 'General');
-            console.log('PACKAGING MATERIALS FILTERED:', packagingMaterials.map(p => p.name), 'from total:', materials.map(m => m.name + ':' + m.category));
+
+          {variantsList.map((variant, vIdx) => {
+            const sizeDisplay = variant.size ? `${variant.size} ${getSizeUnit()}` : 'Default Size';
+            const pkgList = variant.packaging || [];
+            const packagingMaterials = materials.filter(rm => rm.category === 'Packaging' || rm.category === 'General');
+            
             return (
-              <View key={`ing-pkg-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                <View style={[styles.formInput, { flex: 2, height: 42 }]}>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={item.rawMaterialId}
-                      onChange={(e: any) => handleIngredientChange(idx, 'rawMaterialId', e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
-                    >
-                      <option value="">-- Select Packaging Material --</option>
-                      {packagingMaterials.map(rm => (
-                        <option key={rm._id} value={rm._id}>📦 {rm.name} ({rm.sku})</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <TextInput
-                      style={styles.formInputText}
-                      placeholder="Packaging Material ID"
-                      placeholderTextColor={colors.text.muted}
-                      value={item.rawMaterialId}
-                      onChangeText={(val) => handleIngredientChange(idx, 'rawMaterialId', val)}
-                    />
-                  )}
-                </View>
-                <View style={[styles.formInput, { flex: 1, height: 42 }]}>
-                  <TextInput
-                    style={styles.formInputText}
-                    placeholder="e.g. 1"
-                    placeholderTextColor={colors.text.muted}
-                    value={item.qtyRequired}
-                    onChangeText={(val) => handleIngredientChange(idx, 'qtyRequired', val)}
-                    keyboardType="numeric"
-                  />
-                  <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 6, fontWeight: '700' }}>Pcs/unit</Text>
-                </View>
-                <TouchableOpacity onPress={() => handleRemoveIngredientRow(idx)}>
-                  <Ionicons name="remove-circle" size={22} color={colors.danger} />
+              <View key={`var-pkg-${vIdx}`} style={{ marginBottom: 16, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary + '40' }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: 8 }}>
+                  Size Variant: {sizeDisplay}
+                </Text>
+
+                {pkgList.map((pkg, pIdx) => (
+                  <View key={`pkg-${vIdx}-${pIdx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <View style={[styles.formInput, { flex: 2, height: 42 }]}>
+                      {Platform.OS === 'web' ? (
+                        <select
+                          value={pkg.rawMaterialId}
+                          onChange={(e: any) => handleVariantPackagingChange(vIdx, pIdx, 'rawMaterialId', e.target.value)}
+                          style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                        >
+                          <option value="">-- Select Packaging Material --</option>
+                          {packagingMaterials.map(rm => (
+                            <option key={rm._id} value={rm._id}>📦 {rm.name} ({rm.sku})</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <TextInput
+                          style={styles.formInputText}
+                          placeholder="Material ID"
+                          placeholderTextColor={colors.text.muted}
+                          value={pkg.rawMaterialId}
+                          onChangeText={(val) => handleVariantPackagingChange(vIdx, pIdx, 'rawMaterialId', val)}
+                        />
+                      )}
+                    </View>
+                    <View style={[styles.formInput, { flex: 1.2, height: 42 }]}>
+                      <TextInput
+                        style={styles.formInputText}
+                        placeholder="Qty"
+                        placeholderTextColor={colors.text.muted}
+                        value={pkg.qtyRequired}
+                        onChangeText={(val) => handleVariantPackagingChange(vIdx, pIdx, 'qtyRequired', val)}
+                        keyboardType="numeric"
+                      />
+                      <Text style={{ fontSize: 10, color: colors.text.muted, marginRight: 6, fontWeight: '700' }}>Pcs/unit</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleRemoveVariantPackagingRow(vIdx, pIdx)}>
+                      <Ionicons name="remove-circle" size={22} color={colors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, alignSelf: 'flex-start' }}
+                  onPress={() => handleAddVariantPackagingRow(vIdx)}
+                >
+                  <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Add Packaging Material</Text>
                 </TouchableOpacity>
               </View>
             );
           })}
-
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, alignSelf: 'flex-start' }}
-            onPress={() => handleAddIngredientRow('packaging')}
-          >
-            <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Packaging Material (Pcs/Unit)</Text>
-          </TouchableOpacity>
 
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 20, marginBottom: 8 }}>Configured Process Stages / Timelines:</Text>
           {bomStages.map((item, idx) => (
@@ -1450,6 +1721,7 @@ export default function ProductsScreen() {
   const [detailVisible, setDetailVisible] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [parentProductId, setParentProductId] = useState<string | null>(null);
 
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -1504,6 +1776,10 @@ export default function ProductsScreen() {
     if (!selectedTypeFilter) return true;
     return normalizeTitleCase(item.productType) === normalizeTitleCase(selectedTypeFilter);
   }).sort((a, b) => {
+    const nameA = (a.name || '').toLowerCase();
+    const nameB = (b.name || '').toLowerCase();
+    if (nameA < nameB) return -1;
+    if (nameA > nameB) return 1;
     const sizeA = parseFloat(a.size || '0') || 0;
     const sizeB = parseFloat(b.size || '0') || 0;
     return sizeA - sizeB;
@@ -1535,13 +1811,34 @@ export default function ProductsScreen() {
       key: 'name',
       title: 'Name',
       flex: 2.5,
-      render: (item) => <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.name}</Text>
+      render: (item) => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          {item.parentId ? (
+            <Ionicons name="git-branch-outline" size={14} color={colors.text.muted} style={{ marginRight: 6 }} />
+          ) : null}
+          <Text style={[styles.tableCell, { fontWeight: '700', flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+        </View>
+      )
     },
     {
       key: 'size',
-      title: 'Size',
-      flex: 1.5,
-      render: (item) => <Text style={styles.tableCell} numberOfLines={1}>{toTitleCase(item.size)}</Text>
+      title: 'Size Variants',
+      flex: 2,
+      render: (item) => {
+        const children = products.filter(p => p.parentId === item._id);
+        const allVariants = [item, ...children];
+        return (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            {allVariants.map((v, idx) => (
+              <View key={idx} style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.primary }}>
+                  {v.size || 'N/A'}{v.price !== undefined ? ` (₹${v.price})` : ''}
+                </Text>
+              </View>
+            ))}
+          </View>
+        );
+      }
     },
     {
       key: 'type',
@@ -1658,9 +1955,9 @@ export default function ProductsScreen() {
           )}
         </View>
 
-        <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+         <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
           <DataTable 
-            data={filteredProducts}
+            data={filteredProducts.filter(p => !p.parentId)}
             columns={columns}
             keyExtractor={item => item._id}
             isLoading={loading}
@@ -1681,8 +1978,22 @@ export default function ProductsScreen() {
         visible={detailVisible}
         onClose={() => { setDetailVisible(false); load(); }}
         onDeleted={load}
+        products={products}
         onEdit={() => {
           setDetailVisible(false);
+          const target = selectedProd && selectedProd.parentId 
+            ? products.find(p => p._id === selectedProd.parentId) || selectedProd
+            : selectedProd;
+          setSelectedProd(target);
+          setIsEditing(true);
+          setAddVisible(true);
+        }}
+        onAddSizeVariant={(id) => {
+          setDetailVisible(false);
+          const target = selectedProd && selectedProd.parentId 
+            ? products.find(p => p._id === selectedProd.parentId) || selectedProd
+            : selectedProd;
+          setSelectedProd(target);
           setIsEditing(true);
           setAddVisible(true);
         }}
@@ -1694,6 +2005,7 @@ export default function ProductsScreen() {
           setAddVisible(false);
           setSelectedProd(null);
           setIsEditing(false);
+          setParentProductId(null);
         }}
         onSaved={load}
         product={isEditing ? selectedProd : null}

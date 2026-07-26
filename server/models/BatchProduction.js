@@ -32,6 +32,11 @@ const batchProductionSchema = new mongoose.Schema({
     ref: 'Product',
     required: true,
   },
+  bomId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'BillOfMaterials',
+    default: null,
+  },
   manufacturingUnitId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ManufacturingUnit',

@@ -881,7 +881,7 @@ class ApiClient {
       return null;
     }
   }
-  async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number; itemType?: string }[]; isActive?: boolean; productionNotes?: string; overheadCost?: number; stages?: any[]; defaultProductionType?: string; defaultJobWorkMode?: string; defaultPackagingMode?: string; defaultJobWorkerId?: string | null }): Promise<BillOfMaterials> {
+  async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number; itemType?: string }[]; isActive?: boolean; productionNotes?: string; overheadCost?: number; stages?: any[]; defaultProductionType?: string; defaultJobWorkMode?: string; defaultPackagingMode?: string; defaultJobWorkerId?: string | null; recipeName?: string; isDefault?: boolean }): Promise<BillOfMaterials> {
     const res = await this.request(`${API_BASE}/bom`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
@@ -895,7 +895,7 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`);
     return res.json();
   }
-  async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; manufacturingUnitId: string; productionType?: string; jobWorkMode?: string; packagingMode?: string; jobWorkerId?: string | null; jobWorkerName?: string; jobWorkerChallanRef?: string }): Promise<BatchProduction> {
+  async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; manufacturingUnitId: string; productionType?: string; jobWorkMode?: string; packagingMode?: string; jobWorkerId?: string | null; jobWorkerName?: string; jobWorkerChallanRef?: string; bomId?: string }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }

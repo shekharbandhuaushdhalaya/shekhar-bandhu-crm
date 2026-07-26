@@ -16,6 +16,8 @@ interface Props {
   bomIngredients: Ingredient[];
   bomError: string;
   bomIsActive: boolean; setBomIsActive: (v: boolean) => void;
+  bomIsDefault: boolean; setBomIsDefault: (v: boolean) => void;
+  bomRecipeName: string; setBomRecipeName: (v: string) => void;
   bomNotes: string; setBomNotes: (v: string) => void;
   bomOverhead: string; setBomOverhead: (v: string) => void;
   bomDefaultProductionType: 'in_house' | 'job_work';
@@ -41,7 +43,8 @@ interface Props {
 
 export default function BOMModal({
   visible, editingBomId, selectedProdId, setSelectedProdId, bomYield, setBomYield,
-  bomIngredients, bomError, bomIsActive, setBomIsActive, bomNotes, setBomNotes,
+  bomIngredients, bomError, bomIsActive, setBomIsActive, bomIsDefault, setBomIsDefault,
+  bomRecipeName, setBomRecipeName, bomNotes, setBomNotes,
   bomOverhead, setBomOverhead, bomDefaultProductionType, setBomDefaultProductionType,
   bomDefaultJobWorkMode, setBomDefaultJobWorkMode, bomDefaultPackagingMode, setBomDefaultPackagingMode,
   bomDefaultJobWorkerId, setBomDefaultJobWorkerId, bomStages,
@@ -81,6 +84,15 @@ export default function BOMModal({
                 <TextInput style={styles.input} placeholder="Product ID" value={selectedProdId} onChangeText={setSelectedProdId} />
               )}
             </View>
+
+            <Text style={styles.inputLabel}>Recipe Name *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Standard Recipe, Sugar-Free Formula"
+              placeholderTextColor={colors.text.muted}
+              value={bomRecipeName}
+              onChangeText={setBomRecipeName}
+            />
 
             <Text style={styles.inputLabel}>Standard Batch Yield Size (units) *</Text>
             <TextInput style={styles.input} placeholder="e.g. 100" placeholderTextColor={colors.text.muted} value={bomYield} onChangeText={setBomYield} keyboardType="numeric" />
@@ -221,7 +233,7 @@ export default function BOMModal({
               numberOfLines={3}
             />
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
               <Text style={styles.inputLabel}>Mark as Active Recipe</Text>
               <TouchableOpacity
                 onPress={() => setBomIsActive(!bomIsActive)}
@@ -229,6 +241,17 @@ export default function BOMModal({
               >
                 <Ionicons name={bomIsActive ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={bomIsActive ? '#fff' : colors.text.muted} />
                 <Text style={{ fontSize: 12, fontWeight: '700', color: bomIsActive ? '#fff' : colors.text.secondary }}>{bomIsActive ? 'Active' : 'Inactive'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+              <Text style={styles.inputLabel}>Set as Default Recipe</Text>
+              <TouchableOpacity
+                onPress={() => setBomIsDefault(!bomIsDefault)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, backgroundColor: bomIsDefault ? colors.primary : colors.bg.secondary, borderColor: bomIsDefault ? colors.primary : colors.border }}
+              >
+                <Ionicons name={bomIsDefault ? 'star' : 'star-outline'} size={16} color={bomIsDefault ? '#fff' : colors.text.muted} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: bomIsDefault ? '#fff' : colors.text.secondary }}>{bomIsDefault ? 'Default' : 'Not Default'}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

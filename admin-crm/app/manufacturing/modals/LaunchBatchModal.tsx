@@ -13,6 +13,7 @@ interface Props {
   boms: BillOfMaterials[];
   materials: RawMaterial[];
   prodProductId: string; setProdProductId: (v: string) => void;
+  prodBomId: string; setProdBomId: (v: string) => void;
   prodPlannedQty: string; setProdPlannedQty: (v: string) => void;
   prodBatchNo: string; setProdBatchNo: (v: string) => void;
   prodProductionType: 'in_house' | 'job_work'; setProdProductionType: (v: 'in_house' | 'job_work') => void;
@@ -30,7 +31,8 @@ interface Props {
 
 export default function LaunchBatchModal({
   visible, products, vendors, manufacturingUnits, boms, materials,
-  prodProductId, setProdProductId, prodPlannedQty, setProdPlannedQty,
+  prodProductId, setProdProductId, prodBomId, setProdBomId,
+  prodPlannedQty, setProdPlannedQty,
   prodBatchNo, setProdBatchNo, prodProductionType, setProdProductionType,
   prodJobWorkMode, setProdJobWorkMode, prodPackagingMode, setProdPackagingMode,
   prodJobWorkerId, setProdJobWorkerId, prodJobWorkerName, setProdJobWorkerName,
@@ -42,6 +44,23 @@ export default function LaunchBatchModal({
   const styles = useStyles(createStyles);
 
   const isDirectPurchaseJobWork = prodProductionType === 'job_work' && prodJobWorkMode === 'direct_purchase';
+
+  const selectedProduct = products.find(p => p._id === prodProductId);
+  const getYieldUnitLabel = () => {
+    if (!selectedProduct) return 'units';
+    const s = (selectedProduct.shape || '').toLowerCase().trim();
+    if (s === 'liquid') return 'Liters (L)';
+    if (s === 'tablet') return 'Tablets (pcs)';
+    if (s === 'capsule') return 'Capsules (pcs)';
+    if (s === 'powder' || s === 'paste') return 'Kilograms (Kg)';
+    return 'units';
+  };
+
+  // Recipes available for the selected product
+  const productRecipes = boms.filter(b => {
+    const bPid = b.productId && typeof b.productId === 'object' ? (b.productId as any)._id : b.productId;
+    return bPid === prodProductId;
+  });
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -64,10 +83,13 @@ export default function LaunchBatchModal({
                   onChange={(e: any) => {
                     const val = e.target.value;
                     setProdProductId(val);
-                    const activeBom = boms.find(b => {
+                    // Auto-select recipe: default or first available
+                    const productBoms = boms.filter(b => {
                       const bPid = b.productId && typeof b.productId === 'object' ? (b.productId as any)._id : b.productId;
                       return bPid === val;
                     });
+                    const activeBom = productBoms.find(b => b.isDefault) || productBoms[0];
+                    setProdBomId(activeBom ? activeBom._id : '');
                     if (activeBom) {
                       setProdProductionType((activeBom as any).defaultProductionType || 'in_house');
                       setProdJobWorkMode((activeBom as any).defaultJobWorkMode || 'none');
@@ -87,12 +109,41 @@ export default function LaunchBatchModal({
                   style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                 >
                   <option value="">-- Choose Product --</option>
-                  {products.map(p => <option key={p._id} value={p._id}>{p.name} ({p.size || 'Standard'})</option>)}
+                  {products.filter(p => !p.parentId).map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
                 </select>
               ) : (
                 <TextInput style={styles.input} placeholder="Product ID" value={prodProductId} onChangeText={setProdProductId} />
               )}
             </View>
+
+            {productRecipes.length > 1 && (
+              <>
+                <Text style={styles.inputLabel}>Select Recipe *</Text>
+                <View style={styles.pickerWrapper}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={prodBomId}
+                      onChange={(e: any) => setProdBomId(e.target.value)}
+                      style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                    >
+                      {productRecipes.map(b => (
+                        <option key={b._id} value={b._id}>
+                          {b.recipeName || 'Standard Recipe'}{b.isDefault ? ' ⭐ (Default)' : ''}{b.isActive === false ? ' (Inactive)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TextInput style={styles.input} placeholder="Recipe ID" value={prodBomId} onChangeText={setProdBomId} />
+                  )}
+                </View>
+              </>
+            )}
+
+            {productRecipes.length === 1 && (
+              <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
+                📋 Recipe: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{productRecipes[0].recipeName || 'Standard Recipe'}</Text>
+              </Text>
+            )}
 
             <Text style={styles.inputLabel}>Manufacturing Unit *</Text>
             <View style={styles.pickerWrapper}>
@@ -203,8 +254,8 @@ export default function LaunchBatchModal({
               </>
             )}
 
-            <Text style={styles.inputLabel}>Planned Yield Quantity (units) *</Text>
-            <TextInput style={styles.input} placeholder="Planned output units (e.g. 500)" placeholderTextColor={colors.text.muted} value={prodPlannedQty} onChangeText={setProdPlannedQty} keyboardType="numeric" />
+            <Text style={styles.inputLabel}>Planned Yield Quantity ({getYieldUnitLabel()}) *</Text>
+            <TextInput style={styles.input} placeholder={`Planned output quantity (e.g. 500)`} placeholderTextColor={colors.text.muted} value={prodPlannedQty} onChangeText={setProdPlannedQty} keyboardType="numeric" />
 
             <Text style={styles.inputLabel}>Finished Goods Production Batch No. *</Text>
             <TextInput style={styles.input} placeholder="e.g. ABH-JUL26-01" placeholderTextColor={colors.text.muted} value={prodBatchNo} onChangeText={setProdBatchNo} />

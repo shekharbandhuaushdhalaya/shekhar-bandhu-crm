@@ -119,6 +119,8 @@ export default function ManufacturingScreen() {
   ]);
   const [bomError, setBomError] = useState('');
   const [bomIsActive, setBomIsActive] = useState(true);
+  const [bomIsDefault, setBomIsDefault] = useState(true);
+  const [bomRecipeName, setBomRecipeName] = useState('Standard Recipe');
   const [bomNotes, setBomNotes] = useState('');
   const [bomOverhead, setBomOverhead] = useState('0');
   const [bomDefaultProductionType, setBomDefaultProductionType] = useState<'in_house' | 'job_work'>('in_house');
@@ -132,6 +134,7 @@ export default function ManufacturingScreen() {
 
   // Form States — Production Launch
   const [prodProductId, setProdProductId] = useState('');
+  const [prodBomId, setProdBomId] = useState('');
   const [prodPlannedQty, setProdPlannedQty] = useState('');
   const [prodBatchNo, setProdBatchNo] = useState('');
   const [prodProductionType, setProdProductionType] = useState<'in_house' | 'job_work'>('in_house');
@@ -386,6 +389,8 @@ export default function ManufacturingScreen() {
           qtyRequired: Number(ing.qtyRequired)
         })),
         isActive: bomIsActive,
+        isDefault: bomIsDefault,
+        recipeName: bomRecipeName.trim() || 'Standard Recipe',
         productionNotes: bomNotes.trim(),
         overheadCost: parseFloat(bomOverhead) || 0,
         stages: filteredStages,
@@ -399,6 +404,8 @@ export default function ManufacturingScreen() {
       setBomYield('100');
       setBomIngredients([{ rawMaterialId: '', qtyRequired: '' }]);
       setBomIsActive(true);
+      setBomIsDefault(true);
+      setBomRecipeName('Standard Recipe');
       setBomNotes('');
       setBomOverhead('0');
       setBomDefaultProductionType('in_house');
@@ -423,6 +430,7 @@ export default function ManufacturingScreen() {
     try {
       await api.startBatchProduction({
         productId: prodProductId,
+        bomId: prodBomId || undefined,
         plannedQty: Number(prodPlannedQty),
         batchNo: prodBatchNo.trim().toUpperCase(),
         manufacturingUnitId: prodManufacturingUnitId,
@@ -435,6 +443,7 @@ export default function ManufacturingScreen() {
       });
 
       setProdProductId('');
+      setProdBomId('');
       setProdPlannedQty('');
       setProdBatchNo('');
       setProdManufacturingUnitId('');
@@ -1827,6 +1836,8 @@ export default function ManufacturingScreen() {
         bomIngredients={bomIngredients}
         bomError={bomError}
         bomIsActive={bomIsActive} setBomIsActive={setBomIsActive}
+        bomIsDefault={bomIsDefault} setBomIsDefault={setBomIsDefault}
+        bomRecipeName={bomRecipeName} setBomRecipeName={setBomRecipeName}
         bomNotes={bomNotes} setBomNotes={setBomNotes}
         bomOverhead={bomOverhead} setBomOverhead={setBomOverhead}
         bomDefaultProductionType={bomDefaultProductionType} setBomDefaultProductionType={setBomDefaultProductionType}
@@ -1855,6 +1866,7 @@ export default function ManufacturingScreen() {
         boms={boms}
         materials={materials}
         prodProductId={prodProductId} setProdProductId={setProdProductId}
+        prodBomId={prodBomId} setProdBomId={setProdBomId}
         prodPlannedQty={prodPlannedQty} setProdPlannedQty={setProdPlannedQty}
         prodBatchNo={prodBatchNo} setProdBatchNo={setProdBatchNo}
         prodProductionType={prodProductionType} setProdProductionType={setProdProductionType}

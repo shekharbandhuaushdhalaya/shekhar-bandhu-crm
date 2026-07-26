@@ -21,10 +21,25 @@ router.get('/', async (req, res) => {
 // GET /api/bom/:productId — Get BOM formulation for a specific product
 router.get('/:productId', async (req, res) => {
   try {
-    const bom = await BillOfMaterials.findOne({ productId: req.params.productId })
+    const { all } = req.query;
+    if (all === 'true') {
+      const boms = await BillOfMaterials.find({ productId: req.params.productId })
+        .populate('productId', 'name sku size')
+        .populate('ingredients.rawMaterialId', 'name sku unit')
+        .lean();
+      return res.json(boms);
+    }
+
+    let bom = await BillOfMaterials.findOne({ productId: req.params.productId, isDefault: true })
       .populate('productId', 'name sku size')
       .populate('ingredients.rawMaterialId', 'name sku unit')
       .lean();
+    if (!bom) {
+      bom = await BillOfMaterials.findOne({ productId: req.params.productId })
+        .populate('productId', 'name sku size')
+        .populate('ingredients.rawMaterialId', 'name sku unit')
+        .lean();
+    }
     if (!bom) return res.status(404).json({ error: 'Formulation not configured for this product' });
     res.json(bom);
   } catch (err) {
@@ -35,7 +50,7 @@ router.get('/:productId', async (req, res) => {
 // POST /api/bom — Configure a BOM formulation
 router.post('/', validate(schemas.bomSchema), async (req, res) => {
   try {
-    const { productId, batchYieldSize, ingredients, isActive, productionNotes, overheadCost, stages, defaultProductionType, defaultJobWorkMode, defaultPackagingMode, defaultJobWorkerId } = req.body;
+    const { productId, recipeName, isDefault, batchYieldSize, ingredients, isActive, productionNotes, overheadCost, stages, defaultProductionType, defaultJobWorkMode, defaultPackagingMode, defaultJobWorkerId } = req.body;
     if (!productId || !batchYieldSize || !ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
       return res.status(400).json({ error: 'Missing required formulation fields' });
     }
@@ -70,13 +85,17 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
       });
     }
 
-    // Check if BOM already exists for this product
-    let bom = await BillOfMaterials.findOne({ productId });
+    const name = (recipeName || 'Standard Recipe').trim();
+    const isDef = isDefault || false;
+
+    // Check if BOM already exists for this product and name
+    let bom = await BillOfMaterials.findOne({ productId, recipeName: name });
     const yieldBase = Number(batchYieldSize) && Number(batchYieldSize) > 0 ? Number(batchYieldSize) : 100;
     if (bom) {
       // Update existing BOM
       bom.batchYieldSize = yieldBase;
       bom.ingredients = validatedIngredients;
+      bom.isDefault = isDef;
       if (isActive !== undefined) bom.isActive = isActive;
       if (productionNotes !== undefined) bom.productionNotes = productionNotes;
       if (overheadCost !== undefined) bom.overheadCost = Number(overheadCost);
@@ -89,6 +108,8 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
     } else {
       bom = await BillOfMaterials.create({
         productId,
+        recipeName: name,
+        isDefault: isDef,
         batchYieldSize: yieldBase,
         ingredients: validatedIngredients,
         isActive: isActive !== undefined ? isActive : true,
@@ -100,6 +121,14 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
         defaultPackagingMode: defaultPackagingMode || 'self_packed',
         defaultJobWorkerId: defaultJobWorkerId || null
       });
+    }
+
+    // Toggle defaults
+    if (bom.isDefault) {
+      await BillOfMaterials.updateMany(
+        { productId, _id: { $ne: bom._id } },
+        { $set: { isDefault: false } }
+      );
     }
     // Automatically update Product's ingredients field with percentage proportions (formulation materials only)
     const populatedBom = await BillOfMaterials.findById(bom._id).populate('ingredients.rawMaterialId', 'name category');

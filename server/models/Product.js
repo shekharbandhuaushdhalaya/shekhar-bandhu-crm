@@ -25,11 +25,13 @@ const productSchema = new mongoose.Schema({
   disease: { type: String, default: '' },
   ingredients: { type: String, default: '' },
   rating: { type: Number, default: 0 },
-  ratingCount: { type: Number, default: 0 }
+  ratingCount: { type: Number, default: 0 },
+  parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null }
 }, { timestamps: true });
 
 productSchema.index({ name: 'text', sku: 'text', category: 'text' });
 productSchema.index({ productType: 1, size: 1, colour: 1, shape: 1, weight: 1 }, { collation: { locale: 'en', strength: 2 } });
 productSchema.index({ createdAt: -1 });
+productSchema.index({ parentId: 1 });
 
 module.exports = mongoose.model('Product', productSchema);

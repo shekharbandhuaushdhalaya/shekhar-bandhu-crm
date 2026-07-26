@@ -12,7 +12,7 @@ import { ThemeProvider, useTheme, useStyles } from '../utils/themeContext';
 import { ToastProvider } from '../utils/ToastContext';
 import LoginScreen from './login';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Sidebar from '../components/Sidebar';
+import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar';
 import AyurvedicLoader from '../components/AyurvedicLoader';
 import { getSocket } from '../utils/socket';
 
@@ -241,7 +241,11 @@ function MainLayout() {
       <TopHeader user={user} isOnline={isOnline} logout={logout} toggleSidebar={() => setIsSidebarOpen(true)} />
       
       <View style={[styles.mainContainer, { flexDirection: isDesktop ? 'row' : 'column' }]}>
-        {isDesktop && <Sidebar isOnline={isOnline} logout={logout} />}
+        {isDesktop && (
+          <View style={{ width: SIDEBAR_WIDTH, height: '100%' }}>
+            <Sidebar isOnline={isOnline} logout={logout} />
+          </View>
+        )}
         
         {/* Mobile Navigation Drawer Modal */}
         {!isDesktop && (
@@ -260,7 +264,9 @@ function MainLayout() {
                     <Ionicons name="close" size={24} color={colors.text.primary} />
                   </TouchableOpacity>
                 </View>
-                <Sidebar onNavigate={() => setIsSidebarOpen(false)} isOnline={isOnline} logout={logout} />
+                <View style={{ flex: 1 }}>
+                  <Sidebar onNavigate={() => setIsSidebarOpen(false)} isOnline={isOnline} logout={logout} />
+                </View>
               </View>
             </View>
           </Modal>
@@ -535,6 +541,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   drawerContent: {
     width: 260,
     height: '100%',
+    flexDirection: 'column',
     backgroundColor: colors.bg.primary,
     boxShadow: '4px 0px 10px rgba(0,0,0,0.2)',
     elevation: 16,

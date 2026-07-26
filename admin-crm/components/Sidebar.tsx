@@ -156,14 +156,16 @@ function NavItemRow({
 const createSidebarStyles = (colors: typeof LightColors) =>
   StyleSheet.create({
     sidebar: {
-      width: SIDEBAR_WIDTH,
+      width: '100%',
       backgroundColor: colors.bg.secondary,
       borderRightWidth: 1,
       borderRightColor: colors.border,
       height: '100%',
+      flexDirection: 'column',
     },
     scrollContent: {
-      paddingBottom: Spacing.xl,
+      paddingBottom: Spacing.sm,
+      flexGrow: 1,
     },
 
     dashboardItem: {
@@ -383,6 +385,7 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         style={{ flex: 1 }}
+        bounces={false}
       >
         {/* Dashboard */}
         <TouchableOpacity
