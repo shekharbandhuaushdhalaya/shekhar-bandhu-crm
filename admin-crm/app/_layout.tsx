@@ -14,6 +14,7 @@ import LoginScreen from './login';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar';
 import AyurvedicLoader from '../components/AyurvedicLoader';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { getSocket } from '../utils/socket';
 
 function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnline: boolean; logout: () => void; toggleSidebar?: () => void }) {
@@ -272,6 +273,7 @@ function MainLayout() {
         )}
 
         <View style={{ flex: 1 }}>
+          <ErrorBoundary>
           <Tabs
             screenOptions={{
               headerShown: false,
@@ -325,6 +327,7 @@ function MainLayout() {
             <Tabs.Screen name="profile" options={{ href: null }} />
             <Tabs.Screen name="campaigns" options={{ href: null }} />
           </Tabs>
+          </ErrorBoundary>
         </View>
       </View>
     </View>

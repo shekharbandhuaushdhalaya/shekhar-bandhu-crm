@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
-const { MANUFACTURING_STAGES } = require('../constants');
+
+const MANUFACTURING_STAGES = [
+  'Raw Material Verification & Weighing',
+  'Primary Processing (Swasan/Mardan)',
+  'Mixing & Blending',
+  'Forming (Vati/Gutika)',
+  'Drying',
+  'QC Testing',
+  'Packaging & Labeling'
+];
 
 const stageSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -27,6 +36,17 @@ const batchProductionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'BillOfMaterials',
     default: null,
+  },
+  bomSnapshot: {
+    recipeName: { type: String, default: '' },
+    recipeVersion: { type: String, default: '' },
+    ingredients: [{
+      rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' },
+      itemType: { type: String, default: 'formulation' },
+      qtyRequired: { type: Number, default: 0 }
+    }],
+    overheadCost: { type: Number, default: 0 },
+    stages: [{ name: String, targetDurationDays: Number }]
   },
   manufacturingUnitId: {
     type: mongoose.Schema.Types.ObjectId,

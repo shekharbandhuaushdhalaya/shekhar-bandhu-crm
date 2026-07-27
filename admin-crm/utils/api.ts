@@ -750,6 +750,10 @@ class ApiClient {
     const res = await this.request(url);
     return res.json();
   }
+  async getFinishedGoodsExpiryAlerts(days = 30): Promise<{ alerts: ExpiryAlert[]; total: number; expiredCount: number; expiringSoonCount: number }> {
+    const res = await this.request(`${API_BASE}/inventory-entries/expiry-alerts?days=${days}`);
+    return res.json();
+  }
   async createInventoryEntry(data: Partial<InventoryEntry>): Promise<InventoryEntry> {
     const res = await this.request(`${API_BASE}/inventory-entries`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();

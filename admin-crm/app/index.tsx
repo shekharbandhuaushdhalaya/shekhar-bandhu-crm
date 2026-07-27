@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, RefreshControl, useWindowDimensions
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
-import { api, DashboardStats, Activity, Contact, Product, Invoice, Challan, ConsolidatedInventory, MrDashboardSummary } from '../utils/api';
+import { api, DashboardStats, Activity, Contact, Product, Invoice, Challan, ConsolidatedInventory, MrDashboardSummary, ExpiryAlert } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
@@ -217,6 +217,61 @@ function LowStockAlerts({ products }: { products: Product[] }) {
               </View>
             </View>
           ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+function ExpiryAlerts({ alerts, loading }: { alerts: ExpiryAlert[]; loading: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const router = useRouter();
+
+  if (loading) {
+    return (
+      <View style={styles.chartCard}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <Ionicons name="alarm-outline" size={18} color={colors.danger} style={{ marginRight: 8 }} />
+          <Text style={styles.sectionTitle}>Finished Goods Expiry Alerts</Text>
+        </View>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.chartCard}>
+      <TouchableOpacity onPress={() => router.push('/inventories')} activeOpacity={0.7}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <Ionicons name="alarm-outline" size={18} color={colors.danger} style={{ marginRight: 8 }} />
+          <Text style={styles.sectionTitle}>Finished Goods Expiry Alerts</Text>
+        </View>
+      </TouchableOpacity>
+      {alerts.length === 0 ? (
+        <Text style={{ color: colors.text.muted }}>No near-expiry or expired finished goods.</Text>
+      ) : (
+        <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+          {alerts.map((a, i) => {
+            const isExpired = a.status === 'expired';
+            const expDate = new Date(a.expiryDate).toLocaleDateString('en-IN');
+            return (
+              <View key={a._id} style={{ paddingVertical: 8, borderBottomWidth: i === alerts.length - 1 ? 0 : 1, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 13 }} numberOfLines={1}>{a.productType} {a.size ? `(${a.size})` : ''}</Text>
+                    <Text style={{ color: colors.text.muted, fontSize: 11 }}>Batch: {a.batchNo} • {a.warehouseName}</Text>
+                    <Text style={{ color: colors.text.muted, fontSize: 11 }}>Exp: {expDate} • {a.qtyBoxes} boxes</Text>
+                  </View>
+                  <View style={{ backgroundColor: isExpired ? colors.danger + '20' : colors.warning + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: isExpired ? colors.danger : colors.warning }}>
+                      {isExpired ? `EXPIRED` : `${a.daysToExpiry}d left`}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
         </ScrollView>
       )}
     </View>
@@ -893,6 +948,8 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [allSales, setAllSales] = useState<Invoice[]>([]);
   const [allChallans, setAllChallans] = useState<Challan[]>([]);
+  const [expiryAlerts, setExpiryAlerts] = useState<ExpiryAlert[]>([]);
+  const [expiryAlertsLoading, setExpiryAlertsLoading] = useState(true);
   
   const { user } = useAuth();
   const perm = usePermission();
@@ -974,6 +1031,11 @@ export default function DashboardScreen() {
     setConsolidatedInv(invs);
     setAllSales(sales);
     setAllChallans(challans);
+
+    api.getFinishedGoodsExpiryAlerts(60).then(r => {
+      setExpiryAlerts(r.alerts);
+      setExpiryAlertsLoading(false);
+    }).catch(() => setExpiryAlertsLoading(false));
     
     setStats(s);
     setActivities(a);
@@ -1158,6 +1220,7 @@ export default function DashboardScreen() {
         )}
         <View style={styles.feedWrapper}>
           <LowStockAlerts products={lowStockProds} />
+          <ExpiryAlerts alerts={expiryAlerts} loading={expiryAlertsLoading} />
         </View>
       </View>
 

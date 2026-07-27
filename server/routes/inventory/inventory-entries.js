@@ -284,4 +284,47 @@ router.get('/ledger/:productId', async (req, res) => {
   }
 });
 
+// GET /api/inventory-entries/expiry-alerts?days=30
+// Returns finished-goods entries nearing expiry
+router.get('/expiry-alerts', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const now = new Date();
+    const threshold = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+    const entries = await InventoryEntry.find({
+      qtyBoxes: { $gt: 0 },
+      expiryDate: { $exists: true, $ne: null }
+    }).sort({ expiryDate: 1 }).lean();
+
+    const alerts = [];
+    for (const entry of entries) {
+      const exp = new Date(entry.expiryDate);
+      const daysToExpiry = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+      const status = daysToExpiry < 0 ? 'expired' : daysToExpiry <= days ? 'expiring_soon' : 'ok';
+      if (status === 'ok') continue;
+      alerts.push({
+        _id: entry._id,
+        warehouseName: entry.warehouseName,
+        productType: entry.productType,
+        size: entry.size,
+        batchNo: entry.batchNo,
+        qtyBoxes: entry.qtyBoxes,
+        expiryDate: entry.expiryDate,
+        daysToExpiry,
+        status
+      });
+    }
+
+    res.json({
+      alerts,
+      total: alerts.length,
+      expiredCount: alerts.filter(a => a.status === 'expired').length,
+      expiringSoonCount: alerts.filter(a => a.status === 'expiring_soon').length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

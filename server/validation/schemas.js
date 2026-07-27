@@ -720,6 +720,26 @@ const gstinVerifySchema = z.object({
   gstin: z.string().length(15),
 });
 
+// ── Batch Production Supporting Documents ─────────────────────
+const batchStageUpdateSchema = z.object({
+  status: z.enum(['pending', 'in_progress', 'completed', 'skipped', 'failed']).optional(),
+  notes: z.string().optional(),
+  completedBy: z.string().optional(),
+});
+
+const batchCancelSchema = z.object({
+  reason: z.string().optional().default(''),
+});
+
+const batchDocumentAddSchema = z.object({
+  name: z.string().min(1, 'Document name required'),
+  url: z.string().url('Valid document URL required'),
+});
+
+const batchDocumentRemoveSchema = z.object({
+  url: z.string().url('Valid document URL required'),
+});
+
 // ── Exports ──────────────────────────────────────────────────
 module.exports = {
   productSchema,
@@ -761,6 +781,10 @@ module.exports = {
   queryConvertSchema,
   salesTargetSchema,
   gstinVerifySchema,
+  batchStageUpdateSchema,
+  batchCancelSchema,
+  batchDocumentAddSchema,
+  batchDocumentRemoveSchema,
   objectId,
   productItem,
   orderItem,

@@ -695,6 +695,32 @@ export type BMRReportYield = {
   productName: string;
 };
 
+export type ExpiryAlert = {
+  _id: string;
+  warehouseName: string;
+  productType: string;
+  size: string;
+  batchNo: string;
+  qtyBoxes: number;
+  expiryDate: string;
+  daysToExpiry: number;
+  status: 'expired' | 'expiring_soon';
+};
+
+export type BOMSnapshotIngredient = {
+  rawMaterialId: string;
+  itemType: string;
+  qtyRequired: number;
+};
+
+export type BOMSnapshot = {
+  recipeName: string;
+  recipeVersion: string;
+  ingredients: BOMSnapshotIngredient[];
+  overheadCost: number;
+  stages: { name: string; targetDurationDays: number }[];
+};
+
 export type BMRReport = {
   batchNo: string;
   productName: string;
@@ -717,6 +743,7 @@ export type BMRReport = {
   unitProductionCost: number;
   stages: ManufacturingStage[];
   ingredients: BMRReportIngredient[];
+  bomSnapshot?: BOMSnapshot | null;
 };
 
 export type BatchGenealogyIngredient = {

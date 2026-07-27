@@ -233,6 +233,17 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
         batchNo: batchNo.trim().toUpperCase(),
         productId,
         bomId: bom._id,
+        bomSnapshot: {
+          recipeName: bom.recipeName || '',
+          recipeVersion: bom.recipeVersion || `v${bom.__v || 0}`,
+          ingredients: (bom.ingredients || []).map(i => ({
+            rawMaterialId: i.rawMaterialId,
+            itemType: i.itemType || 'formulation',
+            qtyRequired: i.qtyRequired || 0
+          })),
+          overheadCost: bom.overheadCost || 0,
+          stages: (bom.stages || []).map(s => ({ name: s.name, targetDurationDays: s.targetDurationDays || 1 }))
+        },
         manufacturingUnitId,
         manufacturingUnitName: mfgUnit.name,
         plannedQty: valPlanned,
@@ -266,7 +277,7 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
 });
 
 // PATCH /api/batch-productions/:id/stage/:stageIndex — Advance a manufacturing stage
-router.patch('/:id/stage/:stageIndex', async (req, res) => {
+router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema), async (req, res) => {
   try {
     const { status, notes, completedBy } = req.body;
     const stageIndex = parseInt(req.params.stageIndex, 10);
@@ -733,7 +744,7 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
 });
 
 // PATCH /api/batch-productions/:id/cancel — Cancel active production run, revert raw materials stock
-router.patch('/:id/cancel', async (req, res) => {
+router.patch('/:id/cancel', validate(schemas.batchCancelSchema), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
@@ -994,7 +1005,8 @@ router.get('/:id/bmr-report', async (req, res) => {
       overheadCost: batch.overheadCost || 0,
       unitProductionCost: batch.unitProductionCost || 0,
       stages: batch.stages || [],
-      ingredients: enrichedIngredients
+      ingredients: enrichedIngredients,
+      bomSnapshot: batch.bomSnapshot || null
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1002,7 +1014,7 @@ router.get('/:id/bmr-report', async (req, res) => {
 });
 
 // PATCH /api/batch-productions/:id/documents — Add a supporting document
-router.patch('/:id/documents', async (req, res) => {
+router.patch('/:id/documents', validate(schemas.batchDocumentAddSchema), async (req, res) => {
   try {
     const { name, url } = req.body;
     if (!name || !url) return res.status(400).json({ error: 'Document name and url are required' });
@@ -1021,7 +1033,7 @@ router.patch('/:id/documents', async (req, res) => {
 });
 
 // DELETE /api/batch-productions/:id/documents — Remove a supporting document
-router.delete('/:id/documents', async (req, res) => {
+router.delete('/:id/documents', validate(schemas.batchDocumentRemoveSchema), async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Document URL is required' });
