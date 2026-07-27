@@ -104,6 +104,7 @@ const printDeliveryChallan = (m: StockMovement) => {
   if (m.type === 'damage' && (m as any).damageReason) {
     extraInfo = `
       <div style="margin-top:4px;padding:4px;border:1px dashed #000;font-size:8px;color:#000;">
+        <strong>DAMAGE WRITE-OFF</strong> — This document is a damage write-off challan for inventory deduction only.<br/>
         <strong>Damage Reason:</strong> ${(m as any).damageReason}
       </div>`;
   }
