@@ -93,7 +93,7 @@ const printDeliveryChallan = (m: StockMovement) => {
 
   const copyBlock = (copy: string) => `
     <div style="height:100%;padding:3mm 5mm;display:flex;flex-direction:column;border:1.5px solid #000;">
-      <div style="font-size:9px;font-weight:bold;text-align:center;letter-spacing:0.5px;border-bottom:1.5px solid #000;padding:2px;">
+      <div style="font-size:9px;font-weight:bold;text-align:center;letter-spacing:0.5px;border-bottom:1.5px solid #000;border-left:1.5px solid #000;border-right:1.5px solid #000;padding:2px;">
         DELIVERY CHALLAN — NOT A TAX INVOICE
       </div>
       <table style="font-size:6px;border:1px solid #000;">
@@ -133,7 +133,7 @@ const printDeliveryChallan = (m: StockMovement) => {
         </tr>
       </table>
       ${extraInfo}
-      <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;">
         <div style="flex:1;overflow:hidden;">
         <table style="font-size:6px;width:100%;">
           <thead>
