@@ -76,14 +76,21 @@ const printDeliveryChallan = (m: StockMovement) => {
       </div>`;
   }
 
-  const halfWidth = '105mm';
+  // Parse partyAddress to extract billing and shipping addresses
+  const rawAddr = m.partyAddress || '';
+  const billingAddr = rawAddr.includes('Billing Address:')
+    ? rawAddr.split('Shipping Address:')[0].replace('Billing Address:\n', '').replace('Billing Address:', '').trim()
+    : rawAddr;
+  const shippingAddr = rawAddr.includes('Shipping Address:')
+    ? rawAddr.split('Shipping Address:')[1]?.replace('Shipping Address:\n', '').replace('Shipping Address:', '').trim() || ''
+    : '';
 
   const copyBlock = (copy: string) => `
     <div style="height:50%;overflow:hidden;padding:3mm 6mm;">
       <div style="font-size:10px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-bottom:none;padding:3px;">
         DELIVERY CHALLAN — NOT A TAX INVOICE
       </div>
-      <table style="margin-bottom:3px;font-size:7px;border:1px solid #000;">
+      <table style="margin-bottom:2px;font-size:7px;border:1px solid #000;">
         <tr>
           <td style="width:50%;padding:2px;border-right:1px solid #000;vertical-align:top;">
             <div style="font-weight:bold;font-size:8px;">${FIRM_DETAILS.name}</div>
@@ -102,6 +109,20 @@ const printDeliveryChallan = (m: StockMovement) => {
             ${(m as any).courierName ? `<br/><strong>Courier:</strong> ${(m as any).courierName}` : ''}
             ${(m as any).trackingId ? `<br/><strong>Tracking ID:</strong> ${(m as any).trackingId}` : ''}
             <br/><span style="font-size:6px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
+          </td>
+        </tr>
+      </table>
+      <table style="margin-bottom:2px;font-size:7px;border:1px solid #000;">
+        <tr>
+          <td style="width:30%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+            <strong>Consignee:</strong> ${m.partyName}
+            ${m.partyGstin ? `<br/><strong>GSTIN:</strong> ${m.partyGstin}` : ''}
+          </td>
+          <td style="width:35%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+            <strong>Billing Address:</strong><br/>${billingAddr ? billingAddr.replace(/\n/g, '<br/>') : '—'}
+          </td>
+          <td style="width:35%;padding:2px;vertical-align:top;">
+            <strong>Shipping Address:</strong><br/>${shippingAddr ? shippingAddr.replace(/\n/g, '<br/>') : '—'}
           </td>
         </tr>
       </table>
