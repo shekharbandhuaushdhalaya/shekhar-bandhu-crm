@@ -92,7 +92,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     : '';
 
   const copyBlock = (copy: string) => `
-    <div style="height:50%;padding:3mm 5mm;display:flex;flex-direction:column;border:1.5px solid #000;">
+    <div style="height:100%;padding:3mm 5mm;display:flex;flex-direction:column;border:1.5px solid #000;">
       <div style="font-size:9px;font-weight:bold;text-align:center;letter-spacing:0.5px;border-bottom:1.5px solid #000;padding:2px;">
         DELIVERY CHALLAN — NOT A TAX INVOICE
       </div>
