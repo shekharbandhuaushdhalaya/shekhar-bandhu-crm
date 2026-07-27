@@ -62,7 +62,6 @@ const printDeliveryChallan = (m: StockMovement) => {
     <tr>
       <td style="padding:5px;text-align:center;">${i + 1}</td>
       <td style="padding:5px;">${displayName}</td>
-      <td style="padding:5px;text-align:center;">${it.size || '—'}</td>
       <td style="padding:5px;text-align:center;">${it.batchNo || '—'}</td>
       <td style="padding:5px;text-align:center;">${totalPcs}</td>
       <td style="padding:5px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
@@ -176,8 +175,7 @@ const printDeliveryChallan = (m: StockMovement) => {
           <thead>
             <tr style="background:#ccc;">
               <th style="border-bottom:1px solid #000;padding:5px;width:3%;">#</th>
-              <th style="border-bottom:1px solid #000;padding:5px;">Product Name &amp; Size</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:6%;">Size</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:26%;">Product Name &amp; Size</th>
               <th style="border-bottom:1px solid #000;padding:5px;width:10%;">Batch</th>
               <th style="border-bottom:1px solid #000;padding:5px;width:6%;">Qty</th>
               <th style="border-bottom:1px solid #000;padding:5px;width:8%;">MRP</th>
