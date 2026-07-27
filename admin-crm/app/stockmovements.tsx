@@ -268,7 +268,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; min-height:297mm; padding:3mm 5mm; }
     .page { width:100%; min-height:100%; display:flex; flex-direction:column; }
     .half { flex:1; position:relative; display:flex; flex-direction:column; }
-    .separator { border:none; border-top:2px dashed #000; margin:0; }
+    .separator { border:none; border-top:2px dashed #000; margin:1.5mm 0; }
     table { border-collapse: collapse; width: 100%; }
     @media print { @page { size: A4 portrait; margin: 3mm 5mm; } body { width:auto; height:auto; padding:0; } }
   </style>
