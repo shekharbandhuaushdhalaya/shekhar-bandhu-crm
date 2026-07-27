@@ -60,11 +60,20 @@ const printDeliveryChallan = (m: StockMovement) => {
     const totalPcs = (it.qty || 0) * (it.packing || 1);
     return sum + totalPcs * (it.rate || 0);
   }, 0);
+  const totalDiscount = (m.items || []).reduce((sum, it) => {
+    const totalPcs = (it.qty || 0) * (it.packing || 1);
+    const mrpVal = it.mrp || 0;
+    const discAmt = mrpVal > 0 ? totalPcs * (mrpVal - (it.rate || 0)) : 0;
+    return sum + Math.max(0, discAmt);
+  }, 0);
   const totalGst = (m.items || []).reduce((sum, it) => {
     const totalPcs = (it.qty || 0) * (it.packing || 1);
     const itemTotal = totalPcs * (it.rate || 0);
     return sum + itemTotal * (it.gstRate || 0) / 100;
   }, 0);
+  const discountRow = totalDiscount > 0
+    ? '<tr style="background:#fef3c7;font-weight:bold;"><td style="border:1px solid #000;padding:1.5px;text-align:right;">Total Discount</td><td style="border:1px solid #000;padding:1.5px;text-align:right;">&minus;\u20B9' + totalDiscount.toFixed(2) + '</td></tr>'
+    : '';
 
   // Extra info block
   let extraInfo = '';
@@ -173,6 +182,7 @@ const printDeliveryChallan = (m: StockMovement) => {
           </td>
           <td style="width:30%;padding:2px;border:1px solid #000;vertical-align:top;">
             <table style="width:100%;font-size:6px;">
+              ${discountRow}
               <tr style="background:#e5e7eb;font-weight:bold;">
                 <td style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (excl. GST)</td>
                 <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
