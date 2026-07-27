@@ -30,7 +30,11 @@ const systemSettingsSchema = new mongoose.Schema({
   razorpayKeySecret: { type: String, default: '' },
   razorpayWebhookSecret: { type: String, default: '' },
   geminiApiKey: { type: String, default: '' },
-  manufacturingLicenseNo: { type: String, default: '', trim: true }
+  manufacturingLicenseNo: { type: String, default: '', trim: true },
+  gmpCertificateNo: { type: String, default: '', trim: true },
+  licenseValidTill: { type: Date, default: null },
+  gmpValidTill: { type: Date, default: null },
+  qrImageBase64: { type: String, default: '' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('SystemSettings', systemSettingsSchema);

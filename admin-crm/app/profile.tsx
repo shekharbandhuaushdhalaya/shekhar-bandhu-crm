@@ -124,6 +124,9 @@ export default function ProfileScreen() {
   const [razorpayWebhookSecret, setRazorpayWebhookSecret] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [manufacturingLicenseNo, setManufacturingLicenseNo] = useState('');
+  const [gmpCertificateNo, setGmpCertificateNo] = useState('');
+  const [licenseValidTill, setLicenseValidTill] = useState('');
+  const [gmpValidTill, setGmpValidTill] = useState('');
   const [companyLoading, setCompanyLoading] = useState(false);
 
   // User session states
@@ -187,6 +190,9 @@ export default function ProfileScreen() {
         setRazorpayWebhookSecret(config.razorpayWebhookSecret || '');
         setGeminiApiKey(config.geminiApiKey || '');
         setManufacturingLicenseNo(config.manufacturingLicenseNo || '');
+        setGmpCertificateNo(config.gmpCertificateNo || '');
+        setLicenseValidTill(config.licenseValidTill ? config.licenseValidTill.split('T')[0] : '');
+        setGmpValidTill(config.gmpValidTill ? config.gmpValidTill.split('T')[0] : '');
 
         // Instantly synchronize in-memory config on frontend
         updateActiveFirmDetails(config);
@@ -391,6 +397,9 @@ export default function ProfileScreen() {
         razorpayWebhookSecret: razorpayWebhookSecret.trim(),
         geminiApiKey: geminiApiKey.trim(),
         manufacturingLicenseNo: manufacturingLicenseNo.trim(),
+        gmpCertificateNo: gmpCertificateNo.trim(),
+        licenseValidTill: licenseValidTill || null,
+        gmpValidTill: gmpValidTill || null,
       };
       (payload as any).value = { ...payload };
 
@@ -968,15 +977,127 @@ export default function ProfileScreen() {
             autoCapitalize="none"
           />
 
-          <Text style={styles.label}>Manufacturing License Number</Text>
-          <TextInput
-            style={styles.input}
-            value={manufacturingLicenseNo}
-            onChangeText={setManufacturingLicenseNo}
-            placeholder="e.g. Mfg. Lic. No. 123/2026"
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="characters"
-          />
+          <View style={[styles.divider, { marginVertical: 8 }]} />
+
+          {/* AYUSH Manufacturing License & GMP Section */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, marginTop: 4 }}>
+            <Ionicons name="shield-checkmark-outline" size={16} color={colors.success} />
+            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>AYUSH Manufacturing License & GMP</Text>
+          </View>
+
+          <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 10, lineHeight: 14 }}>
+            Enter your AYUSH / State Drug Authority manufacturing license number and GMP certificate details. License format: e.g. "AYU/MFG/UP/12345" or as issued by your State Licensing Authority under Drugs & Cosmetics Act.
+          </Text>
+
+          <View style={styles.rowInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Manufacturing License No. *</Text>
+              <TextInput
+                style={[styles.input, manufacturingLicenseNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(manufacturingLicenseNo.trim()) ? { borderColor: colors.danger } : {}]}
+                value={manufacturingLicenseNo}
+                onChangeText={setManufacturingLicenseNo}
+                placeholder="e.g. AYU/MFG/UP/12345"
+                placeholderTextColor={colors.text.muted}
+                autoCapitalize="characters"
+              />
+              {manufacturingLicenseNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(manufacturingLicenseNo.trim()) ? (
+                <Text style={{ fontSize: 9, color: colors.danger, marginTop: -8, marginBottom: 6 }}>⚠ Invalid format. Use alphanumeric with / - . only (as per AYUSH guidelines)</Text>
+              ) : manufacturingLicenseNo.trim() ? (
+                <Text style={{ fontSize: 9, color: colors.success, marginTop: -8, marginBottom: 6 }}>✓ Format looks valid</Text>
+              ) : null}
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.label}>License Valid Till</Text>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={licenseValidTill}
+                  onChange={(e: any) => setLicenseValidTill(e.target.value)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: `1px solid ${licenseValidTill && new Date(licenseValidTill) < new Date() ? colors.danger : colors.border}`,
+                    backgroundColor: colors.bg.secondary,
+                    color: colors.text.primary,
+                    fontSize: 13,
+                    height: 42,
+                    width: '100%',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    marginBottom: 12,
+                  } as any}
+                />
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  value={licenseValidTill}
+                  onChangeText={setLicenseValidTill}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.text.muted}
+                />
+              )}
+              {licenseValidTill && new Date(licenseValidTill) < new Date() ? (
+                <Text style={{ fontSize: 9, color: colors.danger, marginTop: -8, marginBottom: 6 }}>⚠ License has EXPIRED! Renew immediately.</Text>
+              ) : licenseValidTill ? (
+                <Text style={{ fontSize: 9, color: colors.success, marginTop: -8, marginBottom: 6 }}>✓ Valid till {new Date(licenseValidTill).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
+              ) : null}
+            </View>
+          </View>
+
+          <View style={styles.rowInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>GMP Certificate No.</Text>
+              <TextInput
+                style={[styles.input, gmpCertificateNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(gmpCertificateNo.trim()) ? { borderColor: colors.danger } : {}]}
+                value={gmpCertificateNo}
+                onChangeText={setGmpCertificateNo}
+                placeholder="e.g. GMP/AYU/UP/2024/12345"
+                placeholderTextColor={colors.text.muted}
+                autoCapitalize="characters"
+              />
+              {gmpCertificateNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(gmpCertificateNo.trim()) ? (
+                <Text style={{ fontSize: 9, color: colors.danger, marginTop: -8, marginBottom: 6 }}>⚠ Invalid format. Use alphanumeric with / - . only</Text>
+              ) : gmpCertificateNo.trim() ? (
+                <Text style={{ fontSize: 9, color: colors.success, marginTop: -8, marginBottom: 6 }}>✓ Format looks valid</Text>
+              ) : null}
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.label}>GMP Valid Till</Text>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={gmpValidTill}
+                  onChange={(e: any) => setGmpValidTill(e.target.value)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: `1px solid ${gmpValidTill && new Date(gmpValidTill) < new Date() ? colors.danger : colors.border}`,
+                    backgroundColor: colors.bg.secondary,
+                    color: colors.text.primary,
+                    fontSize: 13,
+                    height: 42,
+                    width: '100%',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    marginBottom: 12,
+                  } as any}
+                />
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  value={gmpValidTill}
+                  onChangeText={setGmpValidTill}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.text.muted}
+                />
+              )}
+              {gmpValidTill && new Date(gmpValidTill) < new Date() ? (
+                <Text style={{ fontSize: 9, color: colors.danger, marginTop: -8, marginBottom: 6 }}>⚠ GMP Certificate has EXPIRED! Renew immediately.</Text>
+              ) : gmpValidTill ? (
+                <Text style={{ fontSize: 9, color: colors.success, marginTop: -8, marginBottom: 6 }}>✓ Valid till {new Date(gmpValidTill).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
+              ) : null}
+            </View>
+          </View>
         </View>
       </View>
 

@@ -39,7 +39,9 @@ router.put('/settings', authenticateToken, authorize('settings:edit'), validate(
       'defaultTerms', 'defaultGstRate',
       'signatureBase64', 'signatureUrl', 'dscSignatoryName', 'dscCertificateName',
       'paymentGatewayEnabled', 'razorpayKeyId', 'razorpayKeySecret', 'razorpayWebhookSecret',
-      'geminiApiKey', 'manufacturingLicenseNo'
+      'geminiApiKey', 'manufacturingLicenseNo',
+      'gmpCertificateNo', 'licenseValidTill', 'gmpValidTill',
+      'qrImageBase64'
     ];
 
     fields.forEach(field => {

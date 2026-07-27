@@ -23,6 +23,10 @@ const DEFAULT_FIRM_DETAILS = {
   dscSignatoryName: "Authorised Representative",
   dscCertificateName: "eMudhra / Class 3 DSC",
   manufacturingLicenseNo: "",
+  gmpCertificateNo: "",
+  licenseValidTill: "",
+  gmpValidTill: "",
+  qrImageBase64: "",
 };
 
 let activeSettings = { ...DEFAULT_FIRM_DETAILS };
@@ -49,6 +53,10 @@ export const FIRM_DETAILS = {
   get dscSignatoryName() { return activeSettings.dscSignatoryName || 'Authorised Representative'; },
   get dscCertificateName() { return activeSettings.dscCertificateName || 'Govt Approved DSC'; },
   get manufacturingLicenseNo() { return (activeSettings as any).manufacturingLicenseNo || ''; },
+  get gmpCertificateNo() { return (activeSettings as any).gmpCertificateNo || ''; },
+  get licenseValidTill() { return (activeSettings as any).licenseValidTill || ''; },
+  get gmpValidTill() { return (activeSettings as any).gmpValidTill || ''; },
+  get qrImageBase64() { return (activeSettings as any).qrImageBase64 || ''; },
 };
 
 export function updateActiveFirmDetails(newSettings: Partial<typeof DEFAULT_FIRM_DETAILS>) {

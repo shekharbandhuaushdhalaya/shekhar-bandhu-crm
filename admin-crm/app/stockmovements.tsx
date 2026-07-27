@@ -16,11 +16,11 @@ import InventoryDispatchScreen from './inventorydispatch';
 
 // ── Movement Type Config ────────────────────────────────────────────────────────
 const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string; dir: 'out' }> = {
-  sale:         { label: 'Sale',          icon: 'receipt-outline',       color: '#3b82f6', dir: 'out' },
-  sample:       { label: 'Doctor Sample', icon: 'medical-outline',       color: '#8b5cf6', dir: 'out' },
-  damage:       { label: 'Damage',        icon: 'alert-circle-outline',  color: '#ef4444', dir: 'out' },
-  transfer_out: { label: 'Transfer Out',  icon: 'arrow-forward-circle-outline', color: '#f59e0b', dir: 'out' },
-  order:        { label: 'Online Order',  icon: 'cart-outline',          color: '#10b981', dir: 'out' },
+  sale: { label: 'Sale', icon: 'receipt-outline', color: '#3b82f6', dir: 'out' },
+  sample: { label: 'Doctor Sample', icon: 'medical-outline', color: '#8b5cf6', dir: 'out' },
+  damage: { label: 'Damage', icon: 'alert-circle-outline', color: '#ef4444', dir: 'out' },
+  transfer_out: { label: 'Transfer Out', icon: 'arrow-forward-circle-outline', color: '#f59e0b', dir: 'out' },
+  order: { label: 'Online Order', icon: 'cart-outline', color: '#10b981', dir: 'out' },
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -60,15 +60,15 @@ const printDeliveryChallan = (m: StockMovement) => {
     const displayName = it.size ? `${it.productName.replace(/\s*\([^)]*\)$/, '')} ${it.size}` : it.productName;
     return `
     <tr>
-      <td style="padding:5px;text-align:center;">${i + 1}</td>
-      <td style="padding:5px;">${displayName}</td>
-      <td style="padding:5px;text-align:center;">${it.batchNo || '—'}</td>
-      <td style="padding:5px;text-align:center;">${totalPcs}</td>
-      <td style="padding:5px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
-      <td style="padding:5px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
-      <td style="padding:5px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
-      <td style="padding:5px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
-      <td style="padding:5px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
+      <td style="padding:3px 4px;text-align:center;border-bottom:1px solid #ddd;">${i + 1}</td>
+      <td style="padding:3px 4px;border-bottom:1px solid #ddd;">${displayName}</td>
+      <td style="padding:3px 4px;text-align:center;border-bottom:1px solid #ddd;">${it.batchNo || '—'}</td>
+      <td style="padding:3px 4px;text-align:center;border-bottom:1px solid #ddd;">${totalPcs}</td>
+      <td style="padding:3px 4px;text-align:right;border-bottom:1px solid #ddd;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
+      <td style="padding:3px 4px;text-align:right;border-bottom:1px solid #ddd;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
+      <td style="padding:3px 4px;text-align:right;border-bottom:1px solid #ddd;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
+      <td style="padding:3px 4px;text-align:right;border-bottom:1px solid #ddd;">₹${itemTotal.toFixed(2)}</td>
+      <td style="padding:3px 4px;text-align:right;border-bottom:1px solid #ddd;">₹${gstAmt.toFixed(2)}</td>
     </tr>`;
   }).join('');
 
@@ -88,14 +88,14 @@ const printDeliveryChallan = (m: StockMovement) => {
     return sum + itemTotal * (it.gstRate || 0) / 100;
   }, 0);
   const discountRow = totalDiscount > 0
-    ? '<tr style="background:#ddd;font-weight:bold;"><td style="border:1px solid #000;padding:1.5px;text-align:right;">Total Discount</td><td style="border:1px solid #000;padding:1.5px;text-align:right;">&minus;\u20B9' + totalDiscount.toFixed(2) + '</td></tr>'
+    ? '<tr style="background:#e8e8e8;font-weight:bold;"><td style="border:1px solid #000;padding:4px 6px;text-align:right;">Total Discount</td><td style="border:1px solid #000;padding:4px 6px;text-align:right;">&minus;\u20B9' + totalDiscount.toFixed(2) + '</td></tr>'
     : '';
 
   // Extra info block
   let extraInfo = '';
   if (m.type === 'sample' && ((m as any).medicalRepName || (m as any).doctorName)) {
     extraInfo = `
-      <div style="margin-top:4px;padding:4px;border:1px dashed #666;font-size:8px;">
+      <div style="margin-top:6px;padding:8px 10px;border:1.5px dashed #666;font-size:10px;">
         <strong>DOCTOR SAMPLE</strong> — Not a taxable supply. For promotional distribution only.<br/>
         <strong>MR Name:</strong> ${(m as any).medicalRepName || '—'} &nbsp;&nbsp;
         <strong>Doctor:</strong> ${(m as any).doctorName || '—'}
@@ -103,7 +103,7 @@ const printDeliveryChallan = (m: StockMovement) => {
   }
   if (m.type === 'damage' && (m as any).damageReason) {
     extraInfo = `
-      <div style="margin-top:4px;padding:4px;border:1px dashed #000;font-size:8px;color:#000;">
+      <div style="margin-top:6px;padding:8px 10px;border:1.5px dashed #000;font-size:10px;color:#000;">
         <strong>DAMAGE WRITE-OFF</strong> — This document is a damage write-off challan for inventory deduction only.<br/>
         <strong>Damage Reason:</strong> ${(m as any).damageReason}
       </div>`;
@@ -119,28 +119,28 @@ const printDeliveryChallan = (m: StockMovement) => {
     : '';
 
   const copyBlock = (copy: string) => `
-    <div style="height:100%;padding:1.5mm 2mm;display:flex;flex-direction:column;border:1.5px solid #000;border-radius:4px;">
-      <div style="font-size:8px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:1.5px 3px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="height:100%;padding:2mm 3mm;display:flex;flex-direction:column;border:1.5px solid #000;border-radius:3px;">
+      <div style="font-size:9px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;padding:2px 4px;display:flex;align-items:center;justify-content:space-between;">
         <span>DELIVERY CHALLAN — NOT A TAX INVOICE</span>
-        <span style="font-size:5px;font-weight:normal;">(${copy})</span>
+        <span style="font-size:6px;font-weight:normal;">(${copy})</span>
       </div>
-      <table style="font-size:6px;border:1px solid #000;">
+      <table style="font-size:7.5px;border:1px solid #000;">
         <tr>
-          <td style="width:50%;padding:1.5px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:50%;padding:2px 4px;border-right:1px solid #000;vertical-align:top;">
             <table style="width:100%;">
               <tr>
-                <td style="width:28px;padding-right:2px;vertical-align:middle;">
-                  <img src="data:image/png;base64,${LOGO_BASE64}" style="height:24px;width:auto;object-fit:contain;" />
+                <td style="width:28px;padding-right:3px;vertical-align:middle;">
+                  <img src="data:image/png;base64,${LOGO_BASE64}" style="height:22px;width:auto;object-fit:contain;" />
                 </td>
                 <td style="vertical-align:middle;">
-                  <div style="font-weight:bold;font-size:7px;">${FIRM_DETAILS.name}</div>
+                  <div style="font-weight:bold;font-size:9px;">${FIRM_DETAILS.name}</div>
                 </td>
               </tr>
             </table>
-            <div style="font-size:6px;">${FIRM_DETAILS.address}</div>
-            <div style="font-size:6px;">GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
+            <div style="font-size:7px;margin-top:2px;">${FIRM_DETAILS.address}</div>
+            <div style="font-size:7px;">GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
           </td>
-          <td style="width:50%;padding:1.5px;vertical-align:top;">
+          <td style="width:50%;padding:2px 4px;vertical-align:top;">
             <strong>Challan No.:</strong> ${m.docNo}<br/>
             <strong>Date:</strong> ${dateStr}<br/>
             <strong>Warehouse:</strong> ${m.warehouseName}
@@ -149,40 +149,40 @@ const printDeliveryChallan = (m: StockMovement) => {
             ${(m as any).vehicleNo ? `<br/><strong>Vehicle:</strong> ${(m as any).vehicleNo}` : ''}
             ${(m as any).courierName ? `<br/><strong>Courier:</strong> ${(m as any).courierName}` : ''}
             ${(m as any).trackingId ? `<br/><strong>Tracking ID:</strong> ${(m as any).trackingId}` : ''}
-            <br/><span style="font-size:5px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
+            <br/><span style="font-size:5.5px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
           </td>
         </tr>
       </table>
-      ${FIRM_DETAILS.manufacturingLicenseNo ? `<table style="font-size:6px;width:100%;"><tr><td style="padding:1.5px;border:1px solid #000;text-align:center;font-weight:bold;">Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</td></tr></table>` : ''}
-      <table style="font-size:6px;border:1px solid #000;">
+      ${FIRM_DETAILS.manufacturingLicenseNo ? `<table style="font-size:7.5px;width:100%;"><tr><td style="padding:2px 4px;border:1px solid #000;text-align:center;font-weight:bold;background:#f0f0f0;">Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}${(FIRM_DETAILS as any).gmpCertificateNo ? ' &nbsp;|&nbsp; GMP No: ' + (FIRM_DETAILS as any).gmpCertificateNo : ''}</td></tr></table>` : ''}
+      <table style="font-size:7.5px;border:1px solid #000;">
         <tr>
-          <td style="width:28%;padding:1.5px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:28%;padding:2px 4px;border-right:1px solid #000;vertical-align:top;">
             <strong>Consignee:</strong> ${m.partyName}
             ${m.partyGstin ? `<br/><strong>GSTIN:</strong> ${m.partyGstin}` : ''}
           </td>
-          <td style="width:36%;padding:1.5px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:36%;padding:2px 4px;border-right:1px solid #000;vertical-align:top;">
             <strong>Billing:</strong> ${billingAddr ? billingAddr.replace(/\n/g, ', ') : '—'}
           </td>
-          <td style="width:36%;padding:2px;vertical-align:top;">
+          <td style="width:36%;padding:2px 4px;vertical-align:top;">
             <strong>Shipping:</strong> ${shippingAddr ? shippingAddr.replace(/\n/g, ', ') : '—'}
           </td>
         </tr>
       </table>
       ${extraInfo}
       <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;border-bottom:1px solid #000;">
-        <div style="flex:1;overflow:hidden;min-height:200px;">
-        <table style="font-size:7px;width:100%;">
+        <div style="flex:1;overflow:hidden;">
+        <table style="font-size:8px;width:100%;">
           <thead>
             <tr style="background:#ccc;">
               <th style="border-bottom:1px solid #000;padding:3px;width:3%;text-align:center;">#</th>
-              <th style="border-bottom:1px solid #000;padding:3px;width:26%;text-align:left;">Product Name &amp; Size</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:27%;text-align:left;">Product Name &amp; Size</th>
               <th style="border-bottom:1px solid #000;padding:3px;width:10%;text-align:center;">Batch</th>
               <th style="border-bottom:1px solid #000;padding:3px;width:6%;text-align:center;">Qty</th>
-              <th style="border-bottom:1px solid #000;padding:3px;width:8%;text-align:right;">MRP</th>
-              <th style="border-bottom:1px solid #000;padding:3px;width:5%;text-align:right;">Disc</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:9%;text-align:right;">MRP</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:6%;text-align:right;">Disc</th>
               <th style="border-bottom:1px solid #000;padding:3px;width:5%;text-align:right;">GST%</th>
-              <th style="border-bottom:1px solid #000;padding:3px;width:9%;text-align:right;">Amount</th>
-              <th style="border-bottom:1px solid #000;padding:3px;width:8%;text-align:right;">GST Amt</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:10%;text-align:right;">Amount</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:9%;text-align:right;">GST Amt</th>
             </tr>
           </thead>
           <tbody>
@@ -191,67 +191,67 @@ const printDeliveryChallan = (m: StockMovement) => {
         </table>
         </div>
       </div>
-      ${m.notes ? `<div style="margin-top:1px;font-size:6px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
+      ${m.notes ? `<div style="margin-top:1px;font-size:7px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
       <div style="margin-top:auto;display:flex;flex-direction:column;gap:0;">
-      <table style="font-size:6px;width:100%;">
+      <table style="font-size:7px;width:100%;">
         <tr>
           <td style="width:35%;padding:0;border:1px solid #000;vertical-align:top;">
-            <table style="width:100%;height:100%;font-size:6px;">
+            <table style="width:100%;height:100%;font-size:7px;">
               <tr>
-                <td style="width:55%;vertical-align:top;padding:1.5px;">
-                  <div style="font-weight:bold;font-size:7px;">Bank Details:</div>
+                <td style="width:55%;vertical-align:top;padding:2px 4px;">
+                  <div style="font-weight:bold;font-size:8px;">Bank Details:</div>
                   <div>${FIRM_DETAILS.bankName}</div>
                   <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
                   <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
                   <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
                 </td>
-                <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:1.5px;">
-                  <div style="margin:1px auto;width:28px;height:28px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:4px;color:#999;">
+                <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:2px;">
+                  <div style="margin:1px auto;width:30px;height:30px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:5px;color:#999;">
                     QR
                   </div>
-                  <div style="font-size:5px;font-weight:600;margin-top:1px;">QR for online payment</div>
-                  <div style="font-size:5px;color:#666;margin-top:1px;">UPI ID: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
+                  <div style="font-size:6px;font-weight:600;margin-top:2px;">QR for online payment</div>
+                  <div style="font-size:5.5px;color:#666;margin-top:1px;">UPI: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
                 </td>
               </tr>
               <tr>
-                <td colspan="2" style="border-top:1px solid #000;padding:3px;font-size:7px;">Amount in Words: <strong>Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only</strong></td>
+                <td colspan="2" style="border-top:1px solid #000;padding:2px 4px;font-size:7.5px;">Amount in Words: <strong>Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only</strong></td>
               </tr>
             </table>
           </td>
-          <td style="width:35%;padding:1.5px;border:1px solid #000;vertical-align:top;">
-            <div style="font-weight:bold;font-size:7px;">Terms &amp; Conditions:</div>
-            <div style="line-height:1.2;font-size:6px;">${(FIRM_DETAILS.defaultTerms || '').split('\n').map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
+          <td style="width:35%;padding:2px 4px;border:1px solid #000;vertical-align:top;">
+            <div style="font-weight:bold;font-size:8px;">Terms &amp; Conditions:</div>
+            <div style="line-height:1.2;font-size:6.5px;">${(FIRM_DETAILS.defaultTerms || '').split('\\n').map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
           </td>
-          <td style="width:30%;padding:1.5px;border:1px solid #000;vertical-align:top;">
-            <table style="width:100%;font-size:6px;">
+          <td style="width:30%;padding:2px 4px;border:1px solid #000;vertical-align:top;">
+            <table style="width:100%;font-size:7px;">
               ${discountRow}
               <tr style="background:#ccc;font-weight:bold;">
-                <td style="border:1px solid #000;padding:1px;text-align:right;">Grand Total (excl. GST)</td>
-                <td style="border:1px solid #000;padding:1px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
+                <td style="border:1px solid #000;padding:2px 4px;text-align:right;">Grand Total (excl. GST)</td>
+                <td style="border:1px solid #000;padding:2px 4px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
               </tr>
               <tr style="background:#ccc;font-weight:bold;">
-                <td style="border:1px solid #000;padding:1px;text-align:right;">Total GST</td>
-                <td style="border:1px solid #000;padding:1px;text-align:right;">₹${totalGst.toFixed(2)}</td>
+                <td style="border:1px solid #000;padding:2px 4px;text-align:right;">Total GST</td>
+                <td style="border:1px solid #000;padding:2px 4px;text-align:right;">₹${totalGst.toFixed(2)}</td>
               </tr>
               <tr style="background:#aaa;font-weight:bold;">
-                <td style="border:1px solid #000;padding:1px;text-align:right;">Grand Total (incl. GST)</td>
-                <td style="border:1px solid #000;padding:1px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
+                <td style="border:1px solid #000;padding:2px 4px;text-align:right;">Grand Total (incl. GST)</td>
+                <td style="border:1px solid #000;padding:2px 4px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
               </tr>
             </table>
           </td>
         </tr>
       </table>
-      <table style="font-size:6px;width:100%;">
+      <table style="font-size:7px;width:100%;">
         <tr>
-          <td style="width:50%;padding:6px 2px;border:1px solid #000;border-top:none;text-align:left;">
+          <td style="width:50%;padding:8px 4px;border:1px solid #000;border-top:none;text-align:left;vertical-align:bottom;">
             <div>Receiver's Signature &amp; Stamp</div>
           </td>
-          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:right;vertical-align:bottom;">
-            <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
+          <td style="width:50%;padding:3px 4px;border:1px solid #000;border-top:none;text-align:right;vertical-align:bottom;">
+            <div style="font-size:8px;">For ${FIRM_DETAILS.name}</div>
             ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
-              <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 14px; width: auto; object-fit: contain; margin-top:1px;" />
-            ` : '<div style="height:16px;"></div>'}
-            <div style="font-size:5px;margin-top:1px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
+              <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 16px; width: auto; object-fit: contain; margin-top:1px;" />
+            ` : '<div style="height:18px;"></div>'}
+            <div style="font-size:6px;margin-top:1px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
           </td>
         </tr>
       </table>
@@ -265,12 +265,16 @@ const printDeliveryChallan = (m: StockMovement) => {
   <title>Delivery Challan ${m.docNo}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; height:297mm; padding:0; }
-    .page { width:100%; height:100%; padding:3mm 5mm; display:flex; flex-direction:column; }
-    .half { flex:1; position:relative; display:flex; flex-direction:column; }
-    .separator { border:none; border-top:2px dashed #000; margin:5mm 0; }
+    body { font-family: Arial, sans-serif; color: #000; background: #fff; width: 210mm; height: 297mm; padding: 0; }
+    .page { width: 100%; height: 100%; padding: 3mm 5mm; display: flex; flex-direction: column; }
+    .half { flex: 1; position: relative; display: flex; flex-direction: column; overflow: hidden; }
+    .separator { border: none; border-top: 1.5px dashed #000; margin: 3mm 0; flex-shrink: 0; }
     table { border-collapse: collapse; width: 100%; }
-    @media print { @page { size: A4 portrait; margin: 3mm 5mm; } body { width:auto; height:auto; padding:0; } }
+    @media print {
+      @page { size: A4 portrait; margin: 3mm 5mm; }
+      body { width: auto; height: auto; padding: 0; }
+      .page { height: 100vh; }
+    }
   </style>
 </head>
 <body>
@@ -452,11 +456,11 @@ export default function StockMovementsScreen() {
     const confirmed = Platform.OS === 'web'
       ? confirm('Are you sure you want to delete this document?')
       : await new Promise(resolve => {
-          Alert.alert('Delete Document', 'Are you sure?', [
-            { text: 'No', onPress: () => resolve(false) },
-            { text: 'Yes, Delete', onPress: () => resolve(true) }
-          ]);
-        });
+        Alert.alert('Delete Document', 'Are you sure?', [
+          { text: 'No', onPress: () => resolve(false) },
+          { text: 'Yes, Delete', onPress: () => resolve(true) }
+        ]);
+      });
     if (!confirmed) return;
     try {
       await api.deleteDocument('challan', challanId, url);
@@ -489,21 +493,21 @@ export default function StockMovementsScreen() {
       if (w.length > 0 && !form.warehouseId) {
         setForm(f => ({ ...f, warehouseId: w[0]._id, warehouseName: w[0].name }));
       }
-    } catch {}
+    } catch { }
   }, []);
 
   const loadCustomers = useCallback(async () => {
     try {
       const c = await api.getCustomers();
       setCustomers(c);
-    } catch {}
+    } catch { }
   }, []);
 
   const loadProducts = useCallback(async () => {
     try {
       const p = await api.getProducts();
       setProducts(p);
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -593,7 +597,7 @@ export default function StockMovementsScreen() {
 
   const getFilteredInventoryEntries = (searchText: string) => {
     const s = searchText ? searchText.toLowerCase() : '';
-    
+
     // Group all warehouse inventory entries and master products by productId to deduplicate
     const productMap: Record<string, any> = {};
 
@@ -801,9 +805,9 @@ export default function StockMovementsScreen() {
     const ok = Platform.OS === 'web'
       ? window.confirm('Cancel this challan? Inventory & customer balance will be reverted.')
       : await new Promise(r => Alert.alert('Cancel', 'Cancel this challan? Inventory & customer balance will be reverted.', [
-          { text: 'No', onPress: () => r(false) },
-          { text: 'Yes', style: 'destructive', onPress: () => r(true) }
-        ]));
+        { text: 'No', onPress: () => r(false) },
+        { text: 'Yes', style: 'destructive', onPress: () => r(true) }
+      ]));
     if (!ok) return;
     try {
       await api.cancelStockMovement(id);
@@ -821,9 +825,9 @@ export default function StockMovementsScreen() {
     const ok = Platform.OS === 'web'
       ? window.confirm('Delete this challan?')
       : await new Promise(r => Alert.alert('Delete', 'Delete this challan?', [
-          { text: 'No', onPress: () => r(false) },
-          { text: 'Delete', style: 'destructive', onPress: () => r(true) }
-        ]));
+        { text: 'No', onPress: () => r(false) },
+        { text: 'Delete', style: 'destructive', onPress: () => r(true) }
+      ]));
     if (!ok) return;
     try {
       await api.deleteStockMovement(id);
@@ -841,9 +845,9 @@ export default function StockMovementsScreen() {
     const ok = Platform.OS === 'web'
       ? window.confirm(`Finalize this challan? This will post the transactions and ${m.direction === 'out' ? 'deduct' : 'increase'} stock inventory.`)
       : await new Promise(r => Alert.alert('Finalize', `Finalize this challan? This will post the transactions and ${m.direction === 'out' ? 'deduct' : 'increase'} stock inventory.`, [
-          { text: 'No', onPress: () => r(false) },
-          { text: 'Yes', onPress: () => r(true) }
-        ]));
+        { text: 'No', onPress: () => r(false) },
+        { text: 'Yes', onPress: () => r(true) }
+      ]));
     if (!ok) return;
     try {
       if (m.direction === 'out') {
@@ -895,7 +899,7 @@ export default function StockMovementsScreen() {
 
   const isIntraState = (form.partyGstin || '').startsWith('09') || !form.partyGstin;
   const showFinancials = (form.type === 'sale' || form.type === 'order' || form.type === 'damage') && !form.isFree;
-  
+
   const cgst = showFinancials && !isCash && isIntraState ? totalTax / 2 : 0;
   const sgst = showFinancials && !isCash && isIntraState ? totalTax / 2 : 0;
   const igst = showFinancials && !isCash && !isIntraState ? totalTax : 0;
@@ -920,731 +924,731 @@ export default function StockMovementsScreen() {
         </View>
         {error ? <Text style={styles.modalError}>{error}</Text> : null}
         <ScrollView style={styles.modalForm} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16 }}>
-            <Pressable onPress={() => { setShowCustomerDropdown(false); setActiveItemDropdownIdx(null); setShowDatePicker(false); }} style={{ flex: 1 }}>
-              {/* Card Section 1: General Details */}
-              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border, zIndex: showDatePicker ? 5000 : 100, overflow: 'visible' }}>
-                <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 8 }]}>📋 Document Details</Text>
-                
-                {/* Movement Type + Warehouse + Date — single row */}
-                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12, zIndex: showDatePicker ? 5100 : 10, overflow: 'visible' }}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.inputLabel}>Movement Type *</Text>
-                    {Platform.OS === 'web' ? (
-                      <select value={form.type} onChange={(e: any) => {
-                        const key = e.target.value;
-                        setForm(f => ({ ...f, type: key, medicalRepName: key === 'sample' ? (user?.name || '') : f.medicalRepName, partyName: key === 'damage' ? 'Damage' : f.partyName }));
-                      }} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, fontSize: 13, height: 35, width: '100%', outline: 'none', boxSizing: 'border-box' }}>
-                        {availableTypes.map(([key, conf]) => (
-                          <option key={key} value={key}>{conf.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                        {availableTypes.map(([key, conf]) => (
-                          <TouchableOpacity key={key}
-                            style={[styles.toggleChip, form.type === key && { backgroundColor: conf.color, borderColor: conf.color }]}
-                            onPress={() => setForm(f => ({ ...f, type: key, medicalRepName: key === 'sample' ? (user?.name || '') : f.medicalRepName, partyName: key === 'damage' ? 'Damage' : f.partyName }))}>
-                            <Text style={[styles.toggleChipText, form.type === key && { color: '#fff', fontWeight: '700' }]}>{conf.label}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.inputLabel}>Source Warehouse *</Text>
-                    {Platform.OS === 'web' ? (
-                      <select value={form.warehouseId} onChange={(e: any) => {
-                        const w = warehouses.find(x => x._id === e.target.value);
-                        setForm(f => ({ ...f, warehouseId: e.target.value, warehouseName: w?.name || '' }));
-                      }} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, fontSize: 13, height: 35, width: '100%', outline: 'none', boxSizing: 'border-box' }}>
-                        <option value="">Select Warehouse</option>
-                        {warehouses.map(w => <option key={w._id} value={w._id}>{w.name}</option>)}
-                      </select>
-                    ) : (
-                      <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.primary }]} value={form.warehouseName} onChangeText={v => setForm(f => ({ ...f, warehouseName: v }))} placeholder="Warehouse" placeholderTextColor={colors.text.muted} />
-                    )}
-                  </View>
-                  <View style={{ flex: 0.8, minWidth: 0, zIndex: showDatePicker ? 3000 : 100, position: 'relative' }}>
-                    <Text style={styles.inputLabel}>Date *</Text>
-                    <View style={styles.customSearchSelectContainer}>
-                      <TouchableOpacity 
-                        style={[styles.input, { height: 35, justifyContent: 'center', cursor: 'pointer', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 0 } as any]}
-                        onPress={() => setShowDatePicker(!showDatePicker)}
-                      >
-                        <Ionicons name="calendar-outline" size={14} color={colors.text.muted} />
-                        <Text style={{ flex: 1, color: colors.text.primary, fontWeight: '700', fontSize: 13 }}>
-                          {form.date ? new Date(form.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Select Date'}
-                        </Text>
-                        <Ionicons name={showDatePicker ? "chevron-up" : "chevron-down"} size={14} color={colors.text.muted} />
-                      </TouchableOpacity>
+          <Pressable onPress={() => { setShowCustomerDropdown(false); setActiveItemDropdownIdx(null); setShowDatePicker(false); }} style={{ flex: 1 }}>
+            {/* Card Section 1: General Details */}
+            <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border, zIndex: showDatePicker ? 5000 : 100, overflow: 'visible' }}>
+              <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 8 }]}>📋 Document Details</Text>
 
-                      {showDatePicker && (() => {
-                        const currentDateObj = form.date ? new Date(form.date) : new Date();
-                        const year = currentDateObj.getFullYear();
-                        const month = currentDateObj.getMonth();
+              {/* Movement Type + Warehouse + Date — single row */}
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12, zIndex: showDatePicker ? 5100 : 10, overflow: 'visible' }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.inputLabel}>Movement Type *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select value={form.type} onChange={(e: any) => {
+                      const key = e.target.value;
+                      setForm(f => ({ ...f, type: key, medicalRepName: key === 'sample' ? (user?.name || '') : f.medicalRepName, partyName: key === 'damage' ? 'Damage' : f.partyName }));
+                    }} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, fontSize: 13, height: 35, width: '100%', outline: 'none', boxSizing: 'border-box' }}>
+                      {availableTypes.map(([key, conf]) => (
+                        <option key={key} value={key}>{conf.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                      {availableTypes.map(([key, conf]) => (
+                        <TouchableOpacity key={key}
+                          style={[styles.toggleChip, form.type === key && { backgroundColor: conf.color, borderColor: conf.color }]}
+                          onPress={() => setForm(f => ({ ...f, type: key, medicalRepName: key === 'sample' ? (user?.name || '') : f.medicalRepName, partyName: key === 'damage' ? 'Damage' : f.partyName }))}>
+                          <Text style={[styles.toggleChipText, form.type === key && { color: '#fff', fontWeight: '700' }]}>{conf.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.inputLabel}>Source Warehouse *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select value={form.warehouseId} onChange={(e: any) => {
+                      const w = warehouses.find(x => x._id === e.target.value);
+                      setForm(f => ({ ...f, warehouseId: e.target.value, warehouseName: w?.name || '' }));
+                    }} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, fontSize: 13, height: 35, width: '100%', outline: 'none', boxSizing: 'border-box' }}>
+                      <option value="">Select Warehouse</option>
+                      {warehouses.map(w => <option key={w._id} value={w._id}>{w.name}</option>)}
+                    </select>
+                  ) : (
+                    <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.primary }]} value={form.warehouseName} onChangeText={v => setForm(f => ({ ...f, warehouseName: v }))} placeholder="Warehouse" placeholderTextColor={colors.text.muted} />
+                  )}
+                </View>
+                <View style={{ flex: 0.8, minWidth: 0, zIndex: showDatePicker ? 3000 : 100, position: 'relative' }}>
+                  <Text style={styles.inputLabel}>Date *</Text>
+                  <View style={styles.customSearchSelectContainer}>
+                    <TouchableOpacity
+                      style={[styles.input, { height: 35, justifyContent: 'center', cursor: 'pointer', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 0 } as any]}
+                      onPress={() => setShowDatePicker(!showDatePicker)}
+                    >
+                      <Ionicons name="calendar-outline" size={14} color={colors.text.muted} />
+                      <Text style={{ flex: 1, color: colors.text.primary, fontWeight: '700', fontSize: 13 }}>
+                        {form.date ? new Date(form.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Select Date'}
+                      </Text>
+                      <Ionicons name={showDatePicker ? "chevron-up" : "chevron-down"} size={14} color={colors.text.muted} />
+                    </TouchableOpacity>
 
-                        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                        const daysInMonth = new Date(year, month + 1, 0).getDate();
-                        const firstDayIndex = new Date(year, month, 1).getDay();
+                    {showDatePicker && (() => {
+                      const currentDateObj = form.date ? new Date(form.date) : new Date();
+                      const year = currentDateObj.getFullYear();
+                      const month = currentDateObj.getMonth();
 
-                        const calendarDays = [];
-                        for (let i = 0; i < firstDayIndex; i++) {
-                          calendarDays.push(null);
-                        }
-                        for (let d = 1; d <= daysInMonth; d++) {
-                          calendarDays.push(d);
-                        }
+                      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                      const daysInMonth = new Date(year, month + 1, 0).getDate();
+                      const firstDayIndex = new Date(year, month, 1).getDay();
 
-                        const handleMonthChange = (offset: number) => {
-                          const newDate = new Date(year, month + offset, 1);
-                          const formatted = newDate.toISOString().split('T')[0];
-                          setForm(f => ({ ...f, date: formatted }));
-                        };
+                      const calendarDays = [];
+                      for (let i = 0; i < firstDayIndex; i++) {
+                        calendarDays.push(null);
+                      }
+                      for (let d = 1; d <= daysInMonth; d++) {
+                        calendarDays.push(d);
+                      }
 
-                        const handleSelectDay = (day: number) => {
-                          const selected = new Date(year, month, day);
-                          const yyyy = selected.getFullYear();
-                          const mm = String(selected.getMonth() + 1).padStart(2, '0');
-                          const dd = String(selected.getDate()).padStart(2, '0');
-                          setForm(f => ({ ...f, date: `${yyyy}-${mm}-${dd}` }));
-                          setShowDatePicker(false);
-                        };
+                      const handleMonthChange = (offset: number) => {
+                        const newDate = new Date(year, month + offset, 1);
+                        const formatted = newDate.toISOString().split('T')[0];
+                        setForm(f => ({ ...f, date: formatted }));
+                      };
 
-                        return (
-                          <View style={[styles.customSelectPanel, { 
-                            padding: 14, 
-                            width: '100%', 
-                            left: 0, 
-                            right: 0,
-                            backgroundColor: colors.bg.card,
-                            borderRadius: Radius.lg,
-                            borderWidth: 1,
-                            borderColor: colors.border,
-                            boxShadow: '0px 10px 25px rgba(0,0,0,0.15)',
-                            elevation: 10,
-                            top: 40,
-                            position: 'absolute',
-                            zIndex: 4000
-                          }]}>
-                            {/* Calendar Header */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                              <TouchableOpacity onPress={() => handleMonthChange(-1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
-                                <Ionicons name="chevron-back" size={14} color={colors.text.primary} />
-                              </TouchableOpacity>
-                              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text.primary }}>
-                                {monthNames[month]} {year}
-                              </Text>
-                              <TouchableOpacity onPress={() => handleMonthChange(1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
-                                <Ionicons name="chevron-forward" size={14} color={colors.text.primary} />
-                              </TouchableOpacity>
-                            </View>
+                      const handleSelectDay = (day: number) => {
+                        const selected = new Date(year, month, day);
+                        const yyyy = selected.getFullYear();
+                        const mm = String(selected.getMonth() + 1).padStart(2, '0');
+                        const dd = String(selected.getDate()).padStart(2, '0');
+                        setForm(f => ({ ...f, date: `${yyyy}-${mm}-${dd}` }));
+                        setShowDatePicker(false);
+                      };
 
-                            {/* Weekday Labels */}
-                            <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(w => (
-                                <Text key={w} style={{ flex: 1, textAlign: 'center', fontSize: 9, fontWeight: '800', color: colors.text.muted }}>{w}</Text>
-                              ))}
-                            </View>
-
-                            {/* Day Grid */}
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                              {calendarDays.map((dayNum, i) => {
-                                if (dayNum === null) {
-                                  return <View key={`empty-${i}`} style={{ width: '14.28%', height: 26 }} />;
-                                }
-                                const isSelected = form.date && new Date(form.date).getDate() === dayNum && new Date(form.date).getMonth() === month && new Date(form.date).getFullYear() === year;
-                                const isToday = new Date().getDate() === dayNum && new Date().getMonth() === month && new Date().getFullYear() === year;
-
-                                return (
-                                  <TouchableOpacity
-                                    key={`day-${dayNum}`}
-                                    style={[{
-                                      width: '14.28%',
-                                      height: 26,
-                                      justifyContent: 'center',
-                                      alignItems: 'center',
-                                      borderRadius: 6
-                                    }, isSelected && { backgroundColor: colors.primary }, isToday && !isSelected && { borderWidth: 1, borderColor: colors.primary }]}
-                                    onPress={() => handleSelectDay(dayNum)}
-                                  >
-                                    <Text style={[{ fontSize: 11, fontWeight: isSelected || isToday ? '800' : '500', color: isSelected ? '#fff' : colors.text.primary }]}>
-                                      {dayNum}
-                                    </Text>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-
-                            {/* Today Quick Select Footer */}
-                            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: 10, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <TouchableOpacity onPress={() => { setForm(f => ({ ...f, date: new Date().toISOString().split('T')[0] })); setShowDatePicker(false); }}>
-                                <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>Today</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>Close</Text>
-                              </TouchableOpacity>
-                            </View>
+                      return (
+                        <View style={[styles.customSelectPanel, {
+                          padding: 14,
+                          width: '100%',
+                          left: 0,
+                          right: 0,
+                          backgroundColor: colors.bg.card,
+                          borderRadius: Radius.lg,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          boxShadow: '0px 10px 25px rgba(0,0,0,0.15)',
+                          elevation: 10,
+                          top: 40,
+                          position: 'absolute',
+                          zIndex: 4000
+                        }]}>
+                          {/* Calendar Header */}
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <TouchableOpacity onPress={() => handleMonthChange(-1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
+                              <Ionicons name="chevron-back" size={14} color={colors.text.primary} />
+                            </TouchableOpacity>
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text.primary }}>
+                              {monthNames[month]} {year}
+                            </Text>
+                            <TouchableOpacity onPress={() => handleMonthChange(1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
+                              <Ionicons name="chevron-forward" size={14} color={colors.text.primary} />
+                            </TouchableOpacity>
                           </View>
-                        );
-                      })()}
+
+                          {/* Weekday Labels */}
+                          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+                            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(w => (
+                              <Text key={w} style={{ flex: 1, textAlign: 'center', fontSize: 9, fontWeight: '800', color: colors.text.muted }}>{w}</Text>
+                            ))}
+                          </View>
+
+                          {/* Day Grid */}
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                            {calendarDays.map((dayNum, i) => {
+                              if (dayNum === null) {
+                                return <View key={`empty-${i}`} style={{ width: '14.28%', height: 26 }} />;
+                              }
+                              const isSelected = form.date && new Date(form.date).getDate() === dayNum && new Date(form.date).getMonth() === month && new Date(form.date).getFullYear() === year;
+                              const isToday = new Date().getDate() === dayNum && new Date().getMonth() === month && new Date().getFullYear() === year;
+
+                              return (
+                                <TouchableOpacity
+                                  key={`day-${dayNum}`}
+                                  style={[{
+                                    width: '14.28%',
+                                    height: 26,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    borderRadius: 6
+                                  }, isSelected && { backgroundColor: colors.primary }, isToday && !isSelected && { borderWidth: 1, borderColor: colors.primary }]}
+                                  onPress={() => handleSelectDay(dayNum)}
+                                >
+                                  <Text style={[{ fontSize: 11, fontWeight: isSelected || isToday ? '800' : '500', color: isSelected ? '#fff' : colors.text.primary }]}>
+                                    {dayNum}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+
+                          {/* Today Quick Select Footer */}
+                          <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: 10, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <TouchableOpacity onPress={() => { setForm(f => ({ ...f, date: new Date().toISOString().split('T')[0] })); setShowDatePicker(false); }}>
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>Today</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>Close</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })()}
+                  </View>
+                </View>
+              </View>
+
+              {/* Notes */}
+              <Text style={styles.inputLabel}>Notes</Text>
+              <TextInput style={[styles.input, { height: 38, textAlignVertical: 'top', backgroundColor: colors.bg.primary, marginBottom: 2 }]} value={form.notes} onChangeText={v => setForm(f => ({ ...f, notes: v }))} placeholder="Optional notes..." placeholderTextColor={colors.text.muted} multiline />
+            </View>
+
+            {/* Card Section 2: Party / Target Details */}
+            <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 8 }]}>👤 Party / Clinic Information</Text>
+
+              {/* Billing Mode (sale only) */}
+              {isSale && (() => {
+                const selectedCustomer = customers.find(c => c._id === form.partyId);
+                const isCashCust = selectedCustomer && (selectedCustomer.customerType === 'cash' || selectedCustomer.recordTracking === 'cash_ledger');
+
+                return (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.inputLabel}>Billing Mode *</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.toggleChip,
+                          form.billingMode === 'regular' && { backgroundColor: '#3b82f6', borderColor: '#3b82f6' },
+                          isCashCust && { opacity: 0.4 }
+                        ]}
+                        disabled={isCashCust}
+                        onPress={() => setForm(f => ({ ...f, billingMode: 'regular' }))}
+                      >
+                        <Text style={[styles.toggleChipText, form.billingMode === 'regular' && { color: '#fff', fontWeight: '700' }]}>
+                          Regular (GST Invoice) {isCashCust ? '(Disabled for Non-GST)' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.toggleChip, form.billingMode === 'cash' && { backgroundColor: '#f59e0b', borderColor: '#f59e0b' }]}
+                        onPress={() => setForm(f => ({ ...f, billingMode: 'cash' }))}
+                      >
+                        <Text style={[styles.toggleChipText, form.billingMode === 'cash' && { color: '#fff', fontWeight: '700' }]}>Cash (No GST)</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* Sample-specific fields (MR and Doctor Name Side-by-Side) */}
+              {isSample && (
+                <View style={{ backgroundColor: colors.bg.primary, borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ fontSize: 11, color: '#7c3aed', marginBottom: 8, fontWeight: '700' }}>🩺 Doctor Sample — NOT a taxable supply.</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inputLabel}>MR Name</Text>
+                      <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.secondary, color: colors.text.muted, marginBottom: 0 }]} value={form.medicalRepName} editable={false} placeholder="MR Name" placeholderTextColor={colors.text.muted} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inputLabel}>Doctor Name</Text>
+                      <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.secondary, marginBottom: 0 }]} value={form.doctorName} onChangeText={v => setForm(f => ({ ...f, doctorName: v }))} placeholder="Dr. Name" placeholderTextColor={colors.text.muted} />
                     </View>
                   </View>
                 </View>
+              )}
 
-                {/* Notes */}
-                <Text style={styles.inputLabel}>Notes</Text>
-                <TextInput style={[styles.input, { height: 38, textAlignVertical: 'top', backgroundColor: colors.bg.primary, marginBottom: 2 }]} value={form.notes} onChangeText={v => setForm(f => ({ ...f, notes: v }))} placeholder="Optional notes..." placeholderTextColor={colors.text.muted} multiline />
-              </View>
+              {/* Damage-specific fields */}
+              {isDamage && (
+                <View style={{ backgroundColor: '#fff1f2', borderRadius: 10, padding: 12, marginBottom: 2, borderWidth: 1, borderColor: '#fecdd3' }}>
+                  <Text style={{ fontSize: 11, color: '#be123c', marginBottom: 8, fontWeight: '700' }}>⚠️ Damage Write-off — Deducts inventory only.</Text>
+                  <Text style={styles.inputLabel}>Damage Reason *</Text>
+                  <TextInput style={[styles.input, { height: 50, textAlignVertical: 'top', backgroundColor: colors.bg.secondary, marginBottom: 0 }]} value={form.damageReason} onChangeText={v => setForm(f => ({ ...f, damageReason: v }))} placeholder="Describe the damage..." placeholderTextColor={colors.text.muted} multiline />
+                </View>
+              )}
 
-              {/* Card Section 2: Party / Target Details */}
-              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 8 }]}>👤 Party / Clinic Information</Text>
-
-                {/* Billing Mode (sale only) */}
-                {isSale && (() => {
-                  const selectedCustomer = customers.find(c => c._id === form.partyId);
-                  const isCashCust = selectedCustomer && (selectedCustomer.customerType === 'cash' || selectedCustomer.recordTracking === 'cash_ledger');
-
-                  return (
-                    <View style={{ marginBottom: 12 }}>
-                      <Text style={styles.inputLabel}>Billing Mode *</Text>
-                      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                        <TouchableOpacity
-                          style={[
-                            styles.toggleChip,
-                            form.billingMode === 'regular' && { backgroundColor: '#3b82f6', borderColor: '#3b82f6' },
-                            isCashCust && { opacity: 0.4 }
-                          ]}
-                          disabled={isCashCust}
-                          onPress={() => setForm(f => ({ ...f, billingMode: 'regular' }))}
-                        >
-                          <Text style={[styles.toggleChipText, form.billingMode === 'regular' && { color: '#fff', fontWeight: '700' }]}>
-                            Regular (GST Invoice) {isCashCust ? '(Disabled for Non-GST)' : ''}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.toggleChip, form.billingMode === 'cash' && { backgroundColor: '#f59e0b', borderColor: '#f59e0b' }]}
-                          onPress={() => setForm(f => ({ ...f, billingMode: 'cash' }))}
-                        >
-                          <Text style={[styles.toggleChipText, form.billingMode === 'cash' && { color: '#fff', fontWeight: '700' }]}>Cash (No GST)</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })()}
-
-                {/* Sample-specific fields (MR and Doctor Name Side-by-Side) */}
-                {isSample && (
-                  <View style={{ backgroundColor: colors.bg.primary, borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 11, color: '#7c3aed', marginBottom: 8, fontWeight: '700' }}>🩺 Doctor Sample — NOT a taxable supply.</Text>
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel}>MR Name</Text>
-                        <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.secondary, color: colors.text.muted, marginBottom: 0 }]} value={form.medicalRepName} editable={false} placeholder="MR Name" placeholderTextColor={colors.text.muted} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel}>Doctor Name</Text>
-                        <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.secondary, marginBottom: 0 }]} value={form.doctorName} onChangeText={v => setForm(f => ({ ...f, doctorName: v }))} placeholder="Dr. Name" placeholderTextColor={colors.text.muted} />
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {/* Damage-specific fields */}
-                {isDamage && (
-                  <View style={{ backgroundColor: '#fff1f2', borderRadius: 10, padding: 12, marginBottom: 2, borderWidth: 1, borderColor: '#fecdd3' }}>
-                    <Text style={{ fontSize: 11, color: '#be123c', marginBottom: 8, fontWeight: '700' }}>⚠️ Damage Write-off — Deducts inventory only.</Text>
-                    <Text style={styles.inputLabel}>Damage Reason *</Text>
-                    <TextInput style={[styles.input, { height: 50, textAlignVertical: 'top', backgroundColor: colors.bg.secondary, marginBottom: 0 }]} value={form.damageReason} onChangeText={v => setForm(f => ({ ...f, damageReason: v }))} placeholder="Describe the damage..." placeholderTextColor={colors.text.muted} multiline />
-                  </View>
-                )}
-
-                 {/* Transfer-specific fields */}
-                {isTransfer && (
-                  <View style={{ backgroundColor: colors.bg.primary, borderRadius: 10, padding: 12, marginBottom: 2, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 11, color: '#f59e0b', marginBottom: 8, fontWeight: '700' }}>🔄 Stock Transfer — Outward movement to another warehouse/unit.</Text>
-                    <Text style={styles.inputLabel}>Destination Warehouse / Unit *</Text>
-                    {Platform.OS === 'web' ? (
-                      <select
-                        value={form.partyId || ''}
-                        onChange={(e: any) => {
-                          const w = warehouses.find(x => x._id === e.target.value);
-                          setForm(f => ({
-                            ...f,
-                            partyId: e.target.value,
-                            partyName: w?.name || '',
-                            partyAddress: w ? `Warehouse Address:\n${w.name}` : ''
-                          }));
-                        }}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: 8,
-                          border: `1px solid ${colors.border}`,
-                          backgroundColor: colors.bg.secondary,
-                          color: colors.text.primary,
-                          fontSize: 13,
-                          height: 35,
-                          width: '100%',
-                          outline: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                      >
-                        <option value="">Select Destination Warehouse</option>
-                        {warehouses
-                          .filter(w => w._id !== form.warehouseId)
-                          .map(w => (
-                            <option key={w._id} value={w._id}>{w.name}</option>
-                          ))
-                        }
-                      </select>
-                    ) : (
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                        {warehouses
-                          .filter(w => w._id !== form.warehouseId)
-                          .map(w => (
-                            <TouchableOpacity
-                              key={w._id}
-                              style={[
-                                styles.toggleChip,
-                                form.partyId === w._id && { backgroundColor: '#f59e0b', borderColor: '#f59e0b' }
-                              ]}
-                              onPress={() => {
-                                setForm(f => ({
-                                  ...f,
-                                  partyId: w._id,
-                                  partyName: w.name,
-                                  partyAddress: `Warehouse Address:\n${w.name}`
-                                }));
-                              }}
-                            >
-                              <Text style={[styles.toggleChipText, form.partyId === w._id && { color: '#fff', fontWeight: '700' }]}>
-                                {w.name}
-                              </Text>
-                            </TouchableOpacity>
-                          ))
-                        }
-                      </View>
-                    )}
-                  </View>
-                )}
-
-                {/* Party Information (dropdown fetched from customers) */}
-                {(isDamage || (!isDamage && !isTransfer)) && (
-                  <View style={{ zIndex: 1000, position: 'relative' }}>
-                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10, zIndex: 1001, position: 'relative' }}>
-                      <View style={{ flex: 1.2, position: 'relative', zIndex: 1002 }}>
-                        <Text style={styles.inputLabel}>{isDamage ? 'Party (auto-set)' : isSample ? 'Party / Clinic (optional)' : 'Party Name *'}</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, height: 35, backgroundColor: colors.bg.primary, marginBottom: 2 }}>
-                          <Ionicons name="person-outline" size={14} color={colors.text.muted} />
-                          <TextInput
-                            style={{ flex: 1, fontSize: 13, color: colors.text.primary, height: '100%', paddingLeft: 6 }}
-                            value={isDamage ? form.partyName || 'Damage' : customerSearch}
-                            editable={!isDamage}
-                            onChangeText={v => {
-                              setCustomerSearch(v);
-                              setForm(f => ({ ...f, partyName: v, partyId: '' }));
-                              setShowCustomerDropdown(true);
+              {/* Transfer-specific fields */}
+              {isTransfer && (
+                <View style={{ backgroundColor: colors.bg.primary, borderRadius: 10, padding: 12, marginBottom: 2, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ fontSize: 11, color: '#f59e0b', marginBottom: 8, fontWeight: '700' }}>🔄 Stock Transfer — Outward movement to another warehouse/unit.</Text>
+                  <Text style={styles.inputLabel}>Destination Warehouse / Unit *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={form.partyId || ''}
+                      onChange={(e: any) => {
+                        const w = warehouses.find(x => x._id === e.target.value);
+                        setForm(f => ({
+                          ...f,
+                          partyId: e.target.value,
+                          partyName: w?.name || '',
+                          partyAddress: w ? `Warehouse Address:\n${w.name}` : ''
+                        }));
+                      }}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        border: `1px solid ${colors.border}`,
+                        backgroundColor: colors.bg.secondary,
+                        color: colors.text.primary,
+                        fontSize: 13,
+                        height: 35,
+                        width: '100%',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="">Select Destination Warehouse</option>
+                      {warehouses
+                        .filter(w => w._id !== form.warehouseId)
+                        .map(w => (
+                          <option key={w._id} value={w._id}>{w.name}</option>
+                        ))
+                      }
+                    </select>
+                  ) : (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {warehouses
+                        .filter(w => w._id !== form.warehouseId)
+                        .map(w => (
+                          <TouchableOpacity
+                            key={w._id}
+                            style={[
+                              styles.toggleChip,
+                              form.partyId === w._id && { backgroundColor: '#f59e0b', borderColor: '#f59e0b' }
+                            ]}
+                            onPress={() => {
+                              setForm(f => ({
+                                ...f,
+                                partyId: w._id,
+                                partyName: w.name,
+                                partyAddress: `Warehouse Address:\n${w.name}`
+                              }));
                             }}
-                            onFocus={() => !isDamage && setShowCustomerDropdown(true)}
-                            placeholder={isDamage ? 'Damage' : "Search customer..."}
-                            placeholderTextColor={colors.text.muted}
-                          />
-                          {!isDamage && customerSearch ? (
-                            <TouchableOpacity onPress={() => { setCustomerSearch(''); setForm(f => ({ ...f, partyName: '', partyId: '' })); setShowCustomerDropdown(true); }}>
-                              <Ionicons name="close-circle" size={16} color={colors.text.muted} style={{ paddingLeft: 6 }} />
-                            </TouchableOpacity>
-                          ) : null}
-                        </View>
-                        {showCustomerDropdown && (
-                          <View style={styles.customSelectPanel}>
-                            <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
-                              {customers
-                                .filter(c =>
-                                  !customerSearch.trim() ||
-                                  c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-                                  (c.company && c.company.toLowerCase().includes(customerSearch.toLowerCase()))
-                                )
-                                .slice(0, 8)
-                                .map(c => {
-                                  const displayName = c.company ? `${c.company} (${c.name})` : c.name;
-                                  const hasGst = !!(c.gstin && c.gstin.trim());
-                                  return (
-                                    <TouchableOpacity
-                                      key={c._id}
-                                      style={styles.customSelectItem}
-                                      onPress={() => {
-                                        const finalName = c.company || c.name;
-                                        const billingAddr = c.billingAddress;
-                                        const billingAddrStr = billingAddr ? [billingAddr.street, billingAddr.city, billingAddr.state, billingAddr.pin].filter(Boolean).join(', ') : '';
-                                        const shippingAddr = c.shippingAddress;
-                                        const shippingAddrStr = shippingAddr ? [shippingAddr.street, shippingAddr.city, shippingAddr.state, shippingAddr.pin].filter(Boolean).join(', ') : (billingAddrStr.trim());
-                                        setForm(f => ({
-                                          ...f,
-                                          partyId: c._id,
-                                          partyName: finalName,
-                                          partyGstin: c.gstin || '',
-                                          billingAddress: billingAddrStr.trim(),
-                                          shippingAddress: shippingAddrStr.trim(),
-                                          partyAddress: `Billing Address:\n${billingAddrStr.trim()}\n\nShipping Address:\n${shippingAddrStr.trim()}`
-                                        }));
-                                        setCustomerSearch(finalName);
-                                        setShowCustomerDropdown(false);
-                                      }}
-                                    >
-                                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <View style={{ flex: 1, paddingRight: 8 }}>
-                                          <Text style={styles.customSelectItemText}>{displayName}</Text>
-                                          {c.phone ? <Text style={styles.customSelectItemSubtext}>📞 {c.phone}</Text> : null}
-                                        </View>
-                                        {hasGst ? (
-                                          <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
-                                            <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📄 GST ({c.gstin})</Text>
-                                          </View>
-                                        ) : (
-                                          <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.warning }}>
-                                            <Text style={{ fontSize: 9, fontWeight: '700', color: colors.warning }}>💵 Cash</Text>
-                                          </View>
-                                        )}
-                                      </View>
-                                    </TouchableOpacity>
-                                  );
-                                })
-                              }
-                              {customers.filter(c =>
+                          >
+                            <Text style={[styles.toggleChipText, form.partyId === w._id && { color: '#fff', fontWeight: '700' }]}>
+                              {w.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))
+                      }
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Party Information (dropdown fetched from customers) */}
+              {(isDamage || (!isDamage && !isTransfer)) && (
+                <View style={{ zIndex: 1000, position: 'relative' }}>
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10, zIndex: 1001, position: 'relative' }}>
+                    <View style={{ flex: 1.2, position: 'relative', zIndex: 1002 }}>
+                      <Text style={styles.inputLabel}>{isDamage ? 'Party (auto-set)' : isSample ? 'Party / Clinic (optional)' : 'Party Name *'}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, height: 35, backgroundColor: colors.bg.primary, marginBottom: 2 }}>
+                        <Ionicons name="person-outline" size={14} color={colors.text.muted} />
+                        <TextInput
+                          style={{ flex: 1, fontSize: 13, color: colors.text.primary, height: '100%', paddingLeft: 6 }}
+                          value={isDamage ? form.partyName || 'Damage' : customerSearch}
+                          editable={!isDamage}
+                          onChangeText={v => {
+                            setCustomerSearch(v);
+                            setForm(f => ({ ...f, partyName: v, partyId: '' }));
+                            setShowCustomerDropdown(true);
+                          }}
+                          onFocus={() => !isDamage && setShowCustomerDropdown(true)}
+                          placeholder={isDamage ? 'Damage' : "Search customer..."}
+                          placeholderTextColor={colors.text.muted}
+                        />
+                        {!isDamage && customerSearch ? (
+                          <TouchableOpacity onPress={() => { setCustomerSearch(''); setForm(f => ({ ...f, partyName: '', partyId: '' })); setShowCustomerDropdown(true); }}>
+                            <Ionicons name="close-circle" size={16} color={colors.text.muted} style={{ paddingLeft: 6 }} />
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                      {showCustomerDropdown && (
+                        <View style={styles.customSelectPanel}>
+                          <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
+                            {customers
+                              .filter(c =>
+                                !customerSearch.trim() ||
                                 c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
                                 (c.company && c.company.toLowerCase().includes(customerSearch.toLowerCase()))
-                              ).length === 0 && (
+                              )
+                              .slice(0, 8)
+                              .map(c => {
+                                const displayName = c.company ? `${c.company} (${c.name})` : c.name;
+                                const hasGst = !!(c.gstin && c.gstin.trim());
+                                return (
+                                  <TouchableOpacity
+                                    key={c._id}
+                                    style={styles.customSelectItem}
+                                    onPress={() => {
+                                      const finalName = c.company || c.name;
+                                      const billingAddr = c.billingAddress;
+                                      const billingAddrStr = billingAddr ? [billingAddr.street, billingAddr.city, billingAddr.state, billingAddr.pin].filter(Boolean).join(', ') : '';
+                                      const shippingAddr = c.shippingAddress;
+                                      const shippingAddrStr = shippingAddr ? [shippingAddr.street, shippingAddr.city, shippingAddr.state, shippingAddr.pin].filter(Boolean).join(', ') : (billingAddrStr.trim());
+                                      setForm(f => ({
+                                        ...f,
+                                        partyId: c._id,
+                                        partyName: finalName,
+                                        partyGstin: c.gstin || '',
+                                        billingAddress: billingAddrStr.trim(),
+                                        shippingAddress: shippingAddrStr.trim(),
+                                        partyAddress: `Billing Address:\n${billingAddrStr.trim()}\n\nShipping Address:\n${shippingAddrStr.trim()}`
+                                      }));
+                                      setCustomerSearch(finalName);
+                                      setShowCustomerDropdown(false);
+                                    }}
+                                  >
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <View style={{ flex: 1, paddingRight: 8 }}>
+                                        <Text style={styles.customSelectItemText}>{displayName}</Text>
+                                        {c.phone ? <Text style={styles.customSelectItemSubtext}>📞 {c.phone}</Text> : null}
+                                      </View>
+                                      {hasGst ? (
+                                        <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
+                                          <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📄 GST ({c.gstin})</Text>
+                                        </View>
+                                      ) : (
+                                        <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.warning }}>
+                                          <Text style={{ fontSize: 9, fontWeight: '700', color: colors.warning }}>💵 Cash</Text>
+                                        </View>
+                                      )}
+                                    </View>
+                                  </TouchableOpacity>
+                                );
+                              })
+                            }
+                            {customers.filter(c =>
+                              c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                              (c.company && c.company.toLowerCase().includes(customerSearch.toLowerCase()))
+                            ).length === 0 && (
                                 <View style={{ padding: 12 }}>
                                   <Text style={{ fontSize: 12, color: colors.text.secondary, textAlign: 'center' }}>
                                     {isSale ? 'No registered customers found.' : 'No customers found (typing custom clinic).'}
                                   </Text>
                                 </View>
                               )}
-                            </ScrollView>
-                          </View>
-                        )}
-                      </View>
-                      {(isSale && form.billingMode === 'regular') && (
-                        <View style={{ flex: 0.8 }}>
-                          <Text style={styles.inputLabel}>Party GSTIN</Text>
-                          <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.secondary, color: colors.text.muted }]} value={form.partyGstin} editable={false} placeholder="GSTIN" placeholderTextColor={colors.text.muted} autoCapitalize="characters" />
+                          </ScrollView>
                         </View>
                       )}
                     </View>
+                    {(isSale && form.billingMode === 'regular') && (
+                      <View style={{ flex: 0.8 }}>
+                        <Text style={styles.inputLabel}>Party GSTIN</Text>
+                        <TextInput style={[styles.input, { height: 35, backgroundColor: colors.bg.secondary, color: colors.text.muted }]} value={form.partyGstin} editable={false} placeholder="GSTIN" placeholderTextColor={colors.text.muted} autoCapitalize="characters" />
+                      </View>
+                    )}
+                  </View>
 
-                    {/* Side-by-side Billing & Shipping Address Fields */}
-                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 2 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel}>Billing Address</Text>
-                        <TextInput
-                          style={[styles.input, { height: 60, textAlignVertical: 'top', backgroundColor: colors.bg.secondary, color: colors.text.muted, marginBottom: 0 }]}
-                          value={form.billingAddress}
-                          editable={false}
-                          placeholder="No Billing Address specified"
-                          placeholderTextColor={colors.text.muted}
-                          multiline
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel}>Shipping Address</Text>
-                        <TextInput
-                          style={[styles.input, { height: 60, textAlignVertical: 'top', backgroundColor: colors.bg.primary, marginBottom: 0 }]}
-                          value={form.shippingAddress}
-                          onChangeText={v => setForm(f => {
-                            const newForm = { ...f, shippingAddress: v };
-                            newForm.partyAddress = `Billing Address:\n${newForm.billingAddress}\n\nShipping Address:\n${v}`;
-                            return newForm;
-                          })}
-                          placeholder="Enter Shipping Address..."
-                          placeholderTextColor={colors.text.muted}
-                          multiline
-                        />
-                      </View>
+                  {/* Side-by-side Billing & Shipping Address Fields */}
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 2 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inputLabel}>Billing Address</Text>
+                      <TextInput
+                        style={[styles.input, { height: 60, textAlignVertical: 'top', backgroundColor: colors.bg.secondary, color: colors.text.muted, marginBottom: 0 }]}
+                        value={form.billingAddress}
+                        editable={false}
+                        placeholder="No Billing Address specified"
+                        placeholderTextColor={colors.text.muted}
+                        multiline
+                      />
                     </View>
-                  </View>
-                )}
-              </View>
-
-              {/* Card Section 3: Logistics & Transport Details */}
-              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 10 }]}>🚚 Logistics &amp; Transport Details (Optional)</Text>
-                
-                {/* Row 1: Transporter, LR/GR, Vehicle */}
-                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.inputLabel}>Transporter Name</Text>
-                    <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.transporter || ''} onChangeText={v => setForm(f => ({ ...f, transporter: v }))} placeholder="e.g. VRL, TCI" placeholderTextColor={colors.text.muted} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.inputLabel}>LR / GR Number</Text>
-                    <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.lrNo || ''} onChangeText={v => setForm(f => ({ ...f, lrNo: v }))} placeholder="Lorry Receipt No" placeholderTextColor={colors.text.muted} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.inputLabel}>Vehicle Number</Text>
-                    <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.vehicleNo || ''} onChangeText={v => setForm(f => ({ ...f, vehicleNo: v }))} placeholder="e.g. MH-12-AB-1234" placeholderTextColor={colors.text.muted} />
-                  </View>
-                </View>
-
-                {/* Row 2: Courier Service, Tracking ID, Total Boxes */}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.inputLabel}>Courier Service</Text>
-                    <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.courierName || ''} onChangeText={v => setForm(f => ({ ...f, courierName: v }))} placeholder="e.g. Delhivery, BlueDart" placeholderTextColor={colors.text.muted} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.inputLabel}>Tracking ID</Text>
-                    <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.trackingId || ''} onChangeText={v => setForm(f => ({ ...f, trackingId: v }))} placeholder="Tracking Number" placeholderTextColor={colors.text.muted} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.inputLabel}>Total Boxes</Text>
-                    <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.totalBoxes || '1'} onChangeText={v => setForm(f => ({ ...f, totalBoxes: v }))} keyboardType="numeric" placeholder="1" placeholderTextColor={colors.text.muted} />
-                  </View>
-                </View>
-              </View>
-
-              {/* Card Section 4: Dispatched Products */}
-              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border, overflow: 'visible' }}>
-                <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 8 }]}>📦 Dispatched Products</Text>
-                
-                {items.map((item, idx) => {
-                  const isDropdownOpen = activeItemDropdownIdx === idx;
-                  const filtered = getFilteredInventoryEntries(isDropdownOpen ? itemSearchText : '');
-                  return (
-                    <View key={idx} style={{ marginBottom: 10, padding: 10, borderRadius: 8, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border }}>
-                      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                        <View style={{ flex: 3.5, minWidth: 160 }}>
-                          <Text style={styles.fieldLabel}>Product Name</Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: isDropdownOpen ? colors.primary : colors.border, borderRadius: 8, paddingHorizontal: 10, height: 32, backgroundColor: colors.bg.secondary }}>
-                            <Ionicons name="cube-outline" size={14} color={colors.text.muted} />
-                            <TextInput
-                              style={{ flex: 1, fontSize: 13, color: colors.text.primary, height: '100%', paddingLeft: 6 }}
-                              value={item.productName}
-                              onChangeText={v => {
-                                const n = [...items]; n[idx].productName = v;
-                                setItems(n);
-                                setItemSearchText(v);
-                                setActiveItemDropdownIdx(idx);
-                              }}
-                              onFocus={() => {
-                                setActiveItemDropdownIdx(idx);
-                                setItemSearchText(item.productName);
-                              }}
-                              placeholder="Search product..."
-                              placeholderTextColor={colors.text.muted}
-                            />
-                            {item.productName ? (
-                                <TouchableOpacity onPress={() => {
-                                const n = [...items];
-                                n[idx] = { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' };
-                                setItems(n);
-                                setItemSearchText('');
-                                setActiveItemDropdownIdx(idx);
-                              }}>
-                                <Ionicons name="close-circle" size={16} color={colors.text.muted} style={{ paddingLeft: 6 }} />
-                              </TouchableOpacity>
-                            ) : null}
-                          </View>
-                          {item.size ? <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Size: {item.size}</Text> : null}
-                        </View>
-
-                        <View style={{ flex: 1, minWidth: 60 }}>
-                          <Text style={styles.fieldLabel}>Qty (pcs)</Text>
-                          <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.qty)} onChangeText={v => {
-                            let newQty = parseInt(v) || 0;
-                            if (item.productId) {
-                              const availPcs = warehouseInventory
-                                .filter(e => e.productId === item.productId)
-                                .reduce((s, e) => s + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
-                              if (availPcs > 0 && newQty > availPcs) {
-                                alert(`Cannot enter quantity (${newQty} pcs) exceeding available stock (${availPcs} pcs). Quantity capped to ${availPcs} pcs.`);
-                                newQty = availPcs;
-                              }
-                            }
-                            const n = [...items];
-                            n[idx].qty = newQty;
-                            if (item.productId) {
-                              n[idx].batchNo = computeBatchAllocation(item.productId, newQty);
-                            }
-                            setItems(n);
-                          }} keyboardType="numeric" />
-                        </View>
-
-                        {!isSample && (
-                          <>
-                            <View style={{ flex: 1.1, minWidth: 70 }}>
-                              <Text style={styles.fieldLabel}>MRP (₹)</Text>
-                              <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.mrp || 0)} onChangeText={v => {
-                                const n = [...items];
-                                const mrpVal = parseFloat(v) || 0;
-                                n[idx].mrp = mrpVal;
-                                const disc = n[idx].discountPercent || 0;
-                                const computedRate = mrpVal > 0 ? (disc > 0 ? mrpVal * (1 - disc / 100) : mrpVal) : (n[idx].rate || 0);
-                                n[idx].rate = computedRate;
-                                setItems(n);
-                              }} keyboardType="numeric" />
-                            </View>
-
-                            <View style={{ flex: 0.9, minWidth: 60 }}>
-                              <Text style={styles.fieldLabel}>Disc (%)</Text>
-                              <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.discountPercent || 0)} onChangeText={v => {
-                                const n = [...items];
-                                const discVal = parseFloat(v) || 0;
-                                n[idx].discountPercent = discVal;
-                                const mrpVal = n[idx].mrp || n[idx].rate || 0;
-                                const computedRate = mrpVal > 0 ? mrpVal * (1 - discVal / 100) : (n[idx].rate || 0);
-                                n[idx].rate = computedRate;
-                                setItems(n);
-                              }} keyboardType="numeric" />
-                            </View>
-
-                            <View style={{ flex: 1.1, minWidth: 75 }}>
-                              <Text style={styles.fieldLabel}>Net Rate (₹)</Text>
-                              <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.rate || 0)} onChangeText={v => {
-                                const n = [...items];
-                                const netRate = parseFloat(v) || 0;
-                                n[idx].rate = netRate;
-                                const mrpVal = n[idx].mrp || 0;
-                                if (mrpVal > 0 && mrpVal >= netRate) {
-                                  n[idx].discountPercent = parseFloat((((mrpVal - netRate) / mrpVal) * 100).toFixed(1));
-                                }
-                                setItems(n);
-                              }} keyboardType="numeric" />
-                            </View>
-                          </>
-                        )}
-
-                        {isSale && (form as any).billingMode !== 'cash' && !form.isFree && (
-                          <View style={{ flex: 1, minWidth: 60 }}>
-                            <Text style={styles.fieldLabel}>GST %</Text>
-                            <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.gstRate || 0)} onChangeText={v => { const n = [...items]; n[idx].gstRate = parseFloat(v) || 0; setItems(n); }} keyboardType="numeric" />
-                          </View>
-                        )}
-
-                        {items.length > 1 && (
-                          <TouchableOpacity style={{ marginBottom: 6 }} onPress={() => { setItems(items.filter((_, i) => i !== idx)); setActiveItemDropdownIdx(null); }}>
-                            <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-
-                      {/* Inline dropdown — no absolute positioning, never clipped by ScrollView */}
-                      {isDropdownOpen && filtered.length > 0 && (() => {
-                        const selectedOtherProductIds = items
-                          .filter((_, i) => i !== idx && _.productId)
-                          .map(_ => _.productId);
-                        const allowedFiltered = filtered.filter(entry => !selectedOtherProductIds.includes(entry.productId));
-                        
-                        if (allowedFiltered.length === 0) return null;
-
-                        return (
-                          <View style={{ backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.primary, borderRadius: 8, marginBottom: 8, marginTop: 8, overflow: 'hidden' }}>
-                            <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
-                              {allowedFiltered.slice(0, 10).map(entry => {
-                                const displayName = getInventoryEntryDisplayName(entry);
-                                const availPcs = entry.totalAvailablePcs !== undefined ? entry.totalAvailablePcs : entry.qtyBoxes * (entry.packing || 1);
-                                const batchStr = entry.batches?.length > 0 ? entry.batches[0] : (entry.batchNo || 'N/A');
-                                return (
-                                  <TouchableOpacity key={entry._id} style={styles.customSelectItem}
-                                    onPress={() => handleSelectInventoryEntry(idx, entry)}>
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <View style={{ flex: 1, paddingRight: 8 }}>
-                                        <Text style={styles.customSelectItemText}>{displayName}</Text>
-                                        <Text style={styles.customSelectItemSubtext}>
-                                          Available: {availPcs} pcs {batchStr !== 'N/A' ? `| Batch: ${batchStr}` : ''}
-                                        </Text>
-                                      </View>
-                                      {availPcs > 0 ? (
-                                        <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
-                                          <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📦 In Stock</Text>
-                                        </View>
-                                      ) : (
-                                        <View style={{ backgroundColor: colors.danger + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.danger }}>
-                                          <Text style={{ fontSize: 9, fontWeight: '700', color: colors.danger }}>⚠️ Out of Stock</Text>
-                                        </View>
-                                      )}
-                                    </View>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </ScrollView>
-                          </View>
-                        );
-                      })()}
-                    </View>
-                  );
-                })}
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 8, paddingVertical: 10, marginTop: 4, marginBottom: 6 }} onPress={() => setItems([...items, { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' }])}>
-                  <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
-                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Product Row</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Card Section 4: Amount Summary */}
-              {showFinancials && (
-                <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
-                  <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 10 }]}>💰 Amount Bifurcation</Text>
-                  
-                  <View style={{ gap: 6 }}>
-                    {totalMrpValue > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12, color: colors.text.muted }}>Total Item MRP</Text>
-                        <Text style={{ fontSize: 12, color: colors.text.secondary, fontWeight: '600' }}>₹{totalMrpValue.toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {totalDiscountSaved > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 12, color: colors.success, fontWeight: '600' }}>Total Discount Saved</Text>
-                        <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.sm }}>
-                          <Text style={{ fontSize: 12, color: colors.success, fontWeight: '700' }}>- ₹{totalDiscountSaved.toFixed(2)}</Text>
-                        </View>
-                      </View>
-                    )}
-
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>Taxable Value (Base Amount)</Text>
-                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>₹{totalBase.toFixed(2)}</Text>
-                    </View>
-                    
-                    {cgst > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12, color: colors.text.secondary }}>CGST</Text>
-                        <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>₹{cgst.toFixed(2)}</Text>
-                      </View>
-                    )}
-                    
-                    {sgst > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12, color: colors.text.secondary }}>SGST</Text>
-                        <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>₹{sgst.toFixed(2)}</Text>
-                      </View>
-                    )}
-                    
-                    {igst > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12, color: colors.text.secondary }}>IGST</Text>
-                        <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>₹{igst.toFixed(2)}</Text>
-                      </View>
-                    )}
-                    
-                    {roundOff !== 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12, color: colors.text.secondary }}>Round Off</Text>
-                        <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>{roundOff > 0 ? '+' : ''}₹{roundOff.toFixed(2)}</Text>
-                      </View>
-                    )}
-                    
-                    <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
-                    
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>Grand Total</Text>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: colors.primary }}>₹{nettTotal.toLocaleString()}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inputLabel}>Shipping Address</Text>
+                      <TextInput
+                        style={[styles.input, { height: 60, textAlignVertical: 'top', backgroundColor: colors.bg.primary, marginBottom: 0 }]}
+                        value={form.shippingAddress}
+                        onChangeText={v => setForm(f => {
+                          const newForm = { ...f, shippingAddress: v };
+                          newForm.partyAddress = `Billing Address:\n${newForm.billingAddress}\n\nShipping Address:\n${v}`;
+                          return newForm;
+                        })}
+                        placeholder="Enter Shipping Address..."
+                        placeholderTextColor={colors.text.muted}
+                        multiline
+                      />
                     </View>
                   </View>
                 </View>
               )}
-              </Pressable>
-    </ScrollView>
+            </View>
+
+            {/* Card Section 3: Logistics & Transport Details */}
+            <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 10 }]}>🚚 Logistics &amp; Transport Details (Optional)</Text>
+
+              {/* Row 1: Transporter, LR/GR, Vehicle */}
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.inputLabel}>Transporter Name</Text>
+                  <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.transporter || ''} onChangeText={v => setForm(f => ({ ...f, transporter: v }))} placeholder="e.g. VRL, TCI" placeholderTextColor={colors.text.muted} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.inputLabel}>LR / GR Number</Text>
+                  <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.lrNo || ''} onChangeText={v => setForm(f => ({ ...f, lrNo: v }))} placeholder="Lorry Receipt No" placeholderTextColor={colors.text.muted} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.inputLabel}>Vehicle Number</Text>
+                  <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.vehicleNo || ''} onChangeText={v => setForm(f => ({ ...f, vehicleNo: v }))} placeholder="e.g. MH-12-AB-1234" placeholderTextColor={colors.text.muted} />
+                </View>
+              </View>
+
+              {/* Row 2: Courier Service, Tracking ID, Total Boxes */}
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.inputLabel}>Courier Service</Text>
+                  <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.courierName || ''} onChangeText={v => setForm(f => ({ ...f, courierName: v }))} placeholder="e.g. Delhivery, BlueDart" placeholderTextColor={colors.text.muted} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.inputLabel}>Tracking ID</Text>
+                  <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.trackingId || ''} onChangeText={v => setForm(f => ({ ...f, trackingId: v }))} placeholder="Tracking Number" placeholderTextColor={colors.text.muted} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.inputLabel}>Total Boxes</Text>
+                  <TextInput style={[styles.input, { height: 38, paddingVertical: 0, backgroundColor: colors.bg.primary, marginBottom: 0 }]} value={form.totalBoxes || '1'} onChangeText={v => setForm(f => ({ ...f, totalBoxes: v }))} keyboardType="numeric" placeholder="1" placeholderTextColor={colors.text.muted} />
+                </View>
+              </View>
+            </View>
+
+            {/* Card Section 4: Dispatched Products */}
+            <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border, overflow: 'visible' }}>
+              <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 8 }]}>📦 Dispatched Products</Text>
+
+              {items.map((item, idx) => {
+                const isDropdownOpen = activeItemDropdownIdx === idx;
+                const filtered = getFilteredInventoryEntries(isDropdownOpen ? itemSearchText : '');
+                return (
+                  <View key={idx} style={{ marginBottom: 10, padding: 10, borderRadius: 8, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border }}>
+                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                      <View style={{ flex: 3.5, minWidth: 160 }}>
+                        <Text style={styles.fieldLabel}>Product Name</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: isDropdownOpen ? colors.primary : colors.border, borderRadius: 8, paddingHorizontal: 10, height: 32, backgroundColor: colors.bg.secondary }}>
+                          <Ionicons name="cube-outline" size={14} color={colors.text.muted} />
+                          <TextInput
+                            style={{ flex: 1, fontSize: 13, color: colors.text.primary, height: '100%', paddingLeft: 6 }}
+                            value={item.productName}
+                            onChangeText={v => {
+                              const n = [...items]; n[idx].productName = v;
+                              setItems(n);
+                              setItemSearchText(v);
+                              setActiveItemDropdownIdx(idx);
+                            }}
+                            onFocus={() => {
+                              setActiveItemDropdownIdx(idx);
+                              setItemSearchText(item.productName);
+                            }}
+                            placeholder="Search product..."
+                            placeholderTextColor={colors.text.muted}
+                          />
+                          {item.productName ? (
+                            <TouchableOpacity onPress={() => {
+                              const n = [...items];
+                              n[idx] = { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' };
+                              setItems(n);
+                              setItemSearchText('');
+                              setActiveItemDropdownIdx(idx);
+                            }}>
+                              <Ionicons name="close-circle" size={16} color={colors.text.muted} style={{ paddingLeft: 6 }} />
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                        {item.size ? <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Size: {item.size}</Text> : null}
+                      </View>
+
+                      <View style={{ flex: 1, minWidth: 60 }}>
+                        <Text style={styles.fieldLabel}>Qty (pcs)</Text>
+                        <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.qty)} onChangeText={v => {
+                          let newQty = parseInt(v) || 0;
+                          if (item.productId) {
+                            const availPcs = warehouseInventory
+                              .filter(e => e.productId === item.productId)
+                              .reduce((s, e) => s + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
+                            if (availPcs > 0 && newQty > availPcs) {
+                              alert(`Cannot enter quantity (${newQty} pcs) exceeding available stock (${availPcs} pcs). Quantity capped to ${availPcs} pcs.`);
+                              newQty = availPcs;
+                            }
+                          }
+                          const n = [...items];
+                          n[idx].qty = newQty;
+                          if (item.productId) {
+                            n[idx].batchNo = computeBatchAllocation(item.productId, newQty);
+                          }
+                          setItems(n);
+                        }} keyboardType="numeric" />
+                      </View>
+
+                      {!isSample && (
+                        <>
+                          <View style={{ flex: 1.1, minWidth: 70 }}>
+                            <Text style={styles.fieldLabel}>MRP (₹)</Text>
+                            <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.mrp || 0)} onChangeText={v => {
+                              const n = [...items];
+                              const mrpVal = parseFloat(v) || 0;
+                              n[idx].mrp = mrpVal;
+                              const disc = n[idx].discountPercent || 0;
+                              const computedRate = mrpVal > 0 ? (disc > 0 ? mrpVal * (1 - disc / 100) : mrpVal) : (n[idx].rate || 0);
+                              n[idx].rate = computedRate;
+                              setItems(n);
+                            }} keyboardType="numeric" />
+                          </View>
+
+                          <View style={{ flex: 0.9, minWidth: 60 }}>
+                            <Text style={styles.fieldLabel}>Disc (%)</Text>
+                            <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.discountPercent || 0)} onChangeText={v => {
+                              const n = [...items];
+                              const discVal = parseFloat(v) || 0;
+                              n[idx].discountPercent = discVal;
+                              const mrpVal = n[idx].mrp || n[idx].rate || 0;
+                              const computedRate = mrpVal > 0 ? mrpVal * (1 - discVal / 100) : (n[idx].rate || 0);
+                              n[idx].rate = computedRate;
+                              setItems(n);
+                            }} keyboardType="numeric" />
+                          </View>
+
+                          <View style={{ flex: 1.1, minWidth: 75 }}>
+                            <Text style={styles.fieldLabel}>Net Rate (₹)</Text>
+                            <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.rate || 0)} onChangeText={v => {
+                              const n = [...items];
+                              const netRate = parseFloat(v) || 0;
+                              n[idx].rate = netRate;
+                              const mrpVal = n[idx].mrp || 0;
+                              if (mrpVal > 0 && mrpVal >= netRate) {
+                                n[idx].discountPercent = parseFloat((((mrpVal - netRate) / mrpVal) * 100).toFixed(1));
+                              }
+                              setItems(n);
+                            }} keyboardType="numeric" />
+                          </View>
+                        </>
+                      )}
+
+                      {isSale && (form as any).billingMode !== 'cash' && !form.isFree && (
+                        <View style={{ flex: 1, minWidth: 60 }}>
+                          <Text style={styles.fieldLabel}>GST %</Text>
+                          <TextInput style={[styles.smallInput, { height: 32 }]} value={String(item.gstRate || 0)} onChangeText={v => { const n = [...items]; n[idx].gstRate = parseFloat(v) || 0; setItems(n); }} keyboardType="numeric" />
+                        </View>
+                      )}
+
+                      {items.length > 1 && (
+                        <TouchableOpacity style={{ marginBottom: 6 }} onPress={() => { setItems(items.filter((_, i) => i !== idx)); setActiveItemDropdownIdx(null); }}>
+                          <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Inline dropdown — no absolute positioning, never clipped by ScrollView */}
+                    {isDropdownOpen && filtered.length > 0 && (() => {
+                      const selectedOtherProductIds = items
+                        .filter((_, i) => i !== idx && _.productId)
+                        .map(_ => _.productId);
+                      const allowedFiltered = filtered.filter(entry => !selectedOtherProductIds.includes(entry.productId));
+
+                      if (allowedFiltered.length === 0) return null;
+
+                      return (
+                        <View style={{ backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.primary, borderRadius: 8, marginBottom: 8, marginTop: 8, overflow: 'hidden' }}>
+                          <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
+                            {allowedFiltered.slice(0, 10).map(entry => {
+                              const displayName = getInventoryEntryDisplayName(entry);
+                              const availPcs = entry.totalAvailablePcs !== undefined ? entry.totalAvailablePcs : entry.qtyBoxes * (entry.packing || 1);
+                              const batchStr = entry.batches?.length > 0 ? entry.batches[0] : (entry.batchNo || 'N/A');
+                              return (
+                                <TouchableOpacity key={entry._id} style={styles.customSelectItem}
+                                  onPress={() => handleSelectInventoryEntry(idx, entry)}>
+                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <View style={{ flex: 1, paddingRight: 8 }}>
+                                      <Text style={styles.customSelectItemText}>{displayName}</Text>
+                                      <Text style={styles.customSelectItemSubtext}>
+                                        Available: {availPcs} pcs {batchStr !== 'N/A' ? `| Batch: ${batchStr}` : ''}
+                                      </Text>
+                                    </View>
+                                    {availPcs > 0 ? (
+                                      <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
+                                        <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📦 In Stock</Text>
+                                      </View>
+                                    ) : (
+                                      <View style={{ backgroundColor: colors.danger + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.danger }}>
+                                        <Text style={{ fontSize: 9, fontWeight: '700', color: colors.danger }}>⚠️ Out of Stock</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </ScrollView>
+                        </View>
+                      );
+                    })()}
+                  </View>
+                );
+              })}
+              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 8, paddingVertical: 10, marginTop: 4, marginBottom: 6 }} onPress={() => setItems([...items, { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' }])}>
+                <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Product Row</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Card Section 4: Amount Summary */}
+            {showFinancials && (
+              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={[styles.inputLabel, { color: colors.primary, fontSize: 13, marginBottom: 10 }]}>💰 Amount Bifurcation</Text>
+
+                <View style={{ gap: 6 }}>
+                  {totalMrpValue > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: colors.text.muted }}>Total Item MRP</Text>
+                      <Text style={{ fontSize: 12, color: colors.text.secondary, fontWeight: '600' }}>₹{totalMrpValue.toFixed(2)}</Text>
+                    </View>
+                  )}
+
+                  {totalDiscountSaved > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 12, color: colors.success, fontWeight: '600' }}>Total Discount Saved</Text>
+                      <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.sm }}>
+                        <Text style={{ fontSize: 12, color: colors.success, fontWeight: '700' }}>- ₹{totalDiscountSaved.toFixed(2)}</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Taxable Value (Base Amount)</Text>
+                    <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>₹{totalBase.toFixed(2)}</Text>
+                  </View>
+
+                  {cgst > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>CGST</Text>
+                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>₹{cgst.toFixed(2)}</Text>
+                    </View>
+                  )}
+
+                  {sgst > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>SGST</Text>
+                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>₹{sgst.toFixed(2)}</Text>
+                    </View>
+                  )}
+
+                  {igst > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>IGST</Text>
+                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>₹{igst.toFixed(2)}</Text>
+                    </View>
+                  )}
+
+                  {roundOff !== 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>Round Off</Text>
+                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>{roundOff > 0 ? '+' : ''}₹{roundOff.toFixed(2)}</Text>
+                    </View>
+                  )}
+
+                  <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>Grand Total</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: colors.primary }}>₹{nettTotal.toLocaleString()}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </Pressable>
+        </ScrollView>
       </KeyboardAvoidingView>
     );
   }
@@ -1665,184 +1669,184 @@ export default function StockMovementsScreen() {
           </View>
         </View>
         <ScrollView style={styles.modalForm} contentContainerStyle={{ padding: 16 }}>
-                <View style={{ marginBottom: 12 }}>
-                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                    <View style={[styles.badge, { backgroundColor: STATUS_COLORS[detailMovement.status] + '20', borderColor: STATUS_COLORS[detailMovement.status] }]}>
-                      <Text style={[styles.badgeText, { color: STATUS_COLORS[detailMovement.status] }]}>{detailMovement.status.toUpperCase()}</Text>
-                    </View>
-                    <View style={[styles.badge, { backgroundColor: (TYPE_CONFIG[detailMovement.type]?.color || colors.primary) + '15', borderColor: TYPE_CONFIG[detailMovement.type]?.color || colors.primary }]}>
-                      <Text style={[styles.badgeText, { color: TYPE_CONFIG[detailMovement.type]?.color || colors.primary }]}>{TYPE_CONFIG[detailMovement.type]?.label || detailMovement.type}</Text>
-                    </View>
-                    {detailMovement.type === 'sale' && (
-                      <View style={[styles.badge, { backgroundColor: (detailMovement as any).billingMode === 'cash' ? '#fef3c7' : '#eff6ff', borderColor: (detailMovement as any).billingMode === 'cash' ? '#f59e0b' : '#3b82f6' }]}>
-                        <Text style={[styles.badgeText, { color: (detailMovement as any).billingMode === 'cash' ? '#f59e0b' : '#3b82f6' }]}>{((detailMovement as any).billingMode || 'regular').toUpperCase()}</Text>
-                      </View>
-                    )}
+          <View style={{ marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <View style={[styles.badge, { backgroundColor: STATUS_COLORS[detailMovement.status] + '20', borderColor: STATUS_COLORS[detailMovement.status] }]}>
+                <Text style={[styles.badgeText, { color: STATUS_COLORS[detailMovement.status] }]}>{detailMovement.status.toUpperCase()}</Text>
+              </View>
+              <View style={[styles.badge, { backgroundColor: (TYPE_CONFIG[detailMovement.type]?.color || colors.primary) + '15', borderColor: TYPE_CONFIG[detailMovement.type]?.color || colors.primary }]}>
+                <Text style={[styles.badgeText, { color: TYPE_CONFIG[detailMovement.type]?.color || colors.primary }]}>{TYPE_CONFIG[detailMovement.type]?.label || detailMovement.type}</Text>
+              </View>
+              {detailMovement.type === 'sale' && (
+                <View style={[styles.badge, { backgroundColor: (detailMovement as any).billingMode === 'cash' ? '#fef3c7' : '#eff6ff', borderColor: (detailMovement as any).billingMode === 'cash' ? '#f59e0b' : '#3b82f6' }]}>
+                  <Text style={[styles.badgeText, { color: (detailMovement as any).billingMode === 'cash' ? '#f59e0b' : '#3b82f6' }]}>{((detailMovement as any).billingMode || 'regular').toUpperCase()}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.detailLabel}>Date</Text>
+            <Text style={styles.detailValue}>{new Date(detailMovement.date).toLocaleDateString('en-IN')}</Text>
+            <Text style={styles.detailLabel}>Party</Text>
+            <Text style={styles.detailValue}>{detailMovement.partyName}{detailMovement.partyGstin ? ` (${detailMovement.partyGstin})` : ''}</Text>
+            {detailMovement.partyAddress ? <><Text style={styles.detailLabel}>Address</Text><Text style={styles.detailValue}>{detailMovement.partyAddress}</Text></> : null}
+            <Text style={styles.detailLabel}>Warehouse</Text>
+            <Text style={styles.detailValue}>{detailMovement.warehouseName}</Text>
+            {(detailMovement as any).medicalRepName ? <><Text style={styles.detailLabel}>MR Name</Text><Text style={styles.detailValue}>{(detailMovement as any).medicalRepName}</Text></> : null}
+            {(detailMovement as any).doctorName ? <><Text style={styles.detailLabel}>Doctor Name</Text><Text style={styles.detailValue}>{(detailMovement as any).doctorName}</Text></> : null}
+            {(detailMovement as any).damageReason ? <><Text style={styles.detailLabel}>Damage Reason</Text><Text style={[styles.detailValue, { color: '#ef4444' }]}>{(detailMovement as any).damageReason}</Text></> : null}
+            {detailMovement.convertedToInvoice && <Text style={[styles.detailValue, { color: colors.success }]}>✓ Invoiced: {detailMovement.invoiceNo}</Text>}
+            {detailMovement.notes ? <><Text style={styles.detailLabel}>Notes</Text><Text style={styles.detailValue}>{detailMovement.notes}</Text></> : null}
+
+            {(detailMovement.transporter || detailMovement.courierName || detailMovement.lrNo || detailMovement.vehicleNo || detailMovement.trackingId) ? (
+              <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, marginBottom: 4 }}>🚚 LOGISTICS &amp; TRANSPORT DETAILS</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                  {detailMovement.transporter ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Transporter: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.transporter}</Text></Text> : null}
+                  {detailMovement.lrNo ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>LR/GR No: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.lrNo}</Text></Text> : null}
+                  {detailMovement.vehicleNo ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Vehicle: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.vehicleNo}</Text></Text> : null}
+                  {detailMovement.courierName ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Courier: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.courierName}</Text></Text> : null}
+                  {detailMovement.trackingId ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Tracking ID: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.trackingId}</Text></Text> : null}
+                  {detailMovement.totalBoxes ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Boxes: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.totalBoxes}</Text></Text> : null}
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Items</Text>
+          {detailMovement.items.map((it, i) => {
+            const mrpVal = it.mrp || 0;
+            const discPct = it.discountPercent || (mrpVal > 0 && it.rate ? parseFloat((((mrpVal - it.rate) / mrpVal) * 100).toFixed(1)) : 0);
+            return (
+              <View key={i} style={{ paddingVertical: 6, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.border }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 2 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>{it.productName}</Text>
+                    <Text style={{ fontSize: 11, color: colors.text.muted }}>
+                      {it.batchNo ? `Batch: ${it.batchNo} | ` : ''}
+                      {mrpVal > 0 ? `MRP: ₹${mrpVal}` : ''}
+                      {discPct > 0 ? ` (${discPct}% off)` : ''}
+                    </Text>
                   </View>
-                  <Text style={styles.detailLabel}>Date</Text>
-                  <Text style={styles.detailValue}>{new Date(detailMovement.date).toLocaleDateString('en-IN')}</Text>
-                  <Text style={styles.detailLabel}>Party</Text>
-                  <Text style={styles.detailValue}>{detailMovement.partyName}{detailMovement.partyGstin ? ` (${detailMovement.partyGstin})` : ''}</Text>
-                  {detailMovement.partyAddress ? <><Text style={styles.detailLabel}>Address</Text><Text style={styles.detailValue}>{detailMovement.partyAddress}</Text></> : null}
-                  <Text style={styles.detailLabel}>Warehouse</Text>
-                  <Text style={styles.detailValue}>{detailMovement.warehouseName}</Text>
-                  {(detailMovement as any).medicalRepName ? <><Text style={styles.detailLabel}>MR Name</Text><Text style={styles.detailValue}>{(detailMovement as any).medicalRepName}</Text></> : null}
-                  {(detailMovement as any).doctorName ? <><Text style={styles.detailLabel}>Doctor Name</Text><Text style={styles.detailValue}>{(detailMovement as any).doctorName}</Text></> : null}
-                  {(detailMovement as any).damageReason ? <><Text style={styles.detailLabel}>Damage Reason</Text><Text style={[styles.detailValue, { color: '#ef4444' }]}>{(detailMovement as any).damageReason}</Text></> : null}
-                  {detailMovement.convertedToInvoice && <Text style={[styles.detailValue, { color: colors.success }]}>✓ Invoiced: {detailMovement.invoiceNo}</Text>}
-                  {detailMovement.notes ? <><Text style={styles.detailLabel}>Notes</Text><Text style={styles.detailValue}>{detailMovement.notes}</Text></> : null}
-
-                  {(detailMovement.transporter || detailMovement.courierName || detailMovement.lrNo || detailMovement.vehicleNo || detailMovement.trackingId) ? (
-                    <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: colors.border }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, marginBottom: 4 }}>🚚 LOGISTICS &amp; TRANSPORT DETAILS</Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                        {detailMovement.transporter ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Transporter: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.transporter}</Text></Text> : null}
-                        {detailMovement.lrNo ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>LR/GR No: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.lrNo}</Text></Text> : null}
-                        {detailMovement.vehicleNo ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Vehicle: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.vehicleNo}</Text></Text> : null}
-                        {detailMovement.courierName ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Courier: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.courierName}</Text></Text> : null}
-                        {detailMovement.trackingId ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Tracking ID: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.trackingId}</Text></Text> : null}
-                        {detailMovement.totalBoxes ? <Text style={{ fontSize: 12, color: colors.text.secondary }}>Boxes: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{detailMovement.totalBoxes}</Text></Text> : null}
-                      </View>
-                    </View>
-                  ) : null}
+                  <Text style={{ fontSize: 12, color: colors.text.secondary, flex: 1, textAlign: 'center' }}>Qty: {(it.qty || 0) * (it.packing || 1)} pcs</Text>
+                  <Text style={{ fontSize: 12, color: colors.success, fontWeight: '700', flex: 1, textAlign: 'right' }}>
+                    {(it.rate || 0) > 0 ? `₹${((it.qty || 0) * (it.rate || 0) * (it.packing || 1)).toLocaleString('en-IN')}` : 'Free'}
+                  </Text>
                 </View>
+              </View>
+            );
+          })}
 
-                <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Items</Text>
-                {detailMovement.items.map((it, i) => {
-                  const mrpVal = it.mrp || 0;
-                  const discPct = it.discountPercent || (mrpVal > 0 && it.rate ? parseFloat((((mrpVal - it.rate) / mrpVal) * 100).toFixed(1)) : 0);
-                  return (
-                    <View key={i} style={{ paddingVertical: 6, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.border }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View style={{ flex: 2 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>{it.productName}</Text>
-                          <Text style={{ fontSize: 11, color: colors.text.muted }}>
-                            {it.batchNo ? `Batch: ${it.batchNo} | ` : ''}
-                            {mrpVal > 0 ? `MRP: ₹${mrpVal}` : ''}
-                            {discPct > 0 ? ` (${discPct}% off)` : ''}
-                          </Text>
-                        </View>
-                        <Text style={{ fontSize: 12, color: colors.text.secondary, flex: 1, textAlign: 'center' }}>Qty: {(it.qty || 0) * (it.packing || 1)} pcs</Text>
-                        <Text style={{ fontSize: 12, color: colors.success, fontWeight: '700', flex: 1, textAlign: 'right' }}>
-                          {(it.rate || 0) > 0 ? `₹${((it.qty || 0) * (it.rate || 0) * (it.packing || 1)).toLocaleString('en-IN')}` : 'Free'}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })}
+          {(detailMovement.totalAmount || 0) > 0 && (
+            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: 8, paddingTop: 8, gap: 4 }}>
+              {(detailMovement as any).totalMrp > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: colors.text.muted }}>Total Item MRP</Text>
+                  <Text style={{ fontSize: 12, color: colors.text.muted }}>₹{(detailMovement as any).totalMrp.toLocaleString('en-IN')}</Text>
+                </View>
+              )}
+              {(detailMovement as any).totalDiscount > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.success }}>Total Discount Saved</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>- ₹{(detailMovement as any).totalDiscount.toLocaleString('en-IN')}</Text>
+                </View>
+              )}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <Text style={{ fontWeight: '700', color: colors.text.primary }}>Grand Total</Text>
+                <Text style={{ fontWeight: '800', fontSize: 15, color: colors.primary }}>₹{detailMovement.totalAmount.toLocaleString('en-IN')}</Text>
+              </View>
+            </View>
+          )}
 
-                {(detailMovement.totalAmount || 0) > 0 && (
-                  <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: 8, paddingTop: 8, gap: 4 }}>
-                    {(detailMovement as any).totalMrp > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12, color: colors.text.muted }}>Total Item MRP</Text>
-                        <Text style={{ fontSize: 12, color: colors.text.muted }}>₹{(detailMovement as any).totalMrp.toLocaleString('en-IN')}</Text>
-                      </View>
-                    )}
-                    {(detailMovement as any).totalDiscount > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.success }}>Total Discount Saved</Text>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>- ₹{(detailMovement as any).totalDiscount.toLocaleString('en-IN')}</Text>
-                      </View>
-                    )}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4, borderTopWidth: 1, borderTopColor: colors.border }}>
-                      <Text style={{ fontWeight: '700', color: colors.text.primary }}>Grand Total</Text>
-                      <Text style={{ fontWeight: '800', fontSize: 15, color: colors.primary }}>₹{detailMovement.totalAmount.toLocaleString('en-IN')}</Text>
-                    </View>
+          {/* Supporting Documents Vault */}
+          <View style={{ gap: 6, marginVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Delivery Proof (POD):</Text>
+
+            {(detailMovement as any).supportingDocuments && (detailMovement as any).supportingDocuments.length > 0 ? (
+              <View style={{ gap: 6, marginTop: 4 }}>
+                {(detailMovement as any).supportingDocuments.map((doc: any, docIdx: number) => (
+                  <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                    <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                      <Ionicons name="document-attach" size={15} color={colors.primary} />
+                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDeleteChallanDoc(detailMovement._id, doc.url)} style={{ padding: 4 }}>
+                      <Ionicons name="trash-outline" size={14} color={colors.danger} />
+                    </TouchableOpacity>
                   </View>
-                )}
+                ))}
+              </View>
+            ) : (
+              <Text style={{ fontSize: 11, color: colors.text.muted, fontStyle: 'italic', marginTop: 2 }}>No supporting documents uploaded.</Text>
+            )}
+          </View>
 
-                {/* Supporting Documents Vault */}
-                <View style={{ gap: 6, marginVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Delivery Proof (POD):</Text>
-                  
-                  {(detailMovement as any).supportingDocuments && (detailMovement as any).supportingDocuments.length > 0 ? (
-                    <View style={{ gap: 6, marginTop: 4 }}>
-                      {(detailMovement as any).supportingDocuments.map((doc: any, docIdx: number) => (
-                        <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
-                          <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                            <Ionicons name="document-attach" size={15} color={colors.primary} />
-                            <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => handleDeleteChallanDoc(detailMovement._id, doc.url)} style={{ padding: 4 }}>
-                            <Ionicons name="trash-outline" size={14} color={colors.danger} />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                    </View>
-                  ) : (
-                    <Text style={{ fontSize: 11, color: colors.text.muted, fontStyle: 'italic', marginTop: 2 }}>No supporting documents uploaded.</Text>
-                  )}
-                </View>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
+            {/* Finalize */}
+            {detailMovement.status === 'draft' && (
+              <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.success }]} onPress={() => { setShowDetail(false); handleFinalize(detailMovement); }}>
+                <Ionicons name="checkmark-done-outline" size={16} color="#fff" />
+                <Text style={styles.detailActionBtnText}>Finalize</Text>
+              </TouchableOpacity>
+            )}
 
-                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
-                  {/* Finalize */}
-                  {detailMovement.status === 'draft' && (
-                    <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.success }]} onPress={() => { setShowDetail(false); handleFinalize(detailMovement); }}>
-                      <Ionicons name="checkmark-done-outline" size={16} color="#fff" />
-                      <Text style={styles.detailActionBtnText}>Finalize</Text>
-                    </TouchableOpacity>
-                  )}
+            {/* Edit */}
+            {detailMovement.status === 'draft' && (
+              <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.info }]} onPress={() => {
+                setShowDetail(false);
+                setEditId(detailMovement._id);
+                const foundCust = customers.find(c => c.company === detailMovement.partyName || c.name === detailMovement.partyName);
+                setForm({ ...DEFAULT_FORM, ...(detailMovement as any), partyId: detailMovement.partyId || foundCust?._id || '' });
+                setItems((detailMovement.items || []).map((it: any) => {
+                  const mrpVal = it.mrp || it.rate || 0;
+                  const netRate = it.rate || 0;
+                  let discPct = it.discountPercent || 0;
+                  if (!discPct && mrpVal > 0 && mrpVal > netRate) {
+                    discPct = parseFloat((((mrpVal - netRate) / mrpVal) * 100).toFixed(1));
+                  }
+                  return {
+                    ...it,
+                    mrp: mrpVal,
+                    discountPercent: discPct,
+                    rate: netRate
+                  };
+                }));
+                setCustomerSearch(detailMovement.partyName || '');
+                setShowModal(true);
+              }}>
+                <Ionicons name="create-outline" size={16} color="#fff" />
+                <Text style={styles.detailActionBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
 
-                  {/* Edit */}
-                  {detailMovement.status === 'draft' && (
-                    <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.info }]} onPress={() => {
-                      setShowDetail(false);
-                      setEditId(detailMovement._id);
-                      const foundCust = customers.find(c => c.company === detailMovement.partyName || c.name === detailMovement.partyName);
-                      setForm({ ...DEFAULT_FORM, ...(detailMovement as any), partyId: detailMovement.partyId || foundCust?._id || '' });
-                      setItems((detailMovement.items || []).map((it: any) => {
-                        const mrpVal = it.mrp || it.rate || 0;
-                        const netRate = it.rate || 0;
-                        let discPct = it.discountPercent || 0;
-                        if (!discPct && mrpVal > 0 && mrpVal > netRate) {
-                          discPct = parseFloat((((mrpVal - netRate) / mrpVal) * 100).toFixed(1));
-                        }
-                        return {
-                          ...it,
-                          mrp: mrpVal,
-                          discountPercent: discPct,
-                          rate: netRate
-                        };
-                      }));
-                      setCustomerSearch(detailMovement.partyName || '');
-                      setShowModal(true);
-                    }}>
-                      <Ionicons name="create-outline" size={16} color="#fff" />
-                      <Text style={styles.detailActionBtnText}>Edit</Text>
-                    </TouchableOpacity>
-                  )}
+            {/* Delete */}
+            {detailMovement.status !== 'dispatched' && detailMovement.status !== 'received' && (
+              <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.danger }]} onPress={() => { setShowDetail(false); handleDelete(detailMovement._id); }}>
+                <Ionicons name="trash-outline" size={16} color="#fff" />
+                <Text style={styles.detailActionBtnText}>Delete</Text>
+              </TouchableOpacity>
+            )}
 
-                  {/* Delete */}
-                  {detailMovement.status !== 'dispatched' && detailMovement.status !== 'received' && (
-                    <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.danger }]} onPress={() => { setShowDetail(false); handleDelete(detailMovement._id); }}>
-                      <Ionicons name="trash-outline" size={16} color="#fff" />
-                      <Text style={styles.detailActionBtnText}>Delete</Text>
-                    </TouchableOpacity>
-                  )}
+            {/* Convert to Invoice */}
+            {detailMovement.type === 'sale' && (detailMovement as any).billingMode !== 'cash' && detailMovement.direction === 'out' && detailMovement.partyGstin && !detailMovement.convertedToInvoice && detailMovement.status === 'dispatched' && (
+              <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.success }]} onPress={() => { setShowDetail(false); handleConvertToInvoice(detailMovement._id); }}>
+                <Ionicons name="document-text-outline" size={18} color="#fff" />
+                <Text style={styles.detailActionBtnText}>Convert to GST Tax Invoice</Text>
+              </TouchableOpacity>
+            )}
 
-                  {/* Convert to Invoice */}
-                  {detailMovement.type === 'sale' && (detailMovement as any).billingMode !== 'cash' && detailMovement.direction === 'out' && detailMovement.partyGstin && !detailMovement.convertedToInvoice && detailMovement.status === 'dispatched' && (
-                    <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.success }]} onPress={() => { setShowDetail(false); handleConvertToInvoice(detailMovement._id); }}>
-                      <Ionicons name="document-text-outline" size={18} color="#fff" />
-                      <Text style={styles.detailActionBtnText}>Convert to GST Tax Invoice</Text>
-                    </TouchableOpacity>
-                  )}
+            {/* Cancel */}
+            {(detailMovement.status === 'dispatched' || detailMovement.status === 'received') && !detailMovement.convertedToInvoice && (
+              <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.warning }]} onPress={() => { setShowDetail(false); handleCancel(detailMovement._id); }}>
+                <Ionicons name="close-circle-outline" size={18} color="#fff" />
+                <Text style={styles.detailActionBtnText}>Cancel Challan</Text>
+              </TouchableOpacity>
+            )}
 
-                  {/* Cancel */}
-                  {(detailMovement.status === 'dispatched' || detailMovement.status === 'received') && !detailMovement.convertedToInvoice && (
-                    <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.warning }]} onPress={() => { setShowDetail(false); handleCancel(detailMovement._id); }}>
-                      <Ionicons name="close-circle-outline" size={18} color="#fff" />
-                      <Text style={styles.detailActionBtnText}>Cancel Challan</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Print */}
-                  <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.primary }]} onPress={() => printDeliveryChallan(detailMovement)}>
-                    <Ionicons name="print-outline" size={16} color="#fff" />
-                    <Text style={styles.detailActionBtnText}>Print</Text>
-                  </TouchableOpacity>
-                </View>
+            {/* Print */}
+            <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.primary }]} onPress={() => printDeliveryChallan(detailMovement)}>
+              <Ionicons name="print-outline" size={16} color="#fff" />
+              <Text style={styles.detailActionBtnText}>Print</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </View>
     );
@@ -1879,215 +1883,215 @@ export default function StockMovementsScreen() {
         <>
           {/* Search Bar Container with Type/Status Dropdowns and New Challan Button Inside */}
           <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.sm, marginBottom: Spacing.xs }}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: colors.bg.card,
-          paddingHorizontal: 12,
-          paddingRight: 8,
-          borderRadius: Radius.md,
-          borderWidth: 1,
-          borderColor: colors.border,
-          gap: 10,
-          minHeight: 46
-        }}>
-          <Ionicons name="search" size={18} color={colors.text.muted} />
-          <TextInput
-            style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 100 }}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search doc no or party..."
-            placeholderTextColor={colors.text.muted}
-          />
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: colors.bg.card,
+              paddingHorizontal: 12,
+              paddingRight: 8,
+              borderRadius: Radius.md,
+              borderWidth: 1,
+              borderColor: colors.border,
+              gap: 10,
+              minHeight: 46
+            }}>
+              <Ionicons name="search" size={18} color={colors.text.muted} />
+              <TextInput
+                style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 100 }}
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Search doc no or party..."
+                placeholderTextColor={colors.text.muted}
+              />
 
-          {/* Type & Status Dropdowns inside search bar */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {Platform.OS === 'web' ? (
-              <>
-                <select
-                  value={filterType}
-                  onChange={(e: any) => setFilterType(e.target.value)}
-                  style={{
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    border: `1px solid ${colors.border}`,
-                    backgroundColor: colors.bg.secondary,
-                    color: colors.text.primary,
-                    fontSize: 12,
-                    outline: 'none',
-                    height: 32,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="">All Types</option>
-                  {Object.entries(TYPE_CONFIG).map(([k, v]) => (
-                    <option key={k} value={k}>{v.label}</option>
-                  ))}
-                </select>
+              {/* Type & Status Dropdowns inside search bar */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {Platform.OS === 'web' ? (
+                  <>
+                    <select
+                      value={filterType}
+                      onChange={(e: any) => setFilterType(e.target.value)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        border: `1px solid ${colors.border}`,
+                        backgroundColor: colors.bg.secondary,
+                        color: colors.text.primary,
+                        fontSize: 12,
+                        outline: 'none',
+                        height: 32,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">All Types</option>
+                      {Object.entries(TYPE_CONFIG).map(([k, v]) => (
+                        <option key={k} value={k}>{v.label}</option>
+                      ))}
+                    </select>
 
-                <select
-                  value={filterStatus}
-                  onChange={(e: any) => setFilterStatus(e.target.value)}
-                  style={{
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    border: `1px solid ${colors.border}`,
-                    backgroundColor: colors.bg.secondary,
-                    color: colors.text.primary,
-                    fontSize: 12,
-                    outline: 'none',
-                    height: 32,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="">All Statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="dispatched">Dispatched</option>
-                  <option value="received">Received</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity style={styles.mobileSelectBtn} onPress={() => { const validTypes = Object.entries(TYPE_CONFIG); Alert.alert('Select Type', '', ['All Types', ...validTypes.map(([,v]) => v.label)].map((o, idx) => ({ text: o, onPress: () => { if (idx === 0) setFilterType(''); else setFilterType(validTypes[idx-1][0]); } }))); }}>
-                  <Text style={styles.mobileSelectText} numberOfLines={1}>{filterType ? (TYPE_CONFIG[filterType]?.label || filterType) : 'Type'}</Text>
-                  <Ionicons name="chevron-down" size={10} color={colors.text.muted} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.mobileSelectBtn} onPress={() => { const opts = ['All Statuses','Draft','Dispatched','Received','Cancelled']; Alert.alert('Select Status', '', opts.map((o, idx) => ({ text: o, onPress: () => setFilterStatus(['','draft','dispatched','received','cancelled'][idx]) }))); }}>
-                  <Text style={styles.mobileSelectText}>{filterStatus ? filterStatus.toUpperCase() : 'Status'}</Text>
-                  <Ionicons name="chevron-down" size={10} color={colors.text.muted} />
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-
-          {/* New Challan Button (+) inside search bar */}
-          <TouchableOpacity
-            style={[styles.addBtn, { height: 34, paddingHorizontal: 12, borderRadius: Radius.sm }]}
-            onPress={() => { setEditId(null); resetForm(); setShowModal(true); }}
-          >
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.addBtnText}>New Challan</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
-
-        {movements.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Ionicons name="document-text-outline" size={40} color={colors.text.secondary} />
-            <Text style={styles.emptyText}>No delivery challans found.</Text>
-          </View>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, width: '100%' }}>
-            <View style={styles.table}>
-              {/* Table Header */}
-              <View style={styles.tableHeaderRow}>
-                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc No</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 90 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 1, minWidth: 220 }]}><Text style={styles.tableHeaderCell}>Party</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Warehouse</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>Type</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>Status</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Amount</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 160, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Actions</Text></View>
+                    <select
+                      value={filterStatus}
+                      onChange={(e: any) => setFilterStatus(e.target.value)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        border: `1px solid ${colors.border}`,
+                        backgroundColor: colors.bg.secondary,
+                        color: colors.text.primary,
+                        fontSize: 12,
+                        outline: 'none',
+                        height: 32,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="draft">Draft</option>
+                      <option value="dispatched">Dispatched</option>
+                      <option value="received">Received</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.mobileSelectBtn} onPress={() => { const validTypes = Object.entries(TYPE_CONFIG); Alert.alert('Select Type', '', ['All Types', ...validTypes.map(([, v]) => v.label)].map((o, idx) => ({ text: o, onPress: () => { if (idx === 0) setFilterType(''); else setFilterType(validTypes[idx - 1][0]); } }))); }}>
+                      <Text style={styles.mobileSelectText} numberOfLines={1}>{filterType ? (TYPE_CONFIG[filterType]?.label || filterType) : 'Type'}</Text>
+                      <Ionicons name="chevron-down" size={10} color={colors.text.muted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.mobileSelectBtn} onPress={() => { const opts = ['All Statuses', 'Draft', 'Dispatched', 'Received', 'Cancelled']; Alert.alert('Select Status', '', opts.map((o, idx) => ({ text: o, onPress: () => setFilterStatus(['', 'draft', 'dispatched', 'received', 'cancelled'][idx]) }))); }}>
+                      <Text style={styles.mobileSelectText}>{filterStatus ? filterStatus.toUpperCase() : 'Status'}</Text>
+                      <Ionicons name="chevron-down" size={10} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
 
-              {movements.map(m => {
-                const tc = TYPE_CONFIG[m.type] || { label: m.type, color: '#999' };
-                return (
-                  <Pressable key={m._id} style={styles.tableBodyRow} onPress={() => { setDetailMovement(m); setShowDetail(true); }}>
-                    {/* Doc No */}
-                    <View style={[styles.tableCellContainer, { width: 120 }]}>
-                      <Text style={[styles.primaryText, { color: colors.primary }]} numberOfLines={1}>{m.docNo.split('/').pop()}</Text>
-                      {m.billingMode === 'cash' && <Text style={{ fontSize: 9, color: '#f59e0b', fontWeight: '700' }}>CASH</Text>}
-                    </View>
-
-                    {/* Date */}
-                    <View style={[styles.tableCellContainer, { width: 90 }]}>
-                      <Text style={styles.tableCell}>{new Date(m.date).toLocaleDateString('en-IN')}</Text>
-                    </View>
-
-                    {/* Party */}
-                    <View style={[styles.tableCellContainer, { flex: 1, minWidth: 220, gap: 2 }]}>
-                      <Text style={[styles.primaryText, { fontSize: 13 }]} numberOfLines={1}>{m.partyName || '—'}</Text>
-                      {m.type === 'sample' && ((m as any).medicalRepName || (m as any).doctorName) && (
-                        <Text style={{ fontSize: 10, color: '#8b5cf6', fontWeight: '600' }} numberOfLines={1}>MR: {(m as any).medicalRepName || '—'} · Dr: {(m as any).doctorName || '—'}</Text>
-                      )}
-                      {m.type === 'damage' && (m as any).damageReason && (
-                        <Text style={{ fontSize: 10, color: '#ef4444', fontWeight: '600' }} numberOfLines={1}>{(m as any).damageReason}</Text>
-                      )}
-                    </View>
-
-                    {/* Warehouse */}
-                    <View style={[styles.tableCellContainer, { width: 130 }]}>
-                      <Text style={styles.tableCell} numberOfLines={1}>{m.warehouseName || '—'}</Text>
-                    </View>
-
-                    {/* Movement Type */}
-                    <View style={[styles.tableCellContainer, { width: 100 }]}>
-                      <View style={[styles.badge, { backgroundColor: tc.color + '15', borderColor: tc.color, paddingHorizontal: 8, paddingVertical: 3 }]}>
-                        <Text style={[styles.badgeText, { color: tc.color, fontSize: 9 }]}>{tc.label}</Text>
-                      </View>
-                      {m.convertedToInvoice && <Text style={{ fontSize: 10, color: colors.success, fontWeight: '600', marginTop: 4 }}>Inv: {m.invoiceNo}</Text>}
-                    </View>
-
-                    {/* Status */}
-                    <View style={[styles.tableCellContainer, { width: 100 }]}>
-                      <View style={[styles.badge, { backgroundColor: STATUS_COLORS[m.status] + '20', borderColor: STATUS_COLORS[m.status] }]}>
-                        <Text style={[styles.badgeText, { color: STATUS_COLORS[m.status], fontSize: 9 }]}>{m.status.toUpperCase()}</Text>
-                      </View>
-                    </View>
-
-                    {/* Total Amount */}
-                    <View style={[styles.tableCellContainer, { width: 100 }]}>
-                      <Text style={[styles.tableCell, { fontWeight: '700', color: colors.text.primary, textAlign: 'right' }]}>
-                        ₹{(m.totalAmount || 0).toLocaleString('en-IN')}
-                      </Text>
-                    </View>
-
-                    {/* Actions */}
-                    <View style={[styles.tableCellContainer, { width: 160, borderRightWidth: 0, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }]}>
-                      {/* Print DC */}
-                      <TouchableOpacity style={styles.actionPillBtn} onPress={(e) => { e.stopPropagation?.(); printDeliveryChallan(m); }}>
-                        <Ionicons name="print-outline" size={12} color={colors.primary} />
-                        <Text style={[styles.actionPillText, { color: colors.primary }]}>Print</Text>
-                      </TouchableOpacity>
-                      {/* WhatsApp Share */}
-                      <TouchableOpacity
-                        style={[styles.actionPillBtn, { backgroundColor: '#25D366' + '15', borderColor: '#25D366' + '40' }]}
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          const itemLines = (m.items || [])
-                            .map((it, i) => `  ${i + 1}. ${it.productName} — ${(it.qty || 0) * (it.packing || 1)} pcs`)
-                            .join('\n');
-                          const total = m.totalAmount
-                            ? `₹${m.totalAmount.toLocaleString('en-IN')}`
-                            : 'Free / Sample';
-                          const dateStr = new Date(m.date).toLocaleDateString('en-IN');
-                          const msg = `*Delivery Challan: ${m.docNo}*\nDate: ${dateStr}\nParty: ${m.partyName || '—'}\nWarehouse: ${m.warehouseName || '—'}\n\n*Items:*\n${itemLines}\n\n*Total: ${total}*`;
-                          const encoded = encodeURIComponent(msg);
-                          if (Platform.OS === 'web') {
-                            (window as any).open(`https://wa.me/?text=${encoded}`, '_blank');
-                          } else {
-                            const { Linking } = require('react-native');
-                            Linking.openURL(`whatsapp://send?text=${encoded}`);
-                          }
-                        }}
-                      >
-                        <Ionicons name="logo-whatsapp" size={12} color="#25D366" />
-                        <Text style={[styles.actionPillText, { color: '#25D366' }]}>Share</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </Pressable>
-                );
-              })}
+              {/* New Challan Button (+) inside search bar */}
+              <TouchableOpacity
+                style={[styles.addBtn, { height: 34, paddingHorizontal: 12, borderRadius: Radius.sm }]}
+                onPress={() => { setEditId(null); resetForm(); setShowModal(true); }}
+              >
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text style={styles.addBtnText}>New Challan</Text>
+              </TouchableOpacity>
             </View>
+          </View>
+
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
+
+            {movements.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Ionicons name="document-text-outline" size={40} color={colors.text.secondary} />
+                <Text style={styles.emptyText}>No delivery challans found.</Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, width: '100%' }}>
+                <View style={styles.table}>
+                  {/* Table Header */}
+                  <View style={styles.tableHeaderRow}>
+                    <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc No</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { width: 90 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { flex: 1, minWidth: 220 }]}><Text style={styles.tableHeaderCell}>Party</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Warehouse</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>Type</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>Status</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Amount</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, { width: 160, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Actions</Text></View>
+                  </View>
+
+                  {movements.map(m => {
+                    const tc = TYPE_CONFIG[m.type] || { label: m.type, color: '#999' };
+                    return (
+                      <Pressable key={m._id} style={styles.tableBodyRow} onPress={() => { setDetailMovement(m); setShowDetail(true); }}>
+                        {/* Doc No */}
+                        <View style={[styles.tableCellContainer, { width: 120 }]}>
+                          <Text style={[styles.primaryText, { color: colors.primary }]} numberOfLines={1}>{m.docNo.split('/').pop()}</Text>
+                          {m.billingMode === 'cash' && <Text style={{ fontSize: 9, color: '#f59e0b', fontWeight: '700' }}>CASH</Text>}
+                        </View>
+
+                        {/* Date */}
+                        <View style={[styles.tableCellContainer, { width: 90 }]}>
+                          <Text style={styles.tableCell}>{new Date(m.date).toLocaleDateString('en-IN')}</Text>
+                        </View>
+
+                        {/* Party */}
+                        <View style={[styles.tableCellContainer, { flex: 1, minWidth: 220, gap: 2 }]}>
+                          <Text style={[styles.primaryText, { fontSize: 13 }]} numberOfLines={1}>{m.partyName || '—'}</Text>
+                          {m.type === 'sample' && ((m as any).medicalRepName || (m as any).doctorName) && (
+                            <Text style={{ fontSize: 10, color: '#8b5cf6', fontWeight: '600' }} numberOfLines={1}>MR: {(m as any).medicalRepName || '—'} · Dr: {(m as any).doctorName || '—'}</Text>
+                          )}
+                          {m.type === 'damage' && (m as any).damageReason && (
+                            <Text style={{ fontSize: 10, color: '#ef4444', fontWeight: '600' }} numberOfLines={1}>{(m as any).damageReason}</Text>
+                          )}
+                        </View>
+
+                        {/* Warehouse */}
+                        <View style={[styles.tableCellContainer, { width: 130 }]}>
+                          <Text style={styles.tableCell} numberOfLines={1}>{m.warehouseName || '—'}</Text>
+                        </View>
+
+                        {/* Movement Type */}
+                        <View style={[styles.tableCellContainer, { width: 100 }]}>
+                          <View style={[styles.badge, { backgroundColor: tc.color + '15', borderColor: tc.color, paddingHorizontal: 8, paddingVertical: 3 }]}>
+                            <Text style={[styles.badgeText, { color: tc.color, fontSize: 9 }]}>{tc.label}</Text>
+                          </View>
+                          {m.convertedToInvoice && <Text style={{ fontSize: 10, color: colors.success, fontWeight: '600', marginTop: 4 }}>Inv: {m.invoiceNo}</Text>}
+                        </View>
+
+                        {/* Status */}
+                        <View style={[styles.tableCellContainer, { width: 100 }]}>
+                          <View style={[styles.badge, { backgroundColor: STATUS_COLORS[m.status] + '20', borderColor: STATUS_COLORS[m.status] }]}>
+                            <Text style={[styles.badgeText, { color: STATUS_COLORS[m.status], fontSize: 9 }]}>{m.status.toUpperCase()}</Text>
+                          </View>
+                        </View>
+
+                        {/* Total Amount */}
+                        <View style={[styles.tableCellContainer, { width: 100 }]}>
+                          <Text style={[styles.tableCell, { fontWeight: '700', color: colors.text.primary, textAlign: 'right' }]}>
+                            ₹{(m.totalAmount || 0).toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+
+                        {/* Actions */}
+                        <View style={[styles.tableCellContainer, { width: 160, borderRightWidth: 0, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }]}>
+                          {/* Print DC */}
+                          <TouchableOpacity style={styles.actionPillBtn} onPress={(e) => { e.stopPropagation?.(); printDeliveryChallan(m); }}>
+                            <Ionicons name="print-outline" size={12} color={colors.primary} />
+                            <Text style={[styles.actionPillText, { color: colors.primary }]}>Print</Text>
+                          </TouchableOpacity>
+                          {/* WhatsApp Share */}
+                          <TouchableOpacity
+                            style={[styles.actionPillBtn, { backgroundColor: '#25D366' + '15', borderColor: '#25D366' + '40' }]}
+                            onPress={(e) => {
+                              e.stopPropagation?.();
+                              const itemLines = (m.items || [])
+                                .map((it, i) => `  ${i + 1}. ${it.productName} — ${(it.qty || 0) * (it.packing || 1)} pcs`)
+                                .join('\n');
+                              const total = m.totalAmount
+                                ? `₹${m.totalAmount.toLocaleString('en-IN')}`
+                                : 'Free / Sample';
+                              const dateStr = new Date(m.date).toLocaleDateString('en-IN');
+                              const msg = `*Delivery Challan: ${m.docNo}*\nDate: ${dateStr}\nParty: ${m.partyName || '—'}\nWarehouse: ${m.warehouseName || '—'}\n\n*Items:*\n${itemLines}\n\n*Total: ${total}*`;
+                              const encoded = encodeURIComponent(msg);
+                              if (Platform.OS === 'web') {
+                                (window as any).open(`https://wa.me/?text=${encoded}`, '_blank');
+                              } else {
+                                const { Linking } = require('react-native');
+                                Linking.openURL(`whatsapp://send?text=${encoded}`);
+                              }
+                            }}
+                          >
+                            <Ionicons name="logo-whatsapp" size={12} color="#25D366" />
+                            <Text style={[styles.actionPillText, { color: '#25D366' }]}>Share</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
           </ScrollView>
-        )}
-      </ScrollView>
         </>
       )}
     </View>
