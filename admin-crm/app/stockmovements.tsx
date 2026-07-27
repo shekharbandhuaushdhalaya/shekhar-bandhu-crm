@@ -97,6 +97,7 @@ const printDeliveryChallan = (m: StockMovement) => {
   if (m.type === 'sample' && ((m as any).medicalRepName || (m as any).doctorName)) {
     extraInfo = `
       <div style="margin-top:4px;padding:4px;border:1px dashed #666;font-size:8px;">
+        <strong>DOCTOR SAMPLE</strong> — Not a taxable supply. For promotional distribution only.<br/>
         <strong>MR Name:</strong> ${(m as any).medicalRepName || '—'} &nbsp;&nbsp;
         <strong>Doctor:</strong> ${(m as any).doctorName || '—'}
       </div>`;
