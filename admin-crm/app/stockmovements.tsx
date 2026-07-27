@@ -176,7 +176,7 @@ const printDeliveryChallan = (m: StockMovement) => {
           <thead>
             <tr style="background:#ccc;">
               <th style="border-bottom:1px solid #000;padding:5px;width:3%;">#</th>
-              <th style="border-bottom:1px solid #000;padding:5px;">Product Name</th>
+              <th style="border-bottom:1px solid #000;padding:5px;">Product Name &amp; Size</th>
               <th style="border-bottom:1px solid #000;padding:5px;width:6%;">Size</th>
               <th style="border-bottom:1px solid #000;padding:5px;width:10%;">Batch</th>
               <th style="border-bottom:1px solid #000;padding:5px;width:6%;">Qty</th>
