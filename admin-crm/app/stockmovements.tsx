@@ -757,6 +757,7 @@ export default function StockMovementsScreen() {
         batchNo: it.batchNo || '',
         mrp: it.mrp || 0,
         hsnCode: it.hsnCode || '',
+        size: it.size || '',
       })),
       status: 'draft',
       baseAmount: showFinancials ? totalBase : 0,
