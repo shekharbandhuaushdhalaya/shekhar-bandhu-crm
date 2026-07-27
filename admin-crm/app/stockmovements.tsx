@@ -156,39 +156,45 @@ const printDeliveryChallan = (m: StockMovement) => {
         </table>
         </div>
       </div>
-      <table style="font-size:6px;width:100%;">
-        <tr style="background:#e5e7eb;font-weight:bold;">
-          <td colspan="9" style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (excl. GST)</td>
-          <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
-        </tr>
-        <tr style="background:#e5e7eb;font-weight:bold;">
-          <td colspan="9" style="border:1px solid #000;padding:1.5px;text-align:right;">Total GST</td>
-          <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${totalGst.toFixed(2)}</td>
-        </tr>
-        <tr style="background:#d1d5db;font-weight:bold;">
-          <td colspan="9" style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (incl. GST)</td>
-          <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
-        </tr>
-      </table>
       ${m.notes ? `<div style="margin-top:2px;font-size:6px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
-      <table style="margin-top:auto;font-size:6px;border:1px solid #000;">
+      <table style="margin-top:auto;font-size:6px;width:100%;">
         <tr>
-          <td style="width:55%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:35%;padding:2px;border-right:1px solid #000;vertical-align:top;">
             <div style="font-weight:bold;font-size:7px;">Bank Details:</div>
-            <div>${FIRM_DETAILS.bankName} | A/C: ${FIRM_DETAILS.bankAccountNo}</div>
-            <div>IFSC: ${FIRM_DETAILS.bankIfsc} | Branch: ${FIRM_DETAILS.bankBranch}</div>
-            <div style="margin-top:2px;font-weight:bold;font-size:7px;">Terms &amp; Conditions:</div>
+            <div>${FIRM_DETAILS.bankName}</div>
+            <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
+            <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
+            <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
+          </td>
+          <td style="width:35%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+            <div style="font-weight:bold;font-size:7px;">Terms &amp; Conditions:</div>
             <div style="line-height:1.3;">${(FIRM_DETAILS.defaultTerms || '').split('\n').map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
           </td>
-          <td style="width:45%;padding:2px;text-align:right;vertical-align:bottom;">
-            <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
-            <div style="margin-top:4px;">Receiver's Signature &amp; Stamp</div>
-            <div style="margin-top:6px;">
+          <td style="width:30%;padding:2px;vertical-align:top;">
+            <table style="width:100%;font-size:6px;">
+              <tr style="background:#e5e7eb;font-weight:bold;">
+                <td style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (excl. GST)</td>
+                <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
+              </tr>
+              <tr style="background:#e5e7eb;font-weight:bold;">
+                <td style="border:1px solid #000;padding:1.5px;text-align:right;">Total GST</td>
+                <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${totalGst.toFixed(2)}</td>
+              </tr>
+              <tr style="background:#d1d5db;font-weight:bold;">
+                <td style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (incl. GST)</td>
+                <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
+              </tr>
+            </table>
+            <div style="margin-top:4px;border-top:1px solid #000;padding-top:2px;text-align:center;">
+              <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
+              <div style="margin-top:4px;">Receiver's Signature &amp; Stamp</div>
               ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
-                <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 22px; width: auto; object-fit: contain; margin-bottom: 1px;" />
+                <div style="margin-top:4px;">
+                  <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 20px; width: auto; object-fit: contain;" />
+                </div>
               ` : ''}
+              <div style="font-size:6px;margin-top:2px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
             </div>
-            <div style="font-size:6px;margin-top:2px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
           </td>
         </tr>
       </table>
