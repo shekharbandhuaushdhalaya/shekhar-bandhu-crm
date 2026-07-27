@@ -594,6 +594,7 @@ export type StockMovementItem = {
   batchNo?: string;
   mrp?: number;
   hsnCode?: string;
+  size?: string;
 };
 
 export type StockMovement = {

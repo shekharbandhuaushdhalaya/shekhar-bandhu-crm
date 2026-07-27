@@ -36,13 +36,29 @@ const printDeliveryChallan = (m: StockMovement) => {
   const dateStr = new Date(m.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const typeConf = TYPE_CONFIG[m.type] || { label: m.type };
 
-  const itemRows = (m.items || []).map((it, i) => `
+  const itemRows = (m.items || []).map((it, i) => {
+    const totalPcs = (it.qty || 0) * (it.packing || 1);
+    const netRate = it.rate || 0;
+    const itemTotal = totalPcs * netRate;
+    const gstAmt = itemTotal * (it.gstRate || 0) / 100;
+    return `
     <tr>
-      <td style="border:1px solid #000;padding:4px;text-align:center;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:4px;">${it.productName}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:center;font-weight:bold;">${it.batchNo || '—'}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:center;">${(it.qty || 0) * (it.packing || 1)} Pcs</td>
-    </tr>`).join('');
+      <td style="border:1px solid #000;padding:3px;text-align:center;">${i + 1}</td>
+      <td style="border:1px solid #000;padding:3px;">${it.productName}</td>
+      <td style="border:1px solid #000;padding:3px;text-align:center;">${it.size || '—'}</td>
+      <td style="border:1px solid #000;padding:3px;text-align:center;">${it.batchNo || '—'}</td>
+      <td style="border:1px solid #000;padding:3px;text-align:center;">${totalPcs}</td>
+      <td style="border:1px solid #000;padding:3px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
+      <td style="border:1px solid #000;padding:3px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
+      <td style="border:1px solid #000;padding:3px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
+      <td style="border:1px solid #000;padding:3px;text-align:right;font-weight:bold;">₹${itemTotal.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  const grandTotal = (m.items || []).reduce((sum, it) => {
+    const totalPcs = (it.qty || 0) * (it.packing || 1);
+    return sum + totalPcs * (it.rate || 0);
+  }, 0);
 
   // Extra info block
   let extraInfo = '';
@@ -106,16 +122,27 @@ const printDeliveryChallan = (m: StockMovement) => {
       </tr>
     </table>
     ${extraInfo}
-    <table style="font-size:10px;margin-top:6px;">
+    <table style="font-size:9px;margin-top:6px;width:100%;">
       <thead>
         <tr style="background:#f3f4f6;">
-          <th style="border:1px solid #000;padding:4px;width:8%;">S.No.</th>
-          <th style="border:1px solid #000;padding:4px;">Description of Goods</th>
-          <th style="border:1px solid #000;padding:4px;width:20%;">Batch No.</th>
-          <th style="border:1px solid #000;padding:4px;width:20%;">Quantity (Pcs)</th>
+          <th style="border:1px solid #000;padding:3px;width:4%;">#</th>
+          <th style="border:1px solid #000;padding:3px;">Product</th>
+          <th style="border:1px solid #000;padding:3px;width:8%;">Size</th>
+          <th style="border:1px solid #000;padding:3px;width:12%;">Batch No.</th>
+          <th style="border:1px solid #000;padding:3px;width:8%;">Qty</th>
+          <th style="border:1px solid #000;padding:3px;width:9%;">MRP</th>
+          <th style="border:1px solid #000;padding:3px;width:8%;">Disc</th>
+          <th style="border:1px solid #000;padding:3px;width:8%;">GST</th>
+          <th style="border:1px solid #000;padding:3px;width:12%;">Amount</th>
         </tr>
       </thead>
-      <tbody>${itemRows}</tbody>
+      <tbody>
+        ${itemRows}
+        <tr style="background:#e5e7eb;font-weight:bold;">
+          <td colspan="8" style="border:1px solid #000;padding:3px;text-align:right;">Grand Total</td>
+          <td style="border:1px solid #000;padding:3px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
+        </tr>
+      </tbody>
     </table>
     ${m.notes ? `<div style="margin-top:8px;font-size:10px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
     <div style="margin-top:24px;display:flex;justify-content:space-between;align-items:center;font-size:10px;">
@@ -434,7 +461,7 @@ export default function StockMovementsScreen() {
 
   const resetForm = () => {
     setForm({ ...DEFAULT_FORM, warehouseId: warehouses[0]?._id || '', warehouseName: warehouses[0]?.name || '' });
-    setItems([{ productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0 }]);
+    setItems([{ productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' }]);
     setCustomerSearch('');
     setShowCustomerDropdown(false);
     setError('');
@@ -564,6 +591,7 @@ export default function StockMovementsScreen() {
       rate: netRate,
       gstRate,
       batchNo: computedBatchNo,
+      size: entry.size || '',
     };
     setItems(next);
     setActiveItemDropdownIdx(null);
@@ -575,8 +603,11 @@ export default function StockMovementsScreen() {
       return;
     }
     if (form.type !== 'damage' && !form.partyName.trim()) {
-      setError('Party name is required.');
+      setError('Please enter party name.');
       return;
+    }
+    if (form.type === 'damage') {
+      setForm(f => ({ ...f, partyName: 'Damage' }));
     }
     if (items.some(i => !i.productName.trim())) {
       setError('All items must have a product name.');
@@ -606,9 +637,9 @@ export default function StockMovementsScreen() {
         productName: it.productName,
         qty: it.qty,
         packing: it.packing || 1,
-        rate: (form.type === 'sample' || form.type === 'damage') ? 0 : (it.rate || 0),
-        discountPercent: (form.type === 'sample' || form.type === 'damage') ? 0 : (it.discountPercent || 0),
-        gstRate: (form.type === 'sample' || form.type === 'damage' || (form as any).billingMode === 'cash') ? 0 : (it.gstRate || 0),
+        rate: form.type === 'sample' ? 0 : (it.rate || 0),
+        discountPercent: form.type === 'sample' ? 0 : (it.discountPercent || 0),
+        gstRate: (form.type === 'sample' || (form as any).billingMode === 'cash') ? 0 : (it.gstRate || 0),
         batchNo: it.batchNo || '',
         mrp: it.mrp || 0,
         hsnCode: it.hsnCode || '',
@@ -750,7 +781,7 @@ export default function StockMovementsScreen() {
   });
 
   const isIntraState = (form.partyGstin || '').startsWith('09') || !form.partyGstin;
-  const showFinancials = (form.type === 'sale' || form.type === 'order') && !form.isFree;
+  const showFinancials = (form.type === 'sale' || form.type === 'order' || form.type === 'damage') && !form.isFree;
   
   const cgst = showFinancials && !isCash && isIntraState ? totalTax / 2 : 0;
   const sgst = showFinancials && !isCash && isIntraState ? totalTax / 2 : 0;
@@ -788,7 +819,7 @@ export default function StockMovementsScreen() {
                     {Platform.OS === 'web' ? (
                       <select value={form.type} onChange={(e: any) => {
                         const key = e.target.value;
-                        setForm(f => ({ ...f, type: key, medicalRepName: key === 'sample' ? (user?.name || '') : f.medicalRepName }));
+                        setForm(f => ({ ...f, type: key, medicalRepName: key === 'sample' ? (user?.name || '') : f.medicalRepName, partyName: key === 'damage' ? 'Damage' : f.partyName }));
                       }} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, fontSize: 13, height: 35, width: '100%', outline: 'none', boxSizing: 'border-box' }}>
                         {availableTypes.map(([key, conf]) => (
                           <option key={key} value={key}>{conf.label}</option>
@@ -799,7 +830,7 @@ export default function StockMovementsScreen() {
                         {availableTypes.map(([key, conf]) => (
                           <TouchableOpacity key={key}
                             style={[styles.toggleChip, form.type === key && { backgroundColor: conf.color, borderColor: conf.color }]}
-                            onPress={() => setForm(f => ({ ...f, type: key, medicalRepName: key === 'sample' ? (user?.name || '') : f.medicalRepName }))}>
+                            onPress={() => setForm(f => ({ ...f, type: key, medicalRepName: key === 'sample' ? (user?.name || '') : f.medicalRepName, partyName: key === 'damage' ? 'Damage' : f.partyName }))}>
                             <Text style={[styles.toggleChipText, form.type === key && { color: '#fff', fontWeight: '700' }]}>{conf.label}</Text>
                           </TouchableOpacity>
                         ))}
@@ -1085,26 +1116,27 @@ export default function StockMovementsScreen() {
                 )}
 
                 {/* Party Information (dropdown fetched from customers) */}
-                {!isDamage && !isTransfer && (
+                {(isDamage || (!isDamage && !isTransfer)) && (
                   <View style={{ zIndex: 1000, position: 'relative' }}>
                     <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10, zIndex: 1001, position: 'relative' }}>
                       <View style={{ flex: 1.2, position: 'relative', zIndex: 1002 }}>
-                        <Text style={styles.inputLabel}>{isSample ? 'Party / Clinic (optional)' : 'Party Name *'}</Text>
+                        <Text style={styles.inputLabel}>{isDamage ? 'Party (auto-set)' : isSample ? 'Party / Clinic (optional)' : 'Party Name *'}</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, height: 35, backgroundColor: colors.bg.primary, marginBottom: 2 }}>
                           <Ionicons name="person-outline" size={14} color={colors.text.muted} />
                           <TextInput
                             style={{ flex: 1, fontSize: 13, color: colors.text.primary, height: '100%', paddingLeft: 6 }}
-                            value={customerSearch}
+                            value={isDamage ? form.partyName || 'Damage' : customerSearch}
+                            editable={!isDamage}
                             onChangeText={v => {
                               setCustomerSearch(v);
                               setForm(f => ({ ...f, partyName: v, partyId: '' }));
                               setShowCustomerDropdown(true);
                             }}
-                            onFocus={() => setShowCustomerDropdown(true)}
-                            placeholder="Search customer..."
+                            onFocus={() => !isDamage && setShowCustomerDropdown(true)}
+                            placeholder={isDamage ? 'Damage' : "Search customer..."}
                             placeholderTextColor={colors.text.muted}
                           />
-                          {customerSearch ? (
+                          {!isDamage && customerSearch ? (
                             <TouchableOpacity onPress={() => { setCustomerSearch(''); setForm(f => ({ ...f, partyName: '', partyId: '' })); setShowCustomerDropdown(true); }}>
                               <Ionicons name="close-circle" size={16} color={colors.text.muted} style={{ paddingLeft: 6 }} />
                             </TouchableOpacity>
@@ -1288,9 +1320,9 @@ export default function StockMovementsScreen() {
                               placeholderTextColor={colors.text.muted}
                             />
                             {item.productName ? (
-                              <TouchableOpacity onPress={() => {
+                                <TouchableOpacity onPress={() => {
                                 const n = [...items];
-                                n[idx] = { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0 };
+                                n[idx] = { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' };
                                 setItems(n);
                                 setItemSearchText('');
                                 setActiveItemDropdownIdx(idx);
@@ -1323,7 +1355,7 @@ export default function StockMovementsScreen() {
                           }} keyboardType="numeric" />
                         </View>
 
-                        {!isSample && !isDamage && (
+                        {!isSample && (
                           <>
                             <View style={{ flex: 1.1, minWidth: 70 }}>
                               <Text style={styles.fieldLabel}>MRP (₹)</Text>
@@ -1427,7 +1459,7 @@ export default function StockMovementsScreen() {
                     </View>
                   );
                 })}
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 8, paddingVertical: 10, marginTop: 4, marginBottom: 6 }} onPress={() => setItems([...items, { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0 }])}>
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 8, paddingVertical: 10, marginTop: 4, marginBottom: 6 }} onPress={() => setItems([...items, { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' }])}>
                   <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
                   <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Product Row</Text>
                 </TouchableOpacity>

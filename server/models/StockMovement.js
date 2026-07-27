@@ -10,7 +10,8 @@ const stockMovementItemSchema = new mongoose.Schema({
   gstRate:     { type: Number, default: 0 },
   batchNo:     { type: String, default: '', trim: true },
   mrp:         { type: Number, default: 0 },
-  hsnCode:     { type: String, default: '', trim: true }
+  hsnCode:     { type: String, default: '', trim: true },
+  size:        { type: String, default: '', trim: true }
 }, { _id: false });
 
 const stockMovementSchema = new mongoose.Schema({

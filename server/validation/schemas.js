@@ -207,6 +207,7 @@ const smItem = z.object({
   gstRate: z.number().default(0),
   batchNo: z.string().default(''),
   mrp: z.number().default(0),
+  size: z.string().optional().default(''),
 });
 
 const stockMovementSchema = z.object({
