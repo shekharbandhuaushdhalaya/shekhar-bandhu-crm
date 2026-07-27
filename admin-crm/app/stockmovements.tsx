@@ -136,7 +136,6 @@ const printDeliveryChallan = (m: StockMovement) => {
             </table>
             <div>${FIRM_DETAILS.address}</div>
             <div>GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
-            ${FIRM_DETAILS.manufacturingLicenseNo ? `<div>Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</div>` : ''}
             <div style="margin-top:2px;color:#555;font-style:italic;">${copy}</div>
           </td>
           <td style="width:50%;padding:2.5px;vertical-align:top;">
@@ -152,6 +151,7 @@ const printDeliveryChallan = (m: StockMovement) => {
           </td>
         </tr>
       </table>
+      ${FIRM_DETAILS.manufacturingLicenseNo ? `<table style="font-size:8px;width:100%;"><tr><td style="padding:3px;border:1px solid #000;text-align:center;font-weight:bold;">Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</td></tr></table>` : ''}
       <table style="font-size:8px;border:1px solid #000;">
         <tr>
           <td style="width:28%;padding:2.5px;border-right:1px solid #000;vertical-align:top;">
