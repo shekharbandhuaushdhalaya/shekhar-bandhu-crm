@@ -180,12 +180,11 @@ const printDeliveryChallan = (m: StockMovement) => {
                   <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
                 </td>
                 <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:1px;">
-                  <div style="font-weight:bold;font-size:7px;">Pay via UPI</div>
-                  <div style="margin:2px auto;width:40px;height:40px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:5px;color:#999;">
+                  <div style="margin:1px auto;width:36px;height:36px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:5px;color:#999;">
                     QR
                   </div>
-                  <div style="font-size:5px;color:#666;">UPI ID:</div>
-                  <div style="font-size:5px;color:#333;">${FIRM_DETAILS.bankUpi || '—'}</div>
+                  <div style="font-size:5px;font-weight:600;margin-top:1px;">QR for online payment</div>
+                  <div style="font-size:5px;color:#666;margin-top:1px;">UPI ID: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
                 </td>
               </tr>
             </table>
