@@ -41,6 +41,12 @@ import BMRReportModal from './manufacturing/modals/BMRReportModal';
 import ManufacturingUnitModal from './manufacturing/modals/ManufacturingUnitModal';
 import { createStyles } from './manufacturing/manufacturingStyles';
 
+const isIntegerQty = (unit?: string, category?: string) => {
+  const u = (unit || '').toLowerCase().trim();
+  const c = (category || '').toLowerCase().trim();
+  return u === 'pcs' && (c === 'packing' || c === 'packaging');
+};
+
 export default function ManufacturingScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -306,11 +312,11 @@ export default function ManufacturingScreen() {
     const confirmed = Platform.OS === 'web'
       ? window.confirm('Are you sure you want to void this stock entry? This will revert the raw stock inventory.')
       : await new Promise(resolve => {
-          Alert.alert('Void Stock Entry', 'Are you sure you want to void this stock entry?', [
-            { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
-            { text: 'Void', onPress: () => resolve(true), style: 'destructive' }
-          ]);
-        });
+        Alert.alert('Void Stock Entry', 'Are you sure you want to void this stock entry?', [
+          { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
+          { text: 'Void', onPress: () => resolve(true), style: 'destructive' }
+        ]);
+      });
 
     if (!confirmed) return;
     try {
@@ -605,11 +611,11 @@ export default function ManufacturingScreen() {
     const confirmed = Platform.OS === 'web'
       ? window.confirm('Are you sure you want to cancel this batch run? Consumed raw materials will be returned to stock.')
       : await new Promise(resolve => {
-          Alert.alert('Cancel Production Run', 'Are you sure you want to cancel this batch run?', [
-            { text: 'No', onPress: () => resolve(false), style: 'cancel' },
-            { text: 'Yes, Revert Stock', onPress: () => resolve(true), style: 'destructive' }
-          ]);
-        });
+        Alert.alert('Cancel Production Run', 'Are you sure you want to cancel this batch run?', [
+          { text: 'No', onPress: () => resolve(false), style: 'cancel' },
+          { text: 'Yes, Revert Stock', onPress: () => resolve(true), style: 'destructive' }
+        ]);
+      });
 
     if (!confirmed) return;
     try {
@@ -675,7 +681,7 @@ export default function ManufacturingScreen() {
         completedBy: stageOperator.trim(),
         notes: stageNotes.trim()
       });
-      
+
       setStageAction(null);
       setStageBatchId(null);
       setStageIndex(null);
@@ -786,11 +792,11 @@ export default function ManufacturingScreen() {
     const confirmed = Platform.OS === 'web'
       ? confirm('Are you sure you want to delete this document?')
       : await new Promise(resolve => {
-          Alert.alert('Delete Document', 'Are you sure?', [
-            { text: 'No', onPress: () => resolve(false) },
-            { text: 'Yes, Delete', onPress: () => resolve(true) }
-          ]);
-        });
+        Alert.alert('Delete Document', 'Are you sure?', [
+          { text: 'No', onPress: () => resolve(false) },
+          { text: 'Yes, Delete', onPress: () => resolve(true) }
+        ]);
+      });
     if (!confirmed) return;
     try {
       await api.deleteDocument('batch', batchId, url);
@@ -847,10 +853,12 @@ export default function ManufacturingScreen() {
       default: return colors.text.muted;
     }
   };
-  const matchingBom = boms.find(b => {
-    const bPid = b.productId && typeof b.productId === 'object' ? b.productId._id : b.productId;
-    return bPid === prodProductId;
-  });
+  const matchingBom = prodBomId
+    ? boms.find(b => b._id === prodBomId)
+    : boms.find(b => {
+      const bPid = b.productId && typeof b.productId === 'object' ? b.productId._id : b.productId;
+      return bPid === prodProductId;
+    });
 
   const plannedVal = Number(prodPlannedQty);
   let previewIngredients: { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'formulation' | 'packaging' }[] = [];
@@ -862,8 +870,24 @@ export default function ManufacturingScreen() {
       const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown Raw Material';
       const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'kg';
       const matchingMaterial = materials.find(m => m._id === ingId);
-      const available = matchingMaterial ? (matchingMaterial.stockLevel || 0) : 0;
       const isPkg = ing.itemType === 'packaging' || (matchingMaterial && matchingMaterial.category === 'Packaging');
+
+      // Compute available stock scoped to the selected manufacturing unit (warehouseId match).
+      // The backend deducts from entries where warehouseId === manufacturingUnitId,
+      // so we must show the same view to the user.
+      let available = 0;
+      if (prodManufacturingUnitId) {
+        available = entries
+          .filter(e => {
+            const eRmId = typeof e.rawMaterialId === 'object' ? (e.rawMaterialId as any)._id || (e.rawMaterialId as any) : e.rawMaterialId;
+            const eWhId = typeof (e as any).warehouseId === 'object' ? (e as any).warehouseId?._id : (e as any).warehouseId;
+            return String(eRmId) === String(ingId) && String(eWhId) === String(prodManufacturingUnitId);
+          })
+          .reduce((sum, e) => sum + (e.qty || 0), 0);
+      } else {
+        // No unit selected yet — fall back to global stock
+        available = matchingMaterial ? (matchingMaterial.stockLevel || 0) : 0;
+      }
 
       const qtyNeeded = isPkg ? ing.qtyRequired * plannedVal : ing.qtyRequired * scale;
 
@@ -883,7 +907,7 @@ export default function ManufacturingScreen() {
 
   const filteredMaterials = materials.filter(rm => {
     const matchText = (rm.name || '').toLowerCase().includes(materialSearch.toLowerCase()) ||
-                      (rm.sku || '').toLowerCase().includes(materialSearch.toLowerCase());
+      (rm.sku || '').toLowerCase().includes(materialSearch.toLowerCase());
     if (!matchText) return false;
     if (stockFilter === 'low') {
       return (rm.stockLevel || 0) < rm.minReorder;
@@ -897,7 +921,7 @@ export default function ManufacturingScreen() {
   const filteredEntries = entries.filter(e => {
     const name = e.rawMaterialId && typeof e.rawMaterialId === 'object' ? e.rawMaterialId.name : '';
     const matchText = name.toLowerCase().includes(materialSearch.toLowerCase()) ||
-                      (e.batchNo || '').toLowerCase().includes(materialSearch.toLowerCase());
+      (e.batchNo || '').toLowerCase().includes(materialSearch.toLowerCase());
     return matchText;
   });
 
@@ -940,17 +964,17 @@ export default function ManufacturingScreen() {
           <Text style={styles.primaryBtnText}>Trace</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            borderColor: colors.primary, 
-            borderWidth: 1, 
-            borderRadius: 6, 
-            paddingHorizontal: 12, 
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderColor: colors.primary,
+            borderWidth: 1,
+            borderRadius: 6,
+            paddingHorizontal: 12,
             paddingVertical: 8,
             backgroundColor: colors.bg.primary
-          }} 
+          }}
           onPress={() => setMaterialModalVisible(true)}
         >
           <Ionicons name="add-circle-outline" size={15} color={colors.primary} style={{ marginRight: 4 }} />
@@ -984,7 +1008,10 @@ export default function ManufacturingScreen() {
                       🌿 {alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId.name : 'Unknown Material'}
                     </Text>
                     <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                      Batch: <Text style={{ fontWeight: '700' }}>{alert.batchNo}</Text> • Stock: {alert.qty.toFixed(2)} {alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId.unit : ''} • Expires on: <Text style={{ color: colors.danger, fontWeight: '700' }}>{new Date(alert.expiryDate!).toLocaleDateString()}</Text>
+                      Batch: <Text style={{ fontWeight: '700' }}>{alert.batchNo}</Text> • Stock: {(() => {
+                        const r = alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId : null;
+                        return r && isIntegerQty(r.unit, r.category) ? alert.qty.toFixed(0) : alert.qty.toFixed(2);
+                      })()} {alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId.unit : ''} • Expires on: <Text style={{ color: colors.danger, fontWeight: '700' }}>{new Date(alert.expiryDate!).toLocaleDateString()}</Text>
                     </Text>
                   </View>
                 ))}
@@ -995,7 +1022,7 @@ export default function ManufacturingScreen() {
             <View style={[styles.card, { padding: 10 }]}>
               <View style={{ flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, marginBottom: 12 }}>
                 <Text style={[styles.cardSubTitle, { marginBottom: 0 }]}>Raw Stocks & Reorder Status (Click to view active batches)</Text>
-                
+
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   {/* Manufacturing Unit Filter Dropdown */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
@@ -1086,9 +1113,9 @@ export default function ManufacturingScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
+                </View>
               </View>
-            </View>
-              
+
               <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
                 {/* Header */}
                 <View style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
@@ -1116,7 +1143,7 @@ export default function ManufacturingScreen() {
                           {rm.sku ? <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>SKU: {rm.sku}</Text> : null}
                         </View>
                         <Text style={{ flex: 1.2, fontSize: 13, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
-                          {rm.stockLevel?.toFixed(1) || '0.0'} {rm.unit}
+                          {rm.stockLevel !== undefined ? (isIntegerQty(rm.unit, rm.category) ? rm.stockLevel.toFixed(0) : rm.stockLevel.toFixed(1)) : (isIntegerQty(rm.unit, rm.category) ? '0' : '0.0')} {rm.unit}
                         </Text>
                         <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
                           {rm.minReorder} {rm.unit}
@@ -1145,7 +1172,7 @@ export default function ManufacturingScreen() {
                                   const data = await api.traceBatch(rm._id);
                                   if (data && !data.materialSku && rm.sku) data.materialSku = rm.sku;
                                   setTraceResult(data);
-                                } catch(e) {
+                                } catch (e) {
                                   console.log('Trace fetch error', e);
                                 }
                               } finally {
@@ -1433,7 +1460,10 @@ export default function ManufacturingScreen() {
                           <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Raw Materials Consumed (FIFO):</Text>
                           {batch.ingredientsConsumed.map((ing, idx) => (
                             <Text key={idx} style={{ fontSize: 10, color: colors.text.secondary }}>
-                              • {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Material'} (Batch: {ing.batchNo}) — {ing.qtyConsumed.toFixed(2)} {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : ''}
+                              • {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Material'} (Batch: {ing.batchNo}) — {(() => {
+                                const r = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId : null;
+                                return r && isIntegerQty(r.unit, r.category) ? ing.qtyConsumed.toFixed(0) : ing.qtyConsumed.toFixed(2);
+                              })()} {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : ''}
                             </Text>
                           ))}
                         </View>
@@ -1475,7 +1505,7 @@ export default function ManufacturingScreen() {
                       {/* Supporting Documents Vault */}
                       <View style={{ gap: 6, marginTop: 8, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
                         <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Certification:</Text>
-                        
+
                         {batch.supportingDocuments && batch.supportingDocuments.length > 0 ? (
                           <View style={{ gap: 4, marginTop: 2 }}>
                             {batch.supportingDocuments.map((doc: any, docIdx: number) => (
@@ -1518,8 +1548,8 @@ export default function ManufacturingScreen() {
                     {/* Left Side: Report & Genealogy Actions */}
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       {isFinished && (
-                        <TouchableOpacity 
-                          style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12 }]} 
+                        <TouchableOpacity
+                          style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12 }]}
                           onPress={() => handleOpenBMR(batch._id)}
                         >
                           <Ionicons name="document-text-outline" size={15} color={colors.primary} />
@@ -1528,8 +1558,8 @@ export default function ManufacturingScreen() {
                       )}
                       {!isCancelled && (
                         <>
-                          <TouchableOpacity 
-                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.primary }]} 
+                          <TouchableOpacity
+                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.primary }]}
                             onPress={() => {
                               setTraceBatchNo(batch.batchNo);
                               setTraceModalVisible(true);
@@ -1543,8 +1573,8 @@ export default function ManufacturingScreen() {
                             <Ionicons name="list-outline" size={15} color={colors.primary} />
                             <Text style={[styles.outlineBtnText, { color: colors.primary }]}>Stock Trace & Genealogy</Text>
                           </TouchableOpacity>
-                          <TouchableOpacity 
-                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.success }]} 
+                          <TouchableOpacity
+                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.success }]}
                             onPress={() => handleUploadBatchDoc(batch._id)}
                           >
                             <Ionicons name="cloud-upload-outline" size={15} color={colors.success} />
@@ -1651,8 +1681,8 @@ export default function ManufacturingScreen() {
                               )}
                             </View>
                             {targetDate && (
-                              <View style={[styles.statusBadge, { 
-                                borderColor: isOverdue ? colors.danger : colors.success, 
+                              <View style={[styles.statusBadge, {
+                                borderColor: isOverdue ? colors.danger : colors.success,
                                 backgroundColor: isOverdue ? colors.danger + '12' : colors.success + '12',
                               }]}>
                                 <Text style={{ fontSize: 8, fontWeight: '700', color: isOverdue ? colors.danger : colors.success }}>
@@ -1695,7 +1725,7 @@ export default function ManufacturingScreen() {
                       )}
 
                       {run.status === 'completed' && (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={[styles.outlineBtn, { marginTop: 12, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12 }]}
                           onPress={() => handleOpenBMR(run.id)}
                         >
@@ -1970,173 +2000,179 @@ export default function ManufacturingScreen() {
                     </View>
                   </View>
 
-                    {/* Search Bar */}
-                    <View style={{ paddingHorizontal: 12, backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8, height: 38 }}>
-                      <Ionicons name="search-outline" size={15} color={colors.text.muted} />
-                      <TextInput
-                        style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
-                        placeholder="Search by batch number..."
-                        placeholderTextColor={colors.text.muted}
-                        value={traceSearch}
-                        onChangeText={setTraceSearch}
-                      />
-                      {traceSearch.length > 0 && (
-                        <TouchableOpacity onPress={() => setTraceSearch('')}>
-                          <Ionicons name="close-circle" size={15} color={colors.text.muted} />
-                        </TouchableOpacity>
+                  {/* Search Bar */}
+                  <View style={{ paddingHorizontal: 12, backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8, height: 38 }}>
+                    <Ionicons name="search-outline" size={15} color={colors.text.muted} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
+                      placeholder="Search by batch number..."
+                      placeholderTextColor={colors.text.muted}
+                      value={traceSearch}
+                      onChangeText={setTraceSearch}
+                    />
+                    {traceSearch.length > 0 && (
+                      <TouchableOpacity onPress={() => setTraceSearch('')}>
+                        <Ionicons name="close-circle" size={15} color={colors.text.muted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Sub-Tabs Header */}
+                  <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}>
+                    <TouchableOpacity
+                      onPress={() => setTraceSubTab('in')}
+                      style={[
+                        { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 6 },
+                        traceSubTab === 'in' && { borderBottomColor: colors.success, backgroundColor: colors.success + '08' }
+                      ]}
+                    >
+                      <Ionicons name="arrow-down-circle-outline" size={16} color={traceSubTab === 'in' ? colors.success : colors.text.muted} />
+                      <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, traceSubTab === 'in' && { color: colors.success }]}>
+                        Incoming Stock (IN)
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setTraceSubTab('out')}
+                      style={[
+                        { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 6 },
+                        traceSubTab === 'out' && { borderBottomColor: colors.warning, backgroundColor: colors.warning + '08' }
+                      ]}
+                    >
+                      <Ionicons name="arrow-up-circle-outline" size={16} color={traceSubTab === 'out' ? colors.warning : colors.text.muted} />
+                      <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, traceSubTab === 'out' && { color: colors.warning }]}>
+                        Outgoing Stock (OUT)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Table View */}
+                  <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
+                    <View style={{ minWidth: '100%', flex: 1 }}>
+                      {traceSubTab === 'in' ? (
+                        <>
+                          {/* Table Header for IN */}
+                          <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                            <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
+                            <Text style={{ width: 125, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Batch No</Text>
+                            <Text style={{ flex: 1.2, minWidth: 120, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Raw Material</Text>
+                            <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Purchase Ref</Text>
+                            <Text style={{ flex: 1.2, minWidth: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Vendor / Source</Text>
+                            <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left', paddingLeft: 8 }}>IN Qty</Text>
+                            <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left' }}>Warehouse</Text>
+                          </View>
+                          {/* Table Body for IN */}
+                          {(() => {
+                            const parseDate = (val: any) => {
+                              if (!val) return new Date();
+                              const d = new Date(val);
+                              return isNaN(d.getTime()) ? new Date() : d;
+                            };
+                            const inEntries = traceResult?.rawMaterialEntries || [];
+                            const filtered = inEntries.filter((e: any) => {
+                              if (!traceSearch) return true;
+                              return e.batchNo?.toLowerCase().includes(traceSearch.toLowerCase()) ||
+                                e.materialName?.toLowerCase().includes(traceSearch.toLowerCase()) ||
+                                e.purchaseRef?.toLowerCase().includes(traceSearch.toLowerCase());
+                            });
+
+                            if (filtered.length === 0) {
+                              return <Text style={{ padding: 16, textAlign: 'center', color: colors.text.secondary }}>No matching incoming stock found.</Text>;
+                            }
+
+                            return filtered.map((row: any, idx: number) => (
+                              <View key={idx} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < filtered.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
+                                <Text style={{ width: 95, fontSize: 11, color: colors.text.secondary }}>
+                                  {parseDate(row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </Text>
+                                <Text style={{ width: 125, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                                  {row.batchNo}
+                                </Text>
+                                <Text style={{ flex: 1.2, minWidth: 120, fontSize: 11, fontWeight: '600', color: colors.text.primary }} numberOfLines={1}>
+                                  🌿 {row.materialName || 'Raw Material'}
+                                </Text>
+                                <Text style={{ width: 100, fontSize: 11, color: colors.text.primary, fontWeight: '600' }}>
+                                  {row.purchaseRef || 'Inward'}
+                                </Text>
+                                <Text style={{ flex: 1.2, minWidth: 110, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
+                                  {row.vendorName || 'Direct'}
+                                </Text>
+                                <View style={{ width: 130, paddingLeft: 8 }}>
+                                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>
+                                    {(() => {
+                                      const val = row.initialQty !== undefined ? row.initialQty : row.qty;
+                                      return isIntegerQty(row.unit, row.category) ? val.toFixed(0) : val.toFixed(1);
+                                    })()} {row.unit}
+                                  </Text>
+                                  {row.initialQty !== undefined && row.initialQty !== row.qty && (
+                                    <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>
+                                      ({isIntegerQty(row.unit, row.category) ? row.qty.toFixed(0) : row.qty.toFixed(1)} remaining)
+                                    </Text>
+                                  )}
+                                </View>
+                                <Text style={{ width: 130, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'left' }} numberOfLines={1}>
+                                  {row.warehouseName || '-'}
+                                </Text>
+                              </View>
+                            ));
+                          })()}
+                        </>
+                      ) : (
+                        <>
+                          {/* Table Header for OUT */}
+                          <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                            <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
+                            <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Production Batch No</Text>
+                            <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Product Name</Text>
+                            <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Consumed Qty</Text>
+                            <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Manufacturing Unit</Text>
+                          </View>
+                          {/* Table Body for OUT */}
+                          {(() => {
+                            const parseDate = (val: any) => {
+                              if (!val) return new Date();
+                              const d = new Date(val);
+                              return isNaN(d.getTime()) ? new Date() : d;
+                            };
+                            const unit = traceResult?.rawMaterial?.unit || traceResult?.rawMaterialEntries?.[0]?.unit || '';
+                            const category = traceResult?.rawMaterial?.category || traceResult?.rawMaterialEntries?.[0]?.category || '';
+                            const isInt = isIntegerQty(unit, category);
+                            const outItems = (traceResult?.productionBatches || []).filter((b: any) => b.relation === 'raw_material_consumed_in');
+                            const filtered = outItems.filter((b: any) => {
+                              if (!traceSearch) return true;
+                              return b.batchNo?.toLowerCase().includes(traceSearch.toLowerCase()) ||
+                                b.productName?.toLowerCase().includes(traceSearch.toLowerCase()) ||
+                                b.warehouseName?.toLowerCase().includes(traceSearch.toLowerCase());
+                            });
+
+                            if (filtered.length === 0) {
+                              return <Text style={{ padding: 16, textAlign: 'center', color: colors.text.secondary }}>No matching outgoing consumption found.</Text>;
+                            }
+
+                            return filtered.map((row: any, idx: number) => (
+                              <View key={idx} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < filtered.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
+                                <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>
+                                  {parseDate(row.startDate || row.endDate || row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </Text>
+                                <Text style={{ width: 140, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                                  {row.batchNo}
+                                </Text>
+                                <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
+                                  {row.productName}
+                                </Text>
+                                <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.warning, textAlign: 'right' }}>
+                                  {isInt ? row.qtyConsumed.toFixed(0) : row.qtyConsumed.toFixed(1)} {unit}
+                                </Text>
+                                <Text style={{ width: 140, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'right' }} numberOfLines={1}>
+                                  🏭 {row.warehouseName || 'Factory Unit'}
+                                </Text>
+                              </View>
+                            ));
+                          })()}
+                        </>
                       )}
                     </View>
-
-                    {/* Sub-Tabs Header */}
-                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}>
-                      <TouchableOpacity
-                        onPress={() => setTraceSubTab('in')}
-                        style={[
-                          { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 6 },
-                          traceSubTab === 'in' && { borderBottomColor: colors.success, backgroundColor: colors.success + '08' }
-                        ]}
-                      >
-                        <Ionicons name="arrow-down-circle-outline" size={16} color={traceSubTab === 'in' ? colors.success : colors.text.muted} />
-                        <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, traceSubTab === 'in' && { color: colors.success }]}>
-                          Incoming Stock (IN)
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => setTraceSubTab('out')}
-                        style={[
-                          { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 6 },
-                          traceSubTab === 'out' && { borderBottomColor: colors.warning, backgroundColor: colors.warning + '08' }
-                        ]}
-                      >
-                        <Ionicons name="arrow-up-circle-outline" size={16} color={traceSubTab === 'out' ? colors.warning : colors.text.muted} />
-                        <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, traceSubTab === 'out' && { color: colors.warning }]}>
-                          Outgoing Stock (OUT)
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Table View */}
-                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
-                      <View style={{ minWidth: '100%', flex: 1 }}>
-                        {traceSubTab === 'in' ? (
-                          <>
-                            {/* Table Header for IN */}
-                            <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                              <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                              <Text style={{ width: 125, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Batch No</Text>
-                              <Text style={{ flex: 1.2, minWidth: 120, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Raw Material</Text>
-                              <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Purchase Ref</Text>
-                              <Text style={{ flex: 1.2, minWidth: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Vendor / Source</Text>
-                              <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left', paddingLeft: 8 }}>IN Qty</Text>
-                              <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left' }}>Warehouse</Text>
-                            </View>
-                            {/* Table Body for IN */}
-                            {(() => {
-                              const parseDate = (val: any) => {
-                                if (!val) return new Date();
-                                const d = new Date(val);
-                                return isNaN(d.getTime()) ? new Date() : d;
-                              };
-                              const inEntries = traceResult?.rawMaterialEntries || [];
-                              const filtered = inEntries.filter((e: any) => {
-                                if (!traceSearch) return true;
-                                return e.batchNo?.toLowerCase().includes(traceSearch.toLowerCase()) ||
-                                       e.materialName?.toLowerCase().includes(traceSearch.toLowerCase()) ||
-                                       e.purchaseRef?.toLowerCase().includes(traceSearch.toLowerCase());
-                              });
-
-                              if (filtered.length === 0) {
-                                return <Text style={{ padding: 16, textAlign: 'center', color: colors.text.secondary }}>No matching incoming stock found.</Text>;
-                              }
-
-                              return filtered.map((row: any, idx: number) => (
-                                <View key={idx} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < filtered.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                                  <Text style={{ width: 95, fontSize: 11, color: colors.text.secondary }}>
-                                    {parseDate(row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                  </Text>
-                                  <Text style={{ width: 125, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
-                                    {row.batchNo}
-                                  </Text>
-                                  <Text style={{ flex: 1.2, minWidth: 120, fontSize: 11, fontWeight: '600', color: colors.text.primary }} numberOfLines={1}>
-                                    🌿 {row.materialName || 'Raw Material'}
-                                  </Text>
-                                  <Text style={{ width: 100, fontSize: 11, color: colors.text.primary, fontWeight: '600' }}>
-                                    {row.purchaseRef || 'Inward'}
-                                  </Text>
-                                  <Text style={{ flex: 1.2, minWidth: 110, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
-                                    {row.vendorName || 'Direct'}
-                                  </Text>
-                                  <View style={{ width: 130, paddingLeft: 8 }}>
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>
-                                      {(row.initialQty !== undefined ? row.initialQty : row.qty).toFixed(1)} {row.unit}
-                                    </Text>
-                                    {row.initialQty !== undefined && row.initialQty !== row.qty && (
-                                      <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>
-                                        ({row.qty.toFixed(1)} remaining)
-                                      </Text>
-                                    )}
-                                  </View>
-                                  <Text style={{ width: 130, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'left' }} numberOfLines={1}>
-                                    {row.warehouseName || '-'}
-                                  </Text>
-                                </View>
-                              ));
-                            })()}
-                          </>
-                        ) : (
-                          <>
-                            {/* Table Header for OUT */}
-                            <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                              <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                              <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Production Batch No</Text>
-                              <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Product Name</Text>
-                              <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Consumed Qty</Text>
-                              <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Manufacturing Unit</Text>
-                            </View>
-                            {/* Table Body for OUT */}
-                            {(() => {
-                              const parseDate = (val: any) => {
-                                if (!val) return new Date();
-                                const d = new Date(val);
-                                return isNaN(d.getTime()) ? new Date() : d;
-                              };
-                              const outItems = (traceResult?.productionBatches || []).filter((b: any) => b.relation === 'raw_material_consumed_in');
-                              const filtered = outItems.filter((b: any) => {
-                                if (!traceSearch) return true;
-                                return b.batchNo?.toLowerCase().includes(traceSearch.toLowerCase()) ||
-                                       b.productName?.toLowerCase().includes(traceSearch.toLowerCase()) ||
-                                       b.warehouseName?.toLowerCase().includes(traceSearch.toLowerCase());
-                              });
-
-                              if (filtered.length === 0) {
-                                return <Text style={{ padding: 16, textAlign: 'center', color: colors.text.secondary }}>No matching outgoing consumption found.</Text>;
-                              }
-
-                              return filtered.map((row: any, idx: number) => (
-                                <View key={idx} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < filtered.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                                  <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>
-                                    {parseDate(row.startDate || row.endDate || row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                  </Text>
-                                  <Text style={{ width: 140, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
-                                    {row.batchNo}
-                                  </Text>
-                                  <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
-                                    {row.productName}
-                                  </Text>
-                                  <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.warning, textAlign: 'right' }}>
-                                    {row.qtyConsumed.toFixed(1)} {traceResult.rawMaterialEntries?.[0]?.unit || ''}
-                                  </Text>
-                                  <Text style={{ width: 140, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'right' }} numberOfLines={1}>
-                                    🏭 {row.warehouseName || 'Factory Unit'}
-                                  </Text>
-                                </View>
-                              ));
-                            })()}
-                          </>
-                        )}
-                      </View>
-                    </ScrollView>
-                  </View>
+                  </ScrollView>
+                </View>
 
                 {/* Finished Goods Stock */}
                 {!!traceResult?.finishedGoodsEntries?.length && (
@@ -2191,8 +2227,8 @@ export default function ManufacturingScreen() {
                             <Text style={{ width: 130, fontSize: 11, color: colors.text.secondary }} numberOfLines={1}>{c.warehouseName || '—'}</Text>
                             <Text style={{ width: 100, fontSize: 11, color: colors.text.secondary }}>{c.type ? (c.type.charAt(0).toUpperCase() + c.type.slice(1)) : 'Sale'}</Text>
                             <View style={{ width: 100 }}>
-                              <View style={[styles.statusBadge, { 
-                                borderColor: c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted), 
+                              <View style={[styles.statusBadge, {
+                                borderColor: c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted),
                                 backgroundColor: (c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted)) + '10',
                                 alignSelf: 'flex-start',
                                 paddingVertical: 2,
@@ -2232,9 +2268,9 @@ export default function ManufacturingScreen() {
                             <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>{new Date(inv.date).toLocaleDateString('en-IN')}</Text>
                             <Text style={{ flex: 1, minWidth: 220, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>{inv.customerName}</Text>
                             <Text style={{ width: 130, fontSize: 11, color: colors.text.secondary }} numberOfLines={1}>{inv.warehouseName || '—'}</Text>
-                             <View style={{ width: 100 }}>
-                              <View style={[styles.statusBadge, { 
-                                borderColor: inv.status === 'Cancelled' ? colors.danger : (inv.isFinalized ? (inv.status === 'paid' ? colors.success : colors.success) : colors.warning), 
+                            <View style={{ width: 100 }}>
+                              <View style={[styles.statusBadge, {
+                                borderColor: inv.status === 'Cancelled' ? colors.danger : (inv.isFinalized ? (inv.status === 'paid' ? colors.success : colors.success) : colors.warning),
                                 backgroundColor: (inv.status === 'Cancelled' ? colors.danger : (inv.isFinalized ? (inv.status === 'paid' ? colors.success : colors.success) : colors.warning)) + '10',
                                 alignSelf: 'flex-start',
                                 paddingVertical: 2,
@@ -2284,16 +2320,16 @@ export default function ManufacturingScreen() {
                   </View>
                 )}
 
-                {!traceResult?.rawMaterialEntries?.length && !traceResult?.productionBatches?.length && 
-                 !traceResult?.finishedGoodsEntries?.length && !traceResult?.challans?.length &&
-                 !traceResult?.invoices?.length && !traceResult?.dispatches?.length && (
-                  <View style={{ alignItems: 'center', padding: 24 }}>
-                    <Ionicons name="search-outline" size={40} color={colors.text.muted} />
-                    <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 8 }}>
-                      No trace records found for "{decodeURIComponent(traceResult?.materialName || traceResult?.batchNo || traceBatchNo || '')}"
-                    </Text>
-                  </View>
-                )}
+                {!traceResult?.rawMaterialEntries?.length && !traceResult?.productionBatches?.length &&
+                  !traceResult?.finishedGoodsEntries?.length && !traceResult?.challans?.length &&
+                  !traceResult?.invoices?.length && !traceResult?.dispatches?.length && (
+                    <View style={{ alignItems: 'center', padding: 24 }}>
+                      <Ionicons name="search-outline" size={40} color={colors.text.muted} />
+                      <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 8 }}>
+                        No trace records found for "{decodeURIComponent(traceResult?.materialName || traceResult?.batchNo || traceBatchNo || '')}"
+                      </Text>
+                    </View>
+                  )}
               </ScrollView>
             )}
 
@@ -2324,18 +2360,18 @@ export default function ManufacturingScreen() {
             {stageError ? <Text style={styles.modalError}>{stageError}</Text> : null}
             <ScrollView style={styles.modalForm}>
               <Text style={{ fontSize: 13, color: colors.text.secondary, marginBottom: 12 }}>
-                {stageAction === 'advance' 
+                {stageAction === 'advance'
                   ? 'Confirm that this production stage has been successfully processed and completed.'
                   : 'Specify the justification reason for bypassing this manufacturing step.'}
               </Text>
 
               <Text style={styles.inputLabel}>Operator / Signoff By *</Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="Enter operator or supervisor name" 
-                placeholderTextColor={colors.text.muted} 
-                value={stageOperator} 
-                onChangeText={setStageOperator} 
+              <TextInput
+                style={styles.input}
+                placeholder="Enter operator or supervisor name"
+                placeholderTextColor={colors.text.muted}
+                value={stageOperator}
+                onChangeText={setStageOperator}
               />
 
               <Text style={styles.inputLabel}>
@@ -2355,8 +2391,8 @@ export default function ManufacturingScreen() {
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setStageModalVisible(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.submitBtn, stageAction === 'skip' ? { backgroundColor: colors.warning } : null]} 
+              <TouchableOpacity
+                style={[styles.submitBtn, stageAction === 'skip' ? { backgroundColor: colors.warning } : null]}
                 onPress={handleSaveStageAction}
               >
                 <Text style={styles.submitBtnText}>

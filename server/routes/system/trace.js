@@ -41,7 +41,7 @@ router.get('/:batchNo', async (req, res) => {
       result.materialName = rawMaterial.name;
       result.materialSku = rawMaterial.sku;
       rawEntries = await RawMaterialEntry.find({ rawMaterialId: rawMaterial._id })
-        .populate('rawMaterialId', 'name sku unit')
+        .populate('rawMaterialId', 'name sku unit category')
         .lean();
     }
     
@@ -52,7 +52,7 @@ router.get('/:batchNo', async (req, res) => {
           { vendorName: new RegExp(safeRegex, 'i') }
         ]
       })
-        .populate('rawMaterialId', 'name sku unit')
+        .populate('rawMaterialId', 'name sku unit category')
         .lean();
     }
 
@@ -61,6 +61,7 @@ router.get('/:batchNo', async (req, res) => {
       materialName: e.rawMaterialId ? e.rawMaterialId.name : 'Unknown',
       materialSku: e.rawMaterialId ? e.rawMaterialId.sku : '',
       unit: e.rawMaterialId ? e.rawMaterialId.unit : '',
+      category: e.rawMaterialId ? e.rawMaterialId.category : '',
       initialQty: e.initialQty || e.qty,
       qty: e.qty,
       batchNo: e.batchNo,
@@ -83,7 +84,7 @@ router.get('/:batchNo', async (req, res) => {
       })
         .populate('productId', 'name sku')
         .populate('manufacturingUnitId', 'name code')
-        .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
+        .populate('ingredientsConsumed.rawMaterialId', 'name sku unit category')
         .lean();
     } else {
       prodBatchesAsConsumer = await BatchProduction.find({
@@ -91,7 +92,7 @@ router.get('/:batchNo', async (req, res) => {
       })
         .populate('productId', 'name sku')
         .populate('manufacturingUnitId', 'name code')
-        .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
+        .populate('ingredientsConsumed.rawMaterialId', 'name sku unit category')
         .lean();
     }
 
@@ -126,7 +127,7 @@ router.get('/:batchNo', async (req, res) => {
     // 3. Search BatchProduction (as a finished goods batch)
     const prodBatchesAsFinished = await BatchProduction.find({ batchNo: new RegExp(safeRegex, 'i') })
       .populate('productId', 'name sku')
-      .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
+      .populate('ingredientsConsumed.rawMaterialId', 'name sku unit category')
       .lean();
 
     for (const b of prodBatchesAsFinished) {
@@ -136,9 +137,9 @@ router.get('/:batchNo', async (req, res) => {
           let vendorName = ing.vendorName || '';
           let rmEntry = null;
           if (ing.rawMaterialEntryId) {
-            rmEntry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).populate('rawMaterialId', 'name sku unit').lean();
+            rmEntry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).populate('rawMaterialId', 'name sku unit category').lean();
           } else if (ing.batchNo) {
-            rmEntry = await RawMaterialEntry.findOne({ batchNo: ing.batchNo }).populate('rawMaterialId', 'name sku unit').lean();
+            rmEntry = await RawMaterialEntry.findOne({ batchNo: ing.batchNo }).populate('rawMaterialId', 'name sku unit category').lean();
           }
 
           if (rmEntry) {
@@ -150,6 +151,7 @@ router.get('/:batchNo', async (req, res) => {
                 materialName: rmEntry.rawMaterialId ? rmEntry.rawMaterialId.name : (ing.rawMaterialId ? ing.rawMaterialId.name : 'Raw Material'),
                 materialSku: rmEntry.rawMaterialId ? rmEntry.rawMaterialId.sku : (ing.rawMaterialId ? ing.rawMaterialId.sku : ''),
                 unit: rmEntry.rawMaterialId ? rmEntry.rawMaterialId.unit : (ing.rawMaterialId ? ing.rawMaterialId.unit : ''),
+                category: rmEntry.rawMaterialId ? rmEntry.rawMaterialId.category : (ing.rawMaterialId ? ing.rawMaterialId.category : ''),
                 initialQty: rmEntry.initialQty || rmEntry.qty,
                 qty: rmEntry.qty,
                 batchNo: rmEntry.batchNo || ing.batchNo,
@@ -168,6 +170,7 @@ router.get('/:batchNo', async (req, res) => {
             batchNo: ing.batchNo,
             qtyConsumed: ing.qtyConsumed,
             unit: ing.rawMaterialId ? ing.rawMaterialId.unit : 'units',
+            category: ing.rawMaterialId ? ing.rawMaterialId.category : '',
             vendorName: vendorName || 'Direct/Unknown',
           });
         }

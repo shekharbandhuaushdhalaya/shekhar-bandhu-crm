@@ -237,18 +237,67 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
                     </Text>
                   </View>
                 </View>
-                {invoice.warehouseName ? (
-                  <View style={styles.infoItem}>
-                    <View style={[styles.infoIcon, { backgroundColor: colors.infoLight }]}>
-                      <Ionicons name="business" size={16} color={colors.info} />
-                    </View>
-                    <View>
-                      <Text style={styles.infoLabel}>Destination Warehouse</Text>
-                      <Text style={styles.infoValue}>{invoice.warehouseName}</Text>
-                    </View>
-                  </View>
-                ) : null}
               </>
+            )}
+
+            {invoice.warehouseName ? (
+              <View style={styles.infoItem}>
+                <View style={[styles.infoIcon, { backgroundColor: colors.infoLight }]}>
+                  <Ionicons name="business" size={16} color={colors.info} />
+                </View>
+                <View>
+                  <Text style={styles.infoLabel}>Destination Warehouse</Text>
+                  <Text style={styles.infoValue}>{invoice.warehouseName}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {(invoice.freightAmount > 0 || invoice.cartageAmount > 0) && (
+              <View style={styles.infoItem}>
+                <View style={[styles.infoIcon, { backgroundColor: colors.infoLight }]}>
+                  <Ionicons name="car-outline" size={16} color={colors.info} />
+                </View>
+                <View>
+                  <Text style={styles.infoLabel}>Bill Freight & Cartage</Text>
+                  <Text style={styles.infoValue}>
+                    {invoice.freightAmount > 0 ? `Freight: ₹${invoice.freightAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                    {invoice.freightAmount > 0 && invoice.cartageAmount > 0 ? ' | ' : ''}
+                    {invoice.cartageAmount > 0 ? `Cartage: ₹${invoice.cartageAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {invoice.internalFreightExpense > 0 && (
+              <View style={styles.infoItem}>
+                <View style={[styles.infoIcon, { backgroundColor: colors.warningLight }]}>
+                  <Ionicons name="bus-outline" size={16} color={colors.warning} />
+                </View>
+                <View>
+                  <Text style={styles.infoLabel}>Internal Freight Expense (Paid by Us)</Text>
+                  <Text style={styles.infoValue}>
+                    ₹{invoice.internalFreightExpense.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {(invoice.transport || invoice.vehicleNo || invoice.ewayBillNo) && (
+              <View style={styles.infoItem}>
+                <View style={[styles.infoIcon, { backgroundColor: colors.primaryLight }]}>
+                  <Ionicons name="document-text-outline" size={16} color={colors.primary} />
+                </View>
+                <View>
+                  <Text style={styles.infoLabel}>Transport & E-way Bill Details</Text>
+                  <Text style={styles.infoValue}>
+                    {invoice.transport ? `Transporter: ${invoice.transport}` : ''}
+                    {invoice.transport && (invoice.vehicleNo || invoice.ewayBillNo) ? ' | ' : ''}
+                    {invoice.vehicleNo ? `Vehicle: ${invoice.vehicleNo}` : ''}
+                    {invoice.vehicleNo && invoice.ewayBillNo ? ' | ' : ''}
+                    {invoice.ewayBillNo ? `GR/E-way No: ${invoice.ewayBillNo}` : ''}
+                  </Text>
+                </View>
+              </View>
             )}
 
             <View style={styles.infoItem}>
@@ -767,7 +816,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const isIntraState = stateCheck === 'uttar pradesh' || stateCheck === 'up';
 
   // Calculations
-  let totalBase = 0;
+  let itemsBaseTotal = 0;
   let totalGstAmount = 0;
   rows.forEach(r => {
     const qty = parseFloat(r.boxes) || 0;
@@ -775,19 +824,27 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     const gstRate = (mode === 'regular' || (mode as string) === 'pakka') ? (r.gstRate || 0) : 0;
     const itemBase = qty * rate;
     const itemGst = itemBase * (gstRate / 100);
-    totalBase += itemBase;
+    itemsBaseTotal += itemBase;
     totalGstAmount += itemGst;
   });
 
+  let totalBase = itemsBaseTotal;
+
   const freightVal = parseFloat(freightAmount) || 0;
   const cartageVal = parseFloat(cartageAmount) || 0;
+  const isGstActive = (mode === 'regular' || (mode as string) === 'pakka');
+
   if (freightVal > 0) {
     totalBase += freightVal;
-    totalGstAmount += (freightVal * 18) / 100;
+    if (isGstActive) {
+      totalGstAmount += (freightVal * 18) / 100;
+    }
   }
   if (cartageVal > 0) {
     totalBase += cartageVal;
-    totalGstAmount += (cartageVal * 18) / 100;
+    if (isGstActive) {
+      totalGstAmount += (cartageVal * 18) / 100;
+    }
   }
 
   let computedCGST = 0;
@@ -1556,8 +1613,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             <View style={styles.gstCalculationPreview}>
               <Text style={styles.previewTitle}>Invoice Summary:</Text>
                <View style={styles.previewRow}>
-                 <Text style={styles.previewLabel}>Total Base Value:</Text>
-                 <Text style={styles.previewValue}>₹{totalBase.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                 <Text style={styles.previewLabel}>Items Base Total:</Text>
+                 <Text style={styles.previewValue}>₹{itemsBaseTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                </View>
                {freightVal > 0 && (
                  <View style={styles.previewRow}>

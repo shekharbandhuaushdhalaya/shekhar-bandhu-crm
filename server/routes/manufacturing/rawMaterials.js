@@ -120,7 +120,7 @@ router.delete('/:id', async (req, res) => {
 router.get('/entries', async (req, res) => {
   try {
     const entries = await RawMaterialEntry.find({})
-      .populate('rawMaterialId', 'name sku unit')
+      .populate('rawMaterialId', 'name sku unit category')
       .sort({ createdAt: -1 })
       .lean();
     res.json(entries);
@@ -137,7 +137,7 @@ router.get('/expiry-alerts', async (req, res) => {
       qty: { $gt: 0 },
       expiryDate: { $ne: null, $lte: ninetyDays }
     })
-    .populate('rawMaterialId', 'name sku unit')
+    .populate('rawMaterialId', 'name sku unit category')
     .sort({ expiryDate: 1 })
     .lean();
     res.json(alerts);
@@ -246,7 +246,8 @@ router.get('/:id/genealogy', async (req, res) => {
         _id: rawMaterial._id,
         name: rawMaterial.name,
         sku: rawMaterial.sku,
-        unit: rawMaterial.unit
+        unit: rawMaterial.unit,
+        category: rawMaterial.category
       },
       totalBatchesUsedIn: consumptions.length,
       batches: consumptions
@@ -260,7 +261,7 @@ router.get('/:id/genealogy', async (req, res) => {
 router.get('/purchases/list', async (req, res) => {
   try {
     const entries = await RawMaterialEntry.find({ purchaseRef: { $ne: '' } })
-      .populate('rawMaterialId', 'name sku unit')
+      .populate('rawMaterialId', 'name sku unit category')
       .populate('vendorId', 'name company')
       .sort({ createdAt: -1 })
       .lean();

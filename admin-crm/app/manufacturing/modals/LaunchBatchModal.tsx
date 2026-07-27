@@ -282,10 +282,13 @@ export default function LaunchBatchModal({
                     <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: idx === previewIngredients.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
                       <View style={{ flex: 1, marginRight: 8 }}>
                         <Text style={{ fontSize: 12, color: colors.text.primary }}>
-                          {item.itemType === 'packaging' ? '📦' : '🌿'} {item.name} {item.itemType === 'packaging' ? `(${item.ratioPct} Pcs/unit)` : `(${item.ratioPct}%)`}
+                          {item.itemType === 'packaging' ? '📦' : '🌿'} {item.name}{' '}
+                          <Text style={{ fontSize: 10.5, color: colors.text.muted }}>
+                            ({item.ratioPct} {item.unit}{item.itemType === 'packaging' ? '/unit' : '/batch'})
+                          </Text>
                         </Text>
                         <Text style={{ fontSize: 10.5, color: isShortage ? colors.danger : colors.text.secondary, marginTop: 2 }}>
-                          Available: {item.available.toFixed(2)} {item.unit}
+                          Available in Unit: {item.available.toFixed(2)} {item.unit}
                         </Text>
                       </View>
                       <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>

@@ -77,6 +77,7 @@ const invoiceSchema = new mongoose.Schema({
   igst: { type: Number },
   roundOff: { type: Number, default: 0 },
   freightAmount: { type: Number, default: 0 },
+  cartageAmount: { type: Number, default: 0 },
   internalFreightExpense: { type: Number, default: 0 },
   stateOfSupply: { type: String, default: '' },
   gstin: { type: String, default: '', trim: true },

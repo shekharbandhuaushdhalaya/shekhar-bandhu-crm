@@ -16,6 +16,12 @@ import * as Sharing from 'expo-sharing';
 import GstReturnsPage from './gst-returns';
 import UnauthorizedScreen from '../components/UnauthorizedScreen';
 
+const isIntegerQty = (unit?: string, category?: string) => {
+  const u = (unit || '').toLowerCase().trim();
+  const c = (category || '').toLowerCase().trim();
+  return u === 'pcs' && (c === 'packing' || c === 'packaging');
+};
+
 type ReportTab = 'accounting' | 'gst' | 'aging' | 'manufacturing' | 'rawmaterials';
 
 export default function ReportsScreen() {
@@ -352,7 +358,7 @@ export default function ReportsScreen() {
           <td>${idx + 1}</td>
           <td>${rm.name}</td>
           <td>${rm.sku}</td>
-          <td class="right">${stock.toFixed(2)}</td>
+          <td class="right">${isIntegerQty(rm.unit, rm.category) ? stock.toFixed(0) : stock.toFixed(2)}</td>
           <td>${rm.unit}</td>
           <td class="right">${rm.minReorder}</td>
           <td class="right">₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
@@ -379,7 +385,7 @@ export default function ReportsScreen() {
           <td>${idx + 1}</td>
           <td>${rmName}</td>
           <td>${e.batchNo}</td>
-          <td class="right">${e.qty.toFixed(2)}</td>
+          <td class="right">${e.rawMaterialId && typeof e.rawMaterialId === 'object' && isIntegerQty(e.rawMaterialId.unit, e.rawMaterialId.category) ? e.qty.toFixed(0) : e.qty.toFixed(2)}</td>
           <td>${rmUnit}</td>
           <td class="right">₹${(e.purchaseRate || 0).toFixed(2)}</td>
           <td class="right">₹${batchValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
@@ -1146,7 +1152,7 @@ export default function ReportsScreen() {
                           <Text style={styles.expiryMaterialName}>🌿 {rmName}</Text>
                           <Text style={styles.expiryBatchInfo}>
                             Batch: <Text style={{ fontWeight: '700' }}>{alert.batchNo}</Text>
-                            {'  ·  '}Stock: {alert.qty.toFixed(2)} {rmUnit}
+                            {'  ·  '}Stock: {alert.rawMaterialId && typeof alert.rawMaterialId === 'object' && isIntegerQty(alert.rawMaterialId.unit, alert.rawMaterialId.category) ? alert.qty.toFixed(0) : alert.qty.toFixed(2)} {rmUnit}
                           </Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -1244,7 +1250,7 @@ export default function ReportsScreen() {
                               <Text style={styles.rmSkuLabel}>{rm.sku} · {batchCount} batch{batchCount !== 1 ? 'es' : ''}</Text>
                             </View>
                             <Text style={[styles.rmTd, { flex: 1, textAlign: 'right', color: isLow ? colors.danger : colors.text.primary, fontWeight: '700' }]}>
-                              {stock.toFixed(2)} {rm.unit}
+                              {isIntegerQty(rm.unit, rm.category) ? stock.toFixed(0) : stock.toFixed(2)} {rm.unit}
                             </Text>
                             <Text style={[styles.rmTd, { flex: 1, textAlign: 'right' }]}>
                               {rm.minReorder} {rm.unit}
@@ -1339,7 +1345,7 @@ export default function ReportsScreen() {
                                 </View>
                               </View>
                               <Text style={[styles.rmTd, { flex: 1, textAlign: 'right', fontWeight: '700', color: colors.text.primary }]}>
-                                {entry.qty.toFixed(2)} {rmUnit}
+                                {entry.rawMaterialId && typeof entry.rawMaterialId === 'object' && isIntegerQty(entry.rawMaterialId.unit, entry.rawMaterialId.category) ? entry.qty.toFixed(0) : entry.qty.toFixed(2)} {rmUnit}
                               </Text>
                               <Text style={[styles.rmTd, { flex: 1, textAlign: 'right' }]}>
                                 ₹{(entry.purchaseRate || 0).toFixed(2)}
