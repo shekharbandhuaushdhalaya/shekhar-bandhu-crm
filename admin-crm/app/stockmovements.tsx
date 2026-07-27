@@ -246,11 +246,11 @@ const printDeliveryChallan = (m: StockMovement) => {
           <td style="width:50%;padding:6px 2px;border:1px solid #000;border-top:none;text-align:left;">
             <div>Receiver's Signature &amp; Stamp</div>
           </td>
-          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:right;">
+          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:right;vertical-align:bottom;">
             <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
             ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
               <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 14px; width: auto; object-fit: contain; margin-top:1px;" />
-            ` : ''}
+            ` : '<div style="height:16px;"></div>'}
             <div style="font-size:5px;margin-top:1px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
           </td>
         </tr>
