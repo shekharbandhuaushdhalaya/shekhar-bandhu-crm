@@ -185,16 +185,20 @@ const printDeliveryChallan = (m: StockMovement) => {
                 <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
               </tr>
             </table>
-            <div style="margin-top:4px;border-top:1px solid #000;padding-top:2px;text-align:center;">
-              <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
-              <div style="margin-top:4px;">Receiver's Signature &amp; Stamp</div>
-              ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
-                <div style="margin-top:4px;">
-                  <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 20px; width: auto; object-fit: contain;" />
-                </div>
-              ` : ''}
-              <div style="font-size:6px;margin-top:2px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
-            </div>
+          </td>
+        </tr>
+      </table>
+      <table style="font-size:6px;width:100%;border:1px solid #000;border-top:none;">
+        <tr>
+          <td style="width:50%;padding:2px;text-align:left;">
+            <div>Receiver's Signature &amp; Stamp</div>
+          </td>
+          <td style="width:50%;padding:2px;text-align:right;">
+            <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
+            ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
+              <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 22px; width: auto; object-fit: contain; margin-top:2px;" />
+            ` : ''}
+            <div style="font-size:6px;margin-top:2px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
           </td>
         </tr>
       </table>
