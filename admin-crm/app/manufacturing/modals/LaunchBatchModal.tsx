@@ -284,7 +284,9 @@ export default function LaunchBatchModal({
                         <Text style={{ fontSize: 12, color: colors.text.primary }}>
                           {item.itemType === 'packaging' ? '📦' : '🌿'} {item.name}{' '}
                           <Text style={{ fontSize: 10.5, color: colors.text.muted }}>
-                            ({item.ratioPct} {item.unit}{item.itemType === 'packaging' ? '/unit' : '/batch'})
+                            {item.itemType === 'packaging'
+                              ? `(${item.ratioPct} ${item.unit}/unit)`
+                              : `(${item.ratioPct}% of batch)`}
                           </Text>
                         </Text>
                         <Text style={{ fontSize: 10.5, color: isShortage ? colors.danger : colors.text.secondary, marginTop: 2 }}>
