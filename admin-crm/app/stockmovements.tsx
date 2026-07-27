@@ -57,7 +57,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     const netRate = it.rate || 0;
     const itemTotal = totalPcs * netRate;
     const gstAmt = itemTotal * (it.gstRate || 0) / 100;
-    const displayName = it.productName.replace(/\s*\([^)]*\)$/, '');
+    const displayName = it.size ? it.productName.replace(/\s*\([^)]*\)$/, '') : it.productName;
     return `
     <tr>
       <td style="padding:5px;text-align:center;">${i + 1}</td>
