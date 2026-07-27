@@ -79,20 +79,20 @@ const printDeliveryChallan = (m: StockMovement) => {
   const halfWidth = '105mm';
 
   const copyBlock = (copy: string) => `
-    <div style="height:50%;overflow:hidden;padding:4mm 8mm;">
-      <div style="text-align:center;border:1.5px solid #000;padding:4px;margin-bottom:4px;">
-        <div style="font-weight:bold;font-size:11px;">${FIRM_DETAILS.name}</div>
-        <div style="font-size:7px;">${FIRM_DETAILS.address}</div>
-        <div style="font-size:7px;">GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}${FIRM_DETAILS.manufacturingLicenseNo ? ` | Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}` : ''}</div>
-        <div style="font-size:9px;font-weight:bold;margin-top:2px;letter-spacing:0.5px;">
-          DELIVERY CHALLAN — NOT A TAX INVOICE
-        </div>
-        <div style="font-size:7px;color:#555;">(CGST Rule 55 — ${typeConf.label})</div>
-        <div style="font-size:7px;font-style:italic;">${copy}</div>
+    <div style="height:50%;overflow:hidden;padding:3mm 6mm;">
+      <div style="font-size:10px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-bottom:none;padding:3px;">
+        DELIVERY CHALLAN — NOT A TAX INVOICE
       </div>
       <table style="margin-bottom:3px;font-size:7px;border:1px solid #000;">
         <tr>
-          <td style="width:50%;padding:2px;border-right:1px solid #000;">
+          <td style="width:50%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+            <div style="font-weight:bold;font-size:8px;">${FIRM_DETAILS.name}</div>
+            <div>${FIRM_DETAILS.address}</div>
+            <div>GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
+            ${FIRM_DETAILS.manufacturingLicenseNo ? `<div>Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</div>` : ''}
+            <div style="margin-top:2px;color:#555;font-style:italic;">${copy}</div>
+          </td>
+          <td style="width:50%;padding:2px;vertical-align:top;">
             <strong>Challan No.:</strong> ${m.docNo}<br/>
             <strong>Date:</strong> ${dateStr}<br/>
             <strong>Warehouse:</strong> ${m.warehouseName}
@@ -101,11 +101,7 @@ const printDeliveryChallan = (m: StockMovement) => {
             ${(m as any).vehicleNo ? `<br/><strong>Vehicle:</strong> ${(m as any).vehicleNo}` : ''}
             ${(m as any).courierName ? `<br/><strong>Courier:</strong> ${(m as any).courierName}` : ''}
             ${(m as any).trackingId ? `<br/><strong>Tracking ID:</strong> ${(m as any).trackingId}` : ''}
-          </td>
-          <td style="width:50%;padding:2px;">
-            <strong>Consignee:</strong> ${m.partyName}<br/>
-            ${m.partyAddress ? m.partyAddress.replace(/\n/g, '<br/>') : ''}<br/>
-            ${m.partyGstin ? `<strong>GSTIN:</strong> ${m.partyGstin}` : ''}
+            <br/><span style="font-size:6px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
           </td>
         </tr>
       </table>
