@@ -170,7 +170,7 @@ const printDeliveryChallan = (m: StockMovement) => {
       </table>
       ${extraInfo}
       <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;border-bottom:1px solid #000;">
-        <div style="overflow:hidden;min-height:250px;">
+        <div style="flex:1;overflow:hidden;min-height:200px;">
         <table style="font-size:7px;width:100%;">
           <thead>
             <tr style="background:#ccc;">
