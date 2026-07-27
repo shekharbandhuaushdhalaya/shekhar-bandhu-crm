@@ -119,28 +119,28 @@ const printDeliveryChallan = (m: StockMovement) => {
     : '';
 
   const copyBlock = (copy: string) => `
-    <div style="height:100%;padding:2mm 3mm;display:flex;flex-direction:column;border:1.5px solid #000;border-radius:4px;">
-      <div style="font-size:9px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:2px 4px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="height:100%;padding:1.5mm 2mm;display:flex;flex-direction:column;border:1.5px solid #000;border-radius:4px;">
+      <div style="font-size:8px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:1.5px 3px;display:flex;align-items:center;justify-content:space-between;">
         <span>DELIVERY CHALLAN — NOT A TAX INVOICE</span>
-        <span style="font-size:6px;font-weight:normal;">(${copy})</span>
+        <span style="font-size:5px;font-weight:normal;">(${copy})</span>
       </div>
-      <table style="font-size:7px;border:1px solid #000;">
+      <table style="font-size:6px;border:1px solid #000;">
         <tr>
-          <td style="width:50%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:50%;padding:1.5px;border-right:1px solid #000;vertical-align:top;">
             <table style="width:100%;">
               <tr>
-                <td style="width:32px;padding-right:3px;vertical-align:middle;">
-                  <img src="data:image/png;base64,${LOGO_BASE64}" style="height:28px;width:auto;object-fit:contain;" />
+                <td style="width:28px;padding-right:2px;vertical-align:middle;">
+                  <img src="data:image/png;base64,${LOGO_BASE64}" style="height:24px;width:auto;object-fit:contain;" />
                 </td>
                 <td style="vertical-align:middle;">
-                  <div style="font-weight:bold;font-size:8px;">${FIRM_DETAILS.name}</div>
+                  <div style="font-weight:bold;font-size:7px;">${FIRM_DETAILS.name}</div>
                 </td>
               </tr>
             </table>
-            <div>${FIRM_DETAILS.address}</div>
-            <div>GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
+            <div style="font-size:6px;">${FIRM_DETAILS.address}</div>
+            <div style="font-size:6px;">GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
           </td>
-          <td style="width:50%;padding:2px;vertical-align:top;">
+          <td style="width:50%;padding:1.5px;vertical-align:top;">
             <strong>Challan No.:</strong> ${m.docNo}<br/>
             <strong>Date:</strong> ${dateStr}<br/>
             <strong>Warehouse:</strong> ${m.warehouseName}
@@ -149,18 +149,18 @@ const printDeliveryChallan = (m: StockMovement) => {
             ${(m as any).vehicleNo ? `<br/><strong>Vehicle:</strong> ${(m as any).vehicleNo}` : ''}
             ${(m as any).courierName ? `<br/><strong>Courier:</strong> ${(m as any).courierName}` : ''}
             ${(m as any).trackingId ? `<br/><strong>Tracking ID:</strong> ${(m as any).trackingId}` : ''}
-            <br/><span style="font-size:6px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
+            <br/><span style="font-size:5px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
           </td>
         </tr>
       </table>
-      ${FIRM_DETAILS.manufacturingLicenseNo ? `<table style="font-size:7px;width:100%;"><tr><td style="padding:2px;border:1px solid #000;text-align:center;font-weight:bold;">Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</td></tr></table>` : ''}
-      <table style="font-size:7px;border:1px solid #000;">
+      ${FIRM_DETAILS.manufacturingLicenseNo ? `<table style="font-size:6px;width:100%;"><tr><td style="padding:1.5px;border:1px solid #000;text-align:center;font-weight:bold;">Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</td></tr></table>` : ''}
+      <table style="font-size:6px;border:1px solid #000;">
         <tr>
-          <td style="width:28%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:28%;padding:1.5px;border-right:1px solid #000;vertical-align:top;">
             <strong>Consignee:</strong> ${m.partyName}
             ${m.partyGstin ? `<br/><strong>GSTIN:</strong> ${m.partyGstin}` : ''}
           </td>
-          <td style="width:36%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:36%;padding:1.5px;border-right:1px solid #000;vertical-align:top;">
             <strong>Billing:</strong> ${billingAddr ? billingAddr.replace(/\n/g, ', ') : '—'}
           </td>
           <td style="width:36%;padding:2px;vertical-align:top;">
@@ -170,19 +170,19 @@ const printDeliveryChallan = (m: StockMovement) => {
       </table>
       ${extraInfo}
       <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;border-bottom:1px solid #000;">
-        <div style="overflow:hidden;min-height:300px;">
-        <table style="font-size:8px;width:100%;">
+        <div style="overflow:hidden;min-height:250px;">
+        <table style="font-size:7px;width:100%;">
           <thead>
             <tr style="background:#ccc;">
-              <th style="border-bottom:1px solid #000;padding:5px;width:3%;text-align:center;">#</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:26%;text-align:left;">Product Name &amp; Size</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:10%;text-align:center;">Batch</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:6%;text-align:center;">Qty</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:8%;text-align:right;">MRP</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:5%;text-align:right;">Disc</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:5%;text-align:right;">GST%</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:9%;text-align:right;">Amount</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:8%;text-align:right;">GST Amt</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:3%;text-align:center;">#</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:26%;text-align:left;">Product Name &amp; Size</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:10%;text-align:center;">Batch</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:6%;text-align:center;">Qty</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:8%;text-align:right;">MRP</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:5%;text-align:right;">Disc</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:5%;text-align:right;">GST%</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:9%;text-align:right;">Amount</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:8%;text-align:right;">GST Amt</th>
             </tr>
           </thead>
           <tbody>
@@ -193,65 +193,65 @@ const printDeliveryChallan = (m: StockMovement) => {
       </div>
       ${m.notes ? `<div style="margin-top:1px;font-size:6px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
       <div style="margin-top:auto;display:flex;flex-direction:column;gap:0;">
-      <table style="font-size:7px;width:100%;">
+      <table style="font-size:6px;width:100%;">
         <tr>
           <td style="width:35%;padding:0;border:1px solid #000;vertical-align:top;">
-            <table style="width:100%;height:100%;font-size:7px;">
+            <table style="width:100%;height:100%;font-size:6px;">
               <tr>
-                <td style="width:55%;vertical-align:top;padding:2px;">
-                  <div style="font-weight:bold;font-size:8px;">Bank Details:</div>
+                <td style="width:55%;vertical-align:top;padding:1.5px;">
+                  <div style="font-weight:bold;font-size:7px;">Bank Details:</div>
                   <div>${FIRM_DETAILS.bankName}</div>
                   <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
                   <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
                   <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
                 </td>
-                <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:2px;">
-                  <div style="margin:1px auto;width:32px;height:32px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:5px;color:#999;">
+                <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:1.5px;">
+                  <div style="margin:1px auto;width:28px;height:28px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:4px;color:#999;">
                     QR
                   </div>
-                  <div style="font-size:6px;font-weight:600;margin-top:1px;">QR for online payment</div>
-                  <div style="font-size:6px;color:#666;margin-top:1px;">UPI ID: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
+                  <div style="font-size:5px;font-weight:600;margin-top:1px;">QR for online payment</div>
+                  <div style="font-size:5px;color:#666;margin-top:1px;">UPI ID: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
                 </td>
               </tr>
               <tr>
-                <td colspan="2" style="border-top:1px solid #000;padding:5px;font-size:8px;">Amount in Words: <strong>Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only</strong></td>
+                <td colspan="2" style="border-top:1px solid #000;padding:3px;font-size:7px;">Amount in Words: <strong>Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only</strong></td>
               </tr>
             </table>
           </td>
-          <td style="width:35%;padding:2px;border:1px solid #000;vertical-align:top;">
-            <div style="font-weight:bold;font-size:8px;">Terms &amp; Conditions:</div>
-            <div style="line-height:1.3;">${(FIRM_DETAILS.defaultTerms || '').split('\n').map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
+          <td style="width:35%;padding:1.5px;border:1px solid #000;vertical-align:top;">
+            <div style="font-weight:bold;font-size:7px;">Terms &amp; Conditions:</div>
+            <div style="line-height:1.2;font-size:6px;">${(FIRM_DETAILS.defaultTerms || '').split('\n').map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
           </td>
-          <td style="width:30%;padding:2px;border:1px solid #000;vertical-align:top;">
-            <table style="width:100%;font-size:7px;">
+          <td style="width:30%;padding:1.5px;border:1px solid #000;vertical-align:top;">
+            <table style="width:100%;font-size:6px;">
               ${discountRow}
               <tr style="background:#ccc;font-weight:bold;">
-                <td style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (excl. GST)</td>
-                <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
+                <td style="border:1px solid #000;padding:1px;text-align:right;">Grand Total (excl. GST)</td>
+                <td style="border:1px solid #000;padding:1px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
               </tr>
               <tr style="background:#ccc;font-weight:bold;">
-                <td style="border:1px solid #000;padding:1.5px;text-align:right;">Total GST</td>
-                <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${totalGst.toFixed(2)}</td>
+                <td style="border:1px solid #000;padding:1px;text-align:right;">Total GST</td>
+                <td style="border:1px solid #000;padding:1px;text-align:right;">₹${totalGst.toFixed(2)}</td>
               </tr>
               <tr style="background:#aaa;font-weight:bold;">
-                <td style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (incl. GST)</td>
-                <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
+                <td style="border:1px solid #000;padding:1px;text-align:right;">Grand Total (incl. GST)</td>
+                <td style="border:1px solid #000;padding:1px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
               </tr>
             </table>
           </td>
         </tr>
       </table>
-      <table style="font-size:7px;width:100%;">
+      <table style="font-size:6px;width:100%;">
         <tr>
-          <td style="width:50%;padding:3px 3px;border:1px solid #000;border-top:none;text-align:left;">
+          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:left;">
             <div>Receiver's Signature &amp; Stamp</div>
           </td>
-          <td style="width:50%;padding:3px 3px;border:1px solid #000;border-top:none;text-align:right;">
-            <div style="font-size:8px;">For ${FIRM_DETAILS.name}</div>
+          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:right;">
+            <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
             ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
-              <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 18px; width: auto; object-fit: contain; margin-top:1px;" />
+              <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 14px; width: auto; object-fit: contain; margin-top:1px;" />
             ` : ''}
-            <div style="font-size:6px;margin-top:1px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
+            <div style="font-size:5px;margin-top:1px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
           </td>
         </tr>
       </table>
@@ -268,7 +268,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; min-height:297mm; padding:3mm 5mm; }
     .page { width:100%; min-height:100%; display:flex; flex-direction:column; }
     .half { flex:1; position:relative; display:flex; flex-direction:column; }
-    .separator { border:none; border-top:2px dashed #000; margin:3mm 0; }
+    .separator { border:none; border-top:2px dashed #000; margin:5mm 0; }
     table { border-collapse: collapse; width: 100%; }
     @media print { @page { size: A4 portrait; margin: 3mm 5mm; } body { width:auto; height:auto; padding:0; } }
   </style>
