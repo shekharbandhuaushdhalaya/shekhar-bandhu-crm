@@ -43,21 +43,27 @@ const printDeliveryChallan = (m: StockMovement) => {
     const gstAmt = itemTotal * (it.gstRate || 0) / 100;
     return `
     <tr>
-      <td style="border:1px solid #000;padding:3px;text-align:center;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:3px;">${it.productName}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:center;">${it.size || '—'}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:center;">${it.batchNo || '—'}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:center;">${totalPcs}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:right;font-weight:bold;">₹${itemTotal.toFixed(2)}</td>
+      <td style="border:1px solid #000;padding:2px;text-align:center;">${i + 1}</td>
+      <td style="border:1px solid #000;padding:2px;">${it.productName}</td>
+      <td style="border:1px solid #000;padding:2px;text-align:center;">${it.size || '—'}</td>
+      <td style="border:1px solid #000;padding:2px;text-align:center;">${it.batchNo || '—'}</td>
+      <td style="border:1px solid #000;padding:2px;text-align:center;">${totalPcs}</td>
+      <td style="border:1px solid #000;padding:2px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
+      <td style="border:1px solid #000;padding:2px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
+      <td style="border:1px solid #000;padding:2px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
+      <td style="border:1px solid #000;padding:2px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
+      <td style="border:1px solid #000;padding:2px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
     </tr>`;
   }).join('');
 
   const grandTotal = (m.items || []).reduce((sum, it) => {
     const totalPcs = (it.qty || 0) * (it.packing || 1);
     return sum + totalPcs * (it.rate || 0);
+  }, 0);
+  const totalGst = (m.items || []).reduce((sum, it) => {
+    const totalPcs = (it.qty || 0) * (it.packing || 1);
+    const itemTotal = totalPcs * (it.rate || 0);
+    return sum + itemTotal * (it.gstRate || 0) / 100;
   }, 0);
 
   // Extra info block
@@ -86,20 +92,20 @@ const printDeliveryChallan = (m: StockMovement) => {
     : '';
 
   const copyBlock = (copy: string) => `
-    <div style="height:50%;overflow:hidden;padding:3mm 6mm;">
-      <div style="font-size:10px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-bottom:none;padding:3px;">
+    <div style="height:50%;padding:2mm 4mm;display:flex;flex-direction:column;">
+      <div style="font-size:9px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-bottom:none;padding:2px;">
         DELIVERY CHALLAN — NOT A TAX INVOICE
       </div>
-      <table style="margin-bottom:2px;font-size:7px;border:1px solid #000;">
+      <table style="font-size:6px;border:1px solid #000;">
         <tr>
-          <td style="width:50%;padding:2px;border-right:1px solid #000;vertical-align:top;">
-            <div style="font-weight:bold;font-size:8px;">${FIRM_DETAILS.name}</div>
+          <td style="width:50%;padding:1.5px;border-right:1px solid #000;vertical-align:top;">
+            <div style="font-weight:bold;font-size:7px;">${FIRM_DETAILS.name}</div>
             <div>${FIRM_DETAILS.address}</div>
             <div>GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
             ${FIRM_DETAILS.manufacturingLicenseNo ? `<div>Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</div>` : ''}
-            <div style="margin-top:2px;color:#555;font-style:italic;">${copy}</div>
+            <div style="margin-top:1px;color:#555;font-style:italic;">${copy}</div>
           </td>
-          <td style="width:50%;padding:2px;vertical-align:top;">
+          <td style="width:50%;padding:1.5px;vertical-align:top;">
             <strong>Challan No.:</strong> ${m.docNo}<br/>
             <strong>Date:</strong> ${dateStr}<br/>
             <strong>Warehouse:</strong> ${m.warehouseName}
@@ -108,49 +114,64 @@ const printDeliveryChallan = (m: StockMovement) => {
             ${(m as any).vehicleNo ? `<br/><strong>Vehicle:</strong> ${(m as any).vehicleNo}` : ''}
             ${(m as any).courierName ? `<br/><strong>Courier:</strong> ${(m as any).courierName}` : ''}
             ${(m as any).trackingId ? `<br/><strong>Tracking ID:</strong> ${(m as any).trackingId}` : ''}
-            <br/><span style="font-size:6px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
+            <br/><span style="font-size:5px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
           </td>
         </tr>
       </table>
-      <table style="margin-bottom:2px;font-size:7px;border:1px solid #000;">
+      <table style="font-size:6px;border:1px solid #000;">
         <tr>
-          <td style="width:30%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:28%;padding:1.5px;border-right:1px solid #000;vertical-align:top;">
             <strong>Consignee:</strong> ${m.partyName}
             ${m.partyGstin ? `<br/><strong>GSTIN:</strong> ${m.partyGstin}` : ''}
           </td>
-          <td style="width:35%;padding:2px;border-right:1px solid #000;vertical-align:top;">
-            <strong>Billing Address:</strong><br/>${billingAddr ? billingAddr.replace(/\n/g, '<br/>') : '—'}
+          <td style="width:36%;padding:1.5px;border-right:1px solid #000;vertical-align:top;">
+            <strong>Billing:</strong> ${billingAddr ? billingAddr.replace(/\n/g, ', ') : '—'}
           </td>
-          <td style="width:35%;padding:2px;vertical-align:top;">
-            <strong>Shipping Address:</strong><br/>${shippingAddr ? shippingAddr.replace(/\n/g, '<br/>') : '—'}
+          <td style="width:36%;padding:1.5px;vertical-align:top;">
+            <strong>Shipping:</strong> ${shippingAddr ? shippingAddr.replace(/\n/g, ', ') : '—'}
           </td>
         </tr>
       </table>
       ${extraInfo}
-      <table style="font-size:7px;margin-top:3px;width:100%;">
-        <thead>
-          <tr style="background:#f3f4f6;">
-            <th style="border:1px solid #000;padding:2px;width:4%;">#</th>
-            <th style="border:1px solid #000;padding:2px;">Product</th>
-            <th style="border:1px solid #000;padding:2px;width:8%;">Size</th>
-            <th style="border:1px solid #000;padding:2px;width:12%;">Batch</th>
-            <th style="border:1px solid #000;padding:2px;width:7%;">Qty</th>
-            <th style="border:1px solid #000;padding:2px;width:8%;">MRP</th>
-            <th style="border:1px solid #000;padding:2px;width:6%;">Disc</th>
-            <th style="border:1px solid #000;padding:2px;width:6%;">GST</th>
-            <th style="border:1px solid #000;padding:2px;width:10%;">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemRows}
-          <tr style="background:#e5e7eb;font-weight:bold;">
-            <td colspan="8" style="border:1px solid #000;padding:2px;text-align:right;">Grand Total</td>
-            <td style="border:1px solid #000;padding:2px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
-          </tr>
-        </tbody>
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+        <div style="flex:1;overflow:hidden;">
+        <table style="font-size:6px;width:100%;">
+          <thead>
+            <tr style="background:#f3f4f6;">
+              <th style="border:1px solid #000;padding:1.5px;width:3%;">#</th>
+              <th style="border:1px solid #000;padding:1.5px;">Product</th>
+              <th style="border:1px solid #000;padding:1.5px;width:6%;">Size</th>
+              <th style="border:1px solid #000;padding:1.5px;width:10%;">Batch</th>
+              <th style="border:1px solid #000;padding:1.5px;width:6%;">Qty</th>
+              <th style="border:1px solid #000;padding:1.5px;width:8%;">MRP</th>
+              <th style="border:1px solid #000;padding:1.5px;width:5%;">Disc</th>
+              <th style="border:1px solid #000;padding:1.5px;width:5%;">GST%</th>
+              <th style="border:1px solid #000;padding:1.5px;width:9%;">Amount</th>
+              <th style="border:1px solid #000;padding:1.5px;width:8%;">GST Amt</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+          </tbody>
+        </table>
+        </div>
+      </div>
+      <table style="font-size:6px;width:100%;">
+        <tr style="background:#e5e7eb;font-weight:bold;">
+          <td colspan="9" style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (excl. GST)</td>
+          <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
+        </tr>
+        <tr style="background:#e5e7eb;font-weight:bold;">
+          <td colspan="9" style="border:1px solid #000;padding:1.5px;text-align:right;">Total GST</td>
+          <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${totalGst.toFixed(2)}</td>
+        </tr>
+        <tr style="background:#d1d5db;font-weight:bold;">
+          <td colspan="9" style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (incl. GST)</td>
+          <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
+        </tr>
       </table>
-      ${m.notes ? `<div style="margin-top:4px;font-size:7px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
-      <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;font-size:7px;">
+      ${m.notes ? `<div style="margin-top:2px;font-size:6px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
+      <div style="margin-top:auto;display:flex;justify-content:space-between;align-items:center;font-size:6px;padding-top:2px;">
         <div>Receiver's Signature &amp; Stamp</div>
         <div style="text-align:right;">
           ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
