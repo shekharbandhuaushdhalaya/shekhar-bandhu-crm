@@ -213,12 +213,12 @@ const printDeliveryChallan = (m: StockMovement) => {
   <title>Delivery Challan ${m.docNo}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; height:297mm; }
-    .page { width:210mm; height:297mm; display:flex; flex-direction:column; }
+    body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; height:297mm; padding:5mm 7mm; }
+    .page { width:100%; height:100%; display:flex; flex-direction:column; }
     .half { height:50%; overflow:hidden; position:relative; }
     .separator { border:none; border-top:2px dashed #000; margin:0; }
     table { border-collapse: collapse; width: 100%; }
-    @media print { @page { size: A4 portrait; margin: 0; } body { width:210mm; height:297mm; } }
+    @media print { @page { size: A4 portrait; margin: 5mm 7mm; } body { width:auto; height:auto; padding:0; } }
   </style>
 </head>
 <body>
