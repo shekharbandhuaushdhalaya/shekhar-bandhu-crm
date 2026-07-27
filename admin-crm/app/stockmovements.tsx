@@ -57,10 +57,13 @@ const printDeliveryChallan = (m: StockMovement) => {
     const netRate = it.rate || 0;
     const itemTotal = totalPcs * netRate;
     const gstAmt = itemTotal * (it.gstRate || 0) / 100;
+    const displayName = it.size && it.productName.endsWith(` (${it.size})`)
+      ? it.productName.slice(0, -` (${it.size})`.length)
+      : it.productName;
     return `
     <tr>
       <td style="border:1px solid #000;padding:2px;text-align:center;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:2px;">${it.productName}</td>
+      <td style="border:1px solid #000;padding:2px;">${displayName}</td>
       <td style="border:1px solid #000;padding:2px;text-align:center;">${it.size || '—'}</td>
       <td style="border:1px solid #000;padding:2px;text-align:center;">${it.batchNo || '—'}</td>
       <td style="border:1px solid #000;padding:2px;text-align:center;">${totalPcs}</td>
