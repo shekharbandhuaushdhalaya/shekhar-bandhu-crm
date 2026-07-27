@@ -62,16 +62,16 @@ const printDeliveryChallan = (m: StockMovement) => {
       : it.productName;
     return `
     <tr>
-      <td style="border:1px solid #000;padding:5px;text-align:center;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:5px;">${displayName}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:center;">${it.size || '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:center;">${it.batchNo || '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:center;">${totalPcs}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:center;">${i + 1}</td>
+      <td style="border:1px solid #000;padding:8px;">${displayName}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:center;">${it.size || '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:center;">${it.batchNo || '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:center;">${totalPcs}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
     </tr>`;
   }).join('');
 
@@ -175,16 +175,16 @@ const printDeliveryChallan = (m: StockMovement) => {
         <table style="font-size:10px;width:100%;">
           <thead>
             <tr style="background:#ccc;">
-              <th style="border:1px solid #000;padding:5px;width:3%;">#</th>
-              <th style="border:1px solid #000;padding:5px;">Product</th>
-              <th style="border:1px solid #000;padding:5px;width:6%;">Size</th>
-              <th style="border:1px solid #000;padding:5px;width:10%;">Batch</th>
-              <th style="border:1px solid #000;padding:5px;width:6%;">Qty</th>
-              <th style="border:1px solid #000;padding:5px;width:8%;">MRP</th>
-              <th style="border:1px solid #000;padding:5px;width:5%;">Disc</th>
-              <th style="border:1px solid #000;padding:5px;width:5%;">GST%</th>
-              <th style="border:1px solid #000;padding:5px;width:9%;">Amount</th>
-              <th style="border:1px solid #000;padding:5px;width:8%;">GST Amt</th>
+              <th style="border:1px solid #000;padding:8px;width:3%;">#</th>
+              <th style="border:1px solid #000;padding:8px;">Product</th>
+              <th style="border:1px solid #000;padding:8px;width:6%;">Size</th>
+              <th style="border:1px solid #000;padding:8px;width:10%;">Batch</th>
+              <th style="border:1px solid #000;padding:8px;width:6%;">Qty</th>
+              <th style="border:1px solid #000;padding:8px;width:8%;">MRP</th>
+              <th style="border:1px solid #000;padding:8px;width:5%;">Disc</th>
+              <th style="border:1px solid #000;padding:8px;width:5%;">GST%</th>
+              <th style="border:1px solid #000;padding:8px;width:9%;">Amount</th>
+              <th style="border:1px solid #000;padding:8px;width:8%;">GST Amt</th>
             </tr>
           </thead>
           <tbody>
@@ -271,7 +271,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; min-height:297mm; padding:5mm 7mm; }
     .page { width:100%; min-height:100%; display:flex; flex-direction:column; }
-    .half { flex:1; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+    .half { flex:1; position:relative; display:flex; flex-direction:column; }
     .separator { border:none; border-top:2px dashed #000; margin:0; }
     table { border-collapse: collapse; width: 100%; }
     @media print { @page { size: A4 portrait; margin: 5mm 7mm; } body { width:auto; height:auto; padding:0; } }
