@@ -287,7 +287,21 @@ const printDeliveryChallan = (m: StockMovement) => {
     <hr class="separator"/>
     <div class="half">${copyBlock('Duplicate (Transporter)')}</div>
   </div>
-  <script>window.print();</script>
+  <script>
+    Promise.all(
+      Array.from(document.images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      })
+    ).then(() => {
+      setTimeout(() => {
+        window.print();
+      }, 250);
+    });
+  </script>
 </body>
 </html>`;
 

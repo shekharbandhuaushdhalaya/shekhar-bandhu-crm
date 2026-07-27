@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { authStorage } from './storage';
 import { api, setApiBaseUrl } from './api';
-import { loadFirmDetailsFromStorage } from '../constants/firm';
+import { loadFirmDetailsFromStorage, updateActiveFirmDetails } from '../constants/firm';
 
 export type UserProfile = {
   id: string;
@@ -36,7 +36,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setApiBaseUrl(storedApiUrl);
         }
 
+        // Restore last-known firm details immediately (fast, works offline)
         await loadFirmDetailsFromStorage();
+
+        // Then refresh from the live API in the background so QR/signature/
+        // bank details are current even if the user never opens Profile
+        // and the local cache is empty or stale.
+        api.getSystemSettings()
+          .then((config) => {
+            if (config) updateActiveFirmDetails(config);
+          })
+          .catch((err) => {
+            console.error('Failed to refresh firm details on boot:', err);
+          });
 
         const storedToken = await authStorage.getItem('vp_crm_token');
         const storedUser = await authStorage.getItem('vp_crm_user');
