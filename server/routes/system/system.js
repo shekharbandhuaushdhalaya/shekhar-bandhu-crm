@@ -41,7 +41,7 @@ router.put('/settings', authenticateToken, authorize('settings:edit'), validate(
       'paymentGatewayEnabled', 'razorpayKeyId', 'razorpayKeySecret', 'razorpayWebhookSecret',
       'geminiApiKey', 'manufacturingLicenseNo',
       'gmpCertificateNo', 'licenseValidTill', 'gmpValidTill',
-      'qrImageBase64'
+      'qrImageBase64', 'qrImageUrl'
     ];
 
     fields.forEach(field => {
@@ -143,7 +143,7 @@ const cloudinary = require('cloudinary').v2;
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 

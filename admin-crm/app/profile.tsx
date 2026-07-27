@@ -57,7 +57,7 @@ export default function ProfileScreen() {
     try {
       const units = await api.getManufacturingUnits();
       setManufacturingUnits(units);
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // Form states for profile details
@@ -101,7 +101,7 @@ export default function ProfileScreen() {
   const [firmEmail, setFirmEmail] = useState('');
   const [firmPhone, setFirmPhone] = useState('');
   const [firmGstin, setFirmGstin] = useState('');
-  
+
   const [bankName, setBankName] = useState('');
   const [bankAccountNo, setBankAccountNo] = useState('');
   const [bankIfsc, setBankIfsc] = useState('');
@@ -116,6 +116,11 @@ export default function ProfileScreen() {
   const [defaultTerms, setDefaultTerms] = useState('');
   const [defaultGstRate, setDefaultGstRate] = useState('18');
   const [signatureBase64, setSignatureBase64] = useState('');
+  const [signatureUrl, setSignatureUrl] = useState('');
+  const [signatureUploading, setSignatureUploading] = useState(false);
+  const [qrImageBase64, setQrImageBase64] = useState('');
+  const [qrImageUrl, setQrImageUrl] = useState('');
+  const [qrUploading, setQrUploading] = useState(false);
   const [dscSignatoryName, setDscSignatoryName] = useState('Authorised Representative');
   const [dscCertificateName, setDscCertificateName] = useState('eMudhra / Class 3 DSC');
   const [paymentGatewayEnabled, setPaymentGatewayEnabled] = useState(false);
@@ -182,6 +187,9 @@ export default function ProfileScreen() {
         setDefaultTerms(config.defaultTerms || '');
         setDefaultGstRate(config.defaultGstRate ? config.defaultGstRate.toString() : '18');
         setSignatureBase64(config.signatureBase64 || '');
+        setSignatureUrl(config.signatureUrl || '');
+        setQrImageBase64(config.qrImageBase64 || '');
+        setQrImageUrl(config.qrImageUrl || '');
         setDscSignatoryName(config.dscSignatoryName || 'Authorised Representative');
         setDscCertificateName(config.dscCertificateName || 'eMudhra / Class 3 DSC');
         setPaymentGatewayEnabled(config.paymentGatewayEnabled || false);
@@ -389,6 +397,9 @@ export default function ProfileScreen() {
         defaultTerms: defaultTerms.trim(),
         defaultGstRate: Number(defaultGstRate) || 18,
         signatureBase64,
+        signatureUrl,
+        qrImageBase64,
+        qrImageUrl,
         dscSignatoryName: dscSignatoryName.trim(),
         dscCertificateName: dscCertificateName.trim(),
         paymentGatewayEnabled,
@@ -404,10 +415,10 @@ export default function ProfileScreen() {
       (payload as any).value = { ...payload };
 
       const updated = await api.updateSystemSettings(payload);
-      
+
       // Update AsyncStorage cache for offline retrieval
       await authStorage.setItem('vp_crm_firm_settings', JSON.stringify(updated));
-      
+
       // Update in-memory proxy
       updateActiveFirmDetails(updated);
 
@@ -647,172 +658,6 @@ export default function ProfileScreen() {
               <Text style={styles.btnText}>Save Link</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
-
-      {/* Payment Gateway (Razorpay) Card */}
-      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="card-outline" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>Payment Gateway Credentials (Razorpay)</Text>
-        </View>
-        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-          <View style={styles.switchRow}>
-            <Text style={styles.label}>Enable Online Payments</Text>
-            <TouchableOpacity
-              style={[styles.toggleBtn, paymentGatewayEnabled && { backgroundColor: colors.success }]}
-              onPress={() => setPaymentGatewayEnabled(!paymentGatewayEnabled)}
-            >
-              <Text style={{ color: paymentGatewayEnabled ? '#fff' : colors.text.secondary, fontSize: 12, fontWeight: '700' }}>
-                {paymentGatewayEnabled ? 'ENABLED' : 'DISABLED'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12, lineHeight: 14 }}>
-            Configure Razorpay keys to allow customers to pay invoices online.
-          </Text>
-
-          <Text style={styles.label}>Razorpay Key ID</Text>
-          <TextInput
-            style={styles.input}
-            value={razorpayKeyId}
-            onChangeText={setRazorpayKeyId}
-            placeholder="e.g. rzp_live_xxxxxxxx"
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="none"
-          />
-
-          <Text style={styles.label}>Razorpay Key Secret</Text>
-          <TextInput
-            style={styles.input}
-            value={razorpayKeySecret}
-            onChangeText={setRazorpayKeySecret}
-            placeholder="Enter secret key"
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="none"
-            secureTextEntry
-          />
-
-          <Text style={styles.label}>Webhook Secret (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={razorpayWebhookSecret}
-            onChangeText={setRazorpayWebhookSecret}
-            placeholder="For auto-confirming payments"
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="none"
-            secureTextEntry
-          />
-        </View>
-      </View>
-
-      {/* Digital Signature & Authorised Seal Upload Card */}
-      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="document-text-outline" size={18} color={colors.success} />
-          <Text style={styles.cardTitle}>Digital Signature & Authorised Seal Credentials</Text>
-        </View>
-        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-          <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
-            Upload signature PNG image & set signatory designation for Rule 46 CGST & Section 5 IT Act 2000 legal compliance.
-          </Text>
-
-          <View style={{ flexDirection: isDesktop ? 'row' : 'column', alignItems: 'flex-end', gap: 12 }}>
-            {/* Input 1: Signatory Name */}
-            <View style={{ flex: 1, width: isDesktop ? 'auto' : '100%' }}>
-              <Text style={styles.label}>Authorised Signatory / Designation</Text>
-              <TextInput
-                style={[styles.input, { marginBottom: 0 }]}
-                value={dscSignatoryName}
-                onChangeText={setDscSignatoryName}
-                placeholder="e.g. Director / Authorised Rep"
-                placeholderTextColor={colors.text.muted}
-              />
-            </View>
-
-            {/* Input 2: Certifying Authority */}
-            <View style={{ flex: 1, width: isDesktop ? 'auto' : '100%' }}>
-              <Text style={styles.label}>Govt Certifying Authority / CA</Text>
-              <TextInput
-                style={[styles.input, { marginBottom: 0 }]}
-                value={dscCertificateName}
-                onChangeText={setDscCertificateName}
-                placeholder="e.g. eMudhra Class 3 DSC"
-                placeholderTextColor={colors.text.muted}
-              />
-            </View>
-
-            {/* Input 3: Signature PNG Upload Button */}
-            <View style={{ width: isDesktop ? 'auto' : '100%' }}>
-              <Text style={styles.label}>Visual Signature PNG / Stamp</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: colors.primary + '12',
-                    borderWidth: 1,
-                    borderStyle: 'dashed',
-                    borderColor: colors.primary,
-                    borderRadius: Radius.md,
-                    paddingHorizontal: 14,
-                    height: 42,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                  onPress={() => {
-                    if (Platform.OS === 'web') {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/png, image/jpeg, image/jpg';
-                      input.onchange = (e: any) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (uploadEvent: any) => {
-                            setSignatureBase64(uploadEvent.target.result);
-                            showToast('Signature PNG loaded!', 'success');
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      };
-                      input.click();
-                    } else {
-                      showToast('Please upload signature image on Web dashboard.', 'info');
-                    }
-                  }}
-                >
-                  <Ionicons name="cloud-upload-outline" size={16} color={colors.primary} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-                    {signatureBase64 ? 'Change PNG' : 'Upload PNG'}
-                  </Text>
-                </TouchableOpacity>
-
-                {signatureBase64 ? (
-                  <TouchableOpacity
-                    style={{ padding: 6 }}
-                    onPress={() => {
-                      setSignatureBase64('');
-                      showToast('Signature cleared.', 'info');
-                    }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </View>
-          </View>
-
-          {signatureBase64 ? (
-            <View style={{ marginTop: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 6 }}>Signature Preview on Tax Documents:</Text>
-              {Platform.OS === 'web' ? (
-                <img src={signatureBase64} style={{ maxHeight: 50, maxWidth: 200, objectFit: 'contain' }} />
-              ) : (
-                <Text style={{ fontSize: 11, color: colors.success, fontWeight: '700' }}>✔ Signature loaded</Text>
-              )}
-            </View>
-          ) : null}
         </View>
       </View>
 
@@ -1153,10 +998,14 @@ export default function ProfileScreen() {
                 placeholderTextColor={colors.text.muted}
               />
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.label}>UPI ID (Optional)</Text>
+          </View>
+
+          <View style={{ flexDirection: isDesktop ? 'row' : 'column', alignItems: 'flex-end', gap: 12 }}>
+            {/* UPI ID Input */}
+            <View style={{ flex: 1, width: isDesktop ? 'auto' : '100%' }}>
+              <Text style={styles.label}>UPI ID</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { marginBottom: 0 }]}
                 value={bankUpi}
                 onChangeText={setBankUpi}
                 placeholder="e.g. shopify@upi"
@@ -1164,7 +1013,271 @@ export default function ProfileScreen() {
                 autoCapitalize="none"
               />
             </View>
+
+            {/* QR Code Image Upload */}
+            <View style={{ width: isDesktop ? 'auto' : '100%' }}>
+              <Text style={styles.label}>QR Code Image</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.primary + '12',
+                    borderWidth: 1,
+                    borderStyle: 'dashed',
+                    borderColor: colors.primary,
+                    borderRadius: Radius.md,
+                    paddingHorizontal: 14,
+                    height: 42,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                  onPress={() => {
+                    if (Platform.OS === 'web') {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/png, image/jpeg, image/jpg';
+                      input.onchange = (e: any) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          setQrUploading(true);
+                          const reader = new FileReader();
+                          reader.onload = async (uploadEvent: any) => {
+                            try {
+                              const { url } = await api.uploadFile(uploadEvent.target.result, file.name);
+                              setQrImageUrl(url);
+                              setQrImageBase64('');
+                              showToast('QR code image uploaded!', 'success');
+                            } catch (err: any) {
+                              showToast(err.message || 'QR image upload failed.', 'error');
+                            } finally {
+                              setQrUploading(false);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      };
+                      input.click();
+                    } else {
+                      showToast('Please upload QR image on Web dashboard.', 'info');
+                    }
+                  }}
+                >
+                  {qrUploading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="cloud-upload-outline" size={16} color={colors.primary} />
+                  )}
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                    {qrUploading ? 'Uploading...' : (qrImageUrl || qrImageBase64) ? 'Change QR Image' : 'Upload QR Image'}
+                  </Text>
+                </TouchableOpacity>
+
+                {(qrImageUrl || qrImageBase64) ? (
+                  <TouchableOpacity
+                    style={{ padding: 6 }}
+                    onPress={() => {
+                      setQrImageBase64('');
+                      setQrImageUrl('');
+                      showToast('QR code cleared.', 'info');
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
           </View>
+
+          {(qrImageUrl || qrImageBase64) ? (
+            <View style={{ marginTop: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 6 }}>QR Preview on Delivery Challan:</Text>
+              {Platform.OS === 'web' ? (
+                <img src={qrImageUrl || qrImageBase64} style={{ maxHeight: 90, maxWidth: 90, objectFit: 'contain' }} />
+              ) : (
+                <Text style={{ fontSize: 11, color: colors.success, fontWeight: '700' }}>✔ QR code loaded</Text>
+              )}
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {/* Payment Gateway (Razorpay) Card */}
+      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="card-outline" size={18} color={colors.primary} />
+          <Text style={styles.cardTitle}>Payment Gateway Credentials (Razorpay)</Text>
+        </View>
+        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Enable Online Payments</Text>
+            <TouchableOpacity
+              style={[styles.toggleBtn, paymentGatewayEnabled && { backgroundColor: colors.success }]}
+              onPress={() => setPaymentGatewayEnabled(!paymentGatewayEnabled)}
+            >
+              <Text style={{ color: paymentGatewayEnabled ? '#fff' : colors.text.secondary, fontSize: 12, fontWeight: '700' }}>
+                {paymentGatewayEnabled ? 'ENABLED' : 'DISABLED'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12, lineHeight: 14 }}>
+            Configure Razorpay keys to allow customers to pay invoices online.
+          </Text>
+
+          <Text style={styles.label}>Razorpay Key ID</Text>
+          <TextInput
+            style={styles.input}
+            value={razorpayKeyId}
+            onChangeText={setRazorpayKeyId}
+            placeholder="e.g. rzp_live_xxxxxxxx"
+            placeholderTextColor={colors.text.muted}
+            autoCapitalize="none"
+          />
+
+          <Text style={styles.label}>Razorpay Key Secret</Text>
+          <TextInput
+            style={styles.input}
+            value={razorpayKeySecret}
+            onChangeText={setRazorpayKeySecret}
+            placeholder="Enter secret key"
+            placeholderTextColor={colors.text.muted}
+            autoCapitalize="none"
+            secureTextEntry
+          />
+
+          <Text style={styles.label}>Webhook Secret (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={razorpayWebhookSecret}
+            onChangeText={setRazorpayWebhookSecret}
+            placeholder="For auto-confirming payments"
+            placeholderTextColor={colors.text.muted}
+            autoCapitalize="none"
+            secureTextEntry
+          />
+        </View>
+      </View>
+
+      {/* Digital Signature & Authorised Seal Upload Card */}
+      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="document-text-outline" size={18} color={colors.success} />
+          <Text style={styles.cardTitle}>Digital Signature & Authorised Seal Credentials</Text>
+        </View>
+        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
+          <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
+            Upload signature PNG image & set signatory designation for Rule 46 CGST & Section 5 IT Act 2000 legal compliance.
+          </Text>
+
+          <View style={{ flexDirection: isDesktop ? 'row' : 'column', alignItems: 'flex-end', gap: 12 }}>
+            {/* Input 1: Signatory Name */}
+            <View style={{ flex: 1, width: isDesktop ? 'auto' : '100%' }}>
+              <Text style={styles.label}>Authorised Signatory / Designation</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 0 }]}
+                value={dscSignatoryName}
+                onChangeText={setDscSignatoryName}
+                placeholder="e.g. Director / Authorised Rep"
+                placeholderTextColor={colors.text.muted}
+              />
+            </View>
+
+            {/* Input 2: Certifying Authority */}
+            <View style={{ flex: 1, width: isDesktop ? 'auto' : '100%' }}>
+              <Text style={styles.label}>Govt Certifying Authority / CA</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 0 }]}
+                value={dscCertificateName}
+                onChangeText={setDscCertificateName}
+                placeholder="e.g. eMudhra Class 3 DSC"
+                placeholderTextColor={colors.text.muted}
+              />
+            </View>
+
+            {/* Input 3: Signature PNG Upload Button */}
+            <View style={{ width: isDesktop ? 'auto' : '100%' }}>
+              <Text style={styles.label}>Visual Signature PNG / Stamp</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.primary + '12',
+                    borderWidth: 1,
+                    borderStyle: 'dashed',
+                    borderColor: colors.primary,
+                    borderRadius: Radius.md,
+                    paddingHorizontal: 14,
+                    height: 42,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                  onPress={() => {
+                    if (Platform.OS === 'web') {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/png, image/jpeg, image/jpg';
+                      input.onchange = (e: any) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          setSignatureUploading(true);
+                          const reader = new FileReader();
+                          reader.onload = async (uploadEvent: any) => {
+                            try {
+                              const { url } = await api.uploadFile(uploadEvent.target.result, file.name);
+                              setSignatureUrl(url);
+                              setSignatureBase64('');
+                              showToast('Signature uploaded!', 'success');
+                            } catch (err: any) {
+                              showToast(err.message || 'Signature upload failed.', 'error');
+                            } finally {
+                              setSignatureUploading(false);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      };
+                      input.click();
+                    } else {
+                      showToast('Please upload signature image on Web dashboard.', 'info');
+                    }
+                  }}
+                >
+                  {signatureUploading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="cloud-upload-outline" size={16} color={colors.primary} />
+                  )}
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                    {signatureUploading ? 'Uploading...' : (signatureUrl || signatureBase64) ? 'Change PNG' : 'Upload PNG'}
+                  </Text>
+                </TouchableOpacity>
+
+                {(signatureUrl || signatureBase64) ? (
+                  <TouchableOpacity
+                    style={{ padding: 6 }}
+                    onPress={() => {
+                      setSignatureBase64('');
+                      setSignatureUrl('');
+                      showToast('Signature cleared.', 'info');
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+          </View>
+
+          {(signatureUrl || signatureBase64) ? (
+            <View style={{ marginTop: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 6 }}>Signature Preview on Tax Documents:</Text>
+              {Platform.OS === 'web' ? (
+                <img src={signatureUrl || signatureBase64} style={{ maxHeight: 50, maxWidth: 200, objectFit: 'contain' }} />
+              ) : (
+                <Text style={{ fontSize: 11, color: colors.success, fontWeight: '700' }}>✔ Signature loaded</Text>
+              )}
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -1288,7 +1401,7 @@ export default function ProfileScreen() {
           </View>
           <Text style={styles.overviewName}>{user?.name}</Text>
           <Text style={styles.overviewEmail}>{user?.email}</Text>
-          
+
           <View style={[styles.badge, { borderColor: roleColors[user?.role || 'agent'], backgroundColor: roleColors[user?.role || 'agent'] + '12' }]}>
             <Text style={[styles.badgeText, { color: roleColors[user?.role || 'agent'] }]}>
               {user?.role?.toUpperCase()}

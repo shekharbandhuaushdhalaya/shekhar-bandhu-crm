@@ -16,9 +16,9 @@ const systemSettingsSchema = new mongoose.Schema({
   quotationPrefix: { type: String, default: "QT" },
   challanPrefix: { type: String, default: "CH" },
   dispatchPrefix: { type: String, default: "DP" },
-  defaultTerms: { 
-    type: String, 
-    default: `1. All disputes are subject to "VARANASI" Jurisdiction only.\n2. Goods despatched at your risk and responsibility. Kindly retire the documents on presentation.\n3. We do not accept any responsibility for any loss/damages once the goods are delivered to the carriers.\n4. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.\n5. Goods once sold will not be taken back.` 
+  defaultTerms: {
+    type: String,
+    default: `1. All disputes are subject to "VARANASI" Jurisdiction only.\n2. Goods despatched at your risk and responsibility. Kindly retire the documents on presentation.\n3. We do not accept any responsibility for any loss/damages once the goods are delivered to the carriers.\n4. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.\n5. Goods once sold will not be taken back.`
   },
   defaultGstRate: { type: Number, default: 18 },
   signatureBase64: { type: String, default: '' },
@@ -34,7 +34,8 @@ const systemSettingsSchema = new mongoose.Schema({
   gmpCertificateNo: { type: String, default: '', trim: true },
   licenseValidTill: { type: Date, default: null },
   gmpValidTill: { type: Date, default: null },
-  qrImageBase64: { type: String, default: '' }
+  qrImageBase64: { type: String, default: '' },
+  qrImageUrl: { type: String, default: '' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('SystemSettings', systemSettingsSchema);

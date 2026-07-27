@@ -136,6 +136,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({
+  limit: '15mb',
   verify: (req, res, buf) => {
     req.rawBody = buf;
   }
@@ -291,4 +292,3 @@ process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION:', err.message, err.stack);
   process.exit(1);
 });
-

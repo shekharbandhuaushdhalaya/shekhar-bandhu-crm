@@ -206,9 +206,13 @@ const printDeliveryChallan = (m: StockMovement) => {
                   <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
                 </td>
                 <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:2px;">
+                  ${(FIRM_DETAILS.qrImageUrl || FIRM_DETAILS.qrImageBase64) ? `
+                  <img src="${FIRM_DETAILS.qrImageUrl || FIRM_DETAILS.qrImageBase64}" style="margin:1px auto;width:30px;height:30px;object-fit:contain;display:block;" />
+                  ` : `
                   <div style="margin:1px auto;width:30px;height:30px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:5px;color:#999;">
                     QR
                   </div>
+                  `}
                   <div style="font-size:6px;font-weight:600;margin-top:2px;">QR for online payment</div>
                   <div style="font-size:5.5px;color:#666;margin-top:1px;">UPI: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
                 </td>
