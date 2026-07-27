@@ -198,13 +198,15 @@ const printDeliveryChallan = (m: StockMovement) => {
           <td style="width:35%;padding:0;border:1px solid #000;vertical-align:top;">
             <table style="width:100%;height:100%;font-size:7px;">
               <tr>
-                <td style="width:55%;vertical-align:top;padding:2px;">
-                  <div style="font-weight:bold;font-size:8px;">Bank Details:</div>
-                  <div>${FIRM_DETAILS.bankName}</div>
-                  <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
-                  <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
-                  <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
-                  <div style="margin-top:2px;font-weight:600;">Amount in Words: Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only</div>
+                <td style="width:55%;vertical-align:top;padding:2px;display:flex;flex-direction:column;">
+                  <div>
+                    <div style="font-weight:bold;font-size:8px;">Bank Details:</div>
+                    <div>${FIRM_DETAILS.bankName}</div>
+                    <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
+                    <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
+                    <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
+                  </div>
+                  <div style="margin-top:auto;border-top:1px solid #000;padding-top:2px;font-weight:600;">Amount in Words: Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only</div>
                 </td>
                 <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:2px;">
                   <div style="margin:1px auto;width:32px;height:32px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:5px;color:#999;">
