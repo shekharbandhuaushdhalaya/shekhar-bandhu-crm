@@ -174,15 +174,15 @@ const printDeliveryChallan = (m: StockMovement) => {
         <table style="font-size:8px;width:100%;">
           <thead>
             <tr style="background:#ccc;">
-              <th style="border-bottom:1px solid #000;padding:5px;width:3%;">#</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:26%;">Product Name &amp; Size</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:10%;">Batch</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:6%;">Qty</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:8%;">MRP</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:5%;">Disc</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:5%;">GST%</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:9%;">Amount</th>
-              <th style="border-bottom:1px solid #000;padding:5px;width:8%;">GST Amt</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:3%;text-align:center;">#</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:26%;text-align:left;">Product Name &amp; Size</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:10%;text-align:center;">Batch</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:6%;text-align:center;">Qty</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:8%;text-align:right;">MRP</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:5%;text-align:right;">Disc</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:5%;text-align:right;">GST%</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:9%;text-align:right;">Amount</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:8%;text-align:right;">GST Amt</th>
             </tr>
           </thead>
           <tbody>
