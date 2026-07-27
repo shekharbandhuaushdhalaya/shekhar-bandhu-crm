@@ -170,11 +170,25 @@ const printDeliveryChallan = (m: StockMovement) => {
       <table style="font-size:6px;width:100%;">
         <tr>
           <td style="width:35%;padding:2px;border:1px solid #000;vertical-align:top;">
-            <div style="font-weight:bold;font-size:7px;">Bank Details:</div>
-            <div>${FIRM_DETAILS.bankName}</div>
-            <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
-            <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
-            <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
+            <table style="width:100%;font-size:6px;">
+              <tr>
+                <td style="width:55%;vertical-align:top;padding:1px;">
+                  <div style="font-weight:bold;font-size:7px;">Bank Details:</div>
+                  <div>${FIRM_DETAILS.bankName}</div>
+                  <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
+                  <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
+                  <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
+                </td>
+                <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:1px;">
+                  <div style="font-weight:bold;font-size:7px;">Pay via UPI</div>
+                  <div style="margin:2px auto;width:40px;height:40px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:5px;color:#999;">
+                    QR
+                  </div>
+                  <div style="font-size:5px;color:#666;">UPI ID:</div>
+                  <div style="font-size:5px;color:#333;">${FIRM_DETAILS.bankUpi || '—'}</div>
+                </td>
+              </tr>
+            </table>
           </td>
           <td style="width:35%;padding:2px;border:1px solid #000;vertical-align:top;">
             <div style="font-weight:bold;font-size:7px;">Terms &amp; Conditions:</div>
