@@ -96,14 +96,14 @@ const printDeliveryChallan = (m: StockMovement) => {
   let extraInfo = '';
   if (m.type === 'sample' && ((m as any).medicalRepName || (m as any).doctorName)) {
     extraInfo = `
-      <div style="margin-top:4px;padding:4px;border:1px dashed #666;font-size:9px;">
+      <div style="margin-top:4px;padding:4px;border:1px dashed #666;font-size:8px;">
         <strong>MR Name:</strong> ${(m as any).medicalRepName || '—'} &nbsp;&nbsp;
         <strong>Doctor:</strong> ${(m as any).doctorName || '—'}
       </div>`;
   }
   if (m.type === 'damage' && (m as any).damageReason) {
     extraInfo = `
-      <div style="margin-top:4px;padding:4px;border:1px dashed #000;font-size:9px;color:#000;">
+      <div style="margin-top:4px;padding:4px;border:1px dashed #000;font-size:8px;color:#000;">
         <strong>Damage Reason:</strong> ${(m as any).damageReason}
       </div>`;
   }
@@ -119,11 +119,11 @@ const printDeliveryChallan = (m: StockMovement) => {
 
   const copyBlock = (copy: string) => `
     <div style="height:100%;padding:2mm 3mm;display:flex;flex-direction:column;border:1.5px solid #000;border-radius:4px;">
-      <div style="font-size:10px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:2px 4px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:2px 4px;display:flex;align-items:center;justify-content:space-between;">
         <span>DELIVERY CHALLAN — NOT A TAX INVOICE</span>
-        <span style="font-size:7px;font-weight:normal;">(${copy})</span>
+        <span style="font-size:6px;font-weight:normal;">(${copy})</span>
       </div>
-      <table style="font-size:8px;border:1px solid #000;">
+      <table style="font-size:7px;border:1px solid #000;">
         <tr>
           <td style="width:50%;padding:2px;border-right:1px solid #000;vertical-align:top;">
             <table style="width:100%;">
@@ -132,7 +132,7 @@ const printDeliveryChallan = (m: StockMovement) => {
                   <img src="data:image/png;base64,${LOGO_BASE64}" style="height:28px;width:auto;object-fit:contain;" />
                 </td>
                 <td style="vertical-align:middle;">
-                  <div style="font-weight:bold;font-size:9px;">${FIRM_DETAILS.name}</div>
+                  <div style="font-weight:bold;font-size:8px;">${FIRM_DETAILS.name}</div>
                 </td>
               </tr>
             </table>
@@ -148,12 +148,12 @@ const printDeliveryChallan = (m: StockMovement) => {
             ${(m as any).vehicleNo ? `<br/><strong>Vehicle:</strong> ${(m as any).vehicleNo}` : ''}
             ${(m as any).courierName ? `<br/><strong>Courier:</strong> ${(m as any).courierName}` : ''}
             ${(m as any).trackingId ? `<br/><strong>Tracking ID:</strong> ${(m as any).trackingId}` : ''}
-            <br/><span style="font-size:7px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
+            <br/><span style="font-size:6px;color:#555;">(CGST Rule 55 — ${typeConf.label})</span>
           </td>
         </tr>
       </table>
-      ${FIRM_DETAILS.manufacturingLicenseNo ? `<table style="font-size:8px;width:100%;"><tr><td style="padding:2px;border:1px solid #000;text-align:center;font-weight:bold;">Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</td></tr></table>` : ''}
-      <table style="font-size:8px;border:1px solid #000;">
+      ${FIRM_DETAILS.manufacturingLicenseNo ? `<table style="font-size:7px;width:100%;"><tr><td style="padding:2px;border:1px solid #000;text-align:center;font-weight:bold;">Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</td></tr></table>` : ''}
+      <table style="font-size:7px;border:1px solid #000;">
         <tr>
           <td style="width:28%;padding:2px;border-right:1px solid #000;vertical-align:top;">
             <strong>Consignee:</strong> ${m.partyName}
@@ -169,8 +169,8 @@ const printDeliveryChallan = (m: StockMovement) => {
       </table>
       ${extraInfo}
       <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;border-bottom:1px solid #000;">
-        <div style="overflow:hidden;min-height:330px;">
-        <table style="font-size:9px;width:100%;">
+        <div style="overflow:hidden;min-height:300px;">
+        <table style="font-size:8px;width:100%;">
           <thead>
             <tr style="background:#ccc;">
               <th style="border-bottom:1px solid #000;padding:5px;width:3%;">#</th>
@@ -191,15 +191,15 @@ const printDeliveryChallan = (m: StockMovement) => {
         </table>
         </div>
       </div>
-      ${m.notes ? `<div style="margin-top:1px;font-size:7px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
+      ${m.notes ? `<div style="margin-top:1px;font-size:6px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
       <div style="margin-top:auto;display:flex;flex-direction:column;gap:0;">
-      <table style="font-size:8px;width:100%;">
+      <table style="font-size:7px;width:100%;">
         <tr>
           <td style="width:35%;padding:0;border:1px solid #000;vertical-align:top;">
-            <table style="width:100%;height:100%;font-size:8px;">
+            <table style="width:100%;height:100%;font-size:7px;">
               <tr>
                 <td style="width:55%;vertical-align:top;padding:2px;">
-                  <div style="font-weight:bold;font-size:9px;">Bank Details:</div>
+                  <div style="font-weight:bold;font-size:8px;">Bank Details:</div>
                   <div>${FIRM_DETAILS.bankName}</div>
                   <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
                   <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
@@ -209,8 +209,8 @@ const printDeliveryChallan = (m: StockMovement) => {
                   <div style="margin:1px auto;width:32px;height:32px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:5px;color:#999;">
                     QR
                   </div>
-                  <div style="font-size:7px;font-weight:600;margin-top:1px;">QR for online payment</div>
-                  <div style="font-size:7px;color:#666;margin-top:1px;">UPI ID: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
+                  <div style="font-size:6px;font-weight:600;margin-top:1px;">QR for online payment</div>
+                  <div style="font-size:6px;color:#666;margin-top:1px;">UPI ID: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
                 </td>
               </tr>
               <tr>
@@ -219,11 +219,11 @@ const printDeliveryChallan = (m: StockMovement) => {
             </table>
           </td>
           <td style="width:35%;padding:2px;border:1px solid #000;vertical-align:top;">
-            <div style="font-weight:bold;font-size:9px;">Terms &amp; Conditions:</div>
+            <div style="font-weight:bold;font-size:8px;">Terms &amp; Conditions:</div>
             <div style="line-height:1.3;">${(FIRM_DETAILS.defaultTerms || '').split('\n').map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
           </td>
           <td style="width:30%;padding:2px;border:1px solid #000;vertical-align:top;">
-            <table style="width:100%;font-size:8px;">
+            <table style="width:100%;font-size:7px;">
               ${discountRow}
               <tr style="background:#ccc;font-weight:bold;">
                 <td style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (excl. GST)</td>
@@ -241,17 +241,17 @@ const printDeliveryChallan = (m: StockMovement) => {
           </td>
         </tr>
       </table>
-      <table style="font-size:8px;width:100%;">
+      <table style="font-size:7px;width:100%;">
         <tr>
           <td style="width:50%;padding:3px 3px;border:1px solid #000;border-top:none;text-align:left;">
             <div>Receiver's Signature &amp; Stamp</div>
           </td>
           <td style="width:50%;padding:3px 3px;border:1px solid #000;border-top:none;text-align:right;">
-            <div style="font-size:9px;">For ${FIRM_DETAILS.name}</div>
+            <div style="font-size:8px;">For ${FIRM_DETAILS.name}</div>
             ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
               <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 18px; width: auto; object-fit: contain; margin-top:1px;" />
             ` : ''}
-            <div style="font-size:7px;margin-top:1px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
+            <div style="font-size:6px;margin-top:1px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
           </td>
         </tr>
       </table>
@@ -268,7 +268,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; min-height:297mm; padding:3mm 5mm; }
     .page { width:100%; min-height:100%; display:flex; flex-direction:column; }
     .half { flex:1; position:relative; display:flex; flex-direction:column; }
-    .separator { border:none; border-top:2px dashed #000; margin:3mm 0; }
+    .separator { border:none; border-top:2px dashed #000; margin:1.5mm 0; }
     table { border-collapse: collapse; width: 100%; }
     @media print { @page { size: A4 portrait; margin: 3mm 5mm; } body { width:auto; height:auto; padding:0; } }
   </style>
