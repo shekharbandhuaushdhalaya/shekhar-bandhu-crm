@@ -214,7 +214,7 @@ const printDeliveryChallan = (m: StockMovement) => {
                 </td>
               </tr>
               <tr>
-                <td colspan="2" style="border-top:1px solid #000;padding:2px;font-weight:600;font-size:6px;">Amount in Words: Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only</td>
+                <td colspan="2" style="border-top:1px solid #000;padding:5px;font-size:8px;">Amount in Words: <strong>Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only</strong></td>
               </tr>
             </table>
           </td>
