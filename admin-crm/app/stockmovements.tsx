@@ -92,7 +92,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     : '';
 
   const copyBlock = (copy: string) => `
-    <div style="height:50%;padding:2mm 4mm;display:flex;flex-direction:column;border:1.5px solid #000;">
+    <div style="height:50%;padding:3mm 5mm;display:flex;flex-direction:column;border:1.5px solid #000;">
       <div style="font-size:9px;font-weight:bold;text-align:center;letter-spacing:0.5px;border-bottom:1.5px solid #000;padding:2px;">
         DELIVERY CHALLAN — NOT A TAX INVOICE
       </div>
@@ -171,23 +171,27 @@ const printDeliveryChallan = (m: StockMovement) => {
         </tr>
       </table>
       ${m.notes ? `<div style="margin-top:2px;font-size:6px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
-      <div style="margin-top:auto;display:flex;justify-content:space-between;align-items:center;font-size:6px;padding-top:2px;">
-        <div>Receiver's Signature &amp; Stamp</div>
-        <div style="text-align:right;">
-          ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
-            <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 24px; width: auto; object-fit: contain; margin-bottom: 1px;" />
-            <div style="font-weight:bold; font-size: 7px; color: #15803d; margin-bottom: 1px;">
-              ✔ DIGITALLY SIGNED
+      <table style="margin-top:auto;font-size:6px;border:1px solid #000;">
+        <tr>
+          <td style="width:55%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+            <div style="font-weight:bold;font-size:7px;">Bank Details:</div>
+            <div>${FIRM_DETAILS.bankName} | A/C: ${FIRM_DETAILS.bankAccountNo}</div>
+            <div>IFSC: ${FIRM_DETAILS.bankIfsc} | Branch: ${FIRM_DETAILS.bankBranch}</div>
+            <div style="margin-top:2px;font-weight:bold;font-size:7px;">Terms &amp; Conditions:</div>
+            <div style="line-height:1.3;">${(FIRM_DETAILS.defaultTerms || '').split('\n').map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
+          </td>
+          <td style="width:45%;padding:2px;text-align:right;vertical-align:bottom;">
+            <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
+            <div style="margin-top:4px;">Receiver's Signature &amp; Stamp</div>
+            <div style="margin-top:6px;">
+              ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
+                <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 22px; width: auto; object-fit: contain; margin-bottom: 1px;" />
+              ` : ''}
             </div>
-            <div style="border:1px dashed #16a34a;background:#f0fdf4;border-radius:3px;padding:3px;font-size:6px;display:flex;align-items:center;gap:4px;">
-              <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(`GST Challan Digital Verification | Seller: ${FIRM_DETAILS.name} | GSTIN: ${FIRM_DETAILS.gstin || ''} | Challan: ${m.docNo} | Date: ${dateStr} | CGST Rule 55 & Sec 5 IT Act Certified`)}" style="width:30px;height:30px;border:1px solid #16a34a;padding:1px;background:#fff;border-radius:2px;flex-shrink:0;" />
-              <div style="flex:1;"><strong>Signed By:</strong> ${FIRM_DETAILS.name}<br/><strong>GSTIN:</strong> ${FIRM_DETAILS.gstin || ''}<br/><span style="color:#15803d;font-weight:bold;">✔ CGST Rule 55 &amp; IT Act.</span></div>
-            </div>
-          ` : `
-            For ${FIRM_DETAILS.name}<br/>Authorised Signatory
-          `}
-        </div>
-      </div>
+            <div style="font-size:6px;margin-top:2px;">${FIRM_DETAILS.dscSignatoryName || 'Authorised Signatory'}</div>
+          </td>
+        </tr>
+      </table>
     </div>`;
 
   const html = `<!DOCTYPE html>
