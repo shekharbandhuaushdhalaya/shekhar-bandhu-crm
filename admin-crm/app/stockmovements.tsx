@@ -204,6 +204,7 @@ const printDeliveryChallan = (m: StockMovement) => {
                   <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
                   <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
                   <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
+                  <div style="margin-top:2px;font-weight:600;">Amount in Words: Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only</div>
                 </td>
                 <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:2px;">
                   <div style="margin:1px auto;width:32px;height:32px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:5px;color:#999;">
@@ -235,11 +236,6 @@ const printDeliveryChallan = (m: StockMovement) => {
                 <td style="border:1px solid #000;padding:1.5px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
               </tr>
             </table>
-          </td>
-        </tr>
-        <tr>
-          <td colspan="3" style="padding:2px;border:1px solid #000;border-top:none;text-align:left;font-weight:600;">
-            Amount in Words: Rupees ${numberToWords(Math.round(grandTotal + totalGst))} Only
           </td>
         </tr>
       </table>
