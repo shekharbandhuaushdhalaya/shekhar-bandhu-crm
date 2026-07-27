@@ -1446,6 +1446,7 @@ export default function StockMovementsScreen() {
                               </TouchableOpacity>
                             ) : null}
                           </View>
+                          {item.size ? <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Size: {item.size}</Text> : null}
                         </View>
 
                         <View style={{ flex: 1, minWidth: 60 }}>
