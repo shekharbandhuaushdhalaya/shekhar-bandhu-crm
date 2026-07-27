@@ -11,6 +11,7 @@ import { api, StockMovement, StockMovementItem, Product, Warehouse, Customer, In
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { FIRM_DETAILS } from '../constants/firm';
+import { LOGO_BASE64 } from '../utils/logo';
 import InventoryDispatchScreen from './inventorydispatch';
 
 // ── Movement Type Config ────────────────────────────────────────────────────────
@@ -87,7 +88,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     return sum + itemTotal * (it.gstRate || 0) / 100;
   }, 0);
   const discountRow = totalDiscount > 0
-    ? '<tr style="background:#fef3c7;font-weight:bold;"><td style="border:1px solid #000;padding:2px;text-align:right;">Total Discount</td><td style="border:1px solid #000;padding:2px;text-align:right;">&minus;\u20B9' + totalDiscount.toFixed(2) + '</td></tr>'
+    ? '<tr style="background:#ddd;font-weight:bold;"><td style="border:1px solid #000;padding:2px;text-align:right;">Total Discount</td><td style="border:1px solid #000;padding:2px;text-align:right;">&minus;\u20B9' + totalDiscount.toFixed(2) + '</td></tr>'
     : '';
 
   // Extra info block
@@ -101,7 +102,7 @@ const printDeliveryChallan = (m: StockMovement) => {
   }
   if (m.type === 'damage' && (m as any).damageReason) {
     extraInfo = `
-      <div style="margin-top:8px;padding:6px;border:1px dashed #f00;font-size:10px;color:#c00;">
+      <div style="margin-top:8px;padding:6px;border:1px dashed #000;font-size:10px;color:#000;">
         <strong>Damage Reason:</strong> ${(m as any).damageReason}
       </div>`;
   }
@@ -123,7 +124,16 @@ const printDeliveryChallan = (m: StockMovement) => {
       <table style="font-size:8px;border:1px solid #000;">
         <tr>
           <td style="width:50%;padding:2.5px;border-right:1px solid #000;vertical-align:top;">
-            <div style="font-weight:bold;font-size:9px;">${FIRM_DETAILS.name}</div>
+            <table style="width:100%;">
+              <tr>
+                <td style="width:38px;padding-right:4px;vertical-align:middle;">
+                  <img src="data:image/png;base64,${LOGO_BASE64}" style="height:35px;width:auto;object-fit:contain;" />
+                </td>
+                <td style="vertical-align:middle;">
+                  <div style="font-weight:bold;font-size:9px;">${FIRM_DETAILS.name}</div>
+                </td>
+              </tr>
+            </table>
             <div>${FIRM_DETAILS.address}</div>
             <div>GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}</div>
             ${FIRM_DETAILS.manufacturingLicenseNo ? `<div>Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}</div>` : ''}
@@ -161,7 +171,7 @@ const printDeliveryChallan = (m: StockMovement) => {
         <div style="flex:1;overflow:hidden;">
         <table style="font-size:8px;width:100%;">
           <thead>
-            <tr style="background:#f3f4f6;">
+            <tr style="background:#ccc;">
               <th style="border:1px solid #000;padding:2.5px;width:3%;">#</th>
               <th style="border:1px solid #000;padding:2.5px;">Product</th>
               <th style="border:1px solid #000;padding:2.5px;width:6%;">Size</th>
@@ -211,15 +221,15 @@ const printDeliveryChallan = (m: StockMovement) => {
           <td style="width:30%;padding:3px;border:1px solid #000;vertical-align:top;">
             <table style="width:100%;font-size:8px;">
               ${discountRow}
-              <tr style="background:#e5e7eb;font-weight:bold;">
+              <tr style="background:#ccc;font-weight:bold;">
                 <td style="border:1px solid #000;padding:2px;text-align:right;">Grand Total (excl. GST)</td>
                 <td style="border:1px solid #000;padding:2px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
               </tr>
-              <tr style="background:#e5e7eb;font-weight:bold;">
+              <tr style="background:#ccc;font-weight:bold;">
                 <td style="border:1px solid #000;padding:2px;text-align:right;">Total GST</td>
                 <td style="border:1px solid #000;padding:2px;text-align:right;">₹${totalGst.toFixed(2)}</td>
               </tr>
-              <tr style="background:#d1d5db;font-weight:bold;">
+              <tr style="background:#aaa;font-weight:bold;">
                 <td style="border:1px solid #000;padding:2px;text-align:right;">Grand Total (incl. GST)</td>
                 <td style="border:1px solid #000;padding:2px;text-align:right;">₹${(grandTotal + totalGst).toFixed(2)}</td>
               </tr>
