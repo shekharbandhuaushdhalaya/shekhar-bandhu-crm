@@ -47,6 +47,9 @@ router.post('/', validate(schemas.customerSchema), async (req, res) => {
     if (!req.user || !req.user.canAccessCash) {
       doc.cashBalance = 0;
     }
+    if (req.io) {
+      req.io.emit('customer_updated', { type: 'created', id: doc._id });
+    }
     res.status(201).json(doc);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -70,6 +73,9 @@ router.put('/:id', validate(schemas.customerSchema.partial()), async (req, res) 
     if (!req.user || !req.user.canAccessCash) {
       doc.cashBalance = 0;
     }
+    if (req.io) {
+      req.io.emit('customer_updated', { type: 'updated', id: doc._id });
+    }
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -81,6 +87,9 @@ router.delete('/:id', authorize('customer:delete'), async (req, res) => {
   try {
     const customer = await Customer.findByIdAndDelete(req.params.id);
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
+    if (req.io) {
+      req.io.emit('customer_updated', { type: 'deleted', id: req.params.id });
+    }
     res.json({ message: 'Customer deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

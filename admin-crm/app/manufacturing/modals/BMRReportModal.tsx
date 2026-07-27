@@ -66,6 +66,36 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                 </View>
               </View>
 
+              {/* Size-wise Yield Breakdown (multi-size batches) */}
+              {bmrReport.plannedYields && bmrReport.plannedYields.length > 0 && (
+                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Size-wise Yield Breakdown</Text>
+                  </View>
+                  <View style={{ padding: 8 }}>
+                    <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
+                      {['Product / Size', 'Planned Qty', 'Actual Qty', 'Variance'].map((h, i) => (
+                        <Text key={h} style={{ flex: i === 0 ? 2 : 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: i > 0 ? 'right' : 'left' }}>{h}</Text>
+                      ))}
+                    </View>
+                    {bmrReport.plannedYields.map((py: any, idx: number) => {
+                      const actual = bmrReport.yields?.find((y: any) => y.productId === py.productId);
+                      const actualQty = actual ? actual.actualYieldQty : 0;
+                      const variance = py.plannedQty > 0 ? (((actualQty - py.plannedQty) / py.plannedQty) * 100).toFixed(1) : '0.0';
+                      const isDown = parseFloat(variance) < 0;
+                      return (
+                        <View key={idx} style={{ flexDirection: 'row', paddingVertical: 4 }}>
+                          <Text style={{ flex: 2, fontSize: 11, color: colors.text.primary }}>{py.productName || py.productId} ({py.size || 'Std'})</Text>
+                          <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{py.plannedQty}</Text>
+                          <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{actualQty}</Text>
+                          <Text style={{ flex: 1, fontSize: 11, color: isDown ? colors.danger : colors.success, textAlign: 'right', fontWeight: '600' }}>{isDown ? '' : '+'}{variance}%</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
               {/* Section II: Financial Audit */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>

@@ -36,6 +36,9 @@ router.post('/', validate(schemas.complaintSchema), async (req, res) => {
   try {
     const complaintNo = await nextComplaintNo();
     const complaint = await Complaint.create({ ...req.body, complaintNo });
+    if (req.io) {
+      req.io.emit('complaint_updated', { type: 'created', id: complaint._id });
+    }
     res.status(201).json(complaint);
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -49,6 +52,9 @@ router.patch('/:id', validate(schemas.complaintSchema.partial()), async (req, re
     if (data.status === 'resolved' && !data.resolvedAt) data.resolvedAt = new Date();
     const complaint = await Complaint.findByIdAndUpdate(req.params.id, data, { new: true });
     if (!complaint) return res.status(404).json({ error: 'Complaint not found' });
+    if (req.io) {
+      req.io.emit('complaint_updated', { type: 'updated', id: complaint._id });
+    }
     res.json(complaint);
   } catch (e) {
     res.status(400).json({ error: e.message });

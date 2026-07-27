@@ -42,6 +42,9 @@ router.post('/', authorize('vendor:create'), validate(schemas.vendorSchema), asy
     };
     delete data.cashBalance;
     const vendor = await Vendor.create(data);
+    if (req.io) {
+      req.io.emit('vendor_updated', { type: 'created', id: vendor._id });
+    }
     res.status(201).json(vendor);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -70,6 +73,9 @@ router.put('/:id', authorize('vendor:edit'), validate(schemas.vendorSchema.parti
     
     const doc = vendor.toObject();
     doc.cashBalance = 0;
+    if (req.io) {
+      req.io.emit('vendor_updated', { type: 'updated', id: doc._id });
+    }
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -81,6 +87,9 @@ router.delete('/:id', authorize('vendor:delete'), async (req, res) => {
   try {
     const vendor = await Vendor.findByIdAndDelete(req.params.id);
     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+    if (req.io) {
+      req.io.emit('vendor_updated', { type: 'deleted', id: req.params.id });
+    }
     res.json({ message: 'Vendor deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

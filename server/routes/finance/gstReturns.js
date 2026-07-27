@@ -294,6 +294,9 @@ router.post('/filing-status', async (req, res) => {
       filing.supportingDocuments = [{ name: name || 'Filing Receipt', url, uploadedAt: new Date() }];
     }
     await filing.save();
+    if (req.io) {
+      req.io.emit('gst_return_updated', { type: 'filing_saved', period, returnType });
+    }
     res.status(201).json({ filed: true, filing });
   } catch (err) {
     res.status(500).json({ error: err.message });

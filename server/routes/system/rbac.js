@@ -55,6 +55,9 @@ router.post('/permissions', authorize('rbac:manage'), validate(schemas.rbacPermi
       isCustom: true,
     });
     clearPermissionCache();
+    if (req.io) {
+      req.io.emit('rbac_updated', { type: 'created' });
+    }
     res.status(201).json(config);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -109,6 +112,9 @@ router.delete('/permissions/:role', authorize('rbac:manage'), async (req, res) =
     // Reassign users with this role to 'agent'
     await User.updateMany({ role }, { role: 'agent' });
     clearPermissionCache();
+    if (req.io) {
+      req.io.emit('rbac_updated', { type: 'updated' });
+    }
     res.json({ message: `Role "${role}" deleted. Affected users reassigned to agent.` });
   } catch (err) {
     res.status(500).json({ error: err.message });

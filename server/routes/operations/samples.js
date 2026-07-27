@@ -85,6 +85,9 @@ router.post('/', validate(schemas.sampleSchema), async (req, res) => {
       await deductSampleInventory(sample, warehouse._id);
     }
 
+    if (req.io) {
+      req.io.emit('sample_updated', { type: 'created', id: sample._id });
+    }
     res.status(201).json(sample);
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -96,6 +99,9 @@ router.patch('/:id', validate(schemas.sampleSchema.partial()), async (req, res) 
   try {
     const sample = await Sample.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!sample) return res.status(404).json({ error: 'Sample not found' });
+    if (req.io) {
+      req.io.emit('sample_updated', { type: 'updated', id: sample._id });
+    }
     res.json(sample);
   } catch (e) {
     res.status(400).json({ error: e.message });

@@ -22,6 +22,9 @@ router.post('/', validate(schemas.warehouseSchema), async (req, res) => {
     const exists = await Warehouse.findOne({ name: { $regex: `^${name.trim()}$`, $options: 'i' } }).lean();
     if (exists) return res.status(409).json({ error: 'A warehouse with this name already exists' });
     const warehouse = await Warehouse.create({ name: name.trim(), addressLine1, addressLine2, city, state, pincode, contactPerson, phone });
+    if (req.io) {
+      req.io.emit('warehouse_updated', { type: 'created', id: warehouse._id });
+    }
     res.status(201).json(warehouse);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -33,6 +36,9 @@ router.put('/:id', validate(schemas.warehouseSchema.partial()), async (req, res)
   try {
     const warehouse = await Warehouse.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!warehouse) return res.status(404).json({ error: 'Warehouse not found' });
+    if (req.io) {
+      req.io.emit('warehouse_updated', { type: 'updated', id: warehouse._id });
+    }
     res.json(warehouse);
   } catch (err) {
     res.status(400).json({ error: err.message });

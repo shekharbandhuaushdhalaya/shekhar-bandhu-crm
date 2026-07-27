@@ -5,6 +5,8 @@ import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
 import { RawMaterial, BillOfMaterials, Vendor, ManufacturingUnit } from '../../../utils/api';
 
+interface PlannedYield { productId: string; plannedQty: string; size: string; enabled: boolean; }
+
 interface Props {
   visible: boolean;
   products: any[];
@@ -24,6 +26,9 @@ interface Props {
   prodJobWorkerChallanRef: string; setProdJobWorkerChallanRef: (v: string) => void;
   prodManufacturingUnitId: string; setProdManufacturingUnitId: (v: string) => void;
   prodError: string;
+  computedTotalQty: number;
+  prodPlannedYields: PlannedYield[];
+  setProdPlannedYields: (v: PlannedYield[]) => void;
   previewIngredients: { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'formulation' | 'packaging' }[];
   onClose: () => void;
   onLaunch: () => void;
@@ -38,7 +43,8 @@ export default function LaunchBatchModal({
   prodJobWorkerId, setProdJobWorkerId, prodJobWorkerName, setProdJobWorkerName,
   prodJobWorkerChallanRef, setProdJobWorkerChallanRef,
   prodManufacturingUnitId, setProdManufacturingUnitId,
-  prodError, previewIngredients, onClose, onLaunch
+  prodError, computedTotalQty, prodPlannedYields, setProdPlannedYields,
+  previewIngredients, onClose, onLaunch
 }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
@@ -55,6 +61,32 @@ export default function LaunchBatchModal({
     if (s === 'powder' || s === 'paste') return 'Kilograms (Kg)';
     return 'units';
   };
+
+  const parseSizeMl = (sizeStr: string): number => {
+    const s = (sizeStr || '').toLowerCase().trim();
+    const numMatch = s.match(/([\d.]+)/);
+    if (!numMatch) return 0;
+    const numVal = parseFloat(numMatch[1]);
+    if (isNaN(numVal) || numVal <= 0) return 0;
+    if (s.includes('l') && !s.includes('ml')) return numVal * 1000;
+    return numVal;
+  };
+
+  // When multi-size yields are active, compute total volume from size strings (e.g., "450 ml", "1 L")
+  const computedVolumeLabel = (() => {
+    const activeYields = prodPlannedYields.filter(y => y.enabled && Number(y.plannedQty) > 0);
+    if (activeYields.length === 0) return '';
+    let totalVolumeMl = 0;
+    for (const y of activeYields) {
+      const qty = Number(y.plannedQty) || 0;
+      totalVolumeMl += parseSizeMl(y.size) * qty;
+    }
+    if (totalVolumeMl <= 0) return '';
+    if (totalVolumeMl >= 1000) {
+      return ` (≈ ${(totalVolumeMl / 1000).toFixed(1)} L)`;
+    }
+    return ` (≈ ${totalVolumeMl.toFixed(0)} ml)`;
+  })();
 
   // Recipes available for the selected product
   const productRecipes = boms.filter(b => {
@@ -143,6 +175,58 @@ export default function LaunchBatchModal({
               <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
                 📋 Recipe: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{productRecipes[0].recipeName || 'Standard Recipe'}</Text>
               </Text>
+            )}
+
+            {/* Size Variants — Multi-size batch planning */}
+            {prodPlannedYields.length > 0 && (
+              <View style={{ marginBottom: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>
+                  📐 Size Variants (Multi-Size Batch)
+                </Text>
+                <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginBottom: 8 }}>
+                  Enable the sizes you want to produce in this batch and enter quantities for each.
+                </Text>
+                {prodPlannedYields.map((yieldItem, idx) => {
+                  const childProduct = products.find(p => p._id === yieldItem.productId);
+                  return (
+                    <View key={yieldItem.productId} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const updated = [...prodPlannedYields];
+                          updated[idx] = { ...updated[idx], enabled: !updated[idx].enabled };
+                          if (updated[idx].enabled && !updated[idx].plannedQty) updated[idx].plannedQty = '100';
+                          if (!updated[idx].enabled) updated[idx].plannedQty = '';
+                          setProdPlannedYields(updated);
+                        }}
+                        style={{ width: 22, height: 22, borderRadius: 4, borderWidth: 1.5, borderColor: yieldItem.enabled ? colors.primary : colors.border, backgroundColor: yieldItem.enabled ? colors.primary : 'transparent', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        {yieldItem.enabled && <Ionicons name="checkmark" size={14} color="#fff" />}
+                      </TouchableOpacity>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.text.primary }}>
+                        {childProduct?.size || yieldItem.size || 'Size'}
+                      </Text>
+                      <TextInput
+                        style={[styles.input, { flex: 1, marginBottom: 0, opacity: yieldItem.enabled ? 1 : 0.4 }]}
+                        placeholder="Qty"
+                        placeholderTextColor={colors.text.muted}
+                        value={yieldItem.plannedQty}
+                        onChangeText={(v) => {
+                          const updated = [...prodPlannedYields];
+                          updated[idx] = { ...updated[idx], plannedQty: v };
+                          setProdPlannedYields(updated);
+                        }}
+                        keyboardType="numeric"
+                        editable={yieldItem.enabled}
+                      />
+                    </View>
+                  );
+                })}
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 6, borderTopWidth: 0.5, borderTopColor: colors.border, marginTop: 4 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                    Total: {computedTotalQty} units{computedVolumeLabel}
+                  </Text>
+                </View>
+              </View>
             )}
 
             <Text style={styles.inputLabel}>Manufacturing Unit *</Text>
@@ -254,8 +338,19 @@ export default function LaunchBatchModal({
               </>
             )}
 
-            <Text style={styles.inputLabel}>Planned Yield Quantity ({getYieldUnitLabel()}) *</Text>
-            <TextInput style={styles.input} placeholder={`Planned output quantity (e.g. 500)`} placeholderTextColor={colors.text.muted} value={prodPlannedQty} onChangeText={setProdPlannedQty} keyboardType="numeric" />
+            {prodPlannedYields.length > 0 ? (
+              <>
+                <Text style={styles.inputLabel}>Total Planned Yield {computedVolumeLabel || '(units)'}</Text>
+                <View style={[styles.input, { justifyContent: 'center', backgroundColor: colors.bg.secondary }]}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>{computedTotalQty}</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.inputLabel}>Planned Yield Quantity ({getYieldUnitLabel()}) *</Text>
+                <TextInput style={styles.input} placeholder={`Planned output quantity (e.g. 500)`} placeholderTextColor={colors.text.muted} value={prodPlannedQty} onChangeText={setProdPlannedQty} keyboardType="numeric" />
+              </>
+            )}
 
             <Text style={styles.inputLabel}>Finished Goods Production Batch No. *</Text>
             <TextInput style={styles.input} placeholder="e.g. ABH-JUL26-01" placeholderTextColor={colors.text.muted} value={prodBatchNo} onChangeText={setProdBatchNo} />
@@ -265,9 +360,14 @@ export default function LaunchBatchModal({
                 ⚠️ Starting this batch will automatically deduct the corresponding raw material quantities from active stock batches (FIFO). If stocks are insufficient, the launch will be blocked.
               </Text>
             )}
-            {isDirectPurchaseJobWork && (
+            {isDirectPurchaseJobWork && prodPackagingMode === 'packed_by_vendor' && (
               <Text style={[styles.warningDisclaimer, { color: colors.primary, borderColor: colors.primary + '30', backgroundColor: colors.primary + '08' }]}>
                 ℹ️ Under Direct Purchase Job Work, raw material stock deductions are skipped since ingredients are provided and processed by the third-party vendor.
+              </Text>
+            )}
+            {isDirectPurchaseJobWork && prodPackagingMode === 'self_packed' && (
+              <Text style={styles.warningDisclaimer}>
+                ⚠️ Under Direct Purchase Job Work, raw material ingredients are provided by the vendor, but packaging materials (bottles, caps, labels) will be deducted from your stock since packaging is self-packed.
               </Text>
             )}
 

@@ -329,6 +329,9 @@ router.post('/sales', validate(schemas.invoiceSchema), async (req, res) => {
       isFinalized: false,
     };
     const invoice = await Invoice.create(data);
+    if (req.io) {
+      req.io.emit('invoice_updated', { type: 'sale_created', id: invoice._id });
+    }
     res.status(201).json(invoice);
 
     const { logAction } = require('../../utils/auditLogger');
@@ -355,6 +358,9 @@ router.post('/purchases', authorize('invoice:create'), validate(schemas.invoiceS
       isFinalized: false,
     };
     const invoice = await Invoice.create(data);
+    if (req.io) {
+      req.io.emit('invoice_updated', { type: 'purchase_created', id: invoice._id });
+    }
     res.status(201).json(invoice);
 
     const { logAction } = require('../../utils/auditLogger');
@@ -397,6 +403,9 @@ router.put('/:id', authorize('invoice:edit'), validate(schemas.invoiceSchema.par
 
     Object.assign(invoice, updateData);
     await invoice.save();
+    if (req.io) {
+      req.io.emit('invoice_updated', { type: 'updated', id: invoice._id });
+    }
     res.json(invoice);
 
     const { logAction } = require('../../utils/auditLogger');
@@ -699,6 +708,9 @@ router.delete('/sales/:id', authorize('invoice:delete'), async (req, res) => {
     invoice.isFinalized = false;
     await invoice.save();
     
+    if (req.io) {
+      req.io.emit('invoice_updated', { type: 'sale_deleted', id: req.params.id });
+    }
     res.json({ message: 'Sale invoice marked as Cancelled' });
 
     const { logAction } = require('../../utils/auditLogger');
@@ -825,6 +837,9 @@ router.delete('/purchases/:id', authorize('invoice:delete'), async (req, res) =>
     invoice.isFinalized = false;
     await invoice.save();
 
+    if (req.io) {
+      req.io.emit('invoice_updated', { type: 'purchase_deleted', id: req.params.id });
+    }
     res.json({ message: 'Purchase invoice marked as Cancelled' });
 
     const { logAction } = require('../../utils/auditLogger');

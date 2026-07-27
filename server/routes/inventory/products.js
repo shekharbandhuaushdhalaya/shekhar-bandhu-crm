@@ -129,6 +129,9 @@ router.post('/', validate(schemas.productSchema), authorize('product:create'), a
 
     const product = await Product.create(req.body);
 
+    if (req.io) {
+      req.io.emit('product_updated', { type: 'created', id: product._id });
+    }
     res.status(201).json(product);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -249,6 +252,9 @@ router.post('/:id/image/append', authorize('product:edit'), upload.single('image
     product.image = images.join(',');
     await product.save();
 
+    if (req.io) {
+      req.io.emit('product_updated', { type: 'updated', id: product._id });
+    }
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: err.message });

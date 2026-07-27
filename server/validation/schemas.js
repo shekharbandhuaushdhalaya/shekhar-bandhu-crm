@@ -420,6 +420,12 @@ const sampleSchema = z.object({
 });
 
 // ── BatchProduction ──────────────────────────────────────────
+const plannedYieldSchema = z.object({
+  productId: objectId,
+  plannedQty: z.number().int().positive(),
+  size: z.string().optional().default('')
+});
+
 const batchProductionSchema = z.object({
   batchNo: z.string().min(1),
   productId: objectId,
@@ -432,7 +438,8 @@ const batchProductionSchema = z.object({
   packagingMode: z.enum(['packed_by_vendor', 'self_packed']).default('packed_by_vendor'),
   jobWorkerId: objectId.nullable().optional(),
   jobWorkerName: z.string().optional().default(''),
-  jobWorkerChallanRef: z.string().optional().default('')
+  jobWorkerChallanRef: z.string().optional().default(''),
+  plannedYields: z.array(plannedYieldSchema).optional()
 });
 
 const yieldItemSchema = z.object({

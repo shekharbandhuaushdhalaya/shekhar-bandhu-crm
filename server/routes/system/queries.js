@@ -127,6 +127,9 @@ router.post('/submit', upload.single('image'), validate(schemas.querySubmitSchem
       image: imagePath
     });
 
+    if (req.io) {
+      req.io.emit('query_updated', { type: 'created' });
+    }
     res.status(201).json({ message: 'Query submitted successfully', query: newQuery });
   } catch (err) {
     res.status(500).json({ error: err.message });

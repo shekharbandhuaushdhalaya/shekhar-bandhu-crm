@@ -56,6 +56,9 @@ router.post('/', validate(schemas.creditNoteSchema), async (req, res) => {
       status: 'draft',
     };
     const note = await CreditNote.create(data);
+    if (req.io) {
+      req.io.emit('credit_note_updated', { type: 'created', id: note._id });
+    }
     res.status(201).json(note);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -71,6 +74,9 @@ router.put('/:id', async (req, res) => {
 
     Object.assign(note, req.body);
     await note.save();
+    if (req.io) {
+      req.io.emit('credit_note_updated', { type: 'updated', id: note._id });
+    }
     res.json(note);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -112,6 +118,9 @@ router.patch('/:id/finalize', async (req, res) => {
 
     note.status = 'finalized';
     await note.save();
+    if (req.io) {
+      req.io.emit('credit_note_updated', { type: 'finalized', id: note._id });
+    }
     res.json(note);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -151,6 +160,9 @@ router.patch('/:id/cancel', async (req, res) => {
 
     note.status = 'cancelled';
     await note.save();
+    if (req.io) {
+      req.io.emit('credit_note_updated', { type: 'cancelled', id: note._id });
+    }
     res.json(note);
   } catch (err) {
     res.status(500).json({ error: err.message });

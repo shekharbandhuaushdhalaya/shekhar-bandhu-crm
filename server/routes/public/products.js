@@ -102,6 +102,9 @@ router.post('/:id/rate', validate(z.object({ rating: z.number().min(1).max(5) })
     product.ratingCount = newCount;
     await product.save();
 
+    if (req.io) {
+      req.io.emit('product_updated', { type: 'rated', id: product._id });
+    }
     res.json({ rating: product.rating, ratingCount: product.ratingCount });
   } catch (err) {
     res.status(500).json({ error: err.message });

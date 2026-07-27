@@ -8,7 +8,7 @@ const billOfMaterialsSchema = new mongoose.Schema({
   },
   recipeName: { type: String, required: true, default: 'Standard Recipe', trim: true },
   isDefault: { type: Boolean, default: false },
-  batchYieldSize: { type: Number, required: true, default: 1 }, // standard size of output batch (e.g. 100 bottles)
+  batchYieldSize: { type: Number, required: true, default: 100 }, // standard/reference batch size (e.g. 100 bottles) — informational only; formulation ingredient scaling always uses a fixed per-100-output-unit basis, not this value
   ingredients: [
     {
       rawMaterialId: {
@@ -16,7 +16,7 @@ const billOfMaterialsSchema = new mongoose.Schema({
         ref: 'RawMaterial',
         required: true,
       },
-      qtyRequired: { type: Number, required: true }, // qty required (% for formulation, pcs/unit for packaging)
+      qtyRequired: { type: Number, required: true }, // formulation: qty required per 100 output units (100 Liter/100 Kg/100 pieces), fixed basis, independent of batchYieldSize; packaging: pcs/unit
       itemType: { type: String, enum: ['formulation', 'packaging'], default: 'formulation' },
     }
   ],

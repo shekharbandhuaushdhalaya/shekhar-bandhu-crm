@@ -172,44 +172,43 @@ function MainLayout() {
     // Initialize Socket.io real-time connection
     const socket = getSocket();
 
-    socket.on('mfg_stage_updated', (data) => {
-      DeviceEventEmitter.emit('mfg_stage_updated_event', data);
-    });
+    // Define all socket events and their corresponding DeviceEventEmitter events
+    const socketEvents = [
+      // Manufacturing
+      'mfg_stage_updated', 'mfg_batch_created', 'mfg_batch_completed', 'mfg_batch_cancelled',
+      'qc_hold_alert', 'mfg_unit_updated', 'bom_updated', 'raw_material_updated',
+      // Sales & Orders
+      'order_updated', 'quotation_updated', 'customer_updated', 'vendor_updated',
+      'pricing_updated', 'sales_target_updated',
+      // Inventory & Warehouse
+      'inventory_updated', 'product_updated', 'warehouse_updated', 'transfer_updated',
+      'compliance_updated',
+      // Invoices, Challans & Payments
+      'invoice_updated', 'challan_updated', 'payment_updated', 'credit_note_updated',
+      'gst_return_updated',
+      // CRM
+      'contact_updated', 'medrep_updated', 'task_updated',
+      // Operations
+      'dispatch_updated', 'complaint_updated', 'sample_updated',
+      'new_web_order',
+      // Marketing
+      'campaign_updated',
+      // System
+      'rbac_updated', 'settings_updated', 'notification_updated', 'query_updated',
+    ];
 
-    socket.on('mfg_batch_created', (data) => {
-      DeviceEventEmitter.emit('mfg_batch_created_event', data);
-    });
-
-    socket.on('new_web_order', (data) => {
-      DeviceEventEmitter.emit('new_web_order_event', data);
-    });
-
-    socket.on('inventory_updated', (data) => {
-      DeviceEventEmitter.emit('inventory_updated_event', data);
-    });
-
-    socket.on('invoice_updated', (data) => {
-      DeviceEventEmitter.emit('invoice_updated_event', data);
-    });
-
-    socket.on('challan_updated', (data) => {
-      DeviceEventEmitter.emit('challan_updated_event', data);
-    });
-
-    socket.on('payment_updated', (data) => {
-      DeviceEventEmitter.emit('payment_updated_event', data);
+    socketEvents.forEach(eventName => {
+      socket.on(eventName, (data) => {
+        DeviceEventEmitter.emit(`${eventName}_event`, data);
+      });
     });
 
     return () => {
       unsubscribeNetInfo();
       sub.remove();
-      socket.off('mfg_stage_updated');
-      socket.off('mfg_batch_created');
-      socket.off('new_web_order');
-      socket.off('inventory_updated');
-      socket.off('invoice_updated');
-      socket.off('challan_updated');
-      socket.off('payment_updated');
+      socketEvents.forEach(eventName => {
+        socket.off(eventName);
+      });
     };
   }, []);
 

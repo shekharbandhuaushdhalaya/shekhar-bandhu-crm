@@ -60,6 +60,9 @@ router.patch('/:id/status', async (req, res) => {
     order.status = status;
     await order.save();
 
+    if (req.io) {
+      req.io.emit('order_updated', { type: 'status_changed', id: order._id });
+    }
     res.json(order);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -93,6 +96,9 @@ router.put('/:id', validate(schemas.orderSchema.partial()), async (req, res) => 
     if (adminNotes !== undefined) order.adminNotes = adminNotes.trim();
 
     await order.save();
+    if (req.io) {
+      req.io.emit('order_updated', { type: 'updated', id: order._id });
+    }
     res.json(order);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -212,6 +218,9 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
       status: 'pending'
     });
 
+    if (req.io) {
+      req.io.emit('order_updated', { type: 'created', id: newOrder._id });
+    }
     res.status(201).json({ message: 'Order placed successfully', order: newOrder });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -301,6 +310,9 @@ router.patch('/:id/cancel', async (req, res) => {
 
     order.status = 'cancelled';
     await order.save();
+    if (req.io) {
+      req.io.emit('order_updated', { type: 'cancelled', id: order._id });
+    }
     res.json({ message: 'Order cancelled and stock reverted', order });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -427,6 +439,9 @@ router.post('/:id/invoice', validate(schemas.invoiceSchema), async (req, res) =>
       status: 'unpaid'
     });
 
+    if (req.io) {
+      req.io.emit('invoice_updated', { type: 'created_from_order', id: newInvoice._id });
+    }
     res.status(201).json({ message: 'Draft invoice generated successfully', invoice: newInvoice });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -55,6 +55,9 @@ router.put('/:id', authorize('inventory:edit'), async (req, res) => {
     }
 
     await item.save();
+    if (req.io) {
+      req.io.emit('inventory_updated', { type: 'level_updated', id: item._id });
+    }
     res.json(item);
   } catch (err) {
     res.status(400).json({ error: err.message });

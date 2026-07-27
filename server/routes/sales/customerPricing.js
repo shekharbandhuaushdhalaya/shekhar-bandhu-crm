@@ -28,6 +28,9 @@ router.put('/:customerId/:productId', async (req, res) => {
       { discountPercent },
       { upsert: true, new: true }
     );
+    if (req.io) {
+      req.io.emit('pricing_updated', { type: 'updated' });
+    }
     res.json(pricing);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -38,6 +41,9 @@ router.put('/:customerId/:productId', async (req, res) => {
 router.delete('/:customerId/:productId', async (req, res) => {
   try {
     await CustomerPricing.findOneAndDelete({ customerId: req.params.customerId, productId: req.params.productId });
+    if (req.io) {
+      req.io.emit('pricing_updated', { type: 'deleted' });
+    }
     res.json({ message: 'Special pricing removed' });
   } catch (err) {
     res.status(500).json({ error: err.message });

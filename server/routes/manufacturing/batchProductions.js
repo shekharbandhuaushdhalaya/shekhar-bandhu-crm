@@ -30,12 +30,33 @@ router.get('/', async (req, res) => {
 // POST /api/batch-productions — Start a new batch production run
 router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
   try {
-    const { productId, plannedQty, batchNo, manufacturingUnitId, productionType, jobWorkMode, packagingMode, jobWorkerId, jobWorkerName, jobWorkerChallanRef } = req.body;
-    if (!productId || !plannedQty || !batchNo || !manufacturingUnitId) {
+    const { productId, plannedQty, batchNo, manufacturingUnitId, productionType, jobWorkMode, packagingMode, jobWorkerId, jobWorkerName, jobWorkerChallanRef, plannedYields } = req.body;
+
+    // If multi-size yields are provided, compute total plannedQty from them
+    let effectivePlannedQty = plannedQty;
+    let effectiveYields = null;
+    if (plannedYields && Array.isArray(plannedYields) && plannedYields.length > 0) {
+      // Deduplicate by productId (first occurrence wins)
+      const seen = new Set();
+      const uniqueYields = plannedYields.filter(y => {
+        const key = y.productId ? y.productId.toString() : '';
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      effectivePlannedQty = uniqueYields.reduce((sum, y) => sum + Number(y.plannedQty), 0);
+      effectiveYields = uniqueYields.map(y => ({
+        productId: y.productId,
+        plannedQty: Number(y.plannedQty),
+        size: y.size || ''
+      }));
+    }
+
+    if (!productId || !effectivePlannedQty || !batchNo || !manufacturingUnitId) {
       return res.status(400).json({ error: 'Product ID, planned quantity, batch number, and manufacturing unit ID are required' });
     }
 
-    const valPlanned = Number(plannedQty);
+    const valPlanned = Number(effectivePlannedQty);
     if (isNaN(valPlanned) || valPlanned <= 0) {
       return res.status(400).json({ error: 'Planned quantity must be a positive number' });
     }
@@ -54,6 +75,21 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
 
       const prod = await Product.findById(productId).session(session);
       if (!prod) throw new Error('Finished product not found');
+
+      // If multi-size yields specified, validate each product belongs to this product family
+      if (effectiveYields) {
+        const yieldIds = effectiveYields.map(y => y.productId);
+        const familyProducts = await Product.find({ _id: { $in: yieldIds }, $or: [{ _id: productId }, { parentId: productId }] }).session(session);
+        const foundIds = familyProducts.map(c => c._id.toString());
+        for (const y of effectiveYields) {
+          if (!foundIds.includes(y.productId.toString())) {
+            throw new Error(`Product ${y.productId} is not a valid size variant of ${prod.name}`);
+          }
+          // Copy size from product
+          const match = familyProducts.find(c => c._id.toString() === y.productId.toString());
+          if (match) y.size = match.size || '';
+        }
+      }
 
       let bom;
       if (req.body.bomId) {
@@ -75,14 +111,38 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       const isDirectPurchase = jobWorkMode === 'direct_purchase';
       const ingredientsRequired = [];
 
+      const getSizeInMl = (sizeStr) => {
+        const s = (sizeStr || '').toLowerCase().trim();
+        const numMatch = s.match(/([\d.]+)/);
+        if (!numMatch) return 0;
+        const numVal = parseFloat(numMatch[1]);
+        if (isNaN(numVal) || numVal <= 0) return 0;
+        if (s.includes('l') && !s.includes('ml')) return numVal * 1000;
+        return numVal;
+      };
+
+      // Formulation ingredient quantities on the BOM are always expressed as
+      // "qty per 100 output units (100 Liters / 100 Kg / 100 pieces)" — independent of batchYieldSize,
+      // which is purely an informational/standard-batch-size field.
+      const FORMULATION_BASIS = 100;
       if (!isDirectPurchase) {
         for (const ing of bom.ingredients) {
           const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
           const isPackaging = ing.itemType === 'packaging' || (rm && rm.category === 'Packaging');
           if (!isPackaging) {
-            const scaleBase = bom.batchYieldSize && bom.batchYieldSize > 0 ? bom.batchYieldSize : 100;
-            const scale = valPlanned / scaleBase;
-            const qtyNeeded = ing.qtyRequired * scale;
+            let qtyNeeded;
+            if (effectiveYields) {
+              // For multi-size: sum formulation per variant scaled by volume ratio
+              const parentSizeMl = getSizeInMl(prod.size || '');
+              qtyNeeded = 0;
+              for (const y of effectiveYields) {
+                const variantSizeMl = getSizeInMl(y.size || '');
+                const volumeRatio = (parentSizeMl > 0 && variantSizeMl > 0) ? (variantSizeMl / parentSizeMl) : 1;
+                qtyNeeded += ing.qtyRequired * (y.plannedQty / FORMULATION_BASIS) * volumeRatio;
+              }
+            } else {
+              qtyNeeded = ing.qtyRequired * (valPlanned / FORMULATION_BASIS);
+            }
             ingredientsRequired.push({ rawMaterialId: ing.rawMaterialId, qtyNeeded });
           }
         }
@@ -136,22 +196,22 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
         }
       }
 
-      // Scaled overhead calculation based on yield size
-      const scale = valPlanned / bom.batchYieldSize;
-      const computedOverhead = (bom.overheadCost || 0) * scale;
+      // Scaled overhead calculation — same fixed per-100-output-unit basis as formulation ingredients
+      const overheadScale = valPlanned / FORMULATION_BASIS;
+      const computedOverhead = (bom.overheadCost || 0) * overheadScale;
 
       // Configure Custom Stages or fallback to default manufacturing stages
       const customStages = bom.stages && bom.stages.length > 0
         ? bom.stages
         : [
-            { name: 'Raw Material Verification & Weighing', targetDurationDays: 1 },
-            { name: 'Primary Processing (Swasan/Mardan)', targetDurationDays: 1 },
-            { name: 'Mixing & Blending', targetDurationDays: 1 },
-            { name: 'Forming (Vati/Gutika)', targetDurationDays: 1 },
-            { name: 'Drying', targetDurationDays: 1 },
-            { name: 'QC Testing', targetDurationDays: 1 },
-            { name: 'Packaging & Labeling', targetDurationDays: 1 }
-          ];
+          { name: 'Raw Material Verification & Weighing', targetDurationDays: 1 },
+          { name: 'Primary Processing (Swasan/Mardan)', targetDurationDays: 1 },
+          { name: 'Mixing & Blending', targetDurationDays: 1 },
+          { name: 'Forming (Vati/Gutika)', targetDurationDays: 1 },
+          { name: 'Drying', targetDurationDays: 1 },
+          { name: 'QC Testing', targetDurationDays: 1 },
+          { name: 'Packaging & Labeling', targetDurationDays: 1 }
+        ];
 
       const batchStages = customStages.map((st, i) => {
         const startedAt = i === 0 ? new Date() : null;
@@ -176,6 +236,7 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
         manufacturingUnitId,
         manufacturingUnitName: mfgUnit.name,
         plannedQty: valPlanned,
+        plannedYields: effectiveYields || [],
         status: 'in_progress',
         stages: batchStages,
         ingredientsConsumed,
@@ -268,7 +329,16 @@ router.patch('/:id/stage/:stageIndex', async (req, res) => {
     const isPackagingStage = (currentStage.name || '').toLowerCase().includes('packag') || (currentStage.name || '').toLowerCase().includes('label');
     if (isPackagingStage && (newStatus === 'completed' || newStatus === 'skipped')) {
       if (batch.packagingMode === 'self_packed') {
-        await deductPackagingMaterials(batch, batch.plannedQty);
+        const plannedYields = batch.plannedYields && batch.plannedYields.length > 0 ? batch.plannedYields : null;
+        if (plannedYields) {
+          const yieldInput = plannedYields.map(y => ({
+            productId: y.productId,
+            actualYieldQty: y.plannedQty
+          }));
+          await deductPackagingMaterials(batch, yieldInput);
+        } else {
+          await deductPackagingMaterials(batch, batch.plannedQty);
+        }
       } else {
         batch.packagingDeducted = true;
       }
@@ -382,13 +452,13 @@ async function deductPackagingMaterials(batch, outputQtyOrYields) {
 // PATCH /api/batch-productions/:id/complete — Complete batch, record QC and inward finished stock
 router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req, res) => {
   try {
-    const { 
-      actualYieldQty, 
-      wasteQty, 
-      wasteReason, 
-      qcNotes, 
-      qcPassedBy, 
-      packing, 
+    const {
+      actualYieldQty,
+      wasteQty,
+      wasteReason,
+      qcNotes,
+      qcPassedBy,
+      packing,
       yields,
       qcStatus,
       organoleptic,
@@ -514,10 +584,22 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       }
 
       await batch.save();
+      if (req.io) {
+        req.io.emit('mfg_batch_completed', batch);
+        req.io.emit('inventory_updated', { type: 'batch_rejected', batchNo: batch.batchNo });
+      }
       return res.json(batch);
     }
 
 
+
+    // Persist actual yields on batch document
+    batch.yields = yieldsList.map(y => ({
+      productId: y.productId,
+      actualYieldQty: Number(y.actualYieldQty),
+      packing: y.packing || 1,
+      size: productMap[y.productId] ? (productMap[y.productId].size || '') : ''
+    }));
 
     // Compute cost allocation weight for each yield item
     let totalAllocWeight = 0;
@@ -565,18 +647,18 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
           warehouseName: warehouse.name,
           productId: item.productId,
           productType: item.product.productType || '',
-          size:        item.product.size        || '',
-          colour:      item.product.colour      || '',
-          shape:       item.product.shape       || '',
-          weight:      item.product.weight      || '',
-          hsnCode:     item.product.hsnCode     || '',
-          vendorId:    item.product.vendorId    || null,
-          vendorName:  'In-House Production (Self)',
-          qtyBoxes:    actualQty,
-          packing:     packingSize,
-          batchNo:     batch.batchNo,
-          mfgDate:     new Date(),
-          expiryDate:  new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000),
+          size: item.product.size || '',
+          colour: item.product.colour || '',
+          shape: item.product.shape || '',
+          weight: item.product.weight || '',
+          hsnCode: item.product.hsnCode || '',
+          vendorId: item.product.vendorId || null,
+          vendorName: 'In-House Production (Self)',
+          qtyBoxes: actualQty,
+          packing: packingSize,
+          batchNo: batch.batchNo,
+          mfgDate: new Date(),
+          expiryDate: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000),
           purchaseRate: Number(unitCost.toFixed(2)),
           manufacturingUnitId: batch.manufacturingUnitId,
           manufacturingUnitName: batch.manufacturingUnitName
@@ -640,6 +722,10 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
     }
 
     await batch.save();
+    if (req.io) {
+      req.io.emit('mfg_batch_completed', batch);
+      req.io.emit('inventory_updated', { type: 'batch_completed', batchNo: batch.batchNo });
+    }
     res.json(batch);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -684,6 +770,10 @@ router.patch('/:id/cancel', async (req, res) => {
     batch.endDate = new Date();
     await batch.save();
 
+    if (req.io) {
+      req.io.emit('mfg_batch_cancelled', { batchNo: batch.batchNo, id: batch._id });
+      req.io.emit('inventory_updated', { type: 'batch_cancelled', batchNo: batch.batchNo });
+    }
     res.json(batch);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -741,8 +831,8 @@ router.get('/genealogy/search', async (req, res) => {
     }
 
     // 2. Otherwise, check if it matches a Consumed Raw Material Batch No
-    const matchingBatches = await BatchProduction.find({ 
-      'ingredientsConsumed.batchNo': { $regex: new RegExp('^' + q + '$', 'i') } 
+    const matchingBatches = await BatchProduction.find({
+      'ingredientsConsumed.batchNo': { $regex: new RegExp('^' + q + '$', 'i') }
     })
       .populate('productId', 'name sku')
       .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
@@ -859,13 +949,37 @@ router.get('/:id/bmr-report', async (req, res) => {
       });
     }
 
+    const productPopulated = batch.productId ? batch.productId : null;
+
+    // Fetch product names for plannedYields / yields if productId is not populated
+    const yieldProdIds = new Set();
+    if (batch.plannedYields) batch.plannedYields.forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
+    if (batch.yields) batch.yields.forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
+    const yieldProducts = yieldProdIds.size > 0 ? await Product.find({ _id: { $in: [...yieldProdIds] } }).select('name size sku').lean() : [];
+    const yieldProdMap = {};
+    yieldProducts.forEach(p => { yieldProdMap[p._id.toString()] = p; });
+
     res.json({
       batchNo: batch.batchNo,
-      productName: batch.productId ? batch.productId.name : 'Unknown Product',
-      productSku: batch.productId ? batch.productId.sku : 'N/A',
-      productPrice: batch.productId ? batch.productId.price : 0,
+      productName: productPopulated ? productPopulated.name : 'Unknown Product',
+      productSku: productPopulated ? productPopulated.sku : 'N/A',
+      productPrice: productPopulated ? productPopulated.price : 0,
+      productSize: productPopulated ? productPopulated.size : '',
       plannedQty: batch.plannedQty,
       actualYieldQty: batch.actualYieldQty || 0,
+      plannedYields: (batch.plannedYields || []).map(y => ({
+        productId: y.productId ? y.productId.toString() : '',
+        plannedQty: y.plannedQty,
+        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || '') : ''),
+        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || '') : ''
+      })),
+      yields: (batch.yields || []).map(y => ({
+        productId: y.productId ? y.productId.toString() : '',
+        actualYieldQty: y.actualYieldQty,
+        packing: y.packing || 1,
+        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || '') : ''),
+        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || '') : ''
+      })),
       wasteQty: batch.wasteQty || 0,
       wasteReason: batch.wasteReason || '',
       variancePercent: batch.variancePercent || 0,

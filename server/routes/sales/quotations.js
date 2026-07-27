@@ -35,6 +35,9 @@ router.post('/', validate(schemas.quotationSchema), async (req, res) => {
       quotationNo: req.body.quotationNo || 'QUOTE-' + Date.now().toString().slice(-6),
     };
     const quotation = await Quotation.create(data);
+    if (req.io) {
+      req.io.emit('quotation_updated', { type: 'created', id: quotation._id });
+    }
     res.status(201).json(quotation);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -51,6 +54,9 @@ router.put('/:id', validate(schemas.quotationSchema.partial()), async (req, res)
     const { quotationNo, ...updateData } = req.body;
     Object.assign(quotation, updateData);
     await quotation.save();
+    if (req.io) {
+      req.io.emit('quotation_updated', { type: 'updated', id: quotation._id });
+    }
     res.json(quotation);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -63,6 +69,9 @@ router.delete('/:id', authorize('quotation:delete'), async (req, res) => {
     const quotation = await Quotation.findByIdAndDelete(req.params.id);
     if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
     
+    if (req.io) {
+      req.io.emit('quotation_updated', { type: 'deleted', id: req.params.id });
+    }
     res.json({ message: 'Quotation deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -120,6 +120,10 @@ router.post('/write-off', async (req, res) => {
       batchNo: entry.batchNo || '',
     });
 
+    if (req.io) {
+      req.io.emit('inventory_updated', { type: 'write_off', productId, warehouseId });
+      req.io.emit('compliance_updated', { type: 'write_off', productId });
+    }
     res.status(200).json({
       message: 'Stock successfully written off',
       inventoryEntry: entry,

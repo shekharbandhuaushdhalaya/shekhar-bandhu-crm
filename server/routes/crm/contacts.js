@@ -37,6 +37,9 @@ router.get('/:id', async (req, res) => {
   try {
     const contact = await Contact.findById(req.params.id).lean();
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
+    if (req.io) {
+      req.io.emit('contact_updated', { type: 'updated', id: contact._id });
+    }
     res.json(contact);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -58,6 +61,9 @@ router.post('/', validate(schemas.contactSchema), async (req, res) => {
       contactId: contact._id,
     });
 
+    if (req.io) {
+      req.io.emit('contact_updated', { type: 'created', id: contact._id });
+    }
     res.status(201).json(contact);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -121,6 +127,9 @@ router.delete('/:id', authorize('contact:delete'), async (req, res) => {
   try {
     const contact = await Contact.findByIdAndDelete(req.params.id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
+    if (req.io) {
+      req.io.emit('contact_updated', { type: 'deleted', id: req.params.id });
+    }
     res.json({ message: 'Contact deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

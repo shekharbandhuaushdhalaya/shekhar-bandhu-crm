@@ -43,6 +43,9 @@ router.post('/', authorize('mr:create'), validate(schemas.medicalRepSchema), asy
       data.code = `MR-${(count + 1).toString().padStart(3, '0')}`;
     }
     const mr = await MedicalRepresentative.create(data);
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'created', id: mr._id });
+    }
     res.status(201).json(mr);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -76,6 +79,9 @@ router.put('/:id', authorize('mr:edit'), validate(schemas.medicalRepSchema.parti
       }
     }
 
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'updated', id: mr._id });
+    }
     res.json(mr);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -96,6 +102,9 @@ router.delete('/:id', authorize('mr:delete'), async (req, res) => {
     await MrDailyLog.deleteMany({ mrId: req.params.id });
     await MrVisit.deleteMany({ mrId: req.params.id });
     await MrExpense.deleteMany({ mrId: req.params.id });
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'deleted', id: req.params.id });
+    }
     res.json({ message: 'MR deleted and system user access revoked' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -148,6 +157,9 @@ router.post('/:mrId/checkin', authorize('mr:attendance'), validate(schemas.mrChe
       startKmReading: startKm,
       status: 'checked_in',
     });
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'checkin', mrId: req.params.mrId });
+    }
     res.status(201).json(log);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -171,6 +183,9 @@ router.post('/:mrId/checkout', authorize('mr:attendance'), async (req, res) => {
       log.totalDistance = Math.max(0, endKm - log.startKmReading);
     }
     await log.save();
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'checkout', mrId: req.params.mrId });
+    }
     res.json(log);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -294,6 +309,9 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
       });
     }
 
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'visit_created', mrId: req.params.mrId, visitId: visit._id });
+    }
     res.status(201).json(visit);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -306,6 +324,9 @@ router.put('/visits/:visitId', authorize('mr:visits'), validate(schemas.mrVisitS
       req.params.visitId, req.body, { new: true, runValidators: true }
     );
     if (!visit) return res.status(404).json({ error: 'Visit not found' });
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'visit_updated', visitId: visit._id });
+    }
     res.json(visit);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -316,6 +337,9 @@ router.delete('/visits/:visitId', authorize('mr:delete'), async (req, res) => {
   try {
     const visit = await MrVisit.findByIdAndDelete(req.params.visitId);
     if (!visit) return res.status(404).json({ error: 'Visit not found' });
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'visit_deleted', visitId: req.params.visitId });
+    }
     res.json({ message: 'Visit deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -350,6 +374,9 @@ router.post('/:mrId/expenses', authorize('mr:expenses'), validate(schemas.mrExpe
     const data = { ...req.body, mrId: req.params.mrId };
     if (!data.date) data.date = new Date();
     const expense = await MrExpense.create(data);
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'expense_created', mrId: req.params.mrId });
+    }
     res.status(201).json(expense);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -368,6 +395,9 @@ router.put('/expenses/:expenseId/approve', authorize('mr:approveExpenses'), asyn
       { new: true }
     ).populate('approvedBy', 'name');
     if (!expense) return res.status(404).json({ error: 'Expense not found' });
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'expense_approved', expenseId: expense._id });
+    }
     res.json(expense);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -378,6 +408,9 @@ router.delete('/expenses/:expenseId', authorize('mr:delete'), async (req, res) =
   try {
     const expense = await MrExpense.findByIdAndDelete(req.params.expenseId);
     if (!expense) return res.status(404).json({ error: 'Expense not found' });
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'expense_deleted', expenseId: req.params.expenseId });
+    }
     res.json({ message: 'Expense deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,14 +1,5 @@
 const mongoose = require('mongoose');
-
-const MANUFACTURING_STAGES = [
-  'Raw Material Verification & Weighing',
-  'Primary Processing (Swasan/Mardan)',
-  'Mixing & Blending',
-  'Forming (Vati/Gutika)',
-  'Drying',
-  'QC Testing',
-  'Packaging & Labeling'
-];
+const { MANUFACTURING_STAGES } = require('../constants');
 
 const stageSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -71,6 +62,21 @@ const batchProductionSchema = new mongoose.Schema({
     }
   ],
   packagingDeducted: { type: Boolean, default: false },
+  plannedYields: [
+    {
+      productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+      plannedQty: { type: Number, required: true },
+      size: { type: String, default: '' }
+    }
+  ],
+  yields: [
+    {
+      productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+      actualYieldQty: { type: Number, required: true },
+      packing: { type: Number, default: 1 },
+      size: { type: String, default: '' }
+    }
+  ],
   startDate: { type: Date, default: null },
   endDate: { type: Date, default: null },
   qcNotes: { type: String, default: '' },

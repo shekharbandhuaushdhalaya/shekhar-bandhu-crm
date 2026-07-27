@@ -195,6 +195,9 @@ router.post('/', validate(schemas.challanSchema), async (req, res) => {
     data.warehouseName = warehouse.name;
 
     const challan = await Challan.create(data);
+    if (req.io) {
+      req.io.emit('challan_updated', { type: 'created', id: challan._id });
+    }
     res.status(201).json(challan);
 
     const { logAction } = require('../../utils/auditLogger');
@@ -222,6 +225,9 @@ router.put('/:id', validate(schemas.challanSchema.partial()), async (req, res) =
     
     Object.assign(challan, req.body);
     const updated = await challan.save();
+    if (req.io) {
+      req.io.emit('challan_updated', { type: 'updated', id: updated._id });
+    }
     res.json(updated);
 
     const { logAction } = require('../../utils/auditLogger');
@@ -299,6 +305,10 @@ router.patch('/:id/finalize', async (req, res) => {
     challan.status = 'finalized';
     await challan.save();
 
+    if (req.io) {
+      req.io.emit('challan_updated', { type: 'finalized', id: challan._id });
+      req.io.emit('inventory_updated', { type: 'challan_finalized', challanId: challan._id });
+    }
     res.json(challan);
 
     const { logAction } = require('../../utils/auditLogger');
@@ -348,6 +358,10 @@ router.delete('/:id', authorize('challan:delete'), async (req, res) => {
     }
 
     await Challan.findByIdAndDelete(req.params.id);
+    if (req.io) {
+      req.io.emit('challan_updated', { type: 'deleted', id: req.params.id });
+      req.io.emit('inventory_updated', { type: 'challan_deleted', challanId: req.params.id });
+    }
     res.json({ message: 'Challan deleted' });
 
     const { logAction } = require('../../utils/auditLogger');
@@ -485,6 +499,10 @@ router.post('/:id/convert', async (req, res) => {
     challan.invoiceNo = invoice.invoiceNo;
     await challan.save();
 
+    if (req.io) {
+      req.io.emit('challan_updated', { type: 'converted', id: challan._id });
+      req.io.emit('invoice_updated', { type: 'created_from_challan', id: invoice._id });
+    }
     res.status(201).json({
       message: 'Challan successfully converted to Sale Invoice',
       invoice,

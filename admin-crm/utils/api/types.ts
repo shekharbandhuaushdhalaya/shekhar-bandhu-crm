@@ -686,13 +686,25 @@ export type BMRReportIngredient = {
   itemCost: number;
 };
 
+export type BMRReportYield = {
+  productId: string;
+  plannedQty?: number;
+  actualYieldQty?: number;
+  packing?: number;
+  size: string;
+  productName: string;
+};
+
 export type BMRReport = {
   batchNo: string;
   productName: string;
   productSku: string;
   productPrice: number;
+  productSize?: string;
   plannedQty: number;
   actualYieldQty: number;
+  plannedYields: BMRReportYield[];
+  yields: BMRReportYield[];
   wasteQty: number;
   wasteReason: string;
   variancePercent: number;

@@ -59,6 +59,16 @@ export default function QCSignoffModal({
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
 
+  // Only show products that were planned at batch launch (from plannedYields)
+  const plannedProductIds = selectedBatchRun && (selectedBatchRun as any).plannedYields?.length > 0
+    ? (selectedBatchRun as any).plannedYields.map((y: any) =>
+        typeof y.productId === 'object' ? (y.productId as any)._id || y.productId : y.productId
+      )
+    : null;
+  const splitProducts = plannedProductIds
+    ? products.filter(p => plannedProductIds.includes(p._id))
+    : products;
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
@@ -97,6 +107,25 @@ export default function QCSignoffModal({
             <Text style={styles.inputLabel}>Actual Output Yield Size (units) *</Text>
             <TextInput style={styles.input} placeholder="e.g. 498" placeholderTextColor={colors.text.muted} value={qcYieldQty} onChangeText={setQcYieldQty} keyboardType="numeric" />
 
+            {/* Planned Sizes summary (multi-size batches) */}
+            {selectedBatchRun && (selectedBatchRun as any).plannedYields?.length > 0 && (
+              <View style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary, marginBottom: 6 }}>Planned Sizes at Launch:</Text>
+                <View style={{ gap: 4 }}>
+                  {((selectedBatchRun as any).plannedYields as any[]).map((py: any, idx: number) => {
+                    const prodId = typeof py.productId === 'object' ? (py.productId as any)._id : py.productId;
+                    const prod = products.find(p => p._id === prodId);
+                    return (
+                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 }}>
+                        <Text style={{ fontSize: 11, color: colors.text.secondary }}>{prod ? `${prod.name} (${prod.size || 'Std'})` : prodId}</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>{py.plannedQty} units</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
             {/* Split Yield Toggle */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 12 }}>
               <Text style={[styles.inputLabel, { marginBottom: 0 }]}>Split Yield into Multiple Sizes / Packages?</Text>
@@ -126,7 +155,7 @@ export default function QCSignoffModal({
                       {Platform.OS === 'web' ? (
                         <select value={item.productId} onChange={(e: any) => onQcYieldChange(idx, 'productId', e.target.value)} style={{ flex: 1, padding: 8, fontSize: 11, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
                           <option value="">-- Choose Product/Size --</option>
-                          {products.map(p => <option key={p._id} value={p._id}>{p.name} ({p.size || 'Std'})</option>)}
+                          {splitProducts.map(p => <option key={p._id} value={p._id}>{p.name} ({p.size || 'Std'})</option>)}
                         </select>
                       ) : (
                         <TextInput style={styles.input} placeholder="Product ID" value={item.productId} onChangeText={(val) => onQcYieldChange(idx, 'productId', val)} />

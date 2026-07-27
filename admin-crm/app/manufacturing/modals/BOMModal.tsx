@@ -156,6 +156,9 @@ export default function BOMModal({
 
             {/* Ingredients */}
             <Text style={styles.formIngredientsTitle}>Formulation Ingredients *</Text>
+            <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
+              Enter each ingredient's quantity for a standard 100 units/ml/g batch of output. This is scaled automatically to the Planned Yield Quantity when a production batch is launched — independent of the Batch Yield Size below.
+            </Text>
             {bomIngredients.map((ing, idx) => (
               <View key={idx} style={styles.bomIngredientInputRow}>
                 <View style={[styles.pickerWrapper, { flex: 2, marginBottom: 0 }]}>

@@ -181,6 +181,9 @@ router.post('/', validate(schemas.inventoryEntrySchema), async (req, res) => {
       createdAt: req.body.createdAt ? new Date(req.body.createdAt) : undefined,
     });
 
+    if (req.io) {
+      req.io.emit('inventory_updated', { type: 'entry_created', id: entry._id, productId });
+    }
     res.status(201).json(entry);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -233,6 +236,9 @@ router.put('/:id', validate(schemas.inventoryEntrySchema.partial()), async (req,
       createdAt:     createdAt ? new Date(createdAt) : undefined,
     });
 
+    if (req.io) {
+      req.io.emit('inventory_updated', { type: 'entry_adjusted', id: entry._id, movementType });
+    }
     res.json(entry);
   } catch (err) {
     res.status(400).json({ error: err.message });

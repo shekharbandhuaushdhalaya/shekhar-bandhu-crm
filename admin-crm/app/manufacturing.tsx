@@ -150,6 +150,47 @@ export default function ManufacturingScreen() {
   const [prodJobWorkerName, setProdJobWorkerName] = useState('');
   const [prodJobWorkerChallanRef, setProdJobWorkerChallanRef] = useState('');
   const [prodError, setProdError] = useState('');
+  const [prodPlannedYields, setProdPlannedYields] = useState<{ productId: string; plannedQty: string; size: string; enabled: boolean }[]>([]);
+
+  // When product changes, populate size variants for multi-size batch planning
+  useEffect(() => {
+    if (prodProductId) {
+      const parent = products.find(p => p._id === prodProductId);
+      const children = products.filter(p => p.parentId === prodProductId);
+      // Include the parent product itself as the first size option,
+      // since the parent also represents a producible size (e.g., "200 ml").
+      // Deduplicate by _id to avoid any accidental duplicates in the list
+      const allSizeMap = new Map<string, any>();
+      if (parent) allSizeMap.set(parent._id, parent);
+      children.forEach(c => { if (!allSizeMap.has(c._id)) allSizeMap.set(c._id, c); });
+      const allSizes = [...allSizeMap.values()];
+      if (allSizes.length > 0) {
+        setProdPlannedYields(allSizes.map((s, i) => ({
+          productId: s._id,
+          plannedQty: i === 0 ? (prodPlannedQty || '100') : '',
+          size: s.size || '',
+          enabled: i === 0
+        })));
+      } else {
+        setProdPlannedYields([]);
+      }
+    } else {
+      setProdPlannedYields([]);
+    }
+  }, [prodProductId]);
+
+  // Compute total planned qty from yields if multi-size, else use single input
+  const computedTotalQty = prodPlannedYields.some(y => y.enabled)
+    ? prodPlannedYields.filter(y => y.enabled).reduce((sum, y) => sum + (Number(y.plannedQty) || 0), 0)
+    : (Number(prodPlannedQty) || 0);
+
+  // Sync single planned qty input with total from yields
+  useEffect(() => {
+    if (prodPlannedYields.some(y => y.enabled)) {
+      const total = prodPlannedYields.filter(y => y.enabled).reduce((sum, y) => sum + (Number(y.plannedQty) || 0), 0);
+      if (total > 0) setProdPlannedQty(String(total));
+    }
+  }, [prodPlannedYields]);
 
   // Form States — Manufacturing Unit Definition
   const [unitModalVisible, setUnitModalVisible] = useState(false);
@@ -188,6 +229,29 @@ export default function ManufacturingScreen() {
     { productId: '', actualYieldQty: '', packing: '' }
   ]);
   const [qcEnableSplit, setQcEnableSplit] = useState(false);
+
+  // When QC modal opens with a selected batch, pre-populate split yields from plannedYields
+  useEffect(() => {
+    if (selectedBatchRun && qcModalVisible) {
+      const planned = (selectedBatchRun as any).plannedYields;
+      if (planned && planned.length > 0) {
+        const mapped = planned.map((y: any) => ({
+          productId: typeof y.productId === 'object' ? (y.productId as any)._id || y.productId : y.productId,
+          actualYieldQty: String(y.plannedQty),
+          packing: '1'
+        }));
+        setQcYields(mapped);
+        setQcEnableSplit(true);
+        // Auto-calculate total yield from sum of planned split quantities
+        const sum = mapped.reduce((acc: number, y: any) => acc + (Number(y.actualYieldQty) || 0), 0);
+        setQcYieldQty(String(sum || ''));
+      } else {
+        setQcYields([{ productId: '', actualYieldQty: '', packing: '' }]);
+        setQcEnableSplit(false);
+      }
+    }
+  }, [selectedBatchRun, qcModalVisible]);
+
   const [expandedBatchIds, setExpandedBatchIds] = useState<Record<string, boolean>>({});
   const toggleBatchExpanded = (id: string) => setExpandedBatchIds(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -233,12 +297,18 @@ export default function ManufacturingScreen() {
 
     const sub1 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => loadData());
     const sub2 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => loadData());
-    const sub3 = DeviceEventEmitter.addListener('inventory_updated_event', () => loadData());
+    const sub3 = DeviceEventEmitter.addListener('mfg_batch_completed_event', () => loadData());
+    const sub4 = DeviceEventEmitter.addListener('mfg_batch_cancelled_event', () => loadData());
+    const sub5 = DeviceEventEmitter.addListener('qc_hold_alert_event', () => loadData());
+    const sub6 = DeviceEventEmitter.addListener('inventory_updated_event', () => loadData());
 
     return () => {
       sub1.remove();
       sub2.remove();
       sub3.remove();
+      sub4.remove();
+      sub5.remove();
+      sub6.remove();
     };
   }, [loadData]);
 
@@ -434,7 +504,15 @@ export default function ManufacturingScreen() {
     }
     setProdError('');
     try {
-      await api.startBatchProduction({
+      let enabledYields = prodPlannedYields.filter(y => y.enabled && Number(y.plannedQty) > 0);
+      // Deduplicate by productId (take first occurrence)
+      const seenIds = new Set<string>();
+      enabledYields = enabledYields.filter(y => {
+        if (seenIds.has(y.productId)) return false;
+        seenIds.add(y.productId);
+        return true;
+      });
+      const payload: any = {
         productId: prodProductId,
         bomId: prodBomId || undefined,
         plannedQty: Number(prodPlannedQty),
@@ -446,7 +524,15 @@ export default function ManufacturingScreen() {
         jobWorkerId: prodProductionType === 'job_work' ? (prodJobWorkerId || null) : null,
         jobWorkerName: prodProductionType === 'job_work' ? prodJobWorkerName : '',
         jobWorkerChallanRef: prodProductionType === 'job_work' ? prodJobWorkerChallanRef : ''
-      });
+      };
+      if (enabledYields.length > 0) {
+        payload.plannedYields = enabledYields.map(y => ({
+          productId: y.productId,
+          plannedQty: Number(y.plannedQty),
+          size: y.size
+        }));
+      }
+      await api.startBatchProduction(payload);
 
       setProdProductId('');
       setProdBomId('');
@@ -459,6 +545,7 @@ export default function ManufacturingScreen() {
       setProdJobWorkerId('');
       setProdJobWorkerName('');
       setProdJobWorkerChallanRef('');
+      setProdPlannedYields([]);
       setProductionModalVisible(false);
       loadData();
     } catch (err: any) {
@@ -512,6 +599,9 @@ export default function ManufacturingScreen() {
     const updated = [...qcYields];
     updated[index][key] = value;
     setQcYields(updated);
+    // Auto-calculate total yield from sum of split quantities
+    const sum = updated.reduce((acc, y) => acc + (Number(y.actualYieldQty) || 0), 0);
+    setQcYieldQty(String(sum || ''));
   };
 
   const handleCompleteProduction = async () => {
@@ -544,11 +634,6 @@ export default function ManufacturingScreen() {
         actualYieldQty: Number(y.actualYieldQty),
         packing: Number(y.packing) || 1
       }));
-      const sum = yieldsPayload.reduce((acc, y) => acc + y.actualYieldQty, 0);
-      if (sum !== Number(qcYieldQty)) {
-        setQcError(`Sum of split quantities (${sum}) must match the total actual yield quantity (${qcYieldQty}).`);
-        return;
-      }
     }
 
     setQcError('');
@@ -860,46 +945,130 @@ export default function ManufacturingScreen() {
       return bPid === prodProductId;
     });
 
-  const plannedVal = Number(prodPlannedQty);
+  const plannedVal = computedTotalQty;
   let previewIngredients: { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'formulation' | 'packaging' }[] = [];
   const isDirectPurchaseJobWork = prodProductionType === 'job_work' && prodJobWorkMode === 'direct_purchase';
-  if (matchingBom && !isNaN(plannedVal) && plannedVal > 0 && !isDirectPurchaseJobWork) {
-    const scale = plannedVal / (matchingBom.batchYieldSize || 100);
-    previewIngredients = matchingBom.ingredients.map(ing => {
-      const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
-      const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown Raw Material';
-      const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'kg';
-      const matchingMaterial = materials.find(m => m._id === ingId);
-      const isPkg = ing.itemType === 'packaging' || (matchingMaterial && matchingMaterial.category === 'Packaging');
+  const showFormulationPreview = !isDirectPurchaseJobWork;
+  const showPackagingPreview = prodPackagingMode === 'self_packed';
+  const enabledYields = prodPlannedYields.filter(y => y.enabled && Number(y.plannedQty) > 0);
+  const isMultiSize = enabledYields.length > 0;
 
-      // Compute available stock scoped to the selected manufacturing unit (warehouseId match).
-      // The backend deducts from entries where warehouseId === manufacturingUnitId,
-      // so we must show the same view to the user.
-      let available = 0;
+  const parseSizeMl = (sizeStr: string): number => {
+    const s = (sizeStr || '').toLowerCase().trim();
+    const numMatch = s.match(/([\d.]+)/);
+    if (!numMatch) return 0;
+    const numVal = parseFloat(numMatch[1]);
+    if (isNaN(numVal) || numVal <= 0) return 0;
+    if (s.includes('l') && !s.includes('ml')) return numVal * 1000;
+    return numVal;
+  };
+
+  if (matchingBom && !isNaN(plannedVal) && plannedVal > 0 && (showFormulationPreview || showPackagingPreview)) {
+    const FORMULATION_BASIS = 100;
+    const scale = plannedVal / FORMULATION_BASIS;
+
+    const getAvailable = (ingId: string) => {
       if (prodManufacturingUnitId) {
-        available = entries
+        return entries
           .filter(e => {
             const eRmId = typeof e.rawMaterialId === 'object' ? (e.rawMaterialId as any)._id || (e.rawMaterialId as any) : e.rawMaterialId;
             const eWhId = typeof (e as any).warehouseId === 'object' ? (e as any).warehouseId?._id : (e as any).warehouseId;
             return String(eRmId) === String(ingId) && String(eWhId) === String(prodManufacturingUnitId);
           })
           .reduce((sum, e) => sum + (e.qty || 0), 0);
-      } else {
-        // No unit selected yet — fall back to global stock
-        available = matchingMaterial ? (matchingMaterial.stockLevel || 0) : 0;
+      }
+      const mat = materials.find(m => m._id === ingId);
+      return mat ? (mat.stockLevel || 0) : 0;
+    };
+
+    if (isMultiSize) {
+      const parentProduct = products.find(p => p._id === prodProductId);
+      const parentSizeMl = parseSizeMl(parentProduct?.size || '');
+
+      // Formulation preview (when user provides raw materials)
+      const formulationItems: typeof previewIngredients = [];
+      if (showFormulationPreview) {
+        const formulationMap = new Map<string, { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'formulation' }>();
+        for (const yieldItem of enabledYields) {
+          const variantSizeMl = parseSizeMl(yieldItem.size);
+          const volumeRatio = (parentSizeMl > 0 && variantSizeMl > 0) ? (variantSizeMl / parentSizeMl) : 1;
+          const variantScale = Number(yieldItem.plannedQty) / FORMULATION_BASIS;
+          for (const ing of matchingBom.ingredients) {
+            const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
+            const mat = materials.find(m => m._id === ingId);
+            const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+            if (isPkg) continue;
+            const qtyNeeded = ing.qtyRequired * variantScale * volumeRatio;
+            const key = ingId || ing.rawMaterialId.toString();
+            if (formulationMap.has(key)) {
+              formulationMap.get(key)!.qtyNeeded += qtyNeeded;
+            } else {
+              const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown';
+              const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'kg';
+              formulationMap.set(key, { name: ingName, qtyNeeded, unit: ingUnit, available: getAvailable(ingId), ratioPct: ing.qtyRequired, itemType: 'formulation' });
+            }
+          }
+        }
+        formulationItems.push(...formulationMap.values());
       }
 
-      const qtyNeeded = isPkg ? ing.qtyRequired * plannedVal : ing.qtyRequired * scale;
+      // Packaging preview (when self-packed)
+      const packagingItems: typeof previewIngredients = [];
+      if (showPackagingPreview) {
+        const packagingMap = new Map<string, { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'packaging' }>();
+        for (const yieldItem of enabledYields) {
+          const childBom = boms.find(b => {
+            const bPid = b.productId && typeof b.productId === 'object' ? (b.productId as any)._id : b.productId;
+            return bPid === yieldItem.productId;
+          });
+          if (!childBom) continue;
+          for (const ing of childBom.ingredients) {
+            const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
+            const mat = materials.find(m => m._id === ingId);
+            const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+            if (!isPkg) continue;
+            const qtyNeeded = ing.qtyRequired * Number(yieldItem.plannedQty);
+            const key = ingId || ing.rawMaterialId.toString();
+            if (packagingMap.has(key)) {
+              packagingMap.get(key)!.qtyNeeded += qtyNeeded;
+            } else {
+              const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown';
+              const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'pcs';
+              packagingMap.set(key, { name: ingName, qtyNeeded, unit: ingUnit, available: getAvailable(ingId), ratioPct: ing.qtyRequired, itemType: 'packaging' });
+            }
+          }
+        }
+        packagingItems.push(...packagingMap.values());
+      }
 
-      return {
-        name: ingName,
-        qtyNeeded,
-        unit: ingUnit,
-        available,
-        ratioPct: ing.qtyRequired,
-        itemType: isPkg ? 'packaging' : 'formulation'
-      };
-    });
+      previewIngredients = [...formulationItems, ...packagingItems];
+    } else {
+      // Single-size: ingredients from the parent BOM, filtered by preview flags
+      previewIngredients = matchingBom.ingredients
+        .filter(ing => {
+          const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
+          const mat = materials.find(m => m._id === ingId);
+          const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+          if (isPkg) return showPackagingPreview;
+          return showFormulationPreview;
+        })
+        .map(ing => {
+          const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
+          const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown Raw Material';
+          const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'kg';
+          const mat = materials.find(m => m._id === ingId);
+          const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+          const qtyNeeded = isPkg ? ing.qtyRequired * plannedVal : ing.qtyRequired * scale;
+          return {
+            name: ingName,
+            qtyNeeded,
+            unit: ingUnit,
+            available: getAvailable(ingId),
+            ratioPct: ing.qtyRequired,
+            itemType: isPkg ? 'packaging' : 'formulation'
+          };
+        });
+    }
   }
   if (loading) {
     return <AyurvedicLoader />;
@@ -1256,6 +1425,23 @@ export default function ManufacturingScreen() {
                       </Text>
                     </View>
                   </View>
+
+                  {/* Planned Sizes (multi-size batch) */}
+                  {(batch as any).plannedYields?.length > 0 && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                      {((batch as any).plannedYields as any[]).map((py: any, idx: number) => {
+                        const pId = typeof py.productId === 'object' ? (py.productId as any)._id || py.productId : py.productId;
+                        const prod = products.find(p => p._id === pId);
+                        return (
+                          <View key={idx} style={{ backgroundColor: colors.primary + '15', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '600', color: colors.primary }}>
+                              {prod ? `${prod.size || prod.name}` : '?'}: {py.plannedQty}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
 
                   {/* Essential Key Metrics Bar */}
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, backgroundColor: colors.bg.secondary, padding: 10, borderRadius: 8, marginVertical: 8 }}>
@@ -1907,6 +2093,8 @@ export default function ManufacturingScreen() {
         prodJobWorkerChallanRef={prodJobWorkerChallanRef} setProdJobWorkerChallanRef={setProdJobWorkerChallanRef}
         prodManufacturingUnitId={prodManufacturingUnitId} setProdManufacturingUnitId={setProdManufacturingUnitId}
         prodError={prodError}
+        computedTotalQty={computedTotalQty}
+        prodPlannedYields={prodPlannedYields} setProdPlannedYields={setProdPlannedYields}
         previewIngredients={previewIngredients}
         onClose={() => setProductionModalVisible(false)}
         onLaunch={handleStartProduction}

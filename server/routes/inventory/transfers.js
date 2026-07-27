@@ -62,6 +62,9 @@ router.post('/', async (req, res) => {
       status: 'pending'
     });
 
+    if (req.io) {
+      req.io.emit('transfer_updated', { type: 'created', id: transfer._id });
+    }
     res.status(201).json(transfer);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -114,6 +117,10 @@ router.patch('/:id/ship', async (req, res) => {
     transfer.status = 'in_transit';
     await transfer.save();
 
+    if (req.io) {
+      req.io.emit('transfer_updated', { type: 'shipped', id: transfer._id });
+      req.io.emit('inventory_updated', { type: 'transfer_shipped', transferId: transfer._id });
+    }
     res.json(transfer);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -180,6 +187,10 @@ router.patch('/:id/receive', async (req, res) => {
     transfer.approvedBy = req.user ? req.user.name : 'System';
     await transfer.save();
 
+    if (req.io) {
+      req.io.emit('transfer_updated', { type: 'received', id: transfer._id });
+      req.io.emit('inventory_updated', { type: 'transfer_received', transferId: transfer._id });
+    }
     res.json(transfer);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -241,6 +252,10 @@ router.patch('/:id/cancel', async (req, res) => {
     transfer.status = 'cancelled';
     await transfer.save();
 
+    if (req.io) {
+      req.io.emit('transfer_updated', { type: 'cancelled', id: transfer._id });
+      req.io.emit('inventory_updated', { type: 'transfer_cancelled', transferId: transfer._id });
+    }
     res.json(transfer);
   } catch (err) {
     res.status(500).json({ error: err.message });

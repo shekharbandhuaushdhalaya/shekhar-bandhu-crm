@@ -110,6 +110,9 @@ router.delete('/:id', async (req, res) => {
     }
     const deleted = await RawMaterial.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Raw material not found' });
+    if (req.io) {
+      req.io.emit('raw_material_updated', { type: 'deleted', id: req.params.id });
+    }
     res.json({ message: 'Raw material deleted successfully', id: req.params.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -188,6 +191,9 @@ router.post('/entries', validate(schemas.rawMaterialEntrySchema), async (req, re
       });
     }
 
+    if (req.io) {
+      req.io.emit('raw_material_updated', { type: 'entry_created', id: entry._id });
+    }
     res.status(201).json(entry);
   } catch (err) {
     res.status(500).json({ error: err.message });

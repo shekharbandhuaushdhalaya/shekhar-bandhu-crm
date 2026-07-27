@@ -49,6 +49,9 @@ router.put('/settings', authenticateToken, authorize('settings:edit'), validate(
     });
 
     await settings.save();
+    if (req.io) {
+      req.io.emit('settings_updated', { type: 'updated' });
+    }
     res.json(settings);
 
     const { logAction } = require('../../utils/auditLogger');
@@ -122,6 +125,9 @@ router.post('/reset-db', async (req, res) => {
       await ModelClass.deleteMany({});
     }
 
+    if (req.io) {
+      req.io.emit('settings_updated', { type: 'database_reset' });
+    }
     res.json({ message: 'Database reset successfully. Only users are retained.' });
   } catch (err) {
     res.status(500).json({ error: err.message });

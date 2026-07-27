@@ -67,6 +67,9 @@ router.post('/', validate(schemas.salesTargetSchema), async (req, res) => {
       { agentId, agentName, month, year, targetAmount, notes },
       { upsert: true, new: true }
     );
+    if (req.io) {
+      req.io.emit('sales_target_updated', { type: 'created', id: target._id });
+    }
     res.status(201).json(target);
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -77,6 +80,9 @@ router.post('/', validate(schemas.salesTargetSchema), async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     await SalesTarget.findByIdAndDelete(req.params.id);
+    if (req.io) {
+      req.io.emit('sales_target_updated', { type: 'deleted', id: req.params.id });
+    }
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });

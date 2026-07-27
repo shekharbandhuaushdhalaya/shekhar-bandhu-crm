@@ -31,6 +31,9 @@ router.get('/:id', authorize('campaign:view'), async (req, res) => {
       .populate('createdBy', 'name email')
       .lean();
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    if (req.io) {
+      req.io.emit('campaign_updated', { type: 'updated', id: campaign._id });
+    }
     res.json(campaign);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -134,6 +137,9 @@ router.delete('/:id', authorize('campaign:delete'), async (req, res) => {
   try {
     const campaign = await Campaign.findByIdAndDelete(req.params.id);
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    if (req.io) {
+      req.io.emit('campaign_updated', { type: 'deleted', id: req.params.id });
+    }
     res.json({ message: 'Campaign deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -59,7 +59,7 @@ function ProductDetailModal({ product, visible, onClose, onDeleted, onEdit, onAd
         </View>
 
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
-          
+
           {/* Image Gallery */}
           <View style={{ marginBottom: Spacing.lg }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 10, alignSelf: 'center', paddingVertical: 5 }}>
@@ -265,7 +265,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [stock, setStock] = useState('');
-  
+
   const [variantsList, setVariantsList] = useState<{
     _id?: string;
     size: string;
@@ -457,7 +457,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
             setBomDefaultJobWorkMode((parentBom as any).defaultJobWorkMode || 'none');
             setBomDefaultPackagingMode((parentBom as any).defaultPackagingMode || 'self_packed');
             setBomDefaultJobWorkerId((parentBom as any).defaultJobWorkerId ? (((parentBom as any).defaultJobWorkerId as any)._id || (parentBom as any).defaultJobWorkerId) : '');
-            
+
             const formulationIngs = parentBom.ingredients.filter((ing: any) => {
               const rId = ing.rawMaterialId?._id || ing.rawMaterialId;
               const matchedMat = rms.find((r: any) => r._id === rId);
@@ -713,8 +713,8 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       // Save Parent (First Variant in list)
       const parentVar = activeVariants[0];
       const parentSize = parentVar.size.trim();
-      const parentFormattedSize = parentSize.toLowerCase().endsWith(sizeUnit.toLowerCase()) 
-        ? parentSize 
+      const parentFormattedSize = parentSize.toLowerCase().endsWith(sizeUnit.toLowerCase())
+        ? parentSize
         : `${parentSize} ${sizeUnit}`;
 
       const parentPayload = {
@@ -759,8 +759,8 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
       for (let i = 1; i < activeVariants.length; i++) {
         const item = activeVariants[i];
         const childSize = item.size.trim();
-        const childFormattedSize = childSize.toLowerCase().endsWith(sizeUnit.toLowerCase()) 
-          ? childSize 
+        const childFormattedSize = childSize.toLowerCase().endsWith(sizeUnit.toLowerCase())
+          ? childSize
           : `${childSize} ${sizeUnit}`;
 
         const childPayload = {
@@ -931,7 +931,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
-          
+
           <View style={{ marginBottom: Spacing.lg }}>
             <Text style={styles.formLabel}>Product Gallery</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexDirection: 'row', gap: 10, paddingVertical: 5 }}>
@@ -981,7 +981,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
               </TouchableOpacity>
             </ScrollView>
           </View>
-          
+
           {/* Form Tabs Bar */}
           <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border, marginBottom: 16 }}>
             <TouchableOpacity
@@ -1018,323 +1018,323 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
             <>
               <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Core Product Specifications</Text></View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Ayurvedic Formulation Name <Text style={{ color: 'red' }}>*</Text></Text>
-            <View style={styles.formInput}>
-              <Ionicons name="leaf-outline" size={16} color={colors.text.muted} />
-              <TextInput 
-                style={styles.formInputText} 
-                placeholder="e.g. ABHAYARISHTA" 
-                placeholderTextColor={colors.text.muted} 
-                value={name} 
-                onChangeText={setName} 
-              />
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Product SKU / Code (Auto-Generated)</Text>
-            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              <View style={[styles.formInput, { flex: 1, backgroundColor: colors.bg.secondary }]}>
-                <Ionicons name="barcode-outline" size={16} color={colors.text.muted} />
-                <TextInput 
-                  style={[styles.formInputText, { color: colors.text.muted }]} 
-                  placeholder="Auto-generated on save" 
-                  placeholderTextColor={colors.text.muted} 
-                  value={sku} 
-                  editable={false} 
-                />
-              </View>
-            </View>
-          </View>          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.formLabel}>Minimum Alert Level</Text>
-              <View style={styles.formInput}>
-                <Ionicons name="alert-circle-outline" size={16} color={colors.text.muted} />
-                <TextInput 
-                  style={styles.formInputText} 
-                  placeholder="e.g. 15" 
-                  placeholderTextColor={colors.text.muted} 
-                  value={minReorder} 
-                  onChangeText={setMinReorder} 
-                  keyboardType="numeric" 
-                />
-              </View>
-            </View>
-          </View>
-
-          <View style={[styles.formSectionHeader, { marginTop: 12 }]}><Text style={styles.formSectionTitle}>Product Sizes & Pricing</Text></View>
-          <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
-            Define the sizes/packaging units for this formulation. At least one size is required.
-          </Text>
-
-          {variantsList.map((variant, index) => (
-            <View key={index} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: Platform.OS === 'web' ? 'nowrap' : 'wrap' }}>
-              <View style={[styles.formInput, { flex: 1, minWidth: 90 }]}>
-                <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>Size:</Text>
-                <TextInput
-                  style={styles.formInputText}
-                  placeholder={`e.g. 250`}
-                  placeholderTextColor={colors.text.muted}
-                  value={variant.size}
-                  onChangeText={(val) => {
-                    const list = [...variantsList];
-                    list[index].size = val;
-                    setVariantsList(list);
-                  }}
-                  keyboardType="numeric"
-                />
-                <Text style={{ fontSize: 11, color: colors.text.muted, marginLeft: 2 }}>{getSizeUnit()}</Text>
-              </View>
-
-              <View style={[styles.formInput, { flex: 1.2, minWidth: 100 }]}>
-                <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>B2B ₹:</Text>
-                <TextInput
-                  style={styles.formInputText}
-                  placeholder="Price"
-                  placeholderTextColor={colors.text.muted}
-                  value={variant.price}
-                  onChangeText={(val) => {
-                    const list = [...variantsList];
-                    list[index].price = val;
-                    setVariantsList(list);
-                  }}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={[styles.formInput, { flex: 1.2, minWidth: 100 }]}>
-                <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>MRP ₹:</Text>
-                <TextInput
-                  style={styles.formInputText}
-                  placeholder="MRP"
-                  placeholderTextColor={colors.text.muted}
-                  value={variant.mrp}
-                  onChangeText={(val) => {
-                    const list = [...variantsList];
-                    list[index].mrp = val;
-                    setVariantsList(list);
-                  }}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              {variantsList.length > 1 && (
-                <TouchableOpacity
-                  onPress={() => {
-                    const list = [...variantsList];
-                    list.splice(index, 1);
-                    setVariantsList(list);
-                  }}
-                  style={{ width: 34, height: 34, borderRadius: 6, backgroundColor: colors.danger + '15', justifyContent: 'center', alignItems: 'center' }}
-                >
-                  <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
-
-          <TouchableOpacity
-            onPress={() => setVariantsList([...variantsList, { size: '', price: '', mrp: '', packaging: [{ rawMaterialId: '', qtyRequired: '1' }] }])}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10', marginTop: 6, marginBottom: 16 }}
-          >
-            <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Add Size Variant</Text>
-          </TouchableOpacity>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>HSN Code <Text style={{ color: 'red' }}>*</Text></Text>
-            <View style={styles.formInput}>
-              <Ionicons name="finger-print" size={16} color={colors.text.muted} />
-              <TextInput style={styles.formInputText} placeholder="e.g. 30049011" placeholderTextColor={colors.text.muted} value={hsnCode} onChangeText={setHsnCode} />
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Tax Slab (GST Rate) <Text style={{ color: 'red' }}>*</Text></Text>
-            <View style={styles.formInput}>
-              <Ionicons name="cash-outline" size={16} color={colors.text.muted} />
-              {Platform.OS === 'web' ? React.createElement('select', {
-                value: gstRate,
-                onChange: (e: any) => setGstRate(e.target.value),
-                style: { flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
-              }, [
-                React.createElement('option', { value: '0', key: '0' }, '0% (Exempt)'),
-                React.createElement('option', { value: '5', key: '5' }, '5% (Ayurvedic Classical / Herbs)'),
-                React.createElement('option', { value: '12', key: '12' }, '12% (Patent Medicines)'),
-                React.createElement('option', { value: '18', key: '18' }, '18% (Proprietary / Cosmetics)'),
-                React.createElement('option', { value: '28', key: '28' }, '28% (Luxuries)')
-              ]) : (
-                <TextInput
-                  style={styles.formInputText}
-                  placeholder="e.g. 12"
-                  placeholderTextColor={colors.text.muted}
-                  value={gstRate}
-                  onChangeText={setGstRate}
-                  keyboardType="numeric"
-                />
-              )}
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Description (Website Detail Popup)</Text>
-            <View style={[styles.formInput, { height: 80, alignItems: 'flex-start', paddingTop: 8 }]}>
-              <TextInput
-                style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
-                placeholder="Enter therapeutic profile, benefits, dosage..."
-                placeholderTextColor={colors.text.muted}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-              />
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Used For (Disease Indications)</Text>
-            <View style={styles.formInput}>
-              <Ionicons name="medical-outline" size={16} color={colors.text.muted} />
-              <TextInput
-                style={styles.formInputText}
-                placeholder="e.g. Constipation, Piles, Indigestion"
-                placeholderTextColor={colors.text.muted}
-                value={disease}
-                onChangeText={setDisease}
-              />
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Key Ingredients (Auto-Calculated from BOM)</Text>
-            <View style={[styles.formInput, { height: 60, backgroundColor: colors.bg.secondary, alignItems: 'flex-start', paddingTop: 8 }]}>
-              <TextInput
-                style={[styles.formInputText, { height: '100%', color: colors.text.muted, textAlignVertical: 'top' }]}
-                placeholder="Will be auto-calculated from BOM recipe"
-                placeholderTextColor={colors.text.muted}
-                value={ingredients}
-                editable={false}
-                multiline
-              />
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Formulation Type</Text>
-            <View style={styles.typeSelector}>
-              {types.map(t => (
-                <TouchableOpacity
-                  key={t}
-                  style={[
-                    styles.typeBtn,
-                    productType.toLowerCase() === t.toLowerCase() && { backgroundColor: colors.primary, borderColor: colors.primary }
-                  ]}
-                  onPress={() => {
-                    setProductType(t);
-                    setShowTypeInput(false);
-                  }}
-                >
-                  <Text style={[styles.typeBtnText, productType.toLowerCase() === t.toLowerCase() && { color: '#fff' }]}>{t}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={[styles.typeBtn, showTypeInput && { borderColor: colors.primary }]}
-                onPress={() => setShowTypeInput(!showTypeInput)}
-              >
-                <Text style={[styles.typeBtnText, { color: colors.primary }]}>+ Custom Type</Text>
-              </TouchableOpacity>
-            </View>
-
-            {showTypeInput && (
-              <View style={[styles.formInput, { marginTop: 10 }]}>
-                <TextInput
-                  style={styles.formInputText}
-                  placeholder="Enter custom type..."
-                  placeholderTextColor={colors.text.muted}
-                  value={newTypeName}
-                  onChangeText={setNewTypeName}
-                />
-                <TouchableOpacity style={styles.addTypeSaveBtn} onPress={handleAddCustomType}>
-                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
-          {productType ? (
-            <>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Physical Form</Text>
-                <View style={styles.typeSelector}>
-                  {shapes.map(s => (
+                <Text style={styles.formLabel}>Ayurvedic Formulation Name <Text style={{ color: 'red' }}>*</Text></Text>
+                <View style={styles.formInput}>
+                  <Ionicons name="leaf-outline" size={16} color={colors.text.muted} />
+                  <TextInput
+                    style={styles.formInputText}
+                    placeholder="e.g. ABHAYARISHTA"
+                    placeholderTextColor={colors.text.muted}
+                    value={name}
+                    onChangeText={setName}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Product SKU / Code (Auto-Generated)</Text>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <View style={[styles.formInput, { flex: 1, backgroundColor: colors.bg.secondary }]}>
+                    <Ionicons name="barcode-outline" size={16} color={colors.text.muted} />
+                    <TextInput
+                      style={[styles.formInputText, { color: colors.text.muted }]}
+                      placeholder="Auto-generated on save"
+                      placeholderTextColor={colors.text.muted}
+                      value={sku}
+                      editable={false}
+                    />
+                  </View>
+                </View>
+              </View>          <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.formLabel}>Minimum Alert Level</Text>
+                  <View style={styles.formInput}>
+                    <Ionicons name="alert-circle-outline" size={16} color={colors.text.muted} />
+                    <TextInput
+                      style={styles.formInputText}
+                      placeholder="e.g. 15"
+                      placeholderTextColor={colors.text.muted}
+                      value={minReorder}
+                      onChangeText={setMinReorder}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={[styles.formSectionHeader, { marginTop: 12 }]}><Text style={styles.formSectionTitle}>Product Sizes & Pricing</Text></View>
+              <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
+                Define the sizes/packaging units for this formulation. At least one size is required.
+              </Text>
+
+              {variantsList.map((variant, index) => (
+                <View key={index} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: Platform.OS === 'web' ? 'nowrap' : 'wrap' }}>
+                  <View style={[styles.formInput, { flex: 1, minWidth: 90 }]}>
+                    <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>Size:</Text>
+                    <TextInput
+                      style={styles.formInputText}
+                      placeholder={`e.g. 250`}
+                      placeholderTextColor={colors.text.muted}
+                      value={variant.size}
+                      onChangeText={(val) => {
+                        const list = [...variantsList];
+                        list[index].size = val;
+                        setVariantsList(list);
+                      }}
+                      keyboardType="numeric"
+                    />
+                    <Text style={{ fontSize: 11, color: colors.text.muted, marginLeft: 2 }}>{getSizeUnit()}</Text>
+                  </View>
+
+                  <View style={[styles.formInput, { flex: 1.2, minWidth: 100 }]}>
+                    <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>B2B ₹:</Text>
+                    <TextInput
+                      style={styles.formInputText}
+                      placeholder="Price"
+                      placeholderTextColor={colors.text.muted}
+                      value={variant.price}
+                      onChangeText={(val) => {
+                        const list = [...variantsList];
+                        list[index].price = val;
+                        setVariantsList(list);
+                      }}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  <View style={[styles.formInput, { flex: 1.2, minWidth: 100 }]}>
+                    <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>MRP ₹:</Text>
+                    <TextInput
+                      style={styles.formInputText}
+                      placeholder="MRP"
+                      placeholderTextColor={colors.text.muted}
+                      value={variant.mrp}
+                      onChangeText={(val) => {
+                        const list = [...variantsList];
+                        list[index].mrp = val;
+                        setVariantsList(list);
+                      }}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  {variantsList.length > 1 && (
                     <TouchableOpacity
-                      key={s}
+                      onPress={() => {
+                        const list = [...variantsList];
+                        list.splice(index, 1);
+                        setVariantsList(list);
+                      }}
+                      style={{ width: 34, height: 34, borderRadius: 6, backgroundColor: colors.danger + '15', justifyContent: 'center', alignItems: 'center' }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+
+              <TouchableOpacity
+                onPress={() => setVariantsList([...variantsList, { size: '', price: '', mrp: '', packaging: [{ rawMaterialId: '', qtyRequired: '1' }] }])}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10', marginTop: 6, marginBottom: 16 }}
+              >
+                <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Add Size Variant</Text>
+              </TouchableOpacity>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>HSN Code <Text style={{ color: 'red' }}>*</Text></Text>
+                <View style={styles.formInput}>
+                  <Ionicons name="finger-print" size={16} color={colors.text.muted} />
+                  <TextInput style={styles.formInputText} placeholder="e.g. 30049011" placeholderTextColor={colors.text.muted} value={hsnCode} onChangeText={setHsnCode} />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Tax Slab (GST Rate) <Text style={{ color: 'red' }}>*</Text></Text>
+                <View style={styles.formInput}>
+                  <Ionicons name="cash-outline" size={16} color={colors.text.muted} />
+                  {Platform.OS === 'web' ? React.createElement('select', {
+                    value: gstRate,
+                    onChange: (e: any) => setGstRate(e.target.value),
+                    style: { flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
+                  }, [
+                    React.createElement('option', { value: '0', key: '0' }, '0% (Exempt)'),
+                    React.createElement('option', { value: '5', key: '5' }, '5% (Ayurvedic Classical / Herbs)'),
+                    React.createElement('option', { value: '12', key: '12' }, '12% (Patent Medicines)'),
+                    React.createElement('option', { value: '18', key: '18' }, '18% (Proprietary / Cosmetics)'),
+                    React.createElement('option', { value: '28', key: '28' }, '28% (Luxuries)')
+                  ]) : (
+                    <TextInput
+                      style={styles.formInputText}
+                      placeholder="e.g. 12"
+                      placeholderTextColor={colors.text.muted}
+                      value={gstRate}
+                      onChangeText={setGstRate}
+                      keyboardType="numeric"
+                    />
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Description (Website Detail Popup)</Text>
+                <View style={[styles.formInput, { height: 80, alignItems: 'flex-start', paddingTop: 8 }]}>
+                  <TextInput
+                    style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
+                    placeholder="Enter therapeutic profile, benefits, dosage..."
+                    placeholderTextColor={colors.text.muted}
+                    value={description}
+                    onChangeText={setDescription}
+                    multiline
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Used For (Disease Indications)</Text>
+                <View style={styles.formInput}>
+                  <Ionicons name="medical-outline" size={16} color={colors.text.muted} />
+                  <TextInput
+                    style={styles.formInputText}
+                    placeholder="e.g. Constipation, Piles, Indigestion"
+                    placeholderTextColor={colors.text.muted}
+                    value={disease}
+                    onChangeText={setDisease}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Key Ingredients (Auto-Calculated from BOM)</Text>
+                <View style={[styles.formInput, { height: 60, backgroundColor: colors.bg.secondary, alignItems: 'flex-start', paddingTop: 8 }]}>
+                  <TextInput
+                    style={[styles.formInputText, { height: '100%', color: colors.text.muted, textAlignVertical: 'top' }]}
+                    placeholder="Will be auto-calculated from BOM recipe"
+                    placeholderTextColor={colors.text.muted}
+                    value={ingredients}
+                    editable={false}
+                    multiline
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Formulation Type</Text>
+                <View style={styles.typeSelector}>
+                  {types.map(t => (
+                    <TouchableOpacity
+                      key={t}
                       style={[
                         styles.typeBtn,
-                        shape === s && { backgroundColor: colors.primary, borderColor: colors.primary }
+                        productType.toLowerCase() === t.toLowerCase() && { backgroundColor: colors.primary, borderColor: colors.primary }
                       ]}
-                      onPress={() => { setShape(s); setShowShapeInput(false); }}
+                      onPress={() => {
+                        setProductType(t);
+                        setShowTypeInput(false);
+                      }}
                     >
-                      <Text style={[styles.typeBtnText, shape === s && { color: '#fff' }]}>{s.toUpperCase()}</Text>
+                      <Text style={[styles.typeBtnText, productType.toLowerCase() === t.toLowerCase() && { color: '#fff' }]}>{t}</Text>
                     </TouchableOpacity>
                   ))}
                   <TouchableOpacity
-                    style={[styles.typeBtn, showShapeInput && { borderColor: colors.primary }]}
-                    onPress={() => setShowShapeInput(!showShapeInput)}
+                    style={[styles.typeBtn, showTypeInput && { borderColor: colors.primary }]}
+                    onPress={() => setShowTypeInput(!showTypeInput)}
                   >
-                    <Text style={[styles.typeBtnText, { color: colors.primary }]}>+ Custom</Text>
+                    <Text style={[styles.typeBtnText, { color: colors.primary }]}>+ Custom Type</Text>
                   </TouchableOpacity>
                 </View>
-                {showShapeInput && (
+
+                {showTypeInput && (
                   <View style={[styles.formInput, { marginTop: 10 }]}>
                     <TextInput
                       style={styles.formInputText}
-                      placeholder="Enter custom form..."
+                      placeholder="Enter custom type..."
                       placeholderTextColor={colors.text.muted}
-                      value={newShapeName}
-                      onChangeText={setNewShapeName}
+                      value={newTypeName}
+                      onChangeText={setNewTypeName}
                     />
-                    <TouchableOpacity style={styles.addTypeSaveBtn} onPress={handleAddCustomShape}>
+                    <TouchableOpacity style={styles.addTypeSaveBtn} onPress={handleAddCustomType}>
                       <Text style={{ color: colors.primary, fontWeight: '700' }}>Save</Text>
                     </TouchableOpacity>
                   </View>
                 )}
               </View>
 
+              {productType ? (
+                <>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Physical Form</Text>
+                    <View style={styles.typeSelector}>
+                      {shapes.map(s => (
+                        <TouchableOpacity
+                          key={s}
+                          style={[
+                            styles.typeBtn,
+                            shape === s && { backgroundColor: colors.primary, borderColor: colors.primary }
+                          ]}
+                          onPress={() => { setShape(s); setShowShapeInput(false); }}
+                        >
+                          <Text style={[styles.typeBtnText, shape === s && { color: '#fff' }]}>{s.toUpperCase()}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TouchableOpacity
+                        style={[styles.typeBtn, showShapeInput && { borderColor: colors.primary }]}
+                        onPress={() => setShowShapeInput(!showShapeInput)}
+                      >
+                        <Text style={[styles.typeBtnText, { color: colors.primary }]}>+ Custom</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {showShapeInput && (
+                      <View style={[styles.formInput, { marginTop: 10 }]}>
+                        <TextInput
+                          style={styles.formInputText}
+                          placeholder="Enter custom form..."
+                          placeholderTextColor={colors.text.muted}
+                          value={newShapeName}
+                          onChangeText={setNewShapeName}
+                        />
+                        <TouchableOpacity style={styles.addTypeSaveBtn} onPress={handleAddCustomShape}>
+                          <Text style={{ color: colors.primary, fontWeight: '700' }}>Save</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
 
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Formulation Color</Text>
-                <View style={styles.formInput}>
-                  <Ionicons name="color-palette" size={16} color={colors.text.muted} />
-                  <TextInput
-                    style={styles.formInputText}
-                    placeholder="e.g. Amber, Reddish Brown, Blackish"
-                    placeholderTextColor={colors.text.muted}
-                    value={colour}
-                    onChangeText={setColour}
-                  />
-                </View>
-              </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Total Weight (in grams)</Text>
-                <View style={styles.formInput}>
-                  <Ionicons name="speedometer" size={16} color={colors.text.muted} />
-                  <TextInput
-                    style={styles.formInputText}
-                    placeholder="e.g. 500"
-                    placeholderTextColor={colors.text.muted}
-                    value={weight}
-                    onChangeText={setWeight}
-                  />
-                </View>
-              </View>
-            </>
-          ) : null}
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Formulation Color</Text>
+                    <View style={styles.formInput}>
+                      <Ionicons name="color-palette" size={16} color={colors.text.muted} />
+                      <TextInput
+                        style={styles.formInputText}
+                        placeholder="e.g. Amber, Reddish Brown, Blackish"
+                        placeholderTextColor={colors.text.muted}
+                        value={colour}
+                        onChangeText={setColour}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Total Weight (in grams)</Text>
+                    <View style={styles.formInput}>
+                      <Ionicons name="speedometer" size={16} color={colors.text.muted} />
+                      <TextInput
+                        style={styles.formInputText}
+                        placeholder="e.g. 500"
+                        placeholderTextColor={colors.text.muted}
+                        value={weight}
+                        onChangeText={setWeight}
+                      />
+                    </View>
+                  </View>
+                </>
+              ) : null}
             </>
           )}
-          
+
           {activeFormTab === 'basic' && (
             <TouchableOpacity
               onPress={() => setActiveFormTab('recipe')}
@@ -1364,236 +1364,163 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
               {/* ========================================== */}
               <View style={[styles.formSectionHeader, { marginTop: 24 }]}><Text style={styles.formSectionTitle}>Recipe Formulation & Process Stages</Text></View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Overhead Cost per Batch Run (₹)</Text>
-            <View style={styles.formInput}>
-              <Ionicons name="calculator-outline" size={16} color={colors.text.muted} />
-              <TextInput
-                style={styles.formInputText}
-                placeholder="e.g. 1500"
-                placeholderTextColor={colors.text.muted}
-                value={bomOverhead}
-                onChangeText={setBomOverhead}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 12 }}>
-            <Text style={styles.formLabel}>Formulation Status</Text>
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <TouchableOpacity
-                onPress={() => setBomIsActive(true)}
-                style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: bomIsActive ? colors.success : colors.bg.secondary, borderWidth: 1, borderColor: bomIsActive ? colors.success : colors.border }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '700', color: bomIsActive ? '#fff' : colors.text.secondary }}>Active</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setBomIsActive(false)}
-                style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: !bomIsActive ? colors.danger : colors.bg.secondary, borderWidth: 1, borderColor: !bomIsActive ? colors.danger : colors.border }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '700', color: !bomIsActive ? '#fff' : colors.text.secondary }}>Inactive</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Default Production Execution Route *</Text>
-            <View style={styles.formInput}>
-              {Platform.OS === 'web' ? (
-                <select
-                  value={bomDefaultProductionType}
-                  onChange={(e: any) => setBomDefaultProductionType(e.target.value)}
-                  style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
-                >
-                  <option value="in_house">In-House Manufacturing</option>
-                  <option value="job_work">Third-Party Job Work (Outsourced)</option>
-                </select>
-              ) : (
-                <TextInput style={styles.formInputText} value={bomDefaultProductionType} onChangeText={(val: any) => setBomDefaultProductionType(val)} />
-              )}
-            </View>
-          </View>
-
-          {bomDefaultProductionType === 'job_work' && (
-            <>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Default Job Worker Vendor *</Text>
+                <Text style={styles.formLabel}>Overhead Cost per Batch Run (₹)</Text>
                 <View style={styles.formInput}>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={bomDefaultJobWorkerId}
-                      onChange={(e: any) => setBomDefaultJobWorkerId(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
-                    >
-                      <option value="">-- Choose Default Contract Manufacturer --</option>
-                      {vendors.map(v => (
-                        <option key={v._id} value={v._id}>{v.company || v.name} {v.manufacturingLicenseNo ? `(Lic: ${v.manufacturingLicenseNo})` : ''}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <TextInput style={styles.formInputText} value={bomDefaultJobWorkerId} onChangeText={setBomDefaultJobWorkerId} />
-                  )}
-                </View>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Default Job Work Mode *</Text>
-                <View style={styles.formInput}>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={bomDefaultJobWorkMode}
-                      onChange={(e: any) => setBomDefaultJobWorkMode(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
-                    >
-                      <option value="raw_materials_supplied">Raw Materials Supplied (We Provide Ingredients)</option>
-                      <option value="direct_purchase">Direct Purchase of Finished Bulk (Vendor Raw Materials)</option>
-                    </select>
-                  ) : (
-                    <TextInput style={styles.formInputText} value={bomDefaultJobWorkMode} onChangeText={(val: any) => setBomDefaultJobWorkMode(val)} />
-                  )}
-                </View>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Default Packaging & Labeling *</Text>
-                <View style={styles.formInput}>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={bomDefaultPackagingMode}
-                      onChange={(e: any) => setBomDefaultPackagingMode(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
-                    >
-                      <option value="self_packed">Self-Packed (Deduct Bottles/Labels/Caps from our Stock)</option>
-                      <option value="packed_by_vendor">Packed by Vendor (Finished Goods Received fully Boxed)</option>
-                    </select>
-                  ) : (
-                    <TextInput style={styles.formInputText} value={bomDefaultPackagingMode} onChangeText={(val: any) => setBomDefaultPackagingMode(val)} />
-                  )}
-                </View>
-              </View>
-            </>
-          )}
-
-          {/* Section 1: Formulation Ingredients */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>🧪 Formulation Ingredients:</Text>
-            <View style={{
-              backgroundColor: Math.abs(totalFormulaQty - (parseFloat(bomYield) || 100)) < 0.1 ? colors.success + '20' : colors.warning + '20',
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 6,
-              borderWidth: 1,
-              borderColor: Math.abs(totalFormulaQty - (parseFloat(bomYield) || 100)) < 0.1 ? colors.success : colors.warning
-            }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: Math.abs(totalFormulaQty - (parseFloat(bomYield) || 100)) < 0.1 ? colors.success : colors.warning }}>
-                Total Qty: {totalFormulaQty} / {bomYield || '100'} {Math.abs(totalFormulaQty - (parseFloat(bomYield) || 100)) < 0.1 ? '✓ Balanced' : '⚠ Unbalanced'}
-              </Text>
-            </View>
-          </View>
-          {bomIngredients.map((item, idx) => {
-            if (item.itemType === 'packaging') return null;
-            const formulationMaterials = materials.filter(rm => !rm.category || rm.category === 'Herb' || rm.category === 'Excipient' || rm.category === 'General');
-            return (
-              <View key={`ing-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                <View style={[styles.formInput, { flex: 2, height: 42 }]}>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={item.rawMaterialId}
-                      onChange={(e: any) => handleIngredientChange(idx, 'rawMaterialId', e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
-                    >
-                      <option value="">-- Select Formulation Material --</option>
-                      {formulationMaterials.map(rm => {
-                        const icon = rm.category === 'Excipient' ? '💧' : (rm.category === 'Packaging' ? '📦' : '🌿');
-                        return (
-                          <option key={rm._id} value={rm._id}>{icon} {rm.name} ({rm.sku})</option>
-                        );
-                      })}
-                    </select>
-                  ) : (
-                    <TextInput
-                      style={styles.formInputText}
-                      placeholder="RM ID"
-                      placeholderTextColor={colors.text.muted}
-                      value={item.rawMaterialId}
-                      onChangeText={(val) => handleIngredientChange(idx, 'rawMaterialId', val)}
-                    />
-                  )}
-                </View>
-                <View style={[styles.formInput, { flex: 1.2, height: 42 }]}>
+                  <Ionicons name="calculator-outline" size={16} color={colors.text.muted} />
                   <TextInput
                     style={styles.formInputText}
-                    placeholder="Qty"
+                    placeholder="e.g. 1500"
                     placeholderTextColor={colors.text.muted}
-                    value={item.qtyRequired}
-                    onChangeText={(val) => handleIngredientChange(idx, 'qtyRequired', val)}
+                    value={bomOverhead}
+                    onChangeText={setBomOverhead}
                     keyboardType="numeric"
                   />
-                  {(() => {
-                    const val = parseFloat(item.qtyRequired) || 0;
-                    const yieldVal = parseFloat(bomYield) || 100;
-                    const pct = yieldVal > 0 ? ((val / yieldVal) * 100).toFixed(1) : '0.0';
-                    return (
-                      <Text style={{ fontSize: 10, color: colors.primary, marginRight: 8, fontWeight: '700' }}>
-                        {pct}%
-                      </Text>
-                    );
-                  })()}
                 </View>
-                <TouchableOpacity onPress={() => handleRemoveIngredientRow(idx)}>
-                  <Ionicons name="remove-circle" size={22} color={colors.danger} />
-                </TouchableOpacity>
               </View>
-            );
-          })}
 
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, marginBottom: 16, alignSelf: 'flex-start' }}
-            onPress={() => handleAddIngredientRow('formulation')}
-          >
-            <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Formulation Raw Material</Text>
-          </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 12 }}>
+                <Text style={styles.formLabel}>Formulation Status</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <TouchableOpacity
+                    onPress={() => setBomIsActive(true)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: bomIsActive ? colors.success : colors.bg.secondary, borderWidth: 1, borderColor: bomIsActive ? colors.success : colors.border }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: bomIsActive ? '#fff' : colors.text.secondary }}>Active</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setBomIsActive(false)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: !bomIsActive ? colors.danger : colors.bg.secondary, borderWidth: 1, borderColor: !bomIsActive ? colors.danger : colors.border }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: !bomIsActive ? '#fff' : colors.text.secondary }}>Inactive</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
-          {/* Section 2: Packaging Materials per Size Variant */}
-          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 16, marginBottom: 4 }}>📦 Packaging Materials per Size Variant (Per-Unit Pcs):</Text>
-          <Text style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 12 }}>
-            Define container, cap, label, or boxes required for each specific size variant of this formulation.
-          </Text>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Default Production Execution Route *</Text>
+                <View style={styles.formInput}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={bomDefaultProductionType}
+                      onChange={(e: any) => setBomDefaultProductionType(e.target.value)}
+                      style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
+                    >
+                      <option value="in_house">In-House Manufacturing</option>
+                      <option value="job_work">Third-Party Job Work (Outsourced)</option>
+                    </select>
+                  ) : (
+                    <TextInput style={styles.formInputText} value={bomDefaultProductionType} onChangeText={(val: any) => setBomDefaultProductionType(val)} />
+                  )}
+                </View>
+              </View>
 
-          {variantsList.map((variant, vIdx) => {
-            const sizeDisplay = variant.size ? `${variant.size} ${getSizeUnit()}` : 'Default Size';
-            const pkgList = variant.packaging || [];
-            const packagingMaterials = materials.filter(rm => rm.category === 'Packaging' || rm.category === 'General');
-            
-            return (
-              <View key={`var-pkg-${vIdx}`} style={{ marginBottom: 16, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary + '40' }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: 8 }}>
-                  Size Variant: {sizeDisplay}
-                </Text>
+              {bomDefaultProductionType === 'job_work' && (
+                <>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Default Job Worker Vendor *</Text>
+                    <View style={styles.formInput}>
+                      {Platform.OS === 'web' ? (
+                        <select
+                          value={bomDefaultJobWorkerId}
+                          onChange={(e: any) => setBomDefaultJobWorkerId(e.target.value)}
+                          style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
+                        >
+                          <option value="">-- Choose Default Contract Manufacturer --</option>
+                          {vendors.map(v => (
+                            <option key={v._id} value={v._id}>{v.company || v.name} {v.manufacturingLicenseNo ? `(Lic: ${v.manufacturingLicenseNo})` : ''}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <TextInput style={styles.formInputText} value={bomDefaultJobWorkerId} onChangeText={setBomDefaultJobWorkerId} />
+                      )}
+                    </View>
+                  </View>
 
-                {pkgList.map((pkg, pIdx) => (
-                  <View key={`pkg-${vIdx}-${pIdx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Default Job Work Mode *</Text>
+                    <View style={styles.formInput}>
+                      {Platform.OS === 'web' ? (
+                        <select
+                          value={bomDefaultJobWorkMode}
+                          onChange={(e: any) => setBomDefaultJobWorkMode(e.target.value)}
+                          style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
+                        >
+                          <option value="raw_materials_supplied">Raw Materials Supplied (We Provide Ingredients)</option>
+                          <option value="direct_purchase">Direct Purchase of Finished Bulk (Vendor Raw Materials)</option>
+                        </select>
+                      ) : (
+                        <TextInput style={styles.formInputText} value={bomDefaultJobWorkMode} onChangeText={(val: any) => setBomDefaultJobWorkMode(val)} />
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Default Packaging & Labeling *</Text>
+                    <View style={styles.formInput}>
+                      {Platform.OS === 'web' ? (
+                        <select
+                          value={bomDefaultPackagingMode}
+                          onChange={(e: any) => setBomDefaultPackagingMode(e.target.value)}
+                          style={{ flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }}
+                        >
+                          <option value="self_packed">Self-Packed (Deduct Bottles/Labels/Caps from our Stock)</option>
+                          <option value="packed_by_vendor">Packed by Vendor (Finished Goods Received fully Boxed)</option>
+                        </select>
+                      ) : (
+                        <TextInput style={styles.formInputText} value={bomDefaultPackagingMode} onChangeText={(val: any) => setBomDefaultPackagingMode(val)} />
+                      )}
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {/* Section 1: Formulation Ingredients */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>🧪 Formulation Ingredients (per 1 unit/Liter/Kg output):</Text>
+                <View style={{
+                  backgroundColor: Math.abs(totalFormulaQty - 1) < 0.01 ? colors.success + '20' : colors.warning + '20',
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: Math.abs(totalFormulaQty - 1) < 0.01 ? colors.success : colors.warning
+                }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: Math.abs(totalFormulaQty - 1) < 0.01 ? colors.success : colors.warning }}>
+                    Total Qty: {totalFormulaQty} / 1 {Math.abs(totalFormulaQty - 1) < 0.01 ? '✓ Balanced' : '⚠ Unbalanced'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
+                Enter each ingredient's quantity for 1 unit/Liter/Kg of finished output (small-batch friendly) — the system scales this automatically to the actual planned yield when a production batch is launched.
+              </Text>
+              {bomIngredients.map((item, idx) => {
+                if (item.itemType === 'packaging') return null;
+                const formulationMaterials = materials.filter(rm => !rm.category || rm.category === 'Herb' || rm.category === 'Excipient' || rm.category === 'General');
+                return (
+                  <View key={`ing-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                     <View style={[styles.formInput, { flex: 2, height: 42 }]}>
                       {Platform.OS === 'web' ? (
                         <select
-                          value={pkg.rawMaterialId}
-                          onChange={(e: any) => handleVariantPackagingChange(vIdx, pIdx, 'rawMaterialId', e.target.value)}
+                          value={item.rawMaterialId}
+                          onChange={(e: any) => handleIngredientChange(idx, 'rawMaterialId', e.target.value)}
                           style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                         >
-                          <option value="">-- Select Packaging Material --</option>
-                          {packagingMaterials.map(rm => (
-                            <option key={rm._id} value={rm._id}>📦 {rm.name} ({rm.sku})</option>
-                          ))}
+                          <option value="">-- Select Formulation Material --</option>
+                          {formulationMaterials.map(rm => {
+                            const icon = rm.category === 'Excipient' ? '💧' : (rm.category === 'Packaging' ? '📦' : '🌿');
+                            return (
+                              <option key={rm._id} value={rm._id}>{icon} {rm.name} ({rm.sku})</option>
+                            );
+                          })}
                         </select>
                       ) : (
                         <TextInput
                           style={styles.formInputText}
-                          placeholder="Material ID"
+                          placeholder="RM ID"
                           placeholderTextColor={colors.text.muted}
-                          value={pkg.rawMaterialId}
-                          onChangeText={(val) => handleVariantPackagingChange(vIdx, pIdx, 'rawMaterialId', val)}
+                          value={item.rawMaterialId}
+                          onChangeText={(val) => handleIngredientChange(idx, 'rawMaterialId', val)}
                         />
                       )}
                     </View>
@@ -1602,100 +1529,175 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
                         style={styles.formInputText}
                         placeholder="Qty"
                         placeholderTextColor={colors.text.muted}
-                        value={pkg.qtyRequired}
-                        onChangeText={(val) => handleVariantPackagingChange(vIdx, pIdx, 'qtyRequired', val)}
+                        value={item.qtyRequired}
+                        onChangeText={(val) => handleIngredientChange(idx, 'qtyRequired', val)}
                         keyboardType="numeric"
                       />
-                      <Text style={{ fontSize: 10, color: colors.text.muted, marginRight: 6, fontWeight: '700' }}>Pcs/unit</Text>
+                      {(() => {
+                        const val = parseFloat(item.qtyRequired) || 0;
+                        const pct = (val * 100).toFixed(1);
+                        return (
+                          <Text style={{ fontSize: 10, color: colors.primary, marginRight: 8, fontWeight: '700' }}>
+                            {pct}%
+                          </Text>
+                        );
+                      })()}
                     </View>
-                    <TouchableOpacity onPress={() => handleRemoveVariantPackagingRow(vIdx, pIdx)}>
+                    <TouchableOpacity onPress={() => handleRemoveIngredientRow(idx)}>
                       <Ionicons name="remove-circle" size={22} color={colors.danger} />
                     </TouchableOpacity>
                   </View>
-                ))}
+                );
+              })}
 
-                <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, alignSelf: 'flex-start' }}
-                  onPress={() => handleAddVariantPackagingRow(vIdx)}
-                >
-                  <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Add Packaging Material</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-
-          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 20, marginBottom: 8 }}>Configured Process Stages / Timelines:</Text>
-          {bomStages.map((item, idx) => (
-            <View key={`stage-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-              <View style={[styles.formInput, { flex: 2, height: 42 }]}>
-                <TextInput
-                  style={styles.formInputText}
-                  placeholder="e.g. Clay-Sealed Fermentation"
-                  placeholderTextColor={colors.text.muted}
-                  value={item.name}
-                  onChangeText={(val) => handleStageChange(idx, 'name', val)}
-                />
-              </View>
-              <View style={[styles.formInput, { flex: 1, height: 42 }]}>
-                <TextInput
-                  style={styles.formInputText}
-                  placeholder="Days"
-                  placeholderTextColor={colors.text.muted}
-                  value={item.targetDurationDays}
-                  onChangeText={(val) => handleStageChange(idx, 'targetDurationDays', val)}
-                  keyboardType="numeric"
-                />
-              </View>
-              <TouchableOpacity onPress={() => handleRemoveStageRow(idx)}>
-                <Ionicons name="remove-circle" size={22} color={colors.danger} />
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, marginBottom: 16, alignSelf: 'flex-start' }}
+                onPress={() => handleAddIngredientRow('formulation')}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Formulation Raw Material</Text>
               </TouchableOpacity>
-            </View>
-          ))}
 
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, alignSelf: 'flex-start', marginBottom: 20 }}
-            onPress={handleAddStageRow}
-          >
-            <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Stage</Text>
-          </TouchableOpacity>
+              {/* Section 2: Packaging Materials per Size Variant */}
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 16, marginBottom: 4 }}>📦 Packaging Materials per Size Variant (Per-Unit Pcs):</Text>
+              <Text style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 12 }}>
+                Define container, cap, label, or boxes required for each specific size variant of this formulation.
+              </Text>
 
-          {/* Section 4: Manufacturing SOP & Notes at the end */}
-          <View style={[styles.formGroup, { marginTop: 12 }]}>
-            <Text style={styles.formLabel}>Manufacturing SOP & Operational Notes</Text>
-            <View style={[styles.formInput, { height: 90, alignItems: 'flex-start', paddingTop: 8 }]}>
-              <TextInput
-                style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
-                placeholder="Instructions for processing, boiling time, temperature settings, blending sequence..."
-                placeholderTextColor={colors.text.muted}
-                value={bomNotes}
-                onChangeText={setBomNotes}
-                multiline
-              />
-            </View>
-          </View>
+              {variantsList.map((variant, vIdx) => {
+                const sizeDisplay = variant.size ? `${variant.size} ${getSizeUnit()}` : 'Default Size';
+                const pkgList = variant.packaging || [];
+                const packagingMaterials = materials.filter(rm => rm.category === 'Packaging' || rm.category === 'General');
 
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.bg.secondary,
-              borderColor: colors.border,
-              borderWidth: 1,
-              borderRadius: 8,
-              paddingVertical: 12,
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'row',
-              gap: 6,
-              marginTop: 10,
-              marginBottom: 20
-            }}
-            onPress={() => setActiveFormTab('basic')}
-          >
-            <Ionicons name="arrow-back-outline" size={16} color={colors.text.secondary} />
-            <Text style={{ color: colors.text.secondary, fontWeight: '700', fontSize: 13 }}>Back to Product Details</Text>
-          </TouchableOpacity>
-          </>
+                return (
+                  <View key={`var-pkg-${vIdx}`} style={{ marginBottom: 16, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary + '40' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: 8 }}>
+                      Size Variant: {sizeDisplay}
+                    </Text>
+
+                    {pkgList.map((pkg, pIdx) => (
+                      <View key={`pkg-${vIdx}-${pIdx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                        <View style={[styles.formInput, { flex: 2, height: 42 }]}>
+                          {Platform.OS === 'web' ? (
+                            <select
+                              value={pkg.rawMaterialId}
+                              onChange={(e: any) => handleVariantPackagingChange(vIdx, pIdx, 'rawMaterialId', e.target.value)}
+                              style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                            >
+                              <option value="">-- Select Packaging Material --</option>
+                              {packagingMaterials.map(rm => (
+                                <option key={rm._id} value={rm._id}>📦 {rm.name} ({rm.sku})</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <TextInput
+                              style={styles.formInputText}
+                              placeholder="Material ID"
+                              placeholderTextColor={colors.text.muted}
+                              value={pkg.rawMaterialId}
+                              onChangeText={(val) => handleVariantPackagingChange(vIdx, pIdx, 'rawMaterialId', val)}
+                            />
+                          )}
+                        </View>
+                        <View style={[styles.formInput, { flex: 1.2, height: 42 }]}>
+                          <TextInput
+                            style={styles.formInputText}
+                            placeholder="Qty"
+                            placeholderTextColor={colors.text.muted}
+                            value={pkg.qtyRequired}
+                            onChangeText={(val) => handleVariantPackagingChange(vIdx, pIdx, 'qtyRequired', val)}
+                            keyboardType="numeric"
+                          />
+                          <Text style={{ fontSize: 10, color: colors.text.muted, marginRight: 6, fontWeight: '700' }}>Pcs/unit</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => handleRemoveVariantPackagingRow(vIdx, pIdx)}>
+                          <Ionicons name="remove-circle" size={22} color={colors.danger} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, alignSelf: 'flex-start' }}
+                      onPress={() => handleAddVariantPackagingRow(vIdx)}
+                    >
+                      <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Add Packaging Material</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 20, marginBottom: 8 }}>Configured Process Stages / Timelines:</Text>
+              {bomStages.map((item, idx) => (
+                <View key={`stage-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <View style={[styles.formInput, { flex: 2, height: 42 }]}>
+                    <TextInput
+                      style={styles.formInputText}
+                      placeholder="e.g. Clay-Sealed Fermentation"
+                      placeholderTextColor={colors.text.muted}
+                      value={item.name}
+                      onChangeText={(val) => handleStageChange(idx, 'name', val)}
+                    />
+                  </View>
+                  <View style={[styles.formInput, { flex: 1, height: 42 }]}>
+                    <TextInput
+                      style={styles.formInputText}
+                      placeholder="Days"
+                      placeholderTextColor={colors.text.muted}
+                      value={item.targetDurationDays}
+                      onChangeText={(val) => handleStageChange(idx, 'targetDurationDays', val)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <TouchableOpacity onPress={() => handleRemoveStageRow(idx)}>
+                    <Ionicons name="remove-circle" size={22} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, alignSelf: 'flex-start', marginBottom: 20 }}
+                onPress={handleAddStageRow}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Stage</Text>
+              </TouchableOpacity>
+
+              {/* Section 4: Manufacturing SOP & Notes at the end */}
+              <View style={[styles.formGroup, { marginTop: 12 }]}>
+                <Text style={styles.formLabel}>Manufacturing SOP & Operational Notes</Text>
+                <View style={[styles.formInput, { height: 90, alignItems: 'flex-start', paddingTop: 8 }]}>
+                  <TextInput
+                    style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
+                    placeholder="Instructions for processing, boiling time, temperature settings, blending sequence..."
+                    placeholderTextColor={colors.text.muted}
+                    value={bomNotes}
+                    onChangeText={setBomNotes}
+                    multiline
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.bg.secondary,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 6,
+                  marginTop: 10,
+                  marginBottom: 20
+                }}
+                onPress={() => setActiveFormTab('basic')}
+              >
+                <Ionicons name="arrow-back-outline" size={16} color={colors.text.secondary} />
+                <Text style={{ color: colors.text.secondary, fontWeight: '700', fontSize: 13 }}>Back to Product Details</Text>
+              </TouchableOpacity>
+            </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1887,130 +1889,130 @@ export default function ProductsScreen() {
         <PricingScreen />
       ) : (
         <>
-      <View style={styles.innerContainer}>
-        <View style={{ zIndex: 1100, position: 'relative' }}>
-          {showFilterDropdown && (
-            <Pressable
-              style={[
-                StyleSheet.absoluteFill,
-                { 
-                  zIndex: 900,
-                  ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {})
-                }
-              ]}
-              onPress={() => setShowFilterDropdown(false)}
-            />
-          )}
-          <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput
-              style={[styles.searchInput, { minWidth: 100 }]}
-              placeholder="Search products..."
-              placeholderTextColor={colors.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
-            
-            {/* Product Type Filter Dropdown */}
-            <TouchableOpacity style={[styles.filterDropdownButton, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 4 }]} onPress={() => setShowFilterDropdown(!showFilterDropdown)}>
-              <Text style={styles.filterDropdownButtonText}>
-                {selectedTypeFilter || 'All Types'}
-              </Text>
-              <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
-            </TouchableOpacity>
+          <View style={styles.innerContainer}>
+            <View style={{ zIndex: 1100, position: 'relative' }}>
+              {showFilterDropdown && (
+                <Pressable
+                  style={[
+                    StyleSheet.absoluteFill,
+                    {
+                      zIndex: 900,
+                      ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {})
+                    }
+                  ]}
+                  onPress={() => setShowFilterDropdown(false)}
+                />
+              )}
+              <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
+                <Ionicons name="search" size={18} color={colors.text.muted} />
+                <TextInput
+                  style={[styles.searchInput, { minWidth: 100 }]}
+                  placeholder="Search products..."
+                  placeholderTextColor={colors.text.muted}
+                  value={search}
+                  onChangeText={setSearch}
+                />
 
-            {perm.can('product:create') && (
-              <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedProd(null); setIsEditing(false); setAddVisible(true); }}>
-                <Ionicons name="add" size={22} color="#fff" />
-              </TouchableOpacity>
-            )}
+                {/* Product Type Filter Dropdown */}
+                <TouchableOpacity style={[styles.filterDropdownButton, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 4 }]} onPress={() => setShowFilterDropdown(!showFilterDropdown)}>
+                  <Text style={styles.filterDropdownButtonText}>
+                    {selectedTypeFilter || 'All Types'}
+                  </Text>
+                  <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
+                </TouchableOpacity>
+
+                {perm.can('product:create') && (
+                  <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedProd(null); setIsEditing(false); setAddVisible(true); }}>
+                    <Ionicons name="add" size={22} color="#fff" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {showFilterDropdown && (
+                <View style={styles.filterDropdownPanel}>
+                  <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                    <TouchableOpacity
+                      style={styles.filterDropdownItem}
+                      onPress={() => {
+                        setSelectedTypeFilter('');
+                        setShowFilterDropdown(false);
+                      }}
+                    >
+                      <Text style={styles.filterDropdownItemText}>All Types</Text>
+                    </TouchableOpacity>
+                    {availableTypes.map(t => (
+                      <TouchableOpacity
+                        key={t}
+                        style={styles.filterDropdownItem}
+                        onPress={() => {
+                          setSelectedTypeFilter(t);
+                          setShowFilterDropdown(false);
+                        }}
+                      >
+                        <Text style={styles.filterDropdownItemText}>{t}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+
+            <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+              <DataTable
+                data={filteredProducts.filter(p => !p.parentId)}
+                columns={columns}
+                keyExtractor={item => item._id}
+                isLoading={loading}
+                isRefreshing={refreshing}
+                onRefresh={onRefresh}
+                ListEmptyComponent={
+                  <View style={styles.emptyTableContainer}>
+                    <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
+                    <Text style={styles.emptyText}>No products found</Text>
+                  </View>
+                }
+              />
+            </View>
           </View>
 
-          {showFilterDropdown && (
-            <View style={styles.filterDropdownPanel}>
-              <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
-                <TouchableOpacity
-                  style={styles.filterDropdownItem}
-                  onPress={() => {
-                    setSelectedTypeFilter('');
-                    setShowFilterDropdown(false);
-                  }}
-                >
-                  <Text style={styles.filterDropdownItemText}>All Types</Text>
-                </TouchableOpacity>
-                {availableTypes.map(t => (
-                  <TouchableOpacity
-                    key={t}
-                    style={styles.filterDropdownItem}
-                    onPress={() => {
-                      setSelectedTypeFilter(t);
-                      setShowFilterDropdown(false);
-                    }}
-                  >
-                    <Text style={styles.filterDropdownItemText}>{t}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </View>
-
-         <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
-          <DataTable 
-            data={filteredProducts.filter(p => !p.parentId)}
-            columns={columns}
-            keyExtractor={item => item._id}
-            isLoading={loading}
-            isRefreshing={refreshing}
-            onRefresh={onRefresh}
-            ListEmptyComponent={
-              <View style={styles.emptyTableContainer}>
-                <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                <Text style={styles.emptyText}>No products found</Text>
-              </View>
-            }
+          <ProductDetailModal
+            product={selectedProd}
+            visible={detailVisible}
+            onClose={() => { setDetailVisible(false); load(); }}
+            onDeleted={load}
+            products={products}
+            onEdit={() => {
+              setDetailVisible(false);
+              const target = selectedProd && selectedProd.parentId
+                ? products.find(p => p._id === selectedProd.parentId) || selectedProd
+                : selectedProd;
+              setSelectedProd(target);
+              setIsEditing(true);
+              setAddVisible(true);
+            }}
+            onAddSizeVariant={(id) => {
+              setDetailVisible(false);
+              const target = selectedProd && selectedProd.parentId
+                ? products.find(p => p._id === selectedProd.parentId) || selectedProd
+                : selectedProd;
+              setSelectedProd(target);
+              setIsEditing(true);
+              setAddVisible(true);
+            }}
           />
-        </View>
-      </View>
 
-      <ProductDetailModal
-        product={selectedProd}
-        visible={detailVisible}
-        onClose={() => { setDetailVisible(false); load(); }}
-        onDeleted={load}
-        products={products}
-        onEdit={() => {
-          setDetailVisible(false);
-          const target = selectedProd && selectedProd.parentId 
-            ? products.find(p => p._id === selectedProd.parentId) || selectedProd
-            : selectedProd;
-          setSelectedProd(target);
-          setIsEditing(true);
-          setAddVisible(true);
-        }}
-        onAddSizeVariant={(id) => {
-          setDetailVisible(false);
-          const target = selectedProd && selectedProd.parentId 
-            ? products.find(p => p._id === selectedProd.parentId) || selectedProd
-            : selectedProd;
-          setSelectedProd(target);
-          setIsEditing(true);
-          setAddVisible(true);
-        }}
-      />
-      
-      <AddEditProductModal
-        visible={addVisible}
-        onClose={() => {
-          setAddVisible(false);
-          setSelectedProd(null);
-          setIsEditing(false);
-          setParentProductId(null);
-        }}
-        onSaved={load}
-        product={isEditing ? selectedProd : null}
-        products={products}
-      />
+          <AddEditProductModal
+            visible={addVisible}
+            onClose={() => {
+              setAddVisible(false);
+              setSelectedProd(null);
+              setIsEditing(false);
+              setParentProductId(null);
+            }}
+            onSaved={load}
+            product={isEditing ? selectedProd : null}
+            products={products}
+          />
         </>
       )}
     </View>
@@ -2065,7 +2067,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   dropdownPanel: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginTop: 4, overflow: 'hidden' },
   dropdownItem: { paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
   dropdownItemText: { fontSize: 13, color: colors.text.primary },
-  
+
   editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, flex: 1 },
   editBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, width: 120 },

@@ -29,6 +29,9 @@ router.patch('/:id/read', async (req, res) => {
   try {
     const notification = await Notification.findByIdAndUpdate(req.params.id, { isRead: true }, { new: true });
     if (!notification) return res.status(404).json({ error: 'Notification not found' });
+    if (req.io) {
+      req.io.emit('notification_updated', { type: 'read', id: notification._id });
+    }
     res.json(notification);
   } catch (err) {
     res.status(500).json({ error: err.message });

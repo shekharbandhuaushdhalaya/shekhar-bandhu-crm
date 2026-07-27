@@ -88,6 +88,10 @@ router.post('/verify', async (req, res) => {
     };
     await invoice.save();
 
+    if (req.io) {
+      req.io.emit('payment_updated', { type: 'gateway_verified', invoiceId: invoice._id });
+      req.io.emit('invoice_updated', { type: 'paid', id: invoice._id });
+    }
     res.json({
       success: true,
       message: 'Payment verified successfully',
@@ -136,6 +140,10 @@ router.post('/webhook', async (req, res) => {
             webhook: true,
           };
           await invoice.save();
+          if (req.io) {
+            req.io.emit('payment_updated', { type: 'webhook_payment', invoiceId: invoice._id });
+            req.io.emit('invoice_updated', { type: 'paid', id: invoice._id });
+          }
         }
       }
     }

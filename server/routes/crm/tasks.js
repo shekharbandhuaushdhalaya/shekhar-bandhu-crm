@@ -26,6 +26,9 @@ router.get('/', async (req, res) => {
 router.post('/', validate(schemas.taskSchema), async (req, res) => {
   try {
     const task = await Task.create(req.body);
+    if (req.io) {
+      req.io.emit('task_updated', { type: 'created', id: task._id });
+    }
     res.status(201).json(task);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -62,6 +65,9 @@ router.delete('/:id', authorize('task:delete'), async (req, res) => {
   try {
     const task = await Task.findByIdAndDelete(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (req.io) {
+      req.io.emit('task_updated', { type: 'deleted', id: req.params.id });
+    }
     res.json({ message: 'Task deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

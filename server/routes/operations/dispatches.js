@@ -37,6 +37,9 @@ router.post('/', validate(schemas.dispatchSchema), async (req, res) => {
   try {
     const dispatchNo = await nextDispatchNo();
     const dispatch = await Dispatch.create({ ...req.body, dispatchNo });
+    if (req.io) {
+      req.io.emit('dispatch_updated', { type: 'created', id: dispatch._id });
+    }
     res.status(201).json(dispatch);
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -50,6 +53,9 @@ router.patch('/:id', validate(schemas.dispatchSchema.partial()), async (req, res
     if (data.status === 'delivered' && !data.deliveredAt) data.deliveredAt = new Date();
     const dispatch = await Dispatch.findByIdAndUpdate(req.params.id, data, { new: true });
     if (!dispatch) return res.status(404).json({ error: 'Dispatch not found' });
+    if (req.io) {
+      req.io.emit('dispatch_updated', { type: 'updated', id: dispatch._id });
+    }
     res.json(dispatch);
   } catch (e) {
     res.status(400).json({ error: e.message });
