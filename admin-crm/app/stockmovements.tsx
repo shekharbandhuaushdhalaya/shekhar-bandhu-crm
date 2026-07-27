@@ -57,7 +57,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     const netRate = it.rate || 0;
     const itemTotal = totalPcs * netRate;
     const gstAmt = itemTotal * (it.gstRate || 0) / 100;
-    const displayName = it.size ? it.productName.replace(/\s*\([^)]*\)$/, '') : it.productName;
+    const displayName = it.size ? `${it.productName.replace(/\s*\([^)]*\)$/, '')} ${it.size}` : it.productName;
     return `
     <tr>
       <td style="padding:5px;text-align:center;">${i + 1}</td>
@@ -176,7 +176,7 @@ const printDeliveryChallan = (m: StockMovement) => {
           <thead>
             <tr style="background:#ccc;">
               <th style="border-bottom:1px solid #000;padding:5px;width:3%;">#</th>
-              <th style="border-bottom:1px solid #000;padding:5px;">Product</th>
+              <th style="border-bottom:1px solid #000;padding:5px;">Product Name</th>
               <th style="border-bottom:1px solid #000;padding:5px;width:6%;">Size</th>
               <th style="border-bottom:1px solid #000;padding:5px;width:10%;">Batch</th>
               <th style="border-bottom:1px solid #000;padding:5px;width:6%;">Qty</th>
