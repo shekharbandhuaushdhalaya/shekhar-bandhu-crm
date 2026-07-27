@@ -60,16 +60,16 @@ const printDeliveryChallan = (m: StockMovement) => {
     const displayName = it.productName.replace(/\s*\([^)]*\)$/, '');
     return `
     <tr>
-      <td style="padding:4px;text-align:center;">${i + 1}</td>
-      <td style="padding:4px;">${displayName}</td>
-      <td style="padding:4px;text-align:center;">${it.size || '—'}</td>
-      <td style="padding:4px;text-align:center;">${it.batchNo || '—'}</td>
-      <td style="padding:4px;text-align:center;">${totalPcs}</td>
-      <td style="padding:4px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
-      <td style="padding:4px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
-      <td style="padding:4px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
-      <td style="padding:4px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
-      <td style="padding:4px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
+      <td style="padding:5px;text-align:center;">${i + 1}</td>
+      <td style="padding:5px;">${displayName}</td>
+      <td style="padding:5px;text-align:center;">${it.size || '—'}</td>
+      <td style="padding:5px;text-align:center;">${it.batchNo || '—'}</td>
+      <td style="padding:5px;text-align:center;">${totalPcs}</td>
+      <td style="padding:5px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
+      <td style="padding:5px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
+      <td style="padding:5px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
+      <td style="padding:5px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
+      <td style="padding:5px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
     </tr>`;
   }).join('');
 
@@ -118,7 +118,7 @@ const printDeliveryChallan = (m: StockMovement) => {
     : '';
 
   const copyBlock = (copy: string) => `
-    <div style="height:100%;padding:1.5mm 3mm;display:flex;flex-direction:column;border:1.5px solid #000;">
+    <div style="height:100%;padding:2mm 3mm;display:flex;flex-direction:column;border:1.5px solid #000;border-radius:4px;">
       <div style="font-size:9px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:2px 4px;display:flex;align-items:center;justify-content:space-between;">
         <span>DELIVERY CHALLAN — NOT A TAX INVOICE</span>
         <span style="font-size:6px;font-weight:normal;">(${copy})</span>
@@ -169,20 +169,20 @@ const printDeliveryChallan = (m: StockMovement) => {
       </table>
       ${extraInfo}
       <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;border-bottom:1px solid #000;">
-        <div style="overflow:hidden;min-height:264px;">
+        <div style="overflow:hidden;min-height:300px;">
         <table style="font-size:8px;width:100%;">
           <thead>
             <tr style="background:#ccc;">
-              <th style="border-bottom:1px solid #000;padding:4px;width:3%;">#</th>
-              <th style="border-bottom:1px solid #000;padding:4px;">Product</th>
-              <th style="border-bottom:1px solid #000;padding:4px;width:6%;">Size</th>
-              <th style="border-bottom:1px solid #000;padding:4px;width:10%;">Batch</th>
-              <th style="border-bottom:1px solid #000;padding:4px;width:6%;">Qty</th>
-              <th style="border-bottom:1px solid #000;padding:4px;width:8%;">MRP</th>
-              <th style="border-bottom:1px solid #000;padding:4px;width:5%;">Disc</th>
-              <th style="border-bottom:1px solid #000;padding:4px;width:5%;">GST%</th>
-              <th style="border-bottom:1px solid #000;padding:4px;width:9%;">Amount</th>
-              <th style="border-bottom:1px solid #000;padding:4px;width:8%;">GST Amt</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:3%;">#</th>
+              <th style="border-bottom:1px solid #000;padding:5px;">Product</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:6%;">Size</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:10%;">Batch</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:6%;">Qty</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:8%;">MRP</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:5%;">Disc</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:5%;">GST%</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:9%;">Amount</th>
+              <th style="border-bottom:1px solid #000;padding:5px;width:8%;">GST Amt</th>
             </tr>
           </thead>
           <tbody>
