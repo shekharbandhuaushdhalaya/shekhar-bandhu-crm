@@ -62,16 +62,16 @@ const printDeliveryChallan = (m: StockMovement) => {
       : it.productName;
     return `
     <tr>
-      <td style="border:1px solid #000;padding:5px;text-align:center;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:5px;">${displayName}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:center;">${it.size || '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:center;">${it.batchNo || '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:center;">${totalPcs}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
-      <td style="border:1px solid #000;padding:5px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:center;">${i + 1}</td>
+      <td style="border:1px solid #000;padding:8px;">${displayName}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:center;">${it.size || '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:center;">${it.batchNo || '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:center;">${totalPcs}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
+      <td style="border:1px solid #000;padding:8px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
     </tr>`;
   }).join('');
 
@@ -170,21 +170,21 @@ const printDeliveryChallan = (m: StockMovement) => {
         </tr>
       </table>
       ${extraInfo}
-      <div style="flex:1;min-height:0;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;">
-        <div style="flex:1;overflow:hidden;">
+      <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;">
+        <div style="overflow:hidden;min-height:320px;">
         <table style="font-size:9px;width:100%;">
           <thead>
             <tr style="background:#ccc;">
-              <th style="border:1px solid #000;padding:5px;width:3%;">#</th>
-              <th style="border:1px solid #000;padding:5px;">Product</th>
-              <th style="border:1px solid #000;padding:5px;width:6%;">Size</th>
-              <th style="border:1px solid #000;padding:5px;width:10%;">Batch</th>
-              <th style="border:1px solid #000;padding:5px;width:6%;">Qty</th>
-              <th style="border:1px solid #000;padding:5px;width:8%;">MRP</th>
-              <th style="border:1px solid #000;padding:5px;width:5%;">Disc</th>
-              <th style="border:1px solid #000;padding:5px;width:5%;">GST%</th>
-              <th style="border:1px solid #000;padding:5px;width:9%;">Amount</th>
-              <th style="border:1px solid #000;padding:5px;width:8%;">GST Amt</th>
+              <th style="border:1px solid #000;padding:8px;width:3%;">#</th>
+              <th style="border:1px solid #000;padding:8px;">Product</th>
+              <th style="border:1px solid #000;padding:8px;width:6%;">Size</th>
+              <th style="border:1px solid #000;padding:8px;width:10%;">Batch</th>
+              <th style="border:1px solid #000;padding:8px;width:6%;">Qty</th>
+              <th style="border:1px solid #000;padding:8px;width:8%;">MRP</th>
+              <th style="border:1px solid #000;padding:8px;width:5%;">Disc</th>
+              <th style="border:1px solid #000;padding:8px;width:5%;">GST%</th>
+              <th style="border:1px solid #000;padding:8px;width:9%;">Amount</th>
+              <th style="border:1px solid #000;padding:8px;width:8%;">GST Amt</th>
             </tr>
           </thead>
           <tbody>
