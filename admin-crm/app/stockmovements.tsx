@@ -76,6 +76,82 @@ const printDeliveryChallan = (m: StockMovement) => {
       </div>`;
   }
 
+  const halfWidth = '105mm';
+
+  const copyBlock = (copy: string) => `
+    <div style="height:50%;overflow:hidden;padding:4mm 8mm;">
+      <div style="text-align:center;border:1.5px solid #000;padding:4px;margin-bottom:4px;">
+        <div style="font-weight:bold;font-size:11px;">${FIRM_DETAILS.name}</div>
+        <div style="font-size:7px;">${FIRM_DETAILS.address}</div>
+        <div style="font-size:7px;">GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}${FIRM_DETAILS.manufacturingLicenseNo ? ` | Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}` : ''}</div>
+        <div style="font-size:9px;font-weight:bold;margin-top:2px;letter-spacing:0.5px;">
+          DELIVERY CHALLAN — NOT A TAX INVOICE
+        </div>
+        <div style="font-size:7px;color:#555;">(CGST Rule 55 — ${typeConf.label})</div>
+        <div style="font-size:7px;font-style:italic;">${copy}</div>
+      </div>
+      <table style="margin-bottom:3px;font-size:7px;border:1px solid #000;">
+        <tr>
+          <td style="width:50%;padding:2px;border-right:1px solid #000;">
+            <strong>Challan No.:</strong> ${m.docNo}<br/>
+            <strong>Date:</strong> ${dateStr}<br/>
+            <strong>Warehouse:</strong> ${m.warehouseName}
+            ${(m as any).transporter ? `<br/><strong>Transporter:</strong> ${(m as any).transporter}` : ''}
+            ${(m as any).lrNo ? `<br/><strong>LR/GR No:</strong> ${(m as any).lrNo}` : ''}
+            ${(m as any).vehicleNo ? `<br/><strong>Vehicle:</strong> ${(m as any).vehicleNo}` : ''}
+            ${(m as any).courierName ? `<br/><strong>Courier:</strong> ${(m as any).courierName}` : ''}
+            ${(m as any).trackingId ? `<br/><strong>Tracking ID:</strong> ${(m as any).trackingId}` : ''}
+          </td>
+          <td style="width:50%;padding:2px;">
+            <strong>Consignee:</strong> ${m.partyName}<br/>
+            ${m.partyAddress ? m.partyAddress.replace(/\n/g, '<br/>') : ''}<br/>
+            ${m.partyGstin ? `<strong>GSTIN:</strong> ${m.partyGstin}` : ''}
+          </td>
+        </tr>
+      </table>
+      ${extraInfo}
+      <table style="font-size:7px;margin-top:3px;width:100%;">
+        <thead>
+          <tr style="background:#f3f4f6;">
+            <th style="border:1px solid #000;padding:2px;width:4%;">#</th>
+            <th style="border:1px solid #000;padding:2px;">Product</th>
+            <th style="border:1px solid #000;padding:2px;width:8%;">Size</th>
+            <th style="border:1px solid #000;padding:2px;width:12%;">Batch</th>
+            <th style="border:1px solid #000;padding:2px;width:7%;">Qty</th>
+            <th style="border:1px solid #000;padding:2px;width:8%;">MRP</th>
+            <th style="border:1px solid #000;padding:2px;width:6%;">Disc</th>
+            <th style="border:1px solid #000;padding:2px;width:6%;">GST</th>
+            <th style="border:1px solid #000;padding:2px;width:10%;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemRows}
+          <tr style="background:#e5e7eb;font-weight:bold;">
+            <td colspan="8" style="border:1px solid #000;padding:2px;text-align:right;">Grand Total</td>
+            <td style="border:1px solid #000;padding:2px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+      ${m.notes ? `<div style="margin-top:4px;font-size:7px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
+      <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;font-size:7px;">
+        <div>Receiver's Signature &amp; Stamp</div>
+        <div style="text-align:right;">
+          ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
+            <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 24px; width: auto; object-fit: contain; margin-bottom: 1px;" />
+            <div style="font-weight:bold; font-size: 7px; color: #15803d; margin-bottom: 1px;">
+              ✔ DIGITALLY SIGNED
+            </div>
+            <div style="border:1px dashed #16a34a;background:#f0fdf4;border-radius:3px;padding:3px;font-size:6px;display:flex;align-items:center;gap:4px;">
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(`GST Challan Digital Verification | Seller: ${FIRM_DETAILS.name} | GSTIN: ${FIRM_DETAILS.gstin || ''} | Challan: ${m.docNo} | Date: ${dateStr} | CGST Rule 55 & Sec 5 IT Act Certified`)}" style="width:30px;height:30px;border:1px solid #16a34a;padding:1px;background:#fff;border-radius:2px;flex-shrink:0;" />
+              <div style="flex:1;"><strong>Signed By:</strong> ${FIRM_DETAILS.name}<br/><strong>GSTIN:</strong> ${FIRM_DETAILS.gstin || ''}<br/><span style="color:#15803d;font-weight:bold;">✔ CGST Rule 55 &amp; IT Act.</span></div>
+            </div>
+          ` : `
+            For ${FIRM_DETAILS.name}<br/>Authorised Signatory
+          `}
+        </div>
+      </div>
+    </div>`;
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -83,90 +159,20 @@ const printDeliveryChallan = (m: StockMovement) => {
   <title>Delivery Challan ${m.docNo}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; color: #000; background: #fff; }
-    .page { width: 210mm; padding: 8mm; }
+    body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; height:297mm; }
+    .page { width:210mm; height:297mm; display:flex; flex-direction:column; }
+    .half { height:50%; overflow:hidden; position:relative; }
+    .separator { border:none; border-top:2px dashed #000; margin:0; }
     table { border-collapse: collapse; width: 100%; }
-    @media print { @page { size: A4 portrait; margin: 0; } .page { page-break-after: always; padding: 8mm; } }
+    @media print { @page { size: A4 portrait; margin: 0; } body { width:210mm; height:297mm; } }
   </style>
 </head>
 <body>
-  ${['Original (Receiver)', 'Duplicate (Transporter)'].map(copy => `
   <div class="page">
-    <div style="text-align:center;border:2px solid #000;padding:8px;margin-bottom:6px;">
-      <div style="font-weight:bold;font-size:18px;">${FIRM_DETAILS.name}</div>
-      <div style="font-size:9px;">${FIRM_DETAILS.address}</div>
-      <div style="font-size:9px;">GSTIN: ${FIRM_DETAILS.gstin} | Phone: ${FIRM_DETAILS.phone}${FIRM_DETAILS.manufacturingLicenseNo ? ` | Mfg. Lic. No: ${FIRM_DETAILS.manufacturingLicenseNo}` : ''}</div>
-      <div style="font-size:13px;font-weight:bold;margin-top:4px;letter-spacing:1px;">
-        DELIVERY CHALLAN — NOT A TAX INVOICE
-      </div>
-      <div style="font-size:9px;color:#555;">(CGST Rule 55 — ${typeConf.label})</div>
-      <div style="font-size:9px;font-style:italic;">${copy}</div>
-    </div>
-    <table style="margin-bottom:6px;font-size:10px;border:1px solid #000;">
-      <tr>
-        <td style="width:50%;padding:4px;border-right:1px solid #000;">
-          <strong>Challan No.:</strong> ${m.docNo}<br/>
-          <strong>Date:</strong> ${dateStr}<br/>
-          <strong>Warehouse:</strong> ${m.warehouseName}
-          ${(m as any).transporter ? `<br/><strong>Transporter:</strong> ${(m as any).transporter}` : ''}
-          ${(m as any).lrNo ? `<br/><strong>LR/GR No:</strong> ${(m as any).lrNo}` : ''}
-          ${(m as any).vehicleNo ? `<br/><strong>Vehicle:</strong> ${(m as any).vehicleNo}` : ''}
-          ${(m as any).courierName ? `<br/><strong>Courier:</strong> ${(m as any).courierName}` : ''}
-          ${(m as any).trackingId ? `<br/><strong>Tracking ID:</strong> ${(m as any).trackingId}` : ''}
-        </td>
-        <td style="width:50%;padding:4px;">
-          <strong>Consignee:</strong> ${m.partyName}<br/>
-          ${m.partyAddress ? m.partyAddress.replace(/\n/g, '<br/>') : ''}<br/>
-          ${m.partyGstin ? `<strong>GSTIN:</strong> ${m.partyGstin}` : ''}
-        </td>
-      </tr>
-    </table>
-    ${extraInfo}
-    <table style="font-size:9px;margin-top:6px;width:100%;">
-      <thead>
-        <tr style="background:#f3f4f6;">
-          <th style="border:1px solid #000;padding:3px;width:4%;">#</th>
-          <th style="border:1px solid #000;padding:3px;">Product</th>
-          <th style="border:1px solid #000;padding:3px;width:8%;">Size</th>
-          <th style="border:1px solid #000;padding:3px;width:12%;">Batch No.</th>
-          <th style="border:1px solid #000;padding:3px;width:8%;">Qty</th>
-          <th style="border:1px solid #000;padding:3px;width:9%;">MRP</th>
-          <th style="border:1px solid #000;padding:3px;width:8%;">Disc</th>
-          <th style="border:1px solid #000;padding:3px;width:8%;">GST</th>
-          <th style="border:1px solid #000;padding:3px;width:12%;">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${itemRows}
-        <tr style="background:#e5e7eb;font-weight:bold;">
-          <td colspan="8" style="border:1px solid #000;padding:3px;text-align:right;">Grand Total</td>
-          <td style="border:1px solid #000;padding:3px;text-align:right;">₹${grandTotal.toFixed(2)}</td>
-        </tr>
-      </tbody>
-    </table>
-    ${m.notes ? `<div style="margin-top:8px;font-size:10px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
-    <div style="margin-top:24px;display:flex;justify-content:space-between;align-items:center;font-size:10px;">
-      <div>Receiver's Signature &amp; Stamp</div>
-      <div style="text-align:right;">
-        ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
-          <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 38px; width: auto; object-fit: contain; margin-bottom: 2px;" />
-          <div style="font-weight:bold; font-size: 10px; color: #15803d; margin-bottom: 2px;">
-            ✔ DIGITALLY SIGNED DELIVERY CHALLAN
-          </div>
-          <div style="border: 1px dashed #16a34a; background-color: #f0fdf4; border-radius: 4px; padding: 5px; font-size: 8px; text-align: left; line-height: 1.3; display: flex; align-items: center; gap: 8px;">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`GST Challan Digital Verification | Seller: ${FIRM_DETAILS.name} | GSTIN: ${FIRM_DETAILS.gstin || ''} | Challan: ${m.docNo} | Date: ${dateStr} | CGST Rule 55 & Sec 5 IT Act Certified`)}" style="width: 48px; height: 48px; border: 1px solid #16a34a; padding: 2px; background: #fff; border-radius: 3px; flex-shrink: 0;" />
-            <div style="flex: 1;">
-              <strong>Signed By:</strong> ${FIRM_DETAILS.name}<br/>
-              <strong>GSTIN:</strong> ${FIRM_DETAILS.gstin || ''}<br/>
-              <span style="color: #15803d; font-weight: bold;">✔ Certified under CGST Rule 55 &amp; IT Act.</span>
-            </div>
-          </div>
-        ` : `
-          For ${FIRM_DETAILS.name}<br/><br/>Authorised Signatory
-        `}
-      </div>
-    </div>
-  </div>`).join('')}
+    <div class="half">${copyBlock('Original (Receiver)')}</div>
+    <hr class="separator"/>
+    <div class="half">${copyBlock('Duplicate (Transporter)')}</div>
+  </div>
   <script>window.print();</script>
 </body>
 </html>`;
