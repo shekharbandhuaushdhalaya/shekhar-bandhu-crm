@@ -201,10 +201,10 @@ const printDeliveryChallan = (m: StockMovement) => {
       </table>
       <table style="font-size:6px;width:100%;">
         <tr>
-          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:left;">
+          <td style="width:50%;padding:8px 4px;border:1px solid #000;border-top:none;text-align:left;">
             <div>Receiver's Signature &amp; Stamp</div>
           </td>
-          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:right;">
+          <td style="width:50%;padding:8px 4px;border:1px solid #000;border-top:none;text-align:right;">
             <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
             ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
               <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 22px; width: auto; object-fit: contain; margin-top:2px;" />
