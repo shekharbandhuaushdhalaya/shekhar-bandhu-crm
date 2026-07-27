@@ -41,13 +41,13 @@ const printInvoice = (invoice: Invoice) => {
   let totalSGST = 0;
   let totalIGST = 0;
   let grandTotal = 0;
-  
+
   let totalBoxes = 0;
   let totalGoodsQty = 0;
   const numItems = invoice.items?.length || 0;
   const fillerHeight = Math.max(0, 200 - (numItems * 18));
   const isAllPieces = (invoice.items || []).every(it => (it.packing || 1) === 1);
-  
+
   let billingAddressToShow = invoice.partyAddress || '';
   let shippingAddressToShow = invoice.shippingAddress || '';
 
@@ -66,23 +66,23 @@ const printInvoice = (invoice: Invoice) => {
   }
 
   const hsnSummary: Record<string, { taxable: number, cgst: number, sgst: number, igst: number, totalTax: number }> = {};
-  
+
   const itemRows = (invoice.items || [])
     .map((it, i) => {
       const rate = it.rate || 0;
       const packing = it.packing || 1;
       const qty = it.qty || 0;
-      
+
       const totalPcs = qty * packing;
       totalBoxes += qty;
       totalGoodsQty += totalPcs;
       const taxable = totalPcs * rate;
       totalTaxable += taxable;
-      
+
       let cRate = 0, cAmt = 0;
       let sRate = 0, sAmt = 0;
       let iRate = 0, iAmt = 0;
-      
+
       if (isPakka) {
         const gstRate = it.gstRate || invoice.gstRate || FIRM_DETAILS.defaultGstRate;
         if (invoice.igst && invoice.igst > 0) {
@@ -98,7 +98,7 @@ const printInvoice = (invoice: Invoice) => {
           totalSGST += sAmt;
         }
       }
-      
+
       const rowTotal = taxable + cAmt + sAmt + iAmt;
       grandTotal += rowTotal;
 
@@ -130,13 +130,13 @@ const printInvoice = (invoice: Invoice) => {
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${it.discountPercent && it.discountPercent > 0 ? it.discountPercent + '%' : '—'}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${taxable.toFixed(2)}</td>
           
-          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${cRate > 0 ? cRate.toFixed(2)+'%' : ''}</td>
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${cRate > 0 ? cRate.toFixed(2) + '%' : ''}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${cAmt > 0 ? cAmt.toFixed(2) : ''}</td>
           
-          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${sRate > 0 ? sRate.toFixed(2)+'%' : ''}</td>
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${sRate > 0 ? sRate.toFixed(2) + '%' : ''}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${sAmt > 0 ? sAmt.toFixed(2) : ''}</td>
           
-          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${iRate > 0 ? iRate.toFixed(2)+'%' : ''}</td>
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${iRate > 0 ? iRate.toFixed(2) + '%' : ''}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${iAmt > 0 ? iAmt.toFixed(2) : ''}</td>
           
           <td style="padding:1px 2px; text-align:right;">${rowTotal.toFixed(2)}</td>
@@ -347,7 +347,7 @@ const printInvoice = (invoice: Invoice) => {
           </td>
           <td style="width:34%; border-right: 1px solid #000; padding:5px; vertical-align:top; font-size:8px; line-height: 1.3;">
             <strong>Terms & Conditions</strong><br/>
-            ${FIRM_DETAILS.defaultTerms ? FIRM_DETAILS.defaultTerms.replace(/\n/g, '<br/>') : ''}
+            ${FIRM_DETAILS.defaultTerms ? FIRM_DETAILS.defaultTerms.replace(/\\n/g, '\n').replace(/\r?\n/g, '<br/>') : ''}
           </td>
           <td style="width:33%; text-align:center; padding:5px; vertical-align:${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? 'middle' : 'bottom'}; height: 80px;">
             ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
@@ -576,11 +576,11 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
     const confirmed = Platform.OS === 'web'
       ? confirm('Are you sure you want to delete this document?')
       : await new Promise(resolve => {
-          Alert.alert('Delete Document', 'Are you sure?', [
-            { text: 'No', onPress: () => resolve(false) },
-            { text: 'Yes, Delete', onPress: () => resolve(true) }
-          ]);
-        });
+        Alert.alert('Delete Document', 'Are you sure?', [
+          { text: 'No', onPress: () => resolve(false) },
+          { text: 'Yes, Delete', onPress: () => resolve(true) }
+        ]);
+      });
     if (!confirmed) return;
     try {
       await api.deleteDocument('invoice', invoice._id, url);
@@ -743,7 +743,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                 </Text>
               </View>
             </View>
-            
+
             {/* Dispatch Record Reference Info */}
             {(invoice as any).dispatch && (
               <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 12, marginTop: 4, borderWidth: 1, borderColor: colors.border, width: '100%' }}>
@@ -751,39 +751,39 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                   <Ionicons name="bus-outline" size={16} color={colors.primary} />
                   <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>🚚 DISPATCH & COURIER INFORMATION</Text>
                 </View>
-                
+
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, rowGap: 6 }}>
                   <Text style={{ fontSize: 12, color: colors.text.secondary }}>Dispatch No: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.dispatchNo}</Text></Text>
                   <Text style={{ fontSize: 12, color: colors.text.secondary }}>Status: <Text style={{ fontWeight: '700', color: colors.success }}>{(invoice as any).dispatch.status.toUpperCase()}</Text></Text>
-                  
+
                   {((invoice as any).dispatch.transporter || (invoice as any).dispatch.courierName) ? (
                     <Text style={{ fontSize: 12, color: colors.text.secondary }}>Carrier: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.transporter || (invoice as any).dispatch.courierName}</Text></Text>
                   ) : null}
-                  
+
                   {(invoice as any).dispatch.lrNo ? (
                     <Text style={{ fontSize: 12, color: colors.text.secondary }}>LR/GR No: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.lrNo}</Text></Text>
                   ) : null}
-                  
+
                   {(invoice as any).dispatch.vehicleNo ? (
                     <Text style={{ fontSize: 12, color: colors.text.secondary }}>Vehicle: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.vehicleNo}</Text></Text>
                   ) : null}
-                  
+
                   {(invoice as any).dispatch.trackingId ? (
                     <Text style={{ fontSize: 12, color: colors.text.secondary }}>Tracking ID: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.trackingId}</Text></Text>
                   ) : null}
-                  
+
                   {(invoice as any).dispatch.totalBoxes ? (
                     <Text style={{ fontSize: 12, color: colors.text.secondary }}>Boxes: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.totalBoxes}</Text></Text>
                   ) : null}
-                  
+
                   {(invoice as any).dispatch.totalWeight ? (
                     <Text style={{ fontSize: 12, color: colors.text.secondary }}>Weight: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{(invoice as any).dispatch.totalWeight}</Text></Text>
                   ) : null}
                 </View>
 
                 {Platform.OS === 'web' && (invoice as any).dispatch.trackingUrl ? (
-                  <TouchableOpacity 
-                    onPress={() => window.open((invoice as any).dispatch.trackingUrl, '_blank')} 
+                  <TouchableOpacity
+                    onPress={() => window.open((invoice as any).dispatch.trackingUrl, '_blank')}
                     style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
                   >
                     <Ionicons name="open-outline" size={13} color={colors.primary} />
@@ -822,7 +822,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                 </View>
               );
             })}
-            
+
             {invoice.mode === 'regular' && ((invoice.cgst || 0) > 0 || (invoice.sgst || 0) > 0 || (invoice.igst || 0) > 0) ? (
               <View style={{ borderTopWidth: 2, borderTopColor: colors.border, paddingTop: 10, marginTop: 4, gap: 6, paddingBottom: 10 }}>
                 {(invoice.totalMrp || 0) > 0 && (
@@ -975,7 +975,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                                 onClose();
                               }
                             },
-                            modal: { ondismiss: () => {} },
+                            modal: { ondismiss: () => { } },
                           };
                           const rzp = new (window as any).Razorpay(options);
                           rzp.open();
@@ -1020,7 +1020,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
               <Ionicons name="print-outline" size={18} color="#fff" />
               <Text style={styles.printBtnText}>Print Invoice</Text>
             </TouchableOpacity>
-            
+
             {perm.can('invoice:delete') && invoice.status !== 'Cancelled' && (
               <TouchableOpacity style={[styles.deleteBtn, { flex: 1, minWidth: 140, marginTop: 0, marginBottom: 0 }]} onPress={handleDelete}>
                 <Ionicons name="trash-outline" size={16} color="#fff" />
@@ -1176,9 +1176,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
   const filteredCustomers = (customerName
     ? customers.filter(c =>
-        (c.company || c.name || '').toLowerCase().includes(customerName.toLowerCase()) ||
-        (c.contactPerson || '').toLowerCase().includes(customerName.toLowerCase())
-      )
+      (c.company || c.name || '').toLowerCase().includes(customerName.toLowerCase()) ||
+      (c.contactPerson || '').toLowerCase().includes(customerName.toLowerCase())
+    )
     : customers).filter(c => c.gstin && c.gstin.trim() !== '');
 
   const handleSelectCustomer = (c: Customer) => {
@@ -1193,7 +1193,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     const sAddr = c.shippingAddress;
     setShippingAddress(sAddr && !c.shippingSameAsBilling ? [sAddr.street, sAddr.city, sAddr.state, sAddr.pin].filter(Boolean).join(', ') : (addr ? [addr.street, addr.city, addr.state, addr.pin].filter(Boolean).join(', ') : ''));
     setPartyCity(addr ? [addr.city, addr.state].filter(Boolean).join(', ') : (c.state || ''));
-    
+
     // Auto-calculate Due Date
     if (c.paymentTerms) {
       const match = c.paymentTerms.match(/\d+/);
@@ -1212,7 +1212,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     } else {
       setPaymentTermsDays('');
     }
-    
+
     setShowCustomerDropdown(false);
   };
 
@@ -1253,10 +1253,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
   const getFilteredInventoryEntries = (search: string) => {
     const s = search ? search.toLowerCase() : '';
-    
+
     // Combine actual inventory entries with dummy zero-stock entries for unstocked products
     const allDropdownItems: any[] = [...warehouseInventory];
-    
+
     // Add dummy entries for products that have NO inventory entries at all
     products.forEach(p => {
       const hasEntry = warehouseInventory.some(e => e.productId === p._id);
@@ -1501,10 +1501,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16, marginTop: 4 }}
             onPress={() => setOverridePaymentTerms(!overridePaymentTerms)}
           >
-            <Ionicons 
-              name={overridePaymentTerms ? "checkbox" : "square-outline"} 
-              size={18} 
-              color={overridePaymentTerms ? colors.primary : colors.text.muted} 
+            <Ionicons
+              name={overridePaymentTerms ? "checkbox" : "square-outline"}
+              size={18}
+              color={overridePaymentTerms ? colors.primary : colors.text.muted}
             />
             <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.secondary }}>
               Override default customer payment terms
@@ -1542,7 +1542,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                     </>
                   )}
                 </View>
-                
+
                 {showTermsDropdown && Platform.OS !== 'web' && (
                   <View style={[styles.customSelectPanel, { top: 75 }]}>
                     <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }} keyboardShouldPersistTaps="handled">
@@ -1773,7 +1773,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             const filtered = getFilteredInventoryEntries(isDropdownOpen ? itemSearchText : '');
 
             // Check stock limits
-            const matchedEntry = warehouseInventory.find(e => 
+            const matchedEntry = warehouseInventory.find(e =>
               e.productId === it.productId &&
               (e.packing || 1) === (it.packing || 1)
             );
@@ -2034,7 +2034,7 @@ const getOverdueText = (item: Invoice, customers: Customer[], colors: any) => {
   if (item.status?.toLowerCase() === 'paid') return { text: 'Paid', color: colors.success };
 
   let dueDate: Date;
-  
+
   if (item.dueDate) {
     dueDate = new Date(item.dueDate);
   } else {
@@ -2046,7 +2046,7 @@ const getOverdueText = (item: Invoice, customers: Customer[], colors: any) => {
     const invoiceDate = new Date(item.date);
     dueDate = new Date(invoiceDate.getTime() + termDays * 24 * 60 * 60 * 1000);
   }
-  
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   dueDate.setHours(0, 0, 0, 0);
@@ -2118,7 +2118,7 @@ export default function SaleInvoicesScreen() {
   }, [load]);
 
   const availableFYs = ['All', ...Array.from(new Set(invoices.map(inv => getFinancialYearString(new Date(inv.date))))).sort().reverse()];
-  
+
   const filteredInvoices = invoices.filter(inv => {
     if (fyFilter !== 'All') {
       const invFy = getFinancialYearString(new Date(inv.date));
@@ -2135,7 +2135,7 @@ export default function SaleInvoicesScreen() {
             <Pressable
               style={[
                 StyleSheet.absoluteFill,
-                { 
+                {
                   zIndex: 900,
                   ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {})
                 }
@@ -2152,7 +2152,7 @@ export default function SaleInvoicesScreen() {
               value={search}
               onChangeText={setSearch}
             />
-            
+
             <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
               <TouchableOpacity
                 style={styles.filterDropdownButton}
@@ -2192,97 +2192,97 @@ export default function SaleInvoicesScreen() {
           </View>
         </View>
 
-      <ScrollView style={{ flex: 1 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
-          <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
-            {/* Table Header Row */}
-            <View style={styles.tableHeaderRow}>
-              <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Invoice No</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Overdue Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 160, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Actions</Text></View>
-            </View>
-
-            {/* Table Body Rows */}
-            {filteredInvoices.map((item) => {
-              const overdueInfo = getOverdueText(item, customers, colors);
-              return (
-                <TouchableOpacity key={item._id} style={styles.tableBodyRow} onPress={() => { setSelectedInv(item); setDetailVisible(true); }}>
-                  <View style={[styles.tableCellContainer, { width: 160 }]}>
-                    <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.invoiceNo}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
-                    <Text style={styles.tableCell} numberOfLines={1}>{item.customerName || 'N/A'}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 120 }]}>
-                    <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 120 }]}>
-                    <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 120 }]}>
-                    <View style={[styles.statusBadge, {
-                      borderColor: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning),
-                      backgroundColor: (item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)) + '12'
-                    }]}>
-                      <Text style={[styles.statusText, {
-                        color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
-                      }]}>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 130 }]}>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: overdueInfo.color }}>
-                      {overdueInfo.text}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 160, borderRightWidth: 0, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }]}>
-                    <TouchableOpacity 
-                      style={{ 
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 4,
-                        backgroundColor: colors.primary, 
-                        paddingHorizontal: 10, 
-                        paddingVertical: 6, 
-                        borderRadius: 6 
-                      }} 
-                      onPress={(e) => { e.stopPropagation(); printInvoice(item); }}
-                    >
-                      <Ionicons name="print-outline" size={13} color="#fff" />
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Print</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={{ 
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 4,
-                        backgroundColor: '#25D366', 
-                        paddingHorizontal: 10, 
-                        paddingVertical: 6, 
-                        borderRadius: 6 
-                      }} 
-                      onPress={(e) => { e.stopPropagation(); shareInvoiceOnWhatsApp(item, customers); }}
-                    >
-                      <Ionicons name="logo-whatsapp" size={13} color="#fff" />
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Share</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-
-            {filteredInvoices.length === 0 && (
-              <View style={styles.emptyTableContainer}>
-                <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                <Text style={styles.emptyText}>No invoices found</Text>
+        <ScrollView style={{ flex: 1 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
+            <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
+              {/* Table Header Row */}
+              <View style={styles.tableHeaderRow}>
+                <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Invoice No</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Overdue Status</Text></View>
+                <View style={[styles.tableHeaderCellContainer, { width: 160, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Actions</Text></View>
               </View>
-            )}
-          </View>
+
+              {/* Table Body Rows */}
+              {filteredInvoices.map((item) => {
+                const overdueInfo = getOverdueText(item, customers, colors);
+                return (
+                  <TouchableOpacity key={item._id} style={styles.tableBodyRow} onPress={() => { setSelectedInv(item); setDetailVisible(true); }}>
+                    <View style={[styles.tableCellContainer, { width: 160 }]}>
+                      <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.invoiceNo}</Text>
+                    </View>
+                    <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
+                      <Text style={styles.tableCell} numberOfLines={1}>{item.customerName || 'N/A'}</Text>
+                    </View>
+                    <View style={[styles.tableCellContainer, { width: 120 }]}>
+                      <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
+                    </View>
+                    <View style={[styles.tableCellContainer, { width: 120 }]}>
+                      <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    </View>
+                    <View style={[styles.tableCellContainer, { width: 120 }]}>
+                      <View style={[styles.statusBadge, {
+                        borderColor: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning),
+                        backgroundColor: (item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)) + '12'
+                      }]}>
+                        <Text style={[styles.statusText, {
+                          color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
+                        }]}>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.tableCellContainer, { width: 130 }]}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: overdueInfo.color }}>
+                        {overdueInfo.text}
+                      </Text>
+                    </View>
+                    <View style={[styles.tableCellContainer, { width: 160, borderRightWidth: 0, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }]}>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          backgroundColor: colors.primary,
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 6
+                        }}
+                        onPress={(e) => { e.stopPropagation(); printInvoice(item); }}
+                      >
+                        <Ionicons name="print-outline" size={13} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Print</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          backgroundColor: '#25D366',
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 6
+                        }}
+                        onPress={(e) => { e.stopPropagation(); shareInvoiceOnWhatsApp(item, customers); }}
+                      >
+                        <Ionicons name="logo-whatsapp" size={13} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Share</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {filteredInvoices.length === 0 && (
+                <View style={styles.emptyTableContainer}>
+                  <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
+                  <Text style={styles.emptyText}>No invoices found</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
         </ScrollView>
-      </ScrollView>
       </View>
 
       <InvoiceDetailModal
@@ -2380,7 +2380,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   previewLabel: { fontSize: 12, color: colors.text.secondary },
   previewValue: { fontSize: 12, fontWeight: '600', color: colors.text.primary },
   previewDivider: { height: 1, backgroundColor: colors.border, marginVertical: 6 },
-  
+
   // Missing from earlier migration
   customSearchSelectContainer: { position: 'relative', width: '100%' },
   customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)', elevation: 4 },
@@ -2394,7 +2394,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   grandTotalValue: { fontSize: 16, fontWeight: '800', color: colors.success },
   itemRowDetail: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, alignItems: 'center' },
   itemSubTextDetail: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
-  
+
   sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginBottom: 8 },
   itemsCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.lg },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 },

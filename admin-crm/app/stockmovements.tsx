@@ -224,7 +224,7 @@ const printDeliveryChallan = (m: StockMovement) => {
           </td>
           <td style="width:35%;padding:2px 4px;border:1px solid #000;vertical-align:top;">
             <div style="font-weight:bold;font-size:8px;">Terms &amp; Conditions:</div>
-            <div style="line-height:1.2;font-size:6.5px;">${(FIRM_DETAILS.defaultTerms || '').split('\\n').map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
+            <div style="line-height:1.2;font-size:6.5px;">${(FIRM_DETAILS.defaultTerms || '').replace(/\\n/g, '\n').split(/\r?\n/).map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
           </td>
           <td style="width:30%;padding:2px 4px;border:1px solid #000;vertical-align:top;">
             <table style="width:100%;font-size:7px;">
