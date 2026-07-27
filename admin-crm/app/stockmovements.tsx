@@ -157,20 +157,21 @@ const printDeliveryChallan = (m: StockMovement) => {
         </div>
       </div>
       ${m.notes ? `<div style="margin-top:2px;font-size:6px;"><strong>Notes:</strong> ${m.notes}</div>` : ''}
-      <table style="margin-top:auto;font-size:6px;width:100%;">
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:0;">
+      <table style="font-size:6px;width:100%;">
         <tr>
-          <td style="width:35%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:35%;padding:2px;border:1px solid #000;vertical-align:top;">
             <div style="font-weight:bold;font-size:7px;">Bank Details:</div>
             <div>${FIRM_DETAILS.bankName}</div>
             <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
             <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
             <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
           </td>
-          <td style="width:35%;padding:2px;border-right:1px solid #000;vertical-align:top;">
+          <td style="width:35%;padding:2px;border:1px solid #000;vertical-align:top;">
             <div style="font-weight:bold;font-size:7px;">Terms &amp; Conditions:</div>
             <div style="line-height:1.3;">${(FIRM_DETAILS.defaultTerms || '').split('\n').map(t => t.trim()).filter(Boolean).join('<br/>')}</div>
           </td>
-          <td style="width:30%;padding:2px;vertical-align:top;">
+          <td style="width:30%;padding:2px;border:1px solid #000;vertical-align:top;">
             <table style="width:100%;font-size:6px;">
               <tr style="background:#e5e7eb;font-weight:bold;">
                 <td style="border:1px solid #000;padding:1.5px;text-align:right;">Grand Total (excl. GST)</td>
@@ -188,12 +189,12 @@ const printDeliveryChallan = (m: StockMovement) => {
           </td>
         </tr>
       </table>
-      <table style="font-size:6px;width:100%;border:1px solid #000;border-top:none;">
+      <table style="font-size:6px;width:100%;">
         <tr>
-          <td style="width:50%;padding:2px;text-align:left;">
+          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:left;">
             <div>Receiver's Signature &amp; Stamp</div>
           </td>
-          <td style="width:50%;padding:2px;text-align:right;">
+          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:right;">
             <div style="font-size:7px;">For ${FIRM_DETAILS.name}</div>
             ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
               <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 22px; width: auto; object-fit: contain; margin-top:2px;" />
@@ -202,6 +203,7 @@ const printDeliveryChallan = (m: StockMovement) => {
           </td>
         </tr>
       </table>
+      </div>
     </div>`;
 
   const html = `<!DOCTYPE html>
