@@ -60,16 +60,16 @@ const printDeliveryChallan = (m: StockMovement) => {
     const displayName = it.productName.replace(/\s*\([^)]*\)$/, '');
     return `
     <tr>
-      <td style="border:1px solid #000;padding:4px;text-align:center;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:4px;">${displayName}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:center;">${it.size || '—'}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:center;">${it.batchNo || '—'}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:center;">${totalPcs}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
-      <td style="border:1px solid #000;padding:4px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;text-align:center;">${i + 1}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;">${displayName}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;text-align:center;">${it.size || '—'}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;text-align:center;">${it.batchNo || '—'}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;text-align:center;">${totalPcs}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;text-align:right;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;text-align:right;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;text-align:right;">${it.gstRate ? it.gstRate + '%' : '—'}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;text-align:right;">₹${itemTotal.toFixed(2)}</td>
+      <td style="border-left:1px solid #000;border-right:1px solid #000;border-top:1px solid #000;padding:4px;text-align:right;">₹${gstAmt.toFixed(2)}</td>
     </tr>`;
   }).join('');
 
@@ -168,7 +168,7 @@ const printDeliveryChallan = (m: StockMovement) => {
         </tr>
       </table>
       ${extraInfo}
-      <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;">
+      <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid #000;border-right:1px solid #000;border-bottom:1px solid #000;">
         <div style="overflow:hidden;min-height:264px;">
         <table style="font-size:8px;width:100%;">
           <thead>
