@@ -243,7 +243,7 @@ const printDeliveryChallan = (m: StockMovement) => {
       </table>
       <table style="font-size:6px;width:100%;">
         <tr>
-          <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:left;">
+          <td style="width:50%;padding:6px 2px;border:1px solid #000;border-top:none;text-align:left;">
             <div>Receiver's Signature &amp; Stamp</div>
           </td>
           <td style="width:50%;padding:2px;border:1px solid #000;border-top:none;text-align:right;">
