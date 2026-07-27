@@ -265,8 +265,8 @@ const printDeliveryChallan = (m: StockMovement) => {
   <title>Delivery Challan ${m.docNo}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; min-height:297mm; padding:3mm 5mm; }
-    .page { width:100%; min-height:100%; display:flex; flex-direction:column; }
+    body { font-family: Arial, sans-serif; color: #000; background: #fff; width:210mm; height:297mm; padding:0; }
+    .page { width:100%; height:100%; padding:3mm 5mm; display:flex; flex-direction:column; }
     .half { flex:1; position:relative; display:flex; flex-direction:column; }
     .separator { border:none; border-top:2px dashed #000; margin:5mm 0; }
     table { border-collapse: collapse; width: 100%; }
