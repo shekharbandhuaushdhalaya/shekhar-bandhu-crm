@@ -117,7 +117,7 @@ const printDeliveryChallan = (m: StockMovement) => {
 
   const copyBlock = (copy: string) => `
     <div style="height:100%;padding:3mm 5mm;display:flex;flex-direction:column;border:1.5px solid #000;">
-      <div style="font-size:11px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;padding:3px 5mm;margin:-3mm -5mm 0 -5mm;">
+      <div style="font-size:11px;font-weight:bold;text-align:center;letter-spacing:0.5px;border:1.5px solid #000;border-left:none;border-right:none;padding:3px;">
         DELIVERY CHALLAN — NOT A TAX INVOICE
       </div>
       <table style="font-size:8px;border:1px solid #000;">
@@ -185,22 +185,24 @@ const printDeliveryChallan = (m: StockMovement) => {
       <table style="font-size:8px;width:100%;">
         <tr>
           <td style="width:35%;padding:0;border:1px solid #000;vertical-align:top;">
-            <div style="display:flex;min-height:100%;">
-              <div style="width:55%;padding:3px;">
-                <div style="font-weight:bold;font-size:9px;">Bank Details:</div>
-                <div>${FIRM_DETAILS.bankName}</div>
-                <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
-                <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
-                <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
-              </div>
-              <div style="width:45%;padding:3px;border-left:1px solid #000;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-                <div style="margin:2px auto;width:40px;height:40px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:6px;color:#999;">
-                  QR
-                </div>
-                <div style="font-size:7px;font-weight:600;margin-top:2px;">QR for online payment</div>
-                <div style="font-size:7px;color:#666;margin-top:2px;">UPI ID: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
-              </div>
-            </div>
+            <table style="width:100%;height:100%;font-size:8px;">
+              <tr>
+                <td style="width:55%;vertical-align:top;padding:3px;">
+                  <div style="font-weight:bold;font-size:9px;">Bank Details:</div>
+                  <div>${FIRM_DETAILS.bankName}</div>
+                  <div>A/C: ${FIRM_DETAILS.bankAccountNo}</div>
+                  <div>IFSC: ${FIRM_DETAILS.bankIfsc}</div>
+                  <div>Branch: ${FIRM_DETAILS.bankBranch}</div>
+                </td>
+                <td style="width:45%;vertical-align:middle;text-align:center;border-left:1px solid #000;padding:3px;">
+                  <div style="margin:2px auto;width:40px;height:40px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:6px;color:#999;">
+                    QR
+                  </div>
+                  <div style="font-size:7px;font-weight:600;margin-top:2px;">QR for online payment</div>
+                  <div style="font-size:7px;color:#666;margin-top:2px;">UPI ID: <span style="color:#333;font-weight:600;">${FIRM_DETAILS.bankUpi || '—'}</span></div>
+                </td>
+              </tr>
+            </table>
           </td>
           <td style="width:35%;padding:3px;border:1px solid #000;vertical-align:top;">
             <div style="font-weight:bold;font-size:9px;">Terms &amp; Conditions:</div>
