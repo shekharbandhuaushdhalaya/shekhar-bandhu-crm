@@ -500,8 +500,9 @@ export default function StockMovementsScreen() {
 
   const load = useCallback(async () => {
     try {
+      const dir = filterType ? TYPE_CONFIG[filterType]?.dir : undefined;
       const data = await api.getStockMovements({
-        direction: filterType === 'production' ? undefined : 'out',
+        direction: dir,
         type: filterType || undefined,
         status: filterStatus || undefined,
         search: search || undefined,
