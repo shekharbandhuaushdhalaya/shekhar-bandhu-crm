@@ -36,7 +36,7 @@ export default function ProfileScreen() {
   const [initialLoading, setInitialLoading] = useState(true);
 
   // Tab State for Admin & Profile
-  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'units'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'units' | 'admin'>('profile');
 
   // Manufacturing Units state
   const [manufacturingUnits, setManufacturingUnits] = useState<any[]>([]);
@@ -1536,9 +1536,52 @@ export default function ProfileScreen() {
     </View>
   );
 
+  const renderAdministration = () => (
+    <View style={styles.formContainer}>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="settings-outline" size={18} color={colors.primary} />
+          <Text style={styles.cardTitle}>Administration Panel</Text>
+        </View>
+        <View style={styles.cardContent}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border }}
+            onPress={() => router.push('/audit')}
+            activeOpacity={0.7}
+          >
+            <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.warning + '18', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="shield-checkmark" size={18} color={colors.warning} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary }}>System Audit Logs</Text>
+              <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>Security events, user actions & system audit trail</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}
+            onPress={() => router.push('/rbac')}
+            activeOpacity={0.7}
+          >
+            <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.danger + '18', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="people-outline" size={18} color={colors.danger} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary }}>Role-Based Access Control</Text>
+              <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>Manage users, roles & permissions</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
   const renderActiveTabContent = () => {
     if (activeTab === 'profile') return renderForms();
     if (activeTab === 'company') return renderCompanySettings();
+    if (activeTab === 'admin') return renderAdministration();
     return renderManufacturingUnits();
   };
 
@@ -1585,6 +1628,17 @@ export default function ProfileScreen() {
           <Text style={[styles.tabText, activeTab === 'units' && styles.tabActiveText]}>Manufacturing Facilities</Text>
           <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 6 }}>
             <Text style={{ fontSize: 10, fontWeight: '800', color: colors.warning }}>{manufacturingUnits.length} Units</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'admin' && styles.tabActiveButton]}
+          onPress={() => setActiveTab('admin')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="settings-outline" size={16} color={activeTab === 'admin' ? colors.primary : colors.text.secondary} />
+          <Text style={[styles.tabText, activeTab === 'admin' && styles.tabActiveText]}>Administration</Text>
+          <View style={{ backgroundColor: colors.danger + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 6 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.danger }}>Admin</Text>
           </View>
         </TouchableOpacity>
       </View>

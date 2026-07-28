@@ -5,6 +5,7 @@ import {
   TextInput, Alert, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Invoice, ManufacturingAnalytics, RawMaterial, RawMaterialEntry } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
@@ -1380,6 +1381,27 @@ export default function ReportsScreen() {
             </View>
           );
         })()}
+
+        {/* ---- Audit Logs ---- */}
+        <View style={styles.sectionCard}>
+          <TouchableOpacity onPress={() => router.push('/audit')} activeOpacity={0.7}>
+            <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
+                <View style={[styles.iconBadge, { backgroundColor: colors.warning + '15' }]}>
+                  <Ionicons name="shield-checkmark" size={20} color={colors.warning} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sectionCardTitle}>System Audit Logs</Text>
+                  <Text style={styles.sectionCardSubtitle}>Security events, user actions & system audit trail</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>View Logs</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 40 }} />
 
