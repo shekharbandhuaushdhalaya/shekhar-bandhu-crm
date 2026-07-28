@@ -900,7 +900,7 @@ class ApiClient {
       return null;
     }
   }
-  async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number; itemType?: string }[]; isActive?: boolean; productionNotes?: string; overheadCost?: number; stages?: any[]; defaultProductionType?: string; defaultJobWorkMode?: string; defaultPackagingMode?: string; defaultJobWorkerId?: string | null; recipeName?: string; isDefault?: boolean }): Promise<BillOfMaterials> {
+  async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number; itemType?: string; stageName?: string }[]; isActive?: boolean; productionNotes?: string; overheadCost?: number; stages?: any[]; defaultProductionType?: string; defaultJobWorkMode?: string; defaultPackagingMode?: string; defaultJobWorkerId?: string | null; recipeName?: string; isDefault?: boolean }): Promise<BillOfMaterials> {
     const res = await this.request(`${API_BASE}/bom`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }

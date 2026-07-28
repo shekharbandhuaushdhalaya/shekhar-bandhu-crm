@@ -49,7 +49,8 @@ const batchProductionSchema = new mongoose.Schema({
     ingredients: [{
       rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' },
       itemType: { type: String, default: 'formulation' },
-      qtyRequired: { type: Number, default: 0 }
+      qtyRequired: { type: Number, default: 0 },
+      stageName: { type: String, default: '', trim: true }
     }],
     overheadCost: { type: Number, default: 0 },
     stages: [{ name: String, targetDurationDays: Number }]

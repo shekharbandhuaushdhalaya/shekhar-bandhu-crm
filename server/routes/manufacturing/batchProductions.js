@@ -239,7 +239,8 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
           ingredients: (bom.ingredients || []).map(i => ({
             rawMaterialId: i.rawMaterialId,
             itemType: i.itemType || 'formulation',
-            qtyRequired: i.qtyRequired || 0
+            qtyRequired: i.qtyRequired || 0,
+            stageName: i.stageName || ''
           })),
           overheadCost: bom.overheadCost || 0,
           stages: (bom.stages || []).map(s => ({ name: s.name, targetDurationDays: s.targetDurationDays || 1 }))

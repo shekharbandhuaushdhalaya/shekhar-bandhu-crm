@@ -120,7 +120,7 @@ export default function ManufacturingScreen() {
   // Form States — BOM Recipe
   const [selectedProdId, setSelectedProdId] = useState('');
   const [bomYield, setBomYield] = useState('100');
-  const [bomIngredients, setBomIngredients] = useState<{ rawMaterialId: string; qtyRequired: string }[]>([
+  const [bomIngredients, setBomIngredients] = useState<{ rawMaterialId: string; qtyRequired: string; stageName?: string }[]>([
     { rawMaterialId: '', qtyRequired: '' }
   ]);
   const [bomError, setBomError] = useState('');
@@ -400,14 +400,14 @@ export default function ManufacturingScreen() {
 
   // --- Handlers: BOM Formula ---
   const handleAddIngredientRow = () => {
-    setBomIngredients([...bomIngredients, { rawMaterialId: '', qtyRequired: '' }]);
+    setBomIngredients([...bomIngredients, { rawMaterialId: '', qtyRequired: '', stageName: '' }]);
   };
 
   const handleRemoveIngredientRow = (index: number) => {
     setBomIngredients(bomIngredients.filter((_, idx) => idx !== index));
   };
 
-  const handleIngredientChange = (index: number, key: 'rawMaterialId' | 'qtyRequired', value: string) => {
+  const handleIngredientChange = (index: number, key: 'rawMaterialId' | 'qtyRequired' | 'stageName', value: string) => {
     const updated = bomIngredients.map((item, idx) => {
       if (idx === index) {
         return { ...item, [key]: value };
@@ -463,7 +463,8 @@ export default function ManufacturingScreen() {
         batchYieldSize: Number(bomYield),
         ingredients: bomIngredients.map(ing => ({
           rawMaterialId: ing.rawMaterialId,
-          qtyRequired: Number(ing.qtyRequired)
+          qtyRequired: Number(ing.qtyRequired),
+          stageName: ing.stageName || ''
         })),
         isActive: bomIsActive,
         isDefault: bomIsDefault,
@@ -479,7 +480,7 @@ export default function ManufacturingScreen() {
 
       setSelectedProdId('');
       setBomYield('100');
-      setBomIngredients([{ rawMaterialId: '', qtyRequired: '' }]);
+      setBomIngredients([{ rawMaterialId: '', qtyRequired: '', stageName: '' }]);
       setBomIsActive(true);
       setBomIsDefault(true);
       setBomRecipeName('Standard Recipe');

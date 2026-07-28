@@ -67,7 +67,8 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
       return {
         rawMaterialId: ing.rawMaterialId,
         qtyRequired: qty,
-        itemType: ing.itemType === 'packaging' ? 'packaging' : 'formulation'
+        itemType: ing.itemType === 'packaging' ? 'packaging' : 'formulation',
+        stageName: ing.stageName || ''
       };
     });
 

@@ -5,7 +5,7 @@ import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
 import { RawMaterial, Vendor } from '../../../utils/api';
 
-interface Ingredient { rawMaterialId: string; qtyRequired: string; }
+interface Ingredient { rawMaterialId: string; qtyRequired: string; stageName?: string; }
 interface Stage { name: string; targetDurationDays: string; }
 
 interface Props {
@@ -35,7 +35,7 @@ interface Props {
   onSave: () => void;
   onAddIngredient: () => void;
   onRemoveIngredient: (i: number) => void;
-  onIngredientChange: (i: number, key: 'rawMaterialId' | 'qtyRequired', val: string) => void;
+  onIngredientChange: (i: number, key: 'rawMaterialId' | 'qtyRequired' | 'stageName', val: string) => void;
   onAddStage: () => void;
   onRemoveStage: (i: number) => void;
   onStageChange: (i: number, key: 'name' | 'targetDurationDays', val: string) => void;
@@ -157,7 +157,7 @@ export default function BOMModal({
             {/* Ingredients */}
             <Text style={styles.formIngredientsTitle}>Formulation Ingredients *</Text>
             <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
-              Enter each ingredient's quantity for a standard 100 units/ml/g batch of output. This is scaled automatically to the Planned Yield Quantity when a production batch is launched — independent of the Batch Yield Size below.
+              Enter each ingredient's quantity for a standard 100 units/ml/g batch of output. This is scaled automatically to the Planned Yield Quantity when a production batch is launched — independent of the Batch Yield Size below. Optionally assign to a Manufacturing Stage below; unassigned ingredients are consumed at batch start.
             </Text>
             {bomIngredients.map((ing, idx) => (
               <View key={idx} style={styles.bomIngredientInputRow}>
@@ -183,6 +183,22 @@ export default function BOMModal({
                   onChangeText={(v) => onIngredientChange(idx, 'qtyRequired', v)}
                   keyboardType="numeric"
                 />
+                <View style={[styles.pickerWrapper, { flex: 1.5, marginBottom: 0 }]}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={ing.stageName || ''}
+                      onChange={(e: any) => onIngredientChange(idx, 'stageName', e.target.value)}
+                      style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                    >
+                      <option value="">-- No Stage (use at start) --</option>
+                      {bomStages.filter(s => s.name.trim()).map((s, si) => (
+                        <option key={si} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TextInput style={styles.input} placeholder="Stage" value={ing.stageName || ''} onChangeText={(v) => onIngredientChange(idx, 'stageName', v)} />
+                  )}
+                </View>
                 <TouchableOpacity style={styles.removeRowBtn} onPress={() => onRemoveIngredient(idx)}>
                   <Ionicons name="remove-circle" size={20} color={colors.danger} />
                 </TouchableOpacity>
