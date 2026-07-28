@@ -292,6 +292,9 @@ async function increaseInventory(movement) {
   const warehouse = await Warehouse.findById(movement.warehouseId);
   if (!warehouse) return;
 
+  const isProduction = movement.type === 'production';
+  const vendorName = movement.partyName || (isProduction ? 'In-House Production (Self)' : '');
+
   for (const item of movement.items) {
     if (!item.productId) continue;
     const product = await Product.findById(item.productId);
@@ -313,6 +316,13 @@ async function increaseInventory(movement) {
     let entry = await InventoryEntry.findOne(entryQuery);
     if (entry) {
       entry.qtyBoxes += boxes;
+      if (isProduction) {
+        if (item.purchaseRate) entry.purchaseRate = item.purchaseRate;
+        if (item.manufacturingUnitName && !entry.manufacturingUnitName) {
+          entry.manufacturingUnitId = item.manufacturingUnitId;
+          entry.manufacturingUnitName = item.manufacturingUnitName;
+        }
+      }
     } else {
       entry = new InventoryEntry({
         warehouseId: warehouse._id,
@@ -327,6 +337,12 @@ async function increaseInventory(movement) {
         qtyBoxes: boxes,
         packing,
         batchNo: item.batchNo || '',
+        vendorName,
+        purchaseRate: item.purchaseRate || 0,
+        mfgDate: item.mfgDate || undefined,
+        expiryDate: item.expiryDate || undefined,
+        manufacturingUnitId: item.manufacturingUnitId || undefined,
+        manufacturingUnitName: item.manufacturingUnitName || '',
       });
     }
     await entry.save();
@@ -343,6 +359,11 @@ async function increaseInventory(movement) {
       createdBy: movement.createdBy || 'System',
       packing,
       batchNo: item.batchNo || '',
+      vendorName,
+      mfgDate: item.mfgDate || undefined,
+      expiryDate: item.expiryDate || undefined,
+      manufacturingUnitId: item.manufacturingUnitId || undefined,
+      manufacturingUnitName: item.manufacturingUnitName || '',
     });
   }
 }
@@ -543,6 +564,7 @@ router.patch('/:id/cancel', authorize('stockmovement:delete'), async (req, res) 
     const movement = await StockMovement.findById(req.params.id);
     if (!movement) return res.status(404).json({ error: 'Stock movement not found' });
     if (movement.convertedToInvoice) return res.status(400).json({ error: 'Cannot cancel a movement that has been converted to invoice' });
+    if (movement.type === 'production') return res.status(400).json({ error: 'Cannot cancel a production GRN. Contact admin for manual adjustment.' });
 
     const wasDispatched = movement.status === 'dispatched' || movement.status === 'received';
     movement.status = 'cancelled';
@@ -571,6 +593,9 @@ router.delete('/:id', authorize('stockmovement:delete'), async (req, res) => {
     if (!movement) return res.status(404).json({ error: 'Stock movement not found' });
     if (movement.status === 'dispatched' || movement.status === 'received') {
       return res.status(400).json({ error: 'Cannot delete a dispatched/received movement. Cancel it first.' });
+    }
+    if (movement.type === 'production') {
+      return res.status(400).json({ error: 'Cannot delete a production GRN. The batch is already completed.' });
     }
     await StockMovement.findByIdAndDelete(req.params.id);
     res.json({ message: 'Stock movement deleted' });

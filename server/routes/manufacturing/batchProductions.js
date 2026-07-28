@@ -628,82 +628,66 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
     });
 
     const createdEntries = [];
-    const StockLedger = require('../../models/StockLedger');
-    const InventoryEntry = require('../../models/InventoryEntry');
+    const StockMovement = require('../../models/StockMovement');
 
     for (const item of yieldItemsWithWeight) {
       const pct = totalAllocWeight > 0 ? (item.allocWeight / totalAllocWeight) : (1 / yieldItemsWithWeight.length);
       const allocatedCost = totalCost * pct;
       const unitCost = item.actualYieldQty > 0 ? (allocatedCost / Number(item.actualYieldQty)) : 0;
 
-      const actualQty = Number(item.actualYieldQty);
-      const packingSize = 1; // Tracked in Pcs
-      const boxes = actualQty; // 1 box = 1 pc in unified Pcs tracking
-
-      let finEntry = await InventoryEntry.findOne({
-        warehouseId: warehouse._id,
-        productId: item.productId,
-        batchNo: batch.batchNo
-      });
-
-      if (finEntry) {
-        finEntry.qtyBoxes += actualQty;
-        if (batch.manufacturingUnitName && !finEntry.manufacturingUnitName) {
-          finEntry.manufacturingUnitId = batch.manufacturingUnitId;
-          finEntry.manufacturingUnitName = batch.manufacturingUnitName;
-        }
-        await finEntry.save();
-      } else {
-        finEntry = await InventoryEntry.create({
-          warehouseId: warehouse._id,
-          warehouseName: warehouse.name,
-          productId: item.productId,
-          productType: item.product.productType || '',
-          size: item.product.size || '',
-          colour: item.product.colour || '',
-          shape: item.product.shape || '',
-          weight: item.product.weight || '',
-          hsnCode: item.product.hsnCode || '',
-          vendorId: item.product.vendorId || null,
-          vendorName: 'In-House Production (Self)',
-          qtyBoxes: actualQty,
-          packing: packingSize,
-          batchNo: batch.batchNo,
-          mfgDate: new Date(),
-          expiryDate: batch.expiryDate || new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000),
-          purchaseRate: Number(unitCost.toFixed(2)),
-          manufacturingUnitId: batch.manufacturingUnitId,
-          manufacturingUnitName: batch.manufacturingUnitName
-        });
-      }
-
-      item.product.stockLevel += actualQty;
-      await item.product.save();
-
-      await StockLedger.create({
-        productId: item.productId,
-        warehouseId: warehouse._id,
-        warehouseName: warehouse.name,
-        type: 'IN',
-        qtyBoxes: boxes,
-        balanceBoxes: finEntry.qtyBoxes,
-        reference: `Production Batch ${batch.batchNo}`,
-        note: `Inwarded from Batch Production run by QC Inspector ${qcPassedBy}${batch.manufacturingUnitName ? ` (Mfg Unit: ${batch.manufacturingUnitName})` : ''}`,
-        createdBy: qcPassedBy,
-        packing: packingSize,
-        batchNo: batch.batchNo,
-        manufacturingUnitId: batch.manufacturingUnitId,
-        manufacturingUnitName: batch.manufacturingUnitName
-      });
-
       createdEntries.push({
         name: item.product.name,
         size: item.product.size || 'Std',
         qty: Number(item.actualYieldQty),
-        boxes,
+        boxes: Number(item.actualYieldQty),
         unitCost: Number(unitCost.toFixed(2))
       });
     }
+
+    // Generate Production GRN doc no
+    const fy = new Date().getFullYear() % 100 + '-' + (new Date().getFullYear() + 1) % 100;
+    const lastPR = await StockMovement.findOne({ docNo: { $regex: `^PR/${fy}/` } })
+      .sort({ createdAt: -1 }).lean();
+    let nextPR = 1;
+    if (lastPR) {
+      const parts = lastPR.docNo.split('/');
+      if (parts.length === 3) nextPR = parseInt(parts[2], 10) + 1;
+    }
+    const prDocNo = `PR/${fy}/${nextPR.toString().padStart(3, '0')}`;
+
+    const grnItems = yieldItemsWithWeight.map(item => {
+      const pct = totalAllocWeight > 0 ? (item.allocWeight / totalAllocWeight) : (1 / yieldItemsWithWeight.length);
+      const allocatedCost = totalCost * pct;
+      const unitCost = item.actualYieldQty > 0 ? (allocatedCost / Number(item.actualYieldQty)) : 0;
+      return {
+        productId: item.productId,
+        productName: item.product.name,
+        qty: Number(item.actualYieldQty),
+        packing: 1,
+        purchaseRate: Number(unitCost.toFixed(2)),
+        batchNo: batch.batchNo,
+        mfgDate: new Date(),
+        expiryDate: batch.expiryDate || new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000),
+        manufacturingUnitId: batch.manufacturingUnitId,
+        manufacturingUnitName: batch.manufacturingUnitName
+      };
+    });
+
+    const grn = await StockMovement.create({
+      docNo: prDocNo,
+      direction: 'in',
+      type: 'production',
+      date: new Date(),
+      warehouseId: warehouse._id,
+      warehouseName: warehouse.name,
+      partyName: 'In-House Production (Self)',
+      items: grnItems,
+      status: 'draft',
+      notes: `QC Sign-off by ${qcPassedBy}. Batch: ${batch.batchNo}. ${qcNotes || ''}`.trim(),
+      createdBy: qcPassedBy,
+      sourceDocType: 'batch_production',
+      sourceDocId: batch._id
+    });
 
     const valWaste = wasteQty !== undefined ? Number(wasteQty) : Math.max(0, batch.plannedQty - valYield);
     const variancePct = batch.plannedQty > 0 ? Number((((valYield - batch.plannedQty) / batch.plannedQty) * 100).toFixed(2)) : 0;
@@ -737,9 +721,9 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
     await batch.save();
     if (req.io) {
       req.io.emit('mfg_batch_completed', batch);
-      req.io.emit('inventory_updated', { type: 'batch_completed', batchNo: batch.batchNo });
+      req.io.emit('challan_created', grn);
     }
-    res.json(batch);
+    res.json({ batch, grn: { _id: grn._id, docNo: grn.docNo, status: grn.status } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

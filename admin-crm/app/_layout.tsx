@@ -185,7 +185,7 @@ function MainLayout() {
       'inventory_updated', 'product_updated', 'warehouse_updated', 'transfer_updated',
       'compliance_updated',
       // Invoices, Challans & Payments
-      'invoice_updated', 'challan_updated', 'payment_updated', 'credit_note_updated',
+      'invoice_updated', 'challan_updated', 'challan_created', 'payment_updated', 'credit_note_updated',
       'gst_return_updated',
       // CRM
       'contact_updated', 'medrep_updated', 'task_updated',

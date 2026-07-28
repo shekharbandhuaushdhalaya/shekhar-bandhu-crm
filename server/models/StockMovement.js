@@ -13,7 +13,10 @@ const stockMovementItemSchema = new mongoose.Schema({
   expiryDate:  { type: Date, default: null },
   mrp:         { type: Number, default: 0 },
   hsnCode:     { type: String, default: '', trim: true },
-  size:        { type: String, default: '', trim: true }
+  size:        { type: String, default: '', trim: true },
+  purchaseRate:{ type: Number, default: 0 },
+  manufacturingUnitId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit' },
+  manufacturingUnitName: { type: String, default: '', trim: true }
 }, { _id: false });
 
 const stockMovementSchema = new mongoose.Schema({
@@ -21,7 +24,7 @@ const stockMovementSchema = new mongoose.Schema({
   direction: { type: String, enum: ['in', 'out'], required: true },
   type: {
     type: String,
-    enum: ['sale', 'sample', 'order', 'return', 'purchase', 'transfer_out', 'transfer_in', 'damage'],
+    enum: ['sale', 'sample', 'order', 'return', 'purchase', 'transfer_out', 'transfer_in', 'damage', 'production'],
     required: true
   },
 

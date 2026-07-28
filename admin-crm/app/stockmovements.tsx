@@ -16,12 +16,13 @@ import { LOGO_BASE64 } from '../utils/logo';
 import InventoryDispatchScreen from './inventorydispatch';
 
 // ── Movement Type Config ────────────────────────────────────────────────────────
-const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string; dir: 'out' }> = {
+const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string; dir: 'out' | 'in' }> = {
   sale: { label: 'Sale', icon: 'receipt-outline', color: '#3b82f6', dir: 'out' },
   sample: { label: 'Doctor Sample', icon: 'medical-outline', color: '#8b5cf6', dir: 'out' },
   damage: { label: 'Damage', icon: 'alert-circle-outline', color: '#ef4444', dir: 'out' },
   transfer_out: { label: 'Transfer Out', icon: 'arrow-forward-circle-outline', color: '#f59e0b', dir: 'out' },
   order: { label: 'Online Order', icon: 'cart-outline', color: '#10b981', dir: 'out' },
+  production: { label: 'Production GRN', icon: 'cube-outline', color: '#06b6d4', dir: 'in' },
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -896,7 +897,7 @@ export default function StockMovementsScreen() {
     }
   };
 
-  const availableTypes = Object.entries(TYPE_CONFIG);
+  const availableTypes = Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'production');
   const isSale = form.type === 'sale';
   const isSample = form.type === 'sample';
   const isDamage = form.type === 'damage';
@@ -1818,8 +1819,8 @@ export default function StockMovementsScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Edit */}
-            {detailMovement.status === 'draft' && (
+            {/* Edit (not for production GRNs) */}
+            {detailMovement.type !== 'production' && detailMovement.status === 'draft' && (
               <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.info }]} onPress={() => {
                 setShowDetail(false);
                 setEditId(detailMovement._id);
@@ -1847,24 +1848,24 @@ export default function StockMovementsScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Delete */}
-            {detailMovement.status !== 'dispatched' && detailMovement.status !== 'received' && (
+            {/* Delete (not allowed for production GRNs — batch is already completed) */}
+            {detailMovement.type !== 'production' && detailMovement.status !== 'dispatched' && detailMovement.status !== 'received' && (
               <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.danger }]} onPress={() => { setShowDetail(false); handleDelete(detailMovement._id); }}>
                 <Ionicons name="trash-outline" size={16} color="#fff" />
                 <Text style={styles.detailActionBtnText}>Delete</Text>
               </TouchableOpacity>
             )}
 
-            {/* Convert to Invoice */}
-            {detailMovement.type === 'sale' && (detailMovement as any).billingMode !== 'cash' && detailMovement.direction === 'out' && detailMovement.partyGstin && !detailMovement.convertedToInvoice && detailMovement.status === 'dispatched' && (
+            {/* Convert to Invoice (only for sale challans) */}
+            {detailMovement.type === 'sale' && detailMovement.direction === 'out' && (detailMovement as any).billingMode !== 'cash' && detailMovement.partyGstin && !detailMovement.convertedToInvoice && detailMovement.status === 'dispatched' && (
               <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.success }]} onPress={() => { setShowDetail(false); handleConvertToInvoice(detailMovement._id); }}>
                 <Ionicons name="document-text-outline" size={18} color="#fff" />
                 <Text style={styles.detailActionBtnText}>Convert to GST Tax Invoice</Text>
               </TouchableOpacity>
             )}
 
-            {/* Cancel */}
-            {(detailMovement.status === 'dispatched' || detailMovement.status === 'received') && !detailMovement.convertedToInvoice && (
+            {/* Cancel (not for production GRNs) */}
+            {detailMovement.type !== 'production' && (detailMovement.status === 'dispatched' || detailMovement.status === 'received') && !detailMovement.convertedToInvoice && (
               <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.warning }]} onPress={() => { setShowDetail(false); handleCancel(detailMovement._id); }}>
                 <Ionicons name="close-circle-outline" size={18} color="#fff" />
                 <Text style={styles.detailActionBtnText}>Cancel Challan</Text>

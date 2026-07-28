@@ -662,9 +662,15 @@ export default function ManufacturingScreen() {
       if (qcWasteQty) payload.wasteQty = Number(qcWasteQty);
       if (qcWasteReason.trim()) payload.wasteReason = qcWasteReason.trim();
 
-      await api.completeBatchProduction(selectedBatchRun._id, payload);
+      const result = await api.completeBatchProduction(selectedBatchRun._id, payload);
+      const grnDocNo = result?.grn?.docNo;
 
       setSelectedBatchRun(null);
+      if (Platform.OS === 'web') {
+        window.alert(`Batch completed! Production GRN (${grnDocNo || 'N/A'}) created in Delivery Challans. Go to Challans → Finalize to inward stock.`);
+      } else {
+        Alert.alert('Batch Completed', `Production GRN (${grnDocNo || 'N/A'}) created. Go to Delivery Challans → Finalize to inward stock.`);
+      }
       setQcYieldQty('');
       setQcPacking('');
       setQcWarehouseId('');
@@ -1780,7 +1786,7 @@ export default function ManufacturingScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.completeBatchBtn} onPress={() => {
                           setSelectedBatchRun(batch);
-                          setQcYieldQty(batch.plannedQty.toString());
+                          setQcYieldQty('');
                           setQcWarehouseId(warehouses.length > 0 ? warehouses[0]._id : '');
                           setQcWasteQty('');
                           setQcWasteReason('');
