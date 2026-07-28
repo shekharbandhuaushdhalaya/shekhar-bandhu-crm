@@ -132,6 +132,8 @@ class ApiClient {
     const headers = {
       ...(options.headers || {}),
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
     } as Record<string, string>;
 
     if (!this.authToken) {
@@ -144,13 +146,20 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.authToken}`;
     }
 
+    // Bust browser HTTP cache with timestamp on GET requests
+    let fetchUrl = url;
+    if (isGet && !hasCacheBust) {
+      const sep = url.includes('?') ? '&' : '?';
+      fetchUrl = `${url}${sep}_t=${Date.now()}`;
+    }
+
     if (isMutating) {
       this.activeRequests++;
       DeviceEventEmitter.emit('global_loader', { isLoading: this.activeRequests > 0 });
     }
 
     try {
-      const res = await fetch(url, { ...options, headers }).catch((netErr: any) => {
+      const res = await fetch(fetchUrl, { ...options, headers }).catch((netErr: any) => {
         throw new Error(`Connection Error: Unable to reach backend server (${netErr?.message || 'Network Failure'}). Please ensure the server is running.`);
       });
       if (!res.ok) {
