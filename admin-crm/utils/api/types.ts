@@ -247,6 +247,7 @@ export type InventoryEntry = {
   vendorId?: string;
   vendorName: string;
   qtyBoxes: number;
+  purchaseRate?: number;
   updatedAt: string;
   packing: number;
   batchNo?: string;

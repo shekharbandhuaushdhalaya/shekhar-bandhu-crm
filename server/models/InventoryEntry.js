@@ -18,6 +18,7 @@ const inventoryEntrySchema = new mongoose.Schema({
   batchNo:       { type: String, default: '', trim: true },
   mfgDate:       { type: Date },
   expiryDate:    { type: Date },
+  purchaseRate:  { type: Number, default: 0 },
   manufacturingUnitId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit' },
   manufacturingUnitName: { type: String, default: '', trim: true }
 }, { timestamps: true });
