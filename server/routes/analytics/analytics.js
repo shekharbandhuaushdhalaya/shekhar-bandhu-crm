@@ -252,37 +252,33 @@ router.get('/manufacturing', async (req, res) => {
     const inProgressBatches = await BatchProduction.countDocuments({ status: 'in_progress' });
     const qcHoldBatches = await BatchProduction.countDocuments({ status: 'qc_hold' });
 
-    // Retrieve pre-calculated daily snapshot or compute dynamically if missing (lazy snapshot write-through cache)
-    const todayStr = new Date().toISOString().slice(0, 10);
-    let snapshot = await InventorySnapshot.findOne({ dateString: todayStr }).lean();
+    // Always compute dynamically so inventory moves during the day are reflected
+    const snapshotDate = new Date().toISOString().slice(0, 10);
     
-    let netRawMaterialValue = 0;
-    let netFinishedGoodsValue = 0;
+    // Calculate Raw Stock Valuation
+    const rawEntries = await RawMaterialEntry.find({ qty: { $gt: 0 } }).lean();
+    const netRawMaterialValue = rawEntries.reduce((sum, e) => sum + ((e.qty || 0) * (e.purchaseRate || 0)), 0);
 
-    if (snapshot) {
-      netRawMaterialValue = snapshot.netRawMaterialValue;
-      netFinishedGoodsValue = snapshot.netFinishedGoodsValue;
-    } else {
-      // Calculate Raw Stock Valuation
-      const rawEntries = await RawMaterialEntry.find({ qty: { $gt: 0 } }).lean();
-      netRawMaterialValue = rawEntries.reduce((sum, e) => sum + ((e.qty || 0) * (e.purchaseRate || 0)), 0);
+    // Calculate Finished Goods Valuation
+    const finEntries = await InventoryEntry.find({ qtyBoxes: { $gt: 0 } }).lean();
+    const netFinishedGoodsValue = finEntries.reduce((sum, e) => sum + ((e.qtyBoxes || 0) * (e.purchaseRate || 0)), 0);
 
-      // Calculate Finished Goods Valuation
-      const finEntries = await InventoryEntry.find({ qtyBoxes: { $gt: 0 } }).lean();
-      netFinishedGoodsValue = finEntries.reduce((sum, e) => sum + ((e.qtyBoxes || 0) * (e.purchaseRate || 0)), 0);
-
-      // Cache it for the rest of today
-      try {
-        snapshot = await InventorySnapshot.create({
-          dateString: todayStr,
-          netRawMaterialValue: Number(netRawMaterialValue.toFixed(2)),
-          netFinishedGoodsValue: Number(netFinishedGoodsValue.toFixed(2)),
-          totalValuation: Number((netRawMaterialValue + netFinishedGoodsValue).toFixed(2))
-        });
-      } catch (err) {
-        // Prevent crashes if duplicate key from concurrent first-requests of the day
-        console.error('Snapshot caching error (likely duplicate write):', err.message);
-      }
+    // Async cache snapshot for daily records (non-blocking)
+    try {
+      await InventorySnapshot.updateOne(
+        { dateString: snapshotDate },
+        {
+          $set: {
+            dateString: snapshotDate,
+            netRawMaterialValue: Number(netRawMaterialValue.toFixed(2)),
+            netFinishedGoodsValue: Number(netFinishedGoodsValue.toFixed(2)),
+            totalValuation: Number((netRawMaterialValue + netFinishedGoodsValue).toFixed(2))
+          }
+        },
+        { upsert: true }
+      );
+    } catch (err) {
+      console.error('Snapshot cache error:', err.message);
     }
 
     // Yield Performance of completed batches
