@@ -135,7 +135,7 @@ export default function ManufacturingScreen() {
   const [bomDefaultJobWorkerId, setBomDefaultJobWorkerId] = useState('');
   const [editingBomId, setEditingBomId] = useState<string | null>(null);
   const [bomStages, setBomStages] = useState<{ name: string; targetDurationDays: string }[]>([
-    { name: '', targetDurationDays: '1' }
+    { name: 'Packaging & Labeling', targetDurationDays: '1' }
   ]);
 
   // Form States — Production Launch
@@ -410,7 +410,14 @@ export default function ManufacturingScreen() {
   const handleIngredientChange = (index: number, key: 'rawMaterialId' | 'qtyRequired' | 'stageName', value: string) => {
     const updated = bomIngredients.map((item, idx) => {
       if (idx === index) {
-        return { ...item, [key]: value };
+        const next = { ...item, [key]: value };
+        if (key === 'rawMaterialId' && value) {
+          const mat = materials.find(m => m._id === value);
+          if (mat && (mat as any).category === 'Packaging' && !next.stageName) {
+            next.stageName = 'Packaging & Labeling';
+          }
+        }
+        return next;
       }
       return item;
     });
@@ -490,7 +497,7 @@ export default function ManufacturingScreen() {
       setBomDefaultJobWorkMode('none');
       setBomDefaultPackagingMode('self_packed');
       setBomDefaultJobWorkerId('');
-      setBomStages([{ name: '', targetDurationDays: '1' }]);
+      setBomStages([{ name: 'Packaging & Labeling', targetDurationDays: '1' }]);
       setEditingBomId(null);
       setBomModalVisible(false);
       loadData();
