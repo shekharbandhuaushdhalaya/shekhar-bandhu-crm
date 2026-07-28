@@ -5,7 +5,7 @@ import {
   KeyboardAvoidingView, useWindowDimensions, Platform, Alert, DeviceEventEmitter
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, StockMovement, StockMovementItem, Product, Warehouse, Customer, InventoryEntry } from '../utils/api';

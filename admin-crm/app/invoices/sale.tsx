@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Linking, Pressable, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
 import { api, Invoice, Product, Customer, Warehouse, InventoryEntry, InvoiceItem } from '../../utils/api';
 import { shortenPartyName } from '../../utils/string';
