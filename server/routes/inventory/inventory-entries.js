@@ -245,6 +245,25 @@ router.put('/:id', validate(schemas.inventoryEntrySchema.partial()), async (req,
   }
 });
 
+// PATCH /api/inventory-entries/:id — Update metadata fields (e.g. purchaseRate)
+router.patch('/:id', async (req, res) => {
+  try {
+    const allowed = ['purchaseRate', 'batchNo', 'mfgDate', 'expiryDate', 'vendorName', 'hsnCode'];
+    const updates = {};
+    for (const field of allowed) {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+    const entry = await InventoryEntry.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true });
+    if (!entry) return res.status(404).json({ error: 'Inventory entry not found' });
+    res.json(entry);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // GET /api/inventory-entries/ledger/:productId — Stock ledger for a product
 router.get('/ledger/:productId', async (req, res) => {
   try {
