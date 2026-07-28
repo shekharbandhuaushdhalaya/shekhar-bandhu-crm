@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView, useWindowDimensions, Platform, Alert, DeviceEventEmitter
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, StockMovement, StockMovementItem, Product, Warehouse, Customer, InventoryEntry } from '../utils/api';
@@ -532,8 +533,11 @@ export default function StockMovementsScreen() {
     } catch { }
   }, []);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
+    api.clearCache();
     load();
+  }, [load]));
+  useEffect(() => {
     const sub1 = DeviceEventEmitter.addListener('challan_updated_event', () => load());
     const sub2 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
     return () => {

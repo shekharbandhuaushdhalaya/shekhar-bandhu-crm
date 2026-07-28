@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Alert, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
 import { api, Invoice, Product, RawMaterial, Vendor, Warehouse, ManufacturingUnit } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
@@ -1741,11 +1742,9 @@ export default function PurchaseInvoicesScreen() {
     setRawMaterials(rms);
   }, [search, modeFilter]);
 
+  useFocusEffect(useCallback(() => { load(); }, [load]));
   useEffect(() => {
-    load();
-    const sub = DeviceEventEmitter.addListener('invoice_updated_event', () => {
-      load();
-    });
+    const sub = DeviceEventEmitter.addListener('invoice_updated_event', () => { load(); });
     return () => sub.remove();
   }, [load]);
 
