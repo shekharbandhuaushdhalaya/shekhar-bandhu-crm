@@ -357,6 +357,7 @@ const inventoryEntrySchema = z.object({
   batchNo: z.string().default(''),
   mfgDate: z.string().or(z.date()).optional(),
   expiryDate: z.string().or(z.date()).optional(),
+  purchaseRate: z.number().default(0),
 });
 
 // ── Payment ──────────────────────────────────────────────────
