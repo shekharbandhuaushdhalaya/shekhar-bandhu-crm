@@ -381,6 +381,7 @@ function AddEditProductModal({ visible, onClose, onSaved, product, products }: {
   useEffect(() => {
     async function loadAllData() {
       try {
+        api.clearCache();
         const [rms, vends] = await Promise.all([
           api.getRawMaterials(),
           api.getVendors()
