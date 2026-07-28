@@ -80,6 +80,7 @@ export default function AuditLogsScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     setPage(1);
     await fetchLogs(1, searchVal);
   }, [searchVal, fetchLogs]);

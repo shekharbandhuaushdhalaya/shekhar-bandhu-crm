@@ -62,6 +62,7 @@ export default function OrdersScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     await load();
     setRefreshing(false);
   }, [load]);

@@ -595,7 +595,7 @@ export default function StockMovementsScreen() {
     }
   }, [form.warehouseId]);
 
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  const onRefresh = useCallback(async () => { api.clearCache(); setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   const resetForm = () => {
     setForm({ ...DEFAULT_FORM, warehouseId: warehouses[0]?._id || '', warehouseName: warehouses[0]?.name || '' });

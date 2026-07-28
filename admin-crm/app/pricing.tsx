@@ -76,7 +76,7 @@ export default function PricingScreen() {
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
-  const onRefresh = () => { setRefreshing(true); fetchProducts(); };
+  const onRefresh = () => { api.clearCache(); setRefreshing(true); fetchProducts(); };
 
   const updateRow = (id: string, fields: Partial<PricingRow>) => {
     setRows(prev => prev.map(r => r._id === id ? { ...r, ...fields, dirty: true } : r));

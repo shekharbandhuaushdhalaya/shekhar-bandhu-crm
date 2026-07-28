@@ -79,6 +79,7 @@ export default function CampaignsScreen() {
   }, [fetchCampaigns]);
 
   const onRefresh = useCallback(() => {
+    api.clearCache();
     setRefreshing(true);
     fetchCampaigns();
   }, [fetchCampaigns]);

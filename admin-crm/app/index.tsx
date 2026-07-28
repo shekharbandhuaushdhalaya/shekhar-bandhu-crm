@@ -1060,6 +1060,7 @@ export default function DashboardScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     await api.checkConnection();
     await load();
     setRefreshing(false);

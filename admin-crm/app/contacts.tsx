@@ -327,6 +327,7 @@ export default function ContactsScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     await load();
     setRefreshing(false);
   }, [load]);

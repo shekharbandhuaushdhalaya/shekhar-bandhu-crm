@@ -314,6 +314,7 @@ export default function ManufacturingScreen() {
 
   const handleRefresh = () => {
     setRefreshing(true);
+    api.clearCache();
     loadData();
   };
 

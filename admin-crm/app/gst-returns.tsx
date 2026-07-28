@@ -23,6 +23,7 @@ function GstReturnsPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      api.clearCache();
       const res = await api.getGstReturn(view, month, year);
       setData(res);
       const periodStr = `${year}-${month.toString().padStart(2, '0')}`;

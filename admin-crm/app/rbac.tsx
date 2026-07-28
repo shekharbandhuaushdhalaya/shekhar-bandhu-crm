@@ -149,6 +149,7 @@ export default function RbacScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     if (activeTab === 'users') {
       await fetchUsers();
     } else {

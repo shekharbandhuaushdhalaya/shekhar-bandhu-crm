@@ -2121,6 +2121,7 @@ export default function SaleInvoicesScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     await load();
     setRefreshing(false);
   }, [load]);

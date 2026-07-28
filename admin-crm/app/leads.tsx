@@ -95,6 +95,7 @@ export default function LeadsScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     await load();
     setRefreshing(false);
   }, [load]);

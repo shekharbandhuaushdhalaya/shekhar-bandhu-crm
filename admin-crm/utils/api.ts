@@ -98,16 +98,22 @@ class ApiClient {
 
   private activeRequests = 0;
   private cacheStore: Record<string, { data: any, timestamp: number }> = {};
+  private cacheTTL = 3000; // 3 seconds
+
+  clearCache() {
+    this.cacheStore = {};
+  }
 
   private async request(url: string, options: RequestInit = {}): Promise<Response> {
     const method = options.method || 'GET';
     const isGet = method.toUpperCase() === 'GET';
     const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase());
+    const hasCacheBust = url.includes('_cb=') || url.includes('_t=');
 
-    // SWR memory cache lookup
-    if (isGet) {
+    // SWR memory cache lookup (skip if cache-bust param present)
+    if (isGet && !hasCacheBust) {
       const cached = this.cacheStore[url];
-      if (cached && (Date.now() - cached.timestamp < 30000)) { // 30 seconds TTL
+      if (cached && (Date.now() - cached.timestamp < this.cacheTTL)) {
         return {
           ok: true,
           status: 200,

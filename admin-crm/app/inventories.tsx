@@ -1225,6 +1225,7 @@ export default function InventoriesScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     await loadData();
     setRefreshing(false);
   }, [loadData]);

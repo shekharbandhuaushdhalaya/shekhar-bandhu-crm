@@ -90,7 +90,7 @@ export default function SalesCRMScreen() {
   }, [cmpStatusFilter, cmpTypeFilter, targetMonth, targetYear, commissionRate]);
 
   useEffect(() => { load(); }, [load]);
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  const onRefresh = useCallback(async () => { api.clearCache(); setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   // ── Complaint handlers ──
   const resetCmpForm = () => {

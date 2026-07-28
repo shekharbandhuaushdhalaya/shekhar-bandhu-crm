@@ -165,6 +165,7 @@ export default function MedicalRepsScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     if (activeTab === 'mrs') await loadMrs();
     else if (activeTab === 'dashboard') await loadDashboard();
     else if (activeTab === 'attendance' && selectedMrForAttendance) await loadAttendance(selectedMrForAttendance);

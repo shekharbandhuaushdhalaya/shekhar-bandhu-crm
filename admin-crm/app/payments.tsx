@@ -412,6 +412,7 @@ export default function PaymentsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    api.clearCache();
     await load();
     setRefreshing(false);
   };

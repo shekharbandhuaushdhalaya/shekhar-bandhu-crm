@@ -58,7 +58,7 @@ export default function InventoryDispatchScreen() {
   }, [dispStatusFilter, dispSearch]);
 
   useEffect(() => { load(); }, [load]);
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  const onRefresh = useCallback(async () => { api.clearCache(); setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   // Dispatch creation
   const handleCreateDispatch = async () => {

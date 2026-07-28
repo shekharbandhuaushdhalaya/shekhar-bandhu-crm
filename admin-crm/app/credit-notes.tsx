@@ -147,6 +147,7 @@ export default function CreditNotesPage() {
   const fetchNotes = useCallback(async () => {
     try {
       setLoading(true);
+      api.clearCache();
       const res = await api.getCreditNotes(search, filterType);
       setNotes(res || []);
     } catch (err) {

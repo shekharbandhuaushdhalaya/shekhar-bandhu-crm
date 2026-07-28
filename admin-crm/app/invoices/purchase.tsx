@@ -1751,6 +1751,7 @@ export default function PurchaseInvoicesScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    api.clearCache();
     await load();
     setRefreshing(false);
   }, [load]);
