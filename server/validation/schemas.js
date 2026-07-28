@@ -106,6 +106,7 @@ const invoiceItem = z.object({
   hsnCode: z.string().default(''),
   gstRate: z.number().default(0),
   batchNo: z.string().default(''),
+  mfgDate: z.string().or(z.date()).optional().nullable(),
   expiryDate: z.string().or(z.date()).optional().nullable(),
   amount: z.number().optional(),
   size: z.string().optional(),
@@ -170,6 +171,11 @@ const quotationItem = z.object({
   rate: z.number().default(0),
   hsnCode: z.string().default(''),
   gstRate: z.number().default(0),
+  mrp: z.number().default(0),
+  discountPercent: z.number().default(0),
+  discountAmount: z.number().default(0),
+  batchNo: z.string().default(''),
+  expiryDate: z.string().or(z.date()).optional(),
 });
 
 const quotationSchema = z.object({
@@ -180,7 +186,7 @@ const quotationSchema = z.object({
   date: z.string().or(z.date()).optional(),
   amount: z.number().default(0),
   status: z.enum(['draft', 'sent', 'approved', 'rejected']).default('draft'),
-  mode: z.enum(['regular']).default('regular'),
+  mode: z.enum(['regular', 'pakka', 'cash']).default('pakka'),
   baseAmount: z.number().optional(),
   gstRate: z.number().optional(),
   cgst: z.number().optional(),
@@ -206,6 +212,8 @@ const smItem = z.object({
   discountPercent: z.number().default(0),
   gstRate: z.number().default(0),
   batchNo: z.string().default(''),
+  mfgDate: z.string().or(z.date()).optional().default(''),
+  expiryDate: z.string().or(z.date()).optional().default(''),
   mrp: z.number().default(0),
   size: z.string().optional().default(''),
 });
@@ -440,6 +448,7 @@ const batchProductionSchema = z.object({
   jobWorkerId: objectId.nullable().optional(),
   jobWorkerName: z.string().optional().default(''),
   jobWorkerChallanRef: z.string().optional().default(''),
+  expiryDate: z.string().or(z.date()).optional().nullable(),
   plannedYields: z.array(plannedYieldSchema).optional()
 });
 
@@ -499,7 +508,7 @@ const challanSchema = z.object({
   warehouseName: z.string().default(''),
   items: z.array(challanItem).default([]),
   status: z.string().default('draft'),
-  mode: z.enum(['regular']).default('regular'),
+  mode: z.enum(['regular', 'pakka', 'cash']).default('pakka'),
   baseAmount: z.number().default(0),
   cgst: z.number().default(0),
   sgst: z.number().default(0),
@@ -516,6 +525,7 @@ const rawMaterialSchema = z.object({
   unit: z.string().min(1),
   category: z.string().default('Herb'),
   minReorder: z.number().default(0),
+  cleaningLossPercent: z.number().min(0).max(100).default(0),
 });
 
 const rawMaterialEntrySchema = z.object({
@@ -726,6 +736,14 @@ const batchStageUpdateSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'completed', 'skipped', 'failed']).optional(),
   notes: z.string().optional(),
   completedBy: z.string().optional(),
+  inputQty: z.number().min(0).optional(),
+  outputQty: z.number().min(0).optional(),
+  lossReason: z.string().optional(),
+});
+
+const cleaningAdjustmentSchema = z.object({
+  cleanedQty: z.number().min(0),
+  notes: z.string().default(''),
 });
 
 const batchCancelSchema = z.object({
@@ -786,6 +804,7 @@ module.exports = {
   batchCancelSchema,
   batchDocumentAddSchema,
   batchDocumentRemoveSchema,
+  cleaningAdjustmentSchema,
   objectId,
   productItem,
   orderItem,

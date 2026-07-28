@@ -6,6 +6,7 @@ const rawMaterialSchema = new mongoose.Schema({
   unit: { type: String, required: true, default: 'kg' }, // kg, g, l, ml, unit
   category: { type: String, default: 'Herb', trim: true },
   minReorder: { type: Number, default: 0 },
+  cleaningLossPercent: { type: Number, default: 0, min: 0, max: 100 }, // typical % lost during cleaning/sorting
 }, { timestamps: true });
 
 module.exports = mongoose.model('RawMaterial', rawMaterialSchema);

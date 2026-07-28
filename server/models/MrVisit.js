@@ -22,7 +22,7 @@ const mrVisitSchema = new mongoose.Schema({
   },
   purpose:       { type: String, enum: ['promotion', 'sampling', 'collection', 'followup', 'meeting', 'other'], default: 'promotion' },
   samplesGiven:  [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
-  sampleDetails: [{ productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' }, name: String, qty: Number }],
+  sampleDetails: [{ productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' }, name: String, qty: Number, batchNo: { type: String, default: '' } }],
   orderTaken:    { type: Boolean, default: false },
   orderAmount:   { type: Number, default: 0 },
   feedback:      { type: String, default: '' },

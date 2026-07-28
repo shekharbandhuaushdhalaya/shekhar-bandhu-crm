@@ -8,7 +8,12 @@ const quotationItemSchema = new mongoose.Schema({
   packing: { type: Number, required: true, default: 1 },
   rate: { type: Number, required: true, default: 0 },
   hsnCode: { type: String, default: '' },
-  gstRate: { type: Number, default: 0 }
+  gstRate: { type: Number, default: 0 },
+  mrp: { type: Number, default: 0 },
+  discountPercent: { type: Number, default: 0 },
+  discountAmount: { type: Number, default: 0 },
+  batchNo: { type: String, default: '' },
+  expiryDate: { type: Date }
 }, { _id: false });
 
 const quotationSchema = new mongoose.Schema({
@@ -19,7 +24,7 @@ const quotationSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },
   amount: { type: Number, required: true, default: 0 },
   status: { type: String, default: 'draft', enum: ['draft', 'sent', 'approved', 'rejected'] },
-  mode: { type: String, enum: ['regular'], default: 'regular' },
+  mode: { type: String, enum: ['regular', 'pakka', 'cash'], default: 'pakka' },
   baseAmount: { type: Number },
   gstRate: { type: Number },
   cgst: { type: Number },
@@ -33,8 +38,9 @@ const quotationSchema = new mongoose.Schema({
   warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse' },
   warehouseName: { type: String, default: '', trim: true },
   isFinalized: { type: Boolean, default: false },
-  mode: { type: String, default: 'regular' },
-  shippingAddress: { type: String, default: '', trim: true }
+  convertedToInvoice: { type: Boolean, default: false },
+  invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
+  invoiceNo: { type: String, default: '' }
 }, { timestamps: true });
 
 quotationSchema.index({ quotationNo: 'text', customerName: 'text', status: 'text' });

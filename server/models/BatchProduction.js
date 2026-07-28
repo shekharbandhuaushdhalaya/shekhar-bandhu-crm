@@ -22,7 +22,13 @@ const stageSchema = new mongoose.Schema({
   completedBy: { type: String, default: '' },
   notes: { type: String, default: '' },
   targetDurationDays: { type: Number, default: 1 },
-  targetCompletionDate: { type: Date, default: null }
+  targetCompletionDate: { type: Date, default: null },
+  // Stage-wise material quantity tracking (for process loss)
+  inputQty: { type: Number, default: 0 },       // material qty entering this stage (kg/L)
+  outputQty: { type: Number, default: 0 },       // material qty after this stage
+  lossQty: { type: Number, default: 0 },         // loss at this stage (inputQty - outputQty)
+  lossPercent: { type: Number, default: 0 },     // (lossQty / inputQty) * 100
+  lossReason: { type: String, default: '' },     // evaporation, sediment, spillage, etc.
 }, { _id: false });
 
 const batchProductionSchema = new mongoose.Schema({
@@ -99,6 +105,8 @@ const batchProductionSchema = new mongoose.Schema({
   ],
   startDate: { type: Date, default: null },
   endDate: { type: Date, default: null },
+  mfgDate: { type: Date, default: null },
+  expiryDate: { type: Date, default: null },
   qcNotes: { type: String, default: '' },
   qcPassedBy: { type: String, default: '' },
   qcStatus: { type: String, enum: ['approved', 'rejected'], default: 'approved' },

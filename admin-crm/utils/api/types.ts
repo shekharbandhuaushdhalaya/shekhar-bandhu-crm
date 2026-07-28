@@ -315,6 +315,9 @@ export type InvoiceItem = {
   qtyBoxes?: number;
   hsnCode?: string;
   gstRate: number;
+  batchNo?: string;
+  mfgDate?: string;
+  expiryDate?: string;
 };
 
 export type Invoice = {
@@ -367,6 +370,11 @@ export type QuotationItem = {
   boxes: number;
   packing: number;
   rate: number;
+  mrp?: number;
+  discountPercent?: number;
+  discountAmount?: number;
+  batchNo?: string;
+  expiryDate?: string;
   hsnCode?: string;
   gstRate: number;
 };
@@ -592,6 +600,8 @@ export type StockMovementItem = {
   discountPercent?: number;
   gstRate?: number;
   batchNo?: string;
+  mfgDate?: string;
+  expiryDate?: string;
   mrp?: number;
   hsnCode?: string;
   size?: string;
@@ -937,6 +947,7 @@ export type MrDailyLog = {
   startKmReading?: number;
   endKmReading?: number;
   totalDistance?: number;
+  gpsDistance?: number;
   status: 'checked_in' | 'checked_out';
   notes?: string;
 };

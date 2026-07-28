@@ -120,6 +120,9 @@ const printInvoice = (invoice: Invoice) => {
           </td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${it.hsnCode || ''}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center; font-family: monospace; font-size: 9px; font-weight: bold;">${(it as any).batchNo || '—'}</td>
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center; font-size:8px;">
+            ${(it as any).expiryDate ? new Date((it as any).expiryDate).toLocaleDateString('en-IN') : '—'}
+          </td>
           ${isAllPieces ? `
             <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${qty}</td>
           ` : `
@@ -160,7 +163,7 @@ const printInvoice = (invoice: Invoice) => {
               <div style="font-size:10px; margin-top:2px;">${FIRM_DETAILS.address}</div>
               <div style="font-size:10px;">email: ${FIRM_DETAILS.email}</div>
               <div style="font-size:10px;">Phone : ${FIRM_DETAILS.phone}</div>
-              <div style="font-size:11px; margin-top: 2px;"><strong>GSTIN : ${FIRM_DETAILS.gstin}</strong>${FIRM_DETAILS.manufacturingLicenseNo ? ` &nbsp;|&nbsp; <strong>Mfg. Lic. No : ${FIRM_DETAILS.manufacturingLicenseNo}</strong>` : ''}</div>
+              <div style="font-size:11px; margin-top: 2px;"><strong>GSTIN : ${FIRM_DETAILS.gstin}</strong>${FIRM_DETAILS.manufacturingLicenseNo ? ` &nbsp;|&nbsp; <strong>Mfg. Lic. No : ${FIRM_DETAILS.manufacturingLicenseNo}</strong>` : ''}${FIRM_DETAILS.gmpCertificateNo ? ` &nbsp;|&nbsp; <strong>GMP No : ${FIRM_DETAILS.gmpCertificateNo}</strong>` : ''}</div>
             </div>
           </div>
           <div style="text-align:right;">
@@ -218,6 +221,7 @@ const printInvoice = (invoice: Invoice) => {
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:22%;">Description of Goods</th>
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">HSN/SAC</th>
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:8%;">Batch No.</th>
+            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:7%;">Expiry</th>
             ${isAllPieces ? `
               <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">Qty</th>
             ` : `
@@ -248,6 +252,7 @@ const printInvoice = (invoice: Invoice) => {
             <td style="border-right: 1px solid #000;"></td>
             <td style="border-right: 1px solid #000;"></td>
             <td style="border-right: 1px solid #000;"></td> <!-- Batch No -->
+            <td style="border-right: 1px solid #000;"></td> <!-- Expiry -->
             <td style="border-right: 1px solid #000;"></td>
             ${isAllPieces ? '' : '<td style="border-right: 1px solid #000;"></td>'}
             <td style="border-right: 1px solid #000;"></td>
@@ -264,7 +269,7 @@ const printInvoice = (invoice: Invoice) => {
         </tbody>
         <tfoot>
           <tr style="border-bottom: 1px solid #000;">
-            <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>Sub-Total / Total Qty</strong></td>
+            <td colspan="5" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>Sub-Total / Total Qty</strong></td>
             ${isAllPieces ? `
               <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalGoodsQty} Pcs.</strong></td>
             ` : `
@@ -481,7 +486,6 @@ interface ExtendedInvoiceItem extends InvoiceItem {
   rateText?: string;
   mrpText?: string;
   discountText?: string;
-  batchNo?: string;
 }
 
 const toTitleCase = (str?: string) => {
@@ -1071,7 +1075,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const [activeItemDropdownIdx, setActiveItemDropdownIdx] = useState<number | null>(null);
   const [itemSearchText, setItemSearchText] = useState('');
 
-  const [items, setItems] = useState<ExtendedInvoiceItem[]>([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '' }]);
+  const [items, setItems] = useState<ExtendedInvoiceItem[]>([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '', mfgDate: '', expiryDate: '' }]);
 
   useEffect(() => {
     if (visible) {
@@ -1106,7 +1110,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           packing: it.packing || 1,
           hsnCode: it.hsnCode || '',
           gstRate: it.gstRate || 0,
-          batchNo: (it as any).batchNo || ''
+          batchNo: (it as any).batchNo || '',
+          mfgDate: (it as any).mfgDate || '',
+          expiryDate: (it as any).expiryDate || ''
         })));
         setOverridePaymentTerms(true);
       } else {
@@ -1318,7 +1324,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       gstRate: gst,
       hsnCode: hsn,
       maxQty: entry.qtyBoxes,
-      batchNo: entry.batchNo || ''
+      batchNo: entry.batchNo || '',
+      mfgDate: (entry as any).mfgDate || '',
+      expiryDate: (entry as any).expiryDate || ''
     };
     setItems(next);
     setActiveItemDropdownIdx(null);
@@ -1391,7 +1399,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     }
   };
 
-  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '' }, ...items]);
+  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '', mfgDate: '', expiryDate: '' }, ...items]);
   const removeItemRow = (idx: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== idx));

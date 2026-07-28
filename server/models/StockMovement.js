@@ -9,6 +9,8 @@ const stockMovementItemSchema = new mongoose.Schema({
   discountPercent: { type: Number, default: 0 },
   gstRate:     { type: Number, default: 0 },
   batchNo:     { type: String, default: '', trim: true },
+  mfgDate:     { type: Date, default: null },
+  expiryDate:  { type: Date, default: null },
   mrp:         { type: Number, default: 0 },
   hsnCode:     { type: String, default: '', trim: true },
   size:        { type: String, default: '', trim: true }

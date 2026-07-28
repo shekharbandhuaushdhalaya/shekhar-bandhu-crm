@@ -19,7 +19,8 @@ const mrDailyLogSchema = new mongoose.Schema({
   },
   startKmReading:  { type: Number, default: 0 },
   endKmReading:    { type: Number, default: 0 },
-  totalDistance:   { type: Number, default: 0 },
+  totalDistance:   { type: Number, default: 0 },   // odometer-based (endKm - startKm)
+  gpsDistance:     { type: Number, default: 0 },   // GPS straight-line (Haversine) in km
   status:          { type: String, enum: ['checked_in', 'checked_out'], default: 'checked_in' },
   notes:           { type: String, default: '' },
 }, { timestamps: true });

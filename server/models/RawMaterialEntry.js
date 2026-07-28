@@ -24,6 +24,12 @@ const rawMaterialEntrySchema = new mongoose.Schema({
     default: null,
   },
   warehouseName: { type: String, default: '' },
+  // Cleaning / pre-processing loss tracking
+  cleanedQty: { type: Number, default: 0 },           // qty after cleaning (0 = not yet cleaned)
+  cleaningLoss: { type: Number, default: 0 },          // actual weight lost during cleaning
+  cleaningLossPercent: { type: Number, default: 0 },   // actual loss % for this batch
+  cleaningDate: { type: Date, default: null },
+  cleaningNotes: { type: String, default: '' },
 }, { timestamps: true });
 
 rawMaterialEntrySchema.index({ rawMaterialId: 1, batchNo: 1 }, { unique: true });

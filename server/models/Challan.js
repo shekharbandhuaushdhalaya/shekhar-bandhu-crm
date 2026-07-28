@@ -26,7 +26,7 @@ const challanSchema = new mongoose.Schema({
   warehouseName: { type: String, default: '', trim: true },
   items: [challanItemSchema],
   status: { type: String, default: 'draft' },
-  mode: { type: String, enum: ['regular'], default: 'regular' },
+  mode: { type: String, enum: ['regular', 'pakka', 'cash'], default: 'pakka' },
   baseAmount: { type: Number, default: 0 },
   cgst: { type: Number, default: 0 },
   sgst: { type: Number, default: 0 },

@@ -62,7 +62,9 @@ const printDeliveryChallan = (m: StockMovement) => {
     <tr>
       <td style="padding:3px 4px;text-align:center;border-bottom:1px solid #ddd;">${i + 1}</td>
       <td style="padding:3px 4px;border-bottom:1px solid #ddd;">${displayName}</td>
+      <td style="padding:3px 4px;text-align:center;border-bottom:1px solid #ddd;">${it.hsnCode || '—'}</td>
       <td style="padding:3px 4px;text-align:center;border-bottom:1px solid #ddd;">${it.batchNo || '—'}</td>
+      <td style="padding:3px 4px;text-align:center;border-bottom:1px solid #ddd;font-size:7px;">${it.expiryDate ? new Date(it.expiryDate).toLocaleDateString('en-IN') : '—'}</td>
       <td style="padding:3px 4px;text-align:center;border-bottom:1px solid #ddd;">${totalPcs}</td>
       <td style="padding:3px 4px;text-align:right;border-bottom:1px solid #ddd;">${it.mrp ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
       <td style="padding:3px 4px;text-align:right;border-bottom:1px solid #ddd;">${it.discountPercent ? it.discountPercent + '%' : '—'}</td>
@@ -175,8 +177,10 @@ const printDeliveryChallan = (m: StockMovement) => {
           <thead>
             <tr style="background:#ccc;">
               <th style="border-bottom:1px solid #000;padding:3px;width:3%;text-align:center;">#</th>
-              <th style="border-bottom:1px solid #000;padding:3px;width:27%;text-align:left;">Product Name &amp; Size</th>
-              <th style="border-bottom:1px solid #000;padding:3px;width:10%;text-align:center;">Batch</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:22%;text-align:left;">Product Name &amp; Size</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:6%;text-align:center;">HSN</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:8%;text-align:center;">Batch</th>
+              <th style="border-bottom:1px solid #000;padding:3px;width:7%;text-align:center;">Expiry</th>
               <th style="border-bottom:1px solid #000;padding:3px;width:6%;text-align:center;">Qty</th>
               <th style="border-bottom:1px solid #000;padding:3px;width:9%;text-align:right;">MRP</th>
               <th style="border-bottom:1px solid #000;padding:3px;width:6%;text-align:right;">Disc</th>
@@ -595,7 +599,7 @@ export default function StockMovementsScreen() {
 
   const resetForm = () => {
     setForm({ ...DEFAULT_FORM, warehouseId: warehouses[0]?._id || '', warehouseName: warehouses[0]?.name || '' });
-    setItems([{ productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' }]);
+    setItems([{ productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '', mfgDate: '', expiryDate: '' }]);
     setCustomerSearch('');
     setShowCustomerDropdown(false);
     setError('');
@@ -725,6 +729,8 @@ export default function StockMovementsScreen() {
       rate: netRate,
       gstRate,
       batchNo: computedBatchNo,
+      mfgDate: entry.mfgDate || '',
+      expiryDate: entry.expiryDate || '',
       size: entry.size || '',
     };
     setItems(next);
@@ -775,6 +781,8 @@ export default function StockMovementsScreen() {
         discountPercent: form.type === 'sample' ? 0 : (it.discountPercent || 0),
         gstRate: (form.type === 'sample' || (form as any).billingMode === 'cash') ? 0 : (it.gstRate || 0),
         batchNo: it.batchNo || '',
+        mfgDate: it.mfgDate || '',
+        expiryDate: it.expiryDate || '',
         mrp: it.mrp || 0,
         hsnCode: it.hsnCode || '',
         size: it.size || '',
@@ -1595,7 +1603,7 @@ export default function StockMovementsScreen() {
                   </View>
                 );
               })}
-              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 8, paddingVertical: 10, marginTop: 4, marginBottom: 6 }} onPress={() => setItems([...items, { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' }])}>
+              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 8, paddingVertical: 10, marginTop: 4, marginBottom: 6 }} onPress={() => setItems([...items, { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '', mfgDate: '', expiryDate: '' }])}>
                 <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
                 <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Product Row</Text>
               </TouchableOpacity>

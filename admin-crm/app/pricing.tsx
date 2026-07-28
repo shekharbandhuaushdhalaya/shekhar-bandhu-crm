@@ -16,6 +16,7 @@ type PricingRow = {
   _id: string;
   name: string;
   sku: string;
+  size: string;
   category: string;
   price: number;
   discount: number;
@@ -52,6 +53,7 @@ export default function PricingScreen() {
         _id: p._id,
         name: p.name,
         sku: p.sku,
+        size: p.size || '',
         category: p.category || 'General',
         price: p.price ?? 0,
         discount: p.discount ?? 0,
@@ -135,7 +137,8 @@ export default function PricingScreen() {
   const filteredRows = rows.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
     r.sku.toLowerCase().includes(search.toLowerCase()) ||
-    r.category.toLowerCase().includes(search.toLowerCase())
+    r.category.toLowerCase().includes(search.toLowerCase()) ||
+    r.size.toLowerCase().includes(search.toLowerCase())
   );
 
   const dirtyCount = rows.filter(r => r.dirty).length;
@@ -153,6 +156,11 @@ export default function PricingScreen() {
             <View style={[styles.catBadge, { backgroundColor: colors.primary + '15' }]}>
               <Text style={[styles.catBadgeText, { color: colors.primary }]}>{row.category}</Text>
             </View>
+            {row.size ? (
+              <View style={[styles.catBadge, { backgroundColor: colors.info + '15' }]}>
+                <Text style={[styles.catBadgeText, { color: colors.info }]}>{row.size}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
       )
@@ -369,12 +377,10 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   statsStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
     paddingVertical: Spacing.md,
     gap: Spacing.md,
-    backgroundColor: colors.bg.secondary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
     flexWrap: 'wrap',
   },
   statCard: {

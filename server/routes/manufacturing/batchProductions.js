@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 // POST /api/batch-productions — Start a new batch production run
 router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
   try {
-    const { productId, plannedQty, batchNo, manufacturingUnitId, productionType, jobWorkMode, packagingMode, jobWorkerId, jobWorkerName, jobWorkerChallanRef, plannedYields } = req.body;
+    const { productId, plannedQty, batchNo, manufacturingUnitId, productionType, jobWorkMode, packagingMode, jobWorkerId, jobWorkerName, jobWorkerChallanRef, plannedYields, expiryDate } = req.body;
 
     // If multi-size yields are provided, compute total plannedQty from them
     let effectivePlannedQty = plannedQty;
@@ -259,6 +259,7 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
         jobWorkerId: jobWorkerId || null,
         jobWorkerName: jobWorkerName || '',
         jobWorkerChallanRef: jobWorkerChallanRef || '',
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
         startDate: new Date()
       }], { session });
 
@@ -669,7 +670,7 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
           packing: packingSize,
           batchNo: batch.batchNo,
           mfgDate: new Date(),
-          expiryDate: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000),
+          expiryDate: batch.expiryDate || new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000),
           purchaseRate: Number(unitCost.toFixed(2)),
           manufacturingUnitId: batch.manufacturingUnitId,
           manufacturingUnitName: batch.manufacturingUnitName
@@ -718,6 +719,7 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
     batch.qcPassedBy = qcPassedBy.trim();
     batch.status = 'completed';
     batch.endDate = new Date();
+    batch.mfgDate = new Date();
 
     const qcStage = batch.stages.find(s => s.name.toLowerCase().includes('qc'));
     if (qcStage && qcStage.status !== 'completed') {

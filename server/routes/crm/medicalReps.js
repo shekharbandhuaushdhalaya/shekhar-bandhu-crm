@@ -179,9 +179,28 @@ router.post('/:mrId/checkout', authorize('mr:attendance'), async (req, res) => {
     log.endKmReading = endKm;
     log.status = 'checked_out';
 
+    // Odometer-based distance
     if (endKm > 0 && log.startKmReading > 0) {
       log.totalDistance = Math.max(0, endKm - log.startKmReading);
     }
+
+    // GPS straight-line distance (Haversine) between check-in and check-out coordinates
+    const ciLat = log.checkIn?.latitude;
+    const ciLng = log.checkIn?.longitude;
+    const coLat = req.body.latitude || log.checkOut?.latitude;
+    const coLng = req.body.longitude || log.checkOut?.longitude;
+    if (ciLat && ciLng && coLat && coLng) {
+      const distMeters = getHaversineDistanceInMeters(ciLat, ciLng, coLat, coLng);
+      if (distMeters !== null) {
+        log.gpsDistance = Math.round((distMeters / 1000) * 100) / 100; // km, 2 decimal places
+      }
+    }
+
+    // Fallback: if no odometer readings provided, use GPS distance
+    if (!log.totalDistance && log.gpsDistance > 0) {
+      log.totalDistance = log.gpsDistance;
+    }
+
     await log.save();
     if (req.io) {
       req.io.emit('medrep_updated', { type: 'checkout', mrId: req.params.mrId });
@@ -261,6 +280,7 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
       const MedicalRepresentative = require('../../models/MedicalRepresentative');
       const StockMovement = require('../../models/StockMovement');
       const Product = require('../../models/Product');
+      const InventoryEntry = require('../../models/InventoryEntry');
 
       const mr = await MedicalRepresentative.findById(req.params.mrId);
       const count = await StockMovement.countDocuments({ type: 'sample' });
@@ -270,6 +290,8 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
       for (const s of data.sampleDetails) {
         let prodName = s.name;
         let pId = s.productId;
+        let batchNo = s.batchNo || '';
+
         if (pId) {
           const p = await Product.findById(pId);
           if (p) {
@@ -278,6 +300,18 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
             const qtyBoxes = Number(s.qty) || 1;
             p.stockLevel = Math.max(0, (p.stockLevel || 0) - qtyBoxes);
             await p.save();
+
+            // Look up batch number from inventory (FIFO — oldest mfgDate first) if not explicitly provided
+            if (!batchNo) {
+              const invEntry = await InventoryEntry.findOne({
+                productId: pId,
+                qtyBoxes: { $gt: 0 },
+                batchNo: { $ne: '' }
+              }).sort({ mfgDate: 1, createdAt: 1 }).lean();
+              if (invEntry && invEntry.batchNo) {
+                batchNo = invEntry.batchNo;
+              }
+            }
           }
         }
         items.push({
@@ -286,7 +320,8 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
           qty: Number(s.qty) || 1,
           packing: 1,
           rate: 0,
-          mrp: 0
+          mrp: 0,
+          batchNo: batchNo
         });
       }
 

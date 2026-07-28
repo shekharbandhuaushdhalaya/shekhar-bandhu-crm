@@ -19,6 +19,7 @@ export default function MedicalRepsScreen() {
   const styles = useStyles(createStyles);
   const perm = usePermission();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
@@ -103,14 +104,16 @@ export default function MedicalRepsScreen() {
     try {
       const res = await api.getMRs(mrSearch);
       setMrs(res);
-      // Auto-select first active MR for sub-tabs if not selected
+      // Auto-select logged-in MR by matching email, otherwise first active MR
       const active = res.filter(m => m.isActive);
       if (active.length > 0) {
-        setSelectedMrForAttendance(prev => prev || active[0]._id);
-        setSelectedMrForVisits(prev => prev || active[0]._id);
+        const loggedInMr = user?.email ? active.find(m => m.email?.toLowerCase() === user.email.toLowerCase()) : null;
+        const defaultMrId = loggedInMr ? loggedInMr._id : active[0]._id;
+        setSelectedMrForAttendance(prev => prev || defaultMrId);
+        setSelectedMrForVisits(prev => prev || defaultMrId);
       }
     } catch { }
-  }, [mrSearch]);
+  }, [mrSearch, user]);
 
   const loadAttendance = useCallback(async (mrId: string) => {
     if (!mrId) return;
@@ -922,12 +925,48 @@ export default function MedicalRepsScreen() {
                     </View>
                   </View>
 
-                  {log.totalDistance ? (
-                    <View style={styles.distanceFooter}>
-                      <Ionicons name="navigate-outline" size={14} color={colors.info} />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
-                        GPS Tracking Distance: <Text style={{ color: colors.info }}>{log.totalDistance} km</Text>
-                      </Text>
+                  {/* Odometer & GPS Distance Panel */}
+                  {(log.startKmReading || log.endKmReading || log.totalDistance || log.gpsDistance) ? (
+                    <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      {/* Odometer Row */}
+                      {(log.startKmReading || log.endKmReading) ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          <Ionicons name="speedometer-outline" size={14} color={colors.text.primary} />
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+                            Odometer: <Text style={{ color: colors.text.muted }}>{log.startKmReading || 0} km</Text>
+                            <Text style={{ color: colors.text.muted }}> → </Text>
+                            <Text style={{ color: colors.text.muted }}>{log.endKmReading || '—'} km</Text>
+                            {log.totalDistance ? (
+                              <Text style={{ color: colors.info, fontWeight: '800' }}> = {log.totalDistance} km</Text>
+                            ) : null}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {/* GPS Distance Row */}
+                      {log.gpsDistance ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          <Ionicons name="navigate-outline" size={14} color={colors.success} />
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+                            GPS Distance (straight line): <Text style={{ color: colors.success, fontWeight: '800' }}>{log.gpsDistance} km</Text>
+                          </Text>
+                        </View>
+                      ) : null}
+                      {/* Discrepancy Warning */}
+                      {log.totalDistance && log.gpsDistance && log.totalDistance > 0 && log.gpsDistance > 0 ? (() => {
+                        const diff = Math.abs(log.totalDistance - log.gpsDistance);
+                        const pct = (diff / Math.max(log.totalDistance, log.gpsDistance)) * 100;
+                        if (pct > 30) {
+                          return (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.warningLight, paddingVertical: 4, paddingHorizontal: 8, borderRadius: Radius.sm }}>
+                              <Ionicons name="warning-outline" size={13} color={colors.warning} />
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.warning }}>
+                                Odometer vs GPS differs by {pct.toFixed(0)}% — please verify
+                              </Text>
+                            </View>
+                          );
+                        }
+                        return null;
+                      })() : null}
                     </View>
                   ) : null}
                 </View>
@@ -1043,6 +1082,26 @@ export default function MedicalRepsScreen() {
               <View style={styles.formField}>
                 <Text style={styles.fieldLabelText}>End Odometer Reading (KM)</Text>
                 <TextInput style={styles.fieldInput} value={checkOutForm.endKmReading ? checkOutForm.endKmReading.toString() : ''} onChangeText={v => setCheckOutForm({ ...checkOutForm, endKmReading: Number(v) || 0 })} keyboardType="numeric" placeholder="e.g. 14265" placeholderTextColor={colors.text.muted} />
+                {/* GPS distance hint: estimate end KM from today's check-in GPS */}
+                {(() => {
+                  const todayLog = attendanceLogs.find(l => l.status === 'checked_in');
+                  if (todayLog?.startKmReading && todayLog.startKmReading > 0 && checkOutForm.latitude && checkOutForm.longitude && todayLog.checkIn?.latitude && todayLog.checkIn?.longitude) {
+                    const R = 6371;
+                    const dLat = ((checkOutForm.latitude - todayLog.checkIn.latitude) * Math.PI) / 180;
+                    const dLon = ((checkOutForm.longitude - todayLog.checkIn.longitude) * Math.PI) / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos((todayLog.checkIn.latitude * Math.PI)/180) * Math.cos((checkOutForm.latitude * Math.PI)/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const gpsDist = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+                    if (gpsDist > 0) {
+                      const suggestedEnd = todayLog.startKmReading + gpsDist;
+                      return (
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.info, marginTop: 4 }}>
+                          📡 GPS suggests ~{gpsDist} km travelled. Estimated end: {suggestedEnd} km
+                        </Text>
+                      );
+                    }
+                  }
+                  return null;
+                })()}
               </View>
             </View>
             <View style={styles.modalFooterRow}>
@@ -1413,6 +1472,11 @@ export default function MedicalRepsScreen() {
               const statusBg = e.status === 'approved' ? colors.successLight : e.status === 'rejected' ? colors.dangerLight : colors.warningLight;
               const statusFg = e.status === 'approved' ? colors.success : e.status === 'rejected' ? colors.danger : colors.warning;
 
+              // Resolve MR name for display
+              const mrName = typeof e.mrId === 'object' && e.mrId?.name
+                ? e.mrId.name
+                : mrs.find(m => m._id === (typeof e.mrId === 'string' ? e.mrId : e.mrId?._id))?.name || '';
+
               return (
                 <View key={e._id} style={styles.expenseCard}>
                   <View style={styles.expenseCardHeader}>
@@ -1425,6 +1489,11 @@ export default function MedicalRepsScreen() {
                         <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary, textTransform: 'capitalize' }}>{e.category} Claim</Text>
                         <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>₹{e.amount.toLocaleString('en-IN')}</Text>
                       </View>
+                      {mrName ? (
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, marginTop: 2 }}>
+                          👤 {mrName}
+                        </Text>
+                      ) : null}
                       <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 2 }}>
                         Submitted on {new Date(e.date).toLocaleDateString('en-IN')} {e.description ? `• ${e.description}` : ''}
                       </Text>

@@ -18,6 +18,7 @@ interface Props {
   prodBomId: string; setProdBomId: (v: string) => void;
   prodPlannedQty: string; setProdPlannedQty: (v: string) => void;
   prodBatchNo: string; setProdBatchNo: (v: string) => void;
+  prodExpiryDate: string; setProdExpiryDate: (v: string) => void;
   prodProductionType: 'in_house' | 'job_work'; setProdProductionType: (v: 'in_house' | 'job_work') => void;
   prodJobWorkMode: 'raw_materials_supplied' | 'direct_purchase' | 'none'; setProdJobWorkMode: (v: 'raw_materials_supplied' | 'direct_purchase' | 'none') => void;
   prodPackagingMode: 'packed_by_vendor' | 'self_packed'; setProdPackagingMode: (v: 'packed_by_vendor' | 'self_packed') => void;
@@ -38,7 +39,7 @@ export default function LaunchBatchModal({
   visible, products, vendors, manufacturingUnits, boms, materials,
   prodProductId, setProdProductId, prodBomId, setProdBomId,
   prodPlannedQty, setProdPlannedQty,
-  prodBatchNo, setProdBatchNo, prodProductionType, setProdProductionType,
+  prodBatchNo, setProdBatchNo, prodExpiryDate, setProdExpiryDate, prodProductionType, setProdProductionType,
   prodJobWorkMode, setProdJobWorkMode, prodPackagingMode, setProdPackagingMode,
   prodJobWorkerId, setProdJobWorkerId, prodJobWorkerName, setProdJobWorkerName,
   prodJobWorkerChallanRef, setProdJobWorkerChallanRef,
@@ -354,6 +355,15 @@ export default function LaunchBatchModal({
 
             <Text style={styles.inputLabel}>Finished Goods Production Batch No. *</Text>
             <TextInput style={styles.input} placeholder="e.g. ABH-JUL26-01" placeholderTextColor={colors.text.muted} value={prodBatchNo} onChangeText={setProdBatchNo} />
+
+            <Text style={styles.inputLabel}>Finished Goods Expiry Date</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="YYYY-MM-DD (set at launch, MFG date auto-filled on completion)"
+              placeholderTextColor={colors.text.muted}
+              value={prodExpiryDate}
+              onChangeText={setProdExpiryDate}
+            />
 
             {!isDirectPurchaseJobWork && (
               <Text style={styles.warningDisclaimer}>

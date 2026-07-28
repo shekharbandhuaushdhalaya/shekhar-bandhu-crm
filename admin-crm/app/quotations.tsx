@@ -98,6 +98,8 @@ const printQuotation = (invoice: Quotation) => {
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${i + 1}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:left;">${(it.name || '').replace(/\s+[0-9]+(?:\.[0-9]+)?[gG]$/, '')}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${it.hsnCode || ''}</td>
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;font-size:9px;">${it.mrp && it.mrp > 0 ? '₹' + Number(it.mrp).toFixed(2) : '—'}</td>
+          <td style="border-right: 1px solid #000; padding:1px 2px; text-align:center;">${it.discountPercent && it.discountPercent > 0 ? it.discountPercent + '%' : '—'}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${packing}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${qty}</td>
           <td style="border-right: 1px solid #000; padding:1px 2px; text-align:right;">${rate.toFixed(2)}</td>
@@ -179,9 +181,11 @@ const printQuotation = (invoice: Quotation) => {
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:4%;">S.No.</th>
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:24%;">Description of Goods</th>
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">HSN/SAC</th>
+            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">MRP</th>
+            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:5%;">Disc%</th>
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">Packing/Box</th>
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:6%;">No. of Boxes</th>
-            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:5%;">Price</th>
+            <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:5%;">Net Rate</th>
             <th rowspan="2" style="border-right: 1px solid #000; padding:4px; width:8%;">Taxable Amt</th>
             <th colspan="2" style="border-right: 1px solid #000; padding:4px; width:10%;">CGST</th>
             <th colspan="2" style="border-right: 1px solid #000; padding:4px; width:10%;">SGST</th>
@@ -213,12 +217,15 @@ const printQuotation = (invoice: Quotation) => {
             <td style="border-right: 1px solid #000;"></td>
             <td style="border-right: 1px solid #000;"></td>
             <td style="border-right: 1px solid #000;"></td>
+            <td style="border-right: 1px solid #000;"></td>
+            <td style="border-right: 1px solid #000;"></td>
+            <td style="border-right: 1px solid #000;"></td>
             <td></td>
           </tr>
         </tbody>
         <tfoot>
           <tr style="border-bottom: 1px solid #000;">
-            <td colspan="3" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>Sub-Total / Total Qty</strong></td>
+            <td colspan="5" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>Sub-Total / Total Qty</strong></td>
             <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalGoodsQty} Pcs.</strong></td>
             <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px; text-align:right;"><strong>${totalBoxes}</strong></td>
             <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding:4px;"></td>
@@ -387,7 +394,8 @@ const printQuotation = (invoice: Quotation) => {
 interface ExtendedQuotationItem extends QuotationItem {
   maxQty?: number;
   rateText?: string;
-  batchNo?: string;
+  mrpText?: string;
+  discountText?: string;
 }
 
 const toTitleCase = (str?: string) => {
@@ -724,7 +732,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
   const [activeItemDropdownIdx, setActiveItemDropdownIdx] = useState<number | null>(null);
   const [itemSearchText, setItemSearchText] = useState('');
 
-  const [items, setItems] = useState<ExtendedQuotationItem[]>([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0 }]);
+  const [items, setItems] = useState<ExtendedQuotationItem[]>([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', mrp: 0, mrpText: '', discountPercent: 0, discountText: '', gstRate: 0 }]);
 
   useEffect(() => {
     if (visible) {
@@ -746,6 +754,11 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
           boxes: it.boxes !== undefined ? it.boxes : it.qty,
           rate: it.rate,
           rateText: it.rate.toString(),
+          mrp: it.mrp || 0,
+          mrpText: it.mrp ? it.mrp.toString() : '',
+          discountPercent: it.discountPercent || 0,
+          discountText: it.discountPercent ? it.discountPercent.toString() : '',
+          batchNo: it.batchNo || '',
           packing: it.packing || 1,
           hsnCode: it.hsnCode || '',
           gstRate: it.gstRate || 0
@@ -901,11 +914,17 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
     const gst = product ? (product.gstRate || FIRM_DETAILS.defaultGstRate) : FIRM_DETAILS.defaultGstRate;
     const hsn = product ? (product.hsnCode || '') : '';
 
+    const productMrp = product ? (product.mrp || product.price || 0) : 0;
+
     next[idx] = {
       productId: entry.productId,
       name: getInventoryEntryDisplayName(entry),
       qty: 1,
       boxes: 1,
+      mrp: productMrp,
+      mrpText: productMrp > 0 ? productMrp.toString() : '',
+      discountPercent: 0,
+      discountText: '',
       rate: price,
       rateText: price.toString(),
       packing: entry.packing || 1,
@@ -929,8 +948,8 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
 
     // Quotations do not check stock levels
 
-    // Strip maxQty before saving
-    const finalItems = validItems.map(({ maxQty, ...rest }) => rest);
+    // Strip UI-only fields before saving
+    const finalItems = validItems.map(({ maxQty, rateText, mrpText, discountText, ...rest }) => rest);
 
     try {
       const selectedWarehouse = warehouses.find(w => w._id === warehouseId);
@@ -970,7 +989,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
     }
   };
 
-  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '' }, ...items]);
+  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', mrp: 0, mrpText: '', discountPercent: 0, discountText: '', gstRate: 0, batchNo: '' }, ...items]);
   const removeItemRow = (idx: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== idx));
@@ -1294,10 +1313,10 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                   )}
                 </View>
 
-                {/* Bottom line: Qty, Rate, Subtotal, Remove */}
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, alignItems: 'center' }}>
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={styles.itemSublabel}>Pcs</Text>
+                {/* Bottom line: Qty, MRP, Disc %, Net Rate, Subtotal, Remove */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <View style={{ flex: 1, minWidth: 70 }}>
+                    <Text style={styles.itemSublabel}>Boxes</Text>
                     <TextInput
                       style={[styles.itemInput, hasError && { borderColor: colors.danger, borderWidth: 1 }]}
                       placeholder="Qty"
@@ -1306,14 +1325,60 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                       value={it.qty.toString()}
                       onChangeText={(v) => {
                         const next = [...items];
-                        next[idx].qty = parseInt(v) || 0;
+                        const val = parseInt(v) || 0;
+                        next[idx].qty = val;
+                        next[idx].boxes = val;
                         setItems(next);
                       }}
                     />
                   </View>
 
-                  <View style={{ flex: 1.5 }}>
-                    <Text style={styles.itemSublabel}>Rate (₹)</Text>
+                  <View style={{ flex: 1.2, minWidth: 80 }}>
+                    <Text style={styles.itemSublabel}>MRP (₹)</Text>
+                    <TextInput
+                      style={styles.itemInput}
+                      placeholder="0.00"
+                      placeholderTextColor={colors.text.muted}
+                      keyboardType="numeric"
+                      value={it.mrpText !== undefined ? it.mrpText : (it.mrp || 0).toString()}
+                      onChangeText={(v) => {
+                        const next = [...items];
+                        const mrpVal = parseFloat(v) || 0;
+                        next[idx].mrpText = v;
+                        next[idx].mrp = mrpVal;
+                        const disc = next[idx].discountPercent || 0;
+                        const computedRate = mrpVal > 0 ? (disc > 0 ? mrpVal * (1 - disc / 100) : mrpVal) : (next[idx].rate || 0);
+                        next[idx].rate = computedRate;
+                        next[idx].rateText = computedRate > 0 ? computedRate.toString() : '';
+                        setItems(next);
+                      }}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1, minWidth: 70 }}>
+                    <Text style={styles.itemSublabel}>Disc (%)</Text>
+                    <TextInput
+                      style={styles.itemInput}
+                      placeholder="0%"
+                      placeholderTextColor={colors.text.muted}
+                      keyboardType="numeric"
+                      value={it.discountText !== undefined ? it.discountText : (it.discountPercent || 0).toString()}
+                      onChangeText={(v) => {
+                        const next = [...items];
+                        const discVal = parseFloat(v) || 0;
+                        next[idx].discountText = v;
+                        next[idx].discountPercent = discVal;
+                        const mrpVal = next[idx].mrp || next[idx].rate || 0;
+                        const computedRate = mrpVal > 0 ? mrpVal * (1 - discVal / 100) : (next[idx].rate || 0);
+                        next[idx].rate = computedRate;
+                        next[idx].rateText = computedRate > 0 ? computedRate.toString() : '';
+                        setItems(next);
+                      }}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1.2, minWidth: 80 }}>
+                    <Text style={styles.itemSublabel}>Net Rate (₹)</Text>
                     <TextInput
                       style={styles.itemInput}
                       placeholder="Rate"
@@ -1322,16 +1387,23 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                       value={it.rateText !== undefined ? it.rateText : (it.rate || 0).toString()}
                       onChangeText={(v) => {
                         const next = [...items];
+                        const netRate = parseFloat(v) || 0;
                         next[idx].rateText = v;
-                        next[idx].rate = parseFloat(v) || 0;
+                        next[idx].rate = netRate;
+                        const mrpVal = next[idx].mrp || 0;
+                        if (mrpVal > 0 && mrpVal >= netRate) {
+                          const computedDisc = ((mrpVal - netRate) / mrpVal) * 100;
+                          next[idx].discountPercent = parseFloat(computedDisc.toFixed(1));
+                          next[idx].discountText = computedDisc > 0 ? computedDisc.toFixed(1) : '';
+                        }
                         setItems(next);
                       }}
                     />
                   </View>
 
-                  <View style={{ flex: 2, alignItems: 'flex-end', justifyContent: 'center', minHeight: 40, marginTop: 12 }}>
-                    <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '600' }}>Amount</Text>
-                    <Text style={{ fontSize: 13, color: colors.success, fontWeight: '800' }}>
+                  <View style={{ flex: 1.5, minWidth: 90, alignItems: 'flex-end', justifyContent: 'center', minHeight: 40, marginTop: 12 }}>
+                    <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '600' }}>Amount</Text>
+                    <Text style={{ fontSize: 12, color: colors.success, fontWeight: '800' }}>
                       ₹{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Text>
                   </View>
@@ -1344,9 +1416,25 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                 </View>
 
                 {it.productId ? (
-                  <Text style={{ fontSize: 10, color: hasError ? colors.danger : colors.text.muted, marginTop: 4, fontWeight: '600' }}>
-                    {hasError ? `Error: Exceeds stock limit of ${maxQty} pcs` : `Available stock: ${maxQty} pcs`}
-                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                    <Text style={{ fontSize: 10, color: hasError ? colors.danger : colors.text.muted, fontWeight: '600' }}>
+                      {hasError ? `⚠ Exceeds stock: ${maxQty} boxes` : `Stock: ${maxQty} boxes (Pack: ${it.packing || 1})`}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="barcode-outline" size={11} color={colors.primary} />
+                      <TextInput
+                        style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace', borderBottomWidth: 1, borderBottomColor: colors.primary + '50', minWidth: 80, paddingVertical: 1 }}
+                        placeholder="Batch No."
+                        placeholderTextColor={colors.text.muted}
+                        value={it.batchNo || ''}
+                        onChangeText={(v) => {
+                          const next = [...items];
+                          next[idx].batchNo = v;
+                          setItems(next);
+                        }}
+                      />
+                    </View>
+                  </View>
                 ) : null}
               </View>
             );

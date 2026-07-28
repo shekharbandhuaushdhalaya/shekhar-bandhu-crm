@@ -147,7 +147,7 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    filter.mode = 'pakka';
+    filter.mode = { $in: ['pakka', 'regular'] };
 
     const challans = await Challan.find(filter).sort({ date: -1, challanNo: -1 }).lean();
     res.json(challans);
