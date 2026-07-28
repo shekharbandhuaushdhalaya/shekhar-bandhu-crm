@@ -8,19 +8,26 @@ const router = express.Router();
 // GET /api/raw-materials — List all raw materials
 router.get('/', async (req, res) => {
   try {
-    const { warehouseId } = req.query;
+    const { warehouseId, simple } = req.query;
     const rawMaterials = await RawMaterial.find({}).sort({ name: 1 }).lean();
-    
-    // Enrich with aggregated live stock level
-    const entryFilter = {};
-    if (warehouseId && warehouseId !== 'all') {
-      entryFilter.warehouseId = warehouseId;
+
+    if (simple === 'true') {
+      return res.json(rawMaterials);
     }
-    const entries = await RawMaterialEntry.find(entryFilter).lean();
+
+    // Enrich with aggregated live stock level using MongoDB aggregation
+    const matchStage = {};
+    if (warehouseId && warehouseId !== 'all') {
+      matchStage.warehouseId = warehouseId;
+    }
+    const pipeline = [{ $group: { _id: '$rawMaterialId', totalQty: { $sum: '$qty' } } }];
+    if (Object.keys(matchStage).length > 0) {
+      pipeline.unshift({ $match: matchStage });
+    }
+    const stockAgg = await RawMaterialEntry.aggregate(pipeline);
     const stockMap = {};
-    entries.forEach(e => {
-      const rId = e.rawMaterialId.toString();
-      stockMap[rId] = (stockMap[rId] || 0) + (e.qty || 0);
+    stockAgg.forEach(s => {
+      stockMap[s._id.toString()] = s.totalQty || 0;
     });
 
     const enriched = rawMaterials.map(rm => ({

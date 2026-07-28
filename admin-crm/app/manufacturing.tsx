@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -101,6 +101,7 @@ export default function ManufacturingScreen() {
   const [stageNotes, setStageNotes] = useState('');
   const [stageModalVisible, setStageModalVisible] = useState(false);
   const [stageError, setStageError] = useState('');
+  const [stageIngredients, setStageIngredients] = useState<{ rawMaterialId: string; name: string; unit: string; qtyNeeded: number; wastage: string }[]>([]);
 
   // Search & Filter States — Raw Materials tab
   const [materialSearch, setMaterialSearch] = useState('');
@@ -259,16 +260,12 @@ export default function ManufacturingScreen() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [rmsData, entriesData, bomsData, batchesData, prodsData, vendsData, alertsData, analyticsData, whData, mfgUnitsData] = await Promise.all([
+      const [rmsData, entriesData, bomsData, batchesData, prodsData, mfgUnitsData] = await Promise.all([
         api.getRawMaterials(mfgUnitFilter === 'all' ? undefined : mfgUnitFilter),
         api.getRawMaterialEntries(),
         api.getBOMs(),
         api.getBatchProductions(),
         api.getProducts(),
-        api.getVendors(),
-        api.getRawMaterialExpiryAlerts(),
-        api.getManufacturingAnalytics(),
-        api.getWarehouses(),
         api.getManufacturingUnits()
       ]);
 
@@ -277,14 +274,16 @@ export default function ManufacturingScreen() {
       setBoms(bomsData);
       setBatches(batchesData);
       setProducts(prodsData);
-      setVendors(vendsData);
-      setExpiryAlerts(alertsData);
-      setMfgAnalytics(analyticsData);
-      setWarehouses(whData);
       setManufacturingUnits(mfgUnitsData);
       if (mfgUnitsData && mfgUnitsData.length > 0) {
         setProdManufacturingUnitId(prev => prev || mfgUnitsData[0]._id);
       }
+
+      // Lazy-load non-critical data (vendors, alerts, analytics, warehouses) in background
+      api.getVendors().then(setVendors).catch(() => {});
+      api.getRawMaterialExpiryAlerts().then(setExpiryAlerts).catch(() => {});
+      api.getManufacturingAnalytics().then(setMfgAnalytics).catch(() => {});
+      api.getWarehouses().then(setWarehouses).catch(() => {});
     } catch (err) {
       console.error('Failed to load manufacturing workspace data:', err);
     } finally {
@@ -293,15 +292,49 @@ export default function ManufacturingScreen() {
     }
   }, [mfgUnitFilter]);
 
+  // Debounce timer for inventory_updated — fires frequently (18+ sources)
+  const inventoryDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     loadData();
 
-    const sub1 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => loadData());
-    const sub2 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => loadData());
-    const sub3 = DeviceEventEmitter.addListener('mfg_batch_completed_event', () => loadData());
-    const sub4 = DeviceEventEmitter.addListener('mfg_batch_cancelled_event', () => loadData());
-    const sub5 = DeviceEventEmitter.addListener('qc_hold_alert_event', () => loadData());
-    const sub6 = DeviceEventEmitter.addListener('inventory_updated_event', () => loadData());
+    // Selective socket handlers: update only what changed via the event payload
+    const sub1 = DeviceEventEmitter.addListener('mfg_stage_updated_event', (data) => {
+      if (data?._id) {
+        setBatches(prev => prev.map(b => b._id === data._id ? data : b));
+      }
+    });
+    const sub2 = DeviceEventEmitter.addListener('mfg_batch_created_event', (data) => {
+      if (data?._id) {
+        setBatches(prev => [data, ...prev]);
+      }
+    });
+    const sub3 = DeviceEventEmitter.addListener('mfg_batch_completed_event', (data) => {
+      if (data?._id) {
+        setBatches(prev => prev.map(b => b._id === data._id ? data : b));
+      }
+    });
+    const sub4 = DeviceEventEmitter.addListener('mfg_batch_cancelled_event', (data) => {
+      if (data?._id) {
+        setBatches(prev => prev.map(b => b._id === data._id ? data : b));
+      }
+    });
+    const sub5 = DeviceEventEmitter.addListener('qc_hold_alert_event', () => {
+      api.getRawMaterialExpiryAlerts().then(setExpiryAlerts).catch(() => {});
+    });
+    // Debounced: only refresh materials/entries (not all 10 endpoints)
+    const sub6 = DeviceEventEmitter.addListener('inventory_updated_event', () => {
+      if (inventoryDebounceRef.current) clearTimeout(inventoryDebounceRef.current);
+      inventoryDebounceRef.current = setTimeout(() => {
+        Promise.all([
+          api.getRawMaterials(mfgUnitFilter === 'all' ? undefined : mfgUnitFilter),
+          api.getRawMaterialEntries(),
+        ]).then(([rms, ents]) => {
+          setMaterials(rms);
+          setEntries(ents);
+        }).catch(() => {});
+      }, 800);
+    });
 
     return () => {
       sub1.remove();
@@ -310,8 +343,9 @@ export default function ManufacturingScreen() {
       sub4.remove();
       sub5.remove();
       sub6.remove();
+      if (inventoryDebounceRef.current) clearTimeout(inventoryDebounceRef.current);
     };
-  }, [loadData]);
+  }, [loadData, mfgUnitFilter]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -740,6 +774,30 @@ export default function ManufacturingScreen() {
     setStageOperator('Operator');
     setStageNotes('');
     setStageError('');
+    const batch = batches.find(b => b._id === batchId);
+    if (batch) {
+      const stage = batch.stages[idx];
+      const stageName = stage.name;
+      const plannedQty = batch.plannedQty || 0;
+      const ingredients = (batch.bomSnapshot?.ingredients || []).filter(
+        i => i.stageName && i.stageName.trim().toLowerCase() === stageName.trim().toLowerCase()
+      );
+      const computed = ingredients.map(i => {
+        const rmId = typeof i.rawMaterialId === 'string' ? i.rawMaterialId : (i.rawMaterialId as any)?._id || '';
+        const rm = materials.find(r => r._id === rmId);
+        const qtyNeeded = (i.qtyRequired || 0) * (plannedQty / 100);
+        return {
+          rawMaterialId: rmId,
+          name: rm?.name || 'Unknown',
+          unit: rm?.unit || 'kg',
+          qtyNeeded,
+          wastage: '0',
+        };
+      });
+      setStageIngredients(computed);
+    } else {
+      setStageIngredients([]);
+    }
     setStageModalVisible(true);
   };
 
@@ -750,6 +808,7 @@ export default function ManufacturingScreen() {
     setStageOperator('Operator');
     setStageNotes('');
     setStageError('');
+    setStageIngredients([]);
     setStageModalVisible(true);
   };
 
@@ -760,6 +819,7 @@ export default function ManufacturingScreen() {
     setStageOperator('QC Inspector');
     setStageNotes('');
     setStageError('');
+    setStageIngredients([]);
     setStageModalVisible(true);
   };
 
@@ -783,10 +843,16 @@ export default function ManufacturingScreen() {
       if (stageAction === 'skip') statusVal = 'skipped';
       if (stageAction === 'fail') statusVal = 'failed';
 
+      const siPayload = stageIngredients.map(si => ({
+        rawMaterialId: si.rawMaterialId,
+        qtyNeeded: si.qtyNeeded,
+        wastage: parseFloat(si.wastage) || 0,
+      }));
       await api.advanceStage(stageBatchId, stageIndex, {
         status: statusVal,
         completedBy: stageOperator.trim(),
-        notes: stageNotes.trim()
+        notes: stageNotes.trim(),
+        ...(stageAction === 'advance' && siPayload.length > 0 ? { stageIngredients: siPayload } : {}),
       });
 
       setStageAction(null);
@@ -794,6 +860,7 @@ export default function ManufacturingScreen() {
       setStageIndex(null);
       setStageOperator('Operator');
       setStageNotes('');
+      setStageIngredients([]);
       setCurrentInProgressStage(null);
       setStageModalVisible(false);
       loadData();
@@ -801,6 +868,14 @@ export default function ManufacturingScreen() {
       setCurrentInProgressStage(null);
       setStageError(err.message || 'Failed to update stage');
     }
+  };
+
+  const handleStageIngredientChange = (index: number, field: 'wastage', value: string) => {
+    setStageIngredients(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
   const handleOpenGenealogy = async (type: 'batch' | 'material', id: string) => {
@@ -2558,13 +2633,13 @@ export default function ManufacturingScreen() {
       {/* ======================================================== */}
       <Modal visible={stageModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setStageModalVisible(false)} />
+          <Pressable style={styles.modalBackdrop} onPress={() => { setStageModalVisible(false); setStageIngredients([]); }} />
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {stageAction === 'advance' ? 'Complete Manufacturing Stage' : 'Skip Manufacturing Stage'}
               </Text>
-              <TouchableOpacity onPress={() => setStageModalVisible(false)}>
+              <TouchableOpacity onPress={() => { setStageModalVisible(false); setStageIngredients([]); }}>
                 <Ionicons name="close" size={20} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
@@ -2597,9 +2672,49 @@ export default function ManufacturingScreen() {
                 multiline
                 numberOfLines={3}
               />
+
+              {stageAction === 'advance' && stageIngredients.length > 0 && (
+                <View style={{ marginTop: 16 }}>
+                  <Text style={[styles.inputLabel, { fontSize: 15, marginBottom: 8 }]}>
+                    Stage Ingredients — Wastage Entry
+                  </Text>
+                  {stageIngredients.map((si, siIdx) => (
+                    <View
+                      key={si.rawMaterialId + siIdx}
+                      style={{
+                        backgroundColor: colors.surfaceVariant,
+                        borderRadius: 10,
+                        padding: 12,
+                        marginBottom: 10,
+                        borderLeftWidth: 3,
+                        borderLeftColor: colors.accent,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontWeight: '600', fontSize: 14, color: colors.text.primary }}>{si.name}</Text>
+                          <Text style={{ fontSize: 12, color: colors.text.muted, marginTop: 2 }}>Required Qty: {si.qtyNeeded.toFixed(2)} {si.unit}</Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 3 }}>Wastage (loss)</Text>
+                          <TextInput
+                            style={[styles.input, { height: 40, paddingVertical: 4 }]}
+                            keyboardType="decimal-pad"
+                            value={si.wastage}
+                            onChangeText={v => handleStageIngredientChange(siIdx, 'wastage', v)}
+                            placeholderTextColor={colors.text.muted}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
             </ScrollView>
             <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setStageModalVisible(false)}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setStageModalVisible(false); setStageIngredients([]); }}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity

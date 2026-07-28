@@ -480,6 +480,11 @@ export type ManufacturingStage = {
   completedAt?: string;
   completedBy?: string;
   notes?: string;
+  inputQty?: number;
+  outputQty?: number;
+  lossQty?: number;
+  lossPercent?: number;
+  lossReason?: string;
 };
 
 export type BatchProductionIngredient = {
@@ -524,6 +529,17 @@ export type BatchProduction = {
     labReportRef?: string;
   };
   supportingDocuments?: { name: string; url: string; uploadedAt?: string }[];
+  bomSnapshot?: {
+    recipeName?: string;
+    recipeVersion?: string;
+    ingredients?: {
+      rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
+      itemType?: string;
+      qtyRequired: number;
+      stageName?: string;
+    }[];
+    stages?: { name: string; targetDurationDays?: number }[];
+  };
 };
 
 export type Complaint = {

@@ -10,4 +10,7 @@ const rawMaterialSchema = new mongoose.Schema({
   defaultStageName: { type: String, default: '', trim: true }, // which manufacturing stage this material is typically consumed in (e.g. 'Packaging & Labeling')
 }, { timestamps: true });
 
+rawMaterialSchema.index({ name: 1 });
+rawMaterialSchema.index({ category: 1 });
+
 module.exports = mongoose.model('RawMaterial', rawMaterialSchema);

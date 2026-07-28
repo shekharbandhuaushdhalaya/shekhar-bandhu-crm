@@ -29,6 +29,7 @@ const stageSchema = new mongoose.Schema({
   lossQty: { type: Number, default: 0 },         // loss at this stage (inputQty - outputQty)
   lossPercent: { type: Number, default: 0 },     // (lossQty / inputQty) * 100
   lossReason: { type: String, default: '' },     // evaporation, sediment, spillage, etc.
+  ingredientsDeducted: { type: Boolean, default: false },
 }, { _id: false });
 
 const batchProductionSchema = new mongoose.Schema({

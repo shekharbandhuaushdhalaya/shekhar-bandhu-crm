@@ -17,6 +17,7 @@ router.get('/', async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     const batches = await BatchProduction.find({})
+      .select('-bomSnapshot.stages -yields')
       .populate('productId', 'name sku size packing')
       .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
       .sort({ createdAt: -1 })
@@ -129,7 +130,8 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
         for (const ing of bom.ingredients) {
           const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
           const isPackaging = ing.itemType === 'packaging' || (rm && rm.category === 'Packaging');
-          if (!isPackaging) {
+          const hasStage = ing.stageName && ing.stageName.trim().length > 0;
+          if (!isPackaging && !hasStage) {
             let qtyNeeded;
             if (effectiveYields) {
               // For multi-size: sum formulation per variant scaled by volume ratio
@@ -354,6 +356,61 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
         }
       } else {
         batch.packagingDeducted = true;
+      }
+    }
+
+    // Deduct stage-tied ingredients from inventory (FIFO) when stage is completed
+    // Guard: skip if already deducted to prevent double-deduction on re-completion
+    if (!currentStage.ingredientsDeducted) {
+      const RawMaterialEntry = require('../../models/RawMaterialEntry');
+      const stageIngredients = req.body.stageIngredients;
+      if (newStatus === 'completed' && stageIngredients && stageIngredients.length > 0) {
+        let totalInputQty = 0;
+        let totalLossQty = 0;
+        for (const si of stageIngredients) {
+          const qtyNeeded = Number(si.qtyNeeded) || 0;
+          const wastage = Number(si.wastage) || 0;
+          if (qtyNeeded <= 0) continue;
+
+          const entries = await RawMaterialEntry.find({ rawMaterialId: si.rawMaterialId, warehouseId: batch.manufacturingUnitId });
+          entries.sort((a, b) => {
+            if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
+            if (a.expiryDate && !b.expiryDate) return -1;
+            if (!a.expiryDate && b.expiryDate) return 1;
+            return new Date(a.createdAt) - new Date(b.createdAt);
+          });
+
+          let needed = qtyNeeded;
+          for (const entry of entries) {
+            if (needed <= 0.0001) break;
+            if ((entry.qty || 0) <= 0) continue;
+            const rawDeduct = Math.min(needed, entry.qty);
+            const deduct = Number(rawDeduct.toFixed(2));
+            if (deduct <= 0) continue;
+
+            entry.qty = Math.max(0, Number((entry.qty - deduct).toFixed(2)));
+            await entry.save();
+
+            batch.rawMaterialCost += deduct * (entry.purchaseRate || 0);
+            batch.ingredientsConsumed.push({
+              rawMaterialId: si.rawMaterialId,
+              rawMaterialEntryId: entry._id,
+              qtyConsumed: deduct,
+              batchNo: entry.batchNo
+            });
+            needed -= deduct;
+          }
+
+          totalInputQty += qtyNeeded;
+          totalLossQty += wastage;
+        }
+
+        currentStage.inputQty = (currentStage.inputQty || 0) + totalInputQty;
+        currentStage.lossQty = (currentStage.lossQty || 0) + totalLossQty;
+        currentStage.outputQty = Math.max(0, currentStage.inputQty - currentStage.lossQty);
+        currentStage.lossPercent = currentStage.inputQty > 0 ? Number(((currentStage.lossQty / currentStage.inputQty) * 100).toFixed(2)) : 0;
+        if (req.body.lossReason) currentStage.lossReason = req.body.lossReason;
+        currentStage.ingredientsDeducted = true;
       }
     }
 

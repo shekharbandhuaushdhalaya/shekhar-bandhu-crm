@@ -740,6 +740,11 @@ const batchStageUpdateSchema = z.object({
   inputQty: z.number().min(0).optional(),
   outputQty: z.number().min(0).optional(),
   lossReason: z.string().optional(),
+  stageIngredients: z.array(z.object({
+    rawMaterialId: z.string(),
+    qtyNeeded: z.number().min(0),
+    wastage: z.number().min(0).optional(),
+  })).optional(),
 });
 
 const cleaningAdjustmentSchema = z.object({

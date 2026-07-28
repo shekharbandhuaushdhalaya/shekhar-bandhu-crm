@@ -98,7 +98,7 @@ class ApiClient {
 
   private activeRequests = 0;
   private cacheStore: Record<string, { data: any, timestamp: number }> = {};
-  private cacheTTL = 3000; // 3 seconds
+  private cacheTTL = 15000; // 15 seconds (stale data is patched via socket events)
 
   clearCache() {
     this.cacheStore = {};
@@ -851,8 +851,12 @@ class ApiClient {
   }
 
   // --- Raw Materials ---
-  async getRawMaterials(warehouseId?: string): Promise<RawMaterial[]> {
-    const url = warehouseId ? `${API_BASE}/raw-materials?warehouseId=${encodeURIComponent(warehouseId)}` : `${API_BASE}/raw-materials`;
+  async getRawMaterials(warehouseId?: string, simple?: boolean): Promise<RawMaterial[]> {
+    const params = new URLSearchParams();
+    if (warehouseId) params.set('warehouseId', warehouseId);
+    if (simple) params.set('simple', 'true');
+    const qs = params.toString();
+    const url = qs ? `${API_BASE}/raw-materials?${qs}` : `${API_BASE}/raw-materials`;
     const res = await this.request(url);
     return res.json();
   }
@@ -918,7 +922,7 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
-  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string }): Promise<BatchProduction> {
+  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; stageIngredients?: { rawMaterialId: string; qtyNeeded: number; wastage?: number }[] }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
