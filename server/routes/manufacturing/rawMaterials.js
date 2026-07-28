@@ -37,7 +37,7 @@ router.get('/', async (req, res) => {
 // POST /api/raw-materials — Create raw material definition
 router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
   try {
-    const { name, unit, minReorder, category } = req.body;
+    const { name, unit, minReorder, category, defaultStageName } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'Name is required' });
     }
@@ -57,7 +57,8 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
       sku: computedSku,
       unit: unit || 'kg',
       minReorder: Number(minReorder) || 0,
-      category: category || 'Herb'
+      category: category || 'Herb',
+      defaultStageName: defaultStageName || ''
     });
 
     res.status(201).json(newRM);
@@ -69,7 +70,7 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
 // PUT /api/raw-materials/:id — Update raw material definition
 router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, res) => {
   try {
-    const { name, unit, minReorder, category } = req.body;
+    const { name, unit, minReorder, category, defaultStageName } = req.body;
     const updateFields = {};
     if (name !== undefined) {
       updateFields.name = name.trim();
@@ -87,6 +88,7 @@ router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, re
     if (unit !== undefined) updateFields.unit = unit;
     if (minReorder !== undefined) updateFields.minReorder = Number(minReorder) || 0;
     if (category !== undefined) updateFields.category = category;
+    if (defaultStageName !== undefined) updateFields.defaultStageName = defaultStageName;
 
     const updated = await RawMaterial.findByIdAndUpdate(
       req.params.id,

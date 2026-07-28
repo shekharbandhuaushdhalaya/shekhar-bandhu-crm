@@ -112,6 +112,7 @@ export default function ManufacturingScreen() {
   const [rmUnit, setRmUnit] = useState('kg');
   const [rmCategory, setRmCategory] = useState<string>('Herb');
   const [rmMinReorder, setRmMinReorder] = useState('10');
+  const [rmDefaultStage, setRmDefaultStage] = useState('');
   const [rmError, setRmError] = useState('');
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
 
@@ -326,12 +327,14 @@ export default function ManufacturingScreen() {
     }
     setRmError('');
     try {
+      const stageVal = rmDefaultStage.trim();
       if (editingMaterialId) {
         await api.updateRawMaterial(editingMaterialId, {
           name: rmName.trim(),
           unit: rmUnit,
           category: rmCategory,
-          minReorder: Number(rmMinReorder) || 0
+          minReorder: Number(rmMinReorder) || 0,
+          defaultStageName: stageVal
         });
       } else {
         await api.createRawMaterial({
@@ -339,7 +342,8 @@ export default function ManufacturingScreen() {
           sku: rmSku.trim() || undefined,
           unit: rmUnit,
           category: rmCategory,
-          minReorder: Number(rmMinReorder) || 0
+          minReorder: Number(rmMinReorder) || 0,
+          defaultStageName: stageVal
         });
       }
       setRmName('');
@@ -347,6 +351,7 @@ export default function ManufacturingScreen() {
       setRmUnit('kg');
       setRmCategory('Herb');
       setRmMinReorder('10');
+      setRmDefaultStage('');
       setEditingMaterialId(null);
       setMaterialModalVisible(false);
       loadData();
@@ -362,6 +367,7 @@ export default function ManufacturingScreen() {
     setRmUnit(rm.unit);
     setRmCategory(rm.category || 'Herb');
     setRmMinReorder(rm.minReorder ? rm.minReorder.toString() : '0');
+    setRmDefaultStage((rm as any).defaultStageName || '');
     setRmError('');
     setMaterialModalVisible(true);
   };
@@ -413,8 +419,9 @@ export default function ManufacturingScreen() {
         const next = { ...item, [key]: value };
         if (key === 'rawMaterialId' && value) {
           const mat = materials.find(m => m._id === value);
-          if (mat && (mat as any).category === 'Packaging' && !next.stageName) {
-            next.stageName = 'Packaging & Labeling';
+          const defaultStage = mat && (mat as any).defaultStageName;
+          if (defaultStage && !next.stageName) {
+            next.stageName = defaultStage;
           }
         }
         return next;
@@ -2054,6 +2061,7 @@ export default function ManufacturingScreen() {
         rmUnit={rmUnit} setRmUnit={setRmUnit}
         rmCategory={rmCategory} setRmCategory={setRmCategory}
         rmMinReorder={rmMinReorder} setRmMinReorder={setRmMinReorder}
+        rmDefaultStage={rmDefaultStage} setRmDefaultStage={setRmDefaultStage}
         rmError={rmError}
         onClose={handleCloseMaterialModal}
         onSave={handleSaveMaterial}

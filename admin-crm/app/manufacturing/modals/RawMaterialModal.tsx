@@ -12,6 +12,7 @@ interface Props {
   rmUnit: string; setRmUnit: (v: string) => void;
   rmCategory: string; setRmCategory: (v: string) => void;
   rmMinReorder: string; setRmMinReorder: (v: string) => void;
+  rmDefaultStage: string; setRmDefaultStage: (v: string) => void;
   rmError: string;
   onClose: () => void;
   onSave: () => void;
@@ -19,7 +20,8 @@ interface Props {
 
 export default function RawMaterialModal({
   visible, editingMaterialId, rmName, setRmName, rmSku, rmUnit, setRmUnit,
-  rmCategory, setRmCategory, rmMinReorder, setRmMinReorder, rmError, onClose, onSave
+  rmCategory, setRmCategory, rmMinReorder, setRmMinReorder,
+  rmDefaultStage, setRmDefaultStage, rmError, onClose, onSave
 }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
@@ -79,6 +81,18 @@ export default function RawMaterialModal({
 
             <Text style={styles.inputLabel}>Min Reorder Stock level</Text>
             <TextInput style={styles.input} placeholder="e.g. 10" placeholderTextColor={colors.text.muted} value={rmMinReorder} onChangeText={setRmMinReorder} keyboardType="numeric" />
+
+            <Text style={styles.inputLabel}>Default Manufacturing Stage (optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Packaging & Labeling, Boiling, Grinding..."
+              placeholderTextColor={colors.text.muted}
+              value={rmDefaultStage}
+              onChangeText={setRmDefaultStage}
+            />
+            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 10 }}>
+              When this material is added to a recipe, the stage will auto-fill.
+            </Text>
           </ScrollView>
           <View style={styles.modalFooter}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
