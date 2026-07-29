@@ -812,14 +812,24 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                     <Text style={styles.itemSubTextDetail}>
                       {it.hsnCode ? `HSN: ${it.hsnCode} | ` : ''}{it.discountPercent && it.discountPercent > 0 ? `MRP: ₹${(it.mrp || rate).toFixed(2)} (Disc: ${it.discountPercent}%) | Net: ` : ''}Rate: ₹{rate.toFixed(2)}/pc | Qty: {it.qty} boxes {it.packing !== undefined && it.packing > 1 ? `(${it.packing} pcs/box)` : ''}
                     </Text>
-                    {(it as any).batchNo ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                        <Ionicons name="barcode-outline" size={11} color={colors.primary} />
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace' }}>
-                          Batch: {(it as any).batchNo}
-                        </Text>
-                      </View>
-                    ) : null}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                      {(it as any).batchNo ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="barcode-outline" size={11} color={colors.primary} />
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace' }}>
+                            Batch: {(it as any).batchNo}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {(it as any).expiryDate ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="calendar-outline" size={11} color={colors.danger} />
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: colors.danger }}>
+                            Exp: {new Date((it as any).expiryDate).toLocaleDateString('en-IN')}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
                   <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
                     <Text style={styles.itemQtyText}>₹{sub.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
@@ -1076,7 +1086,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const [activeItemDropdownIdx, setActiveItemDropdownIdx] = useState<number | null>(null);
   const [itemSearchText, setItemSearchText] = useState('');
 
-  const [items, setItems] = useState<ExtendedInvoiceItem[]>([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '', mfgDate: '', expiryDate: '' }]);
+  const [items, setItems] = useState<ExtendedInvoiceItem[]>([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, hsnCode: '', batchNo: '', mfgDate: '', expiryDate: '' }]);
 
   useEffect(() => {
     if (visible) {
@@ -1400,7 +1410,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     }
   };
 
-  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, batchNo: '', mfgDate: '', expiryDate: '' }, ...items]);
+  const addItemRow = () => setItems([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', gstRate: 0, hsnCode: '', batchNo: '', mfgDate: '', expiryDate: '' }, ...items]);
   const removeItemRow = (idx: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== idx));
@@ -1953,23 +1963,71 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                 </View>
 
                 {it.productId ? (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                    <Text style={{ fontSize: 10, color: hasError ? colors.danger : colors.text.muted, fontWeight: '600' }}>
-                      {hasError ? `⚠ Exceeds stock: ${maxQty} boxes` : `Stock: ${maxQty} boxes (Pack: ${it.packing || 1})`}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Ionicons name="barcode-outline" size={11} color={colors.primary} />
-                      <TextInput
-                        style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace', borderBottomWidth: 1, borderBottomColor: colors.primary + '50', minWidth: 80, paddingVertical: 1 }}
-                        placeholder="Batch No."
-                        placeholderTextColor={colors.text.muted}
-                        value={it.batchNo || ''}
-                        onChangeText={(v) => {
-                          const next = [...items];
-                          next[idx].batchNo = v;
-                          setItems(next);
-                        }}
-                      />
+                  <View style={{ marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 10, color: hasError ? colors.danger : colors.text.muted, fontWeight: '600' }}>
+                        {hasError ? `⚠ Exceeds stock: ${maxQty} boxes` : `Stock: ${maxQty} boxes (Pack: ${it.packing || 1})`}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="pricetag-outline" size={11} color={colors.text.muted} />
+                          <TextInput
+                            style={{ fontSize: 10, fontWeight: '600', color: colors.text.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, minWidth: 55, paddingVertical: 1, paddingHorizontal: 2 }}
+                            placeholder="HSN"
+                            placeholderTextColor={colors.text.muted}
+                            value={it.hsnCode || ''}
+                            onChangeText={(v) => {
+                              const next = [...items];
+                              next[idx].hsnCode = v;
+                              setItems(next);
+                            }}
+                          />
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="barcode-outline" size={11} color={colors.primary} />
+                          <TextInput
+                            style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace', borderBottomWidth: 1, borderBottomColor: colors.primary + '50', minWidth: 65, paddingVertical: 1, paddingHorizontal: 2 }}
+                            placeholder="Batch"
+                            placeholderTextColor={colors.text.muted}
+                            value={it.batchNo || ''}
+                            onChangeText={(v) => {
+                              const next = [...items];
+                              next[idx].batchNo = v;
+                              setItems(next);
+                            }}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 4, alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Ionicons name="calendar-outline" size={11} color={colors.text.muted} />
+                        <TextInput
+                          style={{ fontSize: 9, color: colors.text.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, minWidth: 85, paddingVertical: 1, paddingHorizontal: 2 }}
+                          placeholder="MFG (YYYY-MM-DD)"
+                          placeholderTextColor={colors.text.muted}
+                          value={it.mfgDate || ''}
+                          onChangeText={(v) => {
+                            const next = [...items];
+                            next[idx].mfgDate = v;
+                            setItems(next);
+                          }}
+                        />
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Ionicons name="calendar-outline" size={11} color={colors.danger} />
+                        <TextInput
+                          style={{ fontSize: 9, color: colors.danger, borderBottomWidth: 1, borderBottomColor: colors.danger + '50', minWidth: 85, paddingVertical: 1, paddingHorizontal: 2 }}
+                          placeholder="Expiry (YYYY-MM-DD)"
+                          placeholderTextColor={colors.text.muted}
+                          value={it.expiryDate || ''}
+                          onChangeText={(v) => {
+                            const next = [...items];
+                            next[idx].expiryDate = v;
+                            setItems(next);
+                          }}
+                        />
+                      </View>
                     </View>
                   </View>
                 ) : null}

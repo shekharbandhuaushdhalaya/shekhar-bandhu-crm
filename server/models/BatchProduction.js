@@ -29,7 +29,12 @@ const stageSchema = new mongoose.Schema({
   outputQty: { type: Number, default: 0 },       // material qty after this stage
   lossQty: { type: Number, default: 0 },         // loss at this stage (inputQty - outputQty)
   lossPercent: { type: Number, default: 0 },     // (lossQty / inputQty) * 100
-  lossReason: { type: String, default: '' },     // evaporation, sediment, spillage, etc.
+  lossReason: { type: String, default: '' },     // evaporation, sediment, spillage, etc. (legacy)
+  lossItems: [{                                     // per-material loss breakdown
+    rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' },
+    qty: { type: Number, default: 0 },
+    reason: { type: String, default: '' }
+  }],
   ingredientsDeducted: { type: Boolean, default: false },
 }, { _id: false });
 
@@ -111,6 +116,7 @@ const batchProductionSchema = new mongoose.Schema({
   endDate: { type: Date, default: null },
   mfgDate: { type: Date, default: null },
   expiryDate: { type: Date, default: null },
+  shelfLifeMonths: { type: Number, default: null },
   qcNotes: { type: String, default: '' },
   qcPassedBy: { type: String, default: '' },
   qcStatus: { type: String, enum: ['approved', 'rejected'], default: 'approved' },

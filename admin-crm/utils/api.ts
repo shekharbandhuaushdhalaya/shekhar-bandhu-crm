@@ -265,12 +265,15 @@ class ApiClient {
     return res.json();
   }
 
-  async getAuditLogs(search: string = '', page: number = 1, limit: number = 50): Promise<any> {
-    const queryParams = new URLSearchParams({
+  async getAuditLogs(search: string = '', page: number = 1, limit: number = 50, dateFrom?: string, dateTo?: string): Promise<any> {
+    const params: Record<string, string> = {
       search,
       page: page.toString(),
       limit: limit.toString()
-    });
+    };
+    if (dateFrom) params.dateFrom = dateFrom;
+    if (dateTo) params.dateTo = dateTo;
+    const queryParams = new URLSearchParams(params);
     const res = await this.request(`${API_BASE}/system/audit-logs?${queryParams}`);
     return res.json();
   }
@@ -940,11 +943,11 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
-  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; stageIngredients?: { rawMaterialId: string; qtyNeeded: number; wastage?: number; itemType?: string }[] }): Promise<BatchProduction> {
+  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; lossReason?: string; actualYieldQty?: number; stageIngredients?: { rawMaterialId: string; qtyNeeded: number; wastage?: number; itemType?: string; lossReason?: string }[]; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[] }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
-  async completeBatchProduction(id: string, data: { actualYieldQty: number; wasteQty?: number; wasteReason?: string; qcNotes: string; qcPassedBy: string; warehouseId: string }): Promise<BatchProduction> {
+  async completeBatchProduction(id: string, data: { actualYieldQty: number; wasteQty?: number; wasteReason?: string; qcNotes: string; qcPassedBy: string; packing?: number; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[]; warehouseId: string; qcStatus?: string; organoleptic?: string; moistureContent?: number | null; ashValue?: number | null; pHValue?: number | null; disintegrationTime?: number | null; heavyMetals?: string; microbialLimit?: string; labReportRef?: string; jobWorkerCertificateRef?: string; coaDocumentRef?: string; jobWorkCharges?: number }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/complete`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }

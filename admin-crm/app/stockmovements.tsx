@@ -344,6 +344,8 @@ interface FormState {
   totalBoxes?: string;
   totalWeight?: string;
   freightCharge?: string;
+  sourceDocType?: string;
+  sourceDocId?: string;
 }
 
 const DEFAULT_FORM: FormState = {
@@ -355,6 +357,7 @@ const DEFAULT_FORM: FormState = {
   isFree: false, notes: '', status: 'draft',
   medicalRepName: '', doctorName: '', damageReason: '',
   transporter: '', lrNo: '', vehicleNo: '', courierName: '', trackingId: '', totalBoxes: '1', totalWeight: '', freightCharge: '0',
+  sourceDocType: '', sourceDocId: '',
 };
 
 const toTitleCase = (str?: string) => {
@@ -400,7 +403,7 @@ export default function StockMovementsScreen() {
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({ ...DEFAULT_FORM });
-  const [items, setItems] = useState<StockMovementItem[]>([{ productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0 }]);
+  const [items, setItems] = useState<StockMovementItem[]>([{ productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, hsnCode: '', batchNo: '', mfgDate: '', expiryDate: '' }]);
   const [error, setError] = useState('');
 
   // Product and Warehouse stock variables linked to Inventory
@@ -518,21 +521,30 @@ export default function StockMovementsScreen() {
       if (w.length > 0 && !form.warehouseId) {
         setForm(f => ({ ...f, warehouseId: w[0]._id, warehouseName: w[0].name }));
       }
-    } catch { }
-  }, []);
+      return w;
+    } catch {
+      return [];
+    }
+  }, [form.warehouseId]);
 
   const loadCustomers = useCallback(async () => {
     try {
       const c = await api.getCustomers();
       setCustomers(c);
-    } catch { }
+      return c;
+    } catch {
+      return [];
+    }
   }, []);
 
   const loadProducts = useCallback(async () => {
     try {
       const p = await api.getProducts();
       setProducts(p);
-    } catch { }
+      return p;
+    } catch {
+      return [];
+    }
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -558,27 +570,51 @@ export default function StockMovementsScreen() {
   // Listen for prefill_challan event from Orders screen (in-memory only — no PII in URL)
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('prefill_challan', (order: any) => {
-      Promise.all([loadWarehouses(), loadCustomers(), loadProducts()]).then(() => {
+      Promise.all([loadWarehouses(), loadCustomers(), loadProducts()]).then(([loadedWhs, _, loadedProducts]) => {
+        const prodList = loadedProducts || [];
+        const whsList = loadedWhs || [];
+        const defaultWh = whsList[0] || null;
         setEditId(null);
         setForm(prev => ({
           ...prev,
           type: 'order',
+          warehouseId: defaultWh ? defaultWh._id : prev.warehouseId,
+          warehouseName: defaultWh ? defaultWh.name : prev.warehouseName,
           partyName: order.name || '',
+          billingAddress: 'Same as Shipping',
+          shippingAddress: order.shippingAddress || '',
           partyAddress: `Billing Address:\nSame as Shipping\n\nShipping Address:\n${order.shippingAddress || ''}`,
           notes: `Online Order #${order._id} | Phone: ${order.phone} | Email: ${order.email}`,
           isFree: false,
+          sourceDocType: 'Order',
+          sourceDocId: order._id,
         }));
         setItems(
-          (order.items || []).map((it: any) => ({
-            productId: it.productId || '',
-            productName: it.name || '',
-            qty: it.qty || 1,
-            packing: 1,
-            rate: it.price || 0,
-            gstRate: 18,
-            mrp: it.price || 0,
-            batchNo: '',
-          }))
+          (order.items || []).map((it: any) => {
+            const prod = prodList.find((p: any) => p._id === it.productId);
+            const originalMrp = prod ? (prod.mrp || 0) : (it.price || 0);
+            const gstRate = prod ? (prod.gstRate || 18) : 18;
+            
+            // If there's an online promotion discount:
+            const discountPercent = originalMrp > it.price 
+              ? parseFloat((((originalMrp - it.price) / originalMrp) * 100).toFixed(1)) 
+              : 0;
+
+            return {
+              productId: it.productId || '',
+              productName: it.name || '',
+              qty: it.qty || 1,
+              packing: 1,
+              rate: originalMrp,
+              gstRate: gstRate,
+              mrp: originalMrp,
+              discountPercent: discountPercent,
+              hsnCode: prod ? (prod.hsnCode || '') : '',
+              batchNo: '',
+              mfgDate: '',
+              expiryDate: '',
+            };
+          })
         );
         setCustomerSearch(order.name || '');
         setError('');
@@ -600,6 +636,38 @@ export default function StockMovementsScreen() {
       setWarehouseInventory([]);
     }
   }, [form.warehouseId]);
+
+  // Reactive Effect to automatically select FIFO batches when inventory loads or updates
+  useEffect(() => {
+    if (form.type === 'order' && warehouseInventory && warehouseInventory.length > 0 && items && items.length > 0) {
+      const updated = items.map(it => {
+        if (!it.productId) return it;
+        // Filter entries for this product that are in stock
+        const productEntries = warehouseInventory
+          .filter((entry: any) => entry.productId === it.productId && entry.qtyBoxes > 0)
+          .sort((a: any, b: any) => {
+            const dateA = a.mfgDate ? new Date(a.mfgDate).getTime() : 0;
+            const dateB = b.mfgDate ? new Date(b.mfgDate).getTime() : 0;
+            return dateA - dateB; // oldest mfgDate first (FIFO)
+          });
+        const chosenEntry = productEntries[0] || null;
+        if (!chosenEntry) return it;
+
+        return {
+          ...it,
+          batchNo: chosenEntry.batchNo || '',
+          mfgDate: chosenEntry.mfgDate ? chosenEntry.mfgDate.split('T')[0] : '',
+          expiryDate: chosenEntry.expiryDate ? chosenEntry.expiryDate.split('T')[0] : '',
+          inventoryEntryId: chosenEntry._id,
+        };
+      });
+
+      const changed = updated.some((item, index) => item.batchNo !== items[index].batchNo);
+      if (changed) {
+        setItems(updated);
+      }
+    }
+  }, [warehouseInventory, form.type]);
 
   const onRefresh = useCallback(async () => { api.clearCache(); setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
@@ -734,6 +802,7 @@ export default function StockMovementsScreen() {
       discountPercent: customerDisc,
       rate: netRate,
       gstRate,
+      hsnCode: product ? (product.hsnCode || '') : '',
       batchNo: computedBatchNo,
       mfgDate: entry.mfgDate || '',
       expiryDate: entry.expiryDate || '',
@@ -826,7 +895,7 @@ export default function StockMovementsScreen() {
   const handleConvertToInvoice = async (id: string) => {
     try {
       const result = await api.convertStockMovementToInvoice(id);
-      if (Platform.OS === 'web') window.alert(`Draft GST Invoice ${result.invoice.invoiceNo} created successfully! You can review and edit it under Tax Invoices.`);
+      if (Platform.OS === 'web') window.alert(`Draft Invoice ${result.invoice.invoiceNo} created successfully! You can review and edit it under Tax Invoices.`);
       load();
     } catch (e: any) {
       if (Platform.OS === 'web') window.alert(e.message);
@@ -906,6 +975,7 @@ export default function StockMovementsScreen() {
 
   // Calculate Totals and Bifurcation
   const isCash = (form as any).billingMode === 'cash';
+  const isOrder = form.type === 'order';
   let totalMrpValue = 0;
   let totalDiscountSaved = 0;
   let totalBase = 0;
@@ -915,17 +985,32 @@ export default function StockMovementsScreen() {
       const totalPcs = (it.qty || 0) * (it.packing || 1);
       const mrpRate = it.mrp || 0;
       const netRate = it.rate || 0;
+      const discount = it.discountPercent || 0;
 
       const itemMrpTotal = mrpRate > 0 ? (totalPcs * mrpRate) : (totalPcs * netRate);
-      const itemBase = totalPcs * netRate;
-      const itemDiscount = Math.max(0, itemMrpTotal - itemBase);
-
-      totalMrpValue += itemMrpTotal;
-      totalDiscountSaved += itemDiscount;
-      totalBase += itemBase;
+      let itemBase = 0;
+      let itemTax = 0;
+      let itemDiscount = 0;
 
       const gst = isCash ? 0 : (it.gstRate || 0);
-      totalTax += (itemBase * gst) / 100;
+
+      if (isOrder) {
+        // netRate is inclusive MRP, calculate net inclusive rate and back-calculate
+        const totalInclusive = totalPcs * netRate * (1 - discount / 100);
+        itemBase = totalInclusive / (1 + gst / 100);
+        itemTax = totalInclusive - itemBase;
+        itemDiscount = itemMrpTotal - totalInclusive;
+      } else {
+        const gross = totalPcs * netRate;
+        itemBase = gross * (1 - discount / 100);
+        itemTax = (itemBase * gst) / 100;
+        itemDiscount = itemMrpTotal - itemBase;
+      }
+
+      totalMrpValue += itemMrpTotal;
+      totalDiscountSaved += Math.max(0, itemDiscount);
+      totalBase += itemBase;
+      totalTax += itemTax;
     }
   });
 
@@ -1471,7 +1556,7 @@ export default function StockMovementsScreen() {
                           {item.productName ? (
                             <TouchableOpacity onPress={() => {
                               const n = [...items];
-                              n[idx] = { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '' };
+                              n[idx] = { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '', hsnCode: '', batchNo: '', mfgDate: '', expiryDate: '' };
                               setItems(n);
                               setItemSearchText('');
                               setActiveItemDropdownIdx(idx);
@@ -1563,6 +1648,51 @@ export default function StockMovementsScreen() {
                       )}
                     </View>
 
+                    {item.productId ? (
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="pricetag-outline" size={11} color={colors.text.muted} />
+                          <TextInput
+                            style={{ fontSize: 10, fontWeight: '600', color: colors.text.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, minWidth: 50, paddingVertical: 1, paddingHorizontal: 2, height: 24 }}
+                            placeholder="HSN"
+                            placeholderTextColor={colors.text.muted}
+                            value={item.hsnCode || ''}
+                            onChangeText={(v) => { const n = [...items]; n[idx].hsnCode = v; setItems(n); }}
+                          />
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="barcode-outline" size={11} color={colors.primary} />
+                          <TextInput
+                            style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace', borderBottomWidth: 1, borderBottomColor: colors.primary + '50', minWidth: 60, paddingVertical: 1, paddingHorizontal: 2, height: 24 }}
+                            placeholder="Batch"
+                            placeholderTextColor={colors.text.muted}
+                            value={item.batchNo || ''}
+                            onChangeText={(v) => { const n = [...items]; n[idx].batchNo = v; setItems(n); }}
+                          />
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="calendar-outline" size={11} color={colors.text.muted} />
+                          <TextInput
+                            style={{ fontSize: 9, color: colors.text.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, minWidth: 85, paddingVertical: 1, paddingHorizontal: 2, height: 24 }}
+                            placeholder="MFG (YYYY-MM-DD)"
+                            placeholderTextColor={colors.text.muted}
+                            value={item.mfgDate || ''}
+                            onChangeText={(v) => { const n = [...items]; n[idx].mfgDate = v; setItems(n); }}
+                          />
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="calendar-outline" size={11} color={colors.danger} />
+                          <TextInput
+                            style={{ fontSize: 9, color: colors.danger, borderBottomWidth: 1, borderBottomColor: colors.danger + '50', minWidth: 85, paddingVertical: 1, paddingHorizontal: 2, height: 24 }}
+                            placeholder="Expiry (YYYY-MM-DD)"
+                            placeholderTextColor={colors.text.muted}
+                            value={item.expiryDate || ''}
+                            onChangeText={(v) => { const n = [...items]; n[idx].expiryDate = v; setItems(n); }}
+                          />
+                        </View>
+                      </View>
+                    ) : null}
+
                     {/* Inline dropdown — no absolute positioning, never clipped by ScrollView */}
                     {isDropdownOpen && filtered.length > 0 && (() => {
                       const selectedOtherProductIds = items
@@ -1609,7 +1739,7 @@ export default function StockMovementsScreen() {
                   </View>
                 );
               })}
-              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 8, paddingVertical: 10, marginTop: 4, marginBottom: 6 }} onPress={() => setItems([...items, { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '', mfgDate: '', expiryDate: '' }])}>
+              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 8, paddingVertical: 10, marginTop: 4, marginBottom: 6 }} onPress={() => setItems([...items, { productName: '', qty: 1, packing: 1, rate: 0, gstRate: 18, mrp: 0, size: '', hsnCode: '', batchNo: '', mfgDate: '', expiryDate: '' }])}>
                 <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
                 <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Product Row</Text>
               </TouchableOpacity>
@@ -1753,7 +1883,11 @@ export default function StockMovementsScreen() {
                   <View style={{ flex: 2 }}>
                     <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>{it.productName}</Text>
                     <Text style={{ fontSize: 11, color: colors.text.muted }}>
-                      {it.batchNo ? `Batch: ${it.batchNo} | ` : ''}
+                      {it.hsnCode ? `HSN: ${it.hsnCode}` : ''}
+                      {it.batchNo ? `${it.hsnCode ? ' | ' : ''}Batch: ${it.batchNo}` : ''}
+                      {it.expiryDate ? ` | Exp: ${new Date(it.expiryDate).toLocaleDateString('en-IN')}` : ''}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: colors.text.muted }}>
                       {mrpVal > 0 ? `MRP: ₹${mrpVal}` : ''}
                       {discPct > 0 ? ` (${discPct}% off)` : ''}
                     </Text>
@@ -1857,11 +1991,18 @@ export default function StockMovementsScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Convert to Invoice (only for sale challans) */}
+            {/* Convert to Invoice (for sale challans — B2B with GSTIN) */}
             {detailMovement.type === 'sale' && detailMovement.direction === 'out' && (detailMovement as any).billingMode !== 'cash' && detailMovement.partyGstin && !detailMovement.convertedToInvoice && detailMovement.status === 'dispatched' && (
               <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.success }]} onPress={() => { setShowDetail(false); handleConvertToInvoice(detailMovement._id); }}>
                 <Ionicons name="document-text-outline" size={18} color="#fff" />
                 <Text style={styles.detailActionBtnText}>Convert to GST Tax Invoice</Text>
+              </TouchableOpacity>
+            )}
+            {/* Convert to Invoice (for order challans — B2C online sale) */}
+            {detailMovement.type === 'order' && detailMovement.direction === 'out' && !detailMovement.convertedToInvoice && detailMovement.status === 'dispatched' && (
+              <TouchableOpacity style={[styles.detailActionBtn, { backgroundColor: colors.success }]} onPress={() => { setShowDetail(false); handleConvertToInvoice(detailMovement._id); }}>
+                <Ionicons name="document-text-outline" size={18} color="#fff" />
+                <Text style={styles.detailActionBtnText}>Convert to B2C Sale Invoice</Text>
               </TouchableOpacity>
             )}
 

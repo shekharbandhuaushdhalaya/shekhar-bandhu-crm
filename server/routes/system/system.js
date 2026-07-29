@@ -71,7 +71,7 @@ router.put('/settings', authenticateToken, authorize('settings:edit'), validate(
 router.get('/audit-logs', authenticateToken, authorize('audit:view'), async (req, res) => {
   try {
 
-    const { search, limit = 50, page = 1 } = req.query;
+    const { search, dateFrom, dateTo, limit = 50, page = 1 } = req.query;
     const filter = {};
 
     if (search) {
@@ -81,6 +81,12 @@ router.get('/audit-logs', authenticateToken, authorize('audit:view'), async (req
         { action: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } }
       ];
+    }
+
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
     }
 
     const parsedLimit = parseInt(limit, 10);

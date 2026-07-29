@@ -173,7 +173,7 @@ router.put('/:id', validate(schemas.productSchema.partial()), authorize('product
     );
 
     if (updatedProduct && !updatedProduct.parentId) {
-      const sharedFields = ['name', 'category', 'description', 'disease', 'ingredients', 'image', 'productType', 'colour', 'shape', 'weight', 'hsnCode', 'gstRate'];
+      const sharedFields = ['name', 'category', 'description', 'disease', 'ingredients', 'image', 'productType', 'colour', 'shape', 'weight', 'hsnCode', 'gstRate', 'suggestedDosage', 'benefits'];
       const syncUpdate = {};
       let hasSharedUpdate = false;
       for (const field of sharedFields) {

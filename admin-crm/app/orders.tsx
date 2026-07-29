@@ -54,9 +54,11 @@ export default function OrdersScreen() {
     load();
     const sub1 = DeviceEventEmitter.addListener('new_web_order_event', () => load());
     const sub2 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
+    const sub3 = DeviceEventEmitter.addListener('order_updated_event', () => load());
     return () => {
       sub1.remove();
       sub2.remove();
+      sub3.remove();
     };
   }, [load]);
 
@@ -273,7 +275,7 @@ export default function OrdersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
+          <View style={[styles.table, { width: '100%', minWidth: 1000 }]}>
             {/* Table Header */}
             <View style={styles.tableHeaderRow}>
               <View style={[styles.tableHeaderCellContainer, { width: 140 }]}>
@@ -291,7 +293,7 @@ export default function OrdersScreen() {
               <View style={[styles.tableHeaderCellContainer, { width: 130 }]}>
                 <Text style={styles.tableHeaderCell}>Status</Text>
               </View>
-              <View style={[styles.tableHeaderCellContainer, { width: 190, borderRightWidth: 0 }]}>
+              <View style={[styles.tableHeaderCellContainer, { width: 230, borderRightWidth: 0 }]}>
                 <Text style={styles.tableHeaderCell}>Action</Text>
               </View>
             </View>
@@ -339,7 +341,7 @@ export default function OrdersScreen() {
                   </View>
                 </View>
 
-                <View style={[styles.tableCellContainer, { width: 190, borderRightWidth: 0, flexDirection: 'row', gap: 6 }]}>
+                <View style={[styles.tableCellContainer, { width: 230, borderRightWidth: 0, flexDirection: 'row', gap: 6 }]}>
                   <TouchableOpacity
                     style={[styles.actionPillBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
                     onPress={() => setSelectedOrder(o)}
@@ -348,13 +350,20 @@ export default function OrdersScreen() {
                     <Text style={[styles.actionPillText, { color: colors.primary }]}>View</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.actionPillBtn, { backgroundColor: '#0d948815', borderColor: '#0d9488' }]}
-                    onPress={() => handleCreateChallan(o)}
-                  >
-                    <Ionicons name="document-attach-outline" size={13} color="#0d9488" />
-                    <Text style={[styles.actionPillText, { color: '#0d9488' }]}>Challan</Text>
-                  </TouchableOpacity>
+                  {o.hasChallan ? (
+                    <View style={[styles.actionPillBtn, { backgroundColor: colors.bg.secondary, borderColor: colors.border }]}>
+                      <Ionicons name="checkmark-done" size={13} color={colors.text.muted} />
+                      <Text style={[styles.actionPillText, { color: colors.text.muted }]}>{o.challanNo || 'Challan'}</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.actionPillBtn, { backgroundColor: '#0d948815', borderColor: '#0d9488' }]}
+                      onPress={() => handleCreateChallan(o)}
+                    >
+                      <Ionicons name="document-attach-outline" size={13} color="#0d9488" />
+                      <Text style={[styles.actionPillText, { color: '#0d9488' }]}>Challan</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -450,21 +459,35 @@ export default function OrdersScreen() {
 
                 {/* Quick Process Actions */}
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                  <TouchableOpacity
-                    style={[styles.primaryActionBtn, { backgroundColor: '#0d9488', flex: 1 }]}
-                    onPress={() => handleCreateChallan(selectedOrder)}
-                  >
-                    <Ionicons name="document-attach-outline" size={14} color="#fff" />
-                    <Text style={styles.primaryActionBtnText}>Create Challan</Text>
-                  </TouchableOpacity>
+                  {selectedOrder.hasChallan ? (
+                    <View style={[styles.primaryActionBtn, { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, flex: 1 }]}>
+                      <Ionicons name="checkmark-done" size={14} color={colors.text.muted} />
+                      <Text style={[styles.primaryActionBtnText, { color: colors.text.muted }]}>Challan Created ({selectedOrder.challanNo})</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.primaryActionBtn, { backgroundColor: '#0d9488', flex: 1 }]}
+                      onPress={() => handleCreateChallan(selectedOrder)}
+                    >
+                      <Ionicons name="document-attach-outline" size={14} color="#fff" />
+                      <Text style={styles.primaryActionBtnText}>Create Challan</Text>
+                    </TouchableOpacity>
+                  )}
 
-                  <TouchableOpacity
-                    style={[styles.primaryActionBtn, { backgroundColor: colors.info, flex: 1 }]}
-                    onPress={() => handleGenerateInvoice(selectedOrder._id)}
-                  >
-                    <Ionicons name="document-text-outline" size={14} color="#fff" />
-                    <Text style={styles.primaryActionBtnText}>Generate Invoice</Text>
-                  </TouchableOpacity>
+                  {selectedOrder.hasInvoice ? (
+                    <View style={[styles.primaryActionBtn, { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, flex: 1 }]}>
+                      <Ionicons name="checkmark-done" size={14} color={colors.text.muted} />
+                      <Text style={[styles.primaryActionBtnText, { color: colors.text.muted }]}>Invoice Created ({selectedOrder.invoiceNo})</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.primaryActionBtn, { backgroundColor: colors.info, flex: 1 }]}
+                      onPress={() => handleGenerateInvoice(selectedOrder._id)}
+                    >
+                      <Ionicons name="document-text-outline" size={14} color="#fff" />
+                      <Text style={styles.primaryActionBtnText}>Generate Invoice</Text>
+                    </TouchableOpacity>
+                  )}
 
                   {selectedOrder.status === 'pending' && (
                     <TouchableOpacity
@@ -475,14 +498,21 @@ export default function OrdersScreen() {
                       <Text style={styles.primaryActionBtnText}>Start Processing</Text>
                     </TouchableOpacity>
                   )}
-                  {selectedOrder.status === 'processing' && (
-                    <TouchableOpacity
-                      style={[styles.primaryActionBtn, { backgroundColor: colors.primary, flex: 1 }]}
-                      onPress={() => handleUpdateStatus(selectedOrder._id, 'shipped')}
-                    >
-                      <Ionicons name="airplane-outline" size={14} color="#fff" />
-                      <Text style={styles.primaryActionBtnText}>Mark Shipped</Text>
-                    </TouchableOpacity>
+                   {selectedOrder.status === 'processing' && (
+                    selectedOrder.hasDispatch ? (
+                      <TouchableOpacity
+                        style={[styles.primaryActionBtn, { backgroundColor: colors.primary, flex: 1 }]}
+                        onPress={() => handleUpdateStatus(selectedOrder._id, 'shipped')}
+                      >
+                        <Ionicons name="airplane-outline" size={14} color="#fff" />
+                        <Text style={styles.primaryActionBtnText}>Mark Shipped</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={[styles.primaryActionBtn, { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, flex: 1 }]}>
+                        <Ionicons name="airplane-outline" size={14} color={colors.text.muted} />
+                        <Text style={[styles.primaryActionBtnText, { color: colors.text.muted }]}>Shipped (Create Dispatch First)</Text>
+                      </View>
+                    )
                   )}
                   {selectedOrder.status === 'shipped' && (
                     <TouchableOpacity

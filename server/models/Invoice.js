@@ -67,7 +67,7 @@ const invoiceSchema = new mongoose.Schema({
   dueDate: { type: Date },
   status: { type: String, default: 'unpaid' },
   amountPaid: { type: Number, default: 0, min: [0, 'Amount paid cannot be negative'] },
-  mode: { type: String, enum: ['regular', 'cash'], default: 'regular' },
+  mode: { type: String, enum: ['regular', 'cash', 'pakka', 'non_gst'], default: 'regular' },
   baseAmount: { type: Number },
   totalMrp: { type: Number, default: 0 },
   totalDiscount: { type: Number, default: 0 },

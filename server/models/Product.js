@@ -24,6 +24,8 @@ const productSchema = new mongoose.Schema({
   description: { type: String, default: '' },
   disease: { type: String, default: '' },
   ingredients: { type: String, default: '' },
+  suggestedDosage: { type: String, default: '' },
+  benefits: { type: String, default: '' },
   rating: { type: Number, default: 0 },
   ratingCount: { type: Number, default: 0 },
   parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null }

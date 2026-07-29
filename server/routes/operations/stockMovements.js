@@ -405,33 +405,67 @@ router.get('/:id', authorize('stockmovement:view'), async (req, res) => {
   }
 });
 
+function calculateMovementTotals(movement) {
+  if (!movement.items || movement.items.length === 0 || movement.direction !== 'out' || movement.isFree) {
+    return;
+  }
+
+  const isOrder = movement.type === 'order';
+  let totalBase = 0;
+  let totalTax = 0;
+
+  movement.items.forEach(it => {
+    const gst = it.gstRate || 0;
+    const discount = it.discountPercent || 0;
+    let itemBase, rate;
+    if (isOrder) {
+      // Back-calculate from inclusive rate (mrp/rate)
+      const totalInclusive = (it.qty || 0) * (it.rate || 0) * (it.packing || 1) * (1 - discount / 100);
+      itemBase = totalInclusive / (1 + gst / 100);
+      rate = (it.rate || 0) / (1 + gst / 100);
+      it.rate = Number(rate.toFixed(2));
+    } else {
+      const gross = (it.qty || 0) * (it.rate || 0) * (it.packing || 1);
+      itemBase = gross * (1 - discount / 100);
+    }
+    const itemTax = isOrder 
+      ? (((it.qty || 0) * (it.rate || 0) * (it.packing || 1) * (1 - discount / 100)) - itemBase) 
+      : ((itemBase * gst) / 100);
+    totalBase += itemBase;
+    totalTax += itemTax;
+  });
+
+  const isIntraState = (movement.partyGstin || '').startsWith('09') || !movement.partyGstin;
+  const cgst = isIntraState ? totalTax / 2 : 0;
+  const sgst = isIntraState ? totalTax / 2 : 0;
+  const igst = !isIntraState ? totalTax : 0;
+  const rawTotal = totalBase + cgst + sgst + igst;
+  const nettTotal = Math.round(rawTotal);
+  const roundOff = nettTotal - rawTotal;
+
+  movement.baseAmount = Number(totalBase.toFixed(2));
+  movement.cgst = Number(cgst.toFixed(2));
+  movement.sgst = Number(sgst.toFixed(2));
+  movement.igst = Number(igst.toFixed(2));
+  movement.roundOff = Number(roundOff.toFixed(2));
+  movement.totalAmount = nettTotal;
+}
+
 // Create
 router.post('/', authorize('stockmovement:create'), validate(schemas.stockMovementSchema), async (req, res) => {
   try {
     const data = req.body;
-    const docNo = await generateDocNo();
 
-    // Auto-calculate financial if not provided
-    let baseAmount = data.baseAmount || 0;
-    let totalTax = 0;
-    if (data.items && data.direction === 'out' && !data.isFree) {
-      data.items.forEach(it => {
-        const itemBase = (it.qty || 0) * (it.rate || 0) * (it.packing || 1);
-        baseAmount += itemBase;
-        const gst = it.gstRate || 0;
-        totalTax += (itemBase * gst) / 100;
-      });
+    if (data.sourceDocType === 'Order' && data.sourceDocId) {
+      const existing = await StockMovement.findOne({ sourceDocId: data.sourceDocId });
+      if (existing) {
+        return res.status(400).json({ error: `A Delivery Challan has already been generated for this Order (Challan No: ${existing.docNo})` });
+      }
     }
 
-    const isIntraState = (data.partyGstin || '').startsWith('09');
-    const cgst = isIntraState ? totalTax / 2 : 0;
-    const sgst = isIntraState ? totalTax / 2 : 0;
-    const igst = !isIntraState ? totalTax : 0;
-    const rawTotal = baseAmount + cgst + sgst + igst;
-    const nettTotal = Math.round(rawTotal);
-    const roundOff = nettTotal - rawTotal;
+    const docNo = await generateDocNo();
 
-    const movement = await StockMovement.create({
+    const movementData = {
       docNo,
       direction: data.direction,
       type: data.type,
@@ -445,9 +479,6 @@ router.post('/', authorize('stockmovement:create'), validate(schemas.stockMoveme
       partyGstin: data.partyGstin || '',
       partyAddress: data.partyAddress || '',
       items: data.items || [],
-      baseAmount,
-      cgst, sgst, igst, roundOff,
-      totalAmount: data.totalAmount ?? nettTotal,
       isFree: data.isFree || false,
       status: data.status || 'draft',
       notes: data.notes || '',
@@ -463,7 +494,11 @@ router.post('/', authorize('stockmovement:create'), validate(schemas.stockMoveme
       createdBy: req.user?.name || 'System',
       sourceDocType: data.sourceDocType || '',
       sourceDocId: data.sourceDocId,
-    });
+    };
+
+    calculateMovementTotals(movementData);
+
+    const movement = await StockMovement.create(movementData);
 
     await syncOrderLogistics(movement);
 
@@ -481,6 +516,9 @@ router.post('/', authorize('stockmovement:create'), validate(schemas.stockMoveme
     if (req.io) {
       req.io.emit('challan_updated', movement);
       req.io.emit('inventory_updated', { type: 'challan', movementId: movement._id });
+      if (movement.sourceDocType === 'Order') {
+        req.io.emit('order_updated', { type: 'challan_created', movementId: movement._id });
+      }
     }
 
     res.status(201).json(movement);
@@ -498,6 +536,7 @@ router.put('/:id', authorize('stockmovement:edit'), validate(schemas.stockMoveme
 
     const data = req.body;
     Object.assign(movement, data);
+    calculateMovementTotals(movement);
     movement.createdBy = req.user?.name || movement.createdBy;
     await movement.save();
     await syncOrderLogistics(movement);
@@ -527,6 +566,7 @@ router.patch('/:id/dispatch', authorize('stockmovement:edit'), async (req, res) 
     if (req.io) {
       req.io.emit('challan_updated', movement);
       req.io.emit('inventory_updated', { type: 'dispatch', movementId: movement._id });
+      req.io.emit('order_updated', { type: 'challan_dispatched', movementId: movement._id });
     }
 
     res.json(movement);
@@ -609,17 +649,20 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
   try {
     const movement = await StockMovement.findById(req.params.id);
     if (!movement) return res.status(404).json({ error: 'Stock movement not found' });
-    if (movement.direction !== 'out' || movement.type !== 'sale') {
-      return res.status(400).json({ error: 'Only outbound sale movements can be converted to invoice' });
+    if (movement.direction !== 'out' || (movement.type !== 'sale' && movement.type !== 'order')) {
+      return res.status(400).json({ error: 'Only outbound sale/order movements can be converted to invoice' });
     }
     if (movement.convertedToInvoice) {
       return res.status(400).json({ error: `Already converted to invoice ${movement.invoiceNo}` });
     }
-    // Cash sales don't need a tax invoice — the DC is the final document
-    if (movement.billingMode === 'cash') {
+
+    const isOrder = movement.type === 'order';
+    // For direct sale challans, cash billing mode doesn't need a separate invoice
+    if (!isOrder && movement.billingMode === 'cash') {
       return res.status(400).json({ error: 'Cash sales do not generate a tax invoice. The Delivery Challan is the final document.' });
     }
-    if (!movement.partyGstin || !movement.partyGstin.trim()) {
+    // Regular (B2B) invoices require a GSTIN
+    if (!isOrder && (!movement.partyGstin || !movement.partyGstin.trim())) {
       return res.status(400).json({ error: 'Party does not have a GSTIN. Cannot create a GST (Regular) invoice.' });
     }
 
@@ -630,38 +673,48 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
     const fy = getFinancialYearString();
     const prefix = `${pfx}/${fy}/`;
 
-    const lastInvoice = await Invoice.findOne({
+    const invoices = await Invoice.find({
       type: 'sale',
       invoiceNo: { $regex: `^${prefix.replace(/\//g, '\\/')}\\d+$` }
-    }).sort({ createdAt: -1 }).lean();
+    }).select('invoiceNo').lean();
 
     let nextNum = 1;
-    if (lastInvoice) {
-      const parts = lastInvoice.invoiceNo.split('/');
-      if (parts.length === 3) nextNum = parseInt(parts[2], 10) + 1;
+    if (invoices.length > 0) {
+      const nums = invoices.map(inv => {
+        const parts = inv.invoiceNo.split('/');
+        return parts.length === 3 ? parseInt(parts[2], 10) : 0;
+      }).filter(n => !isNaN(n));
+      if (nums.length > 0) {
+        nextNum = Math.max(...nums) + 1;
+      }
     }
     const invoiceNo = `${prefix}${nextNum.toString().padStart(3, '0')}`;
 
-    const isIntraState = (movement.partyGstin || '').startsWith('09');
+    const isIntraState = isOrder ? true : (movement.partyGstin || '').startsWith('09');
     let totalBase = 0;
     let totalTax = 0;
     const invoiceItems = movement.items.map(it => {
-      const itemBase = (it.qty || 0) * (it.rate || 0) * (it.packing || 1);
-      totalBase += itemBase;
       const gst = it.gstRate || 0;
-      totalTax += (itemBase * gst) / 100;
+      const discount = it.discountPercent || 0;
+      const rate = it.rate || 0;
+
+      const itemBase = (it.qty || 0) * rate * (it.packing || 1) * (1 - discount / 100);
+      const itemTax = (itemBase * gst) / 100;
+      totalBase += itemBase;
+      totalTax += itemTax;
+
       return {
         productId: it.productId,
         name: it.productName,
         qty: it.qty,
         boxes: it.qty,
         packing: it.packing || 1,
-        rate: it.rate || 0,
-        gstRate: it.gstRate || 0,
+        rate: Number(rate.toFixed(2)),
+        gstRate: gst,
         batchNo: it.batchNo || '',
         hsnCode: it.hsnCode || '',
-        mrp: it.mrp || 0,
-        discountPercent: it.discountPercent || 0,
+        mrp: it.mrp || it.rate || 0,
+        discountPercent: discount,
       };
     });
 
@@ -683,7 +736,7 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
       if (shippingPart) shippingAddress = shippingPart;
     }
 
-    // Create draft tax invoice — inventory already deducted when DC was dispatched
+    // Create draft invoice — inventory already deducted when DC was dispatched
     const invoice = await Invoice.create({
       invoiceNo,
       customerName: movement.partyName,
@@ -696,7 +749,9 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
       baseAmount: totalBase,
       cgst, sgst, igst, roundOff,
       stateOfSupply: isIntraState ? 'Uttar Pradesh' : 'Other State',
-      gstin: movement.partyGstin,
+      gstin: movement.partyGstin || '',
+      saleType: isOrder ? 'b2c_website' : 'b2b',
+      websiteOrderRef: isOrder ? movement.docNo : '',
       warehouseId: movement.warehouseId,
       warehouseName: movement.warehouseName,
       deductInventory: false,   // already deducted with DC

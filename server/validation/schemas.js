@@ -55,6 +55,8 @@ const productSchema = z.object({
   description: z.string().default(''),
   disease: z.string().default(''),
   ingredients: z.string().default(''),
+  suggestedDosage: z.string().optional().default(''),
+  benefits: z.string().optional().default(''),
   rating: z.number().default(0),
   ratingCount: z.number().int().default(0),
   parentId: objectId.optional().nullable(),
@@ -116,7 +118,7 @@ const invoiceItem = z.object({
 });
 
 const invoiceSchema = z.object({
-  type: z.enum(['sale', 'purchase']),
+  type: z.enum(['sale', 'purchase']).default('sale'),
   purchaseType: z.enum(['finished_goods', 'raw_materials']).default('finished_goods'),
   invoiceNo: z.string().optional(),
   customerName: z.string().default(''),
@@ -248,6 +250,14 @@ const stockMovementSchema = z.object({
   damageReason: z.string().optional().default(''),
   notes: z.string().default(''),
   createdBy: z.string().default(''),
+  sourceDocType: z.string().optional().default(''),
+  sourceDocId: objectId.optional(),
+  transporter: z.string().optional().default(''),
+  lrNo: z.string().optional().default(''),
+  vehicleNo: z.string().optional().default(''),
+  courierName: z.string().optional().default(''),
+  trackingId: z.string().optional().default(''),
+  totalBoxes: z.string().optional().default('1'),
 });
 
 // ── Order ────────────────────────────────────────────────────
@@ -266,7 +276,7 @@ const orderSchema = z.object({
   phone: z.string().min(1, 'Phone required'),
   shippingAddress: z.string().min(1, 'Shipping address required'),
   items: z.array(orderItem).min(1, 'At least one item required'),
-  totalAmount: z.number().min(0),
+  totalAmount: z.number().min(0).optional(),
   status: z.enum(['pending', 'processing', 'shipped', 'delivered', 'cancelled']).default('pending'),
   courierName: z.string().default(''),
   trackingId: z.string().default(''),
@@ -457,6 +467,7 @@ const yieldItemSchema = z.object({
   productId: objectId,
   actualYieldQty: z.number().int().min(0),
   packing: z.number().int().min(1).default(1),
+  size: z.string().optional(),
 });
 
 const batchCompleteSchema = z.object({
@@ -664,6 +675,8 @@ const dispatchSchema = z.object({
   dispatchNo: z.string().optional(),
   invoiceId: objectId.optional(),
   invoiceNo: z.string().default(''),
+  challanId: objectId.optional(),
+  challanNo: z.string().default(''),
   customerName: z.string().min(1, 'Customer name required'),
   customerPhone: z.string().default(''),
   shippingAddress: z.string().default(''),
@@ -736,7 +749,7 @@ const gstinVerifySchema = z.object({
   gstin: z.string().length(15),
 });
 
-// ── Batch Production Supporting Documents ─────────────────────
+// ── Batch Production Stage Advance ────────────────────────────
 const batchStageUpdateSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'completed', 'skipped', 'failed']).optional(),
   notes: z.string().optional(),
@@ -750,7 +763,9 @@ const batchStageUpdateSchema = z.object({
     qtyNeeded: z.number().min(0),
     wastage: z.number().min(0).optional(),
     itemType: z.string().optional(),
+    lossReason: z.string().optional(),
   })).optional(),
+  yields: z.array(yieldItemSchema).optional(),
 });
 
 const cleaningAdjustmentSchema = z.object({

@@ -194,6 +194,30 @@ export default function ProductDetailModal({ product, visible, onClose, onDelete
               </View>
             ) : null}
 
+            {(product as any).benefits ? (
+              <View style={[styles.infoItem, { width: '100%' }]}>
+                <View style={[styles.infoIcon, { backgroundColor: colors.successLight }]}>
+                  <Ionicons name="sparkles" size={16} color={colors.success} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.infoLabel}>Health Benefits</Text>
+                  <Text style={styles.infoValue}>{(product as any).benefits}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {(product as any).suggestedDosage ? (
+              <View style={[styles.infoItem, { width: '100%' }]}>
+                <View style={[styles.infoIcon, { backgroundColor: colors.primaryLight }]}>
+                  <Ionicons name="restaurant" size={16} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.infoLabel}>Suggested Dosage</Text>
+                  <Text style={styles.infoValue}>{(product as any).suggestedDosage}</Text>
+                </View>
+              </View>
+            ) : null}
+
             {product.vendorName ? (
               <View style={styles.infoItem}>
                 <View style={[styles.infoIcon, { backgroundColor: colors.successLight }]}>

@@ -1,10 +1,13 @@
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { usePermission } from '../utils/permissions';
 import { LightColors, Spacing, Radius } from '../constants/theme';
+import { authStorage } from '../utils/storage';
+
+const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded';
 
 export const SIDEBAR_WIDTH = 230;
 
@@ -69,14 +72,22 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    key: 'system',
-    label: 'Reports & Administration',
-    icon: 'settings-outline',
+    key: 'reports',
+    label: 'Reports',
+    icon: 'bar-chart-outline',
     items: [
       { label: 'Reports & Audits', route: 'reports', icon: 'bar-chart-outline', activeIcon: 'bar-chart', permission: 'report:view' },
+    ],
+  },
+  {
+    key: 'administration',
+    label: 'Administration',
+    icon: 'settings-outline',
+    items: [
       { label: 'AI Business Assistant', route: 'ai-analytics', icon: 'sparkles-outline', activeIcon: 'sparkles' },
       { label: 'Access Control', route: 'rbac', icon: 'shield-checkmark-outline', activeIcon: 'shield-checkmark', permission: 'rbac:manage' },
       { label: 'My Details', route: 'profile', icon: 'person-outline', activeIcon: 'person' },
+      { label: 'System Audit Logs', route: 'audit', icon: 'shield-outline', activeIcon: 'shield', permission: 'audit:view' },
     ],
   },
 ];
@@ -353,6 +364,19 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
     }
     return map;
   });
+  const loadedRef = useRef(false);
+
+  useEffect(() => {
+    authStorage.getItem(SIDEBAR_EXPANDED_KEY).then((val) => {
+      if (val) {
+        try {
+          const saved = JSON.parse(val);
+          setExpandedGroups((prev) => ({ ...prev, ...saved }));
+        } catch {}
+      }
+      loadedRef.current = true;
+    });
+  }, []);
 
   useEffect(() => {
     setExpandedGroups((prev) => {
@@ -367,7 +391,11 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
   }, [pathname]);
 
   const toggleGroup = (key: string) =>
-    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+    setExpandedGroups((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      authStorage.setItem(SIDEBAR_EXPANDED_KEY, JSON.stringify(next));
+      return next;
+    });
 
   const isActive = (route: string) => {
     if (route === 'index') return pathname === '/';

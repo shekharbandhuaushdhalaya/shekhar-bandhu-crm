@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useRouter } from 'expo-router';
 import AyurvedicLoader from '../components/AyurvedicLoader';
+import { useToast } from '../utils/ToastContext';
 import {
   api,
   RawMaterial,
@@ -59,6 +60,7 @@ export default function ManufacturingScreen() {
   const styles = useStyles(createStyles);
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
+  const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'materials' | 'batches' | 'scheduler' | 'units'>('materials');
   const [loading, setLoading] = useState(true);
@@ -107,9 +109,13 @@ export default function ManufacturingScreen() {
   const [stageNotes, setStageNotes] = useState('');
   const [stageModalVisible, setStageModalVisible] = useState(false);
   const [stageError, setStageError] = useState('');
-  const [stageIngredients, setStageIngredients] = useState<{ rawMaterialId: string; name: string; unit: string; qtyTheoretical: number; actualQty: string; wastage: string; itemType?: string; qtyRequiredPerUnit?: number }[]>([]);
+  interface StageIngredient { rawMaterialId: string; name: string; unit: string; qtyTheoretical: number; actualQty: string; wastage: string; itemType?: string; qtyRequiredPerUnit?: number; stockAvailable?: number; }
+  const [stageIngredients, setStageIngredients] = useState<StageIngredient[]>([]);
   const [stageLossReason, setStageLossReason] = useState('');
   const [stageOutputYield, setStageOutputYield] = useState('');
+  const [stageYields, setStageYields] = useState<{ productId: string; actualYieldQty: number; packing: number; size: string; productName?: string }[]>([]);
+  const [productsForYield, setProductsForYield] = useState<any[]>([]);
+  const [showYieldProductPicker, setShowYieldProductPicker] = useState(false);
 
   // Search & Filter States — Raw Materials tab
   const [materialSearch, setMaterialSearch] = useState('');
@@ -381,13 +387,9 @@ export default function ManufacturingScreen() {
     });
   }, [fetchDataset]);
 
-  // On mount: fetch active tab + prefetch adjacent tabs
+  // On mount: fetch only the active tab
   useEffect(() => {
     fetchTabData(activeTab);
-    // Prefetch adjacent tabs in background
-    const allTabs = ['materials', 'batches', 'scheduler', 'units'];
-    const adjacent = allTabs.filter(t => t !== activeTab);
-    adjacent.forEach(t => fetchTabDataBackground(t));
   }, []); // only on mount
 
   // On tab change: fetch data for the new tab if missing
@@ -448,12 +450,18 @@ export default function ManufacturingScreen() {
     };
   }, [mfgUnitFilter]);
 
-  const handleRefresh = () => {
+  const refreshCurrentTab = useCallback(() => {
     loadedRef.current.clear();
     api.clearCache();
     fetchTabData(activeTab);
+  }, [activeTab, fetchTabData]);
+
+  const handleRefresh = () => {
+    refreshCurrentTab();
     fetchTabDataBackground(activeTab === 'materials' ? 'batches' : 'materials');
   };
+
+  const loadData = refreshCurrentTab;
 
   // --- Handlers: Raw Material Definition ---
   const handleSaveMaterial = async () => {
@@ -552,7 +560,7 @@ export default function ManufacturingScreen() {
       await api.deleteRawMaterialEntry(entryId);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to void stock entry');
+      showToast(err.message || 'Failed to void stock entry', 'error');
     }
   };
 
@@ -684,6 +692,7 @@ export default function ManufacturingScreen() {
         jobWorkerId: prodProductionType === 'job_work' ? (prodJobWorkerId || null) : null,
         jobWorkerName: prodProductionType === 'job_work' ? prodJobWorkerName : '',
         jobWorkerChallanRef: prodProductionType === 'job_work' ? prodJobWorkerChallanRef : '',
+        shelfLifeMonths: parseInt(prodExpiryMonths, 10) || undefined,
         expiryDate: (() => {
           const months = parseInt(prodExpiryMonths, 10);
           if (!months || months <= 0) return undefined;
@@ -839,11 +848,7 @@ export default function ManufacturingScreen() {
       const grnDocNo = result?.grn?.docNo;
 
       setSelectedBatchRun(null);
-      if (Platform.OS === 'web') {
-        window.alert(`Batch completed! Production GRN (${grnDocNo || 'N/A'}) created in Delivery Challans. Go to Challans → Finalize to inward stock.`);
-      } else {
-        Alert.alert('Batch Completed', `Production GRN (${grnDocNo || 'N/A'}) created. Go to Delivery Challans → Finalize to inward stock.`);
-      }
+      showToast(`Batch completed! GRN (${grnDocNo || 'N/A'}) created.`, 'success');
       setQcYieldQty('');
       setQcPacking('');
       setQcWarehouseId('');
@@ -887,7 +892,7 @@ export default function ManufacturingScreen() {
       await api.cancelBatchProduction(batchId);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to cancel production run');
+      showToast(err.message || 'Failed to cancel production run', 'error');
     }
   };
 
@@ -904,21 +909,71 @@ export default function ManufacturingScreen() {
       const stage = batch.stages[idx];
       const stageName = stage.name;
       
-      const isPacking = stageName.trim().toLowerCase() === 'packing';
+      const isPacking = stageName.trim().toLowerCase().includes('pack') || stageName.trim().toLowerCase().includes('label');
       setStageOutputYield(isPacking ? (batch.plannedQty ? batch.plannedQty.toString() : '10') : '');
+
+      // Load products for yield editor (packaging stage)
+      if (isPacking) {
+        api.getProducts().then(prods => setProductsForYield(prods || [])).catch(() => {});
+      } else {
+        setStageYields([]);
+      }
       
       const formulationBasis = batch.bomSnapshot?.formulationBasis || 100;
       const formulationBasisUnit = (batch.bomSnapshot?.formulationBasisUnit || 'ml').toLowerCase();
       
+      // Compute initial yields for packaging stage — include ALL size variants of the batch's product
+      const initialYields = (() => {
+        if (!isPacking) return [];
+        // Collect all size variant product IDs for this batch's product
+        const mainPid = typeof batch.productId === 'string' ? batch.productId : (batch.productId as any)?._id || '';
+        const allVariantPids = new Set<string>();
+        if (mainPid) {
+          allVariantPids.add(mainPid);
+          (products || []).forEach(p => { if (p.parentId === mainPid) allVariantPids.add(p._id); });
+        }
+        // Build a map of productId → yield data from saved yields
+        const yieldMap = new Map<string, { actualYieldQty: number; packing: number; size: string }>();
+        if (batch.yields && batch.yields.length > 0) {
+          batch.yields.forEach((y: any) => {
+            const pid = typeof y.productId === 'string' ? y.productId : (y.productId as any)?._id || '';
+            yieldMap.set(pid, { actualYieldQty: y.actualYieldQty || 0, packing: y.packing || 1, size: y.size || '' });
+          });
+        } else if ((batch as any).plannedYields && (batch as any).plannedYields.length > 0) {
+          (batch as any).plannedYields.forEach((y: any) => {
+            const pid = typeof y.productId === 'string' ? y.productId : (y.productId as any)?._id || '';
+            yieldMap.set(pid, { actualYieldQty: y.plannedQty || 0, packing: 1, size: y.size || '' });
+          });
+        }
+        // Yield row for every variant (with data from map if available)
+        return [...allVariantPids].map(pid => {
+          const existing = yieldMap.get(pid);
+          const prod = products.find(p => p._id === pid);
+          return {
+            productId: pid,
+            actualYieldQty: existing?.actualYieldQty || 0,
+            packing: existing?.packing || 1,
+            size: existing?.size || prod?.size || ''
+          };
+        });
+      })();
+      setStageYields(initialYields);
+
       let scale = 1;
-      const yields = (batch as any).plannedYields || [];
-      if (yields.length > 0) {
+      let effectiveYields: any[] = [];
+      if (isPacking) {
+        effectiveYields = initialYields;
+      } else {
+        effectiveYields = (batch as any).plannedYields || [];
+      }
+      if (effectiveYields.length > 0 && !isPacking) {
+        // Only compute scale from plannedYields for non-packaging stages
         let totalBatchVolume = 0;
         let allHaveSizes = true;
-        for (const y of yields) {
+        for (const y of effectiveYields) {
           const sizeMl = parseSizeMl(y.size || '');
           if (sizeMl > 0) {
-            totalBatchVolume += sizeMl * (Number(y.plannedQty) || 0);
+            totalBatchVolume += sizeMl * (Number(y.plannedQty || y.actualYieldQty) || 0);
           } else {
             allHaveSizes = false;
             break;
@@ -951,39 +1006,16 @@ export default function ManufacturingScreen() {
           wastage: '0',
           itemType: i.itemType || 'formulation',
           qtyRequiredPerUnit: i.qtyRequired || 0,
+          stockAvailable: (rm as any)?.stockLevel || 0,
         };
       });
 
       // Also include packaging materials (bottles, caps, labels) for packaging stages
-      const isPackingStage = stageName.trim().toLowerCase().includes('packag') || stageName.trim().toLowerCase().includes('label');
-      if (isPackingStage && batch.packagingMode === 'self_packed') {
-        const packagingIngs = (batch.bomSnapshot?.ingredients || []).filter(
-          i => i.itemType === 'packaging'
-        );
-        // Calculate packaging qty based on yields or plannedQty
-        const yields = (batch as any).plannedYields || [];
-        const packagingItems = packagingIngs.map(i => {
-          const rmId = typeof i.rawMaterialId === 'string' ? i.rawMaterialId : (i.rawMaterialId as any)?._id || '';
-          const rm = materials.find(r => r._id === rmId);
-          let totalQty = 0;
-          if (yields.length > 0) {
-            totalQty = yields.reduce((sum: number, y: any) => sum + (i.qtyRequired || 0) * (Number(y.plannedQty) || 0), 0);
-          } else {
-            totalQty = (i.qtyRequired || 0) * (batch.plannedQty || 0);
-          }
-          totalQty = parseFloat(totalQty.toFixed(3));
-          return {
-            rawMaterialId: rmId,
-            name: rm?.name || 'Unknown',
-            unit: rm?.unit || 'pcs',
-            qtyTheoretical: totalQty,
-            actualQty: totalQty.toString(),
-            wastage: '0',
-            itemType: 'packaging',
-            qtyRequiredPerUnit: i.qtyRequired || 0,
-          };
-        });
-        computed = [...computed, ...packagingItems];
+      if (isPacking && batch.packagingMode === 'self_packed') {
+        const yieldsForPkg = initialYields.length > 0 ? initialYields : ((batch as any).plannedYields || []);
+        // Compute packaging per yield product using each product's BOM
+        const pkgFromYields = computePackagingFromYields(yieldsForPkg, batch, computed);
+        computed = pkgFromYields;
       }
 
       setStageIngredients(computed);
@@ -1023,7 +1055,7 @@ export default function ManufacturingScreen() {
     }
     const batch = batches.find(b => b._id === stageBatchId);
     const stage = batch?.stages[stageIndex || 0];
-    const isPacking = stage?.name.trim().toLowerCase() === 'packing';
+    const isPacking = (stage?.name || '').trim().toLowerCase().includes('pack') || (stage?.name || '').trim().toLowerCase().includes('label');
 
     const hasWastage = stageIngredients.some(si => parseFloat(si.wastage) > 0);
     if (hasWastage && !stageLossReason.trim()) {
@@ -1032,6 +1064,47 @@ export default function ManufacturingScreen() {
         : 'Loss / Wastage reason is required when there is a process loss.'
       );
       return;
+    }
+
+    // Check stock sufficiency for packaging materials
+    if (isPacking) {
+      const shortItems = stageIngredients
+        .filter(si => si.itemType === 'packaging')
+        .filter(si => {
+          const needed = parseFloat(si.actualQty) || si.qtyTheoretical || 0;
+          return (si.stockAvailable || 0) < needed;
+        });
+      if (shortItems.length > 0) {
+        const msg = shortItems.map(si => `${si.name}: need ${(parseFloat(si.actualQty) || si.qtyTheoretical).toFixed(1)} ${si.unit}, have ${si.stockAvailable}`).join('\n');
+        setStageError(`Insufficient packaging stock:\n${msg}`);
+        return;
+      }
+    }
+
+    // Volume validation: total yield volume must not exceed available batch volume
+    if (isPacking && stageYields.length > 0) {
+      const totalVolumeMl = stageYields.reduce((s, y) => {
+        const prod = productsForYield.find(p => p._id === y.productId);
+        return s + parseSizeMl(y.size || prod?.size || '') * (y.actualYieldQty || 0);
+      }, 0);
+      const availableMl = (() => {
+        if (!batch) return 0;
+        const py = (batch as any).plannedYields;
+        if (py && py.length > 0) {
+          return py.reduce((s: number, y: any) => {
+            return s + parseSizeMl(y.size || '') * (y.plannedQty || 0);
+          }, 0);
+        }
+        const qty = batch.plannedQty || 0;
+        const unit = (batch.bomSnapshot?.formulationBasisUnit || 'ml').toLowerCase();
+        const basisVolMl = unit === 'l' ? qty * 1000 : qty;
+        const basis = batch.bomSnapshot?.formulationBasis || 100;
+        return basis > 0 ? (basisVolMl / basis) * basis : 0;
+      })();
+      if (availableMl > 0 && totalVolumeMl > availableMl * 1.02) {
+        setStageError(`Volume exceeded! Yield total ${totalVolumeMl} ml exceeds available ${availableMl} ml by ${(totalVolumeMl - availableMl).toFixed(0)} ml. Reduce bottle qty or adjust sizes.`);
+        return;
+      }
     }
 
     if ((stageAction === 'skip' || stageAction === 'fail') && !stageNotes.trim()) {
@@ -1053,14 +1126,22 @@ export default function ManufacturingScreen() {
         qtyNeeded: parseFloat(si.actualQty) || si.qtyTheoretical,
         wastage: parseFloat(si.wastage) || 0,
         itemType: si.itemType || 'formulation',
+        lossReason: parseFloat(si.wastage) > 0 ? stageLossReason.trim() : '',
       }));
+      const yieldsPayload = stageYields.length > 0 ? stageYields.map(y => ({
+        productId: y.productId,
+        actualYieldQty: y.actualYieldQty,
+        packing: y.packing || 1,
+        size: y.size || ''
+      })) : undefined;
       await api.advanceStage(stageBatchId, stageIndex, {
         status: statusVal,
         completedBy: stageOperator.trim(),
         notes: stageNotes.trim(),
         lossReason: stageLossReason.trim(),
-        ...(isPacking && stageOutputYield ? { actualYieldQty: parseFloat(stageOutputYield) || 0 } : {}),
+        ...(isPacking && stageOutputYield && !yieldsPayload ? { actualYieldQty: parseFloat(stageOutputYield) || 0 } : {}),
         ...(stageAction === 'advance' && siPayload.length > 0 ? { stageIngredients: siPayload } : {}),
+        ...(stageAction === 'advance' && yieldsPayload ? { yields: yieldsPayload } : {}),
       });
 
       setStageAction(null);
@@ -1069,6 +1150,8 @@ export default function ManufacturingScreen() {
       setStageOperator('Operator');
       setStageNotes('');
       setStageIngredients([]);
+      setStageYields([]);
+      setProductsForYield([]);
       setCurrentInProgressStage(null);
       setStageModalVisible(false);
       loadData();
@@ -1106,24 +1189,113 @@ export default function ManufacturingScreen() {
     });
   };
 
+  // Compute packaging material requirements per yield product using each product's BOM
+  /** Parse a size string out of a material name, e.g. "200 ML Bottle" → 200, "450ML" → 450 */
+  function parseSizeFromName(name: string): number {
+    const s = (name || '').toLowerCase().trim();
+    // Match patterns like "200ml", "200 ml", "200 ML", "200mL" etc.
+    const m = s.match(/(\d+)\s*(ml|l)\b/);
+    if (m) return parseFloat(m[1]) * (m[2] === 'l' ? 1000 : 1);
+    // Also match just a number followed by ml
+    const m2 = s.match(/(\d+)\s*ml/);
+    if (m2) return parseFloat(m2[1]);
+    return 0;
+  }
+
+  function computePackagingFromYields(ylds: { productId: string; actualYieldQty: number }[], batch: any, existingPkg: any[]) {
+    const pkgMap: Record<string, { rawMaterialId: string; name: string; unit: string; qtyTheoretical: number; qtyRequiredPerUnit: number; itemType: string; stockAvailable: number }> = {};
+    for (const y of ylds) {
+      if (!y.productId || !y.actualYieldQty) continue;
+      // Determine the yield's size in ml for matching
+      const yieldSizeMl = (() => {
+        const prod = productsForYield.find(p => p._id === y.productId);
+        return parseSizeMl(y.size || prod?.size || '');
+      })();
+      // Find BOM for this yield product
+      let bom = boms.find(b => b.productId === y.productId || (b.productId as any)?._id === y.productId);
+      if (!bom) {
+        continue; // No BOM means no packaging requirement — user needs to set up BOM
+      }
+      const bomIngs = (bom as any).ingredients || [];
+      const pkgIngs = bomIngs.filter((i: any) => i.itemType === 'packaging');
+      for (const ing of pkgIngs) {
+        const rmId = typeof ing.rawMaterialId === 'string' ? ing.rawMaterialId : (ing.rawMaterialId as any)?._id || '';
+        const rm = materials.find(r => r._id === rmId);
+        // Try to match packaging material by size: only apply to yields that match
+        const matSizeMl = parseSizeFromName(rm?.name || '');
+        // If the packaging material has a discernible size and the yield has a different size, skip
+        if (matSizeMl > 0 && yieldSizeMl > 0 && Math.abs(matSizeMl - yieldSizeMl) > 1) {
+          continue;
+        }
+        pkgMap[rmId] = {
+          rawMaterialId: rmId,
+          name: rm?.name || 'Unknown',
+          unit: rm?.unit || 'pcs',
+          qtyTheoretical: (pkgMap[rmId]?.qtyTheoretical || 0) + (ing.qtyRequired || 0) * y.actualYieldQty,
+          qtyRequiredPerUnit: ing.qtyRequired || 0,
+          itemType: 'packaging',
+          stockAvailable: (rm as any)?.stockLevel || 0,
+        };
+      }
+    }
+    // Merge with existing packaging items (preserve user edits to actualQty/wastage)
+    const result = existingPkg.filter(si => si.itemType !== 'packaging');
+    for (const [, pkg] of Object.entries(pkgMap)) {
+      const thStr = pkg.qtyTheoretical.toFixed(3);
+      const th = parseFloat(thStr);
+      const existing = existingPkg.find(si => si.itemType === 'packaging' && si.rawMaterialId === pkg.rawMaterialId);
+      const existingVal = existing ? parseFloat(existing.actualQty) : 0;
+      const preserveEdit = existing && Math.abs(existingVal - th) > 0.001;
+      result.push({
+        ...pkg,
+        qtyTheoretical: th,
+        actualQty: preserveEdit ? existing.actualQty : thStr,
+        wastage: preserveEdit ? (existing.wastage || '0') : '0',
+      });
+    }
+    return result;
+  }
+
+  const recalcPkgFromYields = (ylds: { productId: string; actualYieldQty: number }[], batch: any) => {
+    setStageIngredients(prev => computePackagingFromYields(ylds, batch, prev));
+  };
+
+  const handleYieldQtyChange = (yIdx: number, val: string) => {
+    setStageYields(prev => {
+      const updated = [...prev];
+      updated[yIdx] = { ...updated[yIdx], actualYieldQty: parseFloat(val) || 0 };
+      // Recalculate packaging materials based on new yields
+      const batch = batches.find(b => b._id === stageBatchId);
+      if (batch) recalcPkgFromYields(updated, batch);
+      return updated;
+    });
+  };
+
+  const addYieldRow = () => {
+    setShowYieldProductPicker(true);
+  };
+
+  const selectYieldProduct = (prod: any) => {
+    setShowYieldProductPicker(false);
+    setStageYields(prev => {
+      const updated = [...prev, { productId: prod._id, actualYieldQty: 0, packing: 1, size: prod.size || '', productName: prod.name }];
+      const batch = batches.find(b => b._id === stageBatchId);
+      if (batch) recalcPkgFromYields(updated, batch);
+      return updated;
+    });
+  };
+
+  const removeYieldRow = (yIdx: number) => {
+    setStageYields(prev => {
+      const updated = prev.filter((_, i) => i !== yIdx);
+      const batch = batches.find(b => b._id === stageBatchId);
+      if (batch) recalcPkgFromYields(updated, batch);
+      return updated;
+    });
+  };
+
   const handleOutputYieldChange = (yieldVal: string) => {
     setStageOutputYield(yieldVal);
-    const yieldNum = parseFloat(yieldVal) || 0;
-    setStageIngredients(prev => {
-      return prev.map(si => {
-        if (si.itemType === 'packaging') {
-          const qtyRequiredPerUnit = si.qtyRequiredPerUnit || 0;
-          const qtyTheoretical = parseFloat((yieldNum * qtyRequiredPerUnit).toFixed(3));
-          return {
-            ...si,
-            qtyTheoretical,
-            actualQty: qtyTheoretical.toString(),
-            wastage: '0'
-          };
-        }
-        return si;
-      });
-    });
   };
 
   const handleOpenGenealogy = async (type: 'batch' | 'material', id: string) => {
@@ -1138,7 +1310,7 @@ export default function ManufacturingScreen() {
         : await api.getRawMaterialGenealogy(id);
       setGenealogyData(data);
     } catch (err: any) {
-      alert(err.message || 'Failed to load genealogy data');
+      showToast(err.message || 'Failed to load genealogy data', 'error');
       setGenealogyModalVisible(false);
     } finally {
       setGenealogyLoading(false);
@@ -1186,12 +1358,12 @@ export default function ManufacturingScreen() {
               });
               loadData();
             } catch (err: any) {
-              alert(err.message || 'Failed to upload document');
+              showToast(err.message || 'Failed to upload document', 'error');
             }
           };
           reader.readAsDataURL(file);
         } catch (err: any) {
-          alert('Failed to read file');
+          showToast('Failed to read file', 'error');
         }
       };
       input.click();
@@ -1209,7 +1381,7 @@ export default function ManufacturingScreen() {
                 await api.addDocument('batch', batchId, { name: 'Attached Certificate', url });
                 loadData();
               } catch (err: any) {
-                alert(err.message || 'Failed to attach document');
+                showToast(err.message || 'Failed to attach document', 'error');
               }
             }
           }
@@ -1232,7 +1404,7 @@ export default function ManufacturingScreen() {
       await api.deleteDocument('batch', batchId, url);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete document');
+      showToast(err.message || 'Failed to delete document', 'error');
     }
   };
 
@@ -1244,7 +1416,7 @@ export default function ManufacturingScreen() {
       const data = await api.traceBatch(traceBatchNo.trim().toUpperCase());
       setTraceResult(data);
     } catch (err: any) {
-      alert(err.message || 'Trace lookup failed');
+      showToast(err.message || 'Trace lookup failed', 'error');
       setTraceModalVisible(false);
     } finally {
       setTraceLoading(false);
@@ -1258,8 +1430,7 @@ export default function ManufacturingScreen() {
       setBmrReport(report);
       setBmrModalVisible(true);
     } catch (err: any) {
-      console.error('Failed to load BMR Report:', err);
-      Alert.alert('Error', err.message || 'Failed to retrieve batch manufacturing record.');
+      showToast(err.message || 'Failed to retrieve batch manufacturing record.', 'error');
     } finally {
       setLoadingBmr(false);
     }
@@ -1269,7 +1440,7 @@ export default function ManufacturingScreen() {
     if (Platform.OS === 'web') {
       window.print();
     } else {
-      Alert.alert('Print Report', 'BMR Report formatted. Connection to wireless label/receipt printer active!');
+      showToast('BMR Report formatted. Ready for printing!', 'success');
     }
   };
 
@@ -1573,7 +1744,7 @@ export default function ManufacturingScreen() {
                 const data = await api.traceBatch(batchNo.trim().toUpperCase());
                 setTraceResult(data);
               } catch (err: any) {
-                alert(err.message || 'Trace lookup failed');
+                showToast(err.message || 'Trace lookup failed', 'error');
                 setTraceModalVisible(false);
               } finally {
                 setTraceLoading(false);
@@ -1770,13 +1941,13 @@ export default function ManufacturingScreen() {
       {/* ======================================================== */}
       <Modal visible={stageModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => { setStageModalVisible(false); setStageIngredients([]); }} />
+          <Pressable style={styles.modalBackdrop} onPress={() => { setStageModalVisible(false); setStageIngredients([]); setStageYields([]); setProductsForYield([]); setShowYieldProductPicker(false); }} />
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {stageAction === 'advance' ? 'Complete Manufacturing Stage' : 'Skip Manufacturing Stage'}
               </Text>
-              <TouchableOpacity onPress={() => { setStageModalVisible(false); setStageIngredients([]); }}>
+              <TouchableOpacity onPress={() => { setStageModalVisible(false); setStageIngredients([]); setStageYields([]); setProductsForYield([]); setShowYieldProductPicker(false); }}>
                 <Ionicons name="close" size={20} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
@@ -1815,22 +1986,125 @@ export default function ManufacturingScreen() {
                 if (!batch) return null;
                 const stage = batch.stages[stageIndex || 0];
                 if (!stage) return null;
-                const isPacking = stage.name.trim().toLowerCase() === 'packing';
+                const isPacking = stage.name.trim().toLowerCase().includes('pack') || stage.name.trim().toLowerCase().includes('label');
                 if (!isPacking) return null;
                 return (
                   <View style={{ marginTop: 12, marginBottom: 12 }}>
-                    <Text style={[styles.inputLabel, { color: colors.primary }]}>Output Yield (Bottles) *</Text>
-                    <TextInput
-                      style={[styles.input, { height: 44, fontWeight: '700' }]}
-                      keyboardType="numeric"
-                      value={stageOutputYield}
-                      onChangeText={handleOutputYieldChange}
-                      placeholder="Enter actual bottles yielded..."
-                      placeholderTextColor={colors.text.muted}
-                    />
-                    <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 12 }}>
-                      Theoretical quantities of packaging materials will automatically recalculate based on this yield.
+                    <Text style={[styles.inputLabel, { color: colors.primary }]}>Production Yields (Bottle Split) *</Text>
+                    <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 8 }}>
+                      Set the actual bottle sizes and quantities filled. Packaging material requirements auto-update.
                     </Text>
+                    {stageYields.map((y, yIdx) => {
+                      const prod = productsForYield.find(p => p._id === y.productId);
+                      return (
+                        <View key={y.productId + yIdx} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, backgroundColor: colors.bg.card, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: colors.border }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>{prod?.name || 'Unknown'}</Text>
+                            <Text style={{ fontSize: 10, color: colors.text.muted }}>{y.size || prod?.size || ''}</Text>
+                          </View>
+                          <TextInput
+                            style={{ width: 80, height: 36, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, fontSize: 14, fontWeight: '700', color: colors.text.primary, textAlign: 'center', backgroundColor: colors.bg.primary }}
+                            keyboardType="numeric"
+                            value={y.actualYieldQty > 0 ? String(y.actualYieldQty) : ''}
+                            onChangeText={v => handleYieldQtyChange(yIdx, v)}
+                            placeholder="0"
+                            placeholderTextColor={colors.text.muted}
+                          />
+                          <TouchableOpacity onPress={() => removeYieldRow(yIdx)} style={{ padding: 4 }}>
+                            <Ionicons name="close-circle" size={20} color={colors.danger} />
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                    <TouchableOpacity onPress={addYieldRow} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, marginBottom: 4 }}>
+                      <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Add Product / Size</Text>
+                    </TouchableOpacity>
+                    {stageYields.length > 0 && (() => {
+                      const totalUnits = stageYields.reduce((s, y) => s + (y.actualYieldQty || 0), 0);
+                      const totalVolumeMl = stageYields.reduce((s, y) => {
+                        const prod = productsForYield.find(p => p._id === y.productId);
+                        return s + parseSizeMl(y.size || prod?.size || '') * (y.actualYieldQty || 0);
+                      }, 0);
+                      // Available volume = sum of planned yields × sizes
+                      const batch2 = batches.find(b => b._id === stageBatchId);
+                      const availableMl = (() => {
+                        if (!batch2) return 0;
+                        const py = (batch2 as any).plannedYields;
+                        if (py && py.length > 0) {
+                          return py.reduce((s: number, y: any) => {
+                            return s + parseSizeMl(y.size || '') * (y.plannedQty || 0);
+                          }, 0);
+                        }
+                        // Fallback: if single product, use plannedQty converted from basis unit
+                        const qty = batch2.plannedQty || 0;
+                        const unit = (batch2.bomSnapshot?.formulationBasisUnit || 'ml').toLowerCase();
+                        const basisVolMl = unit === 'l' ? qty * 1000 : qty;
+                        const basis = batch2.bomSnapshot?.formulationBasis || 100;
+                        return basis > 0 ? (basisVolMl / basis) * basis : 0;
+                      })();
+                      const overVolume = availableMl > 0 && totalVolumeMl > availableMl;
+                      return (
+                        <View style={{ marginBottom: 4 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                            <Text style={{ fontSize: 12, color: colors.text.secondary }}>
+                              Total: <Text style={{ fontWeight: '800', color: colors.primary }}>{totalUnits} units</Text>
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 4 }}>
+                            <Text style={{ fontSize: 11, color: colors.text.muted }}>
+                              Volume: <Text style={{ fontWeight: '700', color: overVolume ? colors.danger : colors.success }}>{totalVolumeMl} ml</Text>
+                            </Text>
+                            <Text style={{ fontSize: 11, color: colors.text.muted }}>
+                              / {availableMl} ml available
+                            </Text>
+                            {overVolume && (
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.danger }}>
+                                ⚠ Over by {(totalVolumeMl - availableMl).toFixed(0)} ml
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })()}
+                  </View>
+                );
+              })()}
+
+              {/* Product picker for adding yield items — only show size variants of the batch's main product */}
+              {showYieldProductPicker && (() => {
+                const batchP = batches.find(b => b._id === stageBatchId);
+                const mainProdId = typeof batchP?.productId === 'string' ? batchP.productId : (batchP?.productId as any)?._id || '';
+                const variantIds = new Set<string>();
+                if (mainProdId) {
+                  variantIds.add(mainProdId);
+                  productsForYield.forEach(p => { if (p.parentId === mainProdId) variantIds.add(p._id); });
+                }
+                const availableVariants = productsForYield.filter(p => variantIds.has(p._id) && !stageYields.some(y => y.productId === p._id));
+                return (
+                  <View style={{ marginTop: 8, marginBottom: 12, backgroundColor: colors.bg.card, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: colors.border }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>Select Product / Size</Text>
+                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                      {availableVariants.map(prod => (
+                        <TouchableOpacity
+                          key={prod._id}
+                          onPress={() => selectYieldProduct(prod)}
+                          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border + '60' }}
+                        >
+                          <View>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>{prod.name}</Text>
+                            <Text style={{ fontSize: 10, color: colors.text.muted }}>{prod.size || ''}</Text>
+                          </View>
+                          <Ionicons name="add" size={18} color={colors.primary} />
+                        </TouchableOpacity>
+                      ))}
+                      {availableVariants.length === 0 && (
+                        <Text style={{ fontSize: 12, color: colors.text.muted, padding: 8 }}>All sizes added</Text>
+                      )}
+                    </ScrollView>
+                    <TouchableOpacity onPress={() => setShowYieldProductPicker(false)} style={{ alignSelf: 'flex-end', padding: 4, marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.text.muted }}>Close</Text>
+                    </TouchableOpacity>
                   </View>
                 );
               })()}
@@ -1874,6 +2148,17 @@ export default function ManufacturingScreen() {
                             <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>
                               Formula standard: <Text style={{ fontWeight: '700', color: colors.primary }}>{theoretical.toFixed(3)} {si.unit}</Text>
                             </Text>
+                            {si.stockAvailable !== undefined && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                <Text style={{ fontSize: 10, color: colors.text.muted }}>In stock:</Text>
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: (si.stockAvailable || 0) >= theoretical ? colors.success : colors.danger }}>
+                                  {si.stockAvailable} {si.unit}
+                                </Text>
+                                {(si.stockAvailable || 0) < theoretical && (
+                                  <Text style={{ fontSize: 10, color: colors.danger }}>⚠ Short by {(theoretical - (si.stockAvailable || 0)).toFixed(2)}</Text>
+                                )}
+                              </View>
+                            )}
                           </View>
                           {isLoss ? (
                             <View style={{ backgroundColor: colors.warning + '20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
@@ -1961,7 +2246,7 @@ export default function ManufacturingScreen() {
               )}
             </ScrollView>
             <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setStageModalVisible(false); setStageIngredients([]); }}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setStageModalVisible(false); setStageIngredients([]); setStageYields([]); setProductsForYield([]); setShowYieldProductPicker(false); }}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity

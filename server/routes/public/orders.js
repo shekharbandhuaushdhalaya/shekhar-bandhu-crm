@@ -17,11 +17,6 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
       return res.status(400).json({ error: 'Missing required order fields or items list' });
     }
 
-    const warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
-    if (!warehouse) {
-      return res.status(500).json({ error: 'No warehouse configured.' });
-    }
-
     let totalAmount = 0;
     const validatedItems = [];
 
@@ -41,12 +36,13 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
         ? dbProd.price * (1 - dbProd.discount / 100)
         : dbProd.price;
 
-      const entries = await InventoryEntry.find({
-        warehouseId: warehouse._id,
-        productId: dbProd._id
+      // Check stock across ALL warehouses
+      const allEntries = await InventoryEntry.find({
+        productId: dbProd._id,
+        qtyBoxes: { $gt: 0 }
       }).sort({ mfgDate: 1, expiryDate: 1, createdAt: 1 });
 
-      const totalAvailableUnits = entries.reduce((acc, e) => acc + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
+      const totalAvailableUnits = allEntries.reduce((acc, e) => acc + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
 
       if (totalAvailableUnits < qty) {
         return res.status(400).json({ error: `Insufficient stock for product: ${dbProd.name}. Available: ${totalAvailableUnits} units` });
@@ -54,25 +50,27 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
 
       let totalDeductedBoxes = 0;
       let unitsNeeded = qty;
-      for (const entry of entries) {
+      for (const entry of allEntries) {
         if (unitsNeeded <= 0) break;
         const packSize = entry.packing || 1;
         const entryUnits = (entry.qtyBoxes || 0) * packSize;
         if (entryUnits <= 0) continue;
 
         const deductUnits = Math.min(unitsNeeded, entryUnits);
-        const deductBoxes = Math.floor(deductUnits / packSize);
-        const actualDeductUnits = deductBoxes * packSize;
+        const deductBoxes = Math.ceil(deductUnits / packSize);
+        const actualDeductBoxes = Math.min(deductBoxes, entry.qtyBoxes || 0);
+        const actualDeductUnits = actualDeductBoxes * packSize;
+        if (actualDeductBoxes <= 0) continue;
 
-        entry.qtyBoxes -= deductBoxes;
+        entry.qtyBoxes -= actualDeductBoxes;
         await entry.save();
 
         await StockLedger.create({
           productId: dbProd._id,
-          warehouseId: warehouse._id,
-          warehouseName: warehouse.name,
+          warehouseId: entry.warehouseId,
+          warehouseName: entry.warehouseName,
           type: 'OUT',
-          qtyBoxes: deductBoxes,
+          qtyBoxes: actualDeductBoxes,
           balanceBoxes: entry.qtyBoxes,
           reference: `Website Order: ${name}`,
           note: `Web sale — ${item.name}`,
@@ -81,7 +79,7 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
           batchNo: entry.batchNo,
         });
 
-        totalDeductedBoxes += deductBoxes;
+        totalDeductedBoxes += actualDeductBoxes;
         unitsNeeded -= actualDeductUnits;
       }
 
@@ -118,12 +116,83 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
   }
 });
 
-// GET /api/public/orders/track/:phone — Track orders by phone (no auth)
-router.get('/public/track/:phone', async (req, res) => {
+// GET /api/public/orders/track/:query — Track orders by Order ID or Phone (no auth)
+router.get('/public/track/:query', async (req, res) => {
   try {
-    const { phone } = req.params;
-    const orders = await Order.find({ phone }).sort({ createdAt: -1 }).lean();
-    res.json(orders);
+    const { query } = req.params;
+    if (!query) {
+      return res.status(400).json({ error: 'Tracking query is required' });
+    }
+
+    const filter = {};
+    const cleanQuery = query.trim();
+
+    if (/^[0-9a-fA-F]{24}$/.test(cleanQuery)) {
+      filter._id = cleanQuery;
+    } else {
+      filter.phone = cleanQuery;
+    }
+
+    const matchedOrders = await Order.find(filter)
+      .select('name status totalAmount courierName trackingId courierLink createdAt items')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const Invoice = require('../../models/Invoice');
+    const StockMovement = require('../../models/StockMovement');
+    const Dispatch = require('../../models/Dispatch');
+
+    const enrichedOrders = await Promise.all(matchedOrders.map(async (order) => {
+      let courierName = order.courierName || '';
+      let trackingId = order.trackingId || '';
+      let courierLink = order.courierLink || '';
+      let transporter = '';
+      let lrNo = '';
+      let vehicleNo = '';
+
+      const invoice = await Invoice.findOne({ reference: order._id }).select('_id').lean();
+      const challan = await StockMovement.findOne({ sourceDocId: order._id }).select('_id transporter lrNo vehicleNo').lean();
+      
+      let dispatch = null;
+      if (invoice || challan) {
+        const query = {};
+        if (invoice && challan) {
+          query.$or = [{ invoiceId: invoice._id }, { challanId: challan._id }];
+        } else if (invoice) {
+          query.invoiceId = invoice._id;
+        } else {
+          query.challanId = challan._id;
+        }
+        dispatch = await Dispatch.findOne(query).lean();
+      }
+
+      if (dispatch) {
+        if (!courierName) courierName = dispatch.courierName || '';
+        if (!trackingId) trackingId = dispatch.trackingId || '';
+        if (!courierLink) courierLink = dispatch.trackingUrl || '';
+        transporter = dispatch.transporter || '';
+        lrNo = dispatch.lrNo || '';
+        vehicleNo = dispatch.vehicleNo || '';
+      }
+
+      if (challan) {
+        if (!transporter) transporter = challan.transporter || '';
+        if (!lrNo) lrNo = challan.lrNo || '';
+        if (!vehicleNo) vehicleNo = challan.vehicleNo || '';
+      }
+
+      return {
+        ...order,
+        courierName,
+        trackingId,
+        courierLink,
+        transporter,
+        lrNo,
+        vehicleNo
+      };
+    }));
+
+    res.json(enrichedOrders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

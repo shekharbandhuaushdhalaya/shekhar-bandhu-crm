@@ -13,6 +13,8 @@ const dispatchSchema = new mongoose.Schema({
   dispatchNo:   { type: String, required: true, unique: true, trim: true },
   invoiceId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
   invoiceNo:    { type: String, default: '', trim: true },
+  challanId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Challan' },
+  challanNo:    { type: String, default: '', trim: true },
   customerName: { type: String, required: true, trim: true },
   customerPhone:{ type: String, default: '', trim: true },
   shippingAddress: { type: String, default: '', trim: true },
@@ -39,5 +41,6 @@ const dispatchSchema = new mongoose.Schema({
 dispatchSchema.index({ createdAt: -1 });
 dispatchSchema.index({ status: 1 });
 dispatchSchema.index({ invoiceId: 1 });
+dispatchSchema.index({ challanId: 1 });
 
 module.exports = mongoose.model('Dispatch', dispatchSchema);

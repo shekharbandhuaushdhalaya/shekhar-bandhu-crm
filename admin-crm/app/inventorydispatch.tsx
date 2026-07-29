@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
-import { api, Dispatch, DeadStockItem, Invoice } from '../utils/api';
+import { api, Dispatch, DeadStockItem, Invoice, StockMovement } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 
 export default function InventoryDispatchScreen() {
@@ -20,10 +20,13 @@ export default function InventoryDispatchScreen() {
   // ── Dispatches ──
   const [dispatches, setDispatches] = useState<Dispatch[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [challans, setChallans] = useState<StockMovement[]>([]);
+  const [sourceType, setSourceType] = useState<'invoice' | 'challan'>('invoice');
   const [dispStatusFilter, setDispStatusFilter] = useState('all');
   const [dispSearch, setDispSearch] = useState('');
   const [showDispModal, setShowDispModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [selectedChallan, setSelectedChallan] = useState<StockMovement | null>(null);
   const [transporter, setTransporter] = useState('');
   const [lrNo, setLrNo] = useState('');
   const [vehicleNo, setVehicleNo] = useState('');
@@ -45,16 +48,22 @@ export default function InventoryDispatchScreen() {
   const [deadStock, setDeadStock] = useState<DeadStockItem[]>([]);
 
   const load = useCallback(async () => {
-    const [disps, dead, sales] = await Promise.all([
+    const [disps, dead, sales, movements] = await Promise.all([
       api.getDispatches(dispStatusFilter, dispSearch).catch(() => []),
       api.getDeadStock().catch(() => []),
       api.getSaleInvoices().catch(() => []),
+      api.getStockMovements({ direction: 'out' }).catch(() => []),
     ]);
     setDispatches(disps);
     setDeadStock(dead);
+
     // Only show finalized invoices that don't have a dispatch yet
-    const dispatchedInvoiceIds = new Set(disps.map(d => d.invoiceId));
+    const dispatchedInvoiceIds = new Set(disps.map(d => d.invoiceId).filter(Boolean));
     setInvoices(sales.filter(inv => inv.isFinalized && !dispatchedInvoiceIds.has(inv._id)));
+
+    // Only show finalized (dispatched) StockMovements/Challans that don't have a dispatch yet
+    const dispatchedChallanIds = new Set(disps.map(d => d.challanId).filter(Boolean));
+    setChallans(movements.filter(m => m.status === 'dispatched' && !dispatchedChallanIds.has(m._id)));
   }, [dispStatusFilter, dispSearch]);
 
   useEffect(() => { load(); }, [load]);
@@ -62,28 +71,47 @@ export default function InventoryDispatchScreen() {
 
   // Dispatch creation
   const handleCreateDispatch = async () => {
-    if (!selectedInvoice) { setDispError('Please select a finalized Sale Invoice.'); return; }
+    if (sourceType === 'invoice' && !selectedInvoice) { setDispError('Please select a finalized Sale Invoice.'); return; }
+    if (sourceType === 'challan' && !selectedChallan) { setDispError('Please select a Delivery Challan.'); return; }
     try {
-      await api.createDispatch({
-        invoiceId: selectedInvoice._id,
-        invoiceNo: selectedInvoice.invoiceNo,
-        customerName: selectedInvoice.customerName,
-        customerPhone: selectedInvoice.gstin || '', // fall back to gstin or dummy
-        shippingAddress: selectedInvoice.shippingAddress || selectedInvoice.partyAddress,
-        items: (selectedInvoice.items || []).map((it: any) => ({
+      const payload: Partial<Dispatch> = {
+        transporter, lrNo, vehicleNo, courierName, trackingId, trackingUrl,
+        totalBoxes: parseInt(totalBoxes) || 1, totalWeight, freightCharge: parseFloat(freightCharge) || 0,
+        notes: dispNotes, status: 'dispatched'
+      };
+
+      if (sourceType === 'invoice' && selectedInvoice) {
+        payload.invoiceId = selectedInvoice._id;
+        payload.invoiceNo = selectedInvoice.invoiceNo;
+        payload.customerName = selectedInvoice.customerName;
+        payload.customerPhone = selectedInvoice.gstin || '';
+        payload.shippingAddress = selectedInvoice.shippingAddress || selectedInvoice.partyAddress;
+        payload.items = (selectedInvoice.items || []).map((it: any) => ({
           productId: it.productId,
           name: it.name,
           qty: it.qty || it.boxes || 1,
           packing: it.packing || 1,
           batchNo: it.batchNo || '',
-        })),
-        transporter, lrNo, vehicleNo, courierName, trackingId, trackingUrl,
-        totalBoxes: parseInt(totalBoxes) || 1, totalWeight, freightCharge: parseFloat(freightCharge) || 0,
-        notes: dispNotes, status: 'dispatched'
-      });
+        }));
+      } else if (sourceType === 'challan' && selectedChallan) {
+        payload.challanId = selectedChallan._id;
+        payload.challanNo = selectedChallan.docNo;
+        payload.customerName = selectedChallan.partyName || '';
+        payload.customerPhone = selectedChallan.partyGstin || '';
+        payload.shippingAddress = selectedChallan.shippingAddress || selectedChallan.partyAddress || '';
+        payload.items = (selectedChallan.items || []).map((it: any) => ({
+          productId: it.productId,
+          name: it.productName,
+          qty: it.qty || 1,
+          packing: it.packing || 1,
+          batchNo: it.batchNo || '',
+        }));
+      }
+
+      await api.createDispatch(payload);
       setShowDispModal(false);
       // Reset form
-      setSelectedInvoice(null); setTransporter(''); setLrNo(''); setVehicleNo('');
+      setSelectedInvoice(null); setSelectedChallan(null); setTransporter(''); setLrNo(''); setVehicleNo('');
       setCourierName(''); setTrackingId(''); setTrackingUrl(''); setTotalBoxes('1');
       setTotalWeight(''); setFreightCharge('0'); setDispNotes(''); setDispError('');
       load();
@@ -144,7 +172,7 @@ export default function InventoryDispatchScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
-                <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedInvoice(null); setShowDispModal(true); }}>
+                <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedInvoice(null); setSelectedChallan(null); setSourceType('invoice'); setShowDispModal(true); }}>
                   <Ionicons name="add" size={16} color="#fff" />
                   <Text style={styles.addBtnText}>Create Dispatch</Text>
                 </TouchableOpacity>
@@ -163,7 +191,9 @@ export default function InventoryDispatchScreen() {
                       <View style={[styles.badge, { backgroundColor: dispatchStatusColors[disp.status] + '20', borderColor: dispatchStatusColors[disp.status] }]}>
                         <Text style={[styles.badgeText, { color: dispatchStatusColors[disp.status] }]}>{disp.status.toUpperCase()}</Text>
                       </View>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>Invoice: {disp.invoiceNo}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>
+                        {disp.invoiceNo ? `Invoice: ${disp.invoiceNo}` : `Challan: ${disp.challanNo}`}
+                      </Text>
                     </View>
                     <Text style={styles.cardSubTitle}>Party: {disp.customerName}</Text>
                     <Text style={styles.metaText}>📍 Address: {disp.shippingAddress}</Text>
@@ -212,14 +242,46 @@ export default function InventoryDispatchScreen() {
             </View>
             {dispError ? <Text style={styles.modalError}>{dispError}</Text> : null}
             <ScrollView style={styles.modalForm}>
-              <Text style={styles.inputLabel}>Select Finalized Sale Invoice *</Text>
-              {Platform.OS === 'web' ? (
-                <select value={selectedInvoice?._id || ''} onChange={(e: any) => setSelectedInvoice(invoices.find(inv => inv._id === e.target.value) || null)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13, marginBottom: 12, width: '100%' }}>
-                  <option value="">-- Select Invoice --</option>
-                  {invoices.map(inv => <option key={inv._id} value={inv._id}>{inv.invoiceNo} - {inv.customerName} (₹{inv.amount.toLocaleString()})</option>)}
-                </select>
+              <Text style={styles.inputLabel}>Dispatch Source Type *</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                <TouchableOpacity 
+                  style={[{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.bg.secondary }, sourceType === 'invoice' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                  onPress={() => { setSourceType('invoice'); setSelectedChallan(null); }}
+                >
+                  <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, sourceType === 'invoice' && { color: '#fff' }]}>Sale Invoice</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.bg.secondary }, sourceType === 'challan' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                  onPress={() => { setSourceType('challan'); setSelectedInvoice(null); }}
+                >
+                  <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, sourceType === 'challan' && { color: '#fff' }]}>Delivery Challan</Text>
+                </TouchableOpacity>
+              </View>
+
+              {sourceType === 'invoice' ? (
+                <>
+                  <Text style={styles.inputLabel}>Select Finalized Sale Invoice *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select value={selectedInvoice?._id || ''} onChange={(e: any) => setSelectedInvoice(invoices.find(inv => inv._id === e.target.value) || null)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13, marginBottom: 12, width: '100%' }}>
+                      <option value="">-- Select Invoice --</option>
+                      {invoices.map(inv => <option key={inv._id} value={inv._id}>{inv.invoiceNo} - {inv.customerName} (₹{inv.amount.toLocaleString()})</option>)}
+                    </select>
+                  ) : (
+                    <TextInput style={styles.input} value={selectedInvoice?.invoiceNo || ''} placeholder="Invoice No" placeholderTextColor={colors.text.muted} />
+                  )}
+                </>
               ) : (
-                <TextInput style={styles.input} value={selectedInvoice?.invoiceNo || ''} placeholder="Invoice No" placeholderTextColor={colors.text.muted} />
+                <>
+                  <Text style={styles.inputLabel}>Select Delivery Challan *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select value={selectedChallan?._id || ''} onChange={(e: any) => setSelectedChallan(challans.find(c => c._id === e.target.value) || null)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13, marginBottom: 12, width: '100%' }}>
+                      <option value="">-- Select Challan --</option>
+                      {challans.map(c => <option key={c._id} value={c._id}>{c.docNo} - {c.partyName} (₹{c.totalAmount.toLocaleString()})</option>)}
+                    </select>
+                  ) : (
+                    <TextInput style={styles.input} value={selectedChallan?.docNo || ''} placeholder="Challan No" placeholderTextColor={colors.text.muted} />
+                  )}
+                </>
               )}
 
               <Text style={styles.inputLabel}>Transporter Name</Text>

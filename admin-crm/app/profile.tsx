@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
   useWindowDimensions,
   RefreshControl,
   Platform,
@@ -424,13 +425,6 @@ export default function ProfileScreen() {
       updateActiveFirmDetails(updated);
 
       showToast('Company settings saved successfully!', 'success');
-      setTimeout(() => {
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.push('/');
-        }
-      }, 500);
     } catch (err: any) {
       let errMsg = err.message || 'Failed to save company settings.';
       if (err.issues && Array.isArray(err.issues) && err.issues.length > 0) {
@@ -632,120 +626,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* App Server Settings Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="link-outline" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>App Server Settings</Text>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.label}>Base API Server URL</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
-              value={serverUrl}
-              onChangeText={setServerUrl}
-              placeholder="e.g. http://192.168.1.100:5000/api"
-              placeholderTextColor={colors.text.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 16, height: 42, marginTop: 0 }]}
-              onPress={handleSaveServerUrl}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="save-outline" size={16} color="#fff" />
-              <Text style={styles.btnText}>Save Link</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      {/* Google Gemini AI Analytics Key Card */}
-      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="sparkles" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>Artificial Intelligence Credentials (Google Gemini 2.5)</Text>
-        </View>
-        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-          <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
-            Configure your Google AI Studio API Key to power the natural language Business AI Assistant and executive CRM analytics.
-          </Text>
-
-          <Text style={styles.label}>Google Gemini API Key</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
-              value={geminiApiKey}
-              onChangeText={setGeminiApiKey}
-              placeholder="Paste your Gemini API Key (e.g. AIzaSy...)"
-              placeholderTextColor={colors.text.muted}
-              secureTextEntry
-            />
-            <TouchableOpacity
-              style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 16, height: 42, marginTop: 0 }]}
-              onPress={handleSaveCompanyConfig}
-              disabled={companyLoading}
-              activeOpacity={0.8}
-            >
-              {companyLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="key-outline" size={16} color="#fff" />
-                  <Text style={styles.btnText}>Save Key</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-          <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 6 }}>
-            Status: {geminiApiKey ? '✔ Key configured (Gemini 2.5 Flash Engine Enabled)' : '⚠️ Not configured'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Save & Revert Action Buttons */}
-      {canEdit && (
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-          <TouchableOpacity
-            style={[styles.btnPrimary, { flex: 1, backgroundColor: colors.success, marginTop: 0 }]}
-            onPress={handleSaveCompanyConfig}
-            disabled={companyLoading}
-            activeOpacity={0.8}
-          >
-            {companyLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="cloud-upload-outline" size={16} color="#fff" />
-                <Text style={styles.btnText}>Save System Credentials & API Keys</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{
-              height: 42,
-              paddingHorizontal: 16,
-              borderRadius: Radius.md,
-              backgroundColor: colors.bg.card,
-              borderWidth: 1,
-              borderColor: colors.border,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6
-            }}
-            onPress={handleRevertCompanyConfig}
-            disabled={companyLoading}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="refresh-outline" size={16} color={colors.text.secondary} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.secondary }}>Revert Changes</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 
@@ -1077,9 +957,14 @@ export default function ProfileScreen() {
                   <TouchableOpacity
                     style={{ padding: 6 }}
                     onPress={() => {
-                      setQrImageBase64('');
-                      setQrImageUrl('');
-                      showToast('QR code cleared.', 'info');
+                      Alert.alert('Clear QR Image', 'Are you sure?', [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Clear', style: 'destructive', onPress: () => {
+                          setQrImageBase64('');
+                          setQrImageUrl('');
+                          showToast('QR code cleared.', 'info');
+                        }},
+                      ]);
                     }}
                   >
                     <Ionicons name="trash-outline" size={18} color={colors.danger} />
@@ -1257,9 +1142,14 @@ export default function ProfileScreen() {
                   <TouchableOpacity
                     style={{ padding: 6 }}
                     onPress={() => {
-                      setSignatureBase64('');
-                      setSignatureUrl('');
-                      showToast('Signature cleared.', 'info');
+                      Alert.alert('Clear Signature', 'Are you sure?', [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Clear', style: 'destructive', onPress: () => {
+                          setSignatureBase64('');
+                          setSignatureUrl('');
+                          showToast('Signature cleared.', 'info');
+                        }},
+                      ]);
                     }}
                   >
                     <Ionicons name="trash-outline" size={18} color={colors.danger} />
@@ -1345,6 +1235,79 @@ export default function ProfileScreen() {
             placeholderTextColor={colors.text.muted}
             multiline
           />
+        </View>
+      </View>
+
+      {/* App Server Settings Card */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="link-outline" size={18} color={colors.primary} />
+          <Text style={styles.cardTitle}>App Server Settings</Text>
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.label}>Base API Server URL</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TextInput
+              style={[styles.input, { flex: 1, marginBottom: 0 }]}
+              value={serverUrl}
+              onChangeText={setServerUrl}
+              placeholder="e.g. http://192.168.1.100:5000/api"
+              placeholderTextColor={colors.text.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 16, height: 42, marginTop: 0 }]}
+              onPress={handleSaveServerUrl}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="save-outline" size={16} color="#fff" />
+              <Text style={styles.btnText}>Save Link</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* Google Gemini AI Analytics Key Card */}
+      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="sparkles" size={18} color={colors.primary} />
+          <Text style={styles.cardTitle}>Artificial Intelligence Credentials (Google Gemini 2.5)</Text>
+        </View>
+        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
+          <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
+            Configure your Google AI Studio API Key to power the natural language Business AI Assistant and executive CRM analytics.
+          </Text>
+
+          <Text style={styles.label}>Google Gemini API Key</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TextInput
+              style={[styles.input, { flex: 1, marginBottom: 0 }]}
+              value={geminiApiKey}
+              onChangeText={setGeminiApiKey}
+              placeholder="Paste your Gemini API Key (e.g. AIzaSy...)"
+              placeholderTextColor={colors.text.muted}
+              secureTextEntry
+            />
+            <TouchableOpacity
+              style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 16, height: 42, marginTop: 0 }]}
+              onPress={handleSaveCompanyConfig}
+              disabled={companyLoading}
+              activeOpacity={0.8}
+            >
+              {companyLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="key-outline" size={16} color="#fff" />
+                  <Text style={styles.btnText}>Save Key</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 6 }}>
+            Status: {geminiApiKey ? '✔ Key configured (Gemini 2.5 Flash Engine Enabled)' : '⚠️ Not configured'}
+          </Text>
         </View>
       </View>
 

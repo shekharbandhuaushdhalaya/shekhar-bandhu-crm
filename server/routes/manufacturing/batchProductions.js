@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
     const statusFilter = req.query.status || '';
     const filter = statusFilter ? { status: statusFilter } : {};
     let query = BatchProduction.find(filter)
-      .select('-bomSnapshot.stages -yields')
+      .select('-bomSnapshot.stages')
       .populate('productId', 'name sku size packing')
       .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
       .sort({ createdAt: -1 })
@@ -401,8 +401,6 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
       }
     }
 
-    // Packaging materials (bottles, caps, labels) are deducted during final QC sign-off based on the actual output yield, not planned quantity.
-
     // Deduct stage-tied ingredients from inventory (FIFO) when stage is completed
     // Guard: skip if already deducted to prevent double-deduction on re-completion
     if (!currentStage.ingredientsDeducted) {
@@ -411,19 +409,14 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
       if (newStatus === 'completed' && stageIngredients && stageIngredients.length > 0) {
         let totalInputQty = 0;
         let totalLossQty = 0;
+        const lossReasons = [];
         for (const si of stageIngredients) {
           const qtyNeeded = Number(si.qtyNeeded) || 0;
           const wastage = Number(si.wastage) || 0;
-          const isPackaging = si.itemType === 'packaging';
           if (qtyNeeded <= 0) continue;
 
-          // Packaging items: just record wastage on stage — actual deduction happens at QC sign-off
-          if (isPackaging) {
-            totalInputQty += qtyNeeded;
-            totalLossQty += wastage;
-            continue;
-          }
-
+          // Deduct both formulation and packaging at stage completion (qtyNeeded + wastage)
+          const totalDeductQty = qtyNeeded + wastage;
           const entries = await RawMaterialEntry.find({ rawMaterialId: si.rawMaterialId, warehouseId: batch.manufacturingUnitId });
           entries.sort((a, b) => {
             if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
@@ -432,7 +425,7 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
             return new Date(a.createdAt) - new Date(b.createdAt);
           });
 
-          let needed = qtyNeeded;
+          let needed = totalDeductQty;
           for (const entry of entries) {
             if (needed <= 0.0001) break;
             if ((entry.qty || 0) <= 0) continue;
@@ -455,6 +448,9 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
 
           totalInputQty += qtyNeeded;
           totalLossQty += wastage;
+          if (wastage > 0) {
+            lossReasons.push({ rawMaterialId: si.rawMaterialId, qty: wastage, reason: si.lossReason || '' });
+          }
         }
 
         currentStage.inputQty = (currentStage.inputQty || 0) + totalInputQty;
@@ -462,8 +458,21 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
         currentStage.outputQty = Math.max(0, currentStage.inputQty - currentStage.lossQty);
         currentStage.lossPercent = currentStage.inputQty > 0 ? Number(((currentStage.lossQty / currentStage.inputQty) * 100).toFixed(2)) : 0;
         if (req.body.lossReason) currentStage.lossReason = req.body.lossReason;
+        if (lossReasons.length > 0) currentStage.lossItems = lossReasons;
         currentStage.ingredientsDeducted = true;
       }
+    }
+
+    // If yields submitted at stage completion (e.g. packaging stage freely adjusted split), save them
+    if (req.body.yields && Array.isArray(req.body.yields) && req.body.yields.length > 0) {
+      batch.yields = req.body.yields.map(y => ({
+        productId: y.productId,
+        actualYieldQty: Number(y.actualYieldQty) || 0,
+        packing: Number(y.packing) || 1,
+        size: y.size || ''
+      }));
+      const totalYield = batch.yields.reduce((s, y) => s + y.actualYieldQty, 0);
+      batch.actualYieldQty = totalYield;
     }
 
     const allDone = batch.stages.every(s => s.status === 'completed' || s.status === 'skipped');
@@ -515,8 +524,7 @@ async function deductPackagingMaterials(batch, outputQtyOrYields) {
 
     const pkgIngs = bom.ingredients.filter(ing => {
       const isExplicitPkg = ing.itemType === 'packaging';
-      // Only deduct at QC Sign-off if it is NOT stage-tied (as stage-tied packaging is deducted during stage completion)
-      return isExplicitPkg && (!ing.stageName || ing.stageName.trim() === '');
+      return isExplicitPkg;
     });
 
     // Also include any raw materials that have category === 'Packaging'
@@ -524,9 +532,7 @@ async function deductPackagingMaterials(batch, outputQtyOrYields) {
       if (ing.itemType !== 'packaging') {
         const rm = await RawMaterial.findById(ing.rawMaterialId);
         if (rm && rm.category === 'Packaging' && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
-          if (!ing.stageName || ing.stageName.trim() === '') {
-            pkgIngs.push(ing);
-          }
+          pkgIngs.push(ing);
         }
       }
     }
@@ -534,6 +540,10 @@ async function deductPackagingMaterials(batch, outputQtyOrYields) {
     if (!pkgIngs || pkgIngs.length === 0) continue;
 
     for (const ing of pkgIngs) {
+      // Skip if already drawn at stage completion (includes wastage)
+      if (batch.ingredientsConsumed.some(c => c.rawMaterialId?.toString() === ing.rawMaterialId?.toString())) {
+        continue;
+      }
       // Packaging items are specified as direct per-unit pieces (e.g. 1 cap per unit produced, 1 box per unit produced)
       const qtyNeeded = ing.qtyRequired * qty;
       const rm = await RawMaterial.findById(ing.rawMaterialId);
@@ -619,12 +629,18 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       return res.status(400).json({ error: 'Cannot complete a cancelled batch' });
     }
 
-    // Build the yields list (split or main single product)
-    const yieldsList = yields && Array.isArray(yields) && yields.length > 0 ? yields : [{
-      productId: batch.productId.toString(),
-      actualYieldQty: valYield,
-      packing: packing || 1
-    }];
+    // Build the yields list: body yields > stage-saved yields > default fallback
+    const yieldsList = yields && Array.isArray(yields) && yields.length > 0 ? yields :
+      (batch.yields && batch.yields.length > 0 ? batch.yields.map(y => ({
+        productId: y.productId.toString(),
+        actualYieldQty: y.actualYieldQty,
+        packing: y.packing || 1,
+        size: y.size || ''
+      })) : [{
+        productId: batch.productId.toString(),
+        actualYieldQty: valYield,
+        packing: packing || 1
+      }]);
 
     // Validate products exist
     const Product = require('../../models/Product');
@@ -767,6 +783,12 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       if (parts.length === 3) nextPR = parseInt(parts[2], 10) + 1;
     }
     const prDocNo = `PR/${fy}/${nextPR.toString().padStart(3, '0')}`;
+    const now = new Date();
+    if (batch.shelfLifeMonths) {
+      const exp = new Date(now);
+      exp.setMonth(exp.getMonth() + batch.shelfLifeMonths);
+      batch.expiryDate = exp;
+    }
 
     const grnItems = yieldItemsWithWeight.map(item => {
       const pct = totalAllocWeight > 0 ? (item.allocWeight / totalAllocWeight) : (1 / yieldItemsWithWeight.length);
@@ -779,7 +801,7 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
         packing: 1,
         purchaseRate: Number(unitCost.toFixed(2)),
         batchNo: batch.batchNo,
-        mfgDate: new Date(),
+        mfgDate: now,
         expiryDate: batch.expiryDate || new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000),
         manufacturingUnitId: batch.manufacturingUnitId,
         manufacturingUnitName: batch.manufacturingUnitName
@@ -815,8 +837,8 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
     batch.qcNotes = `${qcNotes ? qcNotes.trim() + '\n\n' : ''}Packaging Split Inward:\n${splitSummary}`;
     batch.qcPassedBy = qcPassedBy.trim();
     batch.status = 'completed';
-    batch.endDate = new Date();
-    batch.mfgDate = new Date();
+    batch.endDate = now;
+    batch.mfgDate = now;
 
     const qcStage = batch.stages.find(s => s.name.toLowerCase().includes('qc'));
     if (qcStage && qcStage.status !== 'completed') {
@@ -829,6 +851,45 @@ router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req,
       packagingStage.status = 'completed';
       packagingStage.completedAt = new Date();
       packagingStage.completedBy = qcPassedBy.trim();
+    }
+
+    // Backfill: deduct any stage-tied ingredients missed during stage advancement
+    // (covers both formulation and packaging that fell through due to the stageName filter bug)
+    const RawMaterialEntry = require('../../models/RawMaterialEntry');
+    const backfillIngs = (batch.bomSnapshot?.ingredients || []).filter(i => {
+      const hasStage = i.stageName && i.stageName.trim().length > 0;
+      const alreadyConsumed = batch.ingredientsConsumed.some(
+        c => c.rawMaterialId?.toString() === i.rawMaterialId?.toString()
+      );
+      return hasStage && !alreadyConsumed;
+    });
+    if (backfillIngs.length > 0) {
+      const totalYield = batch.actualYieldQty || 0;
+      const totalPlanned = batch.plannedQty || 0;
+      for (const ing of backfillIngs) {
+        const isPackaging = ing.itemType === 'packaging';
+        const qtyNeeded = isPackaging
+          ? Number(((ing.qtyRequired || 0) * totalYield).toFixed(2))
+          : Number(((ing.qtyRequired || 0) * (totalPlanned / 100)).toFixed(2));
+        if (qtyNeeded <= 0) continue;
+        const entries = await RawMaterialEntry.find({ rawMaterialId: ing.rawMaterialId, warehouseId: batch.manufacturingUnitId }).sort({ createdAt: 1 }).lean();
+        let needed = qtyNeeded;
+        for (const entry of entries) {
+          if (needed <= 0.0001) break;
+          if ((entry.qty || 0) <= 0) continue;
+          const deduct = Math.min(needed, Math.round(entry.qty * 100) / 100);
+          if (deduct <= 0) continue;
+          await RawMaterialEntry.updateOne({ _id: entry._id }, { $inc: { qty: -deduct } });
+          batch.rawMaterialCost += deduct * (entry.purchaseRate || 0);
+          batch.ingredientsConsumed.push({
+            rawMaterialId: ing.rawMaterialId,
+            rawMaterialEntryId: entry._id,
+            qtyConsumed: deduct,
+            batchNo: entry.batchNo
+          });
+          needed -= deduct;
+        }
+      }
     }
 
     await batch.save();

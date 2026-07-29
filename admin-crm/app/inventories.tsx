@@ -1,7 +1,6 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product, DeadStockItem } from '../utils/api';
 import { useAuth } from '../utils/auth';
@@ -1210,9 +1209,13 @@ export default function InventoriesScreen() {
     }
   }, [selectedWarehouseId, search]);
 
-  useFocusEffect(useCallback(() => {
-    loadData();
-  }, [loadData]));
+  const loadedOnce = useRef(false);
+  useEffect(() => {
+    if (!loadedOnce.current) {
+      loadedOnce.current = true;
+      loadData();
+    }
+  }, [loadData]);
   useEffect(() => {
     const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => loadData());
     const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => loadData());

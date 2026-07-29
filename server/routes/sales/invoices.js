@@ -303,16 +303,19 @@ router.post('/sales', validate(schemas.invoiceSchema), async (req, res) => {
       const pfx = settings.invoicePrefix || 'VP';
       const prefix = `${pfx}/${fy}/`;
       
-      const lastInvoice = await Invoice.findOne({ 
+      const invoices = await Invoice.find({
         type: 'sale',
         invoiceNo: { $regex: `^${prefix.replace(/\//g, '\\/')}\\d+$` }
-      }).sort({ date: -1, createdAt: -1 }).lean();
+      }).select('invoiceNo').lean();
 
       let nextNum = 1;
-      if (lastInvoice) {
-        const parts = lastInvoice.invoiceNo.split('/');
-        if (parts.length === 3) {
-          nextNum = parseInt(parts[2], 10) + 1;
+      if (invoices.length > 0) {
+        const nums = invoices.map(inv => {
+          const parts = inv.invoiceNo.split('/');
+          return parts.length === 3 ? parseInt(parts[2], 10) : 0;
+        }).filter(n => !isNaN(n));
+        if (nums.length > 0) {
+          nextNum = Math.max(...nums) + 1;
         }
       }
       invoiceNo = `${prefix}${nextNum.toString().padStart(3, '0')}`;

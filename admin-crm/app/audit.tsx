@@ -46,19 +46,38 @@ export default function AuditLogsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchVal, setSearchVal] = useState('');
-  
+
+  // Date range
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
+  // Sorting
+  const [sortField, setSortField] = useState<'timestamp' | 'user' | 'action'>('timestamp');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
   // Selected Log detail Modal
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
+
+  const sortedLogs = (() => {
+    const sorted = [...logs].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'timestamp') cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      else if (sortField === 'user') cmp = (a.userName || '').localeCompare(b.userName || '');
+      else if (sortField === 'action') cmp = a.action.localeCompare(b.action);
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+    return sorted;
+  })();
 
   const fetchLogs = useCallback(async (pageNum: number, searchString: string) => {
     try {
       setLoading(true);
-      const data = await api.getAuditLogs(searchString, pageNum, 20);
+      const data = await api.getAuditLogs(searchString, pageNum, 20, dateFrom || undefined, dateTo || undefined);
       setLogs(data.logs || []);
       setTotalPages(data.pages || 1);
       setTotalItems(data.total || 0);
@@ -68,7 +87,7 @@ export default function AuditLogsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     if (perm.can('audit:view')) {
@@ -201,6 +220,20 @@ export default function AuditLogsScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
+        <TextInput
+          style={styles.dateInput}
+          placeholder="From date"
+          placeholderTextColor={colors.text.muted}
+          value={dateFrom}
+          onChangeText={setDateFrom}
+        />
+        <TextInput
+          style={styles.dateInput}
+          placeholder="To date"
+          placeholderTextColor={colors.text.muted}
+          value={dateTo}
+          onChangeText={setDateTo}
+        />
         <TouchableOpacity style={styles.searchBtn} onPress={handleSearchSubmit}>
           <Text style={styles.searchBtnText}>Search</Text>
         </TouchableOpacity>
@@ -229,17 +262,26 @@ export default function AuditLogsScreen() {
                 <View style={styles.table}>
                   {/* Table Header */}
                   <View style={styles.tableHeader}>
-                    <Text style={[styles.headerCell, { flex: 1.5 }]}>Timestamp</Text>
-                    <Text style={[styles.headerCell, { flex: 2 }]}>User</Text>
-                    <Text style={[styles.headerCell, { flex: 2 }]}>Action</Text>
+                    <TouchableOpacity style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center' }} onPress={() => { setSortField('timestamp'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>Timestamp</Text>
+                      {sortField === 'timestamp' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }} onPress={() => { setSortField('user'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>User</Text>
+                      {sortField === 'user' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }} onPress={() => { setSortField('action'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>Action</Text>
+                      {sortField === 'action' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
+                    </TouchableOpacity>
                     <Text style={[styles.headerCell, { flex: 4 }]}>Description</Text>
                     <Text style={[styles.headerCell, { flex: 1.5, textAlign: 'right' }]}>IP & Detail</Text>
                   </View>
                   {/* Rows */}
-                  {logs.map(renderLogItem)}
+                  {sortedLogs.map(renderLogItem)}
                 </View>
               ) : (
-                logs.map(renderLogItem)
+                sortedLogs.map(renderLogItem)
               )}
             </View>
           )}
@@ -280,8 +322,8 @@ export default function AuditLogsScreen() {
         transparent
         onRequestClose={() => setSelectedLog(null)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSelectedLog(null)}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Log Details</Text>
               <TouchableOpacity onPress={() => setSelectedLog(null)}>
@@ -335,7 +377,7 @@ export default function AuditLogsScreen() {
               </ScrollView>
             )}
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -425,6 +467,17 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 13,
+  },
+  dateInput: {
+    width: 110,
+    height: 40,
+    fontSize: 12,
+    color: colors.text.primary,
+    backgroundColor: colors.bg.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: 10,
   },
   loadingContainer: {
     flex: 1,

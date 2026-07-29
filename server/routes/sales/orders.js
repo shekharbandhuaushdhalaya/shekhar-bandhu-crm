@@ -40,7 +40,39 @@ function checkAndAddAlerts(order, newStatus, newTrackingId, newCourierName) {
 router.get('/', async (req, res) => {
   try {
     const orders = await Order.find({}).sort({ createdAt: -1 }).lean();
-    res.json(orders);
+    const Invoice = require('../../models/Invoice');
+    const StockMovement = require('../../models/StockMovement');
+
+    const enrichedOrders = await Promise.all(orders.map(async (order) => {
+      const invoice = await Invoice.findOne({ reference: order._id }).select('invoiceNo').lean();
+      const challan = await StockMovement.findOne({ sourceDocId: order._id }).select('docNo').lean();
+      
+      let dispatch = null;
+      const Dispatch = require('../../models/Dispatch');
+      if (invoice || challan) {
+        const query = {};
+        if (invoice && challan) {
+          query.$or = [{ invoiceId: invoice._id }, { challanId: challan._id }];
+        } else if (invoice) {
+          query.invoiceId = invoice._id;
+        } else {
+          query.challanId = challan._id;
+        }
+        dispatch = await Dispatch.findOne(query).select('dispatchNo').lean();
+      }
+
+      return {
+        ...order,
+        hasInvoice: !!invoice,
+        invoiceNo: invoice ? invoice.invoiceNo : null,
+        hasChallan: !!challan,
+        challanNo: challan ? challan.docNo : null,
+        hasDispatch: !!dispatch,
+        dispatchNo: dispatch ? dispatch.dispatchNo : null,
+      };
+    }));
+
+    res.json(enrichedOrders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -114,12 +146,6 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
       return res.status(400).json({ error: 'Missing required order fields or items list' });
     }
 
-    // Resolve first warehouse
-    const warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
-    if (!warehouse) {
-      return res.status(500).json({ error: 'No warehouse configured. Please contact administration.' });
-    }
-
     // Validate items and verify stocks/prices
     let totalAmount = 0;
     const validatedItems = [];
@@ -141,14 +167,13 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
         ? dbProd.price * (1 - dbProd.discount / 100)
         : dbProd.price;
 
-      // Verify warehouse stock availability in CRM
-      // Sort by mfgDate ascending (FIFO: oldest batch first), then by createdAt
-      const entries = await InventoryEntry.find({
-        warehouseId: warehouse._id,
-        productId: dbProd._id
+      // Check stock across ALL warehouses
+      const allEntries = await InventoryEntry.find({
+        productId: dbProd._id,
+        qtyBoxes: { $gt: 0 }
       }).sort({ mfgDate: 1, expiryDate: 1, createdAt: 1 });
 
-      const totalAvailableUnits = entries.reduce((acc, e) => acc + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
+      const totalAvailableUnits = allEntries.reduce((acc, e) => acc + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
 
       if (totalAvailableUnits < qty) {
         return res.status(400).json({ error: `Insufficient stock for product: ${dbProd.name}. Available: ${totalAvailableUnits} units` });
@@ -159,15 +184,16 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
       // Deduct via FIFO across batches — track total boxes deducted
       let totalDeductedBoxes = 0;
       let unitsNeeded = qty;
-      for (const entry of entries) {
+      for (const entry of allEntries) {
         if (unitsNeeded <= 0) break;
         const packSize = entry.packing || 1;
         const entryUnits = (entry.qtyBoxes || 0) * packSize;
         if (entryUnits <= 0) continue;
 
         const deductUnits = Math.min(unitsNeeded, entryUnits);
-        const deductBoxes = Math.floor(deductUnits / packSize);
-        const actualDeductBoxes = deductBoxes === 0 && deductUnits > 0 ? 1 : deductBoxes;
+        const deductBoxes = Math.ceil(deductUnits / packSize);
+        const actualDeductBoxes = Math.min(deductBoxes, entry.qtyBoxes || 0);
+        if (actualDeductBoxes <= 0) continue;
 
         entry.qtyBoxes = Math.max(0, entry.qtyBoxes - actualDeductBoxes);
         await entry.save();
@@ -177,8 +203,8 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
 
         await StockLedger.create({
           productId: dbProd._id,
-          warehouseId: warehouse._id,
-          warehouseName: warehouse.name,
+          warehouseId: entry.warehouseId,
+          warehouseName: entry.warehouseName,
           type: 'OUT',
           qtyBoxes: -actualDeductBoxes,
           balanceBoxes: entry.qtyBoxes,
@@ -343,7 +369,61 @@ router.get('/public/track/:query', async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    res.json(matchedOrders);
+    const Invoice = require('../../models/Invoice');
+    const StockMovement = require('../../models/StockMovement');
+    const Dispatch = require('../../models/Dispatch');
+
+    const enrichedOrders = await Promise.all(matchedOrders.map(async (order) => {
+      let courierName = order.courierName || '';
+      let trackingId = order.trackingId || '';
+      let courierLink = order.courierLink || '';
+      let transporter = '';
+      let lrNo = '';
+      let vehicleNo = '';
+
+      const invoice = await Invoice.findOne({ reference: order._id }).select('_id').lean();
+      const challan = await StockMovement.findOne({ sourceDocId: order._id }).select('_id transporter lrNo vehicleNo').lean();
+      
+      let dispatch = null;
+      if (invoice || challan) {
+        const query = {};
+        if (invoice && challan) {
+          query.$or = [{ invoiceId: invoice._id }, { challanId: challan._id }];
+        } else if (invoice) {
+          query.invoiceId = invoice._id;
+        } else {
+          query.challanId = challan._id;
+        }
+        dispatch = await Dispatch.findOne(query).lean();
+      }
+
+      if (dispatch) {
+        if (!courierName) courierName = dispatch.courierName || '';
+        if (!trackingId) trackingId = dispatch.trackingId || '';
+        if (!courierLink) courierLink = dispatch.trackingUrl || '';
+        transporter = dispatch.transporter || '';
+        lrNo = dispatch.lrNo || '';
+        vehicleNo = dispatch.vehicleNo || '';
+      }
+
+      if (challan) {
+        if (!transporter) transporter = challan.transporter || '';
+        if (!lrNo) lrNo = challan.lrNo || '';
+        if (!vehicleNo) vehicleNo = challan.vehicleNo || '';
+      }
+
+      return {
+        ...order,
+        courierName,
+        trackingId,
+        courierLink,
+        transporter,
+        lrNo,
+        vehicleNo
+      };
+    }));
+
+    res.json(enrichedOrders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -394,16 +474,43 @@ router.post('/:id/invoice', validate(schemas.invoiceSchema), async (req, res) =>
       });
     }
 
-    // 3. Format Invoice items
-    const invoiceItems = order.items.map(item => ({
-      productId: item.productId,
-      name: item.name,
-      boxes: item.qty, // maps quantity to boxes in invoice
-      packing: 1,
-      rate: item.price,
-      amount: item.price * item.qty,
-      size: item.size
-    }));
+    // 3. Format Invoice items with GST back-calculation (MRP is tax-inclusive)
+    let totalBase = 0;
+    let totalTax = 0;
+    const invoiceItems = [];
+
+    for (const item of order.items) {
+      const dbProd = await Product.findById(item.productId);
+      const gstRate = dbProd ? (dbProd.gstRate || 18) : 18;
+
+      const totalInclusive = item.qty * item.price;
+      const itemBase = totalInclusive / (1 + gstRate / 100);
+      const itemTax = totalInclusive - itemBase;
+      const rateExclGst = item.price / (1 + gstRate / 100);
+
+      totalBase += itemBase;
+      totalTax += itemTax;
+
+      invoiceItems.push({
+        productId: item.productId,
+        name: item.name,
+        qty: item.qty,
+        boxes: item.qty,
+        packing: 1,
+        rate: Number(rateExclGst.toFixed(2)),
+        gstRate,
+        amount: Number(itemBase.toFixed(2)),
+        size: item.size,
+        mrp: item.price
+      });
+    }
+
+    const cgst = totalTax / 2;
+    const sgst = totalTax / 2;
+    const igst = 0; // website orders default to Uttar Pradesh (intra-state)
+    const rawTotal = totalBase + cgst + sgst + igst;
+    const nettTotal = Math.round(rawTotal);
+    const roundOff = nettTotal - rawTotal;
 
     // 4. Generate unique invoice number
     const fy = getFinancialYearString(new Date());
@@ -411,16 +518,19 @@ router.post('/:id/invoice', validate(schemas.invoiceSchema), async (req, res) =>
     const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
     const pfx = settings.invoicePrefix || 'VP';
     const prefix = `${pfx}/${fy}/`;
-    const lastInvoice = await Invoice.findOne({ 
+    const invoices = await Invoice.find({
       type: 'sale',
       invoiceNo: { $regex: `^${prefix.replace(/\//g, '\\/')}\\d+$` }
-    }).sort({ date: -1, createdAt: -1 }).lean();
+    }).select('invoiceNo').lean();
 
     let nextNum = 1;
-    if (lastInvoice) {
-      const parts = lastInvoice.invoiceNo.split('/');
-      if (parts.length === 3) {
-        nextNum = parseInt(parts[2], 10) + 1;
+    if (invoices.length > 0) {
+      const nums = invoices.map(inv => {
+        const parts = inv.invoiceNo.split('/');
+        return parts.length === 3 ? parseInt(parts[2], 10) : 0;
+      }).filter(n => !isNaN(n));
+      if (nums.length > 0) {
+        nextNum = Math.max(...nums) + 1;
       }
     }
     const invoiceNo = `${prefix}${nextNum.toString().padStart(3, '0')}`;
@@ -432,8 +542,13 @@ router.post('/:id/invoice', validate(schemas.invoiceSchema), async (req, res) =>
       date: new Date(),
       customerName: customer.company || customer.name,
       items: invoiceItems,
-      amount: order.totalAmount,
+      amount: order.totalAmount, // keep the exact order amount
       mode: 'pakka', // default website orders to pakka ledger
+      baseAmount: Number(totalBase.toFixed(2)),
+      cgst: Number(cgst.toFixed(2)),
+      sgst: Number(sgst.toFixed(2)),
+      igst: Number(igst.toFixed(2)),
+      roundOff: Number(roundOff.toFixed(2)),
       isFinalized: false,
       reference: order._id, // link back to this order
       status: 'unpaid'

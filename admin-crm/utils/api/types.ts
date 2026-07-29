@@ -628,7 +628,7 @@ export type StockMovement = {
   _id: string;
   docNo: string;
   direction: 'in' | 'out';
-  type: 'sale' | 'sample' | 'order' | 'return' | 'purchase' | 'transfer_out' | 'transfer_in' | 'damage';
+  type: 'sale' | 'sample' | 'order' | 'return' | 'purchase' | 'transfer_out' | 'transfer_in' | 'damage' | 'production';
   billingMode?: 'cash' | 'regular';
   date: string;
   warehouseId?: string;
@@ -671,6 +671,8 @@ export type Dispatch = {
   dispatchNo: string;
   invoiceId?: string;
   invoiceNo: string;
+  challanId?: string;
+  challanNo?: string;
   customerName: string;
   customerPhone: string;
   shippingAddress: string;
@@ -935,6 +937,12 @@ export type Order = {
   notifications?: string[];
   createdAt: string;
   updatedAt: string;
+  hasInvoice?: boolean;
+  invoiceNo?: string | null;
+  hasChallan?: boolean;
+  challanNo?: string | null;
+  hasDispatch?: boolean;
+  dispatchNo?: string | null;
 };
 
 export type MedicalRepresentative = {

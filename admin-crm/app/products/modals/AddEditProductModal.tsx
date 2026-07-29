@@ -87,6 +87,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
   const [description, setDescription] = useState('');
   const [disease, setDisease] = useState('');
   const [ingredients, setIngredients] = useState('');
+  const [suggestedDosage, setSuggestedDosage] = useState('');
+  const [benefits, setBenefits] = useState('');
   const [imagesList, setImagesList] = useState<string[]>([]);
   const [localNewImages, setLocalNewImages] = useState<string[]>([]);
 
@@ -191,6 +193,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
           setDescription(product.description || '');
           setDisease(product.disease || '');
           setIngredients(product.ingredients || '');
+          setSuggestedDosage((product as any).suggestedDosage || '');
+          setBenefits((product as any).benefits || '');
           setImagesList(product.image ? product.image.split(',').map(s => s.trim()).filter(Boolean) : []);
           setLocalNewImages([]);
 
@@ -320,6 +324,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
           setDescription('');
           setDisease('');
           setIngredients('');
+          setSuggestedDosage('');
+          setBenefits('');
           setImagesList([]);
           setLocalNewImages([]);
           setBomYield('100');
@@ -534,6 +540,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
         description: description.trim(),
         disease: disease.trim(),
         ingredients: ingredients.trim(),
+        suggestedDosage: suggestedDosage.trim(),
+        benefits: benefits.trim(),
         vendorId: product?.vendorId || '',
         vendorName: product?.vendorName || '',
         parentId: null
@@ -578,6 +586,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
           description: description.trim(),
           disease: disease.trim(),
           ingredients: ingredients.trim(),
+          suggestedDosage: suggestedDosage.trim(),
+          benefits: benefits.trim(),
           vendorId: product?.vendorId || '',
           vendorName: product?.vendorName || '',
           parentId: savedParent._id
@@ -976,6 +986,36 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                     placeholderTextColor={colors.text.muted}
                     value={description}
                     onChangeText={setDescription}
+                    multiline
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Health Benefits (Website Detail)</Text>
+                <View style={[styles.formInput, { height: 60, alignItems: 'flex-start', paddingTop: 8 }]}>
+                  <Ionicons name="sparkles-outline" size={16} color={colors.text.muted} style={{ marginTop: 4 }} />
+                  <TextInput
+                    style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
+                    placeholder="e.g. Improves digestion, cleanses gut, boosts vitality"
+                    placeholderTextColor={colors.text.muted}
+                    value={benefits}
+                    onChangeText={setBenefits}
+                    multiline
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Suggested Dosage (Website Detail)</Text>
+                <View style={[styles.formInput, { height: 60, alignItems: 'flex-start', paddingTop: 8 }]}>
+                  <Ionicons name="restaurant-outline" size={16} color={colors.text.muted} style={{ marginTop: 4 }} />
+                  <TextInput
+                    style={[styles.formInputText, { height: '100%', textAlignVertical: 'top' }]}
+                    placeholder="e.g. 15-30ml twice daily with equal lukewarm water after meals"
+                    placeholderTextColor={colors.text.muted}
+                    value={suggestedDosage}
+                    onChangeText={setSuggestedDosage}
                     multiline
                   />
                 </View>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, RefreshControl,
   useWindowDimensions, Pressable, TouchableOpacity, Platform,
@@ -59,8 +59,14 @@ export default function ReportsScreen() {
   const [saleInvs, setSaleInvs] = useState<Invoice[]>([]);
   const [purchInvs, setPurchInvs] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
-  const [gstCollected, setGstCollected] = useState(0);
-  const [gstPaid, setGstPaid] = useState(0);
+  const gstCollected = useMemo(() => saleInvs.reduce((sum, i) => {
+    if (i.mode === 'regular' || (i.mode as any) === 'pakka') return sum + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0);
+    return sum;
+  }, 0), [saleInvs]);
+  const gstPaid = useMemo(() => purchInvs.reduce((sum, i) => {
+    if (i.mode === 'regular' || (i.mode as any) === 'pakka') return sum + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0);
+    return sum;
+  }, 0), [purchInvs]);
 
   // --- Monthly report controls ---
   const [reportMonth, setReportMonth] = useState(new Date().getMonth());
@@ -80,45 +86,65 @@ export default function ReportsScreen() {
   const [rmSearchText, setRmSearchText] = useState('');
   const [rmViewMode, setRmViewMode] = useState<'summary' | 'batches'>('summary');
 
-  const load = useCallback(async () => {
-    const [custs, sInvs, pInvs, mfg, rms, rme, expiry] = await Promise.all([
-      api.getCustomers(),
-      api.getSaleInvoices('', 'all'),
-      api.getPurchaseInvoices('', 'all'),
-      api.getManufacturingAnalytics().catch(() => null),
-      api.getRawMaterials(),
-      api.getRawMaterialEntries(),
-      api.getRawMaterialExpiryAlerts(),
-    ]);
+  const loadedRef = useRef<Set<string>>(new Set());
 
-    const gstCol = sInvs.reduce((sum, i) => {
-      if (i.mode === 'regular' || (i.mode as any) === 'pakka') return sum + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0);
-      return sum;
-    }, 0);
-    const gstPd = pInvs.reduce((sum, i) => {
-      if (i.mode === 'regular' || (i.mode as any) === 'pakka') return sum + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0);
-      return sum;
-    }, 0);
+  const fetchTabData = useCallback(async (tab: ReportTab) => {
+    let sInvsData: Invoice[] | null = null;
+    let pInvsData: Invoice[] | null = null;
 
-    setCustomers(custs);
-    setSaleInvs(sInvs);
-    setPurchInvs(pInvs);
-    setGstCollected(gstCol);
-    setGstPaid(gstPd);
-    setMfgAnalytics(mfg);
-    setRawMaterials(rms);
-    setRawEntries(rme);
-    setExpiryAlerts(expiry);
+    if (tab === 'accounting' || tab === 'gst' || tab === 'aging') {
+      if (!loadedRef.current.has('customers')) {
+        const data = await api.getCustomers().catch(() => null);
+        if (data) { loadedRef.current.add('customers'); setCustomers(data); }
+      }
+      if (!loadedRef.current.has('saleInvs')) {
+        sInvsData = await api.getSaleInvoices('', 'all').catch(() => null);
+        if (sInvsData) { loadedRef.current.add('saleInvs'); setSaleInvs(sInvsData); }
+      }
+      if (tab !== 'aging' && !loadedRef.current.has('purchInvs')) {
+        pInvsData = await api.getPurchaseInvoices('', 'all').catch(() => null);
+        if (pInvsData) { loadedRef.current.add('purchInvs'); setPurchInvs(pInvsData); }
+      }
+    }
+    if (tab === 'manufacturing' && !loadedRef.current.has('mfgAnalytics')) {
+      const data = await api.getManufacturingAnalytics().catch(() => null);
+      if (data) { loadedRef.current.add('mfgAnalytics'); setMfgAnalytics(data); }
+    }
+    if (tab === 'rawmaterials') {
+      if (!loadedRef.current.has('rawMaterials')) {
+        const data = await api.getRawMaterials().catch(() => null);
+        if (data) { loadedRef.current.add('rawMaterials'); setRawMaterials(data); }
+      }
+      if (!loadedRef.current.has('rawEntries')) {
+        const data = await api.getRawMaterialEntries().catch(() => null);
+        if (data) { loadedRef.current.add('rawEntries'); setRawEntries(data); }
+      }
+      if (!loadedRef.current.has('expiryAlerts')) {
+        const data = await api.getRawMaterialExpiryAlerts().catch(() => null);
+        if (data) { loadedRef.current.add('expiryAlerts'); setExpiryAlerts(data); }
+      }
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // On mount: fetch only active tab
+  useEffect(() => { fetchTabData(activeTab); }, []);
+
+  // On tab switch: fetch data for new tab
+  const prevReportTabRef = useRef(activeTab);
+  useEffect(() => {
+    if (prevReportTabRef.current !== activeTab) {
+      fetchTabData(activeTab);
+      prevReportTabRef.current = activeTab;
+    }
+  }, [activeTab, fetchTabData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    loadedRef.current.clear();
     api.clearCache();
-    await load();
+    await fetchTabData(activeTab);
     setRefreshing(false);
-  }, [load]);
+  }, [activeTab, fetchTabData]);
 
   // ---- Aging Calculations ----
   const today = new Date();
@@ -1199,12 +1225,13 @@ export default function ReportsScreen() {
                   {/* Search */}
                   <View style={styles.rmSearchBox}>
                     <Ionicons name="search-outline" size={14} color={colors.text.muted} />
-                    <Text
-                      onPress={() => { }}
-                      style={{ fontSize: 13, color: rmSearchText ? colors.text.primary : colors.text.muted, flex: 1, paddingVertical: 2 }}
-                    >
-                      {/* Native TextInput for real use — static display for now */}
-                    </Text>
+                    <TextInput
+                      value={rmSearchText}
+                      onChangeText={setRmSearchText}
+                      placeholder="Search materials..."
+                      placeholderTextColor={colors.text.muted}
+                      style={{ fontSize: 13, color: colors.text.primary, flex: 1, paddingVertical: 2, outlineStyle: 'none' }}
+                    />
                   </View>
                 </View>
                 <View style={styles.divider} />
