@@ -20,7 +20,7 @@ interface Props {
   onTraceMaterial: (rm: any) => void;
 }
 
-export default function RawMaterialsTab({
+const RawMaterialsTab = React.memo(function RawMaterialsTab({
   expiryAlerts, manufacturingUnits, mfgUnitFilter, setMfgUnitFilter,
   materialSearch, setMaterialSearch, stockFilter, setStockFilter,
   filteredMaterials, isDesktop, isIntegerQty, onEditMaterial, onTraceMaterial
@@ -210,4 +210,5 @@ export default function RawMaterialsTab({
       </View>
     </View>
   );
-}
+});
+export default RawMaterialsTab;

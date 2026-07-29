@@ -24,7 +24,7 @@ interface Props {
   getStatusColor: (status: string) => string;
 }
 
-export default function BatchProductionsTab({
+const BatchProductionsTab = React.memo(function BatchProductionsTab({
   batches, products, warehouses, expandedBatchIds, toggleBatchExpanded,
   onStartProductionBatch, onTraceBatch, onAdvanceStage, onSkipStage, onFailStage,
   onDeleteBatchDoc, onUploadBatchDoc, onOpenBMR, onCancelProduction, onQcSignOff,
@@ -431,4 +431,5 @@ export default function BatchProductionsTab({
       })}
     </View>
   );
-}
+});
+export default BatchProductionsTab;

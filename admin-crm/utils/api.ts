@@ -851,10 +851,11 @@ class ApiClient {
   }
 
   // --- Raw Materials ---
-  async getRawMaterials(warehouseId?: string, simple?: boolean): Promise<RawMaterial[]> {
+  async getRawMaterials(warehouseId?: string, simple?: boolean, search?: string): Promise<RawMaterial[]> {
     const params = new URLSearchParams();
     if (warehouseId) params.set('warehouseId', warehouseId);
     if (simple) params.set('simple', 'true');
+    if (search) params.set('search', search);
     const qs = params.toString();
     const url = qs ? `${API_BASE}/raw-materials?${qs}` : `${API_BASE}/raw-materials`;
     const res = await this.request(url);
@@ -922,9 +923,18 @@ class ApiClient {
   }
 
   // --- Batch Production ---
-  async getBatchProductions(): Promise<BatchProduction[]> {
-    const res = await this.request(`${API_BASE}/batch-productions`);
-    return res.json();
+  async getBatchProductions(options?: { limit?: number; skip?: number; status?: string }): Promise<BatchProduction[]> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set('limit', String(options.limit));
+    if (options?.skip) params.set('skip', String(options.skip));
+    if (options?.status) params.set('status', options.status);
+    const qs = params.toString();
+    const url = qs ? `${API_BASE}/batch-productions?${qs}` : `${API_BASE}/batch-productions`;
+    const res = await this.request(url);
+    const json = await res.json();
+    // Handle both paginated ({ data, total }) and plain array responses
+    if (Array.isArray(json)) return json;
+    return json.data || [];
   }
   async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; manufacturingUnitId: string; productionType?: string; jobWorkMode?: string; packagingMode?: string; jobWorkerId?: string | null; jobWorkerName?: string; jobWorkerChallanRef?: string; bomId?: string; plannedYields?: { productId: string; plannedQty: number; size?: string }[] }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });

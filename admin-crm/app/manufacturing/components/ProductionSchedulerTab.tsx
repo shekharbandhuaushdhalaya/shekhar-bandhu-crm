@@ -10,7 +10,7 @@ interface Props {
   getStatusColor: (status: string) => string;
 }
 
-export default function ProductionSchedulerTab({
+const ProductionSchedulerTab = React.memo(function ProductionSchedulerTab({
   mfgAnalytics, onOpenBMR, getStatusColor
 }: Props) {
   const { colors } = useTheme();
@@ -143,4 +143,5 @@ export default function ProductionSchedulerTab({
       )}
     </View>
   );
-}
+});
+export default ProductionSchedulerTab;

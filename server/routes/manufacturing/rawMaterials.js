@@ -6,10 +6,18 @@ const schemas = require('../../validation/schemas');
 const router = express.Router();
 
 // GET /api/raw-materials — List all raw materials
+// Supports ?warehouseId=&simple=true&search= for filtering
 router.get('/', async (req, res) => {
   try {
-    const { warehouseId, simple } = req.query;
-    const rawMaterials = await RawMaterial.find({}).sort({ name: 1 }).lean();
+    const { warehouseId, simple, search } = req.query;
+    const filter = search ? {
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } },
+      ]
+    } : {};
+    const rawMaterials = await RawMaterial.find(filter).sort({ name: 1 }).lean();
 
     if (simple === 'true') {
       return res.json(rawMaterials);

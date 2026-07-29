@@ -291,75 +291,131 @@ export default function ManufacturingScreen() {
   const [expandedBatchIds, setExpandedBatchIds] = useState<Record<string, boolean>>({});
   const toggleBatchExpanded = (id: string) => setExpandedBatchIds(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const loadData = useCallback(async () => {
+  // ── Per-tab data loading ─────────────────────────────────────────
+  // Which datasets each tab needs
+  const tabDataRequirements: Record<string, string[]> = {
+    materials: ['materials', 'entries', 'mfgUnits', 'alerts'],
+    batches: ['batches', 'boms', 'products', 'mfgUnits'],
+    scheduler: ['batches', 'mfgUnits'],
+    units: ['mfgUnits'],
+  };
+
+  // Track which datasets have been loaded (to avoid redundant fetches)
+  const loadedRef = useRef<Set<string>>(new Set());
+
+  const fetchDataset = useCallback(async (key: string) => {
+    if (loadedRef.current.has(key)) return;
+    loadedRef.current.add(key);
     try {
-      setLoading(true);
-      const [rmsData, entriesData, bomsData, batchesData, prodsData, mfgUnitsData] = await Promise.all([
-        api.getRawMaterials(mfgUnitFilter === 'all' ? undefined : mfgUnitFilter),
-        api.getRawMaterialEntries(),
-        api.getBOMs(),
-        api.getBatchProductions(),
-        api.getProducts(),
-        api.getManufacturingUnits()
-      ]);
-
-      setMaterials(rmsData);
-      setEntries(entriesData);
-      setBoms(bomsData);
-      setBatches(batchesData);
-      setProducts(prodsData);
-      setManufacturingUnits(mfgUnitsData);
-      if (mfgUnitsData && mfgUnitsData.length > 0) {
-        setProdManufacturingUnitId(prev => prev || mfgUnitsData[0]._id);
+      switch (key) {
+        case 'materials': {
+          const data = await api.getRawMaterials(mfgUnitFilter === 'all' ? undefined : mfgUnitFilter);
+          setMaterials(data);
+          break;
+        }
+        case 'entries': {
+          const data = await api.getRawMaterialEntries();
+          setEntries(data);
+          break;
+        }
+        case 'mfgUnits': {
+          const data = await api.getManufacturingUnits();
+          setManufacturingUnits(data);
+          if (data.length > 0) setProdManufacturingUnitId(prev => prev || data[0]._id);
+          break;
+        }
+        case 'batches': {
+          const data = await api.getBatchProductions();
+          setBatches(data);
+          break;
+        }
+        case 'boms': {
+          const data = await api.getBOMs();
+          setBoms(data);
+          break;
+        }
+        case 'products': {
+          const data = await api.getProducts();
+          setProducts(data);
+          break;
+        }
+        case 'alerts': {
+          const data = await api.getRawMaterialExpiryAlerts();
+          setExpiryAlerts(data);
+          break;
+        }
       }
-
-      // Lazy-load non-critical data (vendors, alerts, analytics, warehouses) in background
-      api.getVendors().then(setVendors).catch(() => {});
-      api.getRawMaterialExpiryAlerts().then(setExpiryAlerts).catch(() => {});
-      api.getManufacturingAnalytics().then(setMfgAnalytics).catch(() => {});
-      api.getWarehouses().then(setWarehouses).catch(() => {});
-    } catch (err) {
-      console.error('Failed to load manufacturing workspace data:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    } catch {
+      loadedRef.current.delete(key); // allow retry on failure
     }
   }, [mfgUnitFilter]);
 
-  // Debounce timer for inventory_updated — fires frequently (18+ sources)
+  const fetchTabData = useCallback(async (tab: string) => {
+    const needs = tabDataRequirements[tab] || [];
+    await Promise.all(needs.map(key => fetchDataset(key)));
+    setLoading(false);
+    setRefreshing(false);
+  }, [fetchDataset]);
+
+  const fetchTabDataBackground = useCallback((tab: string) => {
+    const needs = tabDataRequirements[tab] || [];
+    needs.forEach(key => {
+      if (!loadedRef.current.has(key)) {
+        fetchDataset(key);
+      }
+    });
+  }, [fetchDataset]);
+
+  // On mount: fetch active tab + prefetch adjacent tabs
+  useEffect(() => {
+    fetchTabData(activeTab);
+    // Prefetch adjacent tabs in background
+    const allTabs = ['materials', 'batches', 'scheduler', 'units'];
+    const adjacent = allTabs.filter(t => t !== activeTab);
+    adjacent.forEach(t => fetchTabDataBackground(t));
+  }, []); // only on mount
+
+  // On tab change: fetch data for the new tab if missing
+  const prevTabRef = useRef(activeTab);
+  useEffect(() => {
+    if (prevTabRef.current !== activeTab) {
+      fetchTabData(activeTab);
+      prevTabRef.current = activeTab;
+    }
+  }, [activeTab, fetchTabData]);
+
+  // On mfgUnitFilter change: re-fetch materials + entries
+  useEffect(() => {
+    loadedRef.current.delete('materials');
+    loadedRef.current.delete('entries');
+    fetchDataset('materials');
+    fetchDataset('entries');
+  }, [mfgUnitFilter, fetchDataset]);
+
+  // Socket handlers — selective state updates
   const inventoryDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    loadData();
-
-    // Selective socket handlers: update only what changed via the event payload
     const sub1 = DeviceEventEmitter.addListener('mfg_stage_updated_event', (data) => {
-      if (data?._id) {
-        setBatches(prev => prev.map(b => b._id === data._id ? data : b));
-      }
+      if (data?._id) setBatches(prev => prev.map(b => b._id === data._id ? data : b));
     });
     const sub2 = DeviceEventEmitter.addListener('mfg_batch_created_event', (data) => {
-      if (data?._id) {
-        setBatches(prev => [data, ...prev]);
-      }
+      if (data?._id) setBatches(prev => [data, ...prev]);
     });
     const sub3 = DeviceEventEmitter.addListener('mfg_batch_completed_event', (data) => {
-      if (data?._id) {
-        setBatches(prev => prev.map(b => b._id === data._id ? data : b));
-      }
+      if (data?._id) setBatches(prev => prev.map(b => b._id === data._id ? data : b));
     });
     const sub4 = DeviceEventEmitter.addListener('mfg_batch_cancelled_event', (data) => {
-      if (data?._id) {
-        setBatches(prev => prev.map(b => b._id === data._id ? data : b));
-      }
+      if (data?._id) setBatches(prev => prev.map(b => b._id === data._id ? data : b));
     });
     const sub5 = DeviceEventEmitter.addListener('qc_hold_alert_event', () => {
       api.getRawMaterialExpiryAlerts().then(setExpiryAlerts).catch(() => {});
     });
-    // Debounced: only refresh materials/entries (not all 10 endpoints)
     const sub6 = DeviceEventEmitter.addListener('inventory_updated_event', () => {
       if (inventoryDebounceRef.current) clearTimeout(inventoryDebounceRef.current);
       inventoryDebounceRef.current = setTimeout(() => {
+        loadedRef.current.delete('materials');
+        loadedRef.current.delete('entries');
         Promise.all([
           api.getRawMaterials(mfgUnitFilter === 'all' ? undefined : mfgUnitFilter),
           api.getRawMaterialEntries(),
@@ -371,20 +427,17 @@ export default function ManufacturingScreen() {
     });
 
     return () => {
-      sub1.remove();
-      sub2.remove();
-      sub3.remove();
-      sub4.remove();
-      sub5.remove();
-      sub6.remove();
+      sub1.remove(); sub2.remove(); sub3.remove();
+      sub4.remove(); sub5.remove(); sub6.remove();
       if (inventoryDebounceRef.current) clearTimeout(inventoryDebounceRef.current);
     };
-  }, [loadData, mfgUnitFilter]);
+  }, [mfgUnitFilter]);
 
   const handleRefresh = () => {
-    setRefreshing(true);
+    loadedRef.current.clear();
     api.clearCache();
-    loadData();
+    fetchTabData(activeTab);
+    fetchTabDataBackground(activeTab === 'materials' ? 'batches' : 'materials');
   };
 
   // --- Handlers: Raw Material Definition ---

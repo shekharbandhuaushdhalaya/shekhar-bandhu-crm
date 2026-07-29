@@ -13,16 +13,28 @@ const schemas = require('../../validation/schemas');
 const router = express.Router();
 
 // GET /api/batch-productions — List all batch production runs
+// Supports ?limit=&skip=&status= for pagination and filtering
 router.get('/', async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    const batches = await BatchProduction.find({})
+    const limit = Math.min(parseInt(req.query.limit) || 0, 500);
+    const skip = parseInt(req.query.skip) || 0;
+    const statusFilter = req.query.status || '';
+    const filter = statusFilter ? { status: statusFilter } : {};
+    let query = BatchProduction.find(filter)
       .select('-bomSnapshot.stages -yields')
       .populate('productId', 'name sku size packing')
       .populate('ingredientsConsumed.rawMaterialId', 'name sku unit')
       .sort({ createdAt: -1 })
       .lean();
-    res.json(batches);
+    if (limit > 0) query = query.skip(skip).limit(limit);
+    const batches = await query;
+    const total = await BatchProduction.countDocuments(filter);
+    if (limit > 0) {
+      res.json({ data: batches, total, limit, skip });
+    } else {
+      res.json(batches);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

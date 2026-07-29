@@ -10,7 +10,7 @@ interface Props {
   onAddUnit: () => void;
 }
 
-export default function ManufacturingUnitsTab({
+const ManufacturingUnitsTab = React.memo(function ManufacturingUnitsTab({
   manufacturingUnits, onAddUnit
 }: Props) {
   const { colors } = useTheme();
@@ -92,4 +92,5 @@ export default function ManufacturingUnitsTab({
       )}
     </View>
   );
-}
+});
+export default ManufacturingUnitsTab;
