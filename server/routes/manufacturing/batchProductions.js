@@ -414,7 +414,15 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
         for (const si of stageIngredients) {
           const qtyNeeded = Number(si.qtyNeeded) || 0;
           const wastage = Number(si.wastage) || 0;
+          const isPackaging = si.itemType === 'packaging';
           if (qtyNeeded <= 0) continue;
+
+          // Packaging items: just record wastage on stage — actual deduction happens at QC sign-off
+          if (isPackaging) {
+            totalInputQty += qtyNeeded;
+            totalLossQty += wastage;
+            continue;
+          }
 
           const entries = await RawMaterialEntry.find({ rawMaterialId: si.rawMaterialId, warehouseId: batch.manufacturingUnitId });
           entries.sort((a, b) => {

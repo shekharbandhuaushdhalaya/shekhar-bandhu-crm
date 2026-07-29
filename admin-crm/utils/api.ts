@@ -940,7 +940,7 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
-  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; stageIngredients?: { rawMaterialId: string; qtyNeeded: number; wastage?: number }[] }): Promise<BatchProduction> {
+  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; stageIngredients?: { rawMaterialId: string; qtyNeeded: number; wastage?: number; itemType?: string }[] }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }

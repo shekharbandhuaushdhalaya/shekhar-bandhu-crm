@@ -749,6 +749,7 @@ const batchStageUpdateSchema = z.object({
     rawMaterialId: z.string(),
     qtyNeeded: z.number().min(0),
     wastage: z.number().min(0).optional(),
+    itemType: z.string().optional(),
   })).optional(),
 });
 

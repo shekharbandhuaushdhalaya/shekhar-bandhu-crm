@@ -919,10 +919,11 @@ export default function ManufacturingScreen() {
         scale = (batch.plannedQty || 0) / formulationBasis;
       }
 
+      // Stage-tied formulation ingredients
       const ingredients = (batch.bomSnapshot?.ingredients || []).filter(
         i => i.stageName && i.stageName.trim().toLowerCase() === stageName.trim().toLowerCase()
       );
-      const computed = ingredients.map(i => {
+      let computed = ingredients.map(i => {
         const rmId = typeof i.rawMaterialId === 'string' ? i.rawMaterialId : (i.rawMaterialId as any)?._id || '';
         const rm = materials.find(r => r._id === rmId);
         const qtyTheoretical = parseFloat(((i.qtyRequired || 0) * scale).toFixed(3));
@@ -931,12 +932,45 @@ export default function ManufacturingScreen() {
           name: rm?.name || 'Unknown',
           unit: rm?.unit || 'kg',
           qtyTheoretical,
-          actualQty: qtyTheoretical.toString(),  // pre-fill with theoretical; user can adjust
+          actualQty: qtyTheoretical.toString(),
           wastage: '0',
           itemType: i.itemType || 'formulation',
           qtyRequiredPerUnit: i.qtyRequired || 0,
         };
       });
+
+      // Also include packaging materials (bottles, caps, labels) for packaging stages
+      const isPackingStage = stageName.trim().toLowerCase().includes('packag') || stageName.trim().toLowerCase().includes('label');
+      if (isPackingStage && batch.packagingMode === 'self_packed') {
+        const packagingIngs = (batch.bomSnapshot?.ingredients || []).filter(
+          i => i.itemType === 'packaging'
+        );
+        // Calculate packaging qty based on yields or plannedQty
+        const yields = (batch as any).plannedYields || [];
+        const packagingItems = packagingIngs.map(i => {
+          const rmId = typeof i.rawMaterialId === 'string' ? i.rawMaterialId : (i.rawMaterialId as any)?._id || '';
+          const rm = materials.find(r => r._id === rmId);
+          let totalQty = 0;
+          if (yields.length > 0) {
+            totalQty = yields.reduce((sum: number, y: any) => sum + (i.qtyRequired || 0) * (Number(y.plannedQty) || 0), 0);
+          } else {
+            totalQty = (i.qtyRequired || 0) * (batch.plannedQty || 0);
+          }
+          totalQty = parseFloat(totalQty.toFixed(3));
+          return {
+            rawMaterialId: rmId,
+            name: rm?.name || 'Unknown',
+            unit: rm?.unit || 'pcs',
+            qtyTheoretical: totalQty,
+            actualQty: totalQty.toString(),
+            wastage: '0',
+            itemType: 'packaging',
+            qtyRequiredPerUnit: i.qtyRequired || 0,
+          };
+        });
+        computed = [...computed, ...packagingItems];
+      }
+
       setStageIngredients(computed);
     } else {
       setStageIngredients([]);
@@ -1003,6 +1037,7 @@ export default function ManufacturingScreen() {
         rawMaterialId: si.rawMaterialId,
         qtyNeeded: parseFloat(si.actualQty) || si.qtyTheoretical,
         wastage: parseFloat(si.wastage) || 0,
+        itemType: si.itemType || 'formulation',
       }));
       await api.advanceStage(stageBatchId, stageIndex, {
         status: statusVal,
