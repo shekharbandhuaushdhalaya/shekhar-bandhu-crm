@@ -433,7 +433,6 @@ export type RawMaterial = {
   category?: string;
   minReorder: number;
   stockLevel?: number;
-  defaultStageName?: string;
 };
 
 export type RawMaterialEntry = {

@@ -122,10 +122,11 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
         return numVal;
       };
 
-      // Formulation ingredient quantities on the BOM are always expressed as
-      // "qty per 100 output units (100 Liters / 100 Kg / 100 pieces)" — independent of batchYieldSize,
-      // which is purely an informational/standard-batch-size field.
-      const FORMULATION_BASIS = 100;
+      // Formulation ingredient quantities on the BOM are expressed as
+      // "qty per formulationBasis output units" — e.g. per 100ml for syrups, per 10 pcs for tablets.
+      // formulationBasis defaults to 100 for backwards compatibility.
+      const FORMULATION_BASIS = bom.formulationBasis || 100;
+      const FORMULATION_BASIS_UNIT = (bom.formulationBasisUnit || 'ml').toLowerCase();
       if (!isDirectPurchase) {
         for (const ing of bom.ingredients) {
           const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
@@ -134,13 +135,28 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
           if (!isPackaging && !hasStage) {
             let qtyNeeded;
             if (effectiveYields) {
-              // For multi-size: sum formulation per variant scaled by volume ratio
-              const parentSizeMl = getSizeInMl(prod.size || '');
-              qtyNeeded = 0;
+              // For multi-size batches: compute the TOTAL batch volume/qty from all yields
+              // e.g. 1000 × 450ml + 500 × 200ml + 200 × 100ml = 570,000ml = 570L
+              let totalBatchVolume = 0;
+              let allHaveSizes = true;
               for (const y of effectiveYields) {
-                const variantSizeMl = getSizeInMl(y.size || '');
-                const volumeRatio = (parentSizeMl > 0 && variantSizeMl > 0) ? (variantSizeMl / parentSizeMl) : 1;
-                qtyNeeded += ing.qtyRequired * (y.plannedQty / FORMULATION_BASIS) * volumeRatio;
+                const sizeMl = getSizeInMl(y.size || '');
+                if (sizeMl > 0) {
+                  totalBatchVolume += sizeMl * Number(y.plannedQty);
+                } else {
+                  // No size string available — fall back to summing qty directly
+                  allHaveSizes = false;
+                  break;
+                }
+              }
+              if (allHaveSizes && totalBatchVolume > 0) {
+                // Convert totalBatchVolume (ml) to the same unit as formulationBasis
+                const totalInBasisUnit = FORMULATION_BASIS_UNIT === 'l' ? totalBatchVolume / 1000 : totalBatchVolume;
+                qtyNeeded = ing.qtyRequired * (totalInBasisUnit / FORMULATION_BASIS);
+              } else {
+                // Fallback: just sum plannedQtys (for pcs-based products like tablets)
+                const totalPcs = effectiveYields.reduce((s, y) => s + Number(y.plannedQty), 0);
+                qtyNeeded = ing.qtyRequired * (totalPcs / FORMULATION_BASIS);
               }
             } else {
               qtyNeeded = ing.qtyRequired * (valPlanned / FORMULATION_BASIS);
@@ -206,25 +222,26 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       const customStages = bom.stages && bom.stages.length > 0
         ? bom.stages
         : [
-          { name: 'Raw Material Verification & Weighing', targetDurationDays: 1 },
-          { name: 'Primary Processing (Swasan/Mardan)', targetDurationDays: 1 },
-          { name: 'Mixing & Blending', targetDurationDays: 1 },
-          { name: 'Forming (Vati/Gutika)', targetDurationDays: 1 },
-          { name: 'Drying', targetDurationDays: 1 },
-          { name: 'QC Testing', targetDurationDays: 1 },
-          { name: 'Packaging & Labeling', targetDurationDays: 1 }
+          { name: 'Raw Material Verification & Weighing', targetDurationHours: 2 },
+          { name: 'Primary Processing (Swasan/Mardan)', targetDurationHours: 4 },
+          { name: 'Mixing & Blending', targetDurationHours: 4 },
+          { name: 'Forming (Vati/Gutika)', targetDurationHours: 4 },
+          { name: 'Drying', targetDurationHours: 8 },
+          { name: 'QC Testing', targetDurationHours: 4 },
+          { name: 'Packaging & Labeling', targetDurationHours: 4 }
         ];
 
       const batchStages = customStages.map((st, i) => {
         const startedAt = i === 0 ? new Date() : null;
-        const targetDurationDays = st.targetDurationDays || 1;
+        const targetDurationHours = st.targetDurationHours || (st.targetDurationDays ? st.targetDurationDays * 24 : 8);
         let targetCompletionDate = null;
         if (startedAt) {
-          targetCompletionDate = new Date(startedAt.getTime() + targetDurationDays * 24 * 60 * 60 * 1000);
+          targetCompletionDate = new Date(startedAt.getTime() + targetDurationHours * 60 * 60 * 1000);
         }
         return {
           name: st.name,
-          targetDurationDays,
+          targetDurationDays: Math.ceil(targetDurationHours / 24),  // legacy field
+          targetDurationHours,
           status: i === 0 ? 'in_progress' : 'pending',
           startedAt,
           targetCompletionDate
@@ -238,6 +255,8 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
         bomSnapshot: {
           recipeName: bom.recipeName || '',
           recipeVersion: bom.recipeVersion || `v${bom.__v || 0}`,
+          formulationBasis: bom.formulationBasis || 100,
+          formulationBasisUnit: bom.formulationBasisUnit || 'ml',
           ingredients: (bom.ingredients || []).map(i => ({
             rawMaterialId: i.rawMaterialId,
             itemType: i.itemType || 'formulation',
@@ -245,7 +264,7 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
             stageName: i.stageName || ''
           })),
           overheadCost: bom.overheadCost || 0,
-          stages: (bom.stages || []).map(s => ({ name: s.name, targetDurationDays: s.targetDurationDays || 1 }))
+          stages: (bom.stages || []).map(s => ({ name: s.name, targetDurationHours: s.targetDurationHours || (s.targetDurationDays ? s.targetDurationDays * 24 : 8) }))
         },
         manufacturingUnitId,
         manufacturingUnitName: mfgUnit.name,
@@ -320,6 +339,36 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
     }
     currentStage.status = newStatus;
 
+    if (req.body.actualYieldQty !== undefined) {
+      const actualYieldVal = Number(req.body.actualYieldQty);
+      batch.actualYieldQty = actualYieldVal;
+      
+      if (batch.plannedYields && batch.plannedYields.length > 0) {
+        if (batch.plannedYields.length === 1) {
+          batch.yields = [{
+            productId: batch.plannedYields[0].productId,
+            actualYieldQty: actualYieldVal,
+            packing: 1,
+            size: batch.plannedYields[0].size || ''
+          }];
+        } else {
+          batch.yields = batch.plannedYields.map((py, idx) => ({
+            productId: py.productId,
+            actualYieldQty: idx === 0 ? actualYieldVal : 0,
+            packing: 1,
+            size: py.size || ''
+          }));
+        }
+      } else {
+        batch.yields = [{
+          productId: batch.productId,
+          actualYieldQty: actualYieldVal,
+          packing: 1,
+          size: batch.size || ''
+        }];
+      }
+    }
+
     if (newStatus === 'failed') {
       // If any stage fails, the entire batch run fails immediately
       batch.status = 'rejected';
@@ -335,29 +384,12 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
         nextStage.status = 'in_progress';
         const started = new Date();
         nextStage.startedAt = started;
-        const duration = nextStage.targetDurationDays || 1;
-        nextStage.targetCompletionDate = new Date(started.getTime() + duration * 24 * 60 * 60 * 1000);
+        const durationHours = nextStage.targetDurationHours || (nextStage.targetDurationDays ? nextStage.targetDurationDays * 24 : 8);
+        nextStage.targetCompletionDate = new Date(started.getTime() + durationHours * 60 * 60 * 1000);
       }
     }
 
-    // Auto-deduct packaging materials (bottles, caps, labels) when advancing past packaging stage
-    const isPackagingStage = (currentStage.name || '').toLowerCase().includes('packag') || (currentStage.name || '').toLowerCase().includes('label');
-    if (isPackagingStage && (newStatus === 'completed' || newStatus === 'skipped')) {
-      if (batch.packagingMode === 'self_packed') {
-        const plannedYields = batch.plannedYields && batch.plannedYields.length > 0 ? batch.plannedYields : null;
-        if (plannedYields) {
-          const yieldInput = plannedYields.map(y => ({
-            productId: y.productId,
-            actualYieldQty: y.plannedQty
-          }));
-          await deductPackagingMaterials(batch, yieldInput);
-        } else {
-          await deductPackagingMaterials(batch, batch.plannedQty);
-        }
-      } else {
-        batch.packagingDeducted = true;
-      }
-    }
+    // Packaging materials (bottles, caps, labels) are deducted during final QC sign-off based on the actual output yield, not planned quantity.
 
     // Deduct stage-tied ingredients from inventory (FIFO) when stage is completed
     // Guard: skip if already deducted to prevent double-deduction on re-completion
@@ -463,7 +495,8 @@ async function deductPackagingMaterials(batch, outputQtyOrYields) {
 
     const pkgIngs = bom.ingredients.filter(ing => {
       const isExplicitPkg = ing.itemType === 'packaging';
-      return isExplicitPkg;
+      // Only deduct at QC Sign-off if it is NOT stage-tied (as stage-tied packaging is deducted during stage completion)
+      return isExplicitPkg && (!ing.stageName || ing.stageName.trim() === '');
     });
 
     // Also include any raw materials that have category === 'Packaging'
@@ -471,7 +504,9 @@ async function deductPackagingMaterials(batch, outputQtyOrYields) {
       if (ing.itemType !== 'packaging') {
         const rm = await RawMaterial.findById(ing.rawMaterialId);
         if (rm && rm.category === 'Packaging' && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
-          pkgIngs.push(ing);
+          if (!ing.stageName || ing.stageName.trim() === '') {
+            pkgIngs.push(ing);
+          }
         }
       }
     }

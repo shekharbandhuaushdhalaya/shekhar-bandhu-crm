@@ -126,52 +126,56 @@ export default function QCSignoffModal({
               </View>
             )}
 
-            {/* Split Yield Toggle */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 12 }}>
-              <Text style={[styles.inputLabel, { marginBottom: 0 }]}>Split Yield into Multiple Sizes / Packages?</Text>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                {[{ val: true, label: 'Yes' }, { val: false, label: 'No' }].map(({ val, label }) => (
-                  <TouchableOpacity
-                    key={label}
-                    onPress={() => setQcEnableSplit(val)}
-                    style={{
-                      paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, borderWidth: 1,
-                      backgroundColor: qcEnableSplit === val ? (val ? colors.primary : colors.text.muted) : colors.bg.secondary,
-                      borderColor: qcEnableSplit === val ? (val ? colors.primary : colors.text.muted) : colors.border
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: qcEnableSplit === val ? '#fff' : colors.text.secondary }}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+            {/* Split Yield Toggle (Only for multi-size variant batches) */}
+            {selectedBatchRun && (selectedBatchRun as any).plannedYields?.length > 1 && (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 12 }}>
+                  <Text style={[styles.inputLabel, { marginBottom: 0 }]}>Split Yield into Multiple Sizes / Packages?</Text>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {[{ val: true, label: 'Yes' }, { val: false, label: 'No' }].map(({ val, label }) => (
+                      <TouchableOpacity
+                        key={label}
+                        onPress={() => setQcEnableSplit(val)}
+                        style={{
+                          paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, borderWidth: 1,
+                          backgroundColor: qcEnableSplit === val ? (val ? colors.primary : colors.text.muted) : colors.bg.secondary,
+                          borderColor: qcEnableSplit === val ? (val ? colors.primary : colors.text.muted) : colors.border
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: qcEnableSplit === val ? '#fff' : colors.text.secondary }}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
 
-            {qcEnableSplit && (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={[styles.formIngredientsTitle, { fontSize: 12, marginBottom: 8 }]}>Split Quantities across Products:</Text>
-                {qcYields.map((item, idx) => (
-                  <View key={idx} style={[styles.bomIngredientInputRow, { gap: 6 }]}>
-                    <View style={[styles.pickerWrapper, { flex: 2, marginBottom: 0 }]}>
-                      {Platform.OS === 'web' ? (
-                        <select value={item.productId} onChange={(e: any) => onQcYieldChange(idx, 'productId', e.target.value)} style={{ flex: 1, padding: 8, fontSize: 11, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
-                          <option value="">-- Choose Product/Size --</option>
-                          {splitProducts.map(p => <option key={p._id} value={p._id}>{p.name} ({p.size || 'Std'})</option>)}
-                        </select>
-                      ) : (
-                        <TextInput style={styles.input} placeholder="Product ID" value={item.productId} onChangeText={(val) => onQcYieldChange(idx, 'productId', val)} />
-                      )}
-                    </View>
-                    <TextInput style={[styles.input, { flex: 1.2, marginBottom: 0 }]} placeholder="Qty (pcs)" placeholderTextColor={colors.text.muted} value={item.actualYieldQty} onChangeText={(val) => onQcYieldChange(idx, 'actualYieldQty', val)} keyboardType="numeric" />
-                    <TouchableOpacity style={styles.removeRowBtn} onPress={() => onRemoveQcYieldRow(idx)}>
-                      <Ionicons name="remove-circle" size={20} color={colors.danger} />
+                {qcEnableSplit && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={[styles.formIngredientsTitle, { fontSize: 12, marginBottom: 8 }]}>Split Quantities across Products:</Text>
+                    {qcYields.map((item, idx) => (
+                      <View key={idx} style={[styles.bomIngredientInputRow, { gap: 6 }]}>
+                        <View style={[styles.pickerWrapper, { flex: 2, marginBottom: 0 }]}>
+                          {Platform.OS === 'web' ? (
+                            <select value={item.productId} onChange={(e: any) => onQcYieldChange(idx, 'productId', e.target.value)} style={{ flex: 1, padding: 8, fontSize: 11, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
+                              <option value="">-- Choose Product/Size --</option>
+                              {splitProducts.map(p => <option key={p._id} value={p._id}>{p.name} ({p.size || 'Std'})</option>)}
+                            </select>
+                          ) : (
+                            <TextInput style={styles.input} placeholder="Product ID" value={item.productId} onChangeText={(val) => onQcYieldChange(idx, 'productId', val)} />
+                          )}
+                        </View>
+                        <TextInput style={[styles.input, { flex: 1.2, marginBottom: 0 }]} placeholder="Qty (pcs)" placeholderTextColor={colors.text.muted} value={item.actualYieldQty} onChangeText={(val) => onQcYieldChange(idx, 'actualYieldQty', val)} keyboardType="numeric" />
+                        <TouchableOpacity style={styles.removeRowBtn} onPress={() => onRemoveQcYieldRow(idx)}>
+                          <Ionicons name="remove-circle" size={20} color={colors.danger} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                    <TouchableOpacity style={[styles.addIngredientRowBtn, { marginTop: 8 }]} onPress={onAddQcYieldRow}>
+                      <Ionicons name="add" size={16} color={colors.primary} />
+                      <Text style={styles.addIngredientRowBtnText}>Add Split Package</Text>
                     </TouchableOpacity>
                   </View>
-                ))}
-                <TouchableOpacity style={[styles.addIngredientRowBtn, { marginTop: 8 }]} onPress={onAddQcYieldRow}>
-                  <Ionicons name="add" size={16} color={colors.primary} />
-                  <Text style={styles.addIngredientRowBtnText}>Add Split Package</Text>
-                </TouchableOpacity>
-              </View>
+                )}
+              </>
             )}
 
             <Text style={styles.inputLabel}>Target Storage Warehouse (Finished Goods) *</Text>

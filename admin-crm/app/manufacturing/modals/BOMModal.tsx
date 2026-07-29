@@ -154,11 +154,64 @@ export default function BOMModal({
               </>
             )}
 
-            {/* Ingredients */}
-            <Text style={styles.formIngredientsTitle}>Formulation Ingredients *</Text>
+            {/* ── STEP 1: Manufacturing Stages (define these FIRST) ── */}
+            <Text style={styles.formIngredientsTitle}>📋 Step 1: Define Manufacturing Process Stages</Text>
             <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
-              Enter each ingredient's quantity for a standard 100 units/ml/g batch of output. This is scaled automatically to the Planned Yield Quantity when a production batch is launched — independent of the Batch Yield Size below. Optionally assign to a Manufacturing Stage below; unassigned ingredients are consumed at batch start.
+              Define each production stage (e.g. Kwath, Fermentation, Filtration). You can then assign each ingredient to the stage where it is added.
             </Text>
+            {/* Column headers for stages */}
+            <View style={{ flexDirection: 'row', paddingHorizontal: 4, marginBottom: 4, gap: 8 }}>
+              <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>STAGE NAME</Text>
+              <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>DAYS</Text>
+              <View style={{ width: 32 }} />
+            </View>
+            {bomStages.map((stage, idx) => (
+              <View key={idx} style={styles.bomIngredientInputRow}>
+                <TextInput
+                  style={[styles.input, { flex: 2, marginBottom: 0 }]}
+                  placeholder="e.g. Kwath (Boiling)"
+                  placeholderTextColor={colors.text.muted}
+                  value={stage.name}
+                  onChangeText={(v) => onStageChange(idx, 'name', v)}
+                />
+                <TextInput
+                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                  placeholder="Days"
+                  placeholderTextColor={colors.text.muted}
+                  value={stage.targetDurationDays}
+                  onChangeText={(v) => onStageChange(idx, 'targetDurationDays', v)}
+                  keyboardType="numeric"
+                />
+                <TouchableOpacity style={styles.removeRowBtn} onPress={() => onRemoveStage(idx)}>
+                  <Ionicons name="remove-circle" size={20} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={styles.addIngredientRowBtn} onPress={onAddStage}>
+              <Ionicons name="add" size={16} color={colors.primary} />
+              <Text style={styles.addIngredientRowBtnText}>Add Process Stage</Text>
+            </TouchableOpacity>
+
+            {/* ── STEP 2: Ingredients mapped to stages ── */}
+            <Text style={[styles.formIngredientsTitle, { marginTop: 16 }]}>🌿 Step 2: Formulation Ingredients *</Text>
+            <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
+              Enter each ingredient and the quantity per 100 output units. Then select which process stage it is added in. Unassigned ingredients are deducted at batch start.
+            </Text>
+            {bomStages.filter(s => s.name.trim()).length === 0 && (
+              <View style={{ backgroundColor: colors.warning + '18', borderWidth: 1, borderColor: colors.warning + '40', borderRadius: 6, padding: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="information-circle-outline" size={16} color={colors.warning} />
+                <Text style={{ fontSize: 11, color: colors.warning, flex: 1 }}>
+                  Add your process stages above first — then you can assign each ingredient to its stage.
+                </Text>
+              </View>
+            )}
+            {/* Column headers for ingredients */}
+            <View style={{ flexDirection: 'row', paddingHorizontal: 4, marginBottom: 4, gap: 8 }}>
+              <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>INGREDIENT</Text>
+              <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>QTY/100</Text>
+              <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>USED IN STAGE</Text>
+              <View style={{ width: 32 }} />
+            </View>
             {bomIngredients.map((ing, idx) => (
               <View key={idx} style={styles.bomIngredientInputRow}>
                 <View style={[styles.pickerWrapper, { flex: 2, marginBottom: 0 }]}>
@@ -190,7 +243,7 @@ export default function BOMModal({
                       onChange={(e: any) => onIngredientChange(idx, 'stageName', e.target.value)}
                       style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                     >
-                      <option value="">-- No Stage (use at start) --</option>
+                      <option value="">-- At batch start --</option>
                       {bomStages.filter(s => s.name.trim()).map((s, si) => (
                         <option key={si} value={s.name}>{s.name}</option>
                       ))}
@@ -207,35 +260,6 @@ export default function BOMModal({
             <TouchableOpacity style={styles.addIngredientRowBtn} onPress={onAddIngredient}>
               <Ionicons name="add" size={16} color={colors.primary} />
               <Text style={styles.addIngredientRowBtnText}>Add Ingredient Row</Text>
-            </TouchableOpacity>
-
-            {/* Manufacturing Stages */}
-            <Text style={styles.formIngredientsTitle}>Manufacturing Process Stages (SOP)</Text>
-            {bomStages.map((stage, idx) => (
-              <View key={idx} style={styles.bomIngredientInputRow}>
-                <TextInput
-                  style={[styles.input, { flex: 2, marginBottom: 0 }]}
-                  placeholder="Stage name (e.g. Granulation)"
-                  placeholderTextColor={colors.text.muted}
-                  value={stage.name}
-                  onChangeText={(v) => onStageChange(idx, 'name', v)}
-                />
-                <TextInput
-                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                  placeholder="Days"
-                  placeholderTextColor={colors.text.muted}
-                  value={stage.targetDurationDays}
-                  onChangeText={(v) => onStageChange(idx, 'targetDurationDays', v)}
-                  keyboardType="numeric"
-                />
-                <TouchableOpacity style={styles.removeRowBtn} onPress={() => onRemoveStage(idx)}>
-                  <Ionicons name="remove-circle" size={20} color={colors.danger} />
-                </TouchableOpacity>
-              </View>
-            ))}
-            <TouchableOpacity style={styles.addIngredientRowBtn} onPress={onAddStage}>
-              <Ionicons name="add" size={16} color={colors.primary} />
-              <Text style={styles.addIngredientRowBtnText}>Add Process Stage</Text>
             </TouchableOpacity>
 
             <Text style={styles.inputLabel}>Overhead / Fixed Process Cost (₹)</Text>

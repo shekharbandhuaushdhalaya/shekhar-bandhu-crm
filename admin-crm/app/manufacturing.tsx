@@ -41,6 +41,12 @@ import BMRReportModal from './manufacturing/modals/BMRReportModal';
 import ManufacturingUnitModal from './manufacturing/modals/ManufacturingUnitModal';
 import { createStyles } from './manufacturing/manufacturingStyles';
 
+import RawMaterialsTab from './manufacturing/components/RawMaterialsTab';
+import BatchProductionsTab from './manufacturing/components/BatchProductionsTab';
+import ProductionSchedulerTab from './manufacturing/components/ProductionSchedulerTab';
+import ManufacturingUnitsTab from './manufacturing/components/ManufacturingUnitsTab';
+import StockTraceModal from './manufacturing/modals/StockTraceModal';
+
 const isIntegerQty = (unit?: string, category?: string) => {
   const u = (unit || '').toLowerCase().trim();
   const c = (category || '').toLowerCase().trim();
@@ -101,7 +107,9 @@ export default function ManufacturingScreen() {
   const [stageNotes, setStageNotes] = useState('');
   const [stageModalVisible, setStageModalVisible] = useState(false);
   const [stageError, setStageError] = useState('');
-  const [stageIngredients, setStageIngredients] = useState<{ rawMaterialId: string; name: string; unit: string; qtyNeeded: number; wastage: string }[]>([]);
+  const [stageIngredients, setStageIngredients] = useState<{ rawMaterialId: string; name: string; unit: string; qtyTheoretical: number; actualQty: string; wastage: string; itemType?: string; qtyRequiredPerUnit?: number }[]>([]);
+  const [stageLossReason, setStageLossReason] = useState('');
+  const [stageOutputYield, setStageOutputYield] = useState('');
 
   // Search & Filter States — Raw Materials tab
   const [materialSearch, setMaterialSearch] = useState('');
@@ -113,9 +121,12 @@ export default function ManufacturingScreen() {
   const [rmUnit, setRmUnit] = useState('kg');
   const [rmCategory, setRmCategory] = useState<string>('Herb');
   const [rmMinReorder, setRmMinReorder] = useState('10');
-  const [rmDefaultStage, setRmDefaultStage] = useState('');
+
   const [rmError, setRmError] = useState('');
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
+  const [rmStockLevel, setRmStockLevel] = useState('');
+  const [rmOriginalStockLevel, setRmOriginalStockLevel] = useState(0);
+  const [rmAdjustmentReason, setRmAdjustmentReason] = useState('');
 
 
 
@@ -145,6 +156,7 @@ export default function ManufacturingScreen() {
   const [prodBomId, setProdBomId] = useState('');
   const [prodPlannedQty, setProdPlannedQty] = useState('');
   const [prodBatchNo, setProdBatchNo] = useState('');
+  const [prodExpiryMonths, setProdExpiryMonths] = useState('');
   const [prodProductionType, setProdProductionType] = useState<'in_house' | 'job_work'>('in_house');
   const [prodJobWorkMode, setProdJobWorkMode] = useState<'raw_materials_supplied' | 'direct_purchase' | 'none'>('none');
   const [prodPackagingMode, setProdPackagingMode] = useState<'packed_by_vendor' | 'self_packed'>('packed_by_vendor');
@@ -232,24 +244,46 @@ export default function ManufacturingScreen() {
   ]);
   const [qcEnableSplit, setQcEnableSplit] = useState(false);
 
-  // When QC modal opens with a selected batch, pre-populate split yields from plannedYields
+  // When QC modal opens with a selected batch, pre-populate split yields from plannedYields or actual yields
   useEffect(() => {
     if (selectedBatchRun && qcModalVisible) {
       const planned = (selectedBatchRun as any).plannedYields;
+      const actualYieldQty = selectedBatchRun.actualYieldQty || 0;
+      const existingYields = selectedBatchRun.yields || [];
+      
       if (planned && planned.length > 0) {
-        const mapped = planned.map((y: any) => ({
-          productId: typeof y.productId === 'object' ? (y.productId as any)._id || y.productId : y.productId,
-          actualYieldQty: String(y.plannedQty),
-          packing: '1'
-        }));
+        const mapped = planned.map((y: any) => {
+          const pId = typeof y.productId === 'object' ? (y.productId as any)._id || y.productId : y.productId;
+          const matchingExist = existingYields.find((ey: any) => {
+            const eyId = typeof ey.productId === 'object' ? (ey.productId as any)._id || ey.productId : ey.productId;
+            return eyId === pId;
+          });
+          
+          let val = '';
+          if (matchingExist && matchingExist.actualYieldQty !== undefined && matchingExist.actualYieldQty > 0) {
+            val = String(matchingExist.actualYieldQty);
+          } else if (planned.length === 1 && actualYieldQty > 0) {
+            val = String(actualYieldQty);
+          } else {
+            val = String(y.plannedQty || '');
+          }
+          
+          return {
+            productId: pId,
+            actualYieldQty: val,
+            packing: '1'
+          };
+        });
         setQcYields(mapped);
         setQcEnableSplit(true);
-        // Auto-calculate total yield from sum of planned split quantities
+        // Auto-calculate total yield from sum of split quantities
         const sum = mapped.reduce((acc: number, y: any) => acc + (Number(y.actualYieldQty) || 0), 0);
-        setQcYieldQty(String(sum || ''));
+        setQcYieldQty(String(sum || actualYieldQty || ''));
       } else {
-        setQcYields([{ productId: '', actualYieldQty: '', packing: '' }]);
+        const val = actualYieldQty > 0 ? String(actualYieldQty) : '';
+        setQcYields([{ productId: selectedBatchRun.productId || '', actualYieldQty: val, packing: '1' }]);
         setQcEnableSplit(false);
+        setQcYieldQty(val);
       }
     }
   }, [selectedBatchRun, qcModalVisible]);
@@ -359,16 +393,25 @@ export default function ManufacturingScreen() {
       setRmError('Name is required.');
       return;
     }
+    const targetStock = parseFloat(rmStockLevel);
+    const isStockChanged = editingMaterialId && !isNaN(targetStock) && targetStock !== rmOriginalStockLevel;
+    
+    if (isStockChanged && !rmAdjustmentReason.trim()) {
+      setRmError('Reason for stock adjustment is required.');
+      return;
+    }
+    
     setRmError('');
     try {
-      const stageVal = rmDefaultStage.trim();
       if (editingMaterialId) {
+        if (isStockChanged) {
+          await api.adjustRawMaterialStock(editingMaterialId, targetStock, rmAdjustmentReason.trim());
+        }
         await api.updateRawMaterial(editingMaterialId, {
           name: rmName.trim(),
           unit: rmUnit,
           category: rmCategory,
           minReorder: Number(rmMinReorder) || 0,
-          defaultStageName: stageVal
         });
       } else {
         await api.createRawMaterial({
@@ -377,7 +420,6 @@ export default function ManufacturingScreen() {
           unit: rmUnit,
           category: rmCategory,
           minReorder: Number(rmMinReorder) || 0,
-          defaultStageName: stageVal
         });
       }
       setRmName('');
@@ -385,7 +427,9 @@ export default function ManufacturingScreen() {
       setRmUnit('kg');
       setRmCategory('Herb');
       setRmMinReorder('10');
-      setRmDefaultStage('');
+      setRmStockLevel('');
+      setRmOriginalStockLevel(0);
+      setRmAdjustmentReason('');
       setEditingMaterialId(null);
       setMaterialModalVisible(false);
       loadData();
@@ -401,7 +445,10 @@ export default function ManufacturingScreen() {
     setRmUnit(rm.unit);
     setRmCategory(rm.category || 'Herb');
     setRmMinReorder(rm.minReorder ? rm.minReorder.toString() : '0');
-    setRmDefaultStage((rm as any).defaultStageName || '');
+    const currentStock = (rm as any).stockLevel || 0;
+    setRmStockLevel(currentStock.toString());
+    setRmOriginalStockLevel(currentStock);
+    setRmAdjustmentReason('');
     setRmError('');
     setMaterialModalVisible(true);
   };
@@ -413,6 +460,9 @@ export default function ManufacturingScreen() {
     setRmCategory('Herb');
     setRmMinReorder('10');
     setEditingMaterialId(null);
+    setRmStockLevel('');
+    setRmOriginalStockLevel(0);
+    setRmAdjustmentReason('');
     setRmError('');
     setMaterialModalVisible(false);
   };
@@ -450,15 +500,7 @@ export default function ManufacturingScreen() {
   const handleIngredientChange = (index: number, key: 'rawMaterialId' | 'qtyRequired' | 'stageName', value: string) => {
     const updated = bomIngredients.map((item, idx) => {
       if (idx === index) {
-        const next = { ...item, [key]: value };
-        if (key === 'rawMaterialId' && value) {
-          const mat = materials.find(m => m._id === value);
-          const defaultStage = mat && (mat as any).defaultStageName;
-          if (defaultStage && !next.stageName) {
-            next.stageName = defaultStage;
-          }
-        }
-        return next;
+        return { ...item, [key]: value };
       }
       return item;
     });
@@ -573,7 +615,14 @@ export default function ManufacturingScreen() {
         packagingMode: prodProductionType === 'in_house' ? 'self_packed' : prodPackagingMode,
         jobWorkerId: prodProductionType === 'job_work' ? (prodJobWorkerId || null) : null,
         jobWorkerName: prodProductionType === 'job_work' ? prodJobWorkerName : '',
-        jobWorkerChallanRef: prodProductionType === 'job_work' ? prodJobWorkerChallanRef : ''
+        jobWorkerChallanRef: prodProductionType === 'job_work' ? prodJobWorkerChallanRef : '',
+        expiryDate: (() => {
+          const months = parseInt(prodExpiryMonths, 10);
+          if (!months || months <= 0) return undefined;
+          const d = new Date();
+          d.setMonth(d.getMonth() + months);
+          return d.toISOString();
+        })()
       };
       if (enabledYields.length > 0) {
         payload.plannedYields = enabledYields.map(y => ({
@@ -588,6 +637,7 @@ export default function ManufacturingScreen() {
       setProdBomId('');
       setProdPlannedQty('');
       setProdBatchNo('');
+      setProdExpiryMonths('');
       setProdManufacturingUnitId('');
       setProdProductionType('in_house');
       setProdJobWorkMode('none');
@@ -652,6 +702,12 @@ export default function ManufacturingScreen() {
     // Auto-calculate total yield from sum of split quantities
     const sum = updated.reduce((acc, y) => acc + (Number(y.actualYieldQty) || 0), 0);
     setQcYieldQty(String(sum || ''));
+  };
+  const handleQcYieldQtyChange = (val: string) => {
+    setQcYieldQty(val);
+    if (qcYields.length === 1) {
+      setQcYields(prev => prev.map((y, idx) => idx === 0 ? { ...y, actualYieldQty: val } : y));
+    }
   };
 
   const handleCompleteProduction = async () => {
@@ -774,24 +830,58 @@ export default function ManufacturingScreen() {
     setStageOperator('Operator');
     setStageNotes('');
     setStageError('');
+    setStageLossReason('');
     const batch = batches.find(b => b._id === batchId);
     if (batch) {
       const stage = batch.stages[idx];
       const stageName = stage.name;
-      const plannedQty = batch.plannedQty || 0;
+      
+      const isPacking = stageName.trim().toLowerCase() === 'packing';
+      setStageOutputYield(isPacking ? (batch.plannedQty ? batch.plannedQty.toString() : '10') : '');
+      
+      const formulationBasis = batch.bomSnapshot?.formulationBasis || 100;
+      const formulationBasisUnit = (batch.bomSnapshot?.formulationBasisUnit || 'ml').toLowerCase();
+      
+      let scale = 1;
+      const yields = (batch as any).plannedYields || [];
+      if (yields.length > 0) {
+        let totalBatchVolume = 0;
+        let allHaveSizes = true;
+        for (const y of yields) {
+          const sizeMl = parseSizeMl(y.size || '');
+          if (sizeMl > 0) {
+            totalBatchVolume += sizeMl * (Number(y.plannedQty) || 0);
+          } else {
+            allHaveSizes = false;
+            break;
+          }
+        }
+        if (allHaveSizes && totalBatchVolume > 0) {
+          const totalInBasisUnit = formulationBasisUnit === 'l' ? totalBatchVolume / 1000 : totalBatchVolume;
+          scale = totalInBasisUnit / formulationBasis;
+        } else {
+          scale = (batch.plannedQty || 0) / formulationBasis;
+        }
+      } else {
+        scale = (batch.plannedQty || 0) / formulationBasis;
+      }
+
       const ingredients = (batch.bomSnapshot?.ingredients || []).filter(
         i => i.stageName && i.stageName.trim().toLowerCase() === stageName.trim().toLowerCase()
       );
       const computed = ingredients.map(i => {
         const rmId = typeof i.rawMaterialId === 'string' ? i.rawMaterialId : (i.rawMaterialId as any)?._id || '';
         const rm = materials.find(r => r._id === rmId);
-        const qtyNeeded = (i.qtyRequired || 0) * (plannedQty / 100);
+        const qtyTheoretical = parseFloat(((i.qtyRequired || 0) * scale).toFixed(3));
         return {
           rawMaterialId: rmId,
           name: rm?.name || 'Unknown',
           unit: rm?.unit || 'kg',
-          qtyNeeded,
+          qtyTheoretical,
+          actualQty: qtyTheoretical.toString(),  // pre-fill with theoretical; user can adjust
           wastage: '0',
+          itemType: i.itemType || 'formulation',
+          qtyRequiredPerUnit: i.qtyRequired || 0,
         };
       });
       setStageIngredients(computed);
@@ -829,6 +919,19 @@ export default function ManufacturingScreen() {
       setStageError('Operator name is required.');
       return;
     }
+    const batch = batches.find(b => b._id === stageBatchId);
+    const stage = batch?.stages[stageIndex || 0];
+    const isPacking = stage?.name.trim().toLowerCase() === 'packing';
+
+    const hasWastage = stageIngredients.some(si => parseFloat(si.wastage) > 0);
+    if (hasWastage && !stageLossReason.trim()) {
+      setStageError(isPacking 
+        ? 'Please provide a reason for the extra damage / mismatched quantity of packaging materials.'
+        : 'Loss / Wastage reason is required when there is a process loss.'
+      );
+      return;
+    }
+
     if ((stageAction === 'skip' || stageAction === 'fail') && !stageNotes.trim()) {
       setStageError(`Justification / failure reason is required when ${stageAction === 'fail' ? 'rejecting the batch' : 'skipping a stage'}.`);
       return;
@@ -845,13 +948,15 @@ export default function ManufacturingScreen() {
 
       const siPayload = stageIngredients.map(si => ({
         rawMaterialId: si.rawMaterialId,
-        qtyNeeded: si.qtyNeeded,
+        qtyNeeded: parseFloat(si.actualQty) || si.qtyTheoretical,
         wastage: parseFloat(si.wastage) || 0,
       }));
       await api.advanceStage(stageBatchId, stageIndex, {
         status: statusVal,
         completedBy: stageOperator.trim(),
         notes: stageNotes.trim(),
+        lossReason: stageLossReason.trim(),
+        ...(isPacking && stageOutputYield ? { actualYieldQty: parseFloat(stageOutputYield) || 0 } : {}),
         ...(stageAction === 'advance' && siPayload.length > 0 ? { stageIngredients: siPayload } : {}),
       });
 
@@ -870,11 +975,51 @@ export default function ManufacturingScreen() {
     }
   };
 
-  const handleStageIngredientChange = (index: number, field: 'wastage', value: string) => {
+  const handleStageIngredientChange = (index: number, field: 'wastage' | 'actualQty', value: string) => {
     setStageIngredients(prev => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      const item = updated[index];
+      if (field === 'actualQty') {
+        // User is editing "Taken from Stock" — auto-compute wastage as (actual - theoretical)
+        const actualVal = parseFloat(value) || 0;
+        const wastageVal = Math.max(0, actualVal - item.qtyTheoretical);
+        updated[index] = { 
+          ...item, 
+          actualQty: value,
+          wastage: wastageVal > 0 ? wastageVal.toFixed(3) : '0'
+        };
+      } else if (field === 'wastage') {
+        // User is editing "Process Loss" — do NOT change actualQty.
+        // Wastage is tracked independently as loss that occurred during the process.
+        // The "Taken from Stock" remains whatever the user already set.
+        updated[index] = {
+          ...item,
+          wastage: value,
+        };
+      } else {
+        updated[index] = { ...item, [field]: value };
+      }
       return updated;
+    });
+  };
+
+  const handleOutputYieldChange = (yieldVal: string) => {
+    setStageOutputYield(yieldVal);
+    const yieldNum = parseFloat(yieldVal) || 0;
+    setStageIngredients(prev => {
+      return prev.map(si => {
+        if (si.itemType === 'packaging') {
+          const qtyRequiredPerUnit = si.qtyRequiredPerUnit || 0;
+          const qtyTheoretical = parseFloat((yieldNum * qtyRequiredPerUnit).toFixed(3));
+          return {
+            ...si,
+            qtyTheoretical,
+            actualQty: qtyTheoretical.toString(),
+            wastage: '0'
+          };
+        }
+        return si;
+      });
     });
   };
 
@@ -1043,7 +1188,7 @@ export default function ManufacturingScreen() {
     });
 
   const plannedVal = computedTotalQty;
-  let previewIngredients: { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'formulation' | 'packaging' }[] = [];
+  let previewIngredients: { name: string; qtyNeeded: number; unit: string; available: number; ratioLabel: string; itemType: 'formulation' | 'packaging' }[] = [];
   const isDirectPurchaseJobWork = prodProductionType === 'job_work' && prodJobWorkMode === 'direct_purchase';
   const showFormulationPreview = !isDirectPurchaseJobWork;
   const showPackagingPreview = prodPackagingMode === 'self_packed';
@@ -1061,7 +1206,8 @@ export default function ManufacturingScreen() {
   };
 
   if (matchingBom && !isNaN(plannedVal) && plannedVal > 0 && (showFormulationPreview || showPackagingPreview)) {
-    const FORMULATION_BASIS = 100;
+    const FORMULATION_BASIS = (matchingBom as any).formulationBasis || 100;
+    const FORMULATION_BASIS_UNIT = ((matchingBom as any).formulationBasisUnit || 'ml').toLowerCase();
     const scale = plannedVal / FORMULATION_BASIS;
 
     const getAvailable = (ingId: string) => {
@@ -1079,32 +1225,44 @@ export default function ManufacturingScreen() {
     };
 
     if (isMultiSize) {
-      const parentProduct = products.find(p => p._id === prodProductId);
-      const parentSizeMl = parseSizeMl(parentProduct?.size || '');
+      // Calculate total batch volume or count for scaling, matching backend behavior
+      let totalBatchVolume = 0;
+      let allHaveSizes = true;
+      for (const y of enabledYields) {
+        const sizeMl = parseSizeMl(y.size || '');
+        if (sizeMl > 0) {
+          totalBatchVolume += sizeMl * Number(y.plannedQty);
+        } else {
+          allHaveSizes = false;
+          break;
+        }
+      }
+
+      let totalInBasisUnit = 0;
+      if (allHaveSizes && totalBatchVolume > 0) {
+        totalInBasisUnit = FORMULATION_BASIS_UNIT === 'l' ? totalBatchVolume / 1000 : totalBatchVolume;
+      } else {
+        totalInBasisUnit = enabledYields.reduce((s, y) => s + Number(y.plannedQty), 0);
+      }
+      const overallScale = totalInBasisUnit / FORMULATION_BASIS;
 
       // Formulation preview (when user provides raw materials)
       const formulationItems: typeof previewIngredients = [];
       if (showFormulationPreview) {
-        const formulationMap = new Map<string, { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'formulation' }>();
-        for (const yieldItem of enabledYields) {
-          const variantSizeMl = parseSizeMl(yieldItem.size);
-          const volumeRatio = (parentSizeMl > 0 && variantSizeMl > 0) ? (variantSizeMl / parentSizeMl) : 1;
-          const variantScale = Number(yieldItem.plannedQty) / FORMULATION_BASIS;
-          for (const ing of matchingBom.ingredients) {
-            const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
-            const mat = materials.find(m => m._id === ingId);
-            const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
-            if (isPkg) continue;
-            const qtyNeeded = ing.qtyRequired * variantScale * volumeRatio;
-            const key = ingId || ing.rawMaterialId.toString();
-            if (formulationMap.has(key)) {
-              formulationMap.get(key)!.qtyNeeded += qtyNeeded;
-            } else {
-              const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown';
-              const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'kg';
-              formulationMap.set(key, { name: ingName, qtyNeeded, unit: ingUnit, available: getAvailable(ingId), ratioPct: ing.qtyRequired, itemType: 'formulation' });
-            }
-          }
+        const formulationMap = new Map<string, { name: string; qtyNeeded: number; unit: string; available: number; ratioLabel: string; itemType: 'formulation' }>();
+        for (const ing of matchingBom.ingredients) {
+          const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
+          const mat = materials.find(m => m._id === ingId);
+          const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+          if (isPkg) continue;
+          
+          const qtyNeeded = ing.qtyRequired * overallScale;
+          const key = ingId || ing.rawMaterialId.toString();
+          const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown';
+          const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'kg';
+          const ratioLabel = `${ing.qtyRequired} ${ingUnit} per ${FORMULATION_BASIS} ${FORMULATION_BASIS_UNIT.toUpperCase()}`;
+          
+          formulationMap.set(key, { name: ingName, qtyNeeded, unit: ingUnit, available: getAvailable(ingId), ratioLabel, itemType: 'formulation' });
         }
         formulationItems.push(...formulationMap.values());
       }
@@ -1112,7 +1270,7 @@ export default function ManufacturingScreen() {
       // Packaging preview (when self-packed)
       const packagingItems: typeof previewIngredients = [];
       if (showPackagingPreview) {
-        const packagingMap = new Map<string, { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'packaging' }>();
+        const packagingMap = new Map<string, { name: string; qtyNeeded: number; unit: string; available: number; ratioLabel: string; itemType: 'packaging' }>();
         for (const yieldItem of enabledYields) {
           const childBom = boms.find(b => {
             const bPid = b.productId && typeof b.productId === 'object' ? (b.productId as any)._id : b.productId;
@@ -1131,7 +1289,8 @@ export default function ManufacturingScreen() {
             } else {
               const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown';
               const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'pcs';
-              packagingMap.set(key, { name: ingName, qtyNeeded, unit: ingUnit, available: getAvailable(ingId), ratioPct: ing.qtyRequired, itemType: 'packaging' });
+              const ratioLabel = `${ing.qtyRequired} ${ingUnit}/unit`;
+              packagingMap.set(key, { name: ingName, qtyNeeded, unit: ingUnit, available: getAvailable(ingId), ratioLabel, itemType: 'packaging' });
             }
           }
         }
@@ -1156,12 +1315,15 @@ export default function ManufacturingScreen() {
           const mat = materials.find(m => m._id === ingId);
           const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
           const qtyNeeded = isPkg ? ing.qtyRequired * plannedVal : ing.qtyRequired * scale;
+          const ratioLabel = isPkg 
+            ? `${ing.qtyRequired} ${ingUnit}/unit`
+            : `${ing.qtyRequired} ${ingUnit} per ${FORMULATION_BASIS} ${FORMULATION_BASIS_UNIT.toUpperCase()}`;
           return {
             name: ingName,
             qtyNeeded,
             unit: ingUnit,
             available: getAvailable(ingId),
-            ratioPct: ing.qtyRequired,
+            ratioLabel,
             itemType: isPkg ? 'packaging' : 'formulation'
           };
         });
@@ -1253,862 +1415,104 @@ export default function ManufacturingScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
       >
         {/* ======================================================== */}
-        {/* TAB 1: RAW MATERIALS */}
-        {/* ======================================================== */}
         {activeTab === 'materials' && (
-          <View style={styles.tabContent}>
-
-
-            {/* Expiry Alerts Warning Card */}
-            {expiryAlerts.length > 0 && (
-              <View style={[styles.card, { borderColor: colors.danger, backgroundColor: colors.danger + '08', marginBottom: 16 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  <Ionicons name="warning" size={18} color={colors.danger} />
-                  <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '800' }}>
-                    Near Expiry Warning ({expiryAlerts.length} Batches)
-                  </Text>
-                </View>
-                {expiryAlerts.map(alert => (
-                  <View key={alert._id} style={{ paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.text.primary }}>
-                      🌿 {alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId.name : 'Unknown Material'}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                      Batch: <Text style={{ fontWeight: '700' }}>{alert.batchNo}</Text> • Stock: {(() => {
-                        const r = alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId : null;
-                        return r && isIntegerQty(r.unit, r.category) ? alert.qty.toFixed(0) : alert.qty.toFixed(2);
-                      })()} {alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId.unit : ''} • Expires on: <Text style={{ color: colors.danger, fontWeight: '700' }}>{new Date(alert.expiryDate!).toLocaleDateString()}</Text>
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Single Unified Raw Material Stock & Batch Breakdown List */}
-            <View style={[styles.card, { padding: 10 }]}>
-              <View style={{ flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, marginBottom: 12 }}>
-                <Text style={[styles.cardSubTitle, { marginBottom: 0 }]}>Raw Stocks & Reorder Status (Click to view active batches)</Text>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  {/* Manufacturing Unit Filter Dropdown */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-                    <Ionicons name="business" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
-                    {Platform.OS === 'web' ? (
-                      <select
-                        value={mfgUnitFilter}
-                        onChange={(e: any) => setMfgUnitFilter(e.target.value)}
-                        style={{
-                          borderWidth: 0,
-                          backgroundColor: 'transparent',
-                          color: colors.text.primary,
-                          fontSize: 11,
-                          fontWeight: '600',
-                          outlineWidth: 0,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="all">All Units</option>
-                        {manufacturingUnits.map(unit => (
-                          <option key={unit._id} value={unit._id}>{unit.name}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <TouchableOpacity
-                        onPress={() => {
-                          const options = ['all', ...manufacturingUnits.map(u => u._id)];
-                          const currentIdx = options.indexOf(mfgUnitFilter);
-                          const nextIdx = (currentIdx + 1) % options.length;
-                          setMfgUnitFilter(options[nextIdx]);
-                        }}
-                      >
-                        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>
-                          {mfgUnitFilter === 'all' ? 'All Units' : (manufacturingUnits.find(u => u._id === mfgUnitFilter)?.name || 'Unit')}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {/* Search Stocks Box */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, width: isDesktop ? 220 : undefined }}>
-                    <Ionicons name="search-outline" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
-                    <TextInput
-                      style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
-                      placeholder="Search stocks..."
-                      placeholderTextColor={colors.text.muted}
-                      value={materialSearch}
-                      onChangeText={setMaterialSearch}
-                    />
-                    {materialSearch.length > 0 && (
-                      <TouchableOpacity onPress={() => setMaterialSearch('')} style={{ marginRight: 6 }}>
-                        <Ionicons name="close-circle" size={14} color={colors.text.muted} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {/* Stock Status Filter Dropdown */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-                    <Ionicons name="funnel-outline" size={12} color={colors.text.muted} style={{ marginRight: 4 }} />
-                    {Platform.OS === 'web' ? (
-                      <select
-                        value={stockFilter}
-                        onChange={(e: any) => setStockFilter(e.target.value)}
-                        style={{
-                          borderWidth: 0,
-                          backgroundColor: 'transparent',
-                          color: colors.text.primary,
-                          fontSize: 11,
-                          fontWeight: '600',
-                          outlineWidth: 0,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="all">All Stocks</option>
-                        <option value="low">Low Stock</option>
-                        <option value="in_stock">In Stock</option>
-                      </select>
-                    ) : (
-                      <TouchableOpacity
-                        onPress={() => {
-                          const nextFilter = stockFilter === 'all' ? 'low' : (stockFilter === 'low' ? 'in_stock' : 'all');
-                          setStockFilter(nextFilter);
-                        }}
-                      >
-                        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>
-                          {stockFilter === 'all' ? 'All Stocks' : (stockFilter === 'low' ? 'Low Stock' : 'In Stock')}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              </View>
-
-              <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                {/* Header */}
-                <View style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
-                  <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
-                  <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
-                  <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
-                  <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
-                </View>
-                {/* Body */}
-                {filteredMaterials.map((rm, idx) => {
-                  const lowStock = (rm.stockLevel || 0) < rm.minReorder;
-
-                  return (
-                    <View key={rm._id} style={{ borderBottomWidth: idx === filteredMaterials.length - 1 ? 0 : 0.5, borderBottomColor: colors.border, paddingVertical: 4 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8 }}>
-                        <View style={{ flex: 2, paddingLeft: 4 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{rm.name}</Text>
-                            <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
-                              <Text style={{ fontSize: 9, fontWeight: '700', color: colors.text.secondary }}>
-                                {rm.category === 'Packaging' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 Herb'))}
-                              </Text>
-                            </View>
-                          </View>
-                          {rm.sku ? <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>SKU: {rm.sku}</Text> : null}
-                        </View>
-                        <Text style={{ flex: 1.2, fontSize: 13, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
-                          {rm.stockLevel !== undefined ? (isIntegerQty(rm.unit, rm.category) ? rm.stockLevel.toFixed(0) : rm.stockLevel.toFixed(1)) : (isIntegerQty(rm.unit, rm.category) ? '0' : '0.0')} {rm.unit}
-                        </Text>
-                        <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
-                          {rm.minReorder} {rm.unit}
-                        </Text>
-                        <View style={{ width: 140, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
-                          <TouchableOpacity
-                            onPress={() => handleEditMaterial(rm)}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: colors.primary + '10', borderWidth: 0.5, borderColor: colors.primary + '30' }}
-                          >
-                            <Ionicons name="pencil-outline" size={13} color={colors.primary} />
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Edit</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={async () => {
-                              const rawName = rm.name ? rm.name.trim() : rm._id;
-                              setTraceBatchNo(rawName);
-                              setTraceModalVisible(true);
-                              setTraceLoading(true);
-                              setTraceResult(null);
-                              try {
-                                const data = await api.traceBatch(rawName);
-                                if (data && !data.materialSku && rm.sku) data.materialSku = rm.sku;
-                                setTraceResult(data);
-                              } catch (err: any) {
-                                try {
-                                  const data = await api.traceBatch(rm._id);
-                                  if (data && !data.materialSku && rm.sku) data.materialSku = rm.sku;
-                                  setTraceResult(data);
-                                } catch (e) {
-                                  console.log('Trace fetch error', e);
-                                }
-                              } finally {
-                                setTraceLoading(false);
-                              }
-                            }}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: colors.success + '10', borderWidth: 0.5, borderColor: colors.success + '30' }}
-                          >
-                            <Ionicons name="list-outline" size={13} color={colors.success} />
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>Ledger</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-              {filteredMaterials.length === 0 && <Text style={styles.emptyText}>No matching materials found.</Text>}
-            </View>
-          </View>
+          <RawMaterialsTab
+            expiryAlerts={expiryAlerts}
+            manufacturingUnits={manufacturingUnits}
+            mfgUnitFilter={mfgUnitFilter}
+            setMfgUnitFilter={setMfgUnitFilter}
+            materialSearch={materialSearch}
+            setMaterialSearch={setMaterialSearch}
+            stockFilter={stockFilter}
+            setStockFilter={setStockFilter}
+            filteredMaterials={filteredMaterials}
+            isDesktop={isDesktop}
+            isIntegerQty={isIntegerQty}
+            onEditMaterial={handleEditMaterial}
+            onTraceMaterial={async (rm) => {
+              const rawName = rm.name ? rm.name.trim() : rm._id;
+              setTraceBatchNo(rawName);
+              setTraceModalVisible(true);
+              setTraceLoading(true);
+              setTraceResult(null);
+              try {
+                const data = await api.traceBatch(rawName);
+                if (data && !data.materialSku && rm.sku) data.materialSku = rm.sku;
+                setTraceResult(data);
+              } catch (err: any) {
+                try {
+                  const data = await api.traceBatch(rm._id);
+                  if (data && !data.materialSku && rm.sku) data.materialSku = rm.sku;
+                  setTraceResult(data);
+                } catch (e) {
+                  console.log('Trace fetch error', e);
+                }
+              } finally {
+                setTraceLoading(false);
+              }
+            }}
+          />
         )}
 
-
-
-        {/* ======================================================== */}
-        {/* TAB 3: BATCH PRODUCTION */}
-        {/* ======================================================== */}
         {activeTab === 'batches' && (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Active & Finished Production Runs</Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={() => setProductionModalVisible(true)}>
-                <Ionicons name="play-outline" size={16} color="#fff" />
-                <Text style={styles.primaryBtnText}>Start Production Batch</Text>
-              </TouchableOpacity>
-            </View>
-
-            {batches.map(batch => {
-              const isFinished = batch.status === 'completed';
-              const isCancelled = batch.status === 'cancelled';
-              const isInProgress = batch.status === 'in_progress';
-              const isQcHold = batch.status === 'qc_hold';
-
-              const productPrice = batch.productId && typeof batch.productId === 'object' ? batch.productId.price || 0 : 0;
-              const hasCosting = batch.rawMaterialCost !== undefined;
-              const hasUnitCost = isFinished && batch.unitProductionCost !== undefined && batch.unitProductionCost > 0;
-              const grossMargin = hasUnitCost && productPrice > 0 && batch.unitProductionCost !== undefined
-                ? Math.max(0, ((productPrice - batch.unitProductionCost) / productPrice) * 100)
-                : 0;
-
-              return (
-                <View key={batch._id} style={[styles.card, { marginBottom: 12 }]}>
-                  <View style={styles.batchCardHeader}>
-                    <View>
-                      <Text style={styles.batchTitle}>
-                        {batch.productId && typeof batch.productId === 'object' ? batch.productId.name : 'Product'}
-                      </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.batchSubNo}>Batch No: {batch.batchNo} {batch.manufacturingUnitName ? `· Unit: ${batch.manufacturingUnitName}` : ''}</Text>
-                        <TouchableOpacity style={{ padding: 2 }} onPress={async () => {
-                          setTraceBatchNo(batch.batchNo);
-                          setTraceLoading(true);
-                          setTraceModalVisible(true);
-                          try {
-                            const data = await api.traceBatch(batch.batchNo.trim().toUpperCase());
-                            setTraceResult(data);
-                          } catch (err: any) {
-                            alert(err.message || 'Trace lookup failed');
-                            setTraceModalVisible(false);
-                          } finally {
-                            setTraceLoading(false);
-                          }
-                        }}>
-                          <Ionicons name="git-network-outline" size={13} color={colors.primary} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                    <View style={[styles.statusBadge, { borderColor: getStatusColor(batch.status), backgroundColor: getStatusColor(batch.status) + '10' }]}>
-                      <Text style={[styles.statusBadgeText, { color: getStatusColor(batch.status) }]}>
-                        {batch.status.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Planned Sizes (multi-size batch) */}
-                  {(batch as any).plannedYields?.length > 0 && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
-                      {((batch as any).plannedYields as any[]).map((py: any, idx: number) => {
-                        const pId = typeof py.productId === 'object' ? (py.productId as any)._id || py.productId : py.productId;
-                        const prod = products.find(p => p._id === pId);
-                        return (
-                          <View key={idx} style={{ backgroundColor: colors.primary + '15', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '600', color: colors.primary }}>
-                              {prod ? `${prod.size || prod.name}` : '?'}: {py.plannedQty}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
-
-                  {/* Essential Key Metrics Bar */}
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, backgroundColor: colors.bg.secondary, padding: 10, borderRadius: 8, marginVertical: 8 }}>
-                    <View style={{ flex: 1, minWidth: 90 }}>
-                      <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>OUTPUT QTY</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>
-                        {isFinished ? `${batch.actualYieldQty} / ${batch.plannedQty} Pcs` : `${batch.plannedQty} Pcs`}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1, minWidth: 100 }}>
-                      <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>TOTAL COST</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.warning }}>
-                        ₹{((batch.rawMaterialCost || 0) + (batch.overheadCost || 0)).toFixed(2)}
-                        {hasUnitCost ? ` (₹${batch.unitProductionCost?.toFixed(2)}/pc)` : ''}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1, minWidth: 90 }}>
-                      <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>STARTED</Text>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>
-                        {batch.startDate ? new Date(batch.startDate).toLocaleDateString('en-IN') : '—'}
-                      </Text>
-                    </View>
-                    {batch.qcPassedBy ? (
-                      <View style={{ flex: 1, minWidth: 110 }}>
-                        <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>QC INSPECTOR</Text>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }} numberOfLines={1}>
-                          ✓ {batch.qcPassedBy}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  {/* Full-Width Connected Timeline Stepper */}
-                  {batch.stages && batch.stages.length > 0 && (
-                    <View style={{ marginVertical: 12, width: '100%' }}>
-                      <View style={{ position: 'relative', width: '100%', paddingHorizontal: 10, minHeight: 65 }}>
-                        {/* Background & Active Progress Connecting Lines (Strictly bounded between first and last dot center) */}
-                        {(() => {
-                          const N = batch.stages.length;
-                          if (N < 2) return null;
-                          const stepPct = 100 / N;
-                          const startLeftPct = stepPct / 2;
-                          const totalLineWidthPct = ((N - 1) / N) * 100;
-
-                          const lastDoneIdx = batch.stages.reduce((acc: number, s: any, i: number) => (s.status === 'completed' || s.status === 'skipped' || s.status === 'in_progress') ? i : acc, 0);
-                          const activeWidthPct = (lastDoneIdx / (N - 1)) * totalLineWidthPct;
-
-                          return (
-                            <>
-                              {/* Background Line */}
-                              <View style={{
-                                position: 'absolute',
-                                top: 11,
-                                left: `${startLeftPct}%`,
-                                width: `${totalLineWidthPct}%`,
-                                height: 3,
-                                backgroundColor: colors.border,
-                                borderRadius: 2,
-                                zIndex: 1
-                              }} />
-                              {/* Active Progress Line */}
-                              <View style={{
-                                position: 'absolute',
-                                top: 11,
-                                left: `${startLeftPct}%`,
-                                width: `${Math.min(totalLineWidthPct, activeWidthPct)}%`,
-                                height: 3,
-                                backgroundColor: colors.success,
-                                borderRadius: 2,
-                                zIndex: 2
-                              }} />
-                            </>
-                          );
-                        })()}
-
-                        {/* Stage Step Nodes */}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 3, width: '100%' }}>
-                          {batch.stages.map((stage, sIdx) => {
-                            const isCompleted = stage.status === 'completed';
-                            const isSkipped = stage.status === 'skipped';
-                            const isFailed = stage.status === 'failed';
-                            const isActive = stage.status === 'in_progress';
-                            const isInProgress = batch.status === 'in_progress' && stage.status === 'in_progress';
-
-                            const dotBgColor = isCompleted ? colors.success : (isSkipped ? colors.warning : (isFailed ? colors.danger : (isActive ? colors.primary : colors.bg.card)));
-                            const borderColor = isCompleted ? colors.success : (isSkipped ? colors.warning : (isFailed ? colors.danger : (isActive ? colors.primary : colors.border)));
-
-                            return (
-                              <TouchableOpacity
-                                key={sIdx}
-                                style={{ flex: 1, alignItems: 'center', minWidth: 40 }}
-                                disabled={!isInProgress}
-                                onPress={() => handleAdvanceStage(batch._id, sIdx)}
-                              >
-                                {/* Connected Dot Node */}
-                                <View style={{
-                                  width: 22,
-                                  height: 22,
-                                  borderRadius: 11,
-                                  backgroundColor: dotBgColor,
-                                  borderWidth: 2,
-                                  borderColor: borderColor,
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: isActive ? `0 0 6px ${colors.primary}60` : undefined,
-                                  elevation: isActive ? 3 : 0
-                                }}>
-                                  {isCompleted ? (
-                                    <Ionicons name="checkmark" size={12} color="#fff" />
-                                  ) : isSkipped ? (
-                                    <Ionicons name="play-forward" size={10} color="#fff" />
-                                  ) : isFailed ? (
-                                    <Ionicons name="close" size={12} color="#fff" />
-                                  ) : isActive ? (
-                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />
-                                  ) : null}
-                                </View>
-
-                                {/* Stage Title Label */}
-                                <Text style={{
-                                  fontSize: 10,
-                                  fontWeight: isActive ? '800' : (isCompleted ? '700' : '500'),
-                                  color: isActive ? colors.primary : (isCompleted ? colors.text.primary : colors.text.muted),
-                                  textAlign: 'center',
-                                  marginTop: 6,
-                                  lineHeight: 12
-                                }} numberOfLines={2}>
-                                  {stage.name}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </View>
-
-                      {/* Active stage action buttons — prominent & discoverable */}
-                      {batch.status === 'in_progress' && (() => {
-                        const activeIdx = batch.stages.findIndex((s: any) => s.status === 'in_progress');
-                        if (activeIdx === -1) return null;
-                        const activeStageName = batch.stages[activeIdx].name;
-                        return (
-                          <View style={{ marginTop: 10, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                            <TouchableOpacity
-                              style={{ flex: 2, minWidth: 140, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.success }}
-                              onPress={() => handleAdvanceStage(batch._id, activeIdx)}
-                            >
-                              <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-                              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>
-                                Complete: {activeStageName}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={{ flex: 1, minWidth: 70, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.warning + '20', borderWidth: 1, borderColor: colors.warning }}
-                              onPress={() => handleSkipStage(batch._id, activeIdx)}
-                            >
-                              <Ionicons name="play-forward-outline" size={14} color={colors.warning} />
-                              <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '700' }}>Skip</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={{ flex: 1, minWidth: 70, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.danger + '20', borderWidth: 1, borderColor: colors.danger }}
-                              onPress={() => handleFailStage(batch._id, activeIdx)}
-                            >
-                              <Ionicons name="close-circle-outline" size={14} color={colors.danger} />
-                              <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>Fail</Text>
-                            </TouchableOpacity>
-                          </View>
-                        );
-                      })()}
-                    </View>
-                  )}
-
-                  {/* Collapsible Details Toggle (Consumed Raw Materials & Stage Logs) */}
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6 }}
-                    onPress={() => toggleBatchExpanded(batch._id)}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
-                      {expandedBatchIds[batch._id] ? 'Hide Materials & Operator Logs' : `View Materials Consumed (${batch.ingredientsConsumed.length}) & Logs`}
-                    </Text>
-                    <Ionicons name={expandedBatchIds[batch._id] ? 'chevron-up' : 'chevron-down'} size={14} color={colors.primary} />
-                  </TouchableOpacity>
-
-                  {/* Collapsible Drawer Body */}
-                  {expandedBatchIds[batch._id] && (
-                    <View style={{ backgroundColor: colors.bg.secondary, padding: 10, borderRadius: 6, marginTop: 4, gap: 8 }}>
-                      {batch.stages.some((s: any) => s.status === 'completed' || s.status === 'skipped') && (
-                        <View style={{ gap: 4 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Operator Audit Log:</Text>
-                          {batch.stages
-                            .filter((s: any) => s.status === 'completed' || s.status === 'skipped')
-                            .map((s: any, idx: number) => (
-                              <Text key={idx} style={{ fontSize: 10, color: colors.text.secondary }}>
-                                • <Text style={{ fontWeight: '700', color: colors.text.primary }}>{s.name}</Text>: {s.status === 'completed' ? 'Completed' : 'Skipped'} by <Text style={{ color: colors.primary, fontWeight: '600' }}>{s.completedBy || 'Operator'}</Text>
-                                {s.notes ? ` — "${s.notes}"` : ''}
-                              </Text>
-                            ))}
-                        </View>
-                      )}
-
-                      {batch.ingredientsConsumed.length > 0 && (
-                        <View style={{ gap: 3 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Raw Materials Consumed (FIFO):</Text>
-                          {batch.ingredientsConsumed.map((ing, idx) => (
-                            <Text key={idx} style={{ fontSize: 10, color: colors.text.secondary }}>
-                              • {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Material'} (Batch: {ing.batchNo}) — {(() => {
-                                const r = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId : null;
-                                return r && isIntegerQty(r.unit, r.category) ? ing.qtyConsumed.toFixed(0) : ing.qtyConsumed.toFixed(2);
-                              })()} {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : ''}
-                            </Text>
-                          ))}
-                        </View>
-                      )}
-
-                      {/* QC Parameters Log */}
-                      {batch.qcParameters && (
-                        <View style={{ gap: 4, marginTop: 4, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>🔬 QC Testing Parameters Log:</Text>
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
-                            {batch.qcParameters.organoleptic ? (
-                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Organoleptic: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.organoleptic}</Text></Text></View>
-                            ) : null}
-                            {batch.qcParameters.moistureContent !== null ? (
-                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Moisture: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.moistureContent}% w/w</Text></Text></View>
-                            ) : null}
-                            {batch.qcParameters.ashValue !== null ? (
-                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Ash Value: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.ashValue}% w/w</Text></Text></View>
-                            ) : null}
-                            {batch.qcParameters.pHValue !== null ? (
-                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>pH: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.pHValue}</Text></Text></View>
-                            ) : null}
-                            {batch.qcParameters.disintegrationTime !== null ? (
-                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Disintegration: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.disintegrationTime} mins</Text></Text></View>
-                            ) : null}
-                            {batch.qcParameters.heavyMetals ? (
-                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Heavy Metals: <Text style={{ color: batch.qcParameters.heavyMetals === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{batch.qcParameters.heavyMetals}</Text></Text></View>
-                            ) : null}
-                            {batch.qcParameters.microbialLimit ? (
-                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Microbial: <Text style={{ color: batch.qcParameters.microbialLimit === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{batch.qcParameters.microbialLimit}</Text></Text></View>
-                            ) : null}
-                            {batch.qcParameters.labReportRef ? (
-                              <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Lab Ref: <Text style={{ color: colors.primary, fontWeight: '700' }}>{batch.qcParameters.labReportRef}</Text></Text></View>
-                            ) : null}
-                          </View>
-                        </View>
-                      )}
-
-                      {/* Supporting Documents Vault */}
-                      <View style={{ gap: 6, marginTop: 8, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Certification:</Text>
-
-                        {batch.supportingDocuments && batch.supportingDocuments.length > 0 ? (
-                          <View style={{ gap: 4, marginTop: 2 }}>
-                            {batch.supportingDocuments.map((doc: any, docIdx: number) => (
-                              <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.primary, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
-                                <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                  <Ionicons name="document-attach-outline" size={13} color={colors.primary} />
-                                  <Text style={{ fontSize: 10.5, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={() => handleDeleteBatchDoc(batch._id, doc.url)} style={{ padding: 2 }}>
-                                  <Ionicons name="trash-outline" size={12} color={colors.danger} />
-                                </TouchableOpacity>
-                              </View>
-                            ))}
-                          </View>
-                        ) : (
-                          <Text style={{ fontSize: 10, color: colors.text.muted, fontStyle: 'italic' }}>No supporting documents uploaded.</Text>
-                        )}
-                      </View>
-                    </View>
-                  )}
-
-                  {isFinished && !!batch.qcNotes && (
-                    <View style={[styles.qcBox, { marginTop: 6, marginBottom: 4 }]}>
-                      <Text style={styles.qcBoxText}>QC Note: {batch.qcNotes}</Text>
-                    </View>
-                  )}
-
-                  {/* Action Controls */}
-                  {isQcHold && (
-                    <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: colors.warning + '15', borderWidth: 1, borderColor: colors.warning, marginBottom: 8 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <Ionicons name="flask-outline" size={15} color={colors.warning} />
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: colors.warning }}>ALL STAGES COMPLETE — QC SIGN-OFF REQUIRED</Text>
-                      </View>
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>All manufacturing stages are done. Complete QC inspection to inward finished stock into inventory.</Text>
-                    </View>
-                  )}
-                  {/* Action Controls Row */}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: 10 }}>
-                    {/* Left Side: Report & Genealogy Actions */}
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      {isFinished && (
-                        <TouchableOpacity
-                          style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12 }]}
-                          onPress={() => handleOpenBMR(batch._id)}
-                        >
-                          <Ionicons name="document-text-outline" size={15} color={colors.primary} />
-                          <Text style={styles.outlineBtnText}>BMR Report</Text>
-                        </TouchableOpacity>
-                      )}
-                      {!isCancelled && (
-                        <>
-                          <TouchableOpacity
-                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.primary }]}
-                            onPress={() => {
-                              setTraceBatchNo(batch.batchNo);
-                              setTraceModalVisible(true);
-                              setTraceLoading(true);
-                              api.traceBatch(batch.batchNo.trim().toUpperCase())
-                                .then(data => setTraceResult(data))
-                                .catch(err => alert(err.message || 'Trace lookup failed'))
-                                .finally(() => setTraceLoading(false));
-                            }}
-                          >
-                            <Ionicons name="list-outline" size={15} color={colors.primary} />
-                            <Text style={[styles.outlineBtnText, { color: colors.primary }]}>Stock Trace & Genealogy</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.success }]}
-                            onPress={() => handleUploadBatchDoc(batch._id)}
-                          >
-                            <Ionicons name="cloud-upload-outline" size={15} color={colors.success} />
-                            <Text style={[styles.outlineBtnText, { color: colors.success }]}>Upload Doc</Text>
-                          </TouchableOpacity>
-                        </>
-                      )}
-                    </View>
-
-                    {/* Right Side: Active Process State Actions */}
-                    {(isInProgress || isQcHold) && (
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TouchableOpacity style={styles.cancelBatchBtn} onPress={() => handleCancelProduction(batch._id)}>
-                          <Ionicons name="close-circle-outline" size={15} color={colors.danger} />
-                          <Text style={styles.cancelBatchBtnText}>Cancel & Revert Stock</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.completeBatchBtn} onPress={() => {
-                          setSelectedBatchRun(batch);
-                          setQcYieldQty('');
-                          setQcWarehouseId(warehouses.length > 0 ? warehouses[0]._id : '');
-                          setQcWasteQty('');
-                          setQcWasteReason('');
-                          setQcPassedBy('');
-                          setQcNotes('');
-                          setQcError('');
-                          setQcModalVisible(true);
-                        }}>
-                          <Ionicons name="checkmark-done-circle-outline" size={15} color="#fff" />
-                          <Text style={styles.completeBatchBtnText}>QC Sign-off & Inward Stock</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-            {batches.length === 0 && <Text style={styles.emptyText}>No batch productions logged. Start a batch to track BMR.</Text>}
-          </View>
+          <BatchProductionsTab
+            batches={batches}
+            products={products}
+            warehouses={warehouses}
+            expandedBatchIds={expandedBatchIds}
+            toggleBatchExpanded={toggleBatchExpanded}
+            onStartProductionBatch={() => setProductionModalVisible(true)}
+            onTraceBatch={async (batchNo) => {
+              setTraceBatchNo(batchNo);
+              setTraceLoading(true);
+              setTraceModalVisible(true);
+              try {
+                const data = await api.traceBatch(batchNo.trim().toUpperCase());
+                setTraceResult(data);
+              } catch (err: any) {
+                alert(err.message || 'Trace lookup failed');
+                setTraceModalVisible(false);
+              } finally {
+                setTraceLoading(false);
+              }
+            }}
+            onAdvanceStage={handleAdvanceStage}
+            onSkipStage={handleSkipStage}
+            onFailStage={handleFailStage}
+            onDeleteBatchDoc={handleDeleteBatchDoc}
+            onUploadBatchDoc={handleUploadBatchDoc}
+            onOpenBMR={handleOpenBMR}
+            onCancelProduction={handleCancelProduction}
+            onQcSignOff={(batch) => {
+              setSelectedBatchRun(batch);
+              setQcYieldQty('');
+              setQcWarehouseId(warehouses.length > 0 ? warehouses[0]._id : '');
+              setQcWasteQty('');
+              setQcWasteReason('');
+              setQcPassedBy('');
+              setQcNotes('');
+              setQcError('');
+              setQcModalVisible(true);
+            }}
+            isIntegerQty={isIntegerQty}
+            getStatusColor={getStatusColor}
+          />
         )}
 
-        {/* ======================================================== */}
-        {/* TAB 4: TIMELINE / SCHEDULER */}
-        {/* ======================================================== */}
         {activeTab === 'scheduler' && (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Visual Batch Timeline</Text>
-            </View>
-
-            {mfgAnalytics?.timeline && mfgAnalytics.timeline.length > 0 ? (
-              <View style={{ gap: 12 }}>
-                {mfgAnalytics.timeline.map((run: any) => {
-                  const start = new Date(run.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-                  const end = run.endDate ? new Date(run.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'In Progress';
-                  const statusColor = getStatusColor(run.status);
-                  return (
-                    <View key={run.id} style={[styles.card, { borderLeftColor: statusColor, borderLeftWidth: 5, padding: 16 }]}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                        <View style={{ flex: 1, marginRight: 8 }}>
-                          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary }}>Batch: {run.batchNo}</Text>
-                          <Text style={{ fontSize: 13, color: colors.text.secondary, marginTop: 2 }}>{run.productName}</Text>
-                        </View>
-                        <View style={[styles.statusBadge, { borderColor: statusColor, backgroundColor: statusColor + '10', alignSelf: 'center' }]}>
-                          <Text style={{ color: statusColor, fontSize: 10, fontWeight: '800' }}>{run.status.toUpperCase()}</Text>
-                        </View>
-                      </View>
-
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8, padding: 12, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
-                        <View>
-                          <Text style={{ fontSize: 10, color: colors.text.secondary, fontWeight: '700' }}>PLANNED QTY</Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary, marginTop: 2 }}>{run.plannedQty} units</Text>
-                        </View>
-                        <View>
-                          <Text style={{ fontSize: 10, color: colors.text.secondary, fontWeight: '700' }}>ACTUAL YIELD</Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary, marginTop: 2 }}>{run.actualYieldQty || '-'} units</Text>
-                        </View>
-                        <View>
-                          <Text style={{ fontSize: 10, color: colors.text.secondary, fontWeight: '700' }}>TIMEFRAME</Text>
-                          <Text style={{ fontSize: 11, color: colors.text.primary, marginTop: 2 }}>{start} ➔ {end}</Text>
-                        </View>
-                      </View>
-
-                      {/* Current Active Stage & Timeline Warnings */}
-                      {run.status === 'in_progress' && (() => {
-                        const activeStage = run.stages?.find((s: any) => s.status === 'in_progress');
-                        if (!activeStage) return null;
-                        const targetDate = activeStage.targetCompletionDate ? new Date(activeStage.targetCompletionDate) : null;
-                        const isOverdue = targetDate ? new Date() > targetDate : false;
-                        let daysDiff = 0;
-                        if (targetDate) {
-                          const timeDiff = new Date().getTime() - targetDate.getTime();
-                          daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-                        }
-                        return (
-                          <View style={{ padding: 10, backgroundColor: isOverdue ? colors.danger + '08' : colors.primary + '08', borderRadius: 8, borderWidth: 1, borderColor: isOverdue ? colors.danger : colors.primary + '20', marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <View style={{ flex: 1, marginRight: 8 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>
-                                Active Stage: <Text style={{ color: colors.text.primary }}>{activeStage.name}</Text>
-                              </Text>
-                              {targetDate && (
-                                <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
-                                  Target Completion: {targetDate.toLocaleDateString('en-IN')} ({activeStage.targetDurationDays} day{activeStage.targetDurationDays > 1 ? 's' : ''})
-                                </Text>
-                              )}
-                            </View>
-                            {targetDate && (
-                              <View style={[styles.statusBadge, {
-                                borderColor: isOverdue ? colors.danger : colors.success,
-                                backgroundColor: isOverdue ? colors.danger + '12' : colors.success + '12',
-                              }]}>
-                                <Text style={{ fontSize: 8, fontWeight: '700', color: isOverdue ? colors.danger : colors.success }}>
-                                  {isOverdue ? `OVERDUE BY ${daysDiff} DAYS` : 'ON TRACK'}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        );
-                      })()}
-
-                      {/* Mini Visual Process Flow Stepper */}
-                      {run.stages && run.stages.length > 0 && (
-                        <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '800', color: colors.text.secondary, marginBottom: 6, letterSpacing: 0.5 }}>PROCESS FLOW STAGES:</Text>
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
-                            {run.stages.map((st: any, idx: number) => {
-                              const isDone = st.status === 'completed' || st.status === 'skipped';
-                              const isCurrent = st.status === 'in_progress';
-                              const isFailed = st.status === 'failed';
-                              let dotColor = colors.border;
-                              if (isDone) dotColor = colors.success;
-                              else if (isCurrent) dotColor = colors.primary;
-                              else if (isFailed) dotColor = colors.danger;
-
-                              return (
-                                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dotColor }} />
-                                  <Text style={{ fontSize: 10, fontWeight: isCurrent ? '700' : '400', color: isCurrent ? colors.text.primary : colors.text.secondary }}>
-                                    {st.name}
-                                  </Text>
-                                  {idx < run.stages.length - 1 && (
-                                    <Ionicons name="arrow-forward" size={8} color={colors.text.muted} />
-                                  )}
-                                </View>
-                              );
-                            })}
-                          </ScrollView>
-                        </View>
-                      )}
-
-                      {run.status === 'completed' && (
-                        <TouchableOpacity
-                          style={[styles.outlineBtn, { marginTop: 12, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12 }]}
-                          onPress={() => handleOpenBMR(run.id)}
-                        >
-                          <Ionicons name="document-text-outline" size={14} color={colors.primary} />
-                          <Text style={[styles.outlineBtnText, { fontSize: 12 }]}>Generate BMR Report</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="calendar-outline" size={48} color={colors.text.secondary} />
-                <Text style={styles.emptyText}>No active or completed production timeline found.</Text>
-              </View>
-            )}
-          </View>
+          <ProductionSchedulerTab
+            mfgAnalytics={mfgAnalytics}
+            onOpenBMR={handleOpenBMR}
+            getStatusColor={getStatusColor}
+          />
         )}
 
-        {/* ======================================================== */}
-        {/* TAB 4: MANUFACTURING UNITS DIRECTORY */}
-        {/* ======================================================== */}
         {activeTab === 'units' && (
-          <View style={styles.tabContent}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary }}>Manufacturing Facilities & Units</Text>
-                <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                  Directory of manufacturing factories, units, and plant facilities ({manufacturingUnits.length} configured)
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={() => setUnitModalVisible(true)}
-              >
-                <Ionicons name="add-circle-outline" size={16} color="#fff" />
-                <Text style={styles.primaryBtnText}>+ Define New Unit</Text>
-              </TouchableOpacity>
-            </View>
-
-            {manufacturingUnits.length > 0 ? (
-              <View style={{ gap: 12 }}>
-                {manufacturingUnits.map(unit => (
-                  <View key={unit._id} style={[styles.card, { padding: 16, borderLeftColor: colors.primary, borderLeftWidth: 4 }]}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
-                          <Ionicons name="business" size={18} color={colors.primary} />
-                        </View>
-                        <View>
-                          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text.primary }}>{unit.name}</Text>
-                          <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                            Code: <Text style={{ fontWeight: '700', color: colors.primary }}>{unit.code || 'N/A'}</Text>
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.sm }}>
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: colors.success }}>OPERATIONAL</Text>
-                      </View>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, backgroundColor: colors.bg.secondary, padding: 12, borderRadius: Radius.md, marginTop: 8 }}>
-                      <View style={{ flex: 1, minWidth: 140 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>LOCATION / ADDRESS</Text>
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
-                          {[unit.addressLine1, unit.city, unit.state, unit.pincode].filter(Boolean).join(', ') || 'No address specified'}
-                        </Text>
-                      </View>
-
-                      {unit.contactPerson ? (
-                        <View style={{ flex: 1, minWidth: 120 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>FACILITY CONTACT</Text>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
-                            👤 {unit.contactPerson} {unit.phone ? `(${unit.phone})` : ''}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="business-outline" size={48} color={colors.text.secondary} />
-                <Text style={styles.emptyText}>No manufacturing units defined yet.</Text>
-                <TouchableOpacity
-                  style={[styles.primaryBtn, { marginTop: 12 }]}
-                  onPress={() => setUnitModalVisible(true)}
-                >
-                  <Ionicons name="add" size={16} color="#fff" />
-                  <Text style={styles.primaryBtnText}>Define First Unit</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
+          <ManufacturingUnitsTab
+            manufacturingUnits={manufacturingUnits}
+            onAddUnit={() => setUnitModalVisible(true)}
+          />
         )}
-
       </ScrollView>
 
       {/* ── Modals (extracted into focused components) ─────────────────────────── */}
@@ -2136,8 +1540,10 @@ export default function ManufacturingScreen() {
         rmUnit={rmUnit} setRmUnit={setRmUnit}
         rmCategory={rmCategory} setRmCategory={setRmCategory}
         rmMinReorder={rmMinReorder} setRmMinReorder={setRmMinReorder}
-        rmDefaultStage={rmDefaultStage} setRmDefaultStage={setRmDefaultStage}
         rmError={rmError}
+        rmStockLevel={rmStockLevel} setRmStockLevel={setRmStockLevel}
+        rmOriginalStockLevel={rmOriginalStockLevel}
+        rmAdjustmentReason={rmAdjustmentReason} setRmAdjustmentReason={setRmAdjustmentReason}
         onClose={handleCloseMaterialModal}
         onSave={handleSaveMaterial}
       />
@@ -2183,6 +1589,7 @@ export default function ManufacturingScreen() {
         prodBomId={prodBomId} setProdBomId={setProdBomId}
         prodPlannedQty={prodPlannedQty} setProdPlannedQty={setProdPlannedQty}
         prodBatchNo={prodBatchNo} setProdBatchNo={setProdBatchNo}
+        prodExpiryMonths={prodExpiryMonths} setProdExpiryMonths={setProdExpiryMonths}
         prodProductionType={prodProductionType} setProdProductionType={setProdProductionType}
         prodJobWorkMode={prodJobWorkMode} setProdJobWorkMode={setProdJobWorkMode}
         prodPackagingMode={prodPackagingMode} setProdPackagingMode={setProdPackagingMode}
@@ -2203,7 +1610,7 @@ export default function ManufacturingScreen() {
         selectedBatchRun={selectedBatchRun}
         warehouses={warehouses}
         products={products}
-        qcYieldQty={qcYieldQty} setQcYieldQty={setQcYieldQty}
+        qcYieldQty={qcYieldQty} setQcYieldQty={handleQcYieldQtyChange}
         qcPacking={qcPacking} setQcPacking={setQcPacking}
         qcWasteQty={qcWasteQty} setQcWasteQty={setQcWasteQty}
         qcWasteReason={qcWasteReason} setQcWasteReason={setQcWasteReason}
@@ -2240,393 +1647,20 @@ export default function ManufacturingScreen() {
         onPrint={handlePrintBMR}
       />
 
-      {/* ── Genealogy / Trace / Stage Modals (unchanged inline) ────────────────── */}
-      {/* MODAL 7: BATCH GENEALOGY */}
-      {/* ======================================================== */}
-      {/* MODAL 8: END-TO-END BATCH TRACE */}
-      {/* ======================================================== */}
-      <Modal visible={traceModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setTraceModalVisible(false)} />
-          <View style={[styles.modalContainer, { maxWidth: 1200, width: '98%', height: '90%' }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>End-to-End Batch Trace</Text>
-                <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
-                  {traceResult ? `Batch: ${traceResult.batchNo}` : 'Enter a batch number to trace'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setTraceModalVisible(false)}>
-                <Ionicons name="close" size={20} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {traceLoading ? (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 12, fontWeight: '600' }}>Fetching raw material stock ledger...</Text>
-              </View>
-            ) : (
-              <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ gap: 16 }}>
-                {/* Raw Material Stock Ledger (IN/OUT) */}
-                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
-                  {/* Header */}
-                  <View style={{ backgroundColor: colors.primary + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>
-                        📋 Raw Material Stock Ledger: {traceResult?.materialName || traceResult?.rawMaterialEntries?.[0]?.materialName || traceBatchNo || traceResult?.batchNo || 'Stock Trace'}
-                      </Text>
-                      {(traceResult?.materialSku || traceResult?.rawMaterialEntries?.[0]?.materialSku) && (
-                        <View style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.primary + '40' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>
-                            SKU: {traceResult?.materialSku || traceResult?.rawMaterialEntries?.[0]?.materialSku}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Search Bar */}
-                  <View style={{ paddingHorizontal: 12, backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8, height: 38 }}>
-                    <Ionicons name="search-outline" size={15} color={colors.text.muted} />
-                    <TextInput
-                      style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
-                      placeholder="Search by batch number..."
-                      placeholderTextColor={colors.text.muted}
-                      value={traceSearch}
-                      onChangeText={setTraceSearch}
-                    />
-                    {traceSearch.length > 0 && (
-                      <TouchableOpacity onPress={() => setTraceSearch('')}>
-                        <Ionicons name="close-circle" size={15} color={colors.text.muted} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {/* Sub-Tabs Header */}
-                  <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}>
-                    <TouchableOpacity
-                      onPress={() => setTraceSubTab('in')}
-                      style={[
-                        { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 6 },
-                        traceSubTab === 'in' && { borderBottomColor: colors.success, backgroundColor: colors.success + '08' }
-                      ]}
-                    >
-                      <Ionicons name="arrow-down-circle-outline" size={16} color={traceSubTab === 'in' ? colors.success : colors.text.muted} />
-                      <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, traceSubTab === 'in' && { color: colors.success }]}>
-                        Incoming Stock (IN)
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setTraceSubTab('out')}
-                      style={[
-                        { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 6 },
-                        traceSubTab === 'out' && { borderBottomColor: colors.warning, backgroundColor: colors.warning + '08' }
-                      ]}
-                    >
-                      <Ionicons name="arrow-up-circle-outline" size={16} color={traceSubTab === 'out' ? colors.warning : colors.text.muted} />
-                      <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, traceSubTab === 'out' && { color: colors.warning }]}>
-                        Outgoing Stock (OUT)
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Table View */}
-                  <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
-                    <View style={{ minWidth: '100%', flex: 1 }}>
-                      {traceSubTab === 'in' ? (
-                        <>
-                          {/* Table Header for IN */}
-                          <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                            <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                            <Text style={{ width: 125, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Batch No</Text>
-                            <Text style={{ flex: 1.2, minWidth: 120, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Raw Material</Text>
-                            <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Purchase Ref</Text>
-                            <Text style={{ flex: 1.2, minWidth: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Vendor / Source</Text>
-                            <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left', paddingLeft: 8 }}>IN Qty</Text>
-                            <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left' }}>Warehouse</Text>
-                          </View>
-                          {/* Table Body for IN */}
-                          {(() => {
-                            const parseDate = (val: any) => {
-                              if (!val) return new Date();
-                              const d = new Date(val);
-                              return isNaN(d.getTime()) ? new Date() : d;
-                            };
-                            const inEntries = traceResult?.rawMaterialEntries || [];
-                            const filtered = inEntries.filter((e: any) => {
-                              if (!traceSearch) return true;
-                              return e.batchNo?.toLowerCase().includes(traceSearch.toLowerCase()) ||
-                                e.materialName?.toLowerCase().includes(traceSearch.toLowerCase()) ||
-                                e.purchaseRef?.toLowerCase().includes(traceSearch.toLowerCase());
-                            });
-
-                            if (filtered.length === 0) {
-                              return <Text style={{ padding: 16, textAlign: 'center', color: colors.text.secondary }}>No matching incoming stock found.</Text>;
-                            }
-
-                            return filtered.map((row: any, idx: number) => (
-                              <View key={idx} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < filtered.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                                <Text style={{ width: 95, fontSize: 11, color: colors.text.secondary }}>
-                                  {parseDate(row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                </Text>
-                                <Text style={{ width: 125, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
-                                  {row.batchNo}
-                                </Text>
-                                <Text style={{ flex: 1.2, minWidth: 120, fontSize: 11, fontWeight: '600', color: colors.text.primary }} numberOfLines={1}>
-                                  🌿 {row.materialName || 'Raw Material'}
-                                </Text>
-                                <Text style={{ width: 100, fontSize: 11, color: colors.text.primary, fontWeight: '600' }}>
-                                  {row.purchaseRef || 'Inward'}
-                                </Text>
-                                <Text style={{ flex: 1.2, minWidth: 110, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
-                                  {row.vendorName || 'Direct'}
-                                </Text>
-                                <View style={{ width: 130, paddingLeft: 8 }}>
-                                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>
-                                    {(() => {
-                                      const val = row.initialQty !== undefined ? row.initialQty : row.qty;
-                                      return isIntegerQty(row.unit, row.category) ? val.toFixed(0) : val.toFixed(1);
-                                    })()} {row.unit}
-                                  </Text>
-                                  {row.initialQty !== undefined && row.initialQty !== row.qty && (
-                                    <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>
-                                      ({isIntegerQty(row.unit, row.category) ? row.qty.toFixed(0) : row.qty.toFixed(1)} remaining)
-                                    </Text>
-                                  )}
-                                </View>
-                                <Text style={{ width: 130, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'left' }} numberOfLines={1}>
-                                  {row.warehouseName || '-'}
-                                </Text>
-                              </View>
-                            ));
-                          })()}
-                        </>
-                      ) : (
-                        <>
-                          {/* Table Header for OUT */}
-                          <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                            <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                            <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Production Batch No</Text>
-                            <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Product Name</Text>
-                            <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Consumed Qty</Text>
-                            <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Manufacturing Unit</Text>
-                          </View>
-                          {/* Table Body for OUT */}
-                          {(() => {
-                            const parseDate = (val: any) => {
-                              if (!val) return new Date();
-                              const d = new Date(val);
-                              return isNaN(d.getTime()) ? new Date() : d;
-                            };
-                            const unit = traceResult?.rawMaterial?.unit || traceResult?.rawMaterialEntries?.[0]?.unit || '';
-                            const category = traceResult?.rawMaterial?.category || traceResult?.rawMaterialEntries?.[0]?.category || '';
-                            const isInt = isIntegerQty(unit, category);
-                            const outItems = (traceResult?.productionBatches || []).filter((b: any) => b.relation === 'raw_material_consumed_in');
-                            const filtered = outItems.filter((b: any) => {
-                              if (!traceSearch) return true;
-                              return b.batchNo?.toLowerCase().includes(traceSearch.toLowerCase()) ||
-                                b.productName?.toLowerCase().includes(traceSearch.toLowerCase()) ||
-                                b.warehouseName?.toLowerCase().includes(traceSearch.toLowerCase());
-                            });
-
-                            if (filtered.length === 0) {
-                              return <Text style={{ padding: 16, textAlign: 'center', color: colors.text.secondary }}>No matching outgoing consumption found.</Text>;
-                            }
-
-                            return filtered.map((row: any, idx: number) => (
-                              <View key={idx} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < filtered.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                                <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>
-                                  {parseDate(row.startDate || row.endDate || row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                </Text>
-                                <Text style={{ width: 140, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
-                                  {row.batchNo}
-                                </Text>
-                                <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
-                                  {row.productName}
-                                </Text>
-                                <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.warning, textAlign: 'right' }}>
-                                  {isInt ? row.qtyConsumed.toFixed(0) : row.qtyConsumed.toFixed(1)} {unit}
-                                </Text>
-                                <Text style={{ width: 140, fontSize: 11, color: colors.primary, fontWeight: '600', textAlign: 'right' }} numberOfLines={1}>
-                                  🏭 {row.warehouseName || 'Factory Unit'}
-                                </Text>
-                              </View>
-                            ));
-                          })()}
-                        </>
-                      )}
-                    </View>
-                  </ScrollView>
-                </View>
-
-                {/* Finished Goods Stock */}
-                {!!traceResult?.finishedGoodsEntries?.length && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
-                    <View style={{ backgroundColor: colors.success + '15', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>📊 Finished Goods Stock ({traceResult.finishedGoodsEntries.length})</Text>
-                    </View>
-                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
-                      <View style={{ minWidth: '100%', flex: 1 }}>
-                        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                          <Text style={{ flex: 1.5, minWidth: 150, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Product Name</Text>
-                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'left' }}>In-Stock Qty</Text>
-                          <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Warehouse</Text>
-                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Mfg Date</Text>
-                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Exp Date</Text>
-                        </View>
-                        {traceResult.finishedGoodsEntries.map((e: any, idx: number) => (
-                          <View key={e._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.finishedGoodsEntries.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                            <Text style={{ flex: 1.5, minWidth: 150, fontSize: 11, fontWeight: '600', color: colors.text.primary }}>{e.productName}</Text>
-                            <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.success }}>{e.qtyBoxes * (e.packing || 1)} Pcs</Text>
-                            <Text style={{ width: 140, fontSize: 11, color: colors.primary, fontWeight: '600' }}>{e.warehouseName}</Text>
-                            <Text style={{ width: 100, fontSize: 11, color: colors.text.secondary }}>{e.mfgDate ? new Date(e.mfgDate).toLocaleDateString('en-IN') : '—'}</Text>
-                            <Text style={{ width: 100, fontSize: 11, color: colors.text.secondary }}>{e.expiryDate ? new Date(e.expiryDate).toLocaleDateString('en-IN') : '—'}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-                )}
-
-                {/* Challans */}
-                {!!traceResult?.challans?.length && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
-                    <View style={{ backgroundColor: colors.primary + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>📋 Challans / Delivery Challans ({traceResult.challans.length})</Text>
-                    </View>
-                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
-                      <View style={{ minWidth: '100%', flex: 1 }}>
-                        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                          <Text style={{ width: 120, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Doc No</Text>
-                          <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                          <Text style={{ flex: 1, minWidth: 220, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Party</Text>
-                          <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Warehouse</Text>
-                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Type</Text>
-                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Status</Text>
-                        </View>
-                        {traceResult.challans.map((c: any, idx: number) => (
-                          <View key={c._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.challans.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                            <Text style={{ width: 120, fontSize: 11, fontWeight: '700', color: colors.primary }}>{c.challanNo}</Text>
-                            <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>{new Date(c.date).toLocaleDateString('en-IN')}</Text>
-                            <Text style={{ flex: 1, minWidth: 220, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>{c.partyName}</Text>
-                            <Text style={{ width: 130, fontSize: 11, color: colors.text.secondary }} numberOfLines={1}>{c.warehouseName || '—'}</Text>
-                            <Text style={{ width: 100, fontSize: 11, color: colors.text.secondary }}>{c.type ? (c.type.charAt(0).toUpperCase() + c.type.slice(1)) : 'Sale'}</Text>
-                            <View style={{ width: 100 }}>
-                              <View style={[styles.statusBadge, {
-                                borderColor: c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted),
-                                backgroundColor: (c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted)) + '10',
-                                alignSelf: 'flex-start',
-                                paddingVertical: 2,
-                                paddingHorizontal: 6
-                              }]}>
-                                <Text style={{ color: c.status === 'dispatched' ? colors.success : (c.status === 'draft' ? colors.primary : colors.text.muted), fontSize: 9, fontWeight: '800' }}>
-                                  {c.status.toUpperCase()}
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-                )}
-
-                {/* Invoices */}
-                {!!traceResult?.invoices?.length && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
-                    <View style={{ backgroundColor: colors.success + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>🧾 Invoices / Customer Bills ({traceResult.invoices.length})</Text>
-                    </View>
-                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
-                      <View style={{ minWidth: '100%', flex: 1 }}>
-                        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                          <Text style={{ width: 120, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Doc No</Text>
-                          <Text style={{ width: 90, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                          <Text style={{ flex: 1, minWidth: 220, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Party</Text>
-                          <Text style={{ width: 130, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Warehouse</Text>
-                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Status</Text>
-                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Amount</Text>
-                        </View>
-                        {traceResult.invoices.map((inv: any, idx: number) => (
-                          <View key={inv._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.invoices.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                            <Text style={{ width: 120, fontSize: 11, fontWeight: '700', color: colors.primary }}>{inv.invoiceNo}</Text>
-                            <Text style={{ width: 90, fontSize: 11, color: colors.text.secondary }}>{new Date(inv.date).toLocaleDateString('en-IN')}</Text>
-                            <Text style={{ flex: 1, minWidth: 220, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>{inv.customerName}</Text>
-                            <Text style={{ width: 130, fontSize: 11, color: colors.text.secondary }} numberOfLines={1}>{inv.warehouseName || '—'}</Text>
-                            <View style={{ width: 100 }}>
-                              <View style={[styles.statusBadge, {
-                                borderColor: inv.status === 'Cancelled' ? colors.danger : (inv.isFinalized ? (inv.status === 'paid' ? colors.success : colors.success) : colors.warning),
-                                backgroundColor: (inv.status === 'Cancelled' ? colors.danger : (inv.isFinalized ? (inv.status === 'paid' ? colors.success : colors.success) : colors.warning)) + '10',
-                                alignSelf: 'flex-start',
-                                paddingVertical: 2,
-                                paddingHorizontal: 6
-                              }]}>
-                                <Text style={{ color: inv.status === 'Cancelled' ? colors.danger : (inv.isFinalized ? (inv.status === 'paid' ? colors.success : colors.success) : colors.warning), fontSize: 9, fontWeight: '800' }}>
-                                  {inv.status === 'Cancelled' ? 'CANCELLED' : (inv.isFinalized ? (inv.status === 'paid' ? 'PAID' : 'FINALIZED') : 'DRAFT')}
-                                </Text>
-                              </View>
-                            </View>
-                            <Text style={{ width: 100, fontSize: 11, fontWeight: '700', color: colors.text.primary, textAlign: 'right' }}>₹{inv.amount.toLocaleString('en-IN')}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-                )}
-
-                {/* Dispatches */}
-                {!!traceResult?.dispatches?.length && (
-                  <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.bg.card }}>
-                    <View style={{ backgroundColor: colors.warning + '10', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.warning }}>🚚 Dispatch Logistics ({traceResult.dispatches.length})</Text>
-                    </View>
-                    <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
-                      <View style={{ minWidth: '100%', flex: 1 }}>
-                        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                          <Text style={{ width: 95, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Date</Text>
-                          <Text style={{ width: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Dispatch No</Text>
-                          <Text style={{ flex: 1.2, minWidth: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Consignee Name</Text>
-                          <Text style={{ flex: 1, minWidth: 110, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Transporter / LR No</Text>
-                          <Text style={{ width: 100, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Tracking ID</Text>
-                        </View>
-                        {traceResult.dispatches.map((d: any, idx: number) => (
-                          <View key={d._id} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: idx < traceResult.dispatches.length - 1 ? 0.5 : 0, borderBottomColor: colors.border, alignItems: 'center' }}>
-                            <Text style={{ width: 95, fontSize: 11, color: colors.text.secondary }}>{d.dispatchDate ? new Date(d.dispatchDate).toLocaleDateString('en-IN') : '—'}</Text>
-                            <Text style={{ width: 110, fontSize: 11, fontWeight: '700', color: colors.text.primary }}>{d.dispatchNo}</Text>
-                            <Text style={{ flex: 1.2, minWidth: 140, fontSize: 11, color: colors.text.primary }}>{d.customerName}</Text>
-                            <Text style={{ flex: 1, minWidth: 110, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>
-                              {d.transporter || '—'} {d.lrNo ? `| LR: ${d.lrNo}` : ''}
-                            </Text>
-                            <Text style={{ width: 100, fontSize: 11, color: colors.primary, fontWeight: '600' }} numberOfLines={1}>{d.trackingId || '—'}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-                )}
-
-                {!traceResult?.rawMaterialEntries?.length && !traceResult?.productionBatches?.length &&
-                  !traceResult?.finishedGoodsEntries?.length && !traceResult?.challans?.length &&
-                  !traceResult?.invoices?.length && !traceResult?.dispatches?.length && (
-                    <View style={{ alignItems: 'center', padding: 24 }}>
-                      <Ionicons name="search-outline" size={40} color={colors.text.muted} />
-                      <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 8 }}>
-                        No trace records found for "{decodeURIComponent(traceResult?.materialName || traceResult?.batchNo || traceBatchNo || '')}"
-                      </Text>
-                    </View>
-                  )}
-              </ScrollView>
-            )}
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setTraceModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* ── Genealogy / Trace / Stage Modals ────────────────── */}
+      <StockTraceModal
+        visible={traceModalVisible}
+        traceLoading={traceLoading}
+        traceResult={traceResult}
+        traceBatchNo={traceBatchNo}
+        traceSearch={traceSearch}
+        setTraceSearch={setTraceSearch}
+        traceSubTab={traceSubTab}
+        setTraceSubTab={setTraceSubTab}
+        isDesktop={isDesktop}
+        onClose={() => setTraceModalVisible(false)}
+        isIntegerQty={isIntegerQty}
+      />
 
       {/* ======================================================== */}
       {/* MODAL 9: STAGE ADVANCE / SKIP CONFIRMATION */}
@@ -2673,43 +1707,153 @@ export default function ManufacturingScreen() {
                 numberOfLines={3}
               />
 
+              {stageAction === 'advance' && stageBatchId && (() => {
+                const batch = batches.find(b => b._id === stageBatchId);
+                if (!batch) return null;
+                const stage = batch.stages[stageIndex || 0];
+                if (!stage) return null;
+                const isPacking = stage.name.trim().toLowerCase() === 'packing';
+                if (!isPacking) return null;
+                return (
+                  <View style={{ marginTop: 12, marginBottom: 12 }}>
+                    <Text style={[styles.inputLabel, { color: colors.primary }]}>Output Yield (Bottles) *</Text>
+                    <TextInput
+                      style={[styles.input, { height: 44, fontWeight: '700' }]}
+                      keyboardType="numeric"
+                      value={stageOutputYield}
+                      onChangeText={handleOutputYieldChange}
+                      placeholder="Enter actual bottles yielded..."
+                      placeholderTextColor={colors.text.muted}
+                    />
+                    <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 12 }}>
+                      Theoretical quantities of packaging materials will automatically recalculate based on this yield.
+                    </Text>
+                  </View>
+                );
+              })()}
+
               {stageAction === 'advance' && stageIngredients.length > 0 && (
                 <View style={{ marginTop: 16 }}>
-                  <Text style={[styles.inputLabel, { fontSize: 15, marginBottom: 8 }]}>
-                    Stage Ingredients — Wastage Entry
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Ionicons name="flask-outline" size={16} color={colors.primary} />
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>
+                      Raw Materials Added at This Stage
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 12 }}>
+                    Theoretical qty is auto-calculated from your formula. Enter the actual qty used — wastage is computed automatically.
                   </Text>
-                  {stageIngredients.map((si, siIdx) => (
-                    <View
-                      key={si.rawMaterialId + siIdx}
-                      style={{
-                        backgroundColor: colors.surfaceVariant,
-                        borderRadius: 10,
-                        padding: 12,
-                        marginBottom: 10,
-                        borderLeftWidth: 3,
-                        borderLeftColor: colors.accent,
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontWeight: '600', fontSize: 14, color: colors.text.primary }}>{si.name}</Text>
-                          <Text style={{ fontSize: 12, color: colors.text.muted, marginTop: 2 }}>Required Qty: {si.qtyNeeded.toFixed(2)} {si.unit}</Text>
+                  {stageIngredients.map((si, siIdx) => {
+                    const actual = parseFloat(si.actualQty) || 0;
+                    const theoretical = si.qtyTheoretical || 0;
+                    const wastageNum = parseFloat(si.wastage) || 0;
+                    const wastePct = theoretical > 0 ? ((wastageNum / theoretical) * 100).toFixed(1) : '0';
+                    const isOverUsed = actual > theoretical * 1.01;
+                    const isLoss = wastageNum > 0;
+                    return (
+                      <View
+                        key={si.rawMaterialId + siIdx}
+                        style={{
+                          backgroundColor: colors.bg.card,
+                          borderRadius: 10,
+                          padding: 12,
+                          marginBottom: 12,
+                          borderWidth: 1,
+                          borderColor: isLoss ? colors.warning + '60' : colors.border,
+                          borderLeftWidth: 4,
+                          borderLeftColor: isLoss ? colors.warning : colors.success,
+                        }}
+                      >
+                        {/* Header */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontWeight: '800', fontSize: 14, color: colors.text.primary }}>{si.name}</Text>
+                            <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>
+                              Formula standard: <Text style={{ fontWeight: '700', color: colors.primary }}>{theoretical.toFixed(3)} {si.unit}</Text>
+                            </Text>
+                          </View>
+                          {isLoss ? (
+                            <View style={{ backgroundColor: colors.warning + '20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.warning }}>{wastePct}% process loss</Text>
+                            </View>
+                          ) : (
+                            <View style={{ backgroundColor: colors.success + '20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.success }}>No loss</Text>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Two input fields side by side */}
+                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>
+                              📦 Taken from Stock ({si.unit})
+                            </Text>
+                            <TextInput
+                              style={[styles.input, { height: 44, marginBottom: 0, borderColor: isOverUsed ? colors.danger : colors.border, fontWeight: '700' }]}
+                              keyboardType="decimal-pad"
+                              value={si.actualQty}
+                              onChangeText={v => handleStageIngredientChange(siIdx, 'actualQty', v)}
+                              placeholderTextColor={colors.text.muted}
+                              placeholder={theoretical.toFixed(3)}
+                            />
+                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Deducted from inventory</Text>
+                            {isOverUsed && (
+                              <Text style={{ fontSize: 10, color: colors.danger, marginTop: 2 }}>⚠ More than formula qty</Text>
+                            )}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11, color: colors.warning, marginBottom: 4, fontWeight: '700' }}>
+                              🔥 Process Loss ({si.unit})
+                            </Text>
+                            <TextInput
+                              style={[styles.input, { height: 44, marginBottom: 0, borderColor: isLoss ? colors.warning + '80' : colors.border }]}
+                              keyboardType="decimal-pad"
+                              value={si.wastage}
+                              onChangeText={v => handleStageIngredientChange(siIdx, 'wastage', v)}
+                              placeholderTextColor={colors.text.muted}
+                              placeholder="0"
+                            />
+                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Evaporation / spill / cleaning</Text>
+                          </View>
+                        </View>
+
+                        {/* Output preview bar */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: colors.border, flexWrap: 'wrap' }}>
+                          <Text style={{ fontSize: 11, color: colors.text.muted }}>Deducted:</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>{parseFloat(si.actualQty) || 0} {si.unit}</Text>
+                          <Text style={{ fontSize: 11, color: colors.text.muted }}>  −  Lost:</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.warning }}>{parseFloat(si.wastage) || 0} {si.unit}</Text>
+                          <Text style={{ fontSize: 11, color: colors.text.muted }}>  =  Into product:</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>
+                            {Math.max(0, (parseFloat(si.actualQty) || 0) - (parseFloat(si.wastage) || 0)).toFixed(3)} {si.unit}
+                          </Text>
                         </View>
                       </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 3 }}>Wastage (loss)</Text>
-                          <TextInput
-                            style={[styles.input, { height: 40, paddingVertical: 4 }]}
-                            keyboardType="decimal-pad"
-                            value={si.wastage}
-                            onChangeText={v => handleStageIngredientChange(siIdx, 'wastage', v)}
-                            placeholderTextColor={colors.text.muted}
-                          />
-                        </View>
-                      </View>
+                    );
+                  })}
+                  {stageIngredients.some(si => parseFloat(si.wastage) > 0) && (
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={[styles.inputLabel, { color: colors.warning }]}>Loss / Wastage Reason *</Text>
+                      <TextInput
+                        style={[styles.input, { height: 70, paddingVertical: 8 }]}
+                        placeholder="e.g. Boiling evaporation, cleaning loss during Kwath preparation..."
+                        placeholderTextColor={colors.text.muted}
+                        value={stageLossReason}
+                        onChangeText={setStageLossReason}
+                        multiline
+                        numberOfLines={2}
+                      />
                     </View>
-                  ))}
+                  )}
+                </View>
+              )}
+              {stageAction === 'advance' && stageIngredients.length === 0 && (
+                <View style={{ marginTop: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
+                  <Text style={{ fontSize: 12, color: colors.text.secondary, flex: 1 }}>
+                    No specific ingredients assigned to this stage. Proceed to complete it.
+                  </Text>
                 </View>
               )}
             </ScrollView>

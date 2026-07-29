@@ -24,6 +24,8 @@ const billOfMaterialsSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   productionNotes: { type: String, default: "" },
   overheadCost: { type: Number, default: 0 },
+  formulationBasis: { type: Number, default: 100, min: 1 }, // qty standard: e.g. 10 (10L), 100 (100ml), 10 (10 pcs)
+  formulationBasisUnit: { type: String, default: 'ml', trim: true }, // unit of the basis: 'ml', 'L', 'g', 'kg', 'pcs', 'caps'
   defaultProductionType: { type: String, enum: ['in_house', 'job_work'], default: 'in_house' },
   defaultJobWorkMode: { type: String, enum: ['raw_materials_supplied', 'direct_purchase', 'none'], default: 'none' },
   defaultPackagingMode: { type: String, enum: ['packed_by_vendor', 'self_packed'], default: 'self_packed' },
@@ -31,7 +33,7 @@ const billOfMaterialsSchema = new mongoose.Schema({
   stages: [
     {
       name: { type: String, required: true },
-      targetDurationDays: { type: Number, required: true, default: 1 }
+      targetDurationHours: { type: Number, required: true, default: 8 }  // duration in hours
     }
   ],
 }, { timestamps: true });

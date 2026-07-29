@@ -21,7 +21,8 @@ const stageSchema = new mongoose.Schema({
   completedAt: { type: Date, default: null },
   completedBy: { type: String, default: '' },
   notes: { type: String, default: '' },
-  targetDurationDays: { type: Number, default: 1 },
+  targetDurationDays: { type: Number, default: 1 },   // legacy: kept for backward compat
+  targetDurationHours: { type: Number, default: 8 },   // preferred: duration in hours
   targetCompletionDate: { type: Date, default: null },
   // Stage-wise material quantity tracking (for process loss)
   inputQty: { type: Number, default: 0 },       // material qty entering this stage (kg/L)
@@ -47,6 +48,7 @@ const batchProductionSchema = new mongoose.Schema({
   bomSnapshot: {
     recipeName: { type: String, default: '' },
     recipeVersion: { type: String, default: '' },
+    formulationBasis: { type: Number, default: 100 },
     ingredients: [{
       rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' },
       itemType: { type: String, default: 'formulation' },
@@ -54,7 +56,7 @@ const batchProductionSchema = new mongoose.Schema({
       stageName: { type: String, default: '', trim: true }
     }],
     overheadCost: { type: Number, default: 0 },
-    stages: [{ name: String, targetDurationDays: Number }]
+    stages: [{ name: String, targetDurationDays: Number, targetDurationHours: Number }]
   },
   manufacturingUnitId: {
     type: mongoose.Schema.Types.ObjectId,

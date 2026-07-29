@@ -50,7 +50,7 @@ router.get('/:productId', async (req, res) => {
 // POST /api/bom — Configure a BOM formulation
 router.post('/', validate(schemas.bomSchema), async (req, res) => {
   try {
-    const { productId, recipeName, isDefault, batchYieldSize, ingredients, isActive, productionNotes, overheadCost, stages, defaultProductionType, defaultJobWorkMode, defaultPackagingMode, defaultJobWorkerId } = req.body;
+    const { productId, recipeName, isDefault, batchYieldSize, ingredients, isActive, productionNotes, overheadCost, stages, defaultProductionType, defaultJobWorkMode, defaultPackagingMode, defaultJobWorkerId, formulationBasis, formulationBasisUnit } = req.body;
     if (!productId || !batchYieldSize || !ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
       return res.status(400).json({ error: 'Missing required formulation fields' });
     }
@@ -81,7 +81,7 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
         if (isNaN(duration) || duration <= 0) throw new Error('Stage target duration must be a positive number');
         return {
           name: st.name.trim(),
-          targetDurationDays: duration
+          targetDurationHours: duration
         };
       });
     }
@@ -101,6 +101,8 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
       if (productionNotes !== undefined) bom.productionNotes = productionNotes;
       if (overheadCost !== undefined) bom.overheadCost = Number(overheadCost);
       if (validatedStages !== undefined) bom.stages = validatedStages;
+      if (formulationBasis !== undefined) bom.formulationBasis = Number(formulationBasis) || 100;
+      if (formulationBasisUnit !== undefined) bom.formulationBasisUnit = formulationBasisUnit || 'ml';
       if (defaultProductionType !== undefined) bom.defaultProductionType = defaultProductionType;
       if (defaultJobWorkMode !== undefined) bom.defaultJobWorkMode = defaultJobWorkMode;
       if (defaultPackagingMode !== undefined) bom.defaultPackagingMode = defaultPackagingMode;
@@ -116,6 +118,8 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
         isActive: isActive !== undefined ? isActive : true,
         productionNotes: productionNotes || '',
         overheadCost: overheadCost !== undefined ? Number(overheadCost) : 0,
+        formulationBasis: Number(formulationBasis) || 100,
+        formulationBasisUnit: formulationBasisUnit || 'ml',
         stages: validatedStages || [],
         defaultProductionType: defaultProductionType || 'in_house',
         defaultJobWorkMode: defaultJobWorkMode || 'none',

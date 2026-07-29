@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
 // POST /api/raw-materials — Create raw material definition
 router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
   try {
-    const { name, unit, minReorder, category, defaultStageName } = req.body;
+    const { name, unit, minReorder, category } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'Name is required' });
     }
@@ -64,8 +64,7 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
       sku: computedSku,
       unit: unit || 'kg',
       minReorder: Number(minReorder) || 0,
-      category: category || 'Herb',
-      defaultStageName: defaultStageName || ''
+      category: category || 'Herb'
     });
 
     res.status(201).json(newRM);
@@ -77,7 +76,7 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
 // PUT /api/raw-materials/:id — Update raw material definition
 router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, res) => {
   try {
-    const { name, unit, minReorder, category, defaultStageName } = req.body;
+    const { name, unit, minReorder, category } = req.body;
     const updateFields = {};
     if (name !== undefined) {
       updateFields.name = name.trim();
@@ -95,7 +94,6 @@ router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, re
     if (unit !== undefined) updateFields.unit = unit;
     if (minReorder !== undefined) updateFields.minReorder = Number(minReorder) || 0;
     if (category !== undefined) updateFields.category = category;
-    if (defaultStageName !== undefined) updateFields.defaultStageName = defaultStageName;
 
     const updated = await RawMaterial.findByIdAndUpdate(
       req.params.id,
@@ -204,6 +202,43 @@ router.post('/entries', validate(schemas.rawMaterialEntrySchema), async (req, re
       req.io.emit('raw_material_updated', { type: 'entry_created', id: entry._id });
     }
     res.status(201).json(entry);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/raw-materials/entries/:id/clean — Record cleaning/pre‑processing loss for a stock entry
+router.post('/entries/:id/clean', validate(schemas.cleaningAdjustmentSchema), async (req, res) => {
+  try {
+    const entryId = req.params.id;
+    const { cleanedQty, notes } = req.body;
+    const entry = await RawMaterialEntry.findById(entryId);
+    if (!entry) return res.status(404).json({ error: 'Stock entry not found' });
+
+    const originalQty = entry.qty;
+    const cleaned = Number(cleanedQty);
+    if (isNaN(cleaned) || cleaned < 0) {
+      return res.status(400).json({ error: 'cleanedQty must be a non‑negative number' });
+    }
+    if (cleaned > originalQty) {
+      return res.status(400).json({ error: 'cleanedQty cannot exceed current quantity' });
+    }
+
+    const loss = originalQty - cleaned;
+    const lossPercent = originalQty > 0 ? (loss / originalQty) * 100 : 0;
+
+    entry.cleanedQty = cleaned;
+    entry.cleaningLoss = loss;
+    entry.cleaningLossPercent = Number(lossPercent.toFixed(2));
+    entry.cleaningDate = new Date();
+    entry.cleaningNotes = notes || '';
+    entry.qty = cleaned; // update usable qty
+
+    await entry.save();
+    if (req.io) {
+      req.io.emit('raw_material_updated', { type: 'entry_cleaned', id: entry._id });
+    }
+    res.json(entry);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -341,6 +376,83 @@ router.post('/purchase', async (req, res) => {
     res.status(201).json({ purchaseRef, entries: created });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/raw-materials/:id/adjust-stock — Adjust raw material stock level with audit reason
+router.post('/:id/adjust-stock', async (req, res) => {
+  try {
+    const { newStockLevel, reason } = req.body;
+    if (newStockLevel === undefined || newStockLevel === null) {
+      return res.status(400).json({ error: 'New stock level is required' });
+    }
+    const targetStock = Number(newStockLevel);
+    if (isNaN(targetStock) || targetStock < 0) {
+      return res.status(400).json({ error: 'New stock level must be a non-negative number' });
+    }
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'Reason for adjustment is required' });
+    }
+
+    const rm = await RawMaterial.findById(req.params.id);
+    if (!rm) return res.status(404).json({ error: 'Raw material not found' });
+
+    // Calculate current stock level
+    const entries = await RawMaterialEntry.find({ rawMaterialId: req.params.id });
+    const currentStock = entries.reduce((s, e) => s + (e.qty || 0), 0);
+    const diff = Number((targetStock - currentStock).toFixed(3));
+
+    if (diff === 0) {
+      return res.json({ message: 'No adjustment needed', stockLevel: currentStock });
+    }
+
+    if (diff < 0) {
+      // Reduce stock (FIFO)
+      entries.sort((a, b) => {
+        if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
+        if (a.expiryDate && !b.expiryDate) return -1;
+        if (!a.expiryDate && b.expiryDate) return 1;
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      });
+
+      let toReduce = Math.abs(diff);
+      for (const entry of entries) {
+        if (toReduce <= 0.0001) break;
+        if ((entry.qty || 0) <= 0) continue;
+        const reduce = Math.min(toReduce, entry.qty);
+        entry.qty = Number((entry.qty - reduce).toFixed(3));
+        entry.cleaningNotes = `${entry.cleaningNotes ? entry.cleaningNotes + '\n' : ''}Stock Adjustment: -${reduce} units on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`;
+        await entry.save();
+        toReduce -= reduce;
+      }
+    } else {
+      // Increase stock
+      const latestEntry = entries.length > 0 ? entries[entries.length - 1] : null;
+      if (latestEntry) {
+        latestEntry.qty = Number((latestEntry.qty + diff).toFixed(3));
+        latestEntry.initialQty = Number((latestEntry.initialQty + diff).toFixed(3));
+        latestEntry.cleaningNotes = `${latestEntry.cleaningNotes ? latestEntry.cleaningNotes + '\n' : ''}Stock Adjustment: +${diff} units on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`;
+        await latestEntry.save();
+      } else {
+        await RawMaterialEntry.create({
+          rawMaterialId: rm._id,
+          batchNo: `ADJ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
+          initialQty: diff,
+          qty: diff,
+          purchaseRate: 0,
+          vendorName: 'Stock Adjustment',
+          cleaningNotes: `Initial adjustment on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`
+        });
+      }
+    }
+
+    if (req.io) {
+      req.io.emit('raw_material_updated', { type: 'stock_adjusted', id: rm._id });
+    }
+
+    res.json({ message: 'Stock adjusted successfully', diff, currentStock, newStock: targetStock });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

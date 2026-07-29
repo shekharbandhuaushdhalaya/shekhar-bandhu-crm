@@ -360,8 +360,17 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
                   const unitDisplay = item.unit || matchedRawMat?.unit || 'units';
 
                   return (
-                    <View key={idx} style={styles.detailTableRow}>
-                      <Text style={[styles.detailTableCell, { flex: 3.5, fontWeight: '600' }]} numberOfLines={2}>{item.name}</Text>
+                    <View key={idx} style={[styles.detailTableRow, { flexDirection: 'row', alignItems: 'center' }]}>
+                      <View style={{ flex: 3.5 }}>
+                        <Text style={[styles.detailTableCell, { fontWeight: '600', paddingRight: 4 }]} numberOfLines={2}>{item.name}</Text>
+                        {(item.batchNo || item.expiryDate) ? (
+                          <Text style={{ fontSize: 9, color: colors.text.secondary, marginTop: 2 }}>
+                            {item.batchNo ? `Batch: ${item.batchNo}` : ''}
+                            {item.batchNo && item.expiryDate ? ' | ' : ''}
+                            {item.expiryDate ? `Exp: ${new Date(item.expiryDate).toLocaleDateString('en-IN')}` : ''}
+                          </Text>
+                        ) : null}
+                      </View>
                       <Text style={[styles.detailTableCell, { flex: 1.2, textAlign: 'center' }]}>{qty} {unitDisplay}</Text>
                       <Text style={[styles.detailTableCell, { flex: 1.0, textAlign: 'right' }]}>₹{rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                       <Text style={[styles.detailTableCell, { flex: 0.8, textAlign: 'center' }]}>{item.gstRate || 0}%</Text>
@@ -564,7 +573,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           boxes: it.boxes !== undefined ? it.boxes.toString() : (it.qty || 0).toString(),
           packing: (it.packing || 1).toString(),
           rate: (it.rate || 0).toString(),
-          gstRate: it.gstRate || 0
+          gstRate: it.gstRate || 0,
+          batchNo: it.batchNo || '',
+          mfgDate: it.mfgDate ? new Date(it.mfgDate).toISOString().split('T')[0] : '',
+          expiryDate: it.expiryDate ? new Date(it.expiryDate).toISOString().split('T')[0] : ''
         })));
         setPaymentTermsDays('');
         setShowTermsDropdown(false);
@@ -598,7 +610,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           boxes: '',
           packing: '1',
           rate: '',
-          gstRate: 18
+          gstRate: 18,
+          batchNo: '',
+          mfgDate: '',
+          expiryDate: ''
         }]);
         setOverridePaymentTerms(false);
       }
@@ -636,11 +651,15 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                 showProductDropdown: false,
                 showGstDropdown: false,
                 selectedProduct: matchedProd,
+                rawMaterialId: it.rawMaterialId,
                 unit: it.unit || matchedRawMat?.unit || '',
                 boxes: it.boxes !== undefined ? it.boxes.toString() : (it.qty || 0).toString(),
                 packing: (it.packing || 1).toString(),
                 rate: (it.rate || 0).toString(),
-                gstRate: it.gstRate || 0
+                gstRate: it.gstRate || 0,
+                batchNo: it.batchNo || '',
+                mfgDate: it.mfgDate ? new Date(it.mfgDate).toISOString().split('T')[0] : '',
+                expiryDate: it.expiryDate ? new Date(it.expiryDate).toISOString().split('T')[0] : ''
               };
             }));
           }
@@ -728,7 +747,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         boxes: '',
         packing: '1',
         rate: '',
-        gstRate: 18
+        gstRate: 18,
+        batchNo: '',
+        mfgDate: '',
+        expiryDate: ''
       }
     ]);
   };
@@ -745,7 +767,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           boxes: '',
           packing: '1',
           rate: '',
-          gstRate: 18
+          gstRate: 18,
+          batchNo: '',
+          mfgDate: '',
+          expiryDate: ''
         }
       ]);
     } else {
@@ -914,7 +939,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         packing: 1,
         rate: parseFloat(r.rate) || 0,
         gstRate: mode === 'regular' ? r.gstRate : 0,
-        hsnCode: r.selectedProduct ? (r.selectedProduct.hsnCode || '') : ''
+        hsnCode: r.selectedProduct ? (r.selectedProduct.hsnCode || '') : '',
+        batchNo: r.batchNo ? r.batchNo.trim().toUpperCase() : '',
+        mfgDate: r.mfgDate || undefined,
+        expiryDate: r.expiryDate || undefined
       };
     });
 
@@ -1347,7 +1375,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
               }}
               contentContainerStyle={{ minHeight: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? Math.max(350, rows.length * 55 + 180) : 220, flexGrow: 1 }}
             >
-              <View style={{ width: '100%', minWidth: 680, minHeight: 220 }}>
+              <View style={{ width: '100%', minWidth: 1050, minHeight: 220 }}>
                 {/* Header Row */}
                 <View style={{
                   flexDirection: 'row',
@@ -1361,13 +1389,15 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   borderRadius: Radius.md,
                   marginBottom: 8
                 }}>
-                  <Text style={{ flex: mode === 'regular' ? 3.2 : 3.6, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Raw Material Name *</Text>
-                  <Text style={{ flex: mode === 'regular' ? 1.4 : 1.6, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Qty / Unit *</Text>
-                  <Text style={{ flex: mode === 'regular' ? 1.0 : 1.2, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Rate (₹)</Text>
+                  <Text style={{ flex: 3.0, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Raw Material Name *</Text>
+                  <Text style={{ flex: 1.3, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Qty / Unit *</Text>
+                  <Text style={{ flex: 1.0, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Rate (₹)</Text>
+                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Batch No</Text>
+                  <Text style={{ flex: 1.8, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Expiry Date</Text>
                   {mode === 'regular' && (
                     <Text style={{ flex: 0.8, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>GST Rate</Text>
                   )}
-                  <Text style={{ flex: mode === 'regular' ? 1.2 : 1.4, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Line Total (₹)</Text>
+                  <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Line Total (₹)</Text>
                   <View style={{ width: 36 }} />
                 </View>
 
@@ -1482,7 +1512,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
                       {/* Rate */}
                       <TextInput
-                        style={[styles.tableInput, { flex: mode === 'regular' ? 1.0 : 1.2, textAlign: 'right', fontWeight: '600' }]}
+                        style={[styles.tableInput, { flex: 1.0, textAlign: 'right', fontWeight: '600' }]}
                         placeholder="0.00"
                         placeholderTextColor={colors.text.muted}
                         keyboardType="numeric"
@@ -1491,6 +1521,50 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                           setRows(prev => prev.map(r => r.id === row.id ? { ...r, rate: text } : r));
                         }}
                       />
+
+                      {/* Batch No */}
+                      <TextInput
+                        style={[styles.tableInput, { flex: 1.5, fontWeight: '600' }]}
+                        placeholder="e.g. B-MUST-09"
+                        placeholderTextColor={colors.text.muted}
+                        value={row.batchNo}
+                        onChangeText={(text) => {
+                          setRows(prev => prev.map(r => r.id === row.id ? { ...r, batchNo: text } : r));
+                        }}
+                      />
+
+                      {/* Expiry Date */}
+                      <View style={{ flex: 1.8, justifyContent: 'center' }}>
+                        {Platform.OS === 'web' ? (
+                          React.createElement('input', {
+                            type: 'date',
+                            value: row.expiryDate,
+                            onChange: (e: any) => {
+                              setRows(prev => prev.map(r => r.id === row.id ? { ...r, expiryDate: e.target.value } : r));
+                            },
+                            style: {
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: `1px solid ${colors.border}`,
+                              backgroundColor: colors.bg.primary,
+                              color: colors.text.primary,
+                              fontSize: 12,
+                              height: 38,
+                              width: '100%'
+                            }
+                          })
+                        ) : (
+                          <TextInput
+                            style={[styles.tableInput, { width: '100%', fontSize: 12 }]}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor={colors.text.muted}
+                            value={row.expiryDate}
+                            onChangeText={(text) => {
+                              setRows(prev => prev.map(r => r.id === row.id ? { ...r, expiryDate: text } : r));
+                            }}
+                          />
+                        )}
+                      </View>
 
                       {/* GST (Only in Regular mode) */}
                       {mode === 'regular' && (

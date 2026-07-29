@@ -226,55 +226,6 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                   </View>
                 </View>
               </View>
-              {/* Section VI: Costed BOM Versioning (Snapshot at Launch) */}
-              {bmrReport.bomSnapshot && (
-                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section VI: Costed BOM Versioning</Text>
-                  </View>
-                  <View style={{ padding: 12, gap: 8 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Recipe Name:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{bmrReport.bomSnapshot.recipeName || 'N/A'}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: colors.text.secondary }}>Recipe Version:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>{bmrReport.bomSnapshot.recipeVersion || 'N/A'}</Text>
-                    </View>
-                    {bmrReport.bomSnapshot.ingredients && bmrReport.bomSnapshot.ingredients.length > 0 && (
-                      <View style={{ marginTop: 4 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 4 }}>Snapshotted Formulation (at launch):</Text>
-                        <View style={{ padding: 6, backgroundColor: colors.bg.primary, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
-                          <View style={{ flexDirection: 'row', paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 4 }}>
-                            {['Ingredient', 'Qty Required', 'Type'].map(h => (
-                              <Text key={h} style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>{h}</Text>
-                            ))}
-                          </View>
-                          {bmrReport.bomSnapshot.ingredients.map((ing: any, idx: number) => (
-                            <View key={idx} style={{ flexDirection: 'row', paddingVertical: 2 }}>
-                              <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary }}>{ing.rawMaterialId?.name || ing.rawMaterialId || 'Unknown'}</Text>
-                              <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary }}>{ing.qtyRequired}</Text>
-                              <Text style={{ flex: 1, fontSize: 11, color: colors.text.secondary }}>{ing.itemType}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-                    {bmrReport.bomSnapshot.stages && bmrReport.bomSnapshot.stages.length > 0 && (
-                      <View style={{ marginTop: 4 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 4 }}>Planned Stages (at launch):</Text>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                          {bmrReport.bomSnapshot.stages.map((st: any, idx: number) => (
-                            <View key={idx} style={{ backgroundColor: colors.bg.primary, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: colors.border }}>
-                              <Text style={{ fontSize: 10, color: colors.text.primary }}>{st.name}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              )}
             </ScrollView>
           ) : (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

@@ -542,6 +542,8 @@ const rawMaterialEntrySchema = z.object({
 const bomIngredient = z.object({
   rawMaterialId: objectId,
   qtyRequired: z.number().positive(),
+  itemType: z.enum(['formulation', 'packaging']).default('formulation').optional(),
+  stageName: z.string().optional().default(''),
 });
 
 const bomStage = z.object({
@@ -563,6 +565,8 @@ const bomSchema = z.object({
   defaultJobWorkMode: z.enum(['raw_materials_supplied', 'direct_purchase', 'none']).default('none'),
   defaultPackagingMode: z.enum(['packed_by_vendor', 'self_packed']).default('self_packed'),
   defaultJobWorkerId: objectId.nullable().optional(),
+  formulationBasis: z.number().positive().optional().default(100),
+  formulationBasisUnit: z.string().optional().default('ml'),
 });
 
 // ── Contact ──────────────────────────────────────────────────
@@ -739,6 +743,7 @@ const batchStageUpdateSchema = z.object({
   completedBy: z.string().optional(),
   inputQty: z.number().min(0).optional(),
   outputQty: z.number().min(0).optional(),
+  actualYieldQty: z.number().min(0).optional(),
   lossReason: z.string().optional(),
   stageIngredients: z.array(z.object({
     rawMaterialId: z.string(),

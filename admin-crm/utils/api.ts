@@ -891,6 +891,14 @@ class ApiClient {
     return res.ok;
   }
 
+  async adjustRawMaterialStock(id: string, newStockLevel: number, reason: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/raw-materials/${id}/adjust-stock`, {
+      method: 'POST',
+      body: JSON.stringify({ newStockLevel, reason })
+    });
+    return res.json();
+  }
+
   // --- Bill of Materials (BOM) ---
   async getBOMs(): Promise<BillOfMaterials[]> {
     const res = await this.request(`${API_BASE}/bom`);

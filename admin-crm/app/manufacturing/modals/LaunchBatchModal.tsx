@@ -18,7 +18,7 @@ interface Props {
   prodBomId: string; setProdBomId: (v: string) => void;
   prodPlannedQty: string; setProdPlannedQty: (v: string) => void;
   prodBatchNo: string; setProdBatchNo: (v: string) => void;
-  prodExpiryDate: string; setProdExpiryDate: (v: string) => void;
+  prodExpiryMonths: string; setProdExpiryMonths: (v: string) => void;
   prodProductionType: 'in_house' | 'job_work'; setProdProductionType: (v: 'in_house' | 'job_work') => void;
   prodJobWorkMode: 'raw_materials_supplied' | 'direct_purchase' | 'none'; setProdJobWorkMode: (v: 'raw_materials_supplied' | 'direct_purchase' | 'none') => void;
   prodPackagingMode: 'packed_by_vendor' | 'self_packed'; setProdPackagingMode: (v: 'packed_by_vendor' | 'self_packed') => void;
@@ -30,7 +30,7 @@ interface Props {
   computedTotalQty: number;
   prodPlannedYields: PlannedYield[];
   setProdPlannedYields: (v: PlannedYield[]) => void;
-  previewIngredients: { name: string; qtyNeeded: number; unit: string; available: number; ratioPct: number; itemType: 'formulation' | 'packaging' }[];
+  previewIngredients: { name: string; qtyNeeded: number; unit: string; available: number; ratioLabel: string; itemType: 'formulation' | 'packaging' }[];
   onClose: () => void;
   onLaunch: () => void;
 }
@@ -39,7 +39,7 @@ export default function LaunchBatchModal({
   visible, products, vendors, manufacturingUnits, boms, materials,
   prodProductId, setProdProductId, prodBomId, setProdBomId,
   prodPlannedQty, setProdPlannedQty,
-  prodBatchNo, setProdBatchNo, prodExpiryDate, setProdExpiryDate, prodProductionType, setProdProductionType,
+  prodBatchNo, setProdBatchNo, prodExpiryMonths, setProdExpiryMonths, prodProductionType, setProdProductionType,
   prodJobWorkMode, setProdJobWorkMode, prodPackagingMode, setProdPackagingMode,
   prodJobWorkerId, setProdJobWorkerId, prodJobWorkerName, setProdJobWorkerName,
   prodJobWorkerChallanRef, setProdJobWorkerChallanRef,
@@ -49,6 +49,15 @@ export default function LaunchBatchModal({
 }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+
+  // Auto-calculate expiry date from shelf-life months
+  const computedExpiryDate = (() => {
+    const months = parseInt(prodExpiryMonths, 10);
+    if (!months || months <= 0) return null;
+    const d = new Date();
+    d.setMonth(d.getMonth() + months);
+    return d;
+  })();
 
   const isDirectPurchaseJobWork = prodProductionType === 'job_work' && prodJobWorkMode === 'direct_purchase';
 
@@ -356,14 +365,29 @@ export default function LaunchBatchModal({
             <Text style={styles.inputLabel}>Finished Goods Production Batch No. *</Text>
             <TextInput style={styles.input} placeholder="e.g. ABH-JUL26-01" placeholderTextColor={colors.text.muted} value={prodBatchNo} onChangeText={setProdBatchNo} />
 
-            <Text style={styles.inputLabel}>Finished Goods Expiry Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD (set at launch, MFG date auto-filled on completion)"
-              placeholderTextColor={colors.text.muted}
-              value={prodExpiryDate}
-              onChangeText={setProdExpiryDate}
-            />
+            <Text style={styles.inputLabel}>Shelf Life / Expiry *</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <TextInput
+                style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                placeholder="e.g. 36"
+                placeholderTextColor={colors.text.muted}
+                value={prodExpiryMonths}
+                onChangeText={setProdExpiryMonths}
+                keyboardType="numeric"
+              />
+              <Text style={{ fontSize: 12, color: colors.text.secondary, minWidth: 50 }}>months</Text>
+            </View>
+            {computedExpiryDate ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, paddingHorizontal: 2 }}>
+                <Ionicons name="calendar-outline" size={13} color={colors.success} />
+                <Text style={{ fontSize: 12, color: colors.success, fontWeight: '700' }}>
+                  Expires: {computedExpiryDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  <Text style={{ fontWeight: '400', color: colors.text.secondary }}>  (MFG date auto-set at batch completion)</Text>
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>Enter shelf life in months to auto-calculate expiry date</Text>
+            )}
 
             {!isDirectPurchaseJobWork && (
               <Text style={styles.warningDisclaimer}>
@@ -394,9 +418,7 @@ export default function LaunchBatchModal({
                         <Text style={{ fontSize: 12, color: colors.text.primary }}>
                           {item.itemType === 'packaging' ? '📦' : '🌿'} {item.name}{' '}
                           <Text style={{ fontSize: 10.5, color: colors.text.muted }}>
-                            {item.itemType === 'packaging'
-                              ? `(${item.ratioPct} ${item.unit}/unit)`
-                              : `(${item.ratioPct}% of batch)`}
+                            ({item.ratioLabel})
                           </Text>
                         </Text>
                         <Text style={{ fontSize: 10.5, color: isShortage ? colors.danger : colors.text.secondary, marginTop: 2 }}>

@@ -71,6 +71,7 @@ router.get('/:batchNo', async (req, res) => {
       warehouseName: e.warehouseName,
       expiryDate: e.expiryDate,
       createdAt: e.createdAt,
+      cleaningNotes: e.cleaningNotes || '',
     }));
 
     // 2. Search BatchProduction (as a raw material batch consumed in production)
@@ -161,6 +162,7 @@ router.get('/:batchNo', async (req, res) => {
                 warehouseName: rmEntry.warehouseName || 'Factory Warehouse',
                 expiryDate: rmEntry.expiryDate,
                 createdAt: rmEntry.createdAt,
+                cleaningNotes: rmEntry.cleaningNotes || '',
               });
             }
           }

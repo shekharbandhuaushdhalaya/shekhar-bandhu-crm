@@ -12,8 +12,10 @@ interface Props {
   rmUnit: string; setRmUnit: (v: string) => void;
   rmCategory: string; setRmCategory: (v: string) => void;
   rmMinReorder: string; setRmMinReorder: (v: string) => void;
-  rmDefaultStage: string; setRmDefaultStage: (v: string) => void;
   rmError: string;
+  rmStockLevel?: string; setRmStockLevel?: (v: string) => void;
+  rmOriginalStockLevel?: number;
+  rmAdjustmentReason?: string; setRmAdjustmentReason?: (v: string) => void;
   onClose: () => void;
   onSave: () => void;
 }
@@ -21,7 +23,10 @@ interface Props {
 export default function RawMaterialModal({
   visible, editingMaterialId, rmName, setRmName, rmSku, rmUnit, setRmUnit,
   rmCategory, setRmCategory, rmMinReorder, setRmMinReorder,
-  rmDefaultStage, setRmDefaultStage, rmError, onClose, onSave
+  rmError, onClose, onSave,
+  rmStockLevel = '', setRmStockLevel,
+  rmOriginalStockLevel = 0,
+  rmAdjustmentReason = '', setRmAdjustmentReason
 }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
@@ -82,17 +87,34 @@ export default function RawMaterialModal({
             <Text style={styles.inputLabel}>Min Reorder Stock level</Text>
             <TextInput style={styles.input} placeholder="e.g. 10" placeholderTextColor={colors.text.muted} value={rmMinReorder} onChangeText={setRmMinReorder} keyboardType="numeric" />
 
-            <Text style={styles.inputLabel}>Default Manufacturing Stage (optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Packaging & Labeling, Boiling, Grinding..."
-              placeholderTextColor={colors.text.muted}
-              value={rmDefaultStage}
-              onChangeText={setRmDefaultStage}
-            />
-            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 10 }}>
-              When this material is added to a recipe, the stage will auto-fill.
-            </Text>
+            {editingMaterialId !== null && (
+              <View style={{ marginTop: 8, padding: 12, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, marginBottom: 6 }}>📦 PHYSICAL STOCK LEVEL ADJUSTMENT</Text>
+                
+                <Text style={styles.inputLabel}>Current Stock Quantity ({rmUnit})</Text>
+                <TextInput
+                  style={[styles.input, { fontWeight: '700' }]}
+                  placeholder="Enter current physical stock qty"
+                  placeholderTextColor={colors.text.muted}
+                  value={rmStockLevel}
+                  onChangeText={setRmStockLevel}
+                  keyboardType="numeric"
+                />
+                
+                {parseFloat(rmStockLevel) !== rmOriginalStockLevel && (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={[styles.inputLabel, { color: colors.warning }]}>Reason for Stock Adjustment *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. Physical count mismatch, spillage loss, moisture absorption adjustment"
+                      placeholderTextColor={colors.text.muted}
+                      value={rmAdjustmentReason}
+                      onChangeText={setRmAdjustmentReason}
+                    />
+                  </View>
+                )}
+              </View>
+            )}
           </ScrollView>
           <View style={styles.modalFooter}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
