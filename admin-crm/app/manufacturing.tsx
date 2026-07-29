@@ -294,9 +294,9 @@ export default function ManufacturingScreen() {
   // ── Per-tab data loading ─────────────────────────────────────────
   // Which datasets each tab needs
   const tabDataRequirements: Record<string, string[]> = {
-    materials: ['materials', 'entries', 'mfgUnits', 'alerts'],
-    batches: ['batches', 'boms', 'products', 'mfgUnits'],
-    scheduler: ['batches', 'mfgUnits'],
+    materials: ['materials', 'entries', 'mfgUnits', 'alerts', 'warehouses'],
+    batches: ['batches', 'boms', 'products', 'mfgUnits', 'warehouses', 'vendors'],
+    scheduler: ['batches', 'mfgUnits', 'analytics'],
     units: ['mfgUnits'],
   };
 
@@ -342,6 +342,21 @@ export default function ManufacturingScreen() {
         case 'alerts': {
           const data = await api.getRawMaterialExpiryAlerts();
           setExpiryAlerts(data);
+          break;
+        }
+        case 'warehouses': {
+          const data = await api.getWarehouses();
+          setWarehouses(data);
+          break;
+        }
+        case 'vendors': {
+          const data = await api.getVendors();
+          setVendors(data);
+          break;
+        }
+        case 'analytics': {
+          const data = await api.getManufacturingAnalytics();
+          setMfgAnalytics(data);
           break;
         }
       }
