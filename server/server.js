@@ -24,6 +24,7 @@ const taskRoutes = require('./routes/crm/tasks');
 const medicalRepRoutes = require('./routes/crm/medicalReps');
 
 const campaignRoutes = require('./routes/marketing/campaigns');
+const socialRoutes = require('./routes/marketing/social');
 
 const customerRoutes = require('./routes/sales/customers');
 const customerPricingRoutes = require('./routes/sales/customerPricing');
@@ -221,6 +222,12 @@ app.use('/api/payments/gateway/webhook', paymentGatewayRoutes);
 app.use('/api/rbac', authenticateJWT, rbacRoutes);
 app.use('/api/medical-reps', authenticateJWT, medicalRepRoutes);
 app.use('/api/campaigns', authenticateJWT, campaignRoutes);
+app.use('/api/social', (req, res, next) => {
+  if (req.path === '/callback' || req.path === '/auth-url') {
+    return next();
+  }
+  return authenticateJWT(req, res, next);
+}, socialRoutes);
 app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
 app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);

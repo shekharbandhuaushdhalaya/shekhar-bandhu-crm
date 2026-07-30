@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, Alert, useWindowDimensions, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
@@ -6,6 +6,12 @@ import { api, Payment, Customer, Vendor } from '../utils/api';
 import { shortenPartyName } from '../utils/string';
 import { useAuth } from '../utils/auth';
 import { useTheme, useStyles } from '../utils/themeContext';
+
+export const GATEWAY_CLEARING_ACCOUNTS = [
+  { _id: 'clearing_razorpay', name: 'Razorpay Online Gateway Clearing Account', code: 'RAZORPAY', type: 'online_gateway' },
+  { _id: 'clearing_cod_courier', name: 'Courier COD Clearing Account (Delhivery/Shiprocket)', code: 'COD_COURIER', type: 'cod_courier' },
+  { _id: 'clearing_cash_box', name: 'Store Counter Cash Box Clearing Account', code: 'CASH_BOX', type: 'counter_cash' },
+];
 
 export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedPartyId, fixedPartyName }: { visible: boolean, onClose: () => void, onSaved: () => void, initialType: 'receive' | 'make', fixedPartyId?: string, fixedPartyName?: string }) {
   const { colors } = useTheme();
@@ -22,11 +28,13 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
   };
 
   const [type, setType] = useState<'receive' | 'make'>(initialType);
-  const [partyType, setPartyType] = useState<'Customer' | 'Vendor'>(initialType === 'receive' ? 'Customer' : 'Vendor');
+  const [partyType, setPartyType] = useState<'Customer' | 'Vendor' | 'Gateway Clearing'>(initialType === 'receive' ? 'Customer' : 'Vendor');
   const [parties, setParties] = useState<any[]>([]);
   const [partyId, setPartyId] = useState('');
   const [partyName, setPartyName] = useState('');
   const [showPartyDropdown, setShowPartyDropdown] = useState(false);
+  const partyInputRef = useRef<any>(null);
+  const [dropdownLayout, setDropdownLayout] = useState<{ x: number; y: number; width: number } | null>(null);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(getLocalDateString());
   const [mode, setMode] = useState<'regular' | 'cash'>('regular');
@@ -60,8 +68,10 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
           let res: any[] = [];
           if (partyType === 'Customer') {
             res = await api.getCustomers();
-          } else {
+          } else if (partyType === 'Vendor') {
             res = await api.getVendors();
+          } else {
+            res = GATEWAY_CLEARING_ACCOUNTS;
           }
           setParties(res);
 
@@ -86,7 +96,16 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
     setPartyId(p._id);
     setPartyName(p.company || p.name);
     setShowPartyDropdown(false);
+    setDropdownLayout(null);
   };
+
+  const measureInput = useCallback(() => {
+    if (partyInputRef.current && !fixedPartyId) {
+      partyInputRef.current.measureInWindow((x: number, y: number, width: number, height: number) => {
+        setDropdownLayout({ x, y: y + height + 4, width });
+      });
+    }
+  }, [fixedPartyId]);
 
   const handleSave = async () => {
     if (!partyId || !amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -103,7 +122,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
     try {
       await api.createPayment({
         type,
-        partyType,
+        partyType: partyType as any,
         partyId,
         partyName,
         amount: Number(amount),
@@ -123,7 +142,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, Platform.OS === 'web' ? { overflow: 'visible' } as any : {}]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{type === 'receive' ? 'Receive Payment' : 'Make Payment'}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -131,36 +150,34 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Party Type */}
-            {/* Hidden as it automatically switches based on receive/make */}
-
-            {/* Party Selection */}
-            <View style={{ zIndex: 2000, position: 'relative', marginBottom: Spacing.md }}>
-              <Text style={styles.label}>{partyType} *</Text>
-              <View style={styles.dropdownWrap}>
-                <TextInput
-                  style={[styles.input, fixedPartyId && { backgroundColor: colors.bg.secondary, color: colors.text.muted }]}
-                  placeholder={`Search ${type === 'receive' ? 'customer' : 'vendor'}...`}
-                  placeholderTextColor={colors.text.muted}
-                  value={partyName}
-                  onChangeText={(txt) => {
-                    setPartyName(txt);
-                    const exact = parties.find(p => (p.company || p.name).toLowerCase() === txt.trim().toLowerCase());
-                    if (exact) {
-                      setPartyId(exact._id);
-                    } else {
-                      setPartyId('');
-                    }
-                    setShowPartyDropdown(true);
-                  }}
-                  onFocus={() => { if (!fixedPartyId) setShowPartyDropdown(true); }}
-                  editable={!fixedPartyId}
-                />
-                {showPartyDropdown && filteredParties.length > 0 && (
-                  <View style={styles.dropdownList}>
-                    {filteredParties.slice(0, 5).map((p) => (
-                      <TouchableOpacity key={p._id} style={styles.dropdownItem} onPress={() => handleSelectParty(p)}>
+          {/* Party Selection — outside ScrollView so dropdown can render below without being clipped by ScrollView */}
+          <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm, zIndex: 100 } as any}>
+            <Text style={styles.label}>{partyType} *</Text>
+            {/* Inner wrapper is the positioning anchor — dropdown left:0/right:0 matches input width */}
+            <View style={{ position: 'relative' }}>
+              <TextInput
+                style={[styles.input, fixedPartyId && { backgroundColor: colors.bg.secondary, color: colors.text.muted }]}
+                placeholder={`Search ${type === 'receive' ? 'customer' : 'vendor'}...`}
+                placeholderTextColor={colors.text.muted}
+                value={partyName}
+                onChangeText={(txt) => {
+                  setPartyName(txt);
+                  const exact = parties.find(p => (p.company || p.name).toLowerCase() === txt.trim().toLowerCase());
+                  if (exact) { setPartyId(exact._id); } else { setPartyId(''); }
+                  setShowPartyDropdown(true);
+                }}
+                onFocus={() => { if (!fixedPartyId) setShowPartyDropdown(true); }}
+                editable={!fixedPartyId}
+              />
+              {showPartyDropdown && filteredParties.length > 0 && (
+                <View style={[styles.dropdownList, { maxHeight: 220 }]}>
+                  <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                    {filteredParties.slice(0, 8).map((p) => (
+                      <TouchableOpacity
+                        key={p._id}
+                        style={styles.dropdownItem}
+                        onPress={() => handleSelectParty(p)}
+                      >
                         <Text style={styles.dropdownItemText}>{p.company || p.name}</Text>
                         <Text style={styles.dropdownItemSub}>
                           GST Bal: ₹{(p.regularBalance || 0).toLocaleString('en-IN')}
@@ -168,11 +185,14 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
                         </Text>
                       </TouchableOpacity>
                     ))}
-                  </View>
-                )}
-              </View>
+                  </ScrollView>
+                </View>
+              )}
             </View>
+          </View>
 
+
+          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {/* Selected Party Balance Preview & Quick Fill */}
             {partyId && (
               <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 10, marginBottom: Spacing.md, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -373,6 +393,172 @@ export function PaymentDetailModal({ visible, payment, onClose }: { visible: boo
   );
 }
 
+export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boolean; onClose: () => void; onSaved: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+
+  const [selectedGateway, setSelectedGateway] = useState('clearing_razorpay');
+  const [grossAmount, setGrossAmount] = useState('');
+  const [feeAmount, setFeeAmount] = useState('');
+  const [referenceNo, setReferenceNo] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const gatewayAccount = GATEWAY_CLEARING_ACCOUNTS.find(g => g._id === selectedGateway) || GATEWAY_CLEARING_ACCOUNTS[0];
+  const netDeposited = Math.max(0, (Number(grossAmount) || 0) - (Number(feeAmount) || 0));
+
+  const handleSettle = async () => {
+    if (!grossAmount || Number(grossAmount) <= 0) {
+      alert('Please enter gross payout amount.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.createPayment({
+        type: 'receive',
+        partyType: 'Customer',
+        partyId: gatewayAccount._id,
+        partyName: gatewayAccount.name,
+        amount: netDeposited,
+        mode: 'regular',
+        paymentMethod: 'Bank Transfer',
+        referenceNo: referenceNo.trim() || `SETTLE-${gatewayAccount.code}-${Date.now().toString().slice(-6)}`,
+        notes: `Gateway Settlement Payout (${gatewayAccount.name}). Gross: ₹${grossAmount}, Gateway/Courier Fee Deducted: ₹${feeAmount || 0}. ${notes.trim()}`,
+        date: new Date(date).toISOString(),
+      });
+
+      alert(`✓ Gateway Payout Settled Successfully! Net ₹${netDeposited.toLocaleString('en-IN')} deposited to Bank Account.`);
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      alert(err.message || 'Settlement failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { maxWidth: 520 }]}>
+          <View style={styles.modalHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="card-outline" size={20} color={colors.primary} />
+              <Text style={styles.modalTitle}>Lump-Sum Gateway Settlement</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <Ionicons name="close" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 14, lineHeight: 15 }}>
+              Reconcile bulk payouts received from Razorpay online gateway or Courier COD remittance directly into your Bank Account.
+            </Text>
+
+            <Text style={styles.label}>Select Gateway / Clearing Account *</Text>
+            <View style={{ gap: 8, marginBottom: 14 }}>
+              {GATEWAY_CLEARING_ACCOUNTS.map(g => (
+                <TouchableOpacity
+                  key={g._id}
+                  style={{
+                    padding: 10,
+                    borderRadius: Radius.md,
+                    borderWidth: 1,
+                    borderColor: selectedGateway === g._id ? colors.primary : colors.border,
+                    backgroundColor: selectedGateway === g._id ? colors.primary + '10' : colors.bg.primary,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                  onPress={() => setSelectedGateway(g._id)}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: selectedGateway === g._id ? '700' : '500', color: selectedGateway === g._id ? colors.primary : colors.text.primary }}>
+                    {g.name}
+                  </Text>
+                  {selectedGateway === g._id && <Ionicons name="checkmark-circle" size={16} color={colors.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Gross Payout Amount *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 50000"
+                  placeholderTextColor={colors.text.muted}
+                  value={grossAmount}
+                  onChangeText={setGrossAmount}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Gateway / COD Fee</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 1000"
+                  placeholderTextColor={colors.text.muted}
+                  value={feeAmount}
+                  onChangeText={setFeeAmount}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            <View style={{ backgroundColor: colors.success + '12', borderRadius: Radius.md, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: colors.success + '30' }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.success, textTransform: 'uppercase' }}>Net Bank Deposit</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.success, marginTop: 2 }}>
+                ₹{netDeposited.toLocaleString('en-IN')}
+              </Text>
+              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
+                (Gross ₹{Number(grossAmount || 0).toLocaleString('en-IN')} − Fee ₹{Number(feeAmount || 0).toLocaleString('en-IN')})
+              </Text>
+            </View>
+
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.label}>Settlement Reference / UTR No.</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. UTR123456789 or Razorpay Payout ID"
+                placeholderTextColor={colors.text.muted}
+                value={referenceNo}
+                onChangeText={setReferenceNo}
+              />
+            </View>
+
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.label}>Settlement Date</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.text.muted}
+                value={date}
+                onChangeText={setDate}
+              />
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={submitting}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: colors.success }, submitting && { opacity: 0.6 }]}
+              onPress={handleSettle}
+              disabled={submitting}
+            >
+              <Text style={styles.saveBtnText}>{submitting ? 'Settling...' : 'Reconcile Settlement'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 export default function PaymentsScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
@@ -385,6 +571,7 @@ export default function PaymentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
   const [addType, setAddType] = useState<'receive' | 'make'>('receive');
+  const [settleVisible, setSettleVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   
@@ -495,7 +682,24 @@ export default function PaymentsScreen() {
               )}
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 6 }}>
+            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+              <TouchableOpacity
+                style={{
+                  height: 36,
+                  paddingHorizontal: 12,
+                  borderRadius: Radius.md,
+                  backgroundColor: colors.primary + '18',
+                  borderWidth: 1,
+                  borderColor: colors.primary,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+                onPress={() => setSettleVisible(true)}
+              >
+                <Ionicons name="card-outline" size={16} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Settle Gateway Payout</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.danger }]} onPress={() => { setAddType('make'); setAddVisible(true); }}>
                 <Ionicons name="remove" size={20} color="#fff" />
               </TouchableOpacity>
@@ -592,6 +796,7 @@ export default function PaymentsScreen() {
         </ScrollView>
       </View>
       <AddPaymentModal visible={addVisible} onClose={() => setAddVisible(false)} onSaved={load} initialType={addType} />
+      <SettleGatewayModal visible={settleVisible} onClose={() => setSettleVisible(false)} onSaved={load} />
       <PaymentDetailModal visible={detailVisible} payment={selectedPayment} onClose={() => setDetailVisible(false)} />
     </View>
   );
@@ -645,7 +850,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   toggleText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
   
   dropdownWrap: { position: 'relative' },
-  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 150, zIndex: 9999, elevation: 5, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)' },
+  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 220, zIndex: 9999, elevation: 20, overflow: 'hidden', boxShadow: '0px 4px 12px rgba(0,0,0,0.18)' },
   dropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   dropdownItemText: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
   dropdownItemSub: { fontSize: 11, color: colors.text.muted, marginTop: 2 },

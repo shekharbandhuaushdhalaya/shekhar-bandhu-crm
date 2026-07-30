@@ -3,6 +3,7 @@ const Customer = require('../../models/Customer');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
 
@@ -51,6 +52,13 @@ router.post('/', validate(schemas.customerSchema), async (req, res) => {
       req.io.emit('customer_updated', { type: 'created', id: doc._id });
     }
     res.status(201).json(doc);
+
+    await logAction({
+      action: 'CREATE_CUSTOMER',
+      description: `Created customer: ${doc.company || doc.name} (${doc.gstin || 'No GSTIN'})`,
+      details: { customerId: doc._id, name: doc.name, company: doc.company, gstin: doc.gstin },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -77,6 +85,13 @@ router.put('/:id', validate(schemas.customerSchema.partial()), async (req, res) 
       req.io.emit('customer_updated', { type: 'updated', id: doc._id });
     }
     res.json(doc);
+
+    await logAction({
+      action: 'UPDATE_CUSTOMER',
+      description: `Updated customer: ${doc.company || doc.name}`,
+      details: { customerId: doc._id, changes: Object.keys(req.body) },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -91,6 +106,13 @@ router.delete('/:id', authorize('customer:delete'), async (req, res) => {
       req.io.emit('customer_updated', { type: 'deleted', id: req.params.id });
     }
     res.json({ message: 'Customer deleted' });
+
+    await logAction({
+      action: 'DELETE_CUSTOMER',
+      description: `Deleted customer: ${customer.company || customer.name} (ID: ${customer._id})`,
+      details: { customerId: customer._id, name: customer.name, company: customer.company },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

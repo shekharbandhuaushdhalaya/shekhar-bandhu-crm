@@ -198,8 +198,49 @@ function MainLayout() {
       'rbac_updated', 'settings_updated', 'notification_updated', 'query_updated',
     ];
 
+    const socketEventCachePatterns: Record<string, string> = {
+      mfg_stage_updated: 'batch-productions',
+      mfg_batch_created: 'batch-productions',
+      mfg_batch_completed: 'batch-productions',
+      mfg_batch_cancelled: 'batch-productions',
+      mfg_unit_updated: 'manufacturing-units',
+      bom_updated: 'bom',
+      raw_material_updated: 'raw-materials',
+      order_updated: 'orders',
+      quotation_updated: 'quotations',
+      customer_updated: 'customers',
+      vendor_updated: 'vendors',
+      pricing_updated: 'pricing',
+      sales_target_updated: 'sales-targets',
+      inventory_updated: 'inventories',
+      product_updated: 'products',
+      warehouse_updated: 'warehouses',
+      transfer_updated: 'transfers',
+      compliance_updated: 'compliance',
+      invoice_updated: 'invoices',
+      challan_updated: 'challans',
+      challan_created: 'challans',
+      payment_updated: 'payments',
+      credit_note_updated: 'credit-notes',
+      gst_return_updated: 'gst',
+      contact_updated: 'contacts',
+      medrep_updated: 'medical-reps',
+      task_updated: 'tasks',
+      dispatch_updated: 'dispatches',
+      complaint_updated: 'complaints',
+      sample_updated: 'samples',
+      new_web_order: 'orders',
+      campaign_updated: 'campaigns',
+      rbac_updated: 'rbac',
+      settings_updated: 'settings',
+      notification_updated: 'notifications',
+      query_updated: 'queries',
+    };
+
     socketEvents.forEach(eventName => {
       socket.on(eventName, (data) => {
+        const pattern = socketEventCachePatterns[eventName];
+        api.clearCache(pattern);
         DeviceEventEmitter.emit(`${eventName}_event`, data);
       });
     });

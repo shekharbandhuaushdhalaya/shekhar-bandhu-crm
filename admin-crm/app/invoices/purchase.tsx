@@ -7,6 +7,7 @@ import { api, Invoice, Product, RawMaterial, Vendor, Warehouse, ManufacturingUni
 import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
+import { CustomDatePicker } from '../../components/CustomDatePicker';
 
 const toTitleCase = (str?: string) => {
   if (!str) return '';
@@ -1218,129 +1219,14 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
               </View>
             </View>
 
-            {/* Date with Custom Redesigned Calendar Popover */}
-            <View style={[styles.formGroup, { flex: 1, marginBottom: 0, zIndex: showDatePicker ? 3000 : 100 }]}>
+            {/* Purchase Date */}
+            <View style={[styles.formGroup, { flex: 1, marginBottom: 0 }]}>
               <Text style={styles.formLabel}>Purchase Date *</Text>
-              <View style={styles.customSearchSelectContainer}>
-                <TouchableOpacity 
-                  style={[styles.formInput, { cursor: 'pointer' } as any]}
-                  onPress={() => setShowDatePicker(!showDatePicker)}
-                >
-                  <Ionicons name="calendar" size={16} color={colors.primary} />
-                  <Text style={{ flex: 1, color: colors.text.primary, fontWeight: '700', fontSize: 14, paddingVertical: 12 }}>
-                    {date ? new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Select Date'}
-                  </Text>
-                  <Ionicons name={showDatePicker ? "chevron-up" : "calendar-outline"} size={16} color={colors.text.muted} />
-                </TouchableOpacity>
-
-                {showDatePicker && (() => {
-                  const currentDateObj = date ? new Date(date) : new Date();
-                  const year = currentDateObj.getFullYear();
-                  const month = currentDateObj.getMonth();
-
-                  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                  const daysInMonth = new Date(year, month + 1, 0).getDate();
-                  const firstDayIndex = new Date(year, month, 1).getDay();
-
-                  const calendarDays = [];
-                  for (let i = 0; i < firstDayIndex; i++) {
-                    calendarDays.push(null);
-                  }
-                  for (let d = 1; d <= daysInMonth; d++) {
-                    calendarDays.push(d);
-                  }
-
-                  const handleMonthChange = (offset: number) => {
-                    const newDate = new Date(year, month + offset, 1);
-                    const formatted = newDate.toISOString().split('T')[0];
-                    setDate(formatted);
-                  };
-
-                  const handleSelectDay = (day: number) => {
-                    const selected = new Date(year, month, day);
-                    // Adjust timezone offset for ISO string
-                    const yyyy = selected.getFullYear();
-                    const mm = String(selected.getMonth() + 1).padStart(2, '0');
-                    const dd = String(selected.getDate()).padStart(2, '0');
-                    setDate(`${yyyy}-${mm}-${dd}`);
-                    setShowDatePicker(false);
-                  };
-
-                  return (
-                    <View style={[styles.customSelectPanel, { 
-                      padding: 14, 
-                      width: 280, 
-                      right: 0, 
-                      left: 'auto',
-                      backgroundColor: colors.bg.card,
-                      borderRadius: Radius.lg,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      boxShadow: '0px 10px 25px rgba(0,0,0,0.15)',
-                      elevation: 10
-                    }]}>
-                      {/* Calendar Header */}
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <TouchableOpacity onPress={() => handleMonthChange(-1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
-                          <Ionicons name="chevron-back" size={16} color={colors.text.primary} />
-                        </TouchableOpacity>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>
-                          {monthNames[month]} {year}
-                        </Text>
-                        <TouchableOpacity onPress={() => handleMonthChange(1)} style={{ padding: 4, borderRadius: 4, backgroundColor: colors.bg.secondary }}>
-                          <Ionicons name="chevron-forward" size={16} color={colors.text.primary} />
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Weekday Labels */}
-                      <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(w => (
-                          <Text key={w} style={{ flex: 1, textAlign: 'center', fontSize: 10, fontWeight: '800', color: colors.text.muted }}>{w}</Text>
-                        ))}
-                      </View>
-
-                      {/* Day Grid */}
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                        {calendarDays.map((dayNum, i) => {
-                          if (dayNum === null) {
-                            return <View key={`empty-${i}`} style={{ width: '14.28%', height: 32 }} />;
-                          }
-                          const isSelected = date && new Date(date).getDate() === dayNum && new Date(date).getMonth() === month && new Date(date).getFullYear() === year;
-                          const isToday = new Date().getDate() === dayNum && new Date().getMonth() === month && new Date().getFullYear() === year;
-
-                          return (
-                            <TouchableOpacity
-                              key={`day-${dayNum}`}
-                              style={[{
-                                width: '14.28%',
-                                height: 32,
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                borderRadius: 8
-                              }, isSelected && { backgroundColor: colors.primary }, isToday && !isSelected && { borderWidth: 1, borderColor: colors.primary }]}
-                              onPress={() => handleSelectDay(dayNum)}
-                            >
-                              <Text style={[{ fontSize: 12, fontWeight: isSelected || isToday ? '800' : '500', color: isSelected ? '#fff' : colors.text.primary }]}>
-                                {dayNum}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-
-                      {/* Today Quick Select Footer */}
-                      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: 10, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <TouchableOpacity onPress={() => { setDate(new Date().toISOString().split('T')[0]); setShowDatePicker(false); }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>Today</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted }}>Close</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })()}
-              </View>
+              <CustomDatePicker
+                value={date}
+                onChange={setDate}
+                placeholder="Select Date"
+              />
             </View>
           </View>
 
@@ -1389,15 +1275,15 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   borderRadius: Radius.md,
                   marginBottom: 8
                 }}>
-                  <Text style={{ flex: 3.0, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Raw Material Name *</Text>
-                  <Text style={{ flex: 1.3, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Qty / Unit *</Text>
-                  <Text style={{ flex: 1.0, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Rate (₹)</Text>
-                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Batch No</Text>
-                  <Text style={{ flex: 1.8, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Expiry Date</Text>
+                  <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Raw Material Name *</Text>
+                  <Text style={{ width: 110, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Qty / Unit *</Text>
+                  <Text style={{ width: 95, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Rate (₹)</Text>
+                  <Text style={{ width: 100, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Batch No</Text>
+                  <Text style={{ width: 44, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Exp</Text>
                   {mode === 'regular' && (
-                    <Text style={{ flex: 0.8, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>GST Rate</Text>
+                    <Text style={{ width: 75, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>GST Rate</Text>
                   )}
-                  <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Line Total (₹)</Text>
+                  <Text style={{ width: 120, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Line Total (₹)</Text>
                   <View style={{ width: 36 }} />
                 </View>
 
@@ -1437,7 +1323,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                       zIndex: (row.showProductDropdown || row.showGstDropdown) ? 5000 : 100 - index
                     }}>
                       {/* Raw Material search */}
-                      <View style={{ flex: mode === 'regular' ? 3.2 : 3.6, position: 'relative', zIndex: row.showProductDropdown ? 5005 : 1 }}>
+                      <View style={{ flex: 1, position: 'relative', zIndex: row.showProductDropdown ? 5005 : 1 }}>
                         <TextInput
                           style={[styles.tableInput, { fontWeight: '600' }]}
                           placeholder="Search raw material..."
@@ -1482,7 +1368,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                       </View>
 
                       {/* Qty (Unit) */}
-                      <View style={{ flex: mode === 'regular' ? 1.4 : 1.6, position: 'relative', justifyContent: 'center' }}>
+                      <View style={{ width: 110, position: 'relative', justifyContent: 'center' }}>
                         <TextInput
                           style={[styles.tableInput, { width: '100%', textAlign: 'center', fontWeight: '700', paddingRight: row.unit ? 42 : 8 }]}
                           placeholder="0"
@@ -1512,7 +1398,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
                       {/* Rate */}
                       <TextInput
-                        style={[styles.tableInput, { flex: 1.0, textAlign: 'right', fontWeight: '600' }]}
+                        style={[styles.tableInput, { width: 95, textAlign: 'right', fontWeight: '600' }]}
                         placeholder="0.00"
                         placeholderTextColor={colors.text.muted}
                         keyboardType="numeric"
@@ -1524,8 +1410,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
                       {/* Batch No */}
                       <TextInput
-                        style={[styles.tableInput, { flex: 1.5, fontWeight: '600' }]}
-                        placeholder="e.g. B-MUST-09"
+                        style={[styles.tableInput, { width: 100, fontWeight: '600' }]}
+                        placeholder="e.g. B-09"
                         placeholderTextColor={colors.text.muted}
                         value={row.batchNo}
                         onChangeText={(text) => {
@@ -1533,42 +1419,22 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                         }}
                       />
 
-                      {/* Expiry Date */}
-                      <View style={{ flex: 1.8, justifyContent: 'center' }}>
-                        {Platform.OS === 'web' ? (
-                          React.createElement('input', {
-                            type: 'date',
-                            value: row.expiryDate,
-                            onChange: (e: any) => {
-                              setRows(prev => prev.map(r => r.id === row.id ? { ...r, expiryDate: e.target.value } : r));
-                            },
-                            style: {
-                              padding: '8px 10px',
-                              borderRadius: 8,
-                              border: `1px solid ${colors.border}`,
-                              backgroundColor: colors.bg.primary,
-                              color: colors.text.primary,
-                              fontSize: 12,
-                              height: 38,
-                              width: '100%'
-                            }
-                          })
-                        ) : (
-                          <TextInput
-                            style={[styles.tableInput, { width: '100%', fontSize: 12 }]}
-                            placeholder="YYYY-MM-DD"
-                            placeholderTextColor={colors.text.muted}
-                            value={row.expiryDate}
-                            onChangeText={(text) => {
-                              setRows(prev => prev.map(r => r.id === row.id ? { ...r, expiryDate: text } : r));
-                            }}
-                          />
-                        )}
+                      {/* Expiry Date Icon Only */}
+                      <View style={{ width: 44, justifyContent: 'center', alignItems: 'center' }}>
+                        <CustomDatePicker
+                          value={row.expiryDate}
+                          onChange={(date) => {
+                            setRows(prev => prev.map(r => r.id === row.id ? { ...r, expiryDate: date } : r));
+                          }}
+                          placeholder="EXP Date"
+                          compact
+                          iconOnly
+                        />
                       </View>
 
                       {/* GST (Only in Regular mode) */}
                       {mode === 'regular' && (
-                        <View style={{ flex: 0.8, position: 'relative' }}>
+                        <View style={{ width: 75, position: 'relative' }}>
                           <TouchableOpacity
                             style={[styles.tableInputBtn, { width: '100%', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, backgroundColor: colors.primary + '0a', borderColor: colors.primary + '30' }]}
                             onPress={() => {
@@ -1600,7 +1466,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                       )}
 
                       {/* Row Subtotal */}
-                      <View style={{ flex: mode === 'regular' ? 1.2 : 1.4, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 4 }}>
+                      <View style={{ width: 120, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 4 }}>
                          <Text style={[styles.tableRowSubtotal, { fontSize: 13, fontWeight: '800', color: colors.text.primary }]} numberOfLines={1}>
                            ₹{rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                          </Text>
@@ -2079,17 +1945,17 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   formGroup: { marginBottom: 16 },
   formLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
-  formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
-  formInputText: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+  formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, height: 40 },
+  formInputText: { flex: 1, height: 40, color: colors.text.primary, fontSize: 13 },
   statusSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   statusBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
   statusBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
 
   modeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, alignSelf: 'flex-start' },
   modeText: { fontSize: 8, fontWeight: '800' },
-  modeSelector: { flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 16 },
-  modeBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  modeBtnText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  modeSelector: { flexDirection: 'row', gap: 10, marginTop: 0, marginBottom: 0 },
+  modeBtn: { flex: 1, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
+  modeBtnText: { fontSize: 12, fontWeight: '700', color: colors.text.secondary },
 
   filterTabContainer: { flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, gap: 8 },
   filterTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },

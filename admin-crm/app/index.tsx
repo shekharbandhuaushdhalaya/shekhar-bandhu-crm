@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, RefreshControl, useWindowDimensions
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
-import { api, DashboardStats, Activity, Contact, Product, Invoice, Challan, ConsolidatedInventory, MrDashboardSummary, ExpiryAlert } from '../utils/api';
+import { api, DashboardStats, Activity, Contact, Product, Invoice, Challan, ConsolidatedInventory, MrDashboardSummary, ExpiryAlert, Campaign } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
@@ -927,12 +927,166 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
   );
 }
 
+const PLATFORM_LABELS: Record<string, string> = {
+  social_media: 'Social Media',
+  google: 'Google Ads',
+  email: 'Email Blast',
+  sms: 'Bulk SMS',
+  whatsapp: 'WhatsApp',
+  other: 'Other Channel',
+};
+
+function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  
+  const formatCurrency = (v: number) => `₹${(v || 0).toLocaleString('en-IN')}`;
+
+  const totalBudget = campaigns.reduce((acc, c) => acc + c.budget, 0);
+  const totalSpent = campaigns.reduce((acc, c) => acc + c.spent, 0);
+  const totalRevenue = campaigns.reduce((acc, c) => acc + c.analytics.revenue, 0);
+  const netProfit = totalRevenue - totalSpent;
+  const overallRoi = totalSpent > 0 ? (netProfit / totalSpent) * 100 : 0;
+  const totalLeads = campaigns.reduce((acc, c) => acc + c.analytics.leads, 0);
+  const averageCac = totalLeads > 0 ? totalSpent / totalLeads : 0;
+
+  return (
+    <View style={{ gap: 16 }}>
+      {/* Marketing ROI Summary Header */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.primary + '10', padding: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.primary + '30' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="pie-chart" size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>Marketing Financial ROI Analysis</Text>
+            <Text style={{ fontSize: 11, color: colors.text.secondary }}>Compare campaign spends, yields, and net profits across channels</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ROI Cards */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.primary }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Budget</Text>
+          <Text style={{ fontSize: 22, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>{formatCurrency(totalBudget)}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.warning }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Spent</Text>
+          <Text style={{ fontSize: 22, fontWeight: '800', color: colors.warning, marginTop: 4 }}>{formatCurrency(totalSpent)}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.success }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Revenue Yield</Text>
+          <Text style={{ fontSize: 22, fontWeight: '800', color: colors.success, marginTop: 4 }}>{formatCurrency(totalRevenue)}</Text>
+        </View>
+      </View>
+
+      {/* ROI Metric Blocks */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
+          <Ionicons name="trending-up" size={24} color={netProfit >= 0 ? colors.success : colors.danger} />
+          <View style={{ marginLeft: 10 }}>
+            <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Net Yield Profit</Text>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: netProfit >= 0 ? colors.success : colors.danger, marginTop: 2 }}>{formatCurrency(netProfit)}</Text>
+          </View>
+        </View>
+
+        <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
+          <Ionicons name="speedometer-outline" size={24} color={colors.primary} />
+          <View style={{ marginLeft: 10 }}>
+            <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Return on Spend (ROI)</Text>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginTop: 2 }}>{overallRoi.toFixed(1)}%</Text>
+          </View>
+        </View>
+
+        <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
+          <Ionicons name="people" size={24} color="#6366f1" />
+          <View style={{ marginLeft: 10 }}>
+            <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Cost Per Lead (CAC)</Text>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#6366f1', marginTop: 2 }}>{formatCurrency(averageCac)}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Yield Analysis by Channel */}
+      <View style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md }}>
+        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>Yield Analysis by Channel</Text>
+        <View style={{ flexDirection: 'row', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border + '50', marginBottom: 8 }}>
+          <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>Channel</Text>
+          <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Spent</Text>
+          <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Revenue</Text>
+          <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>ROI %</Text>
+        </View>
+
+        {['social_media', 'google', 'email', 'sms', 'whatsapp', 'other'].map(platform => {
+          const platformCampaigns = campaigns.filter(c => c.platform === platform);
+          if (platformCampaigns.length === 0) return null;
+
+          const spent = platformCampaigns.reduce((acc, c) => acc + c.spent, 0);
+          const revenue = platformCampaigns.reduce((acc, c) => acc + c.analytics.revenue, 0);
+          const profit = revenue - spent;
+          const roi = spent > 0 ? (profit / spent) * 100 : 0;
+          const platformColor = platform === 'social_media' ? '#1877f2' :
+                                platform === 'google' ? '#ea4335' :
+                                platform === 'email' ? '#8a2be2' :
+                                platform === 'whatsapp' ? '#25d366' : colors.primary;
+
+          return (
+            <View key={platform} style={{ flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border + '30', alignItems: 'center' }}>
+              <View style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: platformColor }} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+                  {PLATFORM_LABELS[platform] || platform}
+                </Text>
+              </View>
+              <Text style={{ flex: 1, fontSize: 11, textAlign: 'right', color: colors.text.secondary }}>{formatCurrency(spent)}</Text>
+              <Text style={{ flex: 1, fontSize: 11, textAlign: 'right', color: colors.success, fontWeight: '700' }}>{formatCurrency(revenue)}</Text>
+              <Text style={{ flex: 1, fontSize: 11, textAlign: 'right', fontWeight: '700', color: profit >= 0 ? colors.success : colors.danger }}>
+                {roi.toFixed(0)}%
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Campaign Financial Efficiency Table */}
+      <View style={{ gap: 10 }}>
+        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>Campaign Financial Efficiency</Text>
+        {campaigns.map(c => {
+          const profit = c.analytics.revenue - c.spent;
+          const roi = c.spent > 0 ? (profit / c.spent) * 100 : 0;
+          const platformColor = c.platform === 'social_media' ? '#1877f2' :
+                                c.platform === 'google' ? '#ea4335' :
+                                c.platform === 'email' ? '#8a2be2' :
+                                c.platform === 'whatsapp' ? '#25d366' : colors.primary;
+
+          return (
+            <View key={c._id} style={{ flexDirection: 'row', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: platformColor, padding: 12, justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }} numberOfLines={1}>{c.name}</Text>
+                <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>Spent: {formatCurrency(c.spent)}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>+{formatCurrency(c.analytics.revenue)}</Text>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: profit >= 0 ? colors.success : colors.danger, marginTop: 2 }}>
+                  ROI: {roi.toFixed(0)}%
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
   const chartWidth = isDesktop ? (Math.min(winWidth, 1200) - 240 - 64) * 0.5 - 20 : winWidth - 64;
-  const [activeTab, setActiveTab] = useState<'overview' | 'mr_analytics' | 'manufacturing_analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'mr_analytics' | 'manufacturing_analytics' | 'marketing_analytics'>('overview');
   const [mfgAnalytics, setMfgAnalytics] = useState<any>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [stats, setStats] = useState<DashboardStats>({ totalPipeline: 0, closedWon: 0, activeLeadsCount: 0, pendingTasksCount: 0 });
   const [activities, setActivities] = useState<Activity[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -957,7 +1111,7 @@ export default function DashboardScreen() {
   const styles = useStyles(createStyles);
 
   const load = useCallback(async () => {
-    const [s, a, c, custs, vends, invs, prods, purchs, sales, challans, mfgData] = await Promise.all([
+    const [s, a, c, custs, vends, invs, prods, purchs, sales, challans, mfgData, camps] = await Promise.all([
       api.getStats(), 
       api.getActivities(), 
       api.getContacts(),
@@ -968,9 +1122,11 @@ export default function DashboardScreen() {
       api.getPurchaseInvoices('', 'all'),
       api.getSaleInvoices('', 'all'),
       api.getChallans('', 'all'),
-      api.getManufacturingAnalytics().catch(() => null)
+      api.getManufacturingAnalytics().catch(() => null),
+      api.getCampaigns().catch(() => [])
     ]);
     if (mfgData) setMfgAnalytics(mfgData);
+    if (camps) setCampaigns(camps);
 
     const recInvoiceSum = custs.reduce((sum, cust) => sum + (cust.pakkaBalance || 0), 0);
     const payInvoiceSum = vends.reduce((sum, vend) => sum + (vend.pakkaBalance || 0), 0);
@@ -1122,8 +1278,27 @@ export default function DashboardScreen() {
           onPress={() => setActiveTab('manufacturing_analytics')}
         >
           <Ionicons name="build-outline" size={16} color={activeTab === 'manufacturing_analytics' ? '#fff' : colors.text.secondary} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'manufacturing_analytics' ? '#fff' : colors.text.secondary }}>
-            Manufacturing Facility Analytics
+          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'manufacturing_analytics' ? '#fff' : colors.text.secondary }} numberOfLines={1}>
+            Manufacturing
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            paddingVertical: 10,
+            borderRadius: Radius.md,
+            backgroundColor: activeTab === 'marketing_analytics' ? colors.primary : 'transparent'
+          }}
+          onPress={() => setActiveTab('marketing_analytics')}
+        >
+          <Ionicons name="pie-chart-outline" size={16} color={activeTab === 'marketing_analytics' ? '#fff' : colors.text.secondary} />
+          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'marketing_analytics' ? '#fff' : colors.text.secondary }} numberOfLines={1}>
+            Marketing ROI
           </Text>
         </Pressable>
       </View>
@@ -1228,8 +1403,10 @@ export default function DashboardScreen() {
         </>
       ) : activeTab === 'mr_analytics' ? (
         <FullMrAnalyticsTab />
-      ) : (
+      ) : activeTab === 'manufacturing_analytics' ? (
         <FullManufacturingAnalyticsTab mfgAnalytics={mfgAnalytics} />
+      ) : (
+        <DashboardMarketingAnalyticsTab campaigns={campaigns} />
       )}
     </ScrollView>
   );

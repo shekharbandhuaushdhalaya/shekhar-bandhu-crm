@@ -325,11 +325,25 @@ router.post('/sales', validate(schemas.invoiceSchema), async (req, res) => {
       await validateSaleInvoiceDate(req.body.date);
     }
 
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
+
     const data = {
       ...req.body,
       type: 'sale',
       invoiceNo,
       isFinalized: false,
+      firmDetails: {
+        name: settings.firmName || settings.name || '',
+        address: settings.firmAddress || settings.address || '',
+        email: settings.firmEmail || settings.email || '',
+        phone: settings.firmPhone || settings.phone || '',
+        gstin: settings.firmGstin || settings.gstin || '',
+        bankName: settings.bankName || '',
+        bankAccountNo: settings.bankAccountNo || '',
+        bankIfsc: settings.bankIfsc || '',
+        bankBranch: settings.bankBranch || ''
+      }
     };
     const invoice = await Invoice.create(data);
     if (req.io) {
@@ -352,13 +366,25 @@ router.post('/sales', validate(schemas.invoiceSchema), async (req, res) => {
 // POST /api/invoices/purchases — Create purchase invoice in DRAFT status (no inventory/balance changes yet)
 router.post('/purchases', authorize('invoice:create'), validate(schemas.invoiceSchema), async (req, res) => {
   try {
-
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
 
     const data = {
       ...req.body,
       type: 'purchase',
       invoiceNo: req.body.invoiceNo || 'INV-PURCH-' + Date.now().toString().slice(-6),
       isFinalized: false,
+      firmDetails: {
+        name: settings.firmName || settings.name || '',
+        address: settings.firmAddress || settings.address || '',
+        email: settings.firmEmail || settings.email || '',
+        phone: settings.firmPhone || settings.phone || '',
+        gstin: settings.firmGstin || settings.gstin || '',
+        bankName: settings.bankName || '',
+        bankAccountNo: settings.bankAccountNo || '',
+        bankIfsc: settings.bankIfsc || '',
+        bankBranch: settings.bankBranch || ''
+      }
     };
     const invoice = await Invoice.create(data);
     if (req.io) {
@@ -395,6 +421,22 @@ router.put('/:id', authorize('invoice:edit'), validate(schemas.invoiceSchema.par
 
     // Keep invoice type and number immutable during edits
     const { type, invoiceNo, ...updateData } = req.body;
+
+    if (!invoice.isFinalized) {
+      const SystemSettings = require('../../models/SystemSettings');
+      const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
+      updateData.firmDetails = {
+        name: settings.firmName || settings.name || '',
+        address: settings.firmAddress || settings.address || '',
+        email: settings.firmEmail || settings.email || '',
+        phone: settings.firmPhone || settings.phone || '',
+        gstin: settings.firmGstin || settings.gstin || '',
+        bankName: settings.bankName || '',
+        bankAccountNo: settings.bankAccountNo || '',
+        bankIfsc: settings.bankIfsc || '',
+        bankBranch: settings.bankBranch || ''
+      };
+    }
     
     if (invoice.type === 'sale' && updateData.date) {
       const oldDate = invoice.date ? new Date(invoice.date).setHours(0,0,0,0) : 0;

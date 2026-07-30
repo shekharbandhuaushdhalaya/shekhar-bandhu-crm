@@ -15,7 +15,7 @@ import type {
   RBACPermissionsResponse, PaymentOrderResponse, PaymentVerifyResponse,
   ManufacturingAnalytics, OrderItem, Order, MedicalRepresentative, MrDailyLog,
   MrVisit, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics,
-  ManufacturingUnit
+  ManufacturingUnit, ExpiryAlert
 } from './api/types';
 
 export * from './api/types';
@@ -99,9 +99,19 @@ class ApiClient {
   private activeRequests = 0;
   private cacheStore: Record<string, { data: any, timestamp: number }> = {};
   private cacheTTL = 15000; // 15 seconds (stale data is patched via socket events)
+  private inFlightRequests: Record<string, Promise<Response> | undefined> = {};
 
-  clearCache() {
-    this.cacheStore = {};
+  clearCache(pattern?: string) {
+    if (pattern) {
+      const lowerPattern = pattern.toLowerCase();
+      Object.keys(this.cacheStore).forEach(key => {
+        if (key.toLowerCase().includes(lowerPattern)) {
+          delete this.cacheStore[key];
+        }
+      });
+    } else {
+      this.cacheStore = {};
+    }
   }
 
   private async request(url: string, options: RequestInit = {}): Promise<Response> {
@@ -124,90 +134,112 @@ class ApiClient {
           })
         } as any;
       }
+
+      // Request deduplication: if request is already in flight, reuse its promise
+      if (this.inFlightRequests[url]) {
+        const inFlightRes = await this.inFlightRequests[url];
+        return inFlightRes.clone();
+      }
     } else {
       // Invalidate cache on mutations
       this.cacheStore = {};
     }
 
-    const headers = {
-      ...(options.headers || {}),
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-    } as Record<string, string>;
+    const promise = (async () => {
+      const headers = {
+        ...(options.headers || {}),
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      } as Record<string, string>;
 
-    if (!this.authToken) {
-      try {
-        this.authToken = await authStorage.getItem('vp_crm_token');
-      } catch (e) {}
-    }
-
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
-    }
-
-    // Bust browser HTTP cache with timestamp on GET requests
-    let fetchUrl = url;
-    if (isGet && !hasCacheBust) {
-      const sep = url.includes('?') ? '&' : '?';
-      fetchUrl = `${url}${sep}_t=${Date.now()}`;
-    }
-
-    if (isMutating) {
-      this.activeRequests++;
-      DeviceEventEmitter.emit('global_loader', { isLoading: this.activeRequests > 0 });
-    }
-
-    try {
-      const res = await fetch(fetchUrl, { ...options, headers }).catch((netErr: any) => {
-        throw new Error(`Connection Error: Unable to reach backend server (${netErr?.message || 'Network Failure'}). Please ensure the server is running.`);
-      });
-      if (!res.ok) {
-        let errMsg = 'API Error';
+      if (!this.authToken) {
         try {
-            const errData = await res.json();
-            errMsg = errData.error || errData.message || res.statusText;
-            if (errData.issues && Array.isArray(errData.issues) && errData.issues.length > 0) {
-              const details = errData.issues.map((i: any) => `${i.path || 'field'}: ${i.message}`).join(', ');
-              errMsg = `${errMsg} (${details})`;
-            } else if (errData.fields && typeof errData.fields === 'object') {
-              const details = Object.entries(errData.fields).map(([k, v]) => `${k}: ${v}`).join(', ');
-              if (details) errMsg = `${errMsg} (${details})`;
-            }
-        } catch {
-            errMsg = res.statusText;
-        }
-        throw new Error(errMsg);
+          this.authToken = await authStorage.getItem('vp_crm_token');
+        } catch (e) {}
       }
 
-      // Populate memory cache on successful GET responses
-      if (isGet) {
-        try {
-          const resClone = res.clone();
-          const data = await resClone.json();
-          this.cacheStore[url] = { data, timestamp: Date.now() };
-        } catch (e) {
-          // If clone fails, read directly and return custom response
-          try {
-            const data = await res.json();
-            this.cacheStore[url] = { data, timestamp: Date.now() };
-            return {
-              ok: true,
-              status: res.status,
-              json: async () => data,
-              text: async () => JSON.stringify(data)
-            } as any;
-          } catch (errInner) {}
-        }
+      if (this.authToken) {
+        headers['Authorization'] = `Bearer ${this.authToken}`;
       }
 
-      return res;
-    } finally {
+      // Bust browser HTTP cache with timestamp on GET requests
+      let fetchUrl = url;
+      if (isGet && !hasCacheBust) {
+        const sep = url.includes('?') ? '&' : '?';
+        fetchUrl = `${url}${sep}_t=${Date.now()}`;
+      }
+
       if (isMutating) {
-        this.activeRequests = Math.max(0, this.activeRequests - 1);
+        this.activeRequests++;
         DeviceEventEmitter.emit('global_loader', { isLoading: this.activeRequests > 0 });
       }
+
+      try {
+        const res = await fetch(fetchUrl, { ...options, headers }).catch((netErr: any) => {
+          throw new Error(`Connection Error: Unable to reach backend server (${netErr?.message || 'Network Failure'}). Please ensure the server is running.`);
+        });
+        if (!res.ok) {
+          let errMsg = 'API Error';
+          try {
+              const errData = await res.json();
+              errMsg = errData.error || errData.message || res.statusText;
+              if (errData.issues && Array.isArray(errData.issues) && errData.issues.length > 0) {
+                const details = errData.issues.map((i: any) => `${i.path || 'field'}: ${i.message}`).join(', ');
+                errMsg = `${errMsg} (${details})`;
+              } else if (errData.fields && typeof errData.fields === 'object') {
+                const details = Object.entries(errData.fields).map(([k, v]) => `${k}: ${v}`).join(', ');
+                if (details) errMsg = `${errMsg} (${details})`;
+              }
+          } catch {
+              errMsg = res.statusText;
+          }
+          throw new Error(errMsg);
+        }
+
+        // Populate memory cache on successful GET responses
+        if (isGet) {
+          try {
+            const resClone = res.clone();
+            const data = await resClone.json();
+            this.cacheStore[url] = { data, timestamp: Date.now() };
+          } catch (e) {
+            // If clone fails, read directly and return custom response
+            try {
+              const data = await res.json();
+              this.cacheStore[url] = { data, timestamp: Date.now() };
+              return {
+                ok: true,
+                status: res.status,
+                json: async () => data,
+                text: async () => JSON.stringify(data),
+                clone: () => ({
+                  json: async () => data
+                })
+              } as any;
+            } catch (errInner) {}
+          }
+        }
+
+        return res;
+      } finally {
+        if (isMutating) {
+          this.activeRequests = Math.max(0, this.activeRequests - 1);
+          DeviceEventEmitter.emit('global_loader', { isLoading: this.activeRequests > 0 });
+        }
+      }
+    })();
+
+    if (isGet && !hasCacheBust) {
+      this.inFlightRequests[url] = promise;
+      try {
+        return await promise;
+      } finally {
+        delete this.inFlightRequests[url];
+      }
     }
+
+    return promise;
   }
 
   // --- Auth ---
@@ -758,6 +790,27 @@ class ApiClient {
   async deleteManufacturingUnit(id: string): Promise<boolean> {
     const res = await this.request(`${API_BASE}/manufacturing-units/${id}`, { method: 'DELETE' });
     return res.ok;
+  }
+
+  // --- Social Media Integration ---
+  async getSocialAccounts(): Promise<any[]> {
+    const res = await this.request(`${API_BASE}/social/accounts`);
+    return res.json();
+  }
+  async getSocialAuthUrl(): Promise<{ url: string }> {
+    const res = await this.request(`${API_BASE}/social/auth-url`);
+    return res.json();
+  }
+  async disconnectSocialAccount(id: string): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/social/accounts/${id}`, { method: 'DELETE' });
+    return res.ok;
+  }
+  async publishSocialPost(platforms: string[], text: string, imageUrl?: string): Promise<{ results: any[]; errors: any[] }> {
+    const res = await this.request(`${API_BASE}/social/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ platforms, text, imageUrl }),
+    });
+    return res.json();
   }
 
   // --- Inventory Entries (Direct Stock adjustments) ---

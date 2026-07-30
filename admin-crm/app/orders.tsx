@@ -293,7 +293,7 @@ export default function OrdersScreen() {
               <View style={[styles.tableHeaderCellContainer, { width: 130 }]}>
                 <Text style={styles.tableHeaderCell}>Status</Text>
               </View>
-              <View style={[styles.tableHeaderCellContainer, { width: 230, borderRightWidth: 0 }]}>
+              <View style={[styles.tableHeaderCellContainer, { width: 200, borderRightWidth: 0 }]}>
                 <Text style={styles.tableHeaderCell}>Action</Text>
               </View>
             </View>
@@ -341,7 +341,7 @@ export default function OrdersScreen() {
                   </View>
                 </View>
 
-                <View style={[styles.tableCellContainer, { width: 230, borderRightWidth: 0, flexDirection: 'row', gap: 6 }]}>
+                <View style={[styles.tableCellContainer, { width: 200, borderRightWidth: 0, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'flex-start' }]}>
                   <TouchableOpacity
                     style={[styles.actionPillBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
                     onPress={() => setSelectedOrder(o)}
@@ -350,10 +350,20 @@ export default function OrdersScreen() {
                     <Text style={[styles.actionPillText, { color: colors.primary }]}>View</Text>
                   </TouchableOpacity>
 
+                  {o.status === 'pending' && (
+                    <TouchableOpacity
+                      style={[styles.actionPillBtn, { backgroundColor: colors.warning + '15', borderColor: colors.warning }]}
+                      onPress={() => handleUpdateStatus(o._id, 'processing')}
+                    >
+                      <Ionicons name="cog-outline" size={13} color={colors.warning} />
+                      <Text style={[styles.actionPillText, { color: colors.warning }]}>Process</Text>
+                    </TouchableOpacity>
+                  )}
+
                   {o.hasChallan ? (
-                    <View style={[styles.actionPillBtn, { backgroundColor: colors.bg.secondary, borderColor: colors.border }]}>
+                    <View style={[styles.actionPillBtn, { backgroundColor: colors.bg.secondary, borderColor: colors.border, maxWidth: 110 }]}>
                       <Ionicons name="checkmark-done" size={13} color={colors.text.muted} />
-                      <Text style={[styles.actionPillText, { color: colors.text.muted }]}>{o.challanNo || 'Challan'}</Text>
+                      <Text style={[styles.actionPillText, { color: colors.text.muted, flexShrink: 1 }]} numberOfLines={1} ellipsizeMode="tail">{o.challanNo || 'Challan'}</Text>
                     </View>
                   ) : (
                     <TouchableOpacity
@@ -409,7 +419,12 @@ export default function OrdersScreen() {
               <ScrollView style={{ padding: Spacing.lg }} contentContainerStyle={{ gap: 12 }}>
                 {/* Status Bar */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>ORDER STATUS</Text>
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>ORDER STATUS</Text>
+                    <Text style={{ fontSize: 10, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
+                      🏦 Routed to: {(selectedOrder as any).paymentMethod === 'COD' ? 'Courier COD Clearing' : 'Razorpay Online Clearing'}
+                    </Text>
+                  </View>
                   <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedOrder.status) + '15', borderColor: getStatusColor(selectedOrder.status) }]}>
                     <Text style={[styles.statusBadgeText, { color: getStatusColor(selectedOrder.status) }]}>
                       {selectedOrder.status.toUpperCase()}

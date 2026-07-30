@@ -10,6 +10,7 @@ const { getRolePermissions } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { z } = require('zod');
+const { logAction } = require('../../utils/auditLogger');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -133,6 +134,13 @@ router.post('/', validate(schemas.productSchema), authorize('product:create'), a
       req.io.emit('product_updated', { type: 'created', id: product._id });
     }
     res.status(201).json(product);
+
+    await logAction({
+      action: 'CREATE_PRODUCT',
+      description: `Created product: ${product.name} (SKU: ${product.sku})`,
+      details: { productId: product._id, name: product.name, sku: product.sku, category: product.category },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -188,6 +196,13 @@ router.put('/:id', validate(schemas.productSchema.partial()), authorize('product
     }
 
     res.json(updatedProduct);
+
+    await logAction({
+      action: 'UPDATE_PRODUCT',
+      description: `Updated product: ${updatedProduct.name} (SKU: ${updatedProduct.sku})`,
+      details: { productId: updatedProduct._id, name: updatedProduct.name, sku: updatedProduct.sku, changes: Object.keys(req.body) },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -214,6 +229,13 @@ router.delete('/:id', authorize('product:delete'), async (req, res) => {
     // Preserve InventoryEntry records (which now have 0 stock) and StockLedger records for audit/ledger history
 
     res.json({ message: 'Product deleted successfully. Inventory ledger records preserved.' });
+
+    await logAction({
+      action: 'DELETE_PRODUCT',
+      description: `Deleted product: ${product.name} (SKU: ${product.sku})`,
+      details: { productId: product._id, name: product.name, sku: product.sku },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -300,6 +322,13 @@ router.patch('/:id/pricing', validate(z.object({ discount: z.number().optional()
     if (!updated) return res.status(404).json({ error: 'Product not found' });
 
     res.json(updated);
+
+    await logAction({
+      action: 'UPDATE_PRODUCT_PRICING',
+      description: `Updated pricing for product: ${updated.name} (SKU: ${updated.sku}) — Price: ₹${updated.price}, Discount: ${updated.discount}%`,
+      details: { productId: updated._id, name: updated.name, sku: updated.sku, price: updated.price, discount: updated.discount, websitePromoActive: updated.websitePromoActive },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
   useWindowDimensions,
   RefreshControl,
   Platform,
-  Modal
+  Modal,
+  Linking,
+  Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -21,6 +23,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { api, getApiBaseUrl, setApiBaseUrl } from '../utils/api';
 import { authStorage } from '../utils/storage';
+import { CustomDatePicker } from '../components/CustomDatePicker';
 import { updateActiveFirmDetails } from '../constants/firm';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import AyurvedicLoader from '../components/AyurvedicLoader';
@@ -38,6 +41,7 @@ export default function ProfileScreen() {
 
   // Tab State for Admin & Profile
   const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'units'>('profile');
+  const [companySubTab, setCompanySubTab] = useState<'general' | 'integrations' | 'billing'>('general');
 
   // Manufacturing Units state
   const [manufacturingUnits, setManufacturingUnits] = useState<any[]>([]);
@@ -53,6 +57,78 @@ export default function ProfileScreen() {
   const [unitPhone, setUnitPhone] = useState('');
   const [unitError, setUnitError] = useState('');
   const [savingUnit, setSavingUnit] = useState(false);
+
+  const [socialAccounts, setSocialAccounts] = useState<{
+    id: string;
+    name: string;
+    page: string;
+    followers: string;
+    icon: any;
+    connected: boolean;
+    color: string;
+    dbId?: string;
+  }[]>([
+    { id: 'facebook', name: 'Facebook Page', page: 'Shekhar Bandhu Aushadhalaya', followers: '15.4k followers', icon: 'logo-facebook' as const, connected: true, color: '#1877f2' },
+    { id: 'instagram', name: 'Instagram Business', page: '@shekhar_bandhu_official', followers: '8.9k followers', icon: 'logo-instagram' as const, connected: true, color: '#e1306c' },
+    { id: 'google', name: 'Google Ads & Analytics', page: 'GA4 - Shekhar Bandhu CRM', followers: 'API Connected', icon: 'logo-google' as const, connected: false, color: '#ea4335' },
+    { id: 'linkedin', name: 'LinkedIn Company', page: 'Shekhar Bandhu Pharmaceuticals', followers: '2.1k followers', icon: 'logo-linkedin' as const, connected: false, color: '#0077b5' },
+    { id: 'whatsapp', name: 'WhatsApp Business', page: '+91 98765 43210', followers: '3.2k reach', icon: 'logo-whatsapp' as const, connected: true, color: '#25d366' },
+  ]);
+
+  const fetchSocialAccounts = useCallback(async () => {
+    try {
+      const connectedList = await api.getSocialAccounts();
+      setSocialAccounts(prev => prev.map(acc => {
+        const match = connectedList.find((c: any) => c.platform === acc.id);
+        if (match) {
+          return {
+            ...acc,
+            connected: true,
+            dbId: match._id,
+            page: match.accountName || acc.page,
+            followers: match.followersCount === 'Connected' ? acc.followers : match.followersCount || acc.followers
+          };
+        }
+        return { ...acc, connected: false, dbId: undefined };
+      }));
+    } catch (err) {
+      console.error('Failed to fetch social integrations:', err);
+    }
+  }, []);
+
+  const toggleAccountConnection = async (id: string) => {
+    const acc = socialAccounts.find(a => a.id === id);
+    if (!acc) return;
+
+    if (acc.connected) {
+      const confirmed = Platform.OS === 'web'
+        ? window.confirm(`Disconnect your ${acc.name} Integration?`)
+        : true;
+      if (!confirmed) return;
+
+      try {
+        if (acc.dbId) {
+          await api.disconnectSocialAccount(acc.dbId);
+        }
+        setSocialAccounts(prev => prev.map(a => a.id === id ? { ...a, connected: false, dbId: undefined } : a));
+        showToast(`${acc.name} disconnected successfully.`, 'success');
+      } catch (err: any) {
+        showToast(err.message || 'Failed to disconnect account', 'error');
+      }
+    } else {
+      try {
+        const { url } = await api.getSocialAuthUrl();
+        if (Platform.OS === 'web') {
+          window.open(url, '_blank');
+        } else {
+          Linking.openURL(url);
+        }
+        showToast('Meta consent page opened. Once authenticated, refresh to see linked accounts!', 'info');
+      } catch (err: any) {
+        showToast(err.message || 'Meta OAuth initiation failed', 'error');
+      }
+    }
+  };
 
   const loadManufacturingUnits = async () => {
     try {
@@ -108,6 +184,50 @@ export default function ProfileScreen() {
   const [bankIfsc, setBankIfsc] = useState('');
   const [bankBranch, setBankBranch] = useState('');
   const [bankUpi, setBankUpi] = useState('');
+  const [loadingIfsc, setLoadingIfsc] = useState(false);
+
+  const handleIfscChange = async (val: string) => {
+    const upper = val.toUpperCase();
+    setBankIfsc(upper);
+
+    const cleaned = upper.trim();
+    if (cleaned.length === 11) {
+      setLoadingIfsc(true);
+      try {
+        const res = await fetch(`https://ifsc.razorpay.com/${cleaned}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.BANK) setBankName(data.BANK);
+          if (data.BRANCH) setBankBranch(data.BRANCH);
+        } else {
+          // Fallback prefix lookup
+          const prefix = cleaned.substring(0, 4);
+          const bankMap: Record<string, string> = {
+            'SBIN': 'State Bank of India',
+            'HDFC': 'HDFC Bank',
+            'ICIC': 'ICICI Bank',
+            'PUNB': 'Punjab National Bank',
+            'BARB': 'Bank of Baroda',
+            'CNRB': 'Canara Bank',
+            'UBIN': 'Union Bank of India',
+            'BKID': 'Bank of India',
+            'IDIB': 'Indian Bank',
+            'KKBK': 'Kotak Mahindra Bank',
+            'UTIB': 'Axis Bank',
+            'YESB': 'Yes Bank',
+            'MAHB': 'Bank of Maharashtra',
+          };
+          if (bankMap[prefix]) {
+            setBankName(bankMap[prefix]);
+          }
+        }
+      } catch (err) {
+        console.log('IFSC fetch error:', err);
+      } finally {
+        setLoadingIfsc(false);
+      }
+    }
+  };
 
   const [invoicePrefix, setInvoicePrefix] = useState('');
   const [quotationPrefix, setQuotationPrefix] = useState('');
@@ -214,11 +334,11 @@ export default function ProfileScreen() {
   useEffect(() => {
     const init = async () => {
       setInitialLoading(true);
-      await Promise.all([loadSessionDetails(), loadCompanyConfig(), loadManufacturingUnits()]);
+      await Promise.all([loadSessionDetails(), loadCompanyConfig(), loadManufacturingUnits(), fetchSocialAccounts()]);
       setInitialLoading(false);
     };
     init();
-  }, [user]);
+  }, [user, fetchSocialAccounts]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -226,6 +346,7 @@ export default function ProfileScreen() {
     await loadSessionDetails();
     await loadCompanyConfig();
     await loadManufacturingUnits();
+    await fetchSocialAccounts();
     setRefreshing(false);
   };
 
@@ -305,7 +426,7 @@ export default function ProfileScreen() {
   // Profile update handler
   const handleSaveProfile = async () => {
     if (!name.trim() || !email.trim()) {
-      showToast('Name and Email are required.', 'warning');
+      showToast('Name and Email are required.', 'error');
       return;
     }
     setProfileLoading(true);
@@ -327,15 +448,15 @@ export default function ProfileScreen() {
   // Change password handler
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      showToast('All password fields are required.', 'warning');
+      showToast('All password fields are required.', 'error');
       return;
     }
     if (newPassword.length < 6) {
-      showToast('New password must be at least 6 characters long.', 'warning');
+      showToast('New password must be at least 6 characters long.', 'error');
       return;
     }
     if (newPassword !== confirmPassword) {
-      showToast('New passwords do not match.', 'warning');
+      showToast('New passwords do not match.', 'error');
       return;
     }
 
@@ -359,7 +480,7 @@ export default function ProfileScreen() {
   // Server URL update handler
   const handleSaveServerUrl = async () => {
     if (!serverUrl.trim()) {
-      showToast('Server URL cannot be empty.', 'warning');
+      showToast('Server URL cannot be empty.', 'error');
       return;
     }
     try {
@@ -375,7 +496,7 @@ export default function ProfileScreen() {
   // Company Settings update handler (Admin Only)
   const handleSaveCompanyConfig = async () => {
     if (!firmName.trim()) {
-      showToast('Firm name is required.', 'warning');
+      showToast('Firm name is required.', 'error');
       return;
     }
     setCompanyLoading(true);
@@ -462,172 +583,179 @@ export default function ProfileScreen() {
 
   const userInitials = user?.name ? user.name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) : 'U';
 
-  const renderForms = () => (
-    <View style={styles.formContainer}>
-      {/* Profile Details & Account Security Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="person-outline" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>Personal Details & Account Security</Text>
-        </View>
-        <View style={styles.cardContent}>
-          {/* Row 1: Name and Email */}
-          <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Full Name</Text>
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter full name"
-                placeholderTextColor={colors.text.muted}
-              />
+  const renderForms = () => {
+    const isProfileChanged = name.trim() !== (user?.name || '').trim();
+    const isPasswordValid = currentPassword.trim().length > 0 && newPassword.length >= 6 && confirmPassword === newPassword;
+
+    return (
+      <View style={styles.formContainer}>
+        <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16, alignItems: 'stretch' }}>
+          {/* Personal Details Card */}
+          <View style={[styles.card, { flex: 1, width: '100%' }]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="person-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Personal Details & Account Security</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Email Address (Account Login - Read Only)</Text>
-              <TextInput
-                style={[styles.input, { opacity: 0.7, backgroundColor: colors.bg.primary }]}
-                value={email}
-                editable={false}
-                placeholder="Enter email address"
-                placeholderTextColor={colors.text.muted}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.btnPrimary, { marginTop: 4, marginBottom: 16 }]}
-            onPress={handleSaveProfile}
-            disabled={profileLoading}
-            activeOpacity={0.8}
-          >
-            {profileLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-                <Text style={styles.btnText}>Save Profile Details</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <View style={[styles.divider, { marginVertical: 12 }]} />
-
-          {/* Change Password Section inside Personal Details */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <Ionicons name="key-outline" size={16} color={colors.primary} />
-            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>Change Account Password</Text>
-          </View>
-
-          <Text style={styles.label}>Current Password</Text>
-          <View style={{ position: 'relative', justifyContent: 'center' }}>
-            <TextInput
-              style={[styles.input, { paddingRight: 40 }]}
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder="Enter current password"
-              placeholderTextColor={colors.text.muted}
-              secureTextEntry={!showCurrentPassword}
-            />
-            <TouchableOpacity
-              style={{ position: 'absolute', right: 12, top: 0, bottom: 12, justifyContent: 'center' }}
-              onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-            >
-              <Ionicons name={showCurrentPassword ? "eye-off-outline" : "eye-outline"} size={18} color={colors.text.muted} />
-            </TouchableOpacity>
-          </View>
-
-          {/* New Password & Confirm New Password in SAME ROW */}
-          <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>New Password</Text>
-              <View style={{ position: 'relative', justifyContent: 'center' }}>
-                <TextInput
-                  style={[styles.input, { paddingRight: 40 }]}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  placeholder="Enter new password"
-                  placeholderTextColor={colors.text.muted}
-                  secureTextEntry={!showNewPassword}
-                />
-                <TouchableOpacity
-                  style={{ position: 'absolute', right: 12, top: 0, bottom: 12, justifyContent: 'center' }}
-                  onPress={() => setShowNewPassword(!showNewPassword)}
-                >
-                  <Ionicons name={showNewPassword ? "eye-off-outline" : "eye-outline"} size={18} color={colors.text.muted} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Password Strength Indicator */}
-              {newPassword.length > 0 && (
-                <View style={{ marginTop: 6, gap: 4 }}>
-                  <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' }}>
-                    <View style={{ width: `${passStrength.score}%`, height: '100%', backgroundColor: passStrength.color }} />
-                  </View>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: passStrength.color }}>
-                    Strength: {passStrength.label}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Confirm New Password</Text>
-              <View style={{ position: 'relative', justifyContent: 'center' }}>
-                <TextInput
-                  style={[styles.input, { paddingRight: 40 }]}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  placeholder="Re-enter new password"
-                  placeholderTextColor={colors.text.muted}
-                  secureTextEntry={!showConfirmPassword}
-                />
-                <TouchableOpacity
-                  style={{ position: 'absolute', right: 12, top: 0, bottom: 12, justifyContent: 'center' }}
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={18} color={colors.text.muted} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Password Match Status Pill */}
-              {confirmPassword.length > 0 && (
-                <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons
-                    name={isMatching ? "checkmark-circle" : "close-circle"}
-                    size={14}
-                    color={isMatching ? colors.success : colors.danger}
+            <View style={[styles.cardContent, { justifyContent: 'space-between', flex: 1 }]}>
+              <View style={{ gap: 12 }}>
+                <View>
+                  <Text style={styles.label}>Full Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Enter full name"
+                    placeholderTextColor={colors.text.muted}
                   />
-                  <Text style={{ fontSize: 10, fontWeight: '800', color: isMatching ? colors.success : colors.danger }}>
-                    {isMatching ? '✔ Passwords Match' : '✖ Passwords do not match'}
-                  </Text>
                 </View>
-              )}
+                <View>
+                  <Text style={styles.label}>Email Address (Account Login - Read Only)</Text>
+                  <TextInput
+                    style={[styles.input, { opacity: 0.7, backgroundColor: colors.bg.primary }]}
+                    value={email}
+                    editable={false}
+                    placeholder="Enter email address"
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.btnPrimary, { marginTop: 20 }, (!isProfileChanged || profileLoading) && { opacity: 0.5 }]}
+                onPress={handleSaveProfile}
+                disabled={profileLoading || !isProfileChanged}
+                activeOpacity={0.8}
+              >
+                {profileLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+                    <Text style={styles.btnText}>Save Profile Details</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
-          <TouchableOpacity
-            style={[styles.btnPrimary, { backgroundColor: colors.warning }]}
-            onPress={handleChangePassword}
-            disabled={passwordLoading}
-            activeOpacity={0.8}
-          >
-            {passwordLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="lock-closed-outline" size={16} color="#fff" />
-                <Text style={styles.btnText}>Update Password</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Change Password Card */}
+          <View style={[styles.card, { flex: 1, width: '100%' }]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="key-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Change Account Password</Text>
+            </View>
+            <View style={[styles.cardContent, { justifyContent: 'space-between', flex: 1 }]}>
+              <View style={{ gap: 12 }}>
+                <View>
+                  <Text style={styles.label}>Current Password</Text>
+                  <View style={{ position: 'relative', justifyContent: 'center' }}>
+                    <TextInput
+                      style={[styles.input, { paddingRight: 40 }]}
+                      value={currentPassword}
+                      onChangeText={setCurrentPassword}
+                      placeholder="Enter current password"
+                      placeholderTextColor={colors.text.muted}
+                      secureTextEntry={!showCurrentPassword}
+                    />
+                    <TouchableOpacity
+                      style={{ position: 'absolute', right: 12, top: 0, bottom: 12, justifyContent: 'center' }}
+                      onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                    >
+                      <Ionicons name={showCurrentPassword ? "eye-off-outline" : "eye-outline"} size={18} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>New Password</Text>
+                    <View style={{ position: 'relative', justifyContent: 'center' }}>
+                      <TextInput
+                        style={[styles.input, { paddingRight: 40 }]}
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                        placeholder="Enter new password"
+                        placeholderTextColor={colors.text.muted}
+                        secureTextEntry={!showNewPassword}
+                      />
+                      <TouchableOpacity
+                        style={{ position: 'absolute', right: 12, top: 0, bottom: 12, justifyContent: 'center' }}
+                        onPress={() => setShowNewPassword(!showNewPassword)}
+                      >
+                        <Ionicons name={showNewPassword ? "eye-off-outline" : "eye-outline"} size={18} color={colors.text.muted} />
+                      </TouchableOpacity>
+                    </View>
+
+                    {newPassword.length > 0 && (
+                      <View style={{ marginTop: 6, gap: 4 }}>
+                        <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' }}>
+                          <View style={{ width: `${passStrength.score}%`, height: '100%', backgroundColor: passStrength.color }} />
+                        </View>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: passStrength.color }}>
+                          Strength: {passStrength.label}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Confirm New Password</Text>
+                    <View style={{ position: 'relative', justifyContent: 'center' }}>
+                      <TextInput
+                        style={[styles.input, { paddingRight: 40 }]}
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        placeholder="Re-enter new password"
+                        placeholderTextColor={colors.text.muted}
+                        secureTextEntry={!showConfirmPassword}
+                      />
+                      <TouchableOpacity
+                        style={{ position: 'absolute', right: 12, top: 0, bottom: 12, justifyContent: 'center' }}
+                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={18} color={colors.text.muted} />
+                      </TouchableOpacity>
+                    </View>
+
+                    {confirmPassword.length > 0 && (
+                      <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons
+                          name={isMatching ? "checkmark-circle" : "close-circle"}
+                          size={14}
+                          color={isMatching ? colors.success : colors.danger}
+                        />
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: isMatching ? colors.success : colors.danger }}>
+                          {isMatching ? '✔ Passwords Match' : '✖ Passwords do not match'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.btnPrimary, { backgroundColor: colors.warning, marginTop: 20 }, (!isPasswordValid || passwordLoading) && { opacity: 0.5 }]}
+                onPress={handleChangePassword}
+                disabled={passwordLoading || !isPasswordValid}
+                activeOpacity={0.8}
+              >
+                {passwordLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="lock-closed-outline" size={16} color="#fff" />
+                    <Text style={styles.btnText}>Update Password</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </View>
-
-    </View>
-  );
+    );
+  };
 
   const canEdit = perm.can('settings:edit');
 
@@ -641,675 +769,656 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {/* Firm details card */}
-      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="business-outline" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>Firm Details</Text>
-        </View>
-        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-          <Text style={styles.label}>Firm / Company Name</Text>
-          <TextInput
-            style={styles.input}
-            value={firmName}
-            onChangeText={setFirmName}
-            placeholder="Enter firm name"
-            placeholderTextColor={colors.text.muted}
-          />
-
-          <Text style={styles.label}>Address</Text>
-          <TextInput
-            style={[styles.input, { minHeight: 60 }]}
-            value={firmAddress}
-            onChangeText={setFirmAddress}
-            placeholder="Enter billing address"
-            placeholderTextColor={colors.text.muted}
-            multiline
-          />
-
-          <View style={styles.rowInputs}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Phone Number</Text>
-              <TextInput
-                style={styles.input}
-                value={firmPhone}
-                onChangeText={setFirmPhone}
-                placeholder="Phone number"
-                placeholderTextColor={colors.text.muted}
-                keyboardType="phone-pad"
-              />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.label}>GSTIN / Tax ID</Text>
-              <TextInput
-                style={styles.input}
-                value={firmGstin}
-                onChangeText={setFirmGstin}
-                placeholder="GSTIN number"
-                placeholderTextColor={colors.text.muted}
-                autoCapitalize="characters"
-              />
-            </View>
-          </View>
-
-          <Text style={styles.label}>Firm Email Address</Text>
-          <TextInput
-            style={styles.input}
-            value={firmEmail}
-            onChangeText={setFirmEmail}
-            placeholder="Enter contact email"
-            placeholderTextColor={colors.text.muted}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <View style={[styles.divider, { marginVertical: 8 }]} />
-
-          {/* AYUSH Manufacturing License & GMP Section */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, marginTop: 4 }}>
-            <Ionicons name="shield-checkmark-outline" size={16} color={colors.success} />
-            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>AYUSH Manufacturing License & GMP</Text>
-          </View>
-
-          <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 10, lineHeight: 14 }}>
-            Enter your AYUSH / State Drug Authority manufacturing license number and GMP certificate details. License format: e.g. "AYU/MFG/UP/12345" or as issued by your State Licensing Authority under Drugs & Cosmetics Act.
-          </Text>
-
-          <View style={styles.rowInputs}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Manufacturing License No. *</Text>
-              <TextInput
-                style={[styles.input, manufacturingLicenseNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(manufacturingLicenseNo.trim()) ? { borderColor: colors.danger } : {}]}
-                value={manufacturingLicenseNo}
-                onChangeText={setManufacturingLicenseNo}
-                placeholder="e.g. AYU/MFG/UP/12345"
-                placeholderTextColor={colors.text.muted}
-                autoCapitalize="characters"
-              />
-              {manufacturingLicenseNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(manufacturingLicenseNo.trim()) ? (
-                <Text style={{ fontSize: 9, color: colors.danger, marginTop: -8, marginBottom: 6 }}>⚠ Invalid format. Use alphanumeric with / - . only (as per AYUSH guidelines)</Text>
-              ) : manufacturingLicenseNo.trim() ? (
-                <Text style={{ fontSize: 9, color: colors.success, marginTop: -8, marginBottom: 6 }}>✓ Format looks valid</Text>
-              ) : null}
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.label}>License Valid Till</Text>
-              {Platform.OS === 'web' ? (
-                <input
-                  type="date"
-                  value={licenseValidTill}
-                  onChange={(e: any) => setLicenseValidTill(e.target.value)}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: `1px solid ${licenseValidTill && new Date(licenseValidTill) < new Date() ? colors.danger : colors.border}`,
-                    backgroundColor: colors.bg.secondary,
-                    color: colors.text.primary,
-                    fontSize: 13,
-                    height: 42,
-                    width: '100%',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    marginBottom: 12,
-                  } as any}
-                />
-              ) : (
-                <TextInput
-                  style={styles.input}
-                  value={licenseValidTill}
-                  onChangeText={setLicenseValidTill}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.text.muted}
-                />
-              )}
-              {licenseValidTill && new Date(licenseValidTill) < new Date() ? (
-                <Text style={{ fontSize: 9, color: colors.danger, marginTop: -8, marginBottom: 6 }}>⚠ License has EXPIRED! Renew immediately.</Text>
-              ) : licenseValidTill ? (
-                <Text style={{ fontSize: 9, color: colors.success, marginTop: -8, marginBottom: 6 }}>✓ Valid till {new Date(licenseValidTill).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
-              ) : null}
-            </View>
-          </View>
-
-          <View style={styles.rowInputs}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>GMP Certificate No.</Text>
-              <TextInput
-                style={[styles.input, gmpCertificateNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(gmpCertificateNo.trim()) ? { borderColor: colors.danger } : {}]}
-                value={gmpCertificateNo}
-                onChangeText={setGmpCertificateNo}
-                placeholder="e.g. GMP/AYU/UP/2024/12345"
-                placeholderTextColor={colors.text.muted}
-                autoCapitalize="characters"
-              />
-              {gmpCertificateNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(gmpCertificateNo.trim()) ? (
-                <Text style={{ fontSize: 9, color: colors.danger, marginTop: -8, marginBottom: 6 }}>⚠ Invalid format. Use alphanumeric with / - . only</Text>
-              ) : gmpCertificateNo.trim() ? (
-                <Text style={{ fontSize: 9, color: colors.success, marginTop: -8, marginBottom: 6 }}>✓ Format looks valid</Text>
-              ) : null}
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.label}>GMP Valid Till</Text>
-              {Platform.OS === 'web' ? (
-                <input
-                  type="date"
-                  value={gmpValidTill}
-                  onChange={(e: any) => setGmpValidTill(e.target.value)}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: `1px solid ${gmpValidTill && new Date(gmpValidTill) < new Date() ? colors.danger : colors.border}`,
-                    backgroundColor: colors.bg.secondary,
-                    color: colors.text.primary,
-                    fontSize: 13,
-                    height: 42,
-                    width: '100%',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    marginBottom: 12,
-                  } as any}
-                />
-              ) : (
-                <TextInput
-                  style={styles.input}
-                  value={gmpValidTill}
-                  onChangeText={setGmpValidTill}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.text.muted}
-                />
-              )}
-              {gmpValidTill && new Date(gmpValidTill) < new Date() ? (
-                <Text style={{ fontSize: 9, color: colors.danger, marginTop: -8, marginBottom: 6 }}>⚠ GMP Certificate has EXPIRED! Renew immediately.</Text>
-              ) : gmpValidTill ? (
-                <Text style={{ fontSize: 9, color: colors.success, marginTop: -8, marginBottom: 6 }}>✓ Valid till {new Date(gmpValidTill).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
-              ) : null}
-            </View>
-          </View>
-        </View>
+      {/* Company Sub-Tab Selector */}
+      <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12, backgroundColor: colors.bg.card, padding: 4, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
+        {[
+          { id: 'general', label: 'General Info', icon: 'business-outline' },
+          { id: 'integrations', label: 'Integrations & AI', icon: 'logo-instagram' },
+          { id: 'billing', label: 'Billing & Server', icon: 'options-outline' },
+        ].map(tab => (
+          <TouchableOpacity
+            key={tab.id}
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              paddingVertical: 8,
+              borderRadius: Radius.sm,
+              backgroundColor: companySubTab === tab.id ? colors.primary + '12' : 'transparent',
+              borderWidth: companySubTab === tab.id ? 1 : 0,
+              borderColor: colors.primary,
+            }}
+            onPress={() => setCompanySubTab(tab.id as any)}
+          >
+            <Ionicons name={tab.icon as any} size={14} color={companySubTab === tab.id ? colors.primary : colors.text.secondary} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: companySubTab === tab.id ? colors.primary : colors.text.secondary }} numberOfLines={1}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Bank Details Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="card-outline" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>Bank Details</Text>
-        </View>
-        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-          <Text style={styles.label}>Bank Name</Text>
-          <TextInput
-            style={styles.input}
-            value={bankName}
-            onChangeText={setBankName}
-            placeholder="e.g. State Bank of India"
-            placeholderTextColor={colors.text.muted}
-          />
-
-          <View style={styles.rowInputs}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Account Number</Text>
-              <TextInput
-                style={styles.input}
-                value={bankAccountNo}
-                onChangeText={setBankAccountNo}
-                placeholder="Account number"
-                placeholderTextColor={colors.text.muted}
-                keyboardType="numeric"
-              />
+      {companySubTab === 'general' && (
+        <>
+          {/* Firm details card */}
+          <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="business-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Firm Details</Text>
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.label}>IFSC Code</Text>
-              <TextInput
-                style={styles.input}
-                value={bankIfsc}
-                onChangeText={setBankIfsc}
-                placeholder="IFSC code"
-                placeholderTextColor={colors.text.muted}
-                autoCapitalize="characters"
-              />
-            </View>
-          </View>
-
-          <View style={styles.rowInputs}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Branch Name</Text>
-              <TextInput
-                style={styles.input}
-                value={bankBranch}
-                onChangeText={setBankBranch}
-                placeholder="Branch details"
-                placeholderTextColor={colors.text.muted}
-              />
-            </View>
-          </View>
-
-          <View style={{ flexDirection: isDesktop ? 'row' : 'column', alignItems: 'flex-end', gap: 12 }}>
-            {/* UPI ID Input */}
-            <View style={{ flex: 1, width: isDesktop ? 'auto' : '100%' }}>
-              <Text style={styles.label}>UPI ID</Text>
-              <TextInput
-                style={[styles.input, { marginBottom: 0 }]}
-                value={bankUpi}
-                onChangeText={setBankUpi}
-                placeholder="e.g. shopify@upi"
-                placeholderTextColor={colors.text.muted}
-                autoCapitalize="none"
-              />
-            </View>
-
-            {/* QR Code Image Upload */}
-            <View style={{ width: isDesktop ? 'auto' : '100%' }}>
-              <Text style={styles.label}>QR Code Image</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: colors.primary + '12',
-                    borderWidth: 1,
-                    borderStyle: 'dashed',
-                    borderColor: colors.primary,
-                    borderRadius: Radius.md,
-                    paddingHorizontal: 14,
-                    height: 42,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                  onPress={() => {
-                    if (Platform.OS === 'web') {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/png, image/jpeg, image/jpg';
-                      input.onchange = (e: any) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          setQrUploading(true);
-                          const reader = new FileReader();
-                          reader.onload = async (uploadEvent: any) => {
-                            try {
-                              const { url } = await api.uploadFile(uploadEvent.target.result, file.name);
-                              setQrImageUrl(url);
-                              setQrImageBase64('');
-                              showToast('QR code image uploaded!', 'success');
-                            } catch (err: any) {
-                              showToast(err.message || 'QR image upload failed.', 'error');
-                            } finally {
-                              setQrUploading(false);
-                            }
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      };
-                      input.click();
-                    } else {
-                      showToast('Please upload QR image on Web dashboard.', 'info');
-                    }
-                  }}
-                >
-                  {qrUploading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Ionicons name="cloud-upload-outline" size={16} color={colors.primary} />
-                  )}
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-                    {qrUploading ? 'Uploading...' : (qrImageUrl || qrImageBase64) ? 'Change QR Image' : 'Upload QR Image'}
-                  </Text>
-                </TouchableOpacity>
-
-                {(qrImageUrl || qrImageBase64) ? (
-                  <TouchableOpacity
-                    style={{ padding: 6 }}
-                    onPress={() => {
-                      Alert.alert('Clear QR Image', 'Are you sure?', [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Clear', style: 'destructive', onPress: () => {
-                          setQrImageBase64('');
-                          setQrImageUrl('');
-                          showToast('QR code cleared.', 'info');
-                        }},
-                      ]);
-                    }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                  </TouchableOpacity>
-                ) : null}
+            <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
+              {/* Row 1: Firm Name, GSTIN, Phone */}
+              <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Firm / Company Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={firmName}
+                    onChangeText={setFirmName}
+                    placeholder="Enter firm name"
+                    placeholderTextColor={colors.text.muted}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>GSTIN / Tax ID</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={firmGstin}
+                    onChangeText={setFirmGstin}
+                    placeholder="GSTIN number"
+                    placeholderTextColor={colors.text.muted}
+                    autoCapitalize="characters"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Phone Number</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={firmPhone}
+                    onChangeText={setFirmPhone}
+                    placeholder="Phone number"
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="phone-pad"
+                  />
+                </View>
               </View>
-            </View>
-          </View>
 
-          {(qrImageUrl || qrImageBase64) ? (
-            <View style={{ marginTop: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 6 }}>QR Preview on Delivery Challan:</Text>
-              {Platform.OS === 'web' ? (
-                <img src={qrImageUrl || qrImageBase64} style={{ maxHeight: 90, maxWidth: 90, objectFit: 'contain' }} />
-              ) : (
-                <Text style={{ fontSize: 11, color: colors.success, fontWeight: '700' }}>✔ QR code loaded</Text>
-              )}
-            </View>
-          ) : null}
-        </View>
-      </View>
+              {/* Row 2: Address, Email */}
+              <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12, marginTop: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Address</Text>
+                  <TextInput
+                    style={[styles.input, { minHeight: 40 }]}
+                    value={firmAddress}
+                    onChangeText={setFirmAddress}
+                    placeholder="Enter billing address"
+                    placeholderTextColor={colors.text.muted}
+                    multiline
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Firm Email Address</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={firmEmail}
+                    onChangeText={setFirmEmail}
+                    placeholder="Enter contact email"
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
 
-      {/* Payment Gateway (Razorpay) Card */}
-      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="card-outline" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>Payment Gateway Credentials (Razorpay)</Text>
-        </View>
-        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-          <View style={styles.switchRow}>
-            <Text style={styles.label}>Enable Online Payments</Text>
-            <TouchableOpacity
-              style={[styles.toggleBtn, paymentGatewayEnabled && { backgroundColor: colors.success }]}
-              onPress={() => setPaymentGatewayEnabled(!paymentGatewayEnabled)}
-            >
-              <Text style={{ color: paymentGatewayEnabled ? '#fff' : colors.text.secondary, fontSize: 12, fontWeight: '700' }}>
-                {paymentGatewayEnabled ? 'ENABLED' : 'DISABLED'}
+              <View style={[styles.divider, { marginVertical: 12 }]} />
+
+              {/* AYUSH Manufacturing License & GMP Section */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={colors.success} />
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>AYUSH Manufacturing License & GMP</Text>
+              </View>
+
+              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 10, lineHeight: 14 }}>
+                Enter your AYUSH / State Drug Authority manufacturing license number and GMP certificate details. License format: e.g. "AYU/MFG/UP/12345" or as issued by your State Licensing Authority under Drugs & Cosmetics Act.
               </Text>
-            </TouchableOpacity>
-          </View>
 
-          <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12, lineHeight: 14 }}>
-            Configure Razorpay keys to allow customers to pay invoices online.
-          </Text>
+              {/* Row 3: All 4 License & GMP Fields in One Row */}
+              <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.label}>Manufacturing License No. *</Text>
+                  <TextInput
+                    style={[styles.input, manufacturingLicenseNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(manufacturingLicenseNo.trim()) ? { borderColor: colors.danger } : {}]}
+                    value={manufacturingLicenseNo}
+                    onChangeText={setManufacturingLicenseNo}
+                    placeholder="e.g. AYU/MFG/UP/12345"
+                    placeholderTextColor={colors.text.muted}
+                    autoCapitalize="characters"
+                  />
+                  {manufacturingLicenseNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(manufacturingLicenseNo.trim()) ? (
+                    <Text style={{ fontSize: 9, color: colors.danger, marginTop: -2, marginBottom: 6 }}>⚠ Invalid format</Text>
+                  ) : manufacturingLicenseNo.trim() ? (
+                    <Text style={{ fontSize: 9, color: colors.success, marginTop: -2, marginBottom: 6 }}>✓ Valid format</Text>
+                  ) : null}
+                </View>
 
-          <Text style={styles.label}>Razorpay Key ID</Text>
-          <TextInput
-            style={styles.input}
-            value={razorpayKeyId}
-            onChangeText={setRazorpayKeyId}
-            placeholder="e.g. rzp_live_xxxxxxxx"
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="none"
-          />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Valid Till</Text>
+                  <CustomDatePicker
+                    value={licenseValidTill}
+                    onChange={setLicenseValidTill}
+                    placeholder="YYYY-MM-DD"
+                    compact
+                  />
+                  {licenseValidTill && new Date(licenseValidTill) < new Date() ? (
+                    <Text style={{ fontSize: 9, color: colors.danger, marginTop: 4, marginBottom: 6 }}>⚠ Expired</Text>
+                  ) : null}
+                </View>
 
-          <Text style={styles.label}>Razorpay Key Secret</Text>
-          <TextInput
-            style={styles.input}
-            value={razorpayKeySecret}
-            onChangeText={setRazorpayKeySecret}
-            placeholder="Enter secret key"
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="none"
-            secureTextEntry
-          />
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.label}>GMP Certificate No.</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={gmpCertificateNo}
+                    onChangeText={setGmpCertificateNo}
+                    placeholder="e.g. GMP/UP/2026/789"
+                    placeholderTextColor={colors.text.muted}
+                  />
+                </View>
 
-          <Text style={styles.label}>Webhook Secret (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={razorpayWebhookSecret}
-            onChangeText={setRazorpayWebhookSecret}
-            placeholder="For auto-confirming payments"
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="none"
-            secureTextEntry
-          />
-        </View>
-      </View>
-
-      {/* Digital Signature & Authorised Seal Upload Card */}
-      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="document-text-outline" size={18} color={colors.success} />
-          <Text style={styles.cardTitle}>Digital Signature & Authorised Seal Credentials</Text>
-        </View>
-        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-          <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
-            Upload signature PNG image & set signatory designation for Rule 46 CGST & Section 5 IT Act 2000 legal compliance.
-          </Text>
-
-          <View style={{ flexDirection: isDesktop ? 'row' : 'column', alignItems: 'flex-end', gap: 12 }}>
-            {/* Input 1: Signatory Name */}
-            <View style={{ flex: 1, width: isDesktop ? 'auto' : '100%' }}>
-              <Text style={styles.label}>Authorised Signatory / Designation</Text>
-              <TextInput
-                style={[styles.input, { marginBottom: 0 }]}
-                value={dscSignatoryName}
-                onChangeText={setDscSignatoryName}
-                placeholder="e.g. Director / Authorised Rep"
-                placeholderTextColor={colors.text.muted}
-              />
-            </View>
-
-            {/* Input 2: Certifying Authority */}
-            <View style={{ flex: 1, width: isDesktop ? 'auto' : '100%' }}>
-              <Text style={styles.label}>Govt Certifying Authority / CA</Text>
-              <TextInput
-                style={[styles.input, { marginBottom: 0 }]}
-                value={dscCertificateName}
-                onChangeText={setDscCertificateName}
-                placeholder="e.g. eMudhra Class 3 DSC"
-                placeholderTextColor={colors.text.muted}
-              />
-            </View>
-
-            {/* Input 3: Signature PNG Upload Button */}
-            <View style={{ width: isDesktop ? 'auto' : '100%' }}>
-              <Text style={styles.label}>Visual Signature PNG / Stamp</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: colors.primary + '12',
-                    borderWidth: 1,
-                    borderStyle: 'dashed',
-                    borderColor: colors.primary,
-                    borderRadius: Radius.md,
-                    paddingHorizontal: 14,
-                    height: 42,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                  onPress={() => {
-                    if (Platform.OS === 'web') {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/png, image/jpeg, image/jpg';
-                      input.onchange = (e: any) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          setSignatureUploading(true);
-                          const reader = new FileReader();
-                          reader.onload = async (uploadEvent: any) => {
-                            try {
-                              const { url } = await api.uploadFile(uploadEvent.target.result, file.name);
-                              setSignatureUrl(url);
-                              setSignatureBase64('');
-                              showToast('Signature uploaded!', 'success');
-                            } catch (err: any) {
-                              showToast(err.message || 'Signature upload failed.', 'error');
-                            } finally {
-                              setSignatureUploading(false);
-                            }
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      };
-                      input.click();
-                    } else {
-                      showToast('Please upload signature image on Web dashboard.', 'info');
-                    }
-                  }}
-                >
-                  {signatureUploading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Ionicons name="cloud-upload-outline" size={16} color={colors.primary} />
-                  )}
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-                    {signatureUploading ? 'Uploading...' : (signatureUrl || signatureBase64) ? 'Change PNG' : 'Upload PNG'}
-                  </Text>
-                </TouchableOpacity>
-
-                {(signatureUrl || signatureBase64) ? (
-                  <TouchableOpacity
-                    style={{ padding: 6 }}
-                    onPress={() => {
-                      Alert.alert('Clear Signature', 'Are you sure?', [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Clear', style: 'destructive', onPress: () => {
-                          setSignatureBase64('');
-                          setSignatureUrl('');
-                          showToast('Signature cleared.', 'info');
-                        }},
-                      ]);
-                    }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                  </TouchableOpacity>
-                ) : null}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>GMP Valid Till</Text>
+                  <CustomDatePicker
+                    value={gmpValidTill}
+                    onChange={setGmpValidTill}
+                    placeholder="YYYY-MM-DD"
+                    compact
+                    alignRight
+                  />
+                </View>
               </View>
             </View>
           </View>
 
-          {(signatureUrl || signatureBase64) ? (
-            <View style={{ marginTop: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 6 }}>Signature Preview on Tax Documents:</Text>
-              {Platform.OS === 'web' ? (
-                <img src={signatureUrl || signatureBase64} style={{ maxHeight: 50, maxWidth: 200, objectFit: 'contain' }} />
-              ) : (
-                <Text style={{ fontSize: 11, color: colors.success, fontWeight: '700' }}>✔ Signature loaded</Text>
-              )}
+          {/* Bank, UPI & Payment Gateway Settlement Details Card */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="card-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Bank, UPI & Payment Gateway Settlement Details</Text>
             </View>
-          ) : null}
-        </View>
-      </View>
+            <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
+              <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 24 }}>
+                {/* Left Side: Bank Account Details */}
+                <View style={{ flex: 1.2 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    🏦 Bank Account Details
+                  </Text>
 
-      {/* Bill Prefixes & Taxes Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="options-outline" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>Prefixes, Terms & Taxes</Text>
-        </View>
-        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-          <View style={styles.rowInputs}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Invoice Prefix</Text>
-              <TextInput
-                style={styles.input}
-                value={invoicePrefix}
-                onChangeText={setInvoicePrefix}
-                placeholder="e.g. SB"
-                placeholderTextColor={colors.text.muted}
-              />
+                  <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.label}>IFSC Code *</Text>
+                      <View style={{ position: 'relative', justifyContent: 'center' }}>
+                        <TextInput
+                          style={[styles.input, { paddingRight: loadingIfsc ? 36 : 12 }, bankIfsc.trim() && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(bankIfsc.trim()) ? { borderColor: colors.danger } : {}]}
+                          value={bankIfsc}
+                          onChangeText={handleIfscChange}
+                          placeholder="e.g. SBIN0001234"
+                          placeholderTextColor={colors.text.muted}
+                          autoCapitalize="characters"
+                          maxLength={11}
+                        />
+                        {loadingIfsc && (
+                          <View style={{ position: 'absolute', right: 10, top: 12 }}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                          </View>
+                        )}
+                      </View>
+                      {bankIfsc.trim() && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(bankIfsc.trim()) ? (
+                        <Text style={{ fontSize: 9, color: colors.danger, marginTop: 4, marginBottom: 6 }}>⚠ Invalid 11-digit IFSC code</Text>
+                      ) : null}
+                    </View>
+
+                    <View style={{ flex: 1.2 }}>
+                      <Text style={styles.label}>Account Number *</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={bankAccountNo}
+                        onChangeText={setBankAccountNo}
+                        placeholder="e.g. 30123456789"
+                        placeholderTextColor={colors.text.muted}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={styles.label}>Bank Name</Text>
+                        <Text style={{ fontSize: 9, color: colors.text.muted, fontStyle: 'italic', marginBottom: 6 }}>(Auto-filled)</Text>
+                      </View>
+                      <TextInput
+                        style={styles.input}
+                        value={bankName}
+                        onChangeText={setBankName}
+                        placeholder="Auto-filled from IFSC"
+                        placeholderTextColor={colors.text.muted}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={styles.label}>Branch Name</Text>
+                        <Text style={{ fontSize: 9, color: colors.text.muted, fontStyle: 'italic', marginBottom: 6 }}>(Auto-filled)</Text>
+                      </View>
+                      <TextInput
+                        style={styles.input}
+                        value={bankBranch}
+                        onChangeText={setBankBranch}
+                        placeholder="Branch details"
+                        placeholderTextColor={colors.text.muted}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Vertical Divider for Desktop */}
+                {isDesktop && <View style={{ width: 1, backgroundColor: colors.border, alignSelf: 'stretch' }} />}
+
+                {/* Right Side: UPI & QR Code Details */}
+                <View style={{ flex: 1.2 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    📱 UPI & QR Code Details
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+                    {/* Left sub-column: UPI ID + Upload Button */}
+                    <View style={{ flex: 1 }}>
+                      <View style={{ marginBottom: 10 }}>
+                        <Text style={styles.label}>UPI ID</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={bankUpi}
+                          onChangeText={setBankUpi}
+                          placeholder="e.g. firm@upi"
+                          placeholderTextColor={colors.text.muted}
+                          autoCapitalize="none"
+                        />
+                      </View>
+
+                      <Text style={styles.label}>QR Code Image</Text>
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: colors.primary + '12',
+                          borderWidth: 1,
+                          borderStyle: 'dashed',
+                          borderColor: colors.primary,
+                          borderRadius: Radius.md,
+                          paddingHorizontal: 12,
+                          height: 42,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                        }}
+                        onPress={() => {
+                          if (Platform.OS === 'web') {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/png, image/jpeg, image/jpg';
+                            input.onchange = (e: any) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                setQrUploading(true);
+                                const reader = new FileReader();
+                                reader.onload = async (uploadEvent: any) => {
+                                  try {
+                                    const { url } = await api.uploadFile(uploadEvent.target.result, file.name);
+                                    setQrImageUrl(url);
+                                    setQrImageBase64('');
+                                    showToast('QR code image uploaded!', 'success');
+                                  } catch (err: any) {
+                                    showToast(err.message || 'QR image upload failed.', 'error');
+                                  } finally {
+                                    setQrUploading(false);
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            };
+                            input.click();
+                          } else {
+                            showToast('Please upload QR image on Web dashboard.', 'info');
+                          }
+                        }}
+                      >
+                        {qrUploading ? (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        ) : (
+                          <Ionicons name="cloud-upload-outline" size={16} color={colors.primary} />
+                        )}
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }} numberOfLines={1}>
+                          {qrUploading ? 'Uploading...' : (qrImageUrl || qrImageBase64) ? 'Change QR' : 'Upload QR Image'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Right sub-column: QR Code Preview */}
+                    {(qrImageUrl || qrImageBase64) ? (
+                      <View style={{ alignItems: 'flex-start' }}>
+                        <Text style={{ fontSize: 9, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+                          Invoice QR Preview
+                        </Text>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          {Platform.OS === 'web' ? (
+                            <img 
+                              src={qrImageUrl || qrImageBase64} 
+                              style={{ 
+                                height: 105, 
+                                width: 105, 
+                                borderRadius: 8, 
+                                border: `1px solid ${colors.border}`, 
+                                backgroundColor: '#ffffff',
+                                padding: 4,
+                                objectFit: 'contain',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                              }} 
+                            />
+                          ) : (
+                            <View style={{ padding: 8, backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+                              <Ionicons name="qr-code" size={80} color={colors.text.primary} />
+                            </View>
+                          )}
+
+                          {/* Delete Button OUTSIDE the QR Image Box */}
+                          <TouchableOpacity
+                            style={{
+                              padding: 8,
+                              backgroundColor: colors.danger + '12',
+                              borderRadius: Radius.md,
+                              borderWidth: 1,
+                              borderColor: colors.danger + '30',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                            }}
+                            onPress={() => {
+                              Alert.alert('Clear QR Image', 'Are you sure?', [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Clear', style: 'destructive', onPress: () => {
+                                  setQrImageBase64('');
+                                  setQrImageUrl('');
+                                  showToast('QR code cleared.', 'info');
+                                }},
+                              ]);
+                            }}
+                          >
+                            <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+
+              {/* Horizontal Divider */}
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 18 }} />
+
+              {/* Bottom Section: Payment Gateway Credentials (Razorpay) */}
+              <View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    💳 Online Payment Gateway Credentials (Razorpay)
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, paymentGatewayEnabled && { backgroundColor: colors.success }]}
+                    onPress={() => setPaymentGatewayEnabled(!paymentGatewayEnabled)}
+                  >
+                    <Text style={{ color: paymentGatewayEnabled ? '#fff' : colors.text.secondary, fontSize: 11, fontWeight: '700' }}>
+                      {paymentGatewayEnabled ? 'ENABLED' : 'DISABLED'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12 }}>
+                  Configure your Razorpay API keys to accept online customer invoice payments & auto-reconcile settlements.
+                </Text>
+
+                <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Razorpay Key ID</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={razorpayKeyId}
+                      onChangeText={setRazorpayKeyId}
+                      placeholder="e.g. rzp_live_xxxxxxxx"
+                      placeholderTextColor={colors.text.muted}
+                      autoCapitalize="none"
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Razorpay Key Secret</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={razorpayKeySecret}
+                      onChangeText={setRazorpayKeySecret}
+                      placeholder="Enter secret key"
+                      placeholderTextColor={colors.text.muted}
+                      autoCapitalize="none"
+                      secureTextEntry
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Webhook Secret (Optional)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={razorpayWebhookSecret}
+                      onChangeText={setRazorpayWebhookSecret}
+                      placeholder="For auto-confirming payments"
+                      placeholderTextColor={colors.text.muted}
+                      autoCapitalize="none"
+                      secureTextEntry
+                    />
+                  </View>
+                </View>
+              </View>
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.label}>Quotation Prefix</Text>
+          </View>
+        </>
+      )}
+
+      {companySubTab === 'integrations' && (
+        <>
+          {/* Connected Pages & Accounts Card */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="link-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Connected Pages & Accounts</Text>
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
+                Link your brand's official social media pages, Google Ads, and communication channels to enable automated multi-platform promotions and analytics sync.
+              </Text>
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                {socialAccounts.map(acc => (
+                  <View 
+                    key={acc.id} 
+                    style={{ 
+                      width: isDesktop ? 'calc(20% - 8px)' as any : '48%', 
+                      backgroundColor: colors.bg.primary, 
+                      borderWidth: 1, 
+                      borderColor: colors.border, 
+                      borderRadius: Radius.md, 
+                      padding: 10, 
+                      gap: 2 
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: acc.color + '15', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name={acc.icon} size={16} color={acc.color} />
+                      </View>
+                      <Switch
+                        value={acc.connected}
+                        onValueChange={() => toggleAccountConnection(acc.id)}
+                        trackColor={{ false: '#767577', true: colors.primary + '80' }}
+                        thumbColor={acc.connected ? colors.primary : '#f4f3f4'}
+                        style={Platform.OS === 'web' ? { transform: [{ scale: 0.8 }] } : { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                      />
+                    </View>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text.primary }} numberOfLines={1}>{acc.name}</Text>
+                    <Text style={{ fontSize: 9, color: colors.text.secondary }} numberOfLines={1}>
+                      {acc.connected ? acc.page : 'Not Connected'}
+                    </Text>
+                    {acc.connected && (
+                      <Text style={{ fontSize: 9, fontWeight: '700', color: colors.primary, marginTop: 1 }} numberOfLines={1}>
+                        {acc.followers}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Google Gemini AI Analytics Key Card */}
+          <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="sparkles" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Artificial Intelligence Credentials (Google Gemini 2.5)</Text>
+            </View>
+            <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
+              <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
+                Configure your Google AI Studio API Key to power the natural language Business AI Assistant and executive CRM analytics.
+              </Text>
+
+              <Text style={styles.label}>Google Gemini API Key</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <TextInput
+                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                  value={geminiApiKey}
+                  onChangeText={setGeminiApiKey}
+                  placeholder="Paste your Gemini API Key (e.g. AIzaSy...)"
+                  placeholderTextColor={colors.text.muted}
+                  secureTextEntry
+                />
+              </View>
+              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 6 }}>
+                Status: {geminiApiKey ? '✔ Key configured (Gemini 2.5 Flash Engine Enabled)' : '⚠️ Not configured'}
+              </Text>
+            </View>
+          </View>
+
+          {/* App Server Settings Card */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="server-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>App Server Settings</Text>
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={styles.label}>Base API Server URL</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <TextInput
+                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                  value={serverUrl}
+                  onChangeText={setServerUrl}
+                  placeholder="e.g. http://192.168.1.100:5000/api"
+                  placeholderTextColor={colors.text.muted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 16, height: 42, marginTop: 0 }]}
+                  onPress={handleSaveServerUrl}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="save-outline" size={16} color="#fff" />
+                  <Text style={styles.btnText}>Save Link</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </>
+      )}
+
+      {companySubTab === 'billing' && (
+        <>
+          {/* Bill Prefixes & Taxes Card */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="options-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Prefixes, Terms & Taxes</Text>
+            </View>
+            <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
+              <View style={styles.rowInputs}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Invoice Prefix</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={invoicePrefix}
+                    onChangeText={setInvoicePrefix}
+                    placeholder="e.g. SB"
+                    placeholderTextColor={colors.text.muted}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.label}>Quotation Prefix</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={quotationPrefix}
+                    onChangeText={setQuotationPrefix}
+                    placeholder="e.g. QT"
+                    placeholderTextColor={colors.text.muted}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.rowInputs}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Challan Prefix</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={challanPrefix}
+                    onChangeText={setChallanPrefix}
+                    placeholder="e.g. CH"
+                    placeholderTextColor={colors.text.muted}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.label}>Default GST Slab (%)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={defaultGstRate}
+                    onChangeText={setDefaultGstRate}
+                    placeholder="e.g. 18"
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.label}>Invoice Terms & Conditions</Text>
               <TextInput
-                style={styles.input}
-                value={quotationPrefix}
-                onChangeText={setQuotationPrefix}
-                placeholder="e.g. QT"
+                style={[styles.input, { minHeight: 100, fontSize: 12 }]}
+                value={defaultTerms}
+                onChangeText={setDefaultTerms}
+                placeholder="Type default terms printed on documents..."
                 placeholderTextColor={colors.text.muted}
+                multiline
               />
             </View>
           </View>
 
-          <View style={styles.rowInputs}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Challan Prefix</Text>
-              <TextInput
-                style={styles.input}
-                value={challanPrefix}
-                onChangeText={setChallanPrefix}
-                placeholder="e.g. CH"
-                placeholderTextColor={colors.text.muted}
-              />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.label}>Default GST Slab (%)</Text>
-              <TextInput
-                style={styles.input}
-                value={defaultGstRate}
-                onChangeText={setDefaultGstRate}
-                placeholder="e.g. 18"
-                placeholderTextColor={colors.text.muted}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
 
-          <Text style={styles.label}>Invoice Terms & Conditions</Text>
-          <TextInput
-            style={[styles.input, { minHeight: 100, fontSize: 12 }]}
-            value={defaultTerms}
-            onChangeText={setDefaultTerms}
-            placeholder="Type default terms printed on documents..."
-            placeholderTextColor={colors.text.muted}
-            multiline
-          />
-        </View>
-      </View>
 
-      {/* App Server Settings Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="link-outline" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>App Server Settings</Text>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.label}>Base API Server URL</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
-              value={serverUrl}
-              onChangeText={setServerUrl}
-              placeholder="e.g. http://192.168.1.100:5000/api"
-              placeholderTextColor={colors.text.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 16, height: 42, marginTop: 0 }]}
-              onPress={handleSaveServerUrl}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="save-outline" size={16} color="#fff" />
-              <Text style={styles.btnText}>Save Link</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
 
-      {/* Google Gemini AI Analytics Key Card */}
-      <View style={[styles.card, !canEdit && { opacity: 0.85 }]}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="sparkles" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>Artificial Intelligence Credentials (Google Gemini 2.5)</Text>
-        </View>
-        <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-          <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
-            Configure your Google AI Studio API Key to power the natural language Business AI Assistant and executive CRM analytics.
-          </Text>
-
-          <Text style={styles.label}>Google Gemini API Key</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
-              value={geminiApiKey}
-              onChangeText={setGeminiApiKey}
-              placeholder="Paste your Gemini API Key (e.g. AIzaSy...)"
-              placeholderTextColor={colors.text.muted}
-              secureTextEntry
-            />
-            <TouchableOpacity
-              style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 16, height: 42, marginTop: 0 }]}
-              onPress={handleSaveCompanyConfig}
-              disabled={companyLoading}
-              activeOpacity={0.8}
-            >
-              {companyLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="key-outline" size={16} color="#fff" />
-                  <Text style={styles.btnText}>Save Key</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-          <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 6 }}>
-            Status: {geminiApiKey ? '✔ Key configured (Gemini 2.5 Flash Engine Enabled)' : '⚠️ Not configured'}
-          </Text>
-        </View>
-      </View>
+        </>
+      )}
 
       {/* Save & Revert Action Buttons */}
       {canEdit && (
@@ -1357,7 +1466,6 @@ export default function ProfileScreen() {
 
   const renderSidebar = () => (
     <View style={styles.sidebarContainer}>
-      {/* Overview Card */}
       <View style={styles.card}>
         <View style={styles.overviewAvatarContainer}>
           <View style={[styles.avatar, { borderColor: roleColors[user?.role || 'agent'] }]}>
@@ -1372,82 +1480,7 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.permissionRow}>
-          <Ionicons
-            name={user?.canAccessCash ? 'cash-outline' : 'lock-closed-outline'}
-            size={16}
-            color={user?.canAccessCash ? colors.success : colors.text.muted}
-          />
-          <Text style={[styles.permissionText, user?.canAccessCash && { color: colors.success, fontWeight: '700' }]}>
-            {user?.canAccessCash ? 'Cash Ledger Access Granted' : 'No Cash Ledger Access'}
-          </Text>
-        </View>
       </View>
-
-      {/* Security details Session Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
-          <Text style={styles.cardTitle}>Active Session Details</Text>
-        </View>
-        <View style={styles.cardContent}>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Device / Platform</Text>
-            <Text style={styles.metaValue}>{sessionInfo.deviceInfo || 'Unknown Device'}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Active IP Address</Text>
-            <Text style={styles.metaValue}>{sessionInfo.ipAddress || '—'}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Last Session Action</Text>
-            <Text style={styles.metaValue}>{formatTimestamp(sessionInfo.lastActive)}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Member Since</Text>
-            <Text style={styles.metaValue}>{formatTimestamp(sessionInfo.createdAt)}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Admin Navigation */}
-      {perm.can('audit:view') || perm.can('settings:edit') ? (
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="settings-outline" size={18} color={colors.danger} />
-            <Text style={[styles.cardTitle, { color: colors.danger }]}>Administration</Text>
-          </View>
-          <View style={styles.cardContent}>
-            {perm.can('audit:view') && (
-              <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}
-                onPress={() => router.push('/audit')}
-                activeOpacity={0.7}
-              >
-                <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: colors.warning + '18', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="shield-checkmark" size={16} color={colors.warning} />
-                </View>
-                <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text.primary }}>System Audit Logs</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}
-              onPress={() => router.push('/rbac')}
-              activeOpacity={0.7}
-            >
-              <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: colors.danger + '18', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="people-outline" size={16} color={colors.danger} />
-              </View>
-              <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text.primary }}>Role-Based Access Control</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 
@@ -1589,20 +1622,10 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.layoutGrid, { flexDirection: isDesktop ? 'row' : 'column' }]}>
-        {isDesktop ? (
-          <>
-            <View style={{ flex: 2, marginRight: Spacing.lg }}>
-              {renderActiveTabContent()}
-            </View>
-            <View style={{ flex: 1 }}>{renderSidebar()}</View>
-          </>
-        ) : (
-          <>
-            {renderSidebar()}
-            {renderActiveTabContent()}
-          </>
-        )}
+      <View style={styles.layoutGrid}>
+        <View style={{ flex: 1 }}>
+          {renderActiveTabContent()}
+        </View>
       </View>
 
       {/* Modal: Define Manufacturing Unit */}

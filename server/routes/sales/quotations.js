@@ -3,6 +3,7 @@ const Quotation = require('../../models/Quotation');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
 
@@ -39,6 +40,13 @@ router.post('/', validate(schemas.quotationSchema), async (req, res) => {
       req.io.emit('quotation_updated', { type: 'created', id: quotation._id });
     }
     res.status(201).json(quotation);
+
+    await logAction({
+      action: 'CREATE_QUOTATION',
+      description: `Created quotation ${quotation.quotationNo} for ${quotation.customerName} — ₹${quotation.amount || 0}`,
+      details: { quotationId: quotation._id, quotationNo: quotation.quotationNo, customer: quotation.customerName, amount: quotation.amount },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -58,6 +66,13 @@ router.put('/:id', validate(schemas.quotationSchema.partial()), async (req, res)
       req.io.emit('quotation_updated', { type: 'updated', id: quotation._id });
     }
     res.json(quotation);
+
+    await logAction({
+      action: 'UPDATE_QUOTATION',
+      description: `Updated quotation ${quotation.quotationNo} for ${quotation.customerName}`,
+      details: { quotationId: quotation._id, quotationNo: quotation.quotationNo, changes: Object.keys(updateData) },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -73,6 +88,13 @@ router.delete('/:id', authorize('quotation:delete'), async (req, res) => {
       req.io.emit('quotation_updated', { type: 'deleted', id: req.params.id });
     }
     res.json({ message: 'Quotation deleted' });
+
+    await logAction({
+      action: 'DELETE_QUOTATION',
+      description: `Deleted quotation ${quotation.quotationNo} for ${quotation.customerName}`,
+      details: { quotationId: quotation._id, quotationNo: quotation.quotationNo },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -162,6 +184,13 @@ router.post('/:id/convert-to-challan', authorize('quotation:edit'), async (req, 
       message: 'Quotation successfully converted to draft Delivery Challan',
       stockMovement,
       quotation
+    });
+
+    await logAction({
+      action: 'CONVERT_QUOTATION_TO_CHALLAN',
+      description: `Converted quotation ${quotation.quotationNo} → Challan ${docNo} for ${quotation.customerName}`,
+      details: { quotationId: quotation._id, quotationNo: quotation.quotationNo, challanNo: docNo, customer: quotation.customerName },
+      req
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -9,6 +9,7 @@ const InventoryEntry = require('../../models/InventoryEntry');
 const StockLedger = require('../../models/StockLedger');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
 
@@ -96,6 +97,13 @@ router.patch('/:id/status', async (req, res) => {
       req.io.emit('order_updated', { type: 'status_changed', id: order._id });
     }
     res.json(order);
+
+    await logAction({
+      action: 'ORDER_STATUS_CHANGE',
+      description: `Order #${order._id} status changed to "${status}" for customer ${order.name}`,
+      details: { orderId: order._id, customer: order.name, newStatus: status, amount: order.totalAmount },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -132,6 +140,13 @@ router.put('/:id', validate(schemas.orderSchema.partial()), async (req, res) => 
       req.io.emit('order_updated', { type: 'updated', id: order._id });
     }
     res.json(order);
+
+    await logAction({
+      action: 'UPDATE_ORDER',
+      description: `Updated order #${order._id} for ${order.name} — Status: ${order.status}`,
+      details: { orderId: order._id, customer: order.name, status: order.status, changes: Object.keys(req.body) },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -340,6 +355,13 @@ router.patch('/:id/cancel', async (req, res) => {
       req.io.emit('order_updated', { type: 'cancelled', id: order._id });
     }
     res.json({ message: 'Order cancelled and stock reverted', order });
+
+    await logAction({
+      action: 'CANCEL_ORDER',
+      description: `Cancelled order #${order._id} for ${order.name} — Stock reverted for ${order.items.length} product(s)`,
+      details: { orderId: order._id, customer: order.name, phone: order.phone, amount: order.totalAmount, items: order.items.length },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -558,6 +580,13 @@ router.post('/:id/invoice', validate(schemas.invoiceSchema), async (req, res) =>
       req.io.emit('invoice_updated', { type: 'created_from_order', id: newInvoice._id });
     }
     res.status(201).json({ message: 'Draft invoice generated successfully', invoice: newInvoice });
+
+    await logAction({
+      action: 'ORDER_GENERATE_INVOICE',
+      description: `Generated invoice ${newInvoice.invoiceNo} from order #${order._id} for ${order.name} — ₹${order.totalAmount}`,
+      details: { orderId: order._id, invoiceId: newInvoice._id, invoiceNo: newInvoice.invoiceNo, customer: order.name, amount: order.totalAmount },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

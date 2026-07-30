@@ -362,6 +362,17 @@ export type Invoice = {
   internalFreightExpense?: number;
   qrCode?: string;
   supportingDocuments?: any[];
+  firmDetails?: {
+    name?: string;
+    address?: string;
+    email?: string;
+    phone?: string;
+    gstin?: string;
+    bankName?: string;
+    bankAccountNo?: string;
+    bankIfsc?: string;
+    bankBranch?: string;
+  };
 };
 
 export type QuotationItem = {

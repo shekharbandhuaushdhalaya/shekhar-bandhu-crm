@@ -3,6 +3,7 @@ const Vendor = require('../../models/Vendor');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
 
@@ -36,7 +37,6 @@ router.post('/', authorize('vendor:create'), validate(schemas.vendorSchema), asy
   try {
     const data = {
       ...req.body,
-      // Map name/company correctly if not provided directly
       name: req.body.displayName || req.body.name || '',
       company: req.body.registeredName || req.body.company || '',
     };
@@ -46,6 +46,13 @@ router.post('/', authorize('vendor:create'), validate(schemas.vendorSchema), asy
       req.io.emit('vendor_updated', { type: 'created', id: vendor._id });
     }
     res.status(201).json(vendor);
+
+    await logAction({
+      action: 'CREATE_VENDOR',
+      description: `Created vendor: ${vendor.company || vendor.name} (${vendor.gstin || 'No GSTIN'})`,
+      details: { vendorId: vendor._id, name: vendor.name, company: vendor.company },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -54,9 +61,7 @@ router.post('/', authorize('vendor:create'), validate(schemas.vendorSchema), asy
 // PUT /api/vendors/:id — Update vendor details
 router.put('/:id', authorize('vendor:edit'), validate(schemas.vendorSchema.partial()), async (req, res) => {
   try {
-    const data = {
-      ...req.body,
-    };
+    const data = { ...req.body };
     if (req.body.displayName || req.body.name) {
       data.name = req.body.displayName ?? req.body.name;
     }
@@ -70,13 +75,20 @@ router.put('/:id', authorize('vendor:edit'), validate(schemas.vendorSchema.parti
       { new: true, runValidators: true }
     );
     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
-    
+
     const doc = vendor.toObject();
     doc.cashBalance = 0;
     if (req.io) {
       req.io.emit('vendor_updated', { type: 'updated', id: doc._id });
     }
     res.json(doc);
+
+    await logAction({
+      action: 'UPDATE_VENDOR',
+      description: `Updated vendor: ${doc.company || doc.name}`,
+      details: { vendorId: doc._id, changes: Object.keys(req.body) },
+      req
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -91,6 +103,13 @@ router.delete('/:id', authorize('vendor:delete'), async (req, res) => {
       req.io.emit('vendor_updated', { type: 'deleted', id: req.params.id });
     }
     res.json({ message: 'Vendor deleted' });
+
+    await logAction({
+      action: 'DELETE_VENDOR',
+      description: `Deleted vendor: ${vendor.company || vendor.name} (ID: ${vendor._id})`,
+      details: { vendorId: vendor._id, name: vendor.name, company: vendor.company },
+      req
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
