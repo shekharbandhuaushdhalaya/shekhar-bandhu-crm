@@ -1,8 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, RefreshControl, ViewStyle, TextStyle } from 'react-native';
+import React, { useCallback, memo } from 'react';
+import { View, Text, StyleSheet, FlatList, ScrollView, RefreshControl, ViewStyle, TextStyle, TouchableOpacity } from 'react-native';
 import { useTheme } from '../utils/themeContext';
 import { Radius, Spacing, Shadows } from '../constants/theme';
 import { TableSkeleton } from './TableSkeleton';
+import { Ionicons } from '@expo/vector-icons';
 
 export interface Column<T> {
   key: string;
@@ -26,9 +27,13 @@ interface DataTableProps<T> {
   headerStyle?: ViewStyle;
   headerTextStyle?: TextStyle;
   containerStyle?: ViewStyle;
+  
+  // Lazy Loading Props
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
 }
 
-export function DataTable<T>({
+function DataTableInner<T>({
   data,
   columns,
   keyExtractor,
@@ -41,14 +46,12 @@ export function DataTable<T>({
   headerStyle,
   headerTextStyle,
   containerStyle,
+  onLoadMore,
+  isLoadingMore = false,
 }: DataTableProps<T>) {
   const { colors } = useTheme();
 
-  if (isLoading && !isRefreshing) {
-    return <TableSkeleton columns={columns.length} rows={8} />;
-  }
-
-  const renderHeader = () => (
+  const renderHeader = useCallback(() => (
     <View style={[styles.headerRow, { backgroundColor: colors.bg.secondary, borderBottomColor: colors.border }, headerStyle]}>
       {columns.map((col) => (
         <View
@@ -65,9 +68,9 @@ export function DataTable<T>({
         </View>
       ))}
     </View>
-  );
+  ), [columns, colors, headerStyle, headerTextStyle]);
 
-  const renderRow = ({ item, index }: { item: T; index: number }) => {
+  const renderRow = useCallback(({ item, index }: { item: T; index: number }) => {
     const customRowStyle = typeof rowStyle === 'function' ? rowStyle(item) : rowStyle;
     
     return (
@@ -92,7 +95,20 @@ export function DataTable<T>({
         ))}
       </View>
     );
-  };
+  }, [columns, colors, keyExtractor, rowStyle]);
+
+  const renderFooter = useCallback(() => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={{ padding: 20, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
+      </View>
+    );
+  }, [isLoadingMore, colors]);
+
+  if (isLoading && !isRefreshing) {
+    return <TableSkeleton columns={columns.length} rows={8} />;
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg.card, borderColor: colors.border }, containerStyle]}>
@@ -101,7 +117,7 @@ export function DataTable<T>({
           <FlatList
             data={data}
             keyExtractor={keyExtractor}
-            ListHeaderComponent={renderHeader()}
+            ListHeaderComponent={renderHeader}
             stickyHeaderIndices={[0]}
             renderItem={renderRow}
             contentContainerStyle={data.length === 0 ? { flex: 1 } : undefined}
@@ -111,12 +127,18 @@ export function DataTable<T>({
                 <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />
               ) : undefined
             }
+            onEndReached={onLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={renderFooter}
           />
         </View>
       </ScrollView>
     </View>
   );
 }
+
+// Wrap with React.memo to prevent unnecessary re-renders when parent state changes
+export const DataTable = memo(DataTableInner) as typeof DataTableInner;
 
 const styles = StyleSheet.create({
   container: {
@@ -147,5 +169,22 @@ const styles = StyleSheet.create({
   cell: {
     paddingHorizontal: 8,
     justifyContent: 'center',
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+  },
+  pageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
   }
 });

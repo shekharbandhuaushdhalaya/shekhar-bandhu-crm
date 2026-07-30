@@ -1721,6 +1721,11 @@ export default function SaleInvoicesScreen() {
   const [addVisible, setAddVisible] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 50;
+
   const { colors } = useTheme();
   const { user } = useAuth();
   const perm = usePermission();
@@ -1731,12 +1736,29 @@ export default function SaleInvoicesScreen() {
 
   const load = useCallback(async () => {
     const [resInvoices, resCustomers] = await Promise.all([
-      api.getSaleInvoices(search, modeFilter),
+      api.getSaleInvoices(search, modeFilter, page, limit),
       api.getCustomers()
     ]);
-    setInvoices(resInvoices);
-    setCustomers(resCustomers);
-  }, [search, modeFilter]);
+    if (resInvoices && resInvoices.data) {
+      if (page === 1) {
+        setInvoices(resInvoices.data);
+      } else {
+        setInvoices(prev => {
+          // Prevent duplicates by checking IDs
+          const existingIds = new Set(prev.map(inv => inv._id));
+          const newInvoices = resInvoices.data.filter((inv: any) => !existingIds.has(inv._id));
+          return [...prev, ...newInvoices];
+        });
+      }
+      setTotalPages(resInvoices.totalPages || 1);
+    } else {
+      setInvoices(Array.isArray(resInvoices) ? resInvoices : []);
+      setTotalPages(1);
+    }
+    if (page === 1) {
+      setCustomers(resCustomers);
+    }
+  }, [search, modeFilter, page]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useEffect(() => {
@@ -1826,7 +1848,17 @@ export default function SaleInvoicesScreen() {
           </View>
         </View>
 
-        <ScrollView style={{ flex: 1 }}>
+        <ScrollView 
+          style={{ flex: 1 }}
+          scrollEventThrottle={400}
+          onScroll={({ nativeEvent }) => {
+            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+            const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+            if (isCloseToBottom && page < totalPages) {
+              setPage(p => p + 1);
+            }
+          }}
+        >
           <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
             <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
               {/* Table Header Row */}
@@ -1916,6 +1948,12 @@ export default function SaleInvoicesScreen() {
               )}
             </View>
           </ScrollView>
+          
+          {page < totalPages && (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
+            </View>
+          )}
         </ScrollView>
       </View>
 

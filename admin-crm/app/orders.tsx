@@ -40,15 +40,34 @@ export default function OrdersScreen() {
     router.push('/stockmovements');
   };
 
+  // Lazy loading state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 50;
+
   const load = useCallback(async () => {
     try {
-      const data = await api.getOrders();
-      setOrders(data);
+      const res = await api.getOrders(page, limit);
+      if (res && res.data) {
+        if (page === 1) {
+          setOrders(res.data);
+        } else {
+          setOrders(prev => {
+            const existingIds = new Set(prev.map(o => o._id));
+            const newOrders = res.data.filter((o: any) => !existingIds.has(o._id));
+            return [...prev, ...newOrders];
+          });
+        }
+        setTotalPages(res.totalPages || 1);
+      } else {
+        setOrders(Array.isArray(res) ? res : []);
+        setTotalPages(1);
+      }
     } catch (err: any) {
       console.error(err);
       showToast('Failed to load orders: ' + err.message, 'error');
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     load();
@@ -273,6 +292,14 @@ export default function OrdersScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        scrollEventThrottle={400}
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+          if (isCloseToBottom && page < totalPages) {
+            setPage(p => p + 1);
+          }
+        }}
       >
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1 }}>
           <View style={[styles.table, { width: '100%', minWidth: 1000 }]}>
@@ -390,6 +417,12 @@ export default function OrdersScreen() {
                 ? 'No B2B orders have been placed yet.'
                 : `No orders with status "${activeTab}" found.`}
             </Text>
+          </View>
+        )}
+        
+        {page < totalPages && (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
           </View>
         )}
       </ScrollView>

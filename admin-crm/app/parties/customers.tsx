@@ -1557,10 +1557,31 @@ export default function CustomersScreen() {
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
+  // Lazy loading state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 50;
+
   const load = useCallback(async () => {
-    const res = await api.getCustomers(search);
-    setCustomers(res);
-  }, [search]);
+    const res = await api.getCustomers(search, activeTab, page, limit);
+    if (res && res.data) {
+      if (page === 1) {
+        setCustomers(res.data);
+      } else {
+        setCustomers(prev => {
+          const existingIds = new Set(prev.map(c => c._id));
+          const newCustomers = res.data.filter((c: any) => !existingIds.has(c._id));
+          return [...prev, ...newCustomers];
+        });
+      }
+      setTotalPages(res.totalPages || 1);
+    } else {
+      setCustomers(Array.isArray(res) ? res : []);
+      setTotalPages(1);
+    }
+  }, [search, activeTab, page]);
+
+  useEffect(() => { setPage(1); }, [search, activeTab]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1576,12 +1597,6 @@ export default function CustomersScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
-
-  const filteredCustomers = customers.filter(c => {
-    const hasGstin = !!(c.gstin && c.gstin.trim());
-    return activeTab === 'gst' ? hasGstin : !hasGstin;
-  }).sort((a, b) => (a.company || a.name || '').localeCompare(b.company || b.name || ''));
-
   return (
     <View style={styles.screen}>
       <View style={styles.innerContainer}>
@@ -1647,7 +1662,18 @@ export default function CustomersScreen() {
           </View>
         </View>
 
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          showsVerticalScrollIndicator={true}
+          scrollEventThrottle={400}
+          onScroll={({ nativeEvent }) => {
+            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+            const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+            if (isCloseToBottom && page < totalPages) {
+              setPage(p => p + 1);
+            }
+          }}
+        >
           <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
             <View style={styles.table}>
               {/* Table Header Row */}
@@ -1662,7 +1688,7 @@ export default function CustomersScreen() {
               </View>
 
               {/* Table Body Rows */}
-              {filteredCustomers.map((c) => {
+              {customers.map((c) => {
                 const isCash = !c.gstin || !c.gstin.trim();
 
                 const bal = c.regularBalance;
@@ -1779,7 +1805,7 @@ export default function CustomersScreen() {
                 );
               })}
 
-              {filteredCustomers.length === 0 && (
+              {customers.length === 0 && (
                 <View style={styles.emptyTableContainer}>
                   <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
                   <Text style={styles.emptyText}>
@@ -1789,6 +1815,12 @@ export default function CustomersScreen() {
               )}
             </View>
           </ScrollView>
+          
+          {page < totalPages && (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
+            </View>
+          )}
         </ScrollView>
       </View>
 

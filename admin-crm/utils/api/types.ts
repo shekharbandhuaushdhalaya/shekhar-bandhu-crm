@@ -884,7 +884,7 @@ export type TraceResult = {
 };
 
 export type RolePermissionConfig = {
-  _id: string; role: string; permissions: string[]; label: string; description: string;
+  _id: string; role: string; permissions: string[]; mfaPermissions?: string[]; label: string; description: string; isCustom?: boolean;
 };
 export type RBACPermissionsResponse = {
   allPermissions: string[];

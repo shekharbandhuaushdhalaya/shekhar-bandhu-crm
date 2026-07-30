@@ -14,7 +14,8 @@ async function getRolePermissions(role) {
   if (permissionCache.has(role)) {
     return permissionCache.get(role);
   }
-  const perms = await RolePermission.getEffectivePermissions(role);
+  const result = await RolePermission.getEffectivePermissions(role);
+  const perms = result.permissions || [];
   permissionCache.set(role, perms);
   return perms;
 }

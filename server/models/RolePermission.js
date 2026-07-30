@@ -13,6 +13,10 @@ const rolePermissionSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  mfaPermissions: {
+    type: [String],
+    default: [],
+  },
   label: { type: String, default: '' },
   description: { type: String, default: '' },
   isCustom: { type: Boolean, default: false },
@@ -20,8 +24,8 @@ const rolePermissionSchema = new mongoose.Schema({
 
 rolePermissionSchema.statics.getEffectivePermissions = async function (role) {
   const doc = await this.findOne({ role });
-  if (doc && doc.permissions) return doc.permissions;
-  return getDefaultPermissionsForRole(role);
+  if (doc && doc.permissions) return { permissions: doc.permissions, mfaPermissions: doc.mfaPermissions || [] };
+  return { permissions: getDefaultPermissionsForRole(role), mfaPermissions: [] };
 };
 
 rolePermissionSchema.statics.seedDefaults = async function () {

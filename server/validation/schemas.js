@@ -717,6 +717,7 @@ const systemSettingsSchema = z.object({}).passthrough();
 const rbacPermissionsSchema = z.object({
   role: z.string().min(1).optional(),
   permissions: z.array(z.string()).optional(),
+  mfaPermissions: z.array(z.string()).optional(),
   label: z.string().optional(),
   description: z.string().optional(),
 });

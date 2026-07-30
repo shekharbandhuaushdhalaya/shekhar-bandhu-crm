@@ -228,7 +228,7 @@ const router = express.Router();
 // GET /api/invoices/sales — List sale invoices
 router.get('/sales', async (req, res) => {
   try {
-    const { search, mode } = req.query;
+    const { search, mode, page, limit } = req.query;
     const filter = { type: 'sale' };
 
     if (search) {
@@ -241,7 +241,17 @@ router.get('/sales', async (req, res) => {
 
     filter.mode = 'regular';
 
-    const invoices = await Invoice.find(filter).sort({ date: -1, createdAt: -1 }).lean();
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = Invoice.find(filter).sort({ date: -1, createdAt: -1 });
+    
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const invoices = await query.lean();
     
     // Fetch associated dispatches
     const Dispatch = require('../../models/Dispatch');
@@ -259,6 +269,17 @@ router.get('/sales', async (req, res) => {
       dispatch: dispatchMap[inv._id.toString()] || null
     }));
 
+    if (isPaginated) {
+      const total = await Invoice.countDocuments(filter);
+      return res.json({
+        data: enrichedInvoices,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
     res.json(enrichedInvoices);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -268,7 +289,7 @@ router.get('/sales', async (req, res) => {
 // GET /api/invoices/purchases — List purchase invoices
 router.get('/purchases', authorize('invoice:view'), async (req, res) => {
   try {
-    const { search, mode } = req.query;
+    const { search, mode, page, limit } = req.query;
     const filter = { type: 'purchase' };
 
     if (search) {
@@ -283,7 +304,29 @@ router.get('/purchases', authorize('invoice:view'), async (req, res) => {
       filter.mode = mode;
     }
 
-    const invoices = await Invoice.find(filter).sort({ date: -1, createdAt: -1 }).lean();
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = Invoice.find(filter).sort({ date: -1, createdAt: -1 });
+    
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const invoices = await query.lean();
+
+    if (isPaginated) {
+      const total = await Invoice.countDocuments(filter);
+      return res.json({
+        data: invoices,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
     res.json(invoices);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1277,10 +1277,31 @@ export default function VendorsScreen() {
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
 
+  // Lazy loading state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 50;
+
   const load = useCallback(async () => {
-    const res = await api.getVendors(search);
-    setVendors(res);
-  }, [search]);
+    const res = await api.getVendors(search, page, limit);
+    if (res && res.data) {
+      if (page === 1) {
+        setVendors(res.data);
+      } else {
+        setVendors(prev => {
+          const existingIds = new Set(prev.map(v => v._id));
+          const newVendors = res.data.filter((v: any) => !existingIds.has(v._id));
+          return [...prev, ...newVendors];
+        });
+      }
+      setTotalPages(res.totalPages || 1);
+    } else {
+      setVendors(Array.isArray(res) ? res : []);
+      setTotalPages(1);
+    }
+  }, [search, page]);
+
+  useEffect(() => { setPage(1); }, [search]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1319,7 +1340,18 @@ export default function VendorsScreen() {
         </View>
 
         {/* Tabular Layout Scroll Container */}
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          showsVerticalScrollIndicator={true}
+          scrollEventThrottle={400}
+          onScroll={({ nativeEvent }) => {
+            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+            const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+            if (isCloseToBottom && page < totalPages) {
+              setPage(p => p + 1);
+            }
+          }}
+        >
           <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
           <View style={styles.table}>
             {/* Table Header */}
@@ -1334,7 +1366,7 @@ export default function VendorsScreen() {
             </View>
 
             {/* Table Body — each row is clickable for ledger */}
-            {[...vendors].sort((a,b) => (a.company || a.registeredName || a.name || '').localeCompare(b.company || b.registeredName || b.name || '')).map((v) => {
+            {vendors.map((v) => {
               const bal = v.regularBalance;
               const drCrLabel = bal > 0 ? 'CR' : bal < 0 ? 'DR' : null;
               const balColor  = bal > 0 ? colors.danger : bal < 0 ? colors.success : colors.text.muted;
@@ -1459,6 +1491,12 @@ export default function VendorsScreen() {
             )}
           </View>
           </ScrollView>
+          
+          {page < totalPages && (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
+            </View>
+          )}
         </ScrollView>
 
       </View>
