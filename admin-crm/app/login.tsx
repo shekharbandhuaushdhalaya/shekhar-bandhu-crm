@@ -51,7 +51,7 @@ const HERITAGE_THEMES: HeritageTheme[] = [
 ];
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, completeMfaLogin } = useAuth();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { width } = useWindowDimensions();
@@ -63,6 +63,11 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const [greeting, setGreeting] = useState('Welcome Back');
   const [theme, setTheme] = useState<HeritageTheme>(HERITAGE_THEMES[0]);
+
+  // MFA state
+  const [mfaStep, setMfaStep] = useState(false);
+  const [mfaToken, setMfaToken] = useState('');
+  const [totpCode, setTotpCode] = useState('');
 
   // Dynamic greeting and random theme picker
   useEffect(() => {
@@ -86,9 +91,32 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      await login(email.trim(), password);
+      const result = await login(email.trim(), password);
+      if ('mfaRequired' in result && result.mfaRequired) {
+        // MFA required — switch to TOTP entry step
+        setMfaToken(result.mfaToken);
+        setMfaStep(true);
+      }
+      // If no mfaRequired, auth context already navigated
     } catch (err: any) {
       setError(err.message || 'Login failed. Please verify credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMfaVerify = async () => {
+    if (!totpCode.trim() || totpCode.trim().length !== 6) {
+      setError('Please enter the 6-digit code from your authenticator app.');
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      await completeMfaLogin(mfaToken, totpCode.trim());
+      // Auth context sets user, navigation happens automatically
+    } catch (err: any) {
+      setError(err.message || 'Invalid code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -188,60 +216,114 @@ export default function LoginScreen() {
                 </View>
               )}
 
-              {/* Email Field */}
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Email Address</Text>
-                <View style={[styles.inputContainer, error ? styles.inputError : null]}>
-                  <Ionicons name="mail-outline" size={18} color={colors.primary} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="name@shekharbandhu.com"
-                    placeholderTextColor={colors.text.muted}
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="next"
-                    onSubmitEditing={() => handleLogin()}
-                  />
-                </View>
-              </View>
+              {!mfaStep ? (
+                <>
+                  {/* Email Field */}
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Email Address</Text>
+                    <View style={[styles.inputContainer, error ? styles.inputError : null]}>
+                      <Ionicons name="mail-outline" size={18} color={colors.primary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="name@shekharbandhu.com"
+                        placeholderTextColor={colors.text.muted}
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        returnKeyType="next"
+                        onSubmitEditing={() => handleLogin()}
+                      />
+                    </View>
+                  </View>
 
-              {/* Password Field */}
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Password</Text>
-                <View style={[styles.inputContainer, error ? styles.inputError : null]}>
-                  <Ionicons name="lock-closed-outline" size={18} color={colors.primary} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="••••••••"
-                    placeholderTextColor={colors.text.muted}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="go"
-                    onSubmitEditing={() => handleLogin()}
-                  />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.passwordToggle}>
-                    <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.text.muted} />
+                  {/* Password Field */}
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Password</Text>
+                    <View style={[styles.inputContainer, error ? styles.inputError : null]}>
+                      <Ionicons name="lock-closed-outline" size={18} color={colors.primary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="••••••••"
+                        placeholderTextColor={colors.text.muted}
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry={!showPassword}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        returnKeyType="go"
+                        onSubmitEditing={() => handleLogin()}
+                      />
+                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.passwordToggle}>
+                        <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.text.muted} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Submit Action */}
+                  <TouchableOpacity style={styles.loginBtn} onPress={() => handleLogin()} disabled={loading} activeOpacity={0.9}>
+                    {loading ? (
+                      <ActivityIndicator color="#ffffff" size="small" />
+                    ) : (
+                      <>
+                        <Text style={styles.loginBtnText}>Sign In</Text>
+                        <Ionicons name="arrow-forward" size={16} color="#ffffff" style={{ marginLeft: 6 }} />
+                      </>
+                    )}
                   </TouchableOpacity>
-                </View>
-              </View>
+                </>
+              ) : (
+                <>
+                  {/* MFA Step 2 — TOTP entry */}
+                  <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                    <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                      <Ionicons name="shield-checkmark-outline" size={30} color={colors.primary} />
+                    </View>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text.primary, marginBottom: 4 }}>Two-Factor Authentication</Text>
+                    <Text style={{ fontSize: 12, color: colors.text.secondary, textAlign: 'center', lineHeight: 18 }}>
+                      Open Google Authenticator and enter the 6-digit code for your account.
+                    </Text>
+                  </View>
 
-              {/* Submit Action */}
-              <TouchableOpacity style={styles.loginBtn} onPress={() => handleLogin()} disabled={loading} activeOpacity={0.9}>
-                {loading ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <>
-                    <Text style={styles.loginBtnText}>Sign In</Text>
-                    <Ionicons name="arrow-forward" size={16} color="#ffffff" style={{ marginLeft: 6 }} />
-                  </>
-                )}
-              </TouchableOpacity>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Authenticator Code</Text>
+                    <View style={[styles.inputContainer, error ? styles.inputError : null]}>
+                      <Ionicons name="keypad-outline" size={18} color={colors.primary} style={styles.inputIcon} />
+                      <TextInput
+                        style={[styles.input, { letterSpacing: 8, fontSize: 18, fontWeight: '700' }]}
+                        placeholder="000000"
+                        placeholderTextColor={colors.text.muted}
+                        value={totpCode}
+                        onChangeText={v => setTotpCode(v.replace(/[^0-9]/g, '').slice(0, 6))}
+                        keyboardType="number-pad"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        maxLength={6}
+                        returnKeyType="go"
+                        onSubmitEditing={handleMfaVerify}
+                        autoFocus
+                      />
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.loginBtn} onPress={handleMfaVerify} disabled={loading || totpCode.length !== 6} activeOpacity={0.9}>
+                    {loading ? (
+                      <ActivityIndicator color="#ffffff" size="small" />
+                    ) : (
+                      <>
+                        <Text style={styles.loginBtnText}>Verify & Sign In</Text>
+                        <Ionicons name="shield-checkmark" size={16} color="#ffffff" style={{ marginLeft: 6 }} />
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => { setMfaStep(false); setTotpCode(''); setError(null); }} style={{ marginTop: 14, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: colors.text.secondary, fontWeight: '600' }}>← Back to Login</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
             </View>
 
             <Text style={styles.footerText}>

@@ -14,6 +14,7 @@ const { trackAgentActivity } = require('./utils/agentTracker');
 
 // ─── Route imports (grouped by domain) ───
 const { router: authRoutes } = require('./routes/auth/auth');
+const mfaRoutes = require('./routes/auth/mfa');
 const systemRoutes = require('./routes/system/system');
 const rbacRoutes = require('./routes/system/rbac');
 const traceRoutes = require('./routes/system/trace');
@@ -184,6 +185,7 @@ const { seedDatabase } = require('./utils/seed');
 
 // Register all routes synchronously
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth/mfa', authLimiter, mfaRoutes);
 app.use('/api/system', systemRoutes);
 
 app.use('/api/contacts', authenticateJWT, contactRoutes);

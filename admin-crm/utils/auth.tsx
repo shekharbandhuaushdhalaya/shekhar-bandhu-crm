@@ -9,13 +9,16 @@ export type UserProfile = {
   email: string;
   role: 'admin' | 'manager' | 'agent';
   canAccessCash?: boolean;
+  mfaEnabled?: boolean;
+  mustChangePassword?: boolean;
 };
 
 type AuthContextType = {
   user: UserProfile | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<UserProfile>;
+  login: (email: string, password: string) => Promise<{ user: UserProfile } | { mfaRequired: true; mfaToken: string; user: Partial<UserProfile> }>;
+  completeMfaLogin: (mfaToken: string, totpCode: string) => Promise<UserProfile>;
   logout: () => Promise<void>;
   updateUser: (updatedUser: UserProfile) => Promise<void>;
 };
@@ -68,9 +71,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadStoredAuth();
   }, []);
 
-  const login = async (email: string, password: string): Promise<UserProfile> => {
+  const login = async (email: string, password: string) => {
     try {
       const response = await api.login(email, password);
+
+      // MFA required — return mfaToken for the caller to handle step 2
+      if (response?.mfaRequired) {
+        return { mfaRequired: true as const, mfaToken: response.mfaToken, user: response.user };
+      }
+
       if (!response || !response.token || !response.user) {
         throw new Error('Invalid authentication response');
       }
@@ -82,10 +91,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(response.user);
       api.setToken(response.token, response.user);
 
-      return response.user;
+      return { user: response.user as UserProfile };
     } catch (err: any) {
       throw err;
     }
+  };
+
+  const completeMfaLogin = async (mfaToken: string, totpCode: string): Promise<UserProfile> => {
+    const response = await api.verifyMfaLogin(mfaToken, totpCode);
+    if (!response?.token || !response?.user) {
+      throw new Error('MFA verification failed');
+    }
+    await authStorage.setItem('vp_crm_token', response.token);
+    await authStorage.setItem('vp_crm_user', JSON.stringify(response.user));
+    setToken(response.token);
+    setUser(response.user);
+    api.setToken(response.token, response.user);
+    return response.user;
   };
 
   const logout = async () => {
@@ -112,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, completeMfaLogin, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

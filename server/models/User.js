@@ -41,6 +41,15 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  mfaEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  mfaSecret: {
+    type: String,
+    default: null,
+    select: false, // never returned in queries by default
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

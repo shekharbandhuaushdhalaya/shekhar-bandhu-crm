@@ -126,6 +126,21 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
+    // If MFA is enabled, issue a short-lived mfaToken instead of full session
+    const fullUser = await User.findById(user._id).select('+mfaSecret');
+    if (fullUser.mfaEnabled) {
+      const mfaToken = jwt.sign(
+        { id: user._id, mfaPending: true },
+        JWT_SECRET,
+        { expiresIn: '5m' }
+      );
+      return res.json({
+        mfaRequired: true,
+        mfaToken,
+        user: { id: user._id, name: user.name, email: user.email, role: user.role }
+      });
+    }
+
     const token = jwt.sign(
       { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword },
       JWT_SECRET,
@@ -134,7 +149,7 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword }
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword, mfaEnabled: false }
     });
 
     const { logAction } = require('../../utils/auditLogger');
@@ -154,7 +169,7 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
 // GET /api/auth/me — Verify token and get profile
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password').lean();
+    const user = await User.findById(req.user.id).select('-password -mfaSecret').lean();
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (err) {

@@ -297,7 +297,43 @@ class ApiClient {
     return res.json();
   }
 
+  // --- MFA (TOTP) ---
+  async setupMfa(): Promise<{ secret: string; qrCode: string; otpauthUrl: string }> {
+    const res = await this.request(`${API_BASE}/auth/mfa/setup`, { method: 'POST' });
+    return res.json();
+  }
+
+  async verifyMfaSetup(token: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/auth/mfa/verify-setup`, {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+    return res.json();
+  }
+
+  async verifyMfaLogin(mfaToken: string, totpCode: string): Promise<{ token: string; user: any }> {
+    const res = await this.request(`${API_BASE}/auth/mfa/verify`, {
+      method: 'POST',
+      body: JSON.stringify({ mfaToken, totpCode }),
+    });
+    return res.json();
+  }
+
+  async disableMfa(password: string, totpCode: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/auth/mfa/disable`, {
+      method: 'POST',
+      body: JSON.stringify({ password, totpCode }),
+    });
+    return res.json();
+  }
+
+  async adminDisableMfa(userId: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/auth/mfa/admin-disable/${userId}`, { method: 'PUT' });
+    return res.json();
+  }
+
   async getAuditLogs(search: string = '', page: number = 1, limit: number = 50, dateFrom?: string, dateTo?: string): Promise<any> {
+
     const params: Record<string, string> = {
       search,
       page: page.toString(),

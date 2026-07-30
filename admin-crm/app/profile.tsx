@@ -154,6 +154,15 @@ export default function ProfileScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
 
+  // MFA states
+  const [mfaSetupModalVisible, setMfaSetupModalVisible] = useState(false);
+  const [mfaDisableModalVisible, setMfaDisableModalVisible] = useState(false);
+  const [mfaSecret, setMfaSecret] = useState('');
+  const [mfaQrCode, setMfaQrCode] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaPassword, setMfaPassword] = useState('');
+  const [mfaLoading, setMfaLoading] = useState(false);
+
   const getPasswordStrength = (pass: string) => {
     if (!pass) return { score: 0, label: '', color: colors.text.muted };
     let score = 0;
@@ -477,6 +486,67 @@ export default function ProfileScreen() {
     }
   };
 
+  // MFA Handlers
+  const handleSetupMfa = async () => {
+    try {
+      setMfaLoading(true);
+      const data = await api.setupMfa();
+      setMfaSecret(data.secret);
+      setMfaQrCode(data.qrCode);
+      setMfaCode('');
+      setMfaSetupModalVisible(true);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to initialize MFA setup', 'error');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleVerifyMfa = async () => {
+    if (!mfaCode || mfaCode.length !== 6) {
+      showToast('Enter a valid 6-digit code', 'error');
+      return;
+    }
+    try {
+      setMfaLoading(true);
+      await api.verifyMfaSetup(mfaCode);
+      showToast('MFA successfully enabled!', 'success');
+      setMfaSetupModalVisible(false);
+      setMfaCode('');
+      // Update user context to reflect MFA enabled
+      if (user) {
+        await updateUser({ ...user, mfaEnabled: true });
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Invalid code', 'error');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleDisableMfa = async () => {
+    if (!mfaPassword || !mfaCode || mfaCode.length !== 6) {
+      showToast('Password and 6-digit TOTP code are required', 'error');
+      return;
+    }
+    try {
+      setMfaLoading(true);
+      await api.disableMfa(mfaPassword, mfaCode);
+      showToast('MFA successfully disabled', 'success');
+      setMfaDisableModalVisible(false);
+      setMfaPassword('');
+      setMfaCode('');
+      // Update user context
+      if (user) {
+        await updateUser({ ...user, mfaEnabled: false });
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to disable MFA. Check your password and code.', 'error');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
   // Server URL update handler
   const handleSaveServerUrl = async () => {
     if (!serverUrl.trim()) {
@@ -750,6 +820,52 @@ export default function ProfileScreen() {
                   </>
                 )}
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Two-Factor Authentication (MFA) Card */}
+        <View style={[styles.card, { marginTop: 16 }]}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+            <Text style={styles.cardTitle}>Two-Factor Authentication (2FA)</Text>
+          </View>
+          <View style={[styles.cardContent, { flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'flex-start', gap: 16 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>
+                {user?.mfaEnabled ? '2FA is Currently Enabled' : '2FA is Not Enabled'}
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.text.muted, lineHeight: 16 }}>
+                Add an extra layer of security to your account. When enabled, you will need to enter a time-based code from an authenticator app (like Google Authenticator) during login.
+              </Text>
+            </View>
+            <View>
+              {user?.mfaEnabled ? (
+                <TouchableOpacity
+                  style={[styles.btnPrimary, { backgroundColor: colors.danger, minWidth: 160, marginTop: 0 }]}
+                  onPress={() => setMfaDisableModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="shield-half-outline" size={16} color="#fff" />
+                  <Text style={styles.btnText}>Disable 2FA</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.btnPrimary, { minWidth: 160, marginTop: 0 }]}
+                  onPress={handleSetupMfa}
+                  disabled={mfaLoading}
+                  activeOpacity={0.8}
+                >
+                  {mfaLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="shield-checkmark-outline" size={16} color="#fff" />
+                      <Text style={styles.btnText}>Enable 2FA</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -1696,6 +1812,127 @@ export default function ProfileScreen() {
           </View>
         </Modal>
       )}
+
+      {/* MFA Setup Modal */}
+      <Modal visible={mfaSetupModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 450 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Set Up Two-Factor Authentication</Text>
+              <TouchableOpacity onPress={() => setMfaSetupModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={{ padding: Spacing.xl }}>
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 13, color: colors.text.primary, textAlign: 'center', marginBottom: 16, lineHeight: 18 }}>
+                  1. Download Google Authenticator or Authy.{'\n'}
+                  2. Scan the QR code below.
+                </Text>
+                {mfaQrCode ? (
+                  <View style={{ padding: 10, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}>
+                    <img src={mfaQrCode} style={{ width: 180, height: 180 }} alt="QR Code" />
+                  </View>
+                ) : (
+                  <View style={{ width: 180, height: 180, backgroundColor: colors.bg.primary, justifyContent: 'center', alignItems: 'center', borderRadius: 8, marginBottom: 16 }}>
+                    <ActivityIndicator color={colors.primary} />
+                  </View>
+                )}
+                
+                <Text style={{ fontSize: 11, color: colors.text.muted }}>Can't scan? Use this secret key:</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary, letterSpacing: 1, marginTop: 4 }}>
+                  {mfaSecret}
+                </Text>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={{ marginTop: 20 }}>
+                <Text style={styles.label}>3. Enter 6-Digit Code</Text>
+                <TextInput
+                  style={[styles.input, { letterSpacing: 8, fontSize: 18, fontWeight: '700', textAlign: 'center' }]}
+                  placeholder="000000"
+                  placeholderTextColor={colors.text.muted}
+                  value={mfaCode}
+                  onChangeText={v => setMfaCode(v.replace(/[^0-9]/g, '').slice(0, 6))}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.btnPrimary, { marginTop: 20 }, mfaCode.length !== 6 && { opacity: 0.5 }]}
+                onPress={handleVerifyMfa}
+                disabled={mfaLoading || mfaCode.length !== 6}
+              >
+                {mfaLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Verify & Enable</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MFA Disable Modal */}
+      <Modal visible={mfaDisableModalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 400 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Disable Two-Factor Auth</Text>
+              <TouchableOpacity onPress={() => setMfaDisableModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={{ padding: Spacing.xl }}>
+              <View style={{ backgroundColor: colors.warning + '15', padding: 12, borderRadius: Radius.sm, marginBottom: 20 }}>
+                <Text style={{ fontSize: 12, color: colors.warning, fontWeight: '600' }}>
+                  Disabling 2FA makes your account less secure.
+                </Text>
+              </View>
+
+              <View style={{ gap: 16 }}>
+                <View>
+                  <Text style={styles.label}>Current Password</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter password"
+                    secureTextEntry
+                    value={mfaPassword}
+                    onChangeText={setMfaPassword}
+                  />
+                </View>
+
+                <View>
+                  <Text style={styles.label}>Authenticator Code</Text>
+                  <TextInput
+                    style={[styles.input, { letterSpacing: 4, fontSize: 16, fontWeight: '700' }]}
+                    placeholder="000000"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={mfaCode}
+                    onChangeText={v => setMfaCode(v.replace(/[^0-9]/g, '').slice(0, 6))}
+                  />
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+                <TouchableOpacity style={[styles.btnSecondary, { flex: 1 }]} onPress={() => setMfaDisableModalVisible(false)}>
+                  <Text style={styles.btnTextSecondary}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btnPrimary, { flex: 1, backgroundColor: colors.danger }]}
+                  onPress={handleDisableMfa}
+                  disabled={mfaLoading || !mfaPassword || mfaCode.length !== 6}
+                >
+                  {mfaLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Disable 2FA</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
@@ -1807,8 +2044,25 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 12,
     marginTop: 8,
   },
+  btnSecondary: {
+    backgroundColor: colors.bg.primary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: Radius.md,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
   btnText: {
     color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  btnTextSecondary: {
+    color: colors.text.primary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1898,5 +2152,38 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     fontSize: 12,
     color: colors.text.primary,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    backgroundColor: colors.bg.card,
+    borderRadius: Radius.lg,
+    width: '100%',
+    padding: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.bg.primary,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.text.primary,
+  },
+  closeBtn: {
+    padding: 4,
   },
 });
