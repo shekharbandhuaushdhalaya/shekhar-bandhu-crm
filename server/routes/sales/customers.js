@@ -145,4 +145,62 @@ router.delete('/:id', authorize('customer:delete'), async (req, res) => {
   }
 });
 
+// GET /api/customers/export-csv — Export customers list as CSV format
+router.get('/export-csv', async (req, res) => {
+  try {
+    const customers = await Customer.find({}).lean();
+    let csv = 'Name,Company,Email,Phone,GSTIN,State,VolumeTier,CreditLimit,OutstandingBalance\n';
+
+    customers.forEach(c => {
+      const name = `"${(c.name || '').replace(/"/g, '""')}"`;
+      const company = `"${(c.company || '').replace(/"/g, '""')}"`;
+      const email = c.email || '';
+      const phone = c.phone || '';
+      const gstin = c.gstin || '';
+      const state = c.state || '';
+      const tier = c.volumeTier || 'none';
+      const limit = c.creditLimit || 0;
+      const balance = c.regularBalance || 0;
+      csv += `${name},${company},${email},${phone},${gstin},${state},${tier},${limit},${balance}\n`;
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="customers_export.csv"');
+    res.status(200).send(csv);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/customers/import-csv — Import customers from JSON array of CSV rows
+router.post('/import-csv', authorize('customer:create'), async (req, res) => {
+  try {
+    const { rows } = req.body;
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: 'rows array is required' });
+    }
+
+    let createdCount = 0;
+    for (const r of rows) {
+      if (r.name || r.company) {
+        await Customer.create({
+          name: r.name || r.company,
+          company: r.company || r.name,
+          email: r.email || '',
+          phone: r.phone || '',
+          gstin: r.gstin || '',
+          state: r.state || 'Maharashtra',
+          volumeTier: r.volumeTier || 'none',
+          creditLimit: Number(r.creditLimit || 0)
+        });
+        createdCount++;
+      }
+    }
+
+    res.status(201).json({ message: `Successfully imported ${createdCount} customer(s)` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

@@ -71,6 +71,41 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
   }
 });
 
+// PATCH /api/inventory/transfers/:id/approve — Approve transfer request
+router.patch('/:id/approve', authorize('inventory:edit'), async (req, res) => {
+  try {
+    const transfer = await StockTransfer.findById(req.params.id);
+    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
+
+    transfer.approvedBy = req.user ? req.user.name : 'Warehouse Manager';
+    transfer.approvedAt = new Date();
+    await transfer.save();
+
+    if (req.io) req.io.emit('transfer_updated', { type: 'approved', id: transfer._id });
+    res.json({ message: 'Stock transfer request approved', transfer });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/inventory/transfers/:id/reject — Reject transfer request
+router.patch('/:id/reject', authorize('inventory:edit'), async (req, res) => {
+  try {
+    const { rejectionReason } = req.body;
+    const transfer = await StockTransfer.findById(req.params.id);
+    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
+
+    transfer.status = 'cancelled';
+    transfer.notes = (transfer.notes ? transfer.notes + '\n' : '') + `Rejected: ${rejectionReason || 'No reason provided'}`;
+    await transfer.save();
+
+    if (req.io) req.io.emit('transfer_updated', { type: 'rejected', id: transfer._id });
+    res.json({ message: 'Stock transfer request rejected', transfer });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/inventory/transfers/:id/ship — Ship items (moves status to in_transit and deducts from source warehouse)
 router.patch('/:id/ship', authorize('inventory:edit'), async (req, res) => {
   try {
