@@ -28,7 +28,16 @@ const productSchema = new mongoose.Schema({
   benefits: { type: String, default: '' },
   rating: { type: Number, default: 0 },
   ratingCount: { type: Number, default: 0 },
-  parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null }
+  parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
+  specificProductCode: { type: String, default: '', trim: true },
+  spcComponents: {
+    stateCode: { type: String, default: '' },
+    licenceType: { type: String, enum: ['D', 'E', ''], default: '' },
+    licenceSerial: { type: String, default: '' },
+    systemOfMedicine: { type: String, enum: ['Classical', 'PP', ''], default: '' },
+    productSerial: { type: String, default: '' },
+    approvalYear: { type: Number, default: null }
+  }
 }, { timestamps: true });
 
 productSchema.index({ name: 'text', sku: 'text', category: 'text' });

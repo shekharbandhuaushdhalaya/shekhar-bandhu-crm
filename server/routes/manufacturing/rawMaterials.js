@@ -287,6 +287,30 @@ router.post('/entries', validate(schemas.rawMaterialEntrySchema), async (req, re
   }
 });
 
+// PATCH /api/raw-materials/entries/:id/qc-status — Quality control approval for raw material stock entries
+router.patch('/entries/:id/qc-status', authorize('manufacturing:qcApprove'), async (req, res) => {
+  try {
+    const { qcStatus } = req.body;
+    if (!['under_test', 'approved', 'rejected'].includes(qcStatus)) {
+      return res.status(400).json({ error: 'qcStatus must be under_test, approved, or rejected' });
+    }
+
+    const entry = await RawMaterialEntry.findById(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Raw material entry not found' });
+
+    entry.qcStatus = qcStatus;
+    await entry.save();
+
+    if (req.io) {
+      req.io.emit('raw_material_updated', { type: 'qc_status_changed', id: entry._id, qcStatus });
+    }
+
+    res.json(entry);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/raw-materials/entries/:id/clean — Record cleaning/pre‑processing loss for a stock entry
 router.post('/entries/:id/clean', validate(schemas.cleaningAdjustmentSchema), async (req, res) => {
   try {

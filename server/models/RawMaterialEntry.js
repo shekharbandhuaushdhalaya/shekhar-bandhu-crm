@@ -31,6 +31,7 @@ const rawMaterialEntrySchema = new mongoose.Schema({
   cleaningLossPercent: { type: Number, default: 0 },   // actual loss % for this batch
   cleaningDate: { type: Date, default: null },
   cleaningNotes: { type: String, default: '' },
+  qcStatus: { type: String, enum: ['under_test', 'approved', 'rejected'], default: 'under_test' },
 }, { timestamps: true });
 
 rawMaterialEntrySchema.index({ rawMaterialId: 1, batchNo: 1 }, { unique: true });

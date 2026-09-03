@@ -4,7 +4,25 @@ const rawMaterialSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   sku: { type: String, required: true, unique: true, trim: true },
   unit: { type: String, required: true, default: 'kg' }, // kg, g, l, ml, unit
-  category: { type: String, default: 'Herb', trim: true },
+  category: {
+    type: String,
+    enum: [
+      'Metallic/Mineral',
+      'Animal Source',
+      'Fresh Herb',
+      'Dry Herb',
+      'Excipient',
+      'Volatile Oil',
+      'Plant Concentrate',
+      'Schedule E1',
+      'Inflammable',
+      'Packaging',
+      'Herb',
+      'Other'
+    ],
+    default: 'Dry Herb'
+  },
+  isScheduleE1: { type: Boolean, default: false },
   minReorder: { type: Number, default: 0 },
   cleaningLossPercent: { type: Number, default: 0, min: 0, max: 100 }, // typical % lost during cleaning/sorting
   // GMP Pharmacopoeial Identity

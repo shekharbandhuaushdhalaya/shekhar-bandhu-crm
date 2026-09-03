@@ -34,6 +34,10 @@ const systemSettingsSchema = new mongoose.Schema({
   gmpCertificateNo: { type: String, default: '', trim: true },
   licenseValidTill: { type: Date, default: null },
   gmpValidTill: { type: Date, default: null },
+  licenceValidityType: { type: String, enum: ['perpetual', 'time_bound', 'unknown'], default: 'unknown' },
+  stateUtCode: { type: String, default: 'UP', trim: true },
+  licenceSerial: { type: String, default: '1234', trim: true },
+  spcReissueDeadline: { type: Date, default: new Date('2028-07-24') },
   qrImageBase64: { type: String, default: '' },
   qrImageUrl: { type: String, default: '' }
 }, { timestamps: true });

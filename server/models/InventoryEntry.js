@@ -20,7 +20,8 @@ const inventoryEntrySchema = new mongoose.Schema({
   expiryDate:    { type: Date },
   purchaseRate:  { type: Number, default: 0 },
   manufacturingUnitId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit' },
-  manufacturingUnitName: { type: String, default: '', trim: true }
+  manufacturingUnitName: { type: String, default: '', trim: true },
+  qcStatus: { type: String, enum: ['under_test', 'approved', 'rejected'], default: 'under_test' }
 }, { timestamps: true });
 
 // Unique stock slot = product + vendor + warehouse + packing size + batch number

@@ -334,4 +334,41 @@ router.patch('/:id/pricing', validate(z.object({ discount: z.number().optional()
   }
 });
 
+// POST /api/products/:id/generate-spc — Generate Specific Product Code (SPC) per Schedule T (Rule 158B)
+router.post('/:id/generate-spc', authorize('product:edit'), async (req, res) => {
+  try {
+    const { stateCode, licenceType, licenceSerial, systemOfMedicine, productSerial, approvalYear } = req.body;
+
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne().lean();
+
+    const stCode = stateCode || (settings ? settings.stateUtCode : 'UP') || 'UP';
+    const licType = licenceType || 'D';
+    const licSerial = licenceSerial || (settings ? settings.licenceSerial : '1234') || '1234';
+    const sysMed = systemOfMedicine || (product.category === 'Classical' ? 'Classical' : 'PP');
+    const prodSerial = productSerial || product._id.toString().slice(-4).toUpperCase();
+    const appYear = approvalYear || new Date().getFullYear();
+
+    const spc = `${stCode}/${licType}/${licSerial}/${sysMed}/${prodSerial}/${appYear}`;
+
+    product.specificProductCode = spc;
+    product.spcComponents = {
+      stateCode: stCode,
+      licenceType: licType,
+      licenceSerial: licSerial,
+      systemOfMedicine: sysMed,
+      productSerial: prodSerial,
+      approvalYear: appYear
+    };
+
+    await product.save();
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

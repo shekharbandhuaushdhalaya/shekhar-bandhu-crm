@@ -98,7 +98,7 @@ async function checkExpiriesAndReorders() {
     const Vendor = require('../models/Vendor');
 
     const settings = await SystemSettings.findOne().lean();
-    if (settings) {
+    if (settings && settings.licenceValidityType !== 'perpetual') {
       if (settings.licenseValidTill && new Date(settings.licenseValidTill) <= d90) {
         const expDate = new Date(settings.licenseValidTill);
         const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
@@ -154,6 +154,26 @@ async function checkExpiriesAndReorders() {
       const existing = await Notification.findOne({ title, createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } });
       if (!existing) {
         await Notification.create({ title, message, type: 'compliance', link: '/manufacturing' });
+      }
+    }
+
+    // 6. Check Stability Studies Real-Time Follow-Up Deadlines (Schedule T Rule 161B)
+    const StabilityStudy = require('../models/StabilityStudy');
+    const dueStudies = await StabilityStudy.find({
+      studyType: 'accelerated',
+      status: { $ne: 'closed' },
+      realTimeFollowUpDueBy: { $ne: null, $lte: d90 }
+    }).populate('productId', 'name').lean();
+
+    for (const st of dueStudies) {
+      const expDate = new Date(st.realTimeFollowUpDueBy);
+      const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+      const pName = st.productId ? st.productId.name : 'Product';
+      const title = `Stability Study Real-Time Report Due: ${pName}`;
+      const message = `Accelerated stability study for "${pName}" real-time follow-up report is ${daysLeft <= 0 ? 'OVERDUE' : `due in ${daysLeft} days`} (Deadline: ${expDate.toLocaleDateString()}).`;
+      const existing = await Notification.findOne({ title, createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } });
+      if (!existing) {
+        await Notification.create({ title, message, type: 'compliance', link: '/stability-studies' });
       }
     }
   } catch (err) {

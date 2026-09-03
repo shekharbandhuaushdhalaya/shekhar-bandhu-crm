@@ -77,7 +77,8 @@ async function consumeFromReservation(batch, rawMaterialId, qtyNeeded, session) 
   if (needed > 0.0001) {
     let query = RawMaterialEntry.find({
       rawMaterialId,
-      warehouseId: batch.manufacturingUnitId
+      warehouseId: batch.manufacturingUnitId,
+      qcStatus: { $ne: 'rejected' }
     });
     if (session) query = query.session(session);
     const entries = await query;
@@ -239,7 +240,7 @@ async function calculateAggregateMaterialSufficiency(batchIds = []) {
   for (const rmIdStr of rmIds) {
     const demand = demandMap[rmIdStr];
     const rm = rawMaterials.find(r => r._id.toString() === rmIdStr);
-    const rmLots = rmEntries.filter(e => e.rawMaterialId.toString() === rmIdStr);
+    const rmLots = rmEntries.filter(e => e.rawMaterialId.toString() === rmIdStr && e.qcStatus !== 'rejected');
 
     const availableStock = rmLots.reduce((sum, e) => sum + Math.max(0, (e.qty || 0) - (e.reservedQty || 0)), 0);
     const totalRequired = Number(demand.totalRequired.toFixed(2));

@@ -14,7 +14,7 @@ const PERMISSIONS = {
   cash:          ['access'],
   payment:       ['view', 'create'],
   dispatch:      ['view', 'create', 'edit', 'delete'],
-  manufacturing: ['view', 'create', 'edit', 'delete', 'complete', 'verify', 'release', 'correctReleased'],
+  manufacturing: ['view', 'create', 'edit', 'delete', 'complete', 'verify', 'release', 'correctReleased', 'qcApprove', 'approveBmr', 'audit'],
   task:          ['view', 'create', 'edit', 'delete'],
   contact:       ['view', 'create', 'edit', 'delete'],
   mr:            ['view', 'create', 'edit', 'delete', 'attendance', 'visits', 'expenses', 'approveExpenses'],
