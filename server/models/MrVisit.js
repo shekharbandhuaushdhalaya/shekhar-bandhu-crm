@@ -4,6 +4,8 @@ const mrVisitSchema = new mongoose.Schema({
   mrId:          { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative', required: true },
   dailyLogId:    { type: mongoose.Schema.Types.ObjectId, ref: 'MrDailyLog', default: null },
   date:          { type: Date, required: true },
+  doctorId:      { type: mongoose.Schema.Types.ObjectId, refPath: 'doctorRefModel', default: null },
+  doctorRefModel:{ type: String, enum: ['Contact', 'Customer'], default: 'Contact' },
   doctorName:    { type: String, required: true, trim: true },
   clinicName:    { type: String, default: '', trim: true },
   specialization:{ type: String, default: '', trim: true },
@@ -33,5 +35,6 @@ const mrVisitSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 mrVisitSchema.index({ mrId: 1, date: -1 });
+mrVisitSchema.index({ doctorId: 1, date: -1 });
 
 module.exports = mongoose.model('MrVisit', mrVisitSchema);

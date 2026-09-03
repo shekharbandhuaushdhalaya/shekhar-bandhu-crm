@@ -36,6 +36,12 @@ const stageSchema = new mongoose.Schema({
     reason: { type: String, default: '' }
   }],
   ingredientsDeducted: { type: Boolean, default: false },
+  // GMP Equipment & Environmental Logging
+  equipmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Equipment', default: null },
+  equipmentName: { type: String, default: '', trim: true },
+  temperatureCelsius: { type: Number, default: null },
+  humidityPct: { type: Number, default: null },
+  ambientVerified: { type: Boolean, default: false },
 }, { _id: false });
 
 const batchProductionSchema = new mongoose.Schema({

@@ -30,7 +30,6 @@ async function consumeFromReservation(batch, rawMaterialId, qtyNeeded, session) 
 
   const targetIdStr = rawMaterialId.toString();
 
-  // 1. Draw from batch's own ingredientsReserved entries first
   if (batch.ingredientsReserved && batch.ingredientsReserved.length > 0) {
     for (const res of batch.ingredientsReserved) {
       if (needed <= 0.0001) break;
@@ -75,7 +74,6 @@ async function consumeFromReservation(batch, rawMaterialId, qtyNeeded, session) 
     batch.ingredientsReserved = batch.ingredientsReserved.filter(r => (r.qtyReserved || 0) > 0.0001);
   }
 
-  // 2. Fall back to FEFO scan over available stock (qty - reservedQty)
   if (needed > 0.0001) {
     let query = RawMaterialEntry.find({
       rawMaterialId,
@@ -199,9 +197,80 @@ async function deductPackagingMaterials(batch, outputQtyOrYields) {
   batch.packagingDeducted = true;
 }
 
+/**
+ * Calculates aggregate raw material sufficiency across multiple planned batches in a production plan horizon.
+ */
+async function calculateAggregateMaterialSufficiency(batchIds = []) {
+  const BatchProduction = require('../models/BatchProduction');
+  const batches = await BatchProduction.find({ _id: { $in: batchIds } }).populate('bomId').lean();
+
+  const demandMap = {};
+
+  for (const b of batches) {
+    const bom = b.bomId;
+    if (!bom || !bom.ingredients) continue;
+    const batchPlannedOutput = b.plannedOutputQty || 100;
+    const basis = bom.formulationBasis || 100;
+    const multiplier = batchPlannedOutput / basis;
+
+    for (const ing of bom.ingredients) {
+      if (!ing.rawMaterialId) continue;
+      const rmIdStr = ing.rawMaterialId.toString();
+      const required = ing.qtyRequired * multiplier;
+
+      if (!demandMap[rmIdStr]) {
+        demandMap[rmIdStr] = {
+          rawMaterialId: ing.rawMaterialId,
+          totalRequired: 0,
+          unit: ing.unit || 'kg'
+        };
+      }
+      demandMap[rmIdStr].totalRequired += required;
+    }
+  }
+
+  const rmIds = Object.keys(demandMap);
+  const rawMaterials = await RawMaterial.find({ _id: { $in: rmIds } }).lean();
+  const rmEntries = await RawMaterialEntry.find({ rawMaterialId: { $in: rmIds } }).lean();
+
+  const report = [];
+  let overallSufficient = true;
+
+  for (const rmIdStr of rmIds) {
+    const demand = demandMap[rmIdStr];
+    const rm = rawMaterials.find(r => r._id.toString() === rmIdStr);
+    const rmLots = rmEntries.filter(e => e.rawMaterialId.toString() === rmIdStr);
+
+    const availableStock = rmLots.reduce((sum, e) => sum + Math.max(0, (e.qty || 0) - (e.reservedQty || 0)), 0);
+    const totalRequired = Number(demand.totalRequired.toFixed(2));
+    const shortageQty = Math.max(0, Number((totalRequired - availableStock).toFixed(2)));
+    const isSufficient = shortageQty <= 0.001;
+
+    if (!isSufficient) overallSufficient = false;
+
+    report.push({
+      rawMaterialId: demand.rawMaterialId,
+      rawMaterialName: rm ? rm.name : 'Raw Material',
+      sku: rm ? rm.sku : '',
+      unit: demand.unit,
+      totalRequired,
+      availableStock: Number(availableStock.toFixed(2)),
+      shortageQty,
+      isSufficient
+    });
+  }
+
+  return {
+    overallSufficient,
+    totalPlannedBatches: batches.length,
+    materials: report
+  };
+}
+
 module.exports = {
   getSizeInMl,
   consumeFromReservation,
   releaseAllReservations,
-  deductPackagingMaterials
+  deductPackagingMaterials,
+  calculateAggregateMaterialSufficiency
 };

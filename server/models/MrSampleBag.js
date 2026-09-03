@@ -12,6 +12,7 @@ const mrSampleBagSchema = new mongoose.Schema({
     required: true,
   },
   batchNo: { type: String, default: '', trim: true },
+  expiryDate: { type: Date, default: null },
   qty: { type: Number, required: true, default: 0, min: 0 },
   allocatedBy: {
     type: mongoose.Schema.Types.ObjectId,

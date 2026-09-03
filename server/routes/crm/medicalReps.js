@@ -7,10 +7,12 @@ const MrTourPlan = require('../../models/MrTourPlan');
 const MrSampleBag = require('../../models/MrSampleBag');
 const Contact = require('../../models/Contact');
 const Customer = require('../../models/Customer');
+const MrLeave = require('../../models/MrLeave');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
-const { getHaversineDistanceInMeters, compileMRDailyCallReport, calculateMRLeaderboard } = require('../../services/medicalRepService');
+const { getHaversineDistanceInMeters, compileMRDailyCallReport, calculateMRLeaderboard, calculateTourPlanCompliance, calculateMRProfitability } = require('../../services/medicalRepService');
+const { safeEscapeRegex, sendWhatsAppNotification } = require('../../utils/whatsappService');
 
 const router = express.Router();
 
@@ -245,9 +247,20 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
     if (!data.date) data.date = new Date();
 
     let doctorVerified = false;
-    if (data.latitude && data.longitude && data.doctorName) {
-      const target = await Contact.findOne({ name: { $regex: new RegExp(data.doctorName.trim(), 'i') } }) ||
-                     await Customer.findOne({ $or: [{ name: { $regex: new RegExp(data.doctorName.trim(), 'i') } }, { company: { $regex: new RegExp(data.doctorName.trim(), 'i') } }] });
+    if (data.latitude && data.longitude && (data.doctorId || data.doctorName)) {
+      let target = null;
+      if (data.doctorId) {
+        if (data.doctorRefModel === 'Customer') {
+          target = await Customer.findById(data.doctorId);
+        } else {
+          target = await Contact.findById(data.doctorId);
+        }
+      }
+      if (!target && data.doctorName) {
+        const escaped = safeEscapeRegex(data.doctorName.trim());
+        target = await Contact.findOne({ name: { $regex: new RegExp(escaped, 'i') } }) ||
+                 await Customer.findOne({ $or: [{ name: { $regex: new RegExp(escaped, 'i') } }, { company: { $regex: new RegExp(escaped, 'i') } }] });
+      }
       
       if (target && target.latitude && target.longitude) {
         const dist = getHaversineDistanceInMeters(data.latitude, data.longitude, target.latitude, target.longitude);
@@ -512,12 +525,32 @@ router.put('/tour-plans/:id/status', authorize('mr:edit'), async (req, res) => {
     ).populate('approvedBy', 'name');
 
     if (!tourPlan) return res.status(404).json({ error: 'Tour plan not found' });
+
+    // Send WhatsApp Push Notification to MR
+    const mr = await MedicalRepresentative.findById(tourPlan.mrId);
+    if (mr && mr.phone) {
+      const msg = `Your Tour Plan for ${tourPlan.month}/${tourPlan.year} has been ${status.toUpperCase()}.${status === 'rejected' ? ` Reason: ${rejectionReason}` : ''}`;
+      sendWhatsAppNotification(mr.phone, msg);
+    }
+
     if (req.io) {
       req.io.emit('medrep_updated', { type: 'tour_plan_status', id: tourPlan._id });
     }
     res.json(tourPlan);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/medical-reps/tour-plans/compliance — Planned vs Actual Beat Plan Report
+router.get('/tour-plans/compliance', authorize('mr:view'), async (req, res) => {
+  try {
+    const { mrId, month, year } = req.query;
+    if (!mrId) return res.status(400).json({ error: 'mrId parameter is required' });
+    const report = await calculateTourPlanCompliance(mrId, month, year);
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -891,6 +924,85 @@ router.get('/commission/calculate', authorize('mr:view'), async (req, res) => {
       year: queryYear,
       report
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── MR Leave Management System ───
+
+// POST /api/medical-reps/leaves — Apply for planned/sick/casual leave
+router.post('/leaves', authorize('mr:attendance'), validate(schemas.mrLeaveSchema), async (req, res) => {
+  try {
+    const leave = await MrLeave.create(req.body);
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'leave_applied', id: leave._id });
+    }
+    res.status(201).json(leave);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/medical-reps/leaves — List MR leaves
+router.get('/leaves', authorize('mr:view'), async (req, res) => {
+  try {
+    const { mrId, status } = req.query;
+    const filter = {};
+    if (mrId) filter.mrId = mrId;
+    if (status && status !== 'all') filter.status = status;
+
+    const leaves = await MrLeave.find(filter).populate('mrId', 'name code territory').sort({ startDate: -1 }).lean();
+    res.json(leaves);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/medical-reps/leaves/:id/status — Approve or Reject MR Leave Application
+router.put('/leaves/:id/status', authorize('mr:edit'), async (req, res) => {
+  try {
+    const { status, rejectionReason } = req.body;
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be approved or rejected' });
+    }
+
+    const leave = await MrLeave.findByIdAndUpdate(
+      req.params.id,
+      {
+        status,
+        approvedBy: req.user ? req.user.id : null,
+        approvedAt: new Date(),
+        rejectionReason: rejectionReason || ''
+      },
+      { new: true }
+    ).populate('mrId', 'name phone');
+
+    if (!leave) return res.status(404).json({ error: 'Leave record not found' });
+
+    // Send WhatsApp notification to MR
+    if (leave.mrId && leave.mrId.phone) {
+      const msg = `Your Leave Application (${leave.leaveType.toUpperCase()}) from ${new Date(leave.startDate).toLocaleDateString()} to ${new Date(leave.endDate).toLocaleDateString()} has been ${status.toUpperCase()}.${status === 'rejected' ? ` Reason: ${rejectionReason}` : ''}`;
+      sendWhatsAppNotification(leave.mrId.phone, msg);
+    }
+
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'leave_status', id: leave._id });
+    }
+    res.json(leave);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ─── MR P&L / ROI Dashboard ───
+
+// GET /api/medical-reps/roi-dashboard — Compute per-MR / territory profitability
+router.get('/roi-dashboard', authorize('mr:view'), async (req, res) => {
+  try {
+    const { mrId, month, year } = req.query;
+    const report = await calculateMRProfitability(mrId, month, year);
+    res.json(report);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

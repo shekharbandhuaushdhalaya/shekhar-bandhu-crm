@@ -617,6 +617,8 @@ const mrCheckinSchema = z.object({
 });
 
 const mrVisitSchema = z.object({
+  doctorId: objectId.optional().nullable(),
+  doctorRefModel: z.enum(['Contact', 'Customer']).optional().default('Contact'),
   doctorName: z.string().min(1),
   clinic: z.string().default(''),
   location: z.string().default(''),
@@ -627,7 +629,8 @@ const mrVisitSchema = z.object({
   sampleDetails: z.array(z.object({
     productId: objectId.optional(),
     name: z.string().optional(),
-    qty: z.number().default(1)
+    qty: z.number().default(1),
+    batchNo: z.string().optional().default('')
   })).optional()
 });
 
@@ -655,7 +658,16 @@ const mrTourPlanSchema = z.object({
 const mrSampleIssueSchema = z.object({
   productId: objectId,
   batchNo: z.string().optional().default(''),
+  expiryDate: z.string().or(z.date()).optional().nullable(),
   qty: z.number().int().positive(),
+});
+
+const mrLeaveSchema = z.object({
+  mrId: objectId,
+  startDate: z.string().or(z.date()),
+  endDate: z.string().or(z.date()),
+  leaveType: z.enum(['casual', 'sick', 'earned', 'off_territory']).default('casual'),
+  reason: z.string().optional().default('')
 });
 
 // ── Customer Pricing & Volume Tiers ───────────────────────────
@@ -775,6 +787,38 @@ const grnSchema = z.object({
   warehouseId: objectId,
   items: z.array(grnItemInputSchema).min(1, 'At least one GRN item required'),
   notes: z.string().optional().default('')
+});
+
+// ── Manufacturing Structural & GMP Compliance Schemas ─────────
+const productionPlanSchema = z.object({
+  name: z.string().min(1),
+  startDate: z.string().or(z.date()),
+  endDate: z.string().or(z.date()),
+  manufacturingUnitId: objectId,
+  batchIds: z.array(objectId).optional().default([]),
+  notes: z.string().optional().default('')
+});
+
+const equipmentSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  category: z.enum(['mixer', 'drier', 'pulverizer', 'tableting', 'filling', 'packaging', 'qc_instrument', 'other']),
+  manufacturingUnitId: objectId,
+  calibrationDueDate: z.string().or(z.date()).optional().nullable(),
+  lastMaintenanceDate: z.string().or(z.date()).optional().nullable(),
+  notes: z.string().optional().default('')
+});
+
+const deviationCapaSchema = z.object({
+  batchId: objectId,
+  batchNo: z.string().optional().default(''),
+  stageId: z.string().optional().default(''),
+  stageName: z.string().optional().default(''),
+  deviationType: z.enum(['qc_failure', 'abnormal_loss', 'equipment_breakdown', 'temp_excursion', 'material_mismatch', 'other']),
+  description: z.string().min(1),
+  rootCause: z.string().optional().default(''),
+  correctiveAction: z.string().optional().default(''),
+  preventiveAction: z.string().optional().default('')
 });
 
 // ── Task ─────────────────────────────────────────────────────
@@ -959,6 +1003,7 @@ module.exports = {
   mrExpenseSchema,
   mrTourPlanSchema,
   mrSampleIssueSchema,
+  mrLeaveSchema,
   customerPricingSchema,
   pricingResolveSchema,
   volumeTierSchema,
@@ -967,6 +1012,9 @@ module.exports = {
   paymentAllocateSchema,
   purchaseOrderSchema,
   grnSchema,
+  productionPlanSchema,
+  equipmentSchema,
+  deviationCapaSchema,
   taskSchema,
   campaignSchema,
   complaintSchema,

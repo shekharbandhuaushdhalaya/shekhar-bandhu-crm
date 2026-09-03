@@ -61,6 +61,36 @@ async function checkExpiriesAndReorders() {
           await Notification.create({ title, message, type: 'alert', link: '/inventory' });
         }
       }
+    // 3. Check MR Field Sample Bag Expiries
+    const MrSampleBag = require('../models/MrSampleBag');
+    const expiringSampleBags = await MrSampleBag.find({
+      qty: { $gt: 0 },
+      expiryDate: { $ne: null, $lte: d90 }
+    }).populate('mrId', 'name phone').populate('productId', 'name sku').lean();
+
+    for (const sb of expiringSampleBags) {
+      const expDate = new Date(sb.expiryDate);
+      const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+      const mrName = sb.mrId ? sb.mrId.name : 'MR';
+      const prodName = sb.productId ? sb.productId.name : 'Sample Product';
+
+      const title = `Field Sample Bag Expiry Alert: ${mrName}`;
+      const message = `Sample product "${prodName}" (Batch: ${sb.batchNo || 'N/A'}, ${sb.qty} units) in ${mrName}'s sample bag ${daysLeft <= 0 ? 'has EXPIRED' : `expires in ${daysLeft} days`}.`;
+
+      const existingNotif = await Notification.findOne({
+        title,
+        message,
+        createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) }
+      });
+
+      if (!existingNotif) {
+        await Notification.create({
+          title,
+          message,
+          type: 'compliance',
+          link: '/medical-reps'
+        });
+      }
     }
   } catch (err) {
     console.error('Error running expiry & reorder checker:', err.message);

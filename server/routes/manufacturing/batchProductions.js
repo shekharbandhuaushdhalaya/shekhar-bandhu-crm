@@ -10,9 +10,23 @@ const StockLedger = require('../../models/StockLedger');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
-const { getSizeInMl, consumeFromReservation, releaseAllReservations, deductPackagingMaterials } = require('../../services/batchProductionService');
+const { getSizeInMl, consumeFromReservation, releaseAllReservations, deductPackagingMaterials, calculateAggregateMaterialSufficiency } = require('../../services/batchProductionService');
 
 const router = express.Router();
+
+// POST /api/batch-productions/planning/aggregate-sufficiency — Aggregate raw material sufficiency across planned batches
+router.post('/planning/aggregate-sufficiency', authorize('manufacturing:view'), async (req, res) => {
+  try {
+    const { batchIds } = req.body;
+    if (!batchIds || !Array.isArray(batchIds) || batchIds.length === 0) {
+      return res.status(400).json({ error: 'batchIds array is required' });
+    }
+    const report = await calculateAggregateMaterialSufficiency(batchIds);
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/batch-productions — List all batch production runs
 // Supports ?limit=&skip=&status= for pagination and filtering
