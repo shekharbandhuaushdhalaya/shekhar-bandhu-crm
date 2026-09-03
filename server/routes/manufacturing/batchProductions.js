@@ -1559,4 +1559,49 @@ router.delete('/:id/documents', validate(schemas.batchDocumentRemoveSchema), asy
   }
 });
 
+// GET /api/batch-productions/analytics/yield-variance — Yield vs Planned Variance Dashboard
+router.get('/analytics/yield-variance', authorize('manufacturing:view'), async (req, res) => {
+  try {
+    const batches = await BatchProduction.find({ status: { $in: ['released', 'completed', 'qc_passed'] } })
+      .populate('productId', 'name sku')
+      .sort({ endDate: -1 })
+      .lean();
+
+    let totalPlanned = 0;
+    let totalActual = 0;
+    const batchMetrics = batches.map(b => {
+      const planned = b.plannedQty || 1;
+      const actual = b.actualYieldQty !== null && b.actualYieldQty !== undefined ? b.actualYieldQty : planned;
+      const yieldEfficiency = Number(((actual / planned) * 100).toFixed(1));
+      const processLossPercent = Number((((planned - actual) / planned) * 100).toFixed(1));
+
+      totalPlanned += planned;
+      totalActual += actual;
+
+      return {
+        _id: b._id,
+        batchNo: b.batchNo,
+        productName: b.productId ? b.productId.name : 'Unknown Product',
+        plannedQty: planned,
+        actualYieldQty: actual,
+        varianceQty: actual - planned,
+        yieldEfficiencyPercent: yieldEfficiency,
+        processLossPercent: Math.max(0, processLossPercent),
+        qcStatus: b.qcStatus || 'approved',
+        unitProductionCost: b.unitProductionCost || 0
+      };
+    });
+
+    const averageYieldEfficiency = totalPlanned > 0 ? Number(((totalActual / totalPlanned) * 100).toFixed(1)) : 100;
+
+    res.json({
+      averageYieldEfficiencyPercent: averageYieldEfficiency,
+      totalBatchesAnalyzed: batches.length,
+      batchMetrics
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

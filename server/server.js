@@ -250,6 +250,7 @@ const vendorQualificationRoutes = require('./routes/manufacturing/vendorQualific
 const productionPlanRoutes = require('./routes/manufacturing/productionPlans');
 const generalExpenseRoutes = require('./routes/finance/generalExpenses');
 const mrIncentiveRoutes = require('./routes/crm/mrIncentives');
+const financialReportRoutes = require('./routes/finance/financialReports');
 app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
 app.use('/api/debit-notes', authenticateJWT, debitNoteRoutes);
 app.use('/api/recurring-invoices', authenticateJWT, recurringInvoiceRoutes);
@@ -260,6 +261,7 @@ app.use('/api/vendor-qualifications', authenticateJWT, vendorQualificationRoutes
 app.use('/api/production-plans', authenticateJWT, productionPlanRoutes);
 app.use('/api/general-expenses', authenticateJWT, generalExpenseRoutes);
 app.use('/api/mr-incentives', authenticateJWT, mrIncentiveRoutes);
+app.use('/api/finance/reports', authenticateJWT, financialReportRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
 app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);
 

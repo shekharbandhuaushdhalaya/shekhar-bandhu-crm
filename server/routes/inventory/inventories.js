@@ -446,4 +446,91 @@ router.get('/alerts/reorder', authorize('inventory:view'), async (req, res) => {
   }
 });
 
+// GET /api/inventories/reports/expiry-valuation — Batch-wise expiry-risk valuation report
+router.get('/reports/expiry-valuation', authorize('inventory:view'), async (req, res) => {
+  try {
+    const entries = await InventoryEntry.find({ qtyBoxes: { $gt: 0 } })
+      .populate('productId', 'name sku price')
+      .lean();
+
+    const now = new Date();
+    const brackets = {
+      critical_0_3m: { name: 'Critical Risk (0-3 Months)', count: 0, totalValuation: 0, items: [] },
+      high_3_6m: { name: 'High Risk (3-6 Months)', count: 0, totalValuation: 0, items: [] },
+      medium_6_12m: { name: 'Medium Risk (6-12 Months)', count: 0, totalValuation: 0, items: [] },
+      safe_12m_plus: { name: 'Safe (12+ Months)', count: 0, totalValuation: 0, items: [] }
+    };
+
+    entries.forEach(e => {
+      if (!e.expiryDate) return;
+      const exp = new Date(e.expiryDate);
+      const monthsLeft = (exp.getFullYear() - now.getFullYear()) * 12 + (exp.getMonth() - now.getMonth());
+      const rate = e.productId ? (e.productId.price || 100) : 100;
+      const valuation = (e.qtyBoxes || 0) * rate;
+
+      let key = 'safe_12m_plus';
+      if (monthsLeft <= 3) key = 'critical_0_3m';
+      else if (monthsLeft <= 6) key = 'high_3_6m';
+      else if (monthsLeft <= 12) key = 'medium_6_12m';
+
+      brackets[key].count++;
+      brackets[key].totalValuation += valuation;
+      brackets[key].items.push({
+        _id: e._id,
+        batchNo: e.batchNo,
+        productName: e.productId ? e.productId.name : 'Finished Good',
+        qtyBoxes: e.qtyBoxes,
+        expiryDate: e.expiryDate,
+        monthsLeft: Math.max(0, monthsLeft),
+        valuation: Number(valuation.toFixed(2))
+      });
+    });
+
+    res.json(brackets);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/inventories/reports/inventory-aging — Inventory aging report (active/slow-moving/dead stock)
+router.get('/reports/inventory-aging', authorize('inventory:view'), async (req, res) => {
+  try {
+    const entries = await InventoryEntry.find({ qtyBoxes: { $gt: 0 } })
+      .populate('productId', 'name sku price')
+      .lean();
+
+    const now = new Date();
+    const categories = {
+      active_0_90d: { name: 'Active Stock (<90 Days)', totalValuation: 0, items: [] },
+      slow_moving_90_180d: { name: 'Slow-Moving Stock (90-180 Days)', totalValuation: 0, items: [] },
+      dead_stock_180d_plus: { name: 'Dead Stock (>180 Days)', totalValuation: 0, items: [] }
+    };
+
+    entries.forEach(e => {
+      const createdDate = new Date(e.mfgDate || e.createdAt || Date.now());
+      const daysOld = Math.ceil((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+      const rate = e.productId ? (e.productId.price || 100) : 100;
+      const valuation = (e.qtyBoxes || 0) * rate;
+
+      let key = 'active_0_90d';
+      if (daysOld > 180) key = 'dead_stock_180d_plus';
+      else if (daysOld > 90) key = 'slow_moving_90_180d';
+
+      categories[key].totalValuation += valuation;
+      categories[key].items.push({
+        _id: e._id,
+        batchNo: e.batchNo,
+        productName: e.productId ? e.productId.name : 'Item',
+        qtyBoxes: e.qtyBoxes,
+        daysOld,
+        valuation: Number(valuation.toFixed(2))
+      });
+    });
+
+    res.json(categories);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

@@ -1008,4 +1008,47 @@ router.get('/roi-dashboard', authorize('mr:view'), async (req, res) => {
   }
 });
 
+// GET /api/medical-reps/analytics/leaderboard — Rank MRs by total doctor visits, sales volume, and calls
+router.get('/analytics/leaderboard', authorize('mr:view'), async (req, res) => {
+  try {
+    const mrs = await MedicalRepresentative.find({ status: 'active' }).lean();
+    const Invoice = require('../../models/Invoice');
+    const MrVisit = require('../../models/MrVisit');
+
+    const leaderboard = [];
+
+    for (const mr of mrs) {
+      const visitsCount = await MrVisit.countDocuments({ mrId: mr._id });
+      const salesInvoices = await Invoice.find({
+        type: 'sale',
+        isFinalized: true,
+        $or: [{ mrId: mr._id }, { assignedMrId: mr._id }]
+      }).select('nettTotal amount').lean();
+
+      const totalSalesVolume = salesInvoices.reduce((sum, inv) => sum + (inv.nettTotal || inv.amount || 0), 0);
+
+      leaderboard.push({
+        mrId: mr._id,
+        name: mr.name,
+        code: mr.code || 'N/A',
+        headquarter: mr.headquarter || '',
+        totalVisits: visitsCount,
+        totalSalesVolume,
+        salesInvoicesCount: salesInvoices.length
+      });
+    }
+
+    leaderboard.sort((a, b) => b.totalSalesVolume - a.totalSalesVolume || b.totalVisits - a.totalVisits);
+
+    const rankedLeaderboard = leaderboard.map((item, index) => ({
+      rank: index + 1,
+      ...item
+    }));
+
+    res.json(rankedLeaderboard);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
