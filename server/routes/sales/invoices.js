@@ -11,6 +11,7 @@ const StockLedger = require('../../models/StockLedger');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { calculateInvoiceTotals, resolveWarehouse, deductInventoryForInvoice } = require('../../services/invoiceService');
 
 async function resolveWarehouse(warehouseId) {
   if (!warehouseId) return null;
@@ -228,7 +229,7 @@ const router = express.Router();
 // GET /api/invoices/sales — List sale invoices
 router.get('/sales', async (req, res) => {
   try {
-    const { search, mode } = req.query;
+    const { search, mode, page, limit } = req.query;
     const filter = { type: 'sale' };
 
     if (search) {
@@ -241,7 +242,17 @@ router.get('/sales', async (req, res) => {
 
     filter.mode = 'regular';
 
-    const invoices = await Invoice.find(filter).sort({ date: -1, createdAt: -1 }).lean();
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = Invoice.find(filter).sort({ date: -1, createdAt: -1 });
+    
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const invoices = await query.lean();
     
     // Fetch associated dispatches
     const Dispatch = require('../../models/Dispatch');
@@ -259,6 +270,17 @@ router.get('/sales', async (req, res) => {
       dispatch: dispatchMap[inv._id.toString()] || null
     }));
 
+    if (isPaginated) {
+      const total = await Invoice.countDocuments(filter);
+      return res.json({
+        data: enrichedInvoices,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
     res.json(enrichedInvoices);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -268,7 +290,7 @@ router.get('/sales', async (req, res) => {
 // GET /api/invoices/purchases — List purchase invoices
 router.get('/purchases', authorize('invoice:view'), async (req, res) => {
   try {
-    const { search, mode } = req.query;
+    const { search, mode, page, limit } = req.query;
     const filter = { type: 'purchase' };
 
     if (search) {
@@ -283,7 +305,29 @@ router.get('/purchases', authorize('invoice:view'), async (req, res) => {
       filter.mode = mode;
     }
 
-    const invoices = await Invoice.find(filter).sort({ date: -1, createdAt: -1 }).lean();
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = Invoice.find(filter).sort({ date: -1, createdAt: -1 });
+    
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const invoices = await query.lean();
+
+    if (isPaginated) {
+      const total = await Invoice.countDocuments(filter);
+      return res.json({
+        data: invoices,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
     res.json(invoices);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -302,23 +346,8 @@ router.post('/sales', validate(schemas.invoiceSchema), async (req, res) => {
       const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
       const pfx = settings.invoicePrefix || 'VP';
       const prefix = `${pfx}/${fy}/`;
-      
-      const invoices = await Invoice.find({
-        type: 'sale',
-        invoiceNo: { $regex: `^${prefix.replace(/\//g, '\\/')}\\d+$` }
-      }).select('invoiceNo').lean();
-
-      let nextNum = 1;
-      if (invoices.length > 0) {
-        const nums = invoices.map(inv => {
-          const parts = inv.invoiceNo.split('/');
-          return parts.length === 3 ? parseInt(parts[2], 10) : 0;
-        }).filter(n => !isNaN(n));
-        if (nums.length > 0) {
-          nextNum = Math.max(...nums) + 1;
-        }
-      }
-      invoiceNo = `${prefix}${nextNum.toString().padStart(3, '0')}`;
+      const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+      invoiceNo = await generateAtomicDocumentNumber(`invoiceNo_${prefix}`, prefix, 3);
     }
 
     if (req.body.date) {

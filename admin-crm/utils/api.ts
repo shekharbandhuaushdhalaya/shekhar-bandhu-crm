@@ -422,8 +422,14 @@ class ApiClient {
 
 
   // --- Customers ---
-  async getCustomers(search = ''): Promise<Customer[]> {
-    const res = await this.request(`${API_BASE}/customers?search=${search}`);
+  async getCustomers(search = '', mode = 'all', page?: number, limit?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (mode && mode !== 'all') params.append('mode', mode);
+    if (page !== undefined) params.append('page', page.toString());
+    if (limit !== undefined) params.append('limit', limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await this.request(`${API_BASE}/customers${query}`);
     return res.json();
   }
   async getCustomer(id: string): Promise<Customer | null> {
@@ -444,8 +450,13 @@ class ApiClient {
   }
 
   // --- Vendors ---
-  async getVendors(search = ''): Promise<Vendor[]> {
-    const res = await this.request(`${API_BASE}/vendors?search=${search}`);
+  async getVendors(search = '', page?: number, limit?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (page !== undefined) params.append('page', page.toString());
+    if (limit !== undefined) params.append('limit', limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await this.request(`${API_BASE}/vendors${query}`);
     return res.json();
   }
   async getVendor(id: string): Promise<Vendor | null> {
@@ -689,15 +700,19 @@ class ApiClient {
   }
 
   // --- Invoices ---
-  async getSaleInvoices(search = '', mode = 'all'): Promise<Invoice[]> {
+  async getSaleInvoices(search = '', mode = 'all', page?: number, limit?: number): Promise<any> {
     let url = `${API_BASE}/invoices/sales?search=${encodeURIComponent(search)}`;
     if (mode && mode !== 'all') url += `&mode=${encodeURIComponent(mode)}`;
+    if (page !== undefined) url += `&page=${page}`;
+    if (limit !== undefined) url += `&limit=${limit}`;
     const res = await this.request(url);
     return res.json();
   }
-  async getPurchaseInvoices(search = '', mode = 'all'): Promise<Invoice[]> {
+  async getPurchaseInvoices(search = '', mode = 'all', page?: number, limit?: number): Promise<any> {
     let url = `${API_BASE}/invoices/purchases?search=${encodeURIComponent(search)}`;
     if (mode && mode !== 'all') url += `&mode=${encodeURIComponent(mode)}`;
+    if (page !== undefined) url += `&page=${page}`;
+    if (limit !== undefined) url += `&limit=${limit}`;
     const res = await this.request(url);
     return res.json();
   }
@@ -917,8 +932,12 @@ class ApiClient {
   }
 
   // --- E-commerce Orders ---
-  async getOrders(): Promise<Order[]> {
-    const res = await this.request(`${API_BASE}/orders`);
+  async getOrders(page?: number, limit?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (page !== undefined) params.append('page', page.toString());
+    if (limit !== undefined) params.append('limit', limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await this.request(`${API_BASE}/orders${query}`);
     return res.json();
   }
   async updateOrderStatus(id: string, status: 'pending' | 'processing' | 'shipped' | 'delivered'): Promise<Order> {
@@ -1015,18 +1034,16 @@ class ApiClient {
   }
 
   // --- Batch Production ---
-  async getBatchProductions(options?: { limit?: number; skip?: number; status?: string }): Promise<BatchProduction[]> {
+  async getBatchProductions(page?: number, limit?: number): Promise<any> {
     const params = new URLSearchParams();
-    if (options?.limit) params.set('limit', String(options.limit));
-    if (options?.skip) params.set('skip', String(options.skip));
-    if (options?.status) params.set('status', options.status);
+    if (page !== undefined && limit !== undefined) {
+      params.append('limit', limit.toString());
+      params.append('skip', ((page - 1) * limit).toString());
+    }
     const qs = params.toString();
     const url = qs ? `${API_BASE}/batch-productions?${qs}` : `${API_BASE}/batch-productions`;
     const res = await this.request(url);
-    const json = await res.json();
-    // Handle both paginated ({ data, total }) and plain array responses
-    if (Array.isArray(json)) return json;
-    return json.data || [];
+    return res.json();
   }
   async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; manufacturingUnitId: string; productionType?: string; jobWorkMode?: string; packagingMode?: string; jobWorkerId?: string | null; jobWorkerName?: string; jobWorkerChallanRef?: string; bomId?: string; plannedYields?: { productId: string; plannedQty: number; size?: string }[] }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
@@ -1064,9 +1081,10 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/rbac/permissions`);
     return res.json();
   }
-  async updateRolePermissions(role: string, permissions: string[]): Promise<RolePermissionConfig> {
+  async updateRolePermissions(role: string, permissions: string[], mfaPermissions?: string[]): Promise<RolePermissionConfig> {
     const res = await this.request(`${API_BASE}/rbac/permissions/${role}`, {
-      method: 'PUT', body: JSON.stringify({ permissions })
+      method: 'PUT',
+      body: JSON.stringify({ permissions, mfaPermissions }),
     });
     return res.json();
   }

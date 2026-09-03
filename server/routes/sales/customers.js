@@ -10,7 +10,7 @@ const router = express.Router();
 // GET /api/customers — List customers with optional search filter
 router.get('/', async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, page, limit, mode } = req.query;
     const filter = {};
 
     if (search) {
@@ -21,16 +21,43 @@ router.get('/', async (req, res) => {
         { gstin: { $regex: search, $options: 'i' } },
       ];
     }
-
-    const customers = await Customer.find(filter).sort({ createdAt: -1 }).lean();
-    if (!req.user || !req.user.canAccessCash) {
-      const sanitized = customers.map(c => {
-        c.cashBalance = 0;
-        return c;
-      });
-      return res.json(sanitized);
+    
+    if (mode === 'cash') {
+      filter.$or = filter.$or ? [{ $and: [{ $or: filter.$or }, { gstin: { $in: [null, ''] } }] }] : [{ gstin: { $in: [null, ''] } }];
+    } else if (mode === 'gst') {
+      filter.gstin = { $nin: [null, ''] };
     }
-    res.json(customers);
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = Customer.find(filter).sort({ createdAt: -1 });
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const customers = await query.lean();
+
+    const sanitized = customers.map(c => {
+      if (!req.user || !req.user.canAccessCash) {
+        c.cashBalance = 0;
+      }
+      return c;
+    });
+
+    if (isPaginated) {
+      const total = await Customer.countDocuments(filter);
+      return res.json({
+        data: sanitized,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
+    res.json(sanitized);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -8,7 +8,7 @@ const StockLedger = require('../../models/StockLedger');
 const { authorize } = require('../../middleware/authorize');
 
 // GET /api/inventory/transfers — List all stock transfers
-router.get('/', async (req, res) => {
+router.get('/', authorize('inventory:view'), async (req, res) => {
   try {
     const transfers = await StockTransfer.find({}).sort({ createdAt: -1 }).lean();
     res.json(transfers);
@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/inventory/transfers — Create a transfer request
-router.post('/', async (req, res) => {
+router.post('/', authorize('inventory:create'), async (req, res) => {
   try {
     const { fromWarehouseId, toWarehouseId, items, notes } = req.body;
 
@@ -72,7 +72,7 @@ router.post('/', async (req, res) => {
 });
 
 // PATCH /api/inventory/transfers/:id/ship — Ship items (moves status to in_transit and deducts from source warehouse)
-router.patch('/:id/ship', async (req, res) => {
+router.patch('/:id/ship', authorize('inventory:edit'), async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
     if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
@@ -128,7 +128,7 @@ router.patch('/:id/ship', async (req, res) => {
 });
 
 // PATCH /api/inventory/transfers/:id/receive — Receive items (moves status to completed and adds to target warehouse)
-router.patch('/:id/receive', async (req, res) => {
+router.patch('/:id/receive', authorize('inventory:edit'), async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
     if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
@@ -198,7 +198,7 @@ router.patch('/:id/receive', async (req, res) => {
 });
 
 // PATCH /api/inventory/transfers/:id/cancel — Cancel transfer request
-router.patch('/:id/cancel', async (req, res) => {
+router.patch('/:id/cancel', authorize('inventory:edit'), async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
     if (!transfer) return res.status(404).json({ error: 'Transfer not found' });

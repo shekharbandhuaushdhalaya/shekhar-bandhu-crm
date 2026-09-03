@@ -1671,16 +1671,37 @@ export default function PurchaseInvoicesScreen() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
 
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 50;
+
   const load = useCallback(async () => {
     const [res, vends, rms] = await Promise.all([
-      api.getPurchaseInvoices(search, modeFilter),
+      api.getPurchaseInvoices(search, modeFilter, page, limit),
       api.getVendors(),
       api.getRawMaterials().catch(() => [])
     ]);
-    setInvoices(res);
-    setVendors(vends);
-    setRawMaterials(rms);
-  }, [search, modeFilter]);
+    if (res && res.data) {
+      if (page === 1) {
+        setInvoices(res.data);
+      } else {
+        setInvoices(prev => {
+          const existingIds = new Set(prev.map(inv => inv._id));
+          const newInvoices = res.data.filter((inv: any) => !existingIds.has(inv._id));
+          return [...prev, ...newInvoices];
+        });
+      }
+      setTotalPages(res.totalPages || 1);
+    } else {
+      setInvoices(Array.isArray(res) ? res : []);
+      setTotalPages(1);
+    }
+    if (page === 1) {
+      setVendors(vends);
+      setRawMaterials(rms);
+    }
+  }, [search, modeFilter, page]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useEffect(() => {
@@ -1807,7 +1828,17 @@ export default function PurchaseInvoicesScreen() {
           </View>
         </View>
 
-      <ScrollView style={{ flex: 1 }}>
+      <ScrollView 
+        style={{ flex: 1 }}
+        scrollEventThrottle={400}
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+          if (isCloseToBottom && page < totalPages) {
+            setPage(p => p + 1);
+          }
+        }}
+      >
         <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
           <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
             {/* Table Header Row */}
@@ -1872,6 +1903,11 @@ export default function PurchaseInvoicesScreen() {
             )}
           </View>
         </ScrollView>
+        {page < totalPages && (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
+          </View>
+        )}
       </ScrollView>
       </View>
 

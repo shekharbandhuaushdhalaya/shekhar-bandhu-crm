@@ -40,7 +40,17 @@ function checkAndAddAlerts(order, newStatus, newTrackingId, newCourierName) {
 // GET /api/orders — List all orders (Authenticated)
 router.get('/', async (req, res) => {
   try {
-    const orders = await Order.find({}).sort({ createdAt: -1 }).lean();
+    const { page, limit } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = Order.find({}).sort({ createdAt: -1 });
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+    
+    const orders = await query.lean();
     const Invoice = require('../../models/Invoice');
     const StockMovement = require('../../models/StockMovement');
 
@@ -51,15 +61,15 @@ router.get('/', async (req, res) => {
       let dispatch = null;
       const Dispatch = require('../../models/Dispatch');
       if (invoice || challan) {
-        const query = {};
+        const dQuery = {};
         if (invoice && challan) {
-          query.$or = [{ invoiceId: invoice._id }, { challanId: challan._id }];
+          dQuery.$or = [{ invoiceId: invoice._id }, { challanId: challan._id }];
         } else if (invoice) {
-          query.invoiceId = invoice._id;
+          dQuery.invoiceId = invoice._id;
         } else {
-          query.challanId = challan._id;
+          dQuery.challanId = challan._id;
         }
-        dispatch = await Dispatch.findOne(query).select('dispatchNo').lean();
+        dispatch = await Dispatch.findOne(dQuery).select('dispatchNo').lean();
       }
 
       return {
@@ -72,6 +82,17 @@ router.get('/', async (req, res) => {
         dispatchNo: dispatch ? dispatch.dispatchNo : null,
       };
     }));
+
+    if (isPaginated) {
+      const total = await Order.countDocuments({});
+      return res.json({
+        data: enrichedOrders,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
 
     res.json(enrichedOrders);
   } catch (err) {
@@ -281,7 +302,10 @@ router.patch('/:id/cancel', async (req, res) => {
       return res.status(400).json({ error: 'Cannot cancel a delivered order' });
     }
 
-    const warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
+    let warehouse = await Warehouse.findOne({ isDefault: true });
+    if (!warehouse) {
+      warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
+    }
 
     // Revert stock for each item
     for (const item of order.items) {

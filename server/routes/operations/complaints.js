@@ -4,12 +4,11 @@ const Complaint = require('../../models/Complaint');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
-// Auto-generate complaint number
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+
+// Auto-generate complaint number atomically
 async function nextComplaintNo() {
-  const last = await Complaint.findOne().sort({ createdAt: -1 }).select('complaintNo');
-  if (!last || !last.complaintNo) return 'CMP-001';
-  const num = parseInt(last.complaintNo.replace(/\D/g, ''), 10) || 0;
-  return `CMP-${String(num + 1).padStart(3, '0')}`;
+  return generateAtomicDocumentNumber('complaintNo', 'CMP', 3);
 }
 
 // GET all complaints

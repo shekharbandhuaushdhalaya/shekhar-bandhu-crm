@@ -91,6 +91,7 @@ export default function RbacScreen() {
   const [roleConfigs, setRoleConfigs] = useState<RolePermissionConfig[]>([]);
   const [selectedRole, setSelectedRole] = useState<string>('manager');
   const [editPermissions, setEditPermissions] = useState<Set<string>>(new Set());
+  const [editMfaPermissions, setEditMfaPermissions] = useState<Set<string>>(new Set());
   const [searchPerm, setSearchPerm] = useState('');
 
   // --- Create Role Modal ---
@@ -129,6 +130,7 @@ export default function RbacScreen() {
       const config = data.roles.find(r => r.role === selectedRole);
       if (config) {
         setEditPermissions(new Set(config.permissions));
+        setEditMfaPermissions(new Set(config.mfaPermissions || []));
       }
     } catch (err: any) {
       console.error('Failed to fetch permissions:', err);
@@ -243,6 +245,7 @@ export default function RbacScreen() {
     const config = roleConfigs.find(r => r.role === role);
     if (config) {
       setEditPermissions(new Set(config.permissions));
+      setEditMfaPermissions(new Set(config.mfaPermissions || []));
     }
   };
 
@@ -251,7 +254,31 @@ export default function RbacScreen() {
       const next = new Set(prev);
       if (next.has(perm)) {
         next.delete(perm);
+        // Remove MFA if permission is removed
+        setEditMfaPermissions(mfaPrev => {
+          const mfaNext = new Set(mfaPrev);
+          mfaNext.delete(perm);
+          return mfaNext;
+        });
       } else {
+        next.add(perm);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleMfaPermission = (perm: string) => {
+    setEditMfaPermissions(prev => {
+      const next = new Set(prev);
+      if (next.has(perm)) {
+        next.delete(perm);
+      } else {
+        // Ensure regular permission is added if MFA is turned on
+        setEditPermissions(permPrev => {
+          const permNext = new Set(permPrev);
+          permNext.add(perm);
+          return permNext;
+        });
         next.add(perm);
       }
       return next;
@@ -272,7 +299,7 @@ export default function RbacScreen() {
   const handleSavePermissions = async () => {
     setPermSaving(true);
     try {
-      const updated = await api.updateRolePermissions(selectedRole, Array.from(editPermissions));
+      const updated = await api.updateRolePermissions(selectedRole, Array.from(editPermissions), Array.from(editMfaPermissions));
       setRoleConfigs(prev => prev.map(r => r.role === selectedRole ? updated : r));
       alert('Permissions updated successfully!');
     } catch (err: any) {
@@ -578,21 +605,24 @@ export default function RbacScreen() {
             </View>
 
             {/* Search */}
-            <View style={[styles.card, { marginTop: 12 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="search-outline" size={16} color={colors.text.muted} />
-                <TextInput
-                  style={{ flex: 1, fontSize: 13, color: colors.text.primary, paddingVertical: 4 }}
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bg.card, 
+              borderRadius: 9999, borderWidth: 1, borderColor: colors.border, 
+              paddingHorizontal: 16, paddingVertical: 4, marginTop: 20, marginBottom: 16,
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1
+            }}>
+              <Ionicons name="search-outline" size={18} color={colors.text.muted} />
+              <TextInput
+                style={{ flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 10 }}
                   placeholder="Search permissions..."
                   placeholderTextColor={colors.text.muted}
                   value={searchPerm}
                   onChangeText={setSearchPerm}
                 />
                 <Text style={{ fontSize: 10, color: colors.text.muted }}>
-                  {editPermissions.size}/{allPermissions.length} selected
+                  {editPermissions.size} / {allPermissions.length} selected
                 </Text>
               </View>
-            </View>
 
             {/* Permission Matrix */}
             {permLoading ? (
@@ -600,37 +630,59 @@ export default function RbacScreen() {
                 <ActivityIndicator size="large" color={colors.primary} />
               </View>
             ) : (
-              <View style={{ gap: 8, marginTop: 12 }}>
+              <View style={styles.tableContainer}>
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.thText, { flex: 1.2 }]}>Resource Module</Text>
+                  <Text style={[styles.thText, { flex: 2.5 }]}>Specific Actions</Text>
+                  <Text style={[styles.thText, { width: 60, textAlign: 'center' }]}>All</Text>
+                </View>
                 {Object.entries(filteredGrouped).map(([resource, perms]) => {
-                  const allEnabled = perms.every(p => editPermissions.has(p));
-                  const someEnabled = perms.some(p => editPermissions.has(p));
+                  const permissionList = perms as string[];
+                  const allEnabled = permissionList.every(p => editPermissions.has(p));
                   return (
-                    <View key={resource} style={styles.permGroup}>
-                      <TouchableOpacity
-                        style={styles.permGroupHeader}
-                        onPress={() => handleSelectAllGroup(perms, !allEnabled)}
-                      >
-                        <View style={[styles.checkbox, allEnabled ? styles.checkboxOn : someEnabled ? styles.checkboxPartial : styles.checkboxOff]}>
-                          {allEnabled && <Ionicons name="checkmark" size={12} color="#fff" />}
-                          {someEnabled && !allEnabled && <View style={{ width: 8, height: 2, backgroundColor: colors.text.muted, borderRadius: 1 }} />}
-                        </View>
-                        <Text style={styles.permResourceLabel}>{resource}</Text>
-                        <Text style={styles.permCount}>{perms.filter(p => editPermissions.has(p)).length}/{perms.length}</Text>
-                      </TouchableOpacity>
-                      <View style={styles.permActionsRow}>
-                        {perms.map(perm => {
+                    <View key={resource} style={styles.tableRow}>
+                      <View style={{ flex: 1.2, justifyContent: 'center', paddingRight: 10 }}>
+                        <Text style={styles.tdResourceLabel}>{resource}</Text>
+                        <Text style={styles.tdCount}>{permissionList.filter(p => editPermissions.has(p)).length} / {permissionList.length} selected</Text>
+                      </View>
+                      
+                      <View style={{ flex: 2.5, flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                        {permissionList.map(perm => {
                           const action = perm.split(':')[1];
                           const enabled = editPermissions.has(perm);
+                          const mfaEnabled = editMfaPermissions.has(perm);
                           return (
-                            <TouchableOpacity
-                              key={perm}
-                              style={[styles.permChip, enabled && styles.permChipOn]}
-                              onPress={() => handleTogglePermission(perm)}
-                            >
-                              <Text style={[styles.permChipText, enabled && styles.permChipTextOn]}>{action}</Text>
-                            </TouchableOpacity>
+                            <View key={perm} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: enabled ? colors.primary + '10' : 'transparent', borderRadius: Radius.sm, paddingRight: 4 }}>
+                              <TouchableOpacity
+                                style={[styles.tdCheckboxBtn, { paddingHorizontal: 6 }]}
+                                onPress={() => handleTogglePermission(perm)}
+                              >
+                                <Ionicons name={enabled ? 'checkbox' : 'square-outline'} size={18} color={enabled ? colors.primary : colors.text.muted} />
+                                <Text style={[styles.tdActionText, enabled && { color: colors.primary, fontWeight: '700' }]}>{action}</Text>
+                              </TouchableOpacity>
+                              
+                              <TouchableOpacity 
+                                style={{ padding: 4 }} 
+                                onPress={() => handleToggleMfaPermission(perm)}
+                              >
+                                <Ionicons 
+                                  name={mfaEnabled ? 'lock-closed' : 'lock-open-outline'} 
+                                  size={14} 
+                                  color={mfaEnabled ? colors.warning : colors.border} 
+                                />
+                              </TouchableOpacity>
+                            </View>
                           );
                         })}
+                      </View>
+                      
+                      <View style={{ width: 60, alignItems: 'center', justifyContent: 'center' }}>
+                        <Switch 
+                          value={allEnabled}
+                          onValueChange={(val) => handleSelectAllGroup(permissionList, val)}
+                          trackColor={{ false: colors.border, true: colors.primary + '50' }}
+                          thumbColor={allEnabled ? colors.primary : colors.text.muted}
+                        />
                       </View>
                     </View>
                   );
@@ -811,24 +863,26 @@ const createStyles = (colors: typeof LightColors) =>
     helpText: { fontSize: 10, color: colors.text.muted, marginTop: -12, marginBottom: 16, lineHeight: 14 },
 
     // --- Permission Styles ---
-    roleSelectorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    roleSelectorBtn: { alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: Radius.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.bg.secondary, minWidth: 100 },
-    roleSelectorText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-    roleSelectorCount: { fontSize: 9, marginTop: 3 },
-    permGroup: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-    permGroupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bg.secondary, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-    permResourceLabel: { fontSize: 13, fontWeight: '700', color: colors.text.primary, flex: 1, textTransform: 'capitalize' },
-    permCount: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
-    permActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 8 },
-    permChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.primary },
-    permChipOn: { backgroundColor: colors.primary + '15', borderColor: colors.primary },
-    permChipText: { fontSize: 10, fontWeight: '600', color: colors.text.muted },
-    permChipTextOn: { color: colors.primary, fontWeight: '700' },
-    checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-    checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-    checkboxPartial: { backgroundColor: 'transparent', borderColor: colors.text.muted },
-    checkboxOff: { backgroundColor: 'transparent', borderColor: colors.border },
-    savePermBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: Radius.md, borderWidth: 1.5 },
+    roleSelectorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    roleSelectorBtn: { 
+      flexDirection: 'column', alignItems: 'flex-start', paddingVertical: 16, paddingHorizontal: 16, 
+      borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, 
+      minWidth: 140, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 
+    },
+    roleSelectorText: { fontSize: 13, fontWeight: '700', letterSpacing: 0.3, marginBottom: 4 },
+    roleSelectorCount: { fontSize: 11, fontWeight: '600' },
+    
+    // --- Table Permission Styles ---
+    tableContainer: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+    tableHeaderRow: { flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    thText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+    tableRow: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.primary },
+    tdResourceLabel: { fontSize: 13, fontWeight: '800', color: colors.text.primary, textTransform: 'capitalize', marginBottom: 4 },
+    tdCount: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+    tdCheckboxBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 70, paddingVertical: 4 },
+    tdActionText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary, textTransform: 'capitalize' },
+    
+    savePermBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: Radius.lg, borderWidth: 1 },
 
     // --- Modal Styles ---
     modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },

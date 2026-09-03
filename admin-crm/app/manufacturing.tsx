@@ -71,6 +71,9 @@ export default function ManufacturingScreen() {
   const [entries, setEntries] = useState<RawMaterialEntry[]>([]);
   const [boms, setBoms] = useState<BillOfMaterials[]>([]);
   const [batches, setBatches] = useState<BatchProduction[]>([]);
+  const [batchesPage, setBatchesPage] = useState(1);
+  const [batchesTotalPages, setBatchesTotalPages] = useState(1);
+  const loadingBatchesRef = useRef(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -331,8 +334,16 @@ export default function ManufacturingScreen() {
           break;
         }
         case 'batches': {
-          const data = await api.getBatchProductions();
-          setBatches(data);
+          const res = await api.getBatchProductions(1, 50);
+          if (res && res.data) {
+            setBatches(res.data);
+            setBatchesTotalPages(Math.ceil((res.total || 0) / 50) || 1);
+            setBatchesPage(1);
+          } else {
+            setBatches(Array.isArray(res) ? res : []);
+            setBatchesTotalPages(1);
+            setBatchesPage(1);
+          }
           break;
         }
         case 'boms': {
@@ -377,6 +388,25 @@ export default function ManufacturingScreen() {
     setLoading(false);
     setRefreshing(false);
   }, [fetchDataset]);
+
+  const loadMoreBatches = async () => {
+    if (loadingBatchesRef.current || batchesPage >= batchesTotalPages) return;
+    loadingBatchesRef.current = true;
+    try {
+      const nextPage = batchesPage + 1;
+      const res = await api.getBatchProductions(nextPage, 50);
+      if (res && res.data) {
+        setBatches(prev => {
+          const existingIds = new Set(prev.map(b => b._id));
+          const newBatches = res.data.filter((b: any) => !existingIds.has(b._id));
+          return [...prev, ...newBatches];
+        });
+        setBatchesPage(nextPage);
+      }
+    } finally {
+      loadingBatchesRef.current = false;
+    }
+  };
 
   const fetchTabDataBackground = useCallback((tab: string) => {
     const needs = tabDataRequirements[tab] || [];
@@ -1687,6 +1717,16 @@ export default function ManufacturingScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+        scrollEventThrottle={400}
+        onScroll={({ nativeEvent }) => {
+          if (activeTab === 'batches') {
+            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+            const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+            if (isCloseToBottom) {
+              loadMoreBatches();
+            }
+          }
+        }}
       >
         {/* ======================================================== */}
         {activeTab === 'materials' && (
@@ -1759,11 +1799,9 @@ export default function ManufacturingScreen() {
             onCancelProduction={handleCancelProduction}
             onQcSignOff={(batch) => {
               setSelectedBatchRun(batch);
-              setQcYieldQty('');
-              setQcWarehouseId(warehouses.length > 0 ? warehouses[0]._id : '');
+              setQcPassedBy('');
               setQcWasteQty('');
               setQcWasteReason('');
-              setQcPassedBy('');
               setQcNotes('');
               setQcError('');
               setQcModalVisible(true);
@@ -1771,6 +1809,12 @@ export default function ManufacturingScreen() {
             isIntegerQty={isIntegerQty}
             getStatusColor={getStatusColor}
           />
+        )}
+
+        {activeTab === 'batches' && batchesPage < batchesTotalPages && (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more batches...</Text>
+          </View>
         )}
 
         {activeTab === 'scheduler' && (

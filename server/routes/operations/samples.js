@@ -8,11 +8,10 @@ const StockLedger = require('../../models/StockLedger');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+
 async function nextSampleNo() {
-  const last = await Sample.findOne().sort({ createdAt: -1 }).select('sampleNo');
-  if (!last || !last.sampleNo) return 'SMP-001';
-  const num = parseInt(last.sampleNo.replace(/\D/g, ''), 10) || 0;
-  return `SMP-${String(num + 1).padStart(3, '0')}`;
+  return generateAtomicDocumentNumber('sampleNo', 'SMP', 3);
 }
 
 async function deductSampleInventory(sample, warehouseId) {

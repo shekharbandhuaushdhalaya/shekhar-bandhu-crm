@@ -23,25 +23,41 @@ router.get('/', async (req, res) => {
       return res.json(rawMaterials);
     }
 
-    // Enrich with aggregated live stock level using MongoDB aggregation
+    // Enrich with aggregated live stock level, blocked qty, and available qty using MongoDB aggregation
     const matchStage = {};
     if (warehouseId && warehouseId !== 'all') {
       matchStage.warehouseId = warehouseId;
     }
-    const pipeline = [{ $group: { _id: '$rawMaterialId', totalQty: { $sum: '$qty' } } }];
+    const pipeline = [
+      {
+        $group: {
+          _id: '$rawMaterialId',
+          totalQty: { $sum: '$qty' },
+          totalReserved: { $sum: { $ifNull: ['$reservedQty', 0] } }
+        }
+      }
+    ];
     if (Object.keys(matchStage).length > 0) {
       pipeline.unshift({ $match: matchStage });
     }
     const stockAgg = await RawMaterialEntry.aggregate(pipeline);
     const stockMap = {};
     stockAgg.forEach(s => {
-      stockMap[s._id.toString()] = s.totalQty || 0;
+      const stockLevel = Number((s.totalQty || 0).toFixed(2));
+      const blockedQty = Number((s.totalReserved || 0).toFixed(2));
+      const availableQty = Math.max(0, Number((stockLevel - blockedQty).toFixed(2)));
+      stockMap[s._id.toString()] = { stockLevel, blockedQty, availableQty };
     });
 
-    const enriched = rawMaterials.map(rm => ({
-      ...rm,
-      stockLevel: stockMap[rm._id.toString()] || 0
-    }));
+    const enriched = rawMaterials.map(rm => {
+      const data = stockMap[rm._id.toString()] || { stockLevel: 0, blockedQty: 0, availableQty: 0 };
+      return {
+        ...rm,
+        stockLevel: data.stockLevel,
+        blockedQty: data.blockedQty,
+        availableQty: data.availableQty
+      };
+    });
 
     res.json(enriched);
   } catch (err) {
@@ -53,8 +69,28 @@ router.get('/', async (req, res) => {
 router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
   try {
     const { name, unit, minReorder, category } = req.body;
-    if (!name) {
+    if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const resolvedUnit = unit || 'kg';
+    const resolvedCategory = category || 'Herb';
+
+    // Application-level duplicate check (case- and whitespace-insensitive name + unit + category)
+    const duplicate = await RawMaterial.findDuplicateByName(name, {
+      unit: resolvedUnit,
+      category: resolvedCategory
+    });
+
+    if (duplicate) {
+      return res.status(409).json({
+        error: `Raw material "${duplicate.name}" with unit "${duplicate.unit}" and category "${duplicate.category}" already exists (SKU: ${duplicate.sku}).`,
+        existingId: duplicate._id,
+        existingSku: duplicate.sku,
+        existingName: duplicate.name,
+        existingUnit: duplicate.unit,
+        existingCategory: duplicate.category
+      });
     }
 
     const { generateRawMaterialSku } = require('../../utils/skuGenerator');
@@ -70,13 +106,18 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
     const newRM = await RawMaterial.create({
       name: name.trim(),
       sku: computedSku,
-      unit: unit || 'kg',
+      unit: resolvedUnit,
       minReorder: Number(minReorder) || 0,
-      category: category || 'Herb'
+      category: resolvedCategory
     });
 
     res.status(201).json(newRM);
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({
+        error: 'A raw material with the same name, unit, and category already exists.',
+      });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -85,6 +126,33 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
 router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, res) => {
   try {
     const { name, unit, minReorder, category } = req.body;
+
+    const existingRM = await RawMaterial.findById(req.params.id);
+    if (!existingRM) return res.status(404).json({ error: 'Raw material not found' });
+
+    if (name !== undefined || unit !== undefined || category !== undefined) {
+      const effectiveName = name !== undefined ? name.trim() : existingRM.name;
+      const effectiveUnit = unit !== undefined ? unit : existingRM.unit;
+      const effectiveCategory = category !== undefined ? category : existingRM.category;
+
+      const duplicate = await RawMaterial.findDuplicateByName(effectiveName, {
+        unit: effectiveUnit,
+        category: effectiveCategory,
+        excludeId: req.params.id
+      });
+
+      if (duplicate) {
+        return res.status(409).json({
+          error: `Another raw material "${duplicate.name}" with unit "${duplicate.unit}" and category "${duplicate.category}" already exists (SKU: ${duplicate.sku}).`,
+          existingId: duplicate._id,
+          existingSku: duplicate.sku,
+          existingName: duplicate.name,
+          existingUnit: duplicate.unit,
+          existingCategory: duplicate.category
+        });
+      }
+    }
+
     const updateFields = {};
     if (name !== undefined) {
       updateFields.name = name.trim();
@@ -108,9 +176,13 @@ router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, re
       updateFields,
       { new: true, runValidators: true }
     );
-    if (!updated) return res.status(404).json({ error: 'Raw material not found' });
     res.json(updated);
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({
+        error: 'A raw material with the same name, unit, and category already exists.',
+      });
+    }
     res.status(500).json({ error: err.message });
   }
 });

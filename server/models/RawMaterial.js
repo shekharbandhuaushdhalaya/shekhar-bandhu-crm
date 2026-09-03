@@ -12,4 +12,49 @@ const rawMaterialSchema = new mongoose.Schema({
 rawMaterialSchema.index({ name: 1 });
 rawMaterialSchema.index({ category: 1 });
 
+// Compound unique index for name + unit + category (case-insensitive)
+rawMaterialSchema.index(
+  { name: 1, unit: 1, category: 1 },
+  {
+    name: 'name_unit_category_unique_ci',
+    unique: true,
+    collation: { locale: 'en', strength: 2 }
+  }
+);
+
+// Static helper to normalize raw material names (trim, collapse internal whitespace, lowercase)
+rawMaterialSchema.statics.normalizeName = function (name) {
+  if (!name) return '';
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+};
+
+// Static helper to find duplicate raw material by case-insensitive name + unit + category
+rawMaterialSchema.statics.findDuplicateByName = async function (name, { unit, category, excludeId } = {}) {
+  if (!name) return null;
+  const normalized = this.normalizeName(name);
+
+  // Escape special regex characters
+  const escapedName = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Construct regex pattern matching whitespace-collapsed name case-insensitively
+  const regexPattern = `^${escapedName.split(' ').join('\\s+')}$`;
+
+  const query = {
+    name: { $regex: regexPattern, $options: 'i' },
+  };
+
+  if (unit) {
+    const escapedUnit = unit.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.unit = { $regex: `^${escapedUnit}$`, $options: 'i' };
+  }
+  if (category) {
+    const escapedCat = category.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.category = { $regex: `^${escapedCat}$`, $options: 'i' };
+  }
+  if (excludeId) {
+    query._id = { $ne: excludeId };
+  }
+
+  return this.findOne(query);
+};
+
 module.exports = mongoose.model('RawMaterial', rawMaterialSchema);

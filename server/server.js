@@ -243,6 +243,8 @@ app.use((err, req, res, next) => {
 // Start Express / Socket.IO server immediately
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Shekhar Bandhu CRM Server running on port ${PORT} with WebSockets enabled (bound to 0.0.0.0)`);
+  const { startOverdueTaskChecker } = require('./utils/taskOverdueChecker');
+  startOverdueTaskChecker(io);
 });
 
 // Define startup migrations helper

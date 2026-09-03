@@ -10,7 +10,7 @@ const router = express.Router();
 // GET /api/vendors — List vendors with optional search filter
 router.get('/', authorize('vendor:view'), async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, page, limit } = req.query;
     const filter = {};
 
     if (search) {
@@ -21,11 +21,32 @@ router.get('/', authorize('vendor:view'), async (req, res) => {
       ];
     }
 
-    const vendors = await Vendor.find(filter).sort({ createdAt: -1 }).lean();
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = Vendor.find(filter).sort({ createdAt: -1 });
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const vendors = await query.lean();
     const sanitized = vendors.map(v => {
       v.cashBalance = 0;
       return v;
     });
+
+    if (isPaginated) {
+      const total = await Vendor.countDocuments(filter);
+      return res.json({
+        data: sanitized,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
     res.json(sanitized);
   } catch (err) {
     res.status(500).json({ error: err.message });

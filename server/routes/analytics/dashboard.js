@@ -4,11 +4,12 @@ const Task = require('../../models/Task');
 const Activity = require('../../models/Activity');
 const Order = require('../../models/Order');
 const ProductQuery = require('../../models/ProductQuery');
+const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
 
 // GET /api/dashboard/stats — aggregate pipeline metrics & e-commerce stats
-router.get('/stats', async (req, res) => {
+router.get('/stats', authorize('analytics:query'), async (req, res) => {
   try {
     const contacts = await Contact.find().lean();
     const tasks = await Task.find().lean();
@@ -50,7 +51,7 @@ router.get('/stats', async (req, res) => {
 });
 
 // GET /api/dashboard/activities — recent activities
-router.get('/activities', async (req, res) => {
+router.get('/activities', authorize('analytics:query'), async (req, res) => {
   try {
     const activities = await Activity.find().sort({ createdAt: -1 }).limit(20).lean();
     res.json(activities.map(a => ({

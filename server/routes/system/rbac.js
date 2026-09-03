@@ -32,7 +32,7 @@ router.get('/permissions', authorize('rbac:manage', 'user:view'), async (req, re
 // POST /api/rbac/permissions — Create a new custom role
 router.post('/permissions', authorize('rbac:manage'), validate(schemas.rbacPermissionsSchema), async (req, res) => {
   try {
-    const { role, permissions, label, description } = req.body;
+    const { role, permissions, mfaPermissions, label, description } = req.body;
     if (!role || !role.trim()) {
       return res.status(400).json({ error: 'Role name is required' });
     }
@@ -50,6 +50,7 @@ router.post('/permissions', authorize('rbac:manage'), validate(schemas.rbacPermi
     const config = await RolePermission.create({
       role: normalizedRole,
       permissions: perms,
+      mfaPermissions: Array.isArray(mfaPermissions) ? mfaPermissions : [],
       label: label || normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1),
       description: description || `Custom role: ${normalizedRole}`,
       isCustom: true,
@@ -68,7 +69,7 @@ router.post('/permissions', authorize('rbac:manage'), validate(schemas.rbacPermi
 router.put('/permissions/:role', authorize('rbac:manage'), validate(schemas.rbacPermissionsSchema), async (req, res) => {
   try {
     const { role } = req.params;
-    const { permissions, label, description } = req.body;
+    const { permissions, mfaPermissions, label, description } = req.body;
 
     if (!Array.isArray(permissions)) {
       return res.status(400).json({ error: 'Permissions must be an array' });
@@ -85,6 +86,7 @@ router.put('/permissions/:role', authorize('rbac:manage'), validate(schemas.rbac
       config = new RolePermission({ role, isCustom: false });
     }
     config.permissions = permissions;
+    if (Array.isArray(mfaPermissions)) config.mfaPermissions = mfaPermissions;
     if (label !== undefined) config.label = label;
     if (description !== undefined) config.description = description;
     await config.save();
@@ -134,6 +136,7 @@ router.post('/permissions/:role/reset', authorize('rbac:manage'), async (req, re
       config = new RolePermission({ role, isCustom: false });
     }
     config.permissions = defaults;
+    config.mfaPermissions = [];
     await config.save();
 
     clearPermissionCache();
@@ -152,7 +155,8 @@ router.get('/my-permissions', async (req, res) => {
     const permissions = config
       ? config.permissions
       : getDefaultPermissionsForRole(role);
-    res.json({ role, permissions });
+    const mfaPermissions = config ? (config.mfaPermissions || []) : [];
+    res.json({ role, permissions, mfaPermissions });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
