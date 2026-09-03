@@ -210,7 +210,10 @@ router.post('/public/webhook/storefront', async (req, res) => {
     const targetAmount = parseFloat(amount) || 0;
     const targetItems = items || []; // [{ productId, name, qty, price }]
 
-    const warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
+    let warehouse = await Warehouse.findOne({ isDefault: true });
+    if (!warehouse) {
+      warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
+    }
     if (!warehouse) {
       return res.status(500).json({ error: 'No warehouse configured for inventory deduction.' });
     }

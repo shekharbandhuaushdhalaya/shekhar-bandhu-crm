@@ -34,7 +34,13 @@ const customerSchema = new mongoose.Schema({
   drugLicenseNo: { type: String, default: '', trim: true },
   drugLicenseExpiry: { type: Date, default: null },
   latitude: { type: Number },
-  longitude: { type: Number }
+  longitude: { type: Number },
+  category: { type: String, enum: ['A', 'B', 'C', ''], default: '' },
+  specialty: { type: String, default: '', trim: true },
+  birthday: { type: Date, default: null },
+  anniversary: { type: Date, default: null },
+  preferredTime: { type: String, default: '', trim: true },
+  assignedMrId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative', default: null },
 }, { timestamps: true });
 
 customerSchema.index({ name: 'text', company: 'text', email: 'text' });

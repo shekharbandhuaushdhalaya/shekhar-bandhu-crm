@@ -114,11 +114,10 @@ async function syncOrderLogisticsFromDispatch(dispatch) {
   }
 }
 
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+
 async function nextDispatchNo() {
-  const last = await Dispatch.findOne().sort({ createdAt: -1 }).select('dispatchNo');
-  if (!last || !last.dispatchNo) return 'DSP-001';
-  const num = parseInt(last.dispatchNo.replace(/\D/g, ''), 10) || 0;
-  return `DSP-${String(num + 1).padStart(3, '0')}`;
+  return generateAtomicDocumentNumber('dispatchNo', 'DSP', 3);
 }
 
 // GET all dispatches

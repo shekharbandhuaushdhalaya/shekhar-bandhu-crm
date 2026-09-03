@@ -3,9 +3,14 @@ const MedicalRepresentative = require('../../models/MedicalRepresentative');
 const MrDailyLog = require('../../models/MrDailyLog');
 const MrVisit = require('../../models/MrVisit');
 const MrExpense = require('../../models/MrExpense');
+const MrTourPlan = require('../../models/MrTourPlan');
+const MrSampleBag = require('../../models/MrSampleBag');
+const Contact = require('../../models/Contact');
+const Customer = require('../../models/Customer');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { getHaversineDistanceInMeters, compileMRDailyCallReport, calculateMRLeaderboard } = require('../../services/medicalRepService');
 
 const router = express.Router();
 
@@ -102,6 +107,9 @@ router.delete('/:id', authorize('mr:delete'), async (req, res) => {
     await MrDailyLog.deleteMany({ mrId: req.params.id });
     await MrVisit.deleteMany({ mrId: req.params.id });
     await MrExpense.deleteMany({ mrId: req.params.id });
+    await MrTourPlan.deleteMany({ mrId: req.params.id });
+    await MrSampleBag.deleteMany({ mrId: req.params.id });
+
     if (req.io) {
       req.io.emit('medrep_updated', { type: 'deleted', id: req.params.id });
     }
@@ -143,7 +151,6 @@ router.post('/:mrId/checkin', authorize('mr:attendance'), validate(schemas.mrChe
       if (log.status === 'checked_in') {
         return res.status(400).json({ error: 'Already checked in today' });
       }
-      // Re-open if previously checked out
       log.status = 'checked_in';
       log.checkIn = { time: new Date(), ...req.body };
       if (startKm > 0) log.startKmReading = startKm;
@@ -166,6 +173,8 @@ router.post('/:mrId/checkin', authorize('mr:attendance'), validate(schemas.mrChe
   }
 });
 
+
+
 router.post('/:mrId/checkout', authorize('mr:attendance'), async (req, res) => {
   try {
     const today = new Date();
@@ -179,12 +188,10 @@ router.post('/:mrId/checkout', authorize('mr:attendance'), async (req, res) => {
     log.endKmReading = endKm;
     log.status = 'checked_out';
 
-    // Odometer-based distance
     if (endKm > 0 && log.startKmReading > 0) {
       log.totalDistance = Math.max(0, endKm - log.startKmReading);
     }
 
-    // GPS straight-line distance (Haversine) between check-in and check-out coordinates
     const ciLat = log.checkIn?.latitude;
     const ciLng = log.checkIn?.longitude;
     const coLat = req.body.latitude || log.checkOut?.latitude;
@@ -192,11 +199,10 @@ router.post('/:mrId/checkout', authorize('mr:attendance'), async (req, res) => {
     if (ciLat && ciLng && coLat && coLng) {
       const distMeters = getHaversineDistanceInMeters(ciLat, ciLng, coLat, coLng);
       if (distMeters !== null) {
-        log.gpsDistance = Math.round((distMeters / 1000) * 100) / 100; // km, 2 decimal places
+        log.gpsDistance = Math.round((distMeters / 1000) * 100) / 100;
       }
     }
 
-    // Fallback: if no odometer readings provided, use GPS distance
     if (!log.totalDistance && log.gpsDistance > 0) {
       log.totalDistance = log.gpsDistance;
     }
@@ -233,39 +239,19 @@ router.get('/:mrId/visits', authorize('mr:view'), async (req, res) => {
   }
 });
 
-function getHaversineDistanceInMeters(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371e3; // Earth radius in meters
-  const phi1 = (lat1 * Math.PI) / 180;
-  const phi2 = (lat2 * Math.PI) / 180;
-  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
-  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-            Math.cos(phi1) * Math.cos(phi2) *
-            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c; // Distance in meters
-}
-
 router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSchema), async (req, res) => {
   try {
     const data = { ...req.body, mrId: req.params.mrId };
     if (!data.date) data.date = new Date();
 
-    // Geofenced Checkin location validation
     let doctorVerified = false;
     if (data.latitude && data.longitude && data.doctorName) {
-      const Customer = require('../../models/Customer');
-      const Contact = require('../../models/Contact');
-      
       const target = await Contact.findOne({ name: { $regex: new RegExp(data.doctorName.trim(), 'i') } }) ||
                      await Customer.findOne({ $or: [{ name: { $regex: new RegExp(data.doctorName.trim(), 'i') } }, { company: { $regex: new RegExp(data.doctorName.trim(), 'i') } }] });
       
       if (target && target.latitude && target.longitude) {
         const dist = getHaversineDistanceInMeters(data.latitude, data.longitude, target.latitude, target.longitude);
-        if (dist !== null && dist <= 200) { // 200 meters geofence threshold
+        if (dist !== null && dist <= 200) {
           doctorVerified = true;
           data.doctorVerified = true;
           data.doctorVerifiedAt = new Date();
@@ -275,9 +261,7 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
 
     const visit = await MrVisit.create(data);
 
-    // If free samples were given, automatically generate a Doctor Sample Delivery Challan and update inventory!
     if (data.sampleDetails && data.sampleDetails.length > 0) {
-      const MedicalRepresentative = require('../../models/MedicalRepresentative');
       const StockMovement = require('../../models/StockMovement');
       const Product = require('../../models/Product');
       const InventoryEntry = require('../../models/InventoryEntry');
@@ -296,12 +280,17 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
           const p = await Product.findById(pId);
           if (p) {
             prodName = p.name;
-            // Deduct stock level in inventory
             const qtyBoxes = Number(s.qty) || 1;
             p.stockLevel = Math.max(0, (p.stockLevel || 0) - qtyBoxes);
             await p.save();
 
-            // Look up batch number from inventory (FIFO — oldest mfgDate first) if not explicitly provided
+            // Deduct sample balance from MR's personal bag
+            const sampleBagItem = await MrSampleBag.findOne({ mrId: req.params.mrId, productId: pId });
+            if (sampleBagItem) {
+              sampleBagItem.qty = Math.max(0, sampleBagItem.qty - qtyBoxes);
+              await sampleBagItem.save();
+            }
+
             if (!batchNo) {
               const invEntry = await InventoryEntry.findOne({
                 productId: pId,
@@ -452,6 +441,250 @@ router.delete('/expenses/:expenseId', authorize('mr:delete'), async (req, res) =
   }
 });
 
+// ─── Beat Plan / Tour Plan ───
+
+router.get('/:mrId/tour-plans', authorize('mr:view'), async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const filter = { mrId: req.params.mrId };
+    if (month) filter.month = month;
+    if (year) filter.year = Number(year);
+
+    const tourPlans = await MrTourPlan.find(filter)
+      .populate('approvedBy', 'name email')
+      .sort({ year: -1, month: -1 })
+      .lean();
+    res.json(tourPlans);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:mrId/tour-plans', authorize('mr:visits'), validate(schemas.mrTourPlanSchema), async (req, res) => {
+  try {
+    const { month, year, entries, status = 'submitted' } = req.body;
+    const mrId = req.params.mrId;
+
+    let tourPlan = await MrTourPlan.findOne({ mrId, month, year: Number(year) });
+    if (tourPlan) {
+      tourPlan.entries = entries || [];
+      tourPlan.status = status;
+      if (status === 'submitted') {
+        tourPlan.approvedBy = null;
+        tourPlan.rejectionReason = '';
+      }
+      await tourPlan.save();
+    } else {
+      tourPlan = await MrTourPlan.create({
+        mrId,
+        month,
+        year: Number(year),
+        entries: entries || [],
+        status
+      });
+    }
+
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'tour_plan_updated', mrId, id: tourPlan._id });
+    }
+    res.status(201).json(tourPlan);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.put('/tour-plans/:id/status', authorize('mr:edit'), async (req, res) => {
+  try {
+    const { status, rejectionReason } = req.body;
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be approved or rejected' });
+    }
+
+    const tourPlan = await MrTourPlan.findByIdAndUpdate(
+      req.params.id,
+      {
+        status,
+        approvedBy: req.user ? req.user.id : null,
+        approvedAt: new Date(),
+        rejectionReason: rejectionReason || ''
+      },
+      { new: true }
+    ).populate('approvedBy', 'name');
+
+    if (!tourPlan) return res.status(404).json({ error: 'Tour plan not found' });
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'tour_plan_status', id: tourPlan._id });
+    }
+    res.json(tourPlan);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ─── Doctor Classification & Event Matrix ───
+
+router.get('/doctors/matrix', authorize('mr:view'), async (req, res) => {
+  try {
+    const { mrId } = req.query;
+    const filter = { category: { $in: ['A', 'B', 'C'] } };
+    if (mrId) filter.assignedMrId = mrId;
+
+    const [contacts, customers] = await Promise.all([
+      Contact.find(filter).populate('assignedMrId', 'name code').lean(),
+      Customer.find(filter).populate('assignedMrId', 'name code').lean(),
+    ]);
+
+    const allDoctors = [
+      ...contacts.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', category: c.category, specialty: c.specialty, preferredTime: c.preferredTime, assignedMr: c.assignedMrId, type: 'Contact' })),
+      ...customers.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', category: c.category, specialty: c.specialty, preferredTime: c.preferredTime, assignedMr: c.assignedMrId, type: 'Customer' }))
+    ];
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const visitsThisMonth = await MrVisit.find({
+      date: { $gte: startOfMonth, $lte: endOfMonth }
+    }).lean();
+
+    const visitCounts = {};
+    visitsThisMonth.forEach(v => {
+      if (v.doctorName) {
+        const key = v.doctorName.trim().toLowerCase();
+        visitCounts[key] = (visitCounts[key] || 0) + 1;
+      }
+    });
+
+    const report = allDoctors.map(doc => {
+      const requiredVisits = doc.category === 'A' ? 4 : (doc.category === 'B' ? 2 : 1);
+      const actualVisits = visitCounts[doc.name.trim().toLowerCase()] || 0;
+      const compliancePct = Math.min(100, Number(((actualVisits / requiredVisits) * 100).toFixed(1)));
+
+      return {
+        ...doc,
+        requiredVisits,
+        actualVisits,
+        compliancePct
+      };
+    });
+
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/doctors/events', authorize('mr:view'), async (req, res) => {
+  try {
+    const [contacts, customers] = await Promise.all([
+      Contact.find({ $or: [{ birthday: { $ne: null } }, { anniversary: { $ne: null } }] }).populate('assignedMrId', 'name phone').lean(),
+      Customer.find({ $or: [{ birthday: { $ne: null } }, { anniversary: { $ne: null } }] }).populate('assignedMrId', 'name phone').lean(),
+    ]);
+
+    const all = [...contacts, ...customers];
+    const events = [];
+
+    all.forEach(doc => {
+      if (doc.birthday) {
+        events.push({
+          doctorId: doc._id,
+          doctorName: doc.name,
+          clinic: doc.company || '',
+          eventType: 'Birthday',
+          date: new Date(doc.birthday),
+          assignedMr: doc.assignedMrId
+        });
+      }
+      if (doc.anniversary) {
+        events.push({
+          doctorId: doc._id,
+          doctorName: doc.name,
+          clinic: doc.company || '',
+          eventType: 'Anniversary',
+          date: new Date(doc.anniversary),
+          assignedMr: doc.assignedMrId
+        });
+      }
+    });
+
+    res.json(events);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── MR Sample Bag Inventory ───
+
+router.get('/:mrId/sample-bag', authorize('mr:view'), async (req, res) => {
+  try {
+    const items = await MrSampleBag.find({ mrId: req.params.mrId })
+      .populate('productId', 'name sku unit category')
+      .lean();
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:mrId/sample-bag/issue', authorize('mr:edit'), validate(schemas.mrSampleIssueSchema), async (req, res) => {
+  try {
+    const { productId, batchNo = '', qty } = req.body;
+    const mrId = req.params.mrId;
+    const currentUserId = req.user ? req.user.id : null;
+
+    let sampleBagItem = await MrSampleBag.findOne({ mrId, productId, batchNo });
+    if (sampleBagItem) {
+      sampleBagItem.qty += Number(qty);
+      sampleBagItem.allocatedBy = currentUserId;
+      sampleBagItem.allocatedAt = new Date();
+      await sampleBagItem.save();
+    } else {
+      sampleBagItem = await MrSampleBag.create({
+        mrId,
+        productId,
+        batchNo,
+        qty: Number(qty),
+        allocatedBy: currentUserId
+      });
+    }
+
+    const Product = require('../../models/Product');
+    const prod = await Product.findById(productId);
+    if (prod) {
+      prod.stockLevel = Math.max(0, (prod.stockLevel || 0) - Number(qty));
+      await prod.save();
+    }
+
+    if (req.io) {
+      req.io.emit('medrep_updated', { type: 'sample_issued', mrId, productId });
+    }
+    res.status(201).json(sampleBagItem);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ─── DCR & Performance Leaderboard ───
+
+router.get('/:mrId/dcr', authorize('mr:view'), async (req, res) => {
+  try {
+    const dcr = await compileMRDailyCallReport(req.params.mrId, req.query.date);
+    if (!dcr) return res.status(404).json({ error: 'MR not found' });
+    res.json(dcr);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/leaderboard', authorize('mr:view'), async (req, res) => {
+  try {
+    const result = await calculateMRLeaderboard(req.query.month, req.query.year);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Dashboard / Reports ───
 
 router.get('/dashboard/summary', authorize('mr:view'), async (req, res) => {
@@ -536,7 +769,6 @@ router.get('/dashboard/summary', authorize('mr:view'), async (req, res) => {
   }
 });
 
-// All-expenses dashboard (all MRs, for managers)
 router.get('/expenses/all', authorize('mr:approveExpenses'), async (req, res) => {
   try {
     const { from, to, status, limit = 200 } = req.query;
@@ -559,7 +791,6 @@ router.get('/expenses/all', authorize('mr:approveExpenses'), async (req, res) =>
   }
 });
 
-// All visits (for manager overview)
 router.get('/visits/all', authorize('mr:view'), async (req, res) => {
   try {
     const { from, to, mrId, limit = 200 } = req.query;
@@ -582,7 +813,6 @@ router.get('/visits/all', authorize('mr:view'), async (req, res) => {
   }
 });
 
-// GET /api/medical-reps/samples/distribution — Track doctor sample distribution
 router.get('/samples/distribution', authorize('mr:view'), async (req, res) => {
   try {
     const visits = await MrVisit.find({ 'sampleDetails.0': { $exists: true } })
@@ -596,7 +826,6 @@ router.get('/samples/distribution', authorize('mr:view'), async (req, res) => {
   }
 });
 
-// GET /api/medical-reps/commission/calculate — Calculate commissions based on MR sales targets achievement
 router.get('/commission/calculate', authorize('mr:view'), async (req, res) => {
   try {
     const { month, year } = req.query;
@@ -610,7 +839,6 @@ router.get('/commission/calculate', authorize('mr:view'), async (req, res) => {
     const mrs = await MedicalRepresentative.find({ isActive: true }).lean();
     const mrIds = mrs.map(m => m._id);
 
-    // Sum order amounts from visits during the period using MongoDB aggregation
     const salesData = await MrVisit.aggregate([
       {
         $match: {
@@ -636,10 +864,9 @@ router.get('/commission/calculate', authorize('mr:view'), async (req, res) => {
 
     const report = mrs.map(mr => {
       const sales = salesMap[mr._id] || 0;
-      const target = mr.monthlyTarget || 100000; // default fallback target
+      const target = mr.monthlyTarget || 100000;
       const achievementPct = target > 0 ? (sales / target) * 100 : 0;
       
-      // Tiered commission rate: 5% if target achieved 100%+, 2.5% if 75%+, 1% otherwise
       let rate = 0.01;
       if (achievementPct >= 100) rate = 0.05;
       else if (achievementPct >= 75) rate = 0.025;

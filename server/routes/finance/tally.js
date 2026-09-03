@@ -5,7 +5,7 @@ const Payment = require('../../models/Payment');
 const { authorize } = require('../../middleware/authorize');
 
 // GET /api/finance/export/tally — Export sales, purchases, and payments in Tally-friendly CSV format
-router.get('/', async (req, res) => {
+router.get('/', authorize('report:view'), async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
@@ -13,11 +13,12 @@ router.get('/', async (req, res) => {
     const dateFilter = {};
     if (startDate) {
       const start = new Date(startDate);
-      if (!isNaN(start.getTime())) dateFilter.$gte = start.toISOString().split('T')[0];
+      if (!isNaN(start.getTime())) dateFilter.$gte = start;
     }
     if (endDate) {
       const end = new Date(endDate);
-      if (!isNaN(end.getTime())) dateFilter.$lte = end.toISOString().split('T')[0];
+      end.setHours(23, 59, 59, 999);
+      if (!isNaN(end.getTime())) dateFilter.$lte = end;
     }
 
     const invoiceQuery = { isFinalized: true };

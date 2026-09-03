@@ -1,11 +1,12 @@
 const express = require('express');
 const Invoice = require('../../models/Invoice');
 const CreditNote = require('../../models/CreditNote');
+const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
 
 // GET /api/gst/gstr1 — GSTR-1 sales & Credit/Debit Notes summary (monthly)
-router.get('/gstr1', async (req, res) => {
+router.get('/gstr1', authorize('report:view'), async (req, res) => {
   try {
     const { month, year } = req.query;
     const m = month ? parseInt(month) : new Date().getMonth() + 1;
@@ -153,7 +154,7 @@ router.get('/gstr1', async (req, res) => {
 });
 
 // GET /api/gst/gstr3b — GSTR-3B summary (with Credit/Debit Note adjustments)
-router.get('/gstr3b', async (req, res) => {
+router.get('/gstr3b', authorize('report:view'), async (req, res) => {
   try {
     const { month, year } = req.query;
     const m = month ? parseInt(month) : new Date().getMonth() + 1;
@@ -259,7 +260,7 @@ router.get('/gstr3b', async (req, res) => {
 });
 
 // GET /api/gst/filing-status — Get ARN details for period
-router.get('/filing-status', async (req, res) => {
+router.get('/filing-status', authorize('report:view'), async (req, res) => {
   try {
     const { period, returnType } = req.query;
     if (!period || !returnType) {
@@ -275,9 +276,9 @@ router.get('/filing-status', async (req, res) => {
 });
 
 // POST /api/gst/filing-status — Save ARN and mark month returns as filed
-router.post('/filing-status', async (req, res) => {
+router.post('/filing-status', authorize('report:view'), async (req, res) => {
   try {
-    const { period, returnType, arn, url, name } = req.body;
+    const { period, returnType, arn, url, name, snapshot } = req.body;
     if (!period || !returnType || !arn) {
       return res.status(400).json({ error: 'period, returnType, and arn are required' });
     }
@@ -290,6 +291,7 @@ router.post('/filing-status', async (req, res) => {
     }
     filing.filedDate = new Date();
     filing.filedBy = req.user ? req.user.name : 'System Accountant';
+    if (snapshot) filing.snapshot = snapshot;
     if (url) {
       filing.supportingDocuments = [{ name: name || 'Filing Receipt', url, uploadedAt: new Date() }];
     }

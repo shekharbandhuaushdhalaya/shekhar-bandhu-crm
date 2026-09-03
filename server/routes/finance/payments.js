@@ -3,13 +3,14 @@ const mongoose = require('mongoose');
 const Payment = require('../../models/Payment');
 const Customer = require('../../models/Customer');
 const Vendor = require('../../models/Vendor');
+const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
 const router = express.Router();
 
 // GET /api/payments — List payments with optional filters
-router.get('/', async (req, res) => {
+router.get('/', authorize('payment:view'), async (req, res) => {
   try {
     const { search, type, partyType, partyId, mode } = req.query;
     const filter = {};
@@ -46,7 +47,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/payments — Create a new payment and update balances
-router.post('/', validate(schemas.paymentSchema), async (req, res) => {
+router.post('/', authorize('payment:create'), validate(schemas.paymentSchema), async (req, res) => {
   try {
     const { type, partyType, partyId, amount, mode } = req.body;
 
@@ -103,7 +104,7 @@ router.post('/', validate(schemas.paymentSchema), async (req, res) => {
 });
 
 // DELETE /api/payments/:id — Delete payment and revert balances
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('payment:create'), async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
     if (!payment) return res.status(404).json({ error: 'Payment not found' });
@@ -157,7 +158,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // GET /api/payments/ageing — Calculate receivable ageing brackets for B2B invoices
-router.get('/ageing', async (req, res) => {
+router.get('/ageing', authorize('payment:view'), async (req, res) => {
   try {
     const Invoice = require('../../models/Invoice');
     const unpaidInvoices = await Invoice.find({
@@ -229,7 +230,7 @@ router.get('/ageing', async (req, res) => {
 });
 
 // POST /api/payments/allocate — Match payment receipt against outstanding invoices (bill-wise)
-router.post('/allocate', async (req, res) => {
+router.post('/allocate', authorize('payment:create'), async (req, res) => {
   try {
     const { paymentId, allocations } = req.body; // allocations: [{ invoiceId, amount }]
     if (!paymentId || !allocations || !allocations.length) {

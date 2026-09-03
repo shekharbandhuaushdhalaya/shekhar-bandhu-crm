@@ -96,6 +96,23 @@ const batchProductionSchema = new mongoose.Schema({
       batchNo: { type: String, required: true },
     }
   ],
+  ingredientsReserved: [
+    {
+      rawMaterialId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'RawMaterial',
+        required: true,
+      },
+      rawMaterialEntryId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'RawMaterialEntry',
+        required: true,
+      },
+      qtyReserved: { type: Number, required: true },
+      batchNo: { type: String, required: true },
+      stageName: { type: String, default: '', trim: true },
+    }
+  ],
   packagingDeducted: { type: Boolean, default: false },
   plannedYields: [
     {

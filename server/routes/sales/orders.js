@@ -302,7 +302,10 @@ router.patch('/:id/cancel', async (req, res) => {
       return res.status(400).json({ error: 'Cannot cancel a delivered order' });
     }
 
-    const warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
+    let warehouse = await Warehouse.findOne({ isDefault: true });
+    if (!warehouse) {
+      warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
+    }
 
     // Revert stock for each item
     for (const item of order.items) {

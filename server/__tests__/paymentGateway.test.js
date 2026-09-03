@@ -7,6 +7,9 @@ const paymentGatewayRouter = require('../routes/finance/paymentGateway');
 
 jest.mock('../models/SystemSettings');
 jest.mock('../models/Invoice');
+jest.mock('../models/RolePermission', () => ({
+  getEffectivePermissions: jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] }),
+}));
 
 describe('Payment Gateway - Money Critical Paths', () => {
   let app;
@@ -19,6 +22,10 @@ describe('Payment Gateway - Money Critical Paths', () => {
         req.rawBody = buf;
       }
     }));
+    app.use((req, res, next) => {
+      req.user = { role: 'admin' };
+      next();
+    });
     app.use('/api/payments/gateway', paymentGatewayRouter);
   });
 

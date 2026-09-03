@@ -6,6 +6,7 @@ const gstFilingSchema = new mongoose.Schema({
   arn: { type: String, required: true },
   filedDate: { type: Date, default: Date.now },
   filedBy: { type: String },
+  snapshot: { type: mongoose.Schema.Types.Mixed, default: null },
   supportingDocuments: [
     {
       name: { type: String },

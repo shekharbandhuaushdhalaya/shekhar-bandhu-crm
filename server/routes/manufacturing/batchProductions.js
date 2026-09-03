@@ -7,14 +7,16 @@ const Product = require('../../models/Product');
 const Warehouse = require('../../models/Warehouse');
 const InventoryEntry = require('../../models/InventoryEntry');
 const StockLedger = require('../../models/StockLedger');
+const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { getSizeInMl, consumeFromReservation, releaseAllReservations, deductPackagingMaterials } = require('../../services/batchProductionService');
 
 const router = express.Router();
 
 // GET /api/batch-productions — List all batch production runs
 // Supports ?limit=&skip=&status= for pagination and filtering
-router.get('/', async (req, res) => {
+router.get('/', authorize('manufacturing:view'), async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     const limit = Math.min(parseInt(req.query.limit) || 0, 500);
@@ -40,8 +42,73 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/batch-productions/preview — Calculate dry-run projected raw material consumption before starting batch
+router.get('/preview', authorize('manufacturing:view'), async (req, res) => {
+  try {
+    const { productId, plannedQty, bomId, manufacturingUnitId } = req.query;
+    if (!productId || !plannedQty) {
+      return res.status(400).json({ error: 'productId and plannedQty are required' });
+    }
+
+    const prod = await Product.findById(productId);
+    if (!prod) return res.status(404).json({ error: 'Product not found' });
+
+    let bom;
+    if (bomId) {
+      bom = await BillOfMaterials.findById(bomId);
+    } else {
+      bom = await BillOfMaterials.findOne({ productId, isDefault: true }) || await BillOfMaterials.findOne({ productId });
+    }
+    if (!bom) return res.status(404).json({ error: `No Bill of Materials recipe found for ${prod.name}` });
+
+    const valPlanned = Number(plannedQty);
+    const FORMULATION_BASIS = bom.formulationBasis || 100;
+
+    const projectedConsumption = [];
+    let isStockSufficient = true;
+
+    for (const ing of (bom.ingredients || [])) {
+      const rm = await RawMaterial.findById(ing.rawMaterialId);
+      if (!rm) continue;
+
+      const qtyNeeded = (ing.qtyRequired || 0) * (valPlanned / FORMULATION_BASIS);
+      let totalAvailable = 0;
+
+      if (manufacturingUnitId) {
+        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, warehouseId: manufacturingUnitId });
+        totalAvailable = entries.reduce((s, e) => s + (e.qty || 0), 0);
+      } else {
+        totalAvailable = rm.stockLevel || 0;
+      }
+
+      const isSufficient = totalAvailable >= qtyNeeded;
+      if (!isSufficient) isStockSufficient = false;
+
+      projectedConsumption.push({
+        rawMaterialId: rm._id,
+        rawMaterialName: rm.name,
+        unit: rm.unit || 'Kg',
+        qtyNeeded: Number(qtyNeeded.toFixed(2)),
+        totalAvailable: Number(totalAvailable.toFixed(2)),
+        isSufficient,
+        shortage: isSufficient ? 0 : Number((qtyNeeded - totalAvailable).toFixed(2))
+      });
+    }
+
+    res.json({
+      productName: prod.name,
+      recipeName: bom.recipeName || 'Default Recipe',
+      plannedQty: valPlanned,
+      isStockSufficient,
+      ingredients: projectedConsumption
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/batch-productions — Start a new batch production run
-router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), validate(schemas.batchProductionSchema), async (req, res) => {
   try {
     const { productId, plannedQty, batchNo, manufacturingUnitId, productionType, jobWorkMode, packagingMode, jobWorkerId, jobWorkerName, jobWorkerChallanRef, plannedYields, expiryDate } = req.body;
 
@@ -139,16 +206,22 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
       // formulationBasis defaults to 100 for backwards compatibility.
       const FORMULATION_BASIS = bom.formulationBasis || 100;
       const FORMULATION_BASIS_UNIT = (bom.formulationBasisUnit || 'ml').toLowerCase();
+      const immediateDeductGroup = [];
+      const blockGroup = [];
+
       if (!isDirectPurchase) {
         for (const ing of bom.ingredients) {
           const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
-          const isPackaging = ing.itemType === 'packaging' || (rm && rm.category === 'Packaging');
+          if (!rm) continue;
+
+          const isPackaging = ing.itemType === 'packaging' || rm.category === 'Packaging';
           const hasStage = ing.stageName && ing.stageName.trim().length > 0;
-          if (!isPackaging && !hasStage) {
-            let qtyNeeded;
+
+          let qtyNeeded = 0;
+          if (isPackaging) {
+            qtyNeeded = ing.qtyRequired * valPlanned;
+          } else {
             if (effectiveYields) {
-              // For multi-size batches: compute the TOTAL batch volume/qty from all yields
-              // e.g. 1000 × 450ml + 500 × 200ml + 200 × 100ml = 570,000ml = 570L
               let totalBatchVolume = 0;
               let allHaveSizes = true;
               for (const y of effectiveYields) {
@@ -156,73 +229,130 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
                 if (sizeMl > 0) {
                   totalBatchVolume += sizeMl * Number(y.plannedQty);
                 } else {
-                  // No size string available — fall back to summing qty directly
                   allHaveSizes = false;
                   break;
                 }
               }
               if (allHaveSizes && totalBatchVolume > 0) {
-                // Convert totalBatchVolume (ml) to the same unit as formulationBasis
                 const totalInBasisUnit = FORMULATION_BASIS_UNIT === 'l' ? totalBatchVolume / 1000 : totalBatchVolume;
                 qtyNeeded = ing.qtyRequired * (totalInBasisUnit / FORMULATION_BASIS);
               } else {
-                // Fallback: just sum plannedQtys (for pcs-based products like tablets)
                 const totalPcs = effectiveYields.reduce((s, y) => s + Number(y.plannedQty), 0);
                 qtyNeeded = ing.qtyRequired * (totalPcs / FORMULATION_BASIS);
               }
             } else {
               qtyNeeded = ing.qtyRequired * (valPlanned / FORMULATION_BASIS);
             }
-            ingredientsRequired.push({ rawMaterialId: ing.rawMaterialId, qtyNeeded });
-          }
-        }
-      }
-
-      const verifiedDeductions = [];
-      if (!isDirectPurchase) {
-        for (const reqIng of ingredientsRequired) {
-          const rm = await RawMaterial.findById(reqIng.rawMaterialId).session(session);
-          const entries = await RawMaterialEntry.find({ rawMaterialId: reqIng.rawMaterialId, warehouseId: manufacturingUnitId }).session(session);
-
-          entries.sort((a, b) => {
-            if (a.expiryDate && b.expiryDate) {
-              return new Date(a.expiryDate) - new Date(b.expiryDate);
-            }
-            if (a.expiryDate && !b.expiryDate) return -1;
-            if (!a.expiryDate && b.expiryDate) return 1;
-            return new Date(a.createdAt) - new Date(b.createdAt);
-          });
-
-          const totalAvailable = entries.reduce((acc, e) => acc + (e.qty || 0), 0);
-          if (totalAvailable < reqIng.qtyNeeded) {
-            throw new Error(`Insufficient stock for raw material: ${rm.name}. Needed: ${reqIng.qtyNeeded.toFixed(2)} ${rm.unit}, Available: ${totalAvailable.toFixed(2)} ${rm.unit}`);
           }
 
-          let needed = reqIng.qtyNeeded;
-          for (const entry of entries) {
-            if (needed <= 0) break;
-            if ((entry.qty || 0) <= 0) continue;
-            const deduct = Math.min(needed, entry.qty);
-            verifiedDeductions.push({ entry, deductQty: deduct, rawMaterialId: reqIng.rawMaterialId });
-            needed -= deduct;
+          qtyNeeded = Number(qtyNeeded.toFixed(2));
+          if (qtyNeeded <= 0) continue;
+
+          const itemSpec = {
+            rawMaterialId: ing.rawMaterialId,
+            rmName: rm.name,
+            unit: rm.unit || 'Kg',
+            qtyNeeded,
+            stageName: ing.stageName || ''
+          };
+
+          if (!isPackaging && !hasStage) {
+            immediateDeductGroup.push(itemSpec);
+          } else {
+            blockGroup.push(itemSpec);
           }
         }
       }
 
       const ingredientsConsumed = [];
+      const ingredientsReserved = [];
       let rawMaterialCost = 0;
+
       if (!isDirectPurchase) {
-        for (const dec of verifiedDeductions) {
-          const { entry, deductQty, rawMaterialId } = dec;
-          entry.qty = Math.max(0, entry.qty - deductQty);
-          await entry.save({ session });
-          rawMaterialCost += deductQty * (entry.purchaseRate || 0);
-          ingredientsConsumed.push({
-            rawMaterialId,
-            rawMaterialEntryId: entry._id,
-            qtyConsumed: deductQty,
-            batchNo: entry.batchNo
+        // 1. Immediate-deduct group (no stage tag, not packaging)
+        for (const item of immediateDeductGroup) {
+          const entries = await RawMaterialEntry.find({
+            rawMaterialId: item.rawMaterialId,
+            warehouseId: manufacturingUnitId
+          }).session(session);
+
+          entries.sort((a, b) => {
+            if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
+            if (a.expiryDate && !b.expiryDate) return -1;
+            if (!a.expiryDate && b.expiryDate) return 1;
+            return new Date(a.createdAt) - new Date(b.createdAt);
           });
+
+          const totalAvailable = entries.reduce((acc, e) => acc + Math.max(0, (e.qty || 0) - (e.reservedQty || 0)), 0);
+          if (totalAvailable < item.qtyNeeded) {
+            throw new Error(`Insufficient available stock for raw material: ${item.rmName}. Needed: ${item.qtyNeeded.toFixed(2)} ${item.unit}, Available: ${totalAvailable.toFixed(2)} ${item.unit} (excluding stock reserved for other runs)`);
+          }
+
+          let needed = item.qtyNeeded;
+          for (const entry of entries) {
+            if (needed <= 0.0001) break;
+            const avail = Math.max(0, (entry.qty || 0) - (entry.reservedQty || 0));
+            if (avail <= 0.0001) continue;
+
+            const deduct = Math.min(needed, avail);
+            const deductVal = Number(deduct.toFixed(2));
+            if (deductVal <= 0) continue;
+
+            entry.qty = Math.max(0, Number((entry.qty - deductVal).toFixed(2)));
+            await entry.save({ session });
+
+            rawMaterialCost += deductVal * (entry.purchaseRate || 0);
+            ingredientsConsumed.push({
+              rawMaterialId: item.rawMaterialId,
+              rawMaterialEntryId: entry._id,
+              qtyConsumed: deductVal,
+              batchNo: entry.batchNo
+            });
+            needed = Number((needed - deductVal).toFixed(2));
+          }
+        }
+
+        // 2. Block group (has stage tag OR is packaging)
+        for (const item of blockGroup) {
+          const entries = await RawMaterialEntry.find({
+            rawMaterialId: item.rawMaterialId,
+            warehouseId: manufacturingUnitId
+          }).session(session);
+
+          entries.sort((a, b) => {
+            if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
+            if (a.expiryDate && !b.expiryDate) return -1;
+            if (!a.expiryDate && b.expiryDate) return 1;
+            return new Date(a.createdAt) - new Date(b.createdAt);
+          });
+
+          const totalAvailable = entries.reduce((acc, e) => acc + Math.max(0, (e.qty || 0) - (e.reservedQty || 0)), 0);
+          if (totalAvailable < item.qtyNeeded) {
+            throw new Error(`Insufficient available stock for raw material: ${item.rmName}. Needed: ${item.qtyNeeded.toFixed(2)} ${item.unit}, Available: ${totalAvailable.toFixed(2)} ${item.unit} (excluding stock reserved for other runs)`);
+          }
+
+          let needed = item.qtyNeeded;
+          for (const entry of entries) {
+            if (needed <= 0.0001) break;
+            const avail = Math.max(0, (entry.qty || 0) - (entry.reservedQty || 0));
+            if (avail <= 0.0001) continue;
+
+            const block = Math.min(needed, avail);
+            const blockVal = Number(block.toFixed(2));
+            if (blockVal <= 0) continue;
+
+            entry.reservedQty = Number(((entry.reservedQty || 0) + blockVal).toFixed(2));
+            await entry.save({ session });
+
+            ingredientsReserved.push({
+              rawMaterialId: item.rawMaterialId,
+              rawMaterialEntryId: entry._id,
+              qtyReserved: blockVal,
+              batchNo: entry.batchNo,
+              stageName: item.stageName || ''
+            });
+            needed = Number((needed - blockVal).toFixed(2));
+          }
         }
       }
 
@@ -285,6 +415,7 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
         status: 'in_progress',
         stages: batchStages,
         ingredientsConsumed,
+        ingredientsReserved,
         rawMaterialCost: Number(rawMaterialCost.toFixed(2)),
         overheadCost: Number(computedOverhead.toFixed(2)),
         productionType: productionType || 'in_house',
@@ -312,7 +443,7 @@ router.post('/', validate(schemas.batchProductionSchema), async (req, res) => {
 });
 
 // PATCH /api/batch-productions/:id/stage/:stageIndex — Advance a manufacturing stage
-router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema), async (req, res) => {
+router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate(schemas.batchStageUpdateSchema), async (req, res) => {
   try {
     const { status, notes, completedBy } = req.body;
     const stageIndex = parseInt(req.params.stageIndex, 10);
@@ -404,7 +535,6 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
     // Deduct stage-tied ingredients from inventory (FIFO) when stage is completed
     // Guard: skip if already deducted to prevent double-deduction on re-completion
     if (!currentStage.ingredientsDeducted) {
-      const RawMaterialEntry = require('../../models/RawMaterialEntry');
       const stageIngredients = req.body.stageIngredients;
       if (newStatus === 'completed' && stageIngredients && stageIngredients.length > 0) {
         let totalInputQty = 0;
@@ -413,37 +543,9 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
         for (const si of stageIngredients) {
           const qtyNeeded = Number(si.qtyNeeded) || 0;
           const wastage = Number(si.wastage) || 0;
-          if (qtyNeeded <= 0) continue;
-
-          // Deduct both formulation and packaging at stage completion (qtyNeeded + wastage)
           const totalDeductQty = qtyNeeded + wastage;
-          const entries = await RawMaterialEntry.find({ rawMaterialId: si.rawMaterialId, warehouseId: batch.manufacturingUnitId });
-          entries.sort((a, b) => {
-            if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
-            if (a.expiryDate && !b.expiryDate) return -1;
-            if (!a.expiryDate && b.expiryDate) return 1;
-            return new Date(a.createdAt) - new Date(b.createdAt);
-          });
-
-          let needed = totalDeductQty;
-          for (const entry of entries) {
-            if (needed <= 0.0001) break;
-            if ((entry.qty || 0) <= 0) continue;
-            const rawDeduct = Math.min(needed, entry.qty);
-            const deduct = Number(rawDeduct.toFixed(2));
-            if (deduct <= 0) continue;
-
-            entry.qty = Math.max(0, Number((entry.qty - deduct).toFixed(2)));
-            await entry.save();
-
-            batch.rawMaterialCost += deduct * (entry.purchaseRate || 0);
-            batch.ingredientsConsumed.push({
-              rawMaterialId: si.rawMaterialId,
-              rawMaterialEntryId: entry._id,
-              qtyConsumed: deduct,
-              batchNo: entry.batchNo
-            });
-            needed -= deduct;
+          if (totalDeductQty > 0) {
+            await consumeFromReservation(batch, si.rawMaterialId, totalDeductQty);
           }
 
           totalInputQty += qtyNeeded;
@@ -493,99 +595,8 @@ router.patch('/:id/stage/:stageIndex', validate(schemas.batchStageUpdateSchema),
   }
 });
 
-// Helper: Auto-deduct packaging materials (bottles, labels, boxes) when reaching packaging stage or completion
-async function deductPackagingMaterials(batch, outputQtyOrYields) {
-  if (batch.packagingDeducted) return;
-
-  const BillOfMaterials = require('../../models/BillOfMaterials');
-  const RawMaterial = require('../../models/RawMaterial');
-  const RawMaterialEntry = require('../../models/RawMaterialEntry');
-
-  let itemsToProcess = [];
-  if (Array.isArray(outputQtyOrYields)) {
-    itemsToProcess = outputQtyOrYields;
-  } else {
-    itemsToProcess = [{
-      productId: batch.productId.toString(),
-      actualYieldQty: Number(outputQtyOrYields) || 0
-    }];
-  }
-
-  for (const item of itemsToProcess) {
-    const qty = Number(item.actualYieldQty);
-    if (qty <= 0) continue;
-
-    // Find BOM for this specific variant (size) or fallback to batch's BOM
-    let bom = await BillOfMaterials.findOne({ productId: item.productId, isActive: true });
-    if (!bom) {
-      bom = await BillOfMaterials.findById(batch.bomId);
-    }
-    if (!bom) continue;
-
-    const pkgIngs = bom.ingredients.filter(ing => {
-      const isExplicitPkg = ing.itemType === 'packaging';
-      return isExplicitPkg;
-    });
-
-    // Also include any raw materials that have category === 'Packaging'
-    for (const ing of bom.ingredients) {
-      if (ing.itemType !== 'packaging') {
-        const rm = await RawMaterial.findById(ing.rawMaterialId);
-        if (rm && rm.category === 'Packaging' && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
-          pkgIngs.push(ing);
-        }
-      }
-    }
-
-    if (!pkgIngs || pkgIngs.length === 0) continue;
-
-    for (const ing of pkgIngs) {
-      // Skip if already drawn at stage completion (includes wastage)
-      if (batch.ingredientsConsumed.some(c => c.rawMaterialId?.toString() === ing.rawMaterialId?.toString())) {
-        continue;
-      }
-      // Packaging items are specified as direct per-unit pieces (e.g. 1 cap per unit produced, 1 box per unit produced)
-      const qtyNeeded = ing.qtyRequired * qty;
-      const rm = await RawMaterial.findById(ing.rawMaterialId);
-      if (!rm) continue;
-
-      const entries = await RawMaterialEntry.find({ rawMaterialId: ing.rawMaterialId, warehouseId: batch.manufacturingUnitId });
-      entries.sort((a, b) => {
-        if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
-        if (a.expiryDate && !b.expiryDate) return -1;
-        if (!a.expiryDate && b.expiryDate) return 1;
-        return new Date(a.createdAt) - new Date(b.createdAt);
-      });
-
-      let needed = qtyNeeded;
-      for (const entry of entries) {
-        if (needed <= 0.0001) break;
-        if ((entry.qty || 0) <= 0) continue;
-        const rawDeduct = Math.min(needed, entry.qty);
-        // Round to 2 decimal places to avoid floating point micro-fractions
-        const deduct = Number(rawDeduct.toFixed(2));
-        if (deduct <= 0) continue;
-
-        entry.qty = Math.max(0, Number((entry.qty - deduct).toFixed(2)));
-        await entry.save();
-
-        batch.rawMaterialCost += deduct * (entry.purchaseRate || 0);
-        batch.ingredientsConsumed.push({
-          rawMaterialId: ing.rawMaterialId,
-          rawMaterialEntryId: entry._id,
-          qtyConsumed: deduct,
-          batchNo: entry.batchNo
-        });
-        needed -= deduct;
-      }
-    }
-  }
-
-  batch.packagingDeducted = true;
-}
-
 // PATCH /api/batch-productions/:id/complete — Complete batch, record QC and inward finished stock
-router.patch('/:id/complete', validate(schemas.batchCompleteSchema), async (req, res) => {
+router.patch('/:id/complete', authorize('manufacturing:complete'), validate(schemas.batchCompleteSchema), async (req, res) => {
   try {
     const {
       actualYieldQty,

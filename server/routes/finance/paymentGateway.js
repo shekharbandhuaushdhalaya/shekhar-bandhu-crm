@@ -1,10 +1,11 @@
 const express = require('express');
 const SystemSettings = require('../../models/SystemSettings');
 const Invoice = require('../../models/Invoice');
+const { authorize } = require('../../middleware/authorize');
 const router = express.Router();
 
 // POST /api/payments/gateway/create-order — Create a Razorpay order for an invoice
-router.post('/create-order', async (req, res) => {
+router.post('/create-order', authorize('payment:create'), async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: 'Invoice ID is required' });
@@ -52,7 +53,7 @@ router.post('/create-order', async (req, res) => {
 });
 
 // POST /api/payments/gateway/verify — Verify a Razorpay payment signature
-router.post('/verify', async (req, res) => {
+router.post('/verify', authorize('payment:create'), async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, invoiceId } = req.body;
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !invoiceId) {

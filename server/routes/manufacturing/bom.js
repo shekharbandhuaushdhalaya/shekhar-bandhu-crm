@@ -1,12 +1,13 @@
 const express = require('express');
 const BillOfMaterials = require('../../models/BillOfMaterials');
 const Product = require('../../models/Product');
+const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const router = express.Router();
 
 // GET /api/bom — List all BOM formulations
-router.get('/', async (req, res) => {
+router.get('/', authorize('manufacturing:view'), async (req, res) => {
   try {
     const boms = await BillOfMaterials.find({})
       .populate('productId', 'name sku size')
@@ -19,7 +20,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/bom/:productId — Get BOM formulation for a specific product
-router.get('/:productId', async (req, res) => {
+router.get('/:productId', authorize('manufacturing:view'), async (req, res) => {
   try {
     const { all } = req.query;
     if (all === 'true') {
@@ -48,7 +49,7 @@ router.get('/:productId', async (req, res) => {
 });
 
 // POST /api/bom — Configure a BOM formulation
-router.post('/', validate(schemas.bomSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), validate(schemas.bomSchema), async (req, res) => {
   try {
     const { productId, recipeName, isDefault, batchYieldSize, ingredients, isActive, productionNotes, overheadCost, stages, defaultProductionType, defaultJobWorkMode, defaultPackagingMode, defaultJobWorkerId, formulationBasis, formulationBasisUnit } = req.body;
     if (!productId || !batchYieldSize || !ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
@@ -168,7 +169,7 @@ router.post('/', validate(schemas.bomSchema), async (req, res) => {
 });
 
 // DELETE /api/bom/:id — Delete BOM formulation
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('manufacturing:delete'), async (req, res) => {
   try {
     const deleted = await BillOfMaterials.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Formulation not found' });

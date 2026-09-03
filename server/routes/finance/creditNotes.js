@@ -14,7 +14,7 @@ function generateNoteNo(type) {
 const router = express.Router();
 
 // GET /api/credit-notes — List
-router.get('/', async (req, res) => {
+router.get('/', authorize('invoice:view'), async (req, res) => {
   try {
     const { search, type, partyType, status } = req.query;
     const filter = {};
@@ -37,7 +37,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/credit-notes/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', authorize('invoice:view'), async (req, res) => {
   try {
     const note = await CreditNote.findById(req.params.id).lean();
     if (!note) return res.status(404).json({ error: 'Note not found' });
@@ -48,7 +48,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/credit-notes — Create (draft)
-router.post('/', validate(schemas.creditNoteSchema), async (req, res) => {
+router.post('/', authorize('invoice:create'), validate(schemas.creditNoteSchema), async (req, res) => {
   try {
     const data = {
       ...req.body,
@@ -66,7 +66,7 @@ router.post('/', validate(schemas.creditNoteSchema), async (req, res) => {
 });
 
 // PUT /api/credit-notes/:id — Edit draft
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorize('invoice:edit'), async (req, res) => {
   try {
     const note = await CreditNote.findById(req.params.id);
     if (!note) return res.status(404).json({ error: 'Note not found' });
@@ -84,7 +84,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // PATCH /api/credit-notes/:id/finalize
-router.patch('/:id/finalize', async (req, res) => {
+router.patch('/:id/finalize', authorize('invoice:markPaid'), async (req, res) => {
   try {
     const note = await CreditNote.findById(req.params.id);
     if (!note) return res.status(404).json({ error: 'Note not found' });
@@ -128,7 +128,7 @@ router.patch('/:id/finalize', async (req, res) => {
 });
 
 // PATCH /api/credit-notes/:id/cancel
-router.patch('/:id/cancel', async (req, res) => {
+router.patch('/:id/cancel', authorize('invoice:delete'), async (req, res) => {
   try {
     const note = await CreditNote.findById(req.params.id);
     if (!note) return res.status(404).json({ error: 'Note not found' });

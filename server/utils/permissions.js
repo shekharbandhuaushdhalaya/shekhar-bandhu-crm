@@ -21,6 +21,7 @@ const PERMISSIONS = {
   campaign:      ['view', 'create', 'edit', 'delete', 'publish', 'analytics'],
   rbac:          ['manage'],
   stockmovement: ['view', 'create', 'edit', 'delete'],
+  pricing:       ['view', 'edit', 'delete'],
 };
 
 const ALL_PERMISSIONS = [];

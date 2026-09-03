@@ -638,6 +638,95 @@ const mrExpenseSchema = z.object({
   date: z.string().or(z.date()).optional(),
 });
 
+const mrTourPlanEntrySchema = z.object({
+  date: z.string().or(z.date()),
+  territory: z.string().optional().default(''),
+  targetDoctorNames: z.array(z.string()).optional().default([]),
+  targetChemistNames: z.array(z.string()).optional().default([]),
+  notes: z.string().optional().default(''),
+});
+
+const mrTourPlanSchema = z.object({
+  month: z.string().min(1),
+  year: z.number().int().positive(),
+  entries: z.array(mrTourPlanEntrySchema).default([]),
+});
+
+const mrSampleIssueSchema = z.object({
+  productId: objectId,
+  batchNo: z.string().optional().default(''),
+  qty: z.number().int().positive(),
+});
+
+// ── Customer Pricing & Volume Tiers ───────────────────────────
+const volumeTierSchema = z.object({
+  minQty: z.number().positive(),
+  discountPercent: z.number().min(0).max(100).optional().default(0),
+  fixedRate: z.number().nonnegative().nullable().optional()
+});
+
+const customerPricingSchema = z.object({
+  productId: objectId.optional().nullable(),
+  rawMaterialId: objectId.optional().nullable(),
+  customRate: z.number().nonnegative().nullable().optional(),
+  discountPercent: z.number().min(0).max(100).optional().default(0),
+  volumeTiers: z.array(volumeTierSchema).optional().default([]),
+  validUntil: z.string().or(z.date()).nullable().optional()
+});
+
+const pricingResolveItemSchema = z.object({
+  productId: objectId.optional().nullable(),
+  rawMaterialId: objectId.optional().nullable(),
+  qty: z.number().positive().default(1)
+});
+
+const pricingResolveSchema = z.object({
+  customerId: objectId,
+  items: z.array(pricingResolveItemSchema).min(1, 'At least one item required')
+});
+
+// ── Dealer Consignment Stock & Settlement ───────────────────────
+const consignmentDispatchItemSchema = z.object({
+  productId: objectId,
+  qtyBoxes: z.number().int().positive(),
+  packing: z.number().int().min(1).default(1),
+  batchNo: z.string().optional().default(''),
+  vendorId: z.string().optional().default(''),
+});
+
+const consignmentDispatchSchema = z.object({
+  sourceWarehouseId: objectId,
+  customerId: objectId,
+  dealerName: z.string().optional().default(''),
+  items: z.array(consignmentDispatchItemSchema).min(1, 'At least one item required'),
+  notes: z.string().optional().default(''),
+});
+
+const consignmentSettleSoldItemSchema = z.object({
+  productId: objectId,
+  qtyBoxes: z.number().int().positive(),
+  rate: z.number().nonnegative(),
+  packing: z.number().int().min(1).default(1),
+  batchNo: z.string().optional().default(''),
+  hsnCode: z.string().optional().default(''),
+  gstRate: z.number().optional().default(0),
+});
+
+const consignmentSettleReturnedItemSchema = z.object({
+  productId: objectId,
+  qtyBoxes: z.number().int().positive(),
+  packing: z.number().int().min(1).default(1),
+  batchNo: z.string().optional().default(''),
+});
+
+const consignmentSettleSchema = z.object({
+  dealerWarehouseId: objectId,
+  destinationWarehouseId: objectId,
+  soldItems: z.array(consignmentSettleSoldItemSchema).optional().default([]),
+  returnedItems: z.array(consignmentSettleReturnedItemSchema).optional().default([]),
+  notes: z.string().optional().default(''),
+});
+
 // ── Task ─────────────────────────────────────────────────────
 const taskSchema = z.object({
   title: z.string().min(1),
@@ -645,7 +734,7 @@ const taskSchema = z.object({
   dueDate: z.string().or(z.date()).optional(),
   priority: z.enum(['low', 'medium', 'high']).default('medium'),
   status: z.enum(['pending', 'in_progress', 'completed']).default('pending'),
-  assignedTo: objectId.optional(),
+  assignedTo: objectId.optional().nullable(),
 });
 
 // ── Campaign ─────────────────────────────────────────────────
@@ -818,6 +907,13 @@ module.exports = {
   mrCheckinSchema,
   mrVisitSchema,
   mrExpenseSchema,
+  mrTourPlanSchema,
+  mrSampleIssueSchema,
+  customerPricingSchema,
+  pricingResolveSchema,
+  volumeTierSchema,
+  consignmentDispatchSchema,
+  consignmentSettleSchema,
   taskSchema,
   campaignSchema,
   complaintSchema,
