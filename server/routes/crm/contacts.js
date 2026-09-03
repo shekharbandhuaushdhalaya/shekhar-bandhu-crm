@@ -136,4 +136,94 @@ router.delete('/:id', authorize('contact:delete'), async (req, res) => {
   }
 });
 
+// GET /api/contacts/duplicates/scan — Detect potential duplicate contact pairs
+router.get('/duplicates/scan', authorize('contact:view'), async (req, res) => {
+  try {
+    const contacts = await Contact.find({}).lean();
+    const duplicates = [];
+    const seenMap = new Map();
+
+    for (const c of contacts) {
+      const nameKey = (c.name || '').trim().toLowerCase().replace(/\s+/g, '');
+      const phoneKey = (c.phone || '').trim().replace(/[^0-9]/g, '');
+      const emailKey = (c.email || '').trim().toLowerCase();
+
+      let matchedMaster = null;
+      if (phoneKey && phoneKey.length >= 10 && seenMap.has(`phone:${phoneKey}`)) {
+        matchedMaster = seenMap.get(`phone:${phoneKey}`);
+      } else if (emailKey && seenMap.has(`email:${emailKey}`)) {
+        matchedMaster = seenMap.get(`email:${emailKey}`);
+      } else if (nameKey && seenMap.has(`name:${nameKey}`)) {
+        matchedMaster = seenMap.get(`name:${nameKey}`);
+      }
+
+      if (matchedMaster && matchedMaster._id.toString() !== c._id.toString()) {
+        duplicates.push({
+          masterContact: matchedMaster,
+          duplicateContact: c,
+          reason: matchedMaster.phone === c.phone ? 'Matching Phone' : (matchedMaster.email === c.email ? 'Matching Email' : 'Matching Name')
+        });
+      } else {
+        if (nameKey) seenMap.set(`name:${nameKey}`, c);
+        if (phoneKey && phoneKey.length >= 10) seenMap.set(`phone:${phoneKey}`, c);
+        if (emailKey) seenMap.set(`email:${emailKey}`, c);
+      }
+    }
+
+    res.json({ totalDuplicatePairs: duplicates.length, duplicates });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/contacts/merge — Merge duplicate contact into target master contact
+router.post('/merge', authorize('contact:edit'), async (req, res) => {
+  try {
+    const { masterId, duplicateId } = req.body;
+    if (!masterId || !duplicateId) {
+      return res.status(400).json({ error: 'masterId and duplicateId are required' });
+    }
+
+    if (masterId === duplicateId) {
+      return res.status(400).json({ error: 'Cannot merge a contact into itself' });
+    }
+
+    const master = await Contact.findById(masterId);
+    const duplicate = await Contact.findById(duplicateId);
+
+    if (!master || !duplicate) {
+      return res.status(404).json({ error: 'Master or duplicate contact not found' });
+    }
+
+    // Merge interactions & notes
+    const combinedInteractions = [
+      ...(master.interactions || []),
+      ...(duplicate.interactions || []),
+      { type: 'System', note: `Merged contact '${duplicate.name}' (${duplicate._id}) into master`, date: new Date() }
+    ];
+    master.interactions = combinedInteractions;
+
+    if (!master.email && duplicate.email) master.email = duplicate.email;
+    if (!master.phone && duplicate.phone) master.phone = duplicate.phone;
+    if (!master.company && duplicate.company) master.company = duplicate.company;
+
+    await master.save();
+
+    // Re-link Activities & Tasks to master contact
+    const Task = require('../../models/Task');
+    await Activity.updateMany({ contactId: duplicate._id }, { contactId: master._id });
+    await Task.updateMany({ contactId: duplicate._id }, { contactId: master._id });
+
+    // Remove duplicate contact document
+    await Contact.findByIdAndDelete(duplicate._id);
+
+    res.json({
+      message: `Contact '${duplicate.name}' successfully merged into '${master.name}'`,
+      masterContact: master
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

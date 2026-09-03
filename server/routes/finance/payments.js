@@ -229,6 +229,78 @@ router.get('/ageing', authorize('payment:view'), async (req, res) => {
   }
 });
 
+// GET /api/payments/payables/ageing — Calculate payables ageing brackets for vendor purchase invoices
+router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
+  try {
+    const Invoice = require('../../models/Invoice');
+    const unpaidPurchaseInvoices = await Invoice.find({
+      type: 'purchase',
+      isFinalized: true,
+      status: { $ne: 'paid' }
+    }).sort({ date: -1 }).lean();
+
+    const now = new Date();
+    const brackets = {
+      b0_30: 0,
+      b31_60: 0,
+      b61_90: 0,
+      b90_plus: 0
+    };
+
+    const vendorMap = {};
+
+    unpaidPurchaseInvoices.forEach(inv => {
+      const outstanding = (inv.nettTotal || inv.amount || 0) - (inv.amountPaid || 0);
+      if (outstanding <= 0) return;
+
+      const diffTime = Math.abs(now.getTime() - new Date(inv.date).getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      let bracket = '0-30 Days';
+      if (diffDays <= 30) {
+        brackets.b0_30 += outstanding;
+        bracket = '0-30 Days';
+      } else if (diffDays <= 60) {
+        brackets.b31_60 += outstanding;
+        bracket = '31-60 Days';
+      } else if (diffDays <= 90) {
+        brackets.b61_90 += outstanding;
+        bracket = '61-90 Days';
+      } else {
+        brackets.b90_plus += outstanding;
+        bracket = '90+ Days';
+      }
+
+      const vName = inv.partyName || inv.vendorName || 'Vendor';
+      if (!vendorMap[vName]) {
+        vendorMap[vName] = {
+          vendorName: vName,
+          totalOutstanding: 0,
+          invoices: []
+        };
+      }
+      vendorMap[vName].totalOutstanding += outstanding;
+      vendorMap[vName].invoices.push({
+        _id: inv._id,
+        invoiceNo: inv.invoiceNo,
+        date: inv.date,
+        amount: inv.nettTotal || inv.amount || 0,
+        amountPaid: inv.amountPaid || 0,
+        outstanding,
+        daysOld: diffDays,
+        bracket
+      });
+    });
+
+    res.json({
+      summary: brackets,
+      vendors: Object.values(vendorMap).sort((a, b) => b.totalOutstanding - a.totalOutstanding)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/payments/allocate — Match payment receipt against outstanding invoices (bill-wise)
 router.post('/allocate', authorize('payment:create'), validate(schemas.paymentAllocateSchema), async (req, res) => {
   try {

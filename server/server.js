@@ -242,8 +242,14 @@ app.use('/api/retention-samples', authenticateJWT, retentionSampleRoutes);
 app.use('/api/stability-studies', authenticateJWT, stabilityStudyRoutes);
 app.use('/api/manufacturing/quality-audits', authenticateJWT, qualityAuditRoutes);
 const debitNoteRoutes = require('./routes/finance/debitNotes');
+const recurringInvoiceRoutes = require('./routes/sales/recurringInvoices');
+const recallRoutes = require('./routes/manufacturing/recalls');
+const stocktakeRoutes = require('./routes/inventory/stocktakes');
 app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
 app.use('/api/debit-notes', authenticateJWT, debitNoteRoutes);
+app.use('/api/recurring-invoices', authenticateJWT, recurringInvoiceRoutes);
+app.use('/api/recalls', authenticateJWT, recallRoutes);
+app.use('/api/stocktakes', authenticateJWT, stocktakeRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
 app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);
 
