@@ -13,15 +13,6 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { calculateInvoiceTotals, resolveWarehouse, deductInventoryForInvoice } = require('../../services/invoiceService');
 
-async function resolveWarehouse(warehouseId) {
-  if (!warehouseId) return null;
-  let warehouse = await Warehouse.findById(warehouseId);
-  if (!warehouse) {
-    const ManufacturingUnit = require('../../models/ManufacturingUnit');
-    warehouse = await ManufacturingUnit.findById(warehouseId);
-  }
-  return warehouse;
-}
 
 function getFinancialYearString(date = new Date()) {
   const year = date.getFullYear();

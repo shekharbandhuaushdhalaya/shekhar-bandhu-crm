@@ -58,6 +58,9 @@ async function resolveWarehouse(warehouseId) {
   if (warehouseId) {
     const wh = await Warehouse.findById(warehouseId);
     if (wh) return wh;
+    const ManufacturingUnit = require('../models/ManufacturingUnit');
+    const mfgUnit = await ManufacturingUnit.findById(warehouseId);
+    if (mfgUnit) return mfgUnit;
   }
   let defaultWh = await Warehouse.findOne({ isDefault: true });
   if (!defaultWh) {
