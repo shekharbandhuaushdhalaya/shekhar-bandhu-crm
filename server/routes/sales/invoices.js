@@ -11,7 +11,7 @@ const StockLedger = require('../../models/StockLedger');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
-const { calculateInvoiceTotals, resolveWarehouse, deductInventoryForInvoice } = require('../../services/invoiceService');
+const { calculateInvoiceTotals, resolveWarehouse } = require('../../services/invoiceService');
 
 
 function getFinancialYearString(date = new Date()) {
