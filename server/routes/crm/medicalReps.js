@@ -1095,4 +1095,34 @@ router.post('/visits/:id/check-out', authorize('mr:edit'), async (req, res) => {
   }
 });
 
+// GET /api/medical-reps/analytics/territory-heatmap — Territory coverage density & visit heatmap
+router.get('/analytics/territory-heatmap', authorize('mr:view'), async (req, res) => {
+  try {
+    const visits = await MrVisit.find({ status: { $in: ['checked_in', 'checked_out'] } }).lean();
+
+    const cityMap = new Map();
+    visits.forEach(v => {
+      const city = v.city || 'Varanasi';
+      if (!cityMap.has(city)) {
+        cityMap.set(city, { city, totalVisits: 0, totalOrdersAmount: 0, coordinates: [] });
+      }
+      const item = cityMap.get(city);
+      item.totalVisits++;
+      item.totalOrdersAmount += (v.orderAmount || 0);
+      if (v.latitude && v.longitude) {
+        item.coordinates.push({ lat: v.latitude, lng: v.longitude });
+      }
+    });
+
+    const heatmapData = Array.from(cityMap.values()).map(c => ({
+      ...c,
+      totalOrdersAmount: Number(c.totalOrdersAmount.toFixed(2))
+    })).sort((a, b) => b.totalVisits - a.totalVisits);
+
+    res.json(heatmapData);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

@@ -157,8 +157,8 @@ router.delete('/:id', authorize('payment:create'), async (req, res) => {
   }
 });
 
-// GET /api/payments/ageing — Calculate receivable ageing brackets for B2B invoices
-router.get('/ageing', authorize('payment:view'), async (req, res) => {
+// GET /api/payments/ageing & GET /api/payments/receivables/ageing — Calculate receivable ageing brackets for B2B invoices
+router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async (req, res) => {
   try {
     const Invoice = require('../../models/Invoice');
     const unpaidInvoices = await Invoice.find({
