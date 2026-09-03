@@ -348,6 +348,31 @@ router.post('/sales', validate(schemas.invoiceSchema), async (req, res) => {
     const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
 
+    // Customer Credit Limit Enforcement Check
+    if (req.body.customerId || req.body.customerName) {
+      const customer = req.body.customerId
+        ? await Customer.findById(req.body.customerId)
+        : await Customer.findOne({ name: { $regex: new RegExp('^' + (req.body.customerName || '').trim() + '$', 'i') } });
+
+      if (customer && customer.creditLimit > 0) {
+        const unpaidInvoices = await Invoice.find({
+          $or: [{ customerId: customer._id }, { customerName: customer.name }],
+          status: { $in: ['unpaid', 'partially_paid'] },
+          type: 'sale'
+        }).lean();
+
+        const currentOutstanding = unpaidInvoices.reduce((sum, inv) => sum + (inv.nettTotal || inv.totalAmount || 0), 0);
+        const newTotal = req.body.totalAmount || req.body.nettTotal || 0;
+        const prospectiveOutstanding = currentOutstanding + newTotal;
+
+        if (prospectiveOutstanding > customer.creditLimit) {
+          return res.status(400).json({
+            error: `Order exceeds customer credit limit! Credit Limit: ₹${customer.creditLimit.toLocaleString('en-IN')}, Current Unpaid Outstanding: ₹${currentOutstanding.toLocaleString('en-IN')}, New Order: ₹${newTotal.toLocaleString('en-IN')}. Exceeded by ₹${(prospectiveOutstanding - customer.creditLimit).toLocaleString('en-IN')}.`
+          });
+        }
+      }
+    }
+
     const data = {
       ...req.body,
       type: 'sale',

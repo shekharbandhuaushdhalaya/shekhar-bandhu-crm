@@ -23,7 +23,7 @@ const quotationSchema = new mongoose.Schema({
   shippingAddress: { type: String, default: '', trim: true },
   date: { type: Date, default: Date.now },
   amount: { type: Number, required: true, default: 0 },
-  status: { type: String, default: 'draft', enum: ['draft', 'sent', 'approved', 'rejected'] },
+  status: { type: String, default: 'draft', enum: ['draft', 'sent', 'approved', 'rejected', 'converted', 'lost'] },
   mode: { type: String, enum: ['regular', 'pakka', 'cash'], default: 'pakka' },
   baseAmount: { type: Number },
   gstRate: { type: Number },
@@ -40,7 +40,9 @@ const quotationSchema = new mongoose.Schema({
   isFinalized: { type: Boolean, default: false },
   convertedToInvoice: { type: Boolean, default: false },
   invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
-  invoiceNo: { type: String, default: '' }
+  invoiceNo: { type: String, default: '' },
+  winLossReason: { type: String, default: '', trim: true },
+  convertedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 quotationSchema.index({ quotationNo: 'text', customerName: 'text', status: 'text' });

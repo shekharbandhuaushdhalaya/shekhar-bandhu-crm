@@ -241,7 +241,9 @@ app.use('/api/manufacturing/deviations', authenticateJWT, deviationRoutes);
 app.use('/api/retention-samples', authenticateJWT, retentionSampleRoutes);
 app.use('/api/stability-studies', authenticateJWT, stabilityStudyRoutes);
 app.use('/api/manufacturing/quality-audits', authenticateJWT, qualityAuditRoutes);
+const debitNoteRoutes = require('./routes/finance/debitNotes');
 app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
+app.use('/api/debit-notes', authenticateJWT, debitNoteRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
 app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);
 

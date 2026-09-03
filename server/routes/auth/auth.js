@@ -371,6 +371,82 @@ router.put('/change-password', authenticateToken, validate(schemas.changePasswor
   }
 });
 
+// POST /api/auth/forgot-password — Initiate password reset via email/OTP
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email address is required' });
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) {
+      return res.json({ message: 'If that email address is registered, a password reset code has been issued.' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await Otp.findOneAndUpdate(
+      { phone: `email:${user.email}` },
+      { code, expiresAt },
+      { upsert: true, new: true }
+    );
+
+    console.log('\n==================================================');
+    console.log('[PASSWORD RESET OTP SIMULATOR]');
+    console.log(`To: ${user.email}`);
+    console.log(`Message: Your password reset OTP is: ${code}`);
+    console.log('==================================================\n');
+
+    res.json({
+      message: 'Password reset code issued',
+      resetToken: `email:${user.email}`,
+      devOtp: code
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/reset-password — Complete password reset with code
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: 'Email, code, and newPassword are required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const otpRecord = await Otp.findOne({ phone: `email:${cleanEmail}` });
+    if (!otpRecord || otpRecord.code !== code.trim() || otpRecord.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Invalid or expired reset code' });
+    }
+
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.mustChangePassword = false;
+    await user.save();
+
+    await Otp.deleteOne({ phone: `email:${cleanEmail}` });
+
+    res.json({ message: 'Password reset successfully. You may now log in with your new password.' });
+
+    const { logAction } = require('../../utils/auditLogger');
+    await logAction({
+      userId: user._id,
+      userName: user.name,
+      userEmail: user.email,
+      action: 'PASSWORD_RESET',
+      description: `Password reset completed for ${user.email}`,
+      req
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = {
   router,
   authenticateToken

@@ -41,6 +41,7 @@ const customerSchema = new mongoose.Schema({
   anniversary: { type: Date, default: null },
   preferredTime: { type: String, default: '', trim: true },
   assignedMrId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative', default: null },
+  creditLimit: { type: Number, default: 0 }  // 0 = unlimited
 }, { timestamps: true });
 
 customerSchema.index({ name: 'text', company: 'text', email: 'text' });

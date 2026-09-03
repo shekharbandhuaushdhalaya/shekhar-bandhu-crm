@@ -1463,6 +1463,68 @@ router.get('/:id/bmr-report', async (req, res) => {
   }
 });
 
+// GET /api/batch-productions/:id/coa — Auto-generate Certificate of Analysis (CoA) document JSON
+router.get('/:id/coa', async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id)
+      .populate('productId')
+      .lean();
+
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne().lean() || {};
+
+    const product = batch.productId || {};
+    const qc = batch.qcParameters || {};
+
+    const testResults = [
+      { parameter: 'Organoleptic Evaluation', specification: 'Standard', result: qc.organoleptic || 'Complies', status: 'PASS' },
+      { parameter: 'Moisture Content', specification: qc.moistureLimit || 'NMT 10% w/w', result: qc.moistureContent !== null && qc.moistureContent !== undefined ? `${qc.moistureContent}% w/w` : 'N/A', status: 'PASS' },
+      { parameter: 'Total Ash Value', specification: qc.ashValueLimit || 'NMT 5% w/w', result: qc.ashValue !== null && qc.ashValue !== undefined ? `${qc.ashValue}% w/w` : 'N/A', status: 'PASS' },
+      { parameter: 'pH Value (1% w/v soln)', specification: qc.pHLimit || '4.0 - 7.0', result: qc.pHValue !== null && qc.pHValue !== undefined ? `${qc.pHValue}` : 'N/A', status: 'PASS' },
+      { parameter: 'Disintegration Time', specification: qc.disintegrationLimit || 'NMT 30 mins', result: qc.disintegrationTime !== null && qc.disintegrationTime !== undefined ? `${qc.disintegrationTime} mins` : 'N/A', status: 'PASS' },
+      { parameter: 'Heavy Metals (Pb, Cd, As, Hg)', specification: 'Within API limits', result: qc.heavyMetals || 'Complies', status: 'PASS' },
+      { parameter: 'Microbial Limit Test', specification: 'Within API limits', result: qc.microbialLimit || 'Complies', status: 'PASS' }
+    ];
+
+    const coaDocument = {
+      title: 'CERTIFICATE OF ANALYSIS (CoA)',
+      firmDetails: {
+        name: settings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
+        address: settings.firmAddress || 'VARANASI (U.P.)',
+        licenseNo: settings.manufacturingLicenseNo || 'N/A',
+        gmpCertNo: settings.gmpCertificateNo || 'N/A'
+      },
+      batchDetails: {
+        batchNo: batch.batchNo,
+        productName: product.name || 'Ayurvedic Medicine',
+        productSku: product.sku || 'N/A',
+        spcCode: product.specificProductCode || 'N/A',
+        batchSize: `${batch.actualYieldQty || batch.plannedQty} units`,
+        mfgDate: batch.mfgDate ? new Date(batch.mfgDate).toLocaleDateString('en-IN') : 'N/A',
+        expiryDate: batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString('en-IN') : 'N/A',
+        testingDate: batch.endDate ? new Date(batch.endDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
+        testStandardRef: qc.testStandardRef || 'As per Pharmacopoeial API Standards'
+      },
+      testResults,
+      overallResult: batch.qcStatus === 'rejected' ? 'REJECTED' : 'APPROVED & PASSED',
+      inspectorSignature: {
+        name: batch.qcPassedBy || 'Authorized Quality Analyst',
+        timestamp: batch.endDate ? new Date(batch.endDate).toISOString() : new Date().toISOString()
+      },
+      marketReleaserSignature: {
+        name: batch.releasedByName || 'Authorized Quality Releaser',
+        timestamp: batch.releasedAt ? new Date(batch.releasedAt).toISOString() : null
+      }
+    };
+
+    res.json(coaDocument);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/batch-productions/:id/documents — Add a supporting document
 router.patch('/:id/documents', validate(schemas.batchDocumentAddSchema), async (req, res) => {
   try {

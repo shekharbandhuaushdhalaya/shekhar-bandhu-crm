@@ -197,4 +197,99 @@ router.post('/:id/convert-to-challan', authorize('quotation:edit'), async (req, 
   }
 });
 
+// POST /api/quotations/:id/convert-to-invoice — One-click convert Quotation to Draft Sale Invoice
+router.post('/:id/convert-to-invoice', authorize('quotation:edit'), async (req, res) => {
+  try {
+    const { winLossReason } = req.body;
+    const quotation = await Quotation.findById(req.params.id);
+    if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
+
+    if (quotation.convertedToInvoice) {
+      return res.status(400).json({ error: `Quotation has already been converted to Sale Invoice ${quotation.invoiceNo}` });
+    }
+
+    const Invoice = require('../../models/Invoice');
+    const SystemSettings = require('../../models/SystemSettings');
+    const Customer = require('../../models/Customer');
+
+    const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
+    const pfx = settings.invoicePrefix || 'SB';
+    const fy = getFinancialYearString();
+    const prefix = `${pfx}/${fy}/`;
+
+    const lastInv = await Invoice.findOne({
+      invoiceNo: { $regex: `^${prefix.replace(/\//g, '\\/')}\\d+$` }
+    }).sort({ createdAt: -1 }).lean();
+
+    let nextNum = 1;
+    if (lastInv) {
+      const parts = lastInv.invoiceNo.split('/');
+      if (parts.length === 3) nextNum = parseInt(parts[2], 10) + 1;
+    }
+    const invNo = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+
+    const customerObj = await Customer.findOne({ name: { $regex: new RegExp('^' + quotation.customerName.trim() + '$', 'i') } }).lean();
+
+    const invoiceItems = (quotation.items || []).map(it => ({
+      productId: it.productId,
+      name: it.name || '',
+      size: it.size || '',
+      packing: it.packing || 1,
+      qty: it.qty || 0,
+      boxes: it.boxes || it.qty || 0,
+      rate: it.rate || 0,
+      gstRate: it.gstRate || 0,
+      amount: Number((((it.qty || 0) * (it.rate || 0) * (it.packing || 1)) * (1 + (it.gstRate || 0)/100)).toFixed(2)),
+      batchNo: it.batchNo || ''
+    }));
+
+    const invoice = await Invoice.create({
+      invoiceNo: invNo,
+      type: 'sale',
+      mode: quotation.mode === 'cash' ? 'cash' : 'pakka',
+      date: new Date(),
+      partyName: quotation.customerName,
+      customerId: customerObj ? customerObj._id : null,
+      partyAddress: quotation.partyAddress,
+      shippingAddress: quotation.shippingAddress,
+      gstin: quotation.gstin,
+      items: invoiceItems,
+      baseAmount: quotation.baseAmount || 0,
+      cgst: quotation.cgst || 0,
+      sgst: quotation.sgst || 0,
+      igst: quotation.igst || 0,
+      roundOff: quotation.roundOff || 0,
+      totalAmount: quotation.amount || 0,
+      nettTotal: quotation.amount || 0,
+      status: 'unpaid',
+      isFinalized: false,
+      warehouseId: quotation.warehouseId,
+      warehouseName: quotation.warehouseName
+    });
+
+    quotation.status = 'converted';
+    quotation.convertedToInvoice = true;
+    quotation.invoiceNo = invNo;
+    quotation.invoiceId = invoice._id;
+    quotation.winLossReason = winLossReason || 'Quotation accepted by customer';
+    quotation.convertedAt = new Date();
+    await quotation.save();
+
+    res.status(201).json({
+      message: 'Quotation successfully converted to draft Sale Invoice',
+      invoice,
+      quotation
+    });
+
+    await logAction({
+      action: 'CONVERT_QUOTATION_TO_INVOICE',
+      description: `Converted quotation ${quotation.quotationNo} → Invoice ${invNo} for ${quotation.customerName}`,
+      details: { quotationId: quotation._id, quotationNo: quotation.quotationNo, invoiceNo: invNo, customer: quotation.customerName },
+      req
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
