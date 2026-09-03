@@ -50,6 +50,12 @@ const userSchema = new mongoose.Schema({
     default: null,
     select: false, // never returned in queries by default
   },
+  activeSessions: [{
+    sessionId: { type: String, required: true },
+    deviceInfo: { type: String, default: 'Unknown Device' },
+    ipAddress: { type: String, default: '127.0.0.1' },
+    loggedInAt: { type: Date, default: Date.now }
+  }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

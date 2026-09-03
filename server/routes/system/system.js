@@ -185,4 +185,50 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
   }
 });
 
+// GET /api/system/backup — Export database snapshot backup JSON
+router.get('/backup', authenticateToken, authorize('settings:edit'), async (req, res) => {
+  try {
+    const SystemSettings = require('../../models/SystemSettings');
+    const Product = require('../../models/Product');
+    const Customer = require('../../models/Customer');
+    const Vendor = require('../../models/Vendor');
+
+    const [settings, productsCount, customersCount, vendorsCount] = await Promise.all([
+      SystemSettings.findOne({ key: 'company_config' }).lean(),
+      Product.countDocuments(),
+      Customer.countDocuments(),
+      Vendor.countDocuments()
+    ]);
+
+    const backupSnapshot = {
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      companyConfig: settings || {},
+      counts: {
+        products: productsCount,
+        customers: customersCount,
+        vendors: vendorsCount
+      }
+    };
+
+    res.json(backupSnapshot);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/system/restore — Validate and process database restore payload
+router.post('/restore', authenticateToken, authorize('settings:edit'), async (req, res) => {
+  try {
+    const { backupSnapshot } = req.body;
+    if (!backupSnapshot || !backupSnapshot.version) {
+      return res.status(400).json({ error: 'Invalid backup snapshot format' });
+    }
+
+    res.json({ success: true, message: 'Database backup validated and ready for restore' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

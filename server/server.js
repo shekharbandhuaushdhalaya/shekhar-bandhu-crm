@@ -254,6 +254,8 @@ const financialReportRoutes = require('./routes/finance/financialReports');
 const drugLicenseRoutes = require('./routes/manufacturing/drugLicenses');
 const bankReconciliationRoutes = require('./routes/finance/bankReconciliations');
 const demandForecastingRoutes = require('./routes/analytics/demandForecasting');
+const dripCampaignRoutes = require('./routes/marketing/dripCampaigns');
+const reportDigestRoutes = require('./routes/analytics/reportDigests');
 app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
 app.use('/api/debit-notes', authenticateJWT, debitNoteRoutes);
 app.use('/api/recurring-invoices', authenticateJWT, recurringInvoiceRoutes);
@@ -268,6 +270,8 @@ app.use('/api/finance/reports', authenticateJWT, financialReportRoutes);
 app.use('/api/drug-licenses', authenticateJWT, drugLicenseRoutes);
 app.use('/api/bank-reconciliations', authenticateJWT, bankReconciliationRoutes);
 app.use('/api/analytics/demand-forecasting', authenticateJWT, demandForecastingRoutes);
+app.use('/api/drip-campaigns', authenticateJWT, dripCampaignRoutes);
+app.use('/api/analytics/digests', authenticateJWT, reportDigestRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
 app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);
 

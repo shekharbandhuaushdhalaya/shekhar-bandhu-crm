@@ -447,6 +447,32 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// GET /api/auth/sessions — View active logged-in device sessions
+router.get('/sessions', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('activeSessions').lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user.activeSessions || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/auth/sessions/:sessionId — Revoke a logged-in device session
+router.delete('/sessions/:sessionId', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.activeSessions = (user.activeSessions || []).filter(s => s.sessionId !== req.params.sessionId);
+    await user.save();
+
+    res.json({ message: 'Device session revoked successfully', sessionId: req.params.sessionId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = {
   router,
   authenticateToken
