@@ -472,6 +472,10 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
       return res.status(400).json({ error: 'Cannot update stages on a completed batch' });
     }
 
+    if (batch.status === 'completed' && batch.qcStatus === 'approved' && batch.releasedBy) {
+      return res.status(400).json({ error: 'Released batch records are locked against direct mutation. Use /correct endpoint.' });
+    }
+
     if (stageIndex < 0 || stageIndex >= batch.stages.length) {
       return res.status(400).json({ error: 'Invalid stage index' });
     }
@@ -489,7 +493,9 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
     }
     if (newStatus === 'completed' || newStatus === 'skipped' || newStatus === 'failed') {
       currentStage.completedAt = new Date();
-      currentStage.completedBy = completedBy || '';
+      currentStage.completedBy = completedBy || (req.user ? req.user.name : '');
+      currentStage.performedBy = req.user ? req.user.id : null;
+      currentStage.performedByName = req.user ? req.user.name : (completedBy || '');
     }
     if (notes !== undefined) {
       currentStage.notes = notes;
@@ -609,6 +615,47 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
   }
 });
 
+// PATCH /api/batch-productions/:id/stage/:stageIndex/verify — 4-eye stage verification
+router.patch('/:id/stage/:stageIndex/verify', authorize('manufacturing:verify'), async (req, res) => {
+  try {
+    const stageIndex = parseInt(req.params.stageIndex, 10);
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+
+    if (batch.status === 'completed' && batch.qcStatus === 'approved' && batch.releasedBy) {
+      return res.status(400).json({ error: 'Released batch records are locked against direct mutation' });
+    }
+
+    if (stageIndex < 0 || stageIndex >= batch.stages.length) {
+      return res.status(400).json({ error: 'Invalid stage index' });
+    }
+
+    const stage = batch.stages[stageIndex];
+    if (stage.status !== 'completed') {
+      return res.status(400).json({ error: 'Stage must be completed before verification' });
+    }
+
+    const userId = req.user ? req.user.id.toString() : null;
+    const performedById = stage.performedBy ? stage.performedBy.toString() : null;
+
+    if (userId && performedById && userId === performedById) {
+      return res.status(400).json({ error: 'Performer cannot verify their own stage — 4-eye verification required' });
+    }
+
+    stage.verifiedBy = req.user ? req.user.id : null;
+    stage.verifiedByName = req.user ? req.user.name : 'Verifier';
+    stage.verifiedAt = new Date();
+
+    await batch.save();
+    if (req.io) {
+      req.io.emit('mfg_stage_updated', batch);
+    }
+    res.json(batch);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/batch-productions/:id/complete — Complete batch, record QC and inward finished stock
 router.patch('/:id/complete', authorize('manufacturing:complete'), validate(schemas.batchCompleteSchema), async (req, res) => {
   try {
@@ -706,19 +753,53 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
 
     // Save QC parameters
     batch.qcStatus = qcStatus || 'approved';
+    batch.qcPassedByUser = req.user ? req.user.id : null;
+    batch.qcPassedBy = (req.user ? req.user.name : '') || qcPassedBy.trim();
     batch.jobWorkerCertificateRef = jobWorkerCertificateRef || '';
     batch.coaDocumentRef = coaDocumentRef || '';
     batch.jobWorkCharges = Number(jobWorkCharges) || 0;
     batch.qcParameters = {
       organoleptic: organoleptic || '',
       moistureContent: moistureContent !== undefined ? moistureContent : null,
+      moistureLimit: req.body.moistureLimit || '',
       ashValue: ashValue !== undefined ? ashValue : null,
+      ashValueLimit: req.body.ashValueLimit || '',
       pHValue: pHValue !== undefined ? pHValue : null,
+      pHLimit: req.body.pHLimit || '',
       disintegrationTime: disintegrationTime !== undefined ? disintegrationTime : null,
+      disintegrationLimit: req.body.disintegrationLimit || '',
       heavyMetals: heavyMetals || '',
       microbialLimit: microbialLimit || '',
-      labReportRef: labReportRef || ''
+      labReportRef: labReportRef || '',
+      testStandardRef: req.body.testStandardRef || ''
     };
+
+    // Calculate yield variance
+    const plannedQtyVal = batch.plannedQty || 1;
+    const varianceVal = Number((((valYield - plannedQtyVal) / plannedQtyVal) * 100).toFixed(2));
+
+    if (qcStatus === 'approved') {
+      const SystemSettings = require('../../models/SystemSettings');
+      const settings = await SystemSettings.findOne().lean();
+      const tolerance = settings ? (settings.yieldVarianceTolerancePercent || 5) : 5;
+
+      const varianceExceeded = Math.abs(varianceVal) > tolerance;
+
+      let qcLimitBreached = false;
+      if (moistureContent !== null && moistureContent !== undefined && req.body.moistureLimit) {
+        const match = req.body.moistureLimit.match(/NMT\s*(\d+(?:\.\d+)?)/i);
+        if (match && moistureContent > parseFloat(match[1])) qcLimitBreached = true;
+      }
+
+      if (varianceExceeded || qcLimitBreached) {
+        const hasValidDeviation = batch.deviations && batch.deviations.some(d => d.rootCause && d.correctiveAction);
+        if (!hasValidDeviation) {
+          return res.status(400).json({
+            error: `Out-of-tolerance result (Variance: ${varianceVal}%, Tolerance: ±${tolerance}%) requires a populated deviation record (root cause & corrective action) before approval.`
+          });
+        }
+      }
+    }
 
     const totalCost = batch.rawMaterialCost + (batch.overheadCost || 0) + batch.jobWorkCharges;
 
@@ -923,6 +1004,73 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       req.io.emit('challan_created', grn);
     }
     res.json({ batch, grn: { _id: grn._id, docNo: grn.docNo, status: grn.status } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/batch-productions/:id/release — Market release approval separate from QC inspection
+router.patch('/:id/release', authorize('manufacturing:release'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+
+    if (batch.status !== 'completed' || batch.qcStatus !== 'approved') {
+      return res.status(400).json({ error: 'Batch must be completed and QC approved before market release' });
+    }
+
+    batch.releasedBy = req.user ? req.user.id : null;
+    batch.releasedByName = req.user ? req.user.name : 'Authorized Quality Releaser';
+    batch.releasedAt = new Date();
+
+    await batch.save();
+
+    if (req.io) {
+      req.io.emit('mfg_batch_released', batch);
+    }
+
+    res.json(batch);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/batch-productions/:id/correct — Controlled audit correction for released batches
+router.patch('/:id/correct', authorize('manufacturing:correctReleased'), async (req, res) => {
+  try {
+    const { reason, updates } = req.body;
+    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+      return res.status(400).json({ error: 'A mandatory justification reason is required to correct a released batch' });
+    }
+
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+
+    const AuditLog = require('../../models/AuditLog');
+    await AuditLog.create({
+      action: 'CORRECT_RELEASED_BATCH',
+      resource: 'BatchProduction',
+      resourceId: batch._id,
+      userId: req.user ? req.user.id : null,
+      userName: req.user ? req.user.name : 'Admin',
+      details: {
+        batchNo: batch.batchNo,
+        reason,
+        previousState: {
+          qcNotes: batch.qcNotes,
+          notes: batch.notes
+        },
+        requestedUpdates: updates
+      }
+    });
+
+    if (updates && typeof updates === 'object') {
+      if (updates.qcNotes !== undefined) batch.qcNotes = updates.qcNotes;
+      if (updates.notes !== undefined) batch.notes = updates.notes;
+    }
+
+    await batch.save();
+    res.json({ message: 'Controlled audit correction applied successfully', batch });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

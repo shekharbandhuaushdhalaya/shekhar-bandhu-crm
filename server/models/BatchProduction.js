@@ -20,6 +20,11 @@ const stageSchema = new mongoose.Schema({
   startedAt: { type: Date, default: null },
   completedAt: { type: Date, default: null },
   completedBy: { type: String, default: '' },
+  performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  performedByName: { type: String, default: '' },
+  verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  verifiedByName: { type: String, default: '' },
+  verifiedAt: { type: Date, default: null },
   notes: { type: String, default: '' },
   targetDurationDays: { type: Number, default: 1 },   // legacy: kept for backward compat
   targetDurationHours: { type: Number, default: 8 },   // preferred: duration in hours
@@ -142,17 +147,35 @@ const batchProductionSchema = new mongoose.Schema({
   shelfLifeMonths: { type: Number, default: null },
   qcNotes: { type: String, default: '' },
   qcPassedBy: { type: String, default: '' },
+  qcPassedByUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  releasedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  releasedByName: { type: String, default: '' },
+  releasedAt: { type: Date, default: null },
   qcStatus: { type: String, enum: ['approved', 'rejected'], default: 'approved' },
   qcParameters: {
     organoleptic: { type: String, default: '' },
     moistureContent: { type: Number, default: null },
+    moistureLimit: { type: String, default: '' },
     ashValue: { type: Number, default: null },
+    ashValueLimit: { type: String, default: '' },
     pHValue: { type: Number, default: null },
+    pHLimit: { type: String, default: '' },
     disintegrationTime: { type: Number, default: null },
+    disintegrationLimit: { type: String, default: '' },
     heavyMetals: { type: String, default: '' },
     microbialLimit: { type: String, default: '' },
-    labReportRef: { type: String, default: '' }
+    labReportRef: { type: String, default: '' },
+    testStandardRef: { type: String, default: '' }
   },
+  deviations: [{
+    type: { type: String, enum: ['yield_variance', 'qc_parameter', 'process_loss', 'other'], required: true },
+    description: { type: String, required: true },
+    detectedAt: { type: Date, default: Date.now },
+    rootCause: { type: String, default: '' },
+    correctiveAction: { type: String, default: '' },
+    investigatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    status: { type: String, enum: ['open', 'investigating', 'closed'], default: 'open' }
+  }],
   rawMaterialCost: { type: Number, default: 0 },
   overheadCost: { type: Number, default: 0 },
   unitProductionCost: { type: Number, default: 0 },

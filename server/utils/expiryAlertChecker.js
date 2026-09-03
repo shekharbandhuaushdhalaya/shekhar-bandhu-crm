@@ -92,6 +92,52 @@ async function checkExpiriesAndReorders() {
         });
       }
     }
+
+    // 4. Check Manufacturing License & GMP Certificate Expiries (SystemSettings & Vendor)
+    const SystemSettings = require('../models/SystemSettings');
+    const Vendor = require('../models/Vendor');
+
+    const settings = await SystemSettings.findOne().lean();
+    if (settings) {
+      if (settings.licenseValidTill && new Date(settings.licenseValidTill) <= d90) {
+        const expDate = new Date(settings.licenseValidTill);
+        const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+        const title = `Manufacturing License Expiry Warning (${daysLeft <= 0 ? 'EXPIRED' : `${daysLeft} Days`})`;
+        const message = `In-house Manufacturing License (${settings.manufacturingLicenseNo || 'N/A'}) ${daysLeft <= 0 ? 'has EXPIRED' : `expires on ${expDate.toLocaleDateString()}`}.`;
+        const existing = await Notification.findOne({ title, createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } });
+        if (!existing) {
+          await Notification.create({ title, message, type: 'alert', link: '/settings' });
+        }
+      }
+
+      if (settings.gmpValidTill && new Date(settings.gmpValidTill) <= d90) {
+        const expDate = new Date(settings.gmpValidTill);
+        const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+        const title = `GMP Certificate Expiry Warning (${daysLeft <= 0 ? 'EXPIRED' : `${daysLeft} Days`})`;
+        const message = `GMP Certificate (${settings.gmpCertificateNo || 'N/A'}) ${daysLeft <= 0 ? 'has EXPIRED' : `expires on ${expDate.toLocaleDateString()}`}.`;
+        const existing = await Notification.findOne({ title, createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } });
+        if (!existing) {
+          await Notification.create({ title, message, type: 'alert', link: '/settings' });
+        }
+      }
+    }
+
+    const expiringVendors = await Vendor.find({
+      manufacturingLicenseExpiry: { $ne: null, $lte: d90 }
+    }).lean();
+
+    for (const v of expiringVendors) {
+      const expDate = new Date(v.manufacturingLicenseExpiry);
+      const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+      const vName = v.company || v.name || 'Vendor';
+
+      const title = `Job-Work Vendor License Expiry: ${vName}`;
+      const message = `Vendor "${vName}" manufacturing license ${daysLeft <= 0 ? 'has EXPIRED' : `expires on ${expDate.toLocaleDateString()}`}.`;
+      const existing = await Notification.findOne({ title, createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } });
+      if (!existing) {
+        await Notification.create({ title, message, type: 'alert', link: '/vendors' });
+      }
+    }
   } catch (err) {
     console.error('Error running expiry & reorder checker:', err.message);
   }

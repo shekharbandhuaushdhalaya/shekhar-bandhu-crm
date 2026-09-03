@@ -293,6 +293,7 @@ mongoose
     startOverdueTaskChecker();
     const { checkExpiriesAndReorders } = require('./utils/expiryAlertChecker');
     checkExpiriesAndReorders();
+    setInterval(() => checkExpiriesAndReorders(), 6 * 60 * 60 * 1000);
     // Run startup migrations asynchronously out of the request path
     runStartupMigrations().catch(err => {
       console.error('❌ Failed running startup migrations:', err.message);

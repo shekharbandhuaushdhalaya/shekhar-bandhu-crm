@@ -7,6 +7,15 @@ const rawMaterialSchema = new mongoose.Schema({
   category: { type: String, default: 'Herb', trim: true },
   minReorder: { type: Number, default: 0 },
   cleaningLossPercent: { type: Number, default: 0, min: 0, max: 100 }, // typical % lost during cleaning/sorting
+  // GMP Pharmacopoeial Identity
+  botanicalName: { type: String, default: '', trim: true },   // e.g. "Santalum album"
+  partUsed: { type: String, default: '', trim: true },        // e.g. "Heartwood", "Root", "Leaf"
+  pharmacopoeialStandard: {
+    type: String,
+    enum: ['API', 'AFI', 'IP', 'BP', 'USP', 'House Standard'],
+    default: 'API'
+  },
+  monographRef: { type: String, default: '', trim: true },    // e.g. "API Part I, Vol II, pg 45"
 }, { timestamps: true });
 
 rawMaterialSchema.index({ name: 1 });
