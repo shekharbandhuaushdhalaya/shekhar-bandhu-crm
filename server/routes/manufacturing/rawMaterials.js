@@ -1,6 +1,7 @@
 const express = require('express');
 const RawMaterial = require('../../models/RawMaterial');
 const RawMaterialEntry = require('../../models/RawMaterialEntry');
+const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const router = express.Router();
