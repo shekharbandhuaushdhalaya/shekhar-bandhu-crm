@@ -727,6 +727,56 @@ const consignmentSettleSchema = z.object({
   notes: z.string().optional().default(''),
 });
 
+// ── Bill-Wise Payment Allocation ─────────────────────────────
+const allocationItemSchema = z.object({
+  invoiceId: objectId,
+  amount: z.number().positive(),
+});
+
+const paymentAllocateSchema = z.object({
+  paymentId: objectId,
+  allocations: z.array(allocationItemSchema).min(1, 'At least one allocation required')
+});
+
+// ── Procurement PO & GRN ─────────────────────────────────────
+const poItemInputSchema = z.object({
+  rawMaterialId: objectId.optional().nullable(),
+  productId: objectId.optional().nullable(),
+  name: z.string().min(1),
+  qtyOrdered: z.number().positive(),
+  unitPrice: z.number().nonnegative(),
+  unit: z.string().optional().default('kg'),
+  hsnCode: z.string().optional().default(''),
+  gstRate: z.number().optional().default(0)
+});
+
+const purchaseOrderSchema = z.object({
+  vendorId: objectId,
+  vendorName: z.string().optional().default(''),
+  items: z.array(poItemInputSchema).min(1, 'At least one item required'),
+  notes: z.string().optional().default('')
+});
+
+const grnItemInputSchema = z.object({
+  rawMaterialId: objectId.optional().nullable(),
+  productId: objectId.optional().nullable(),
+  name: z.string().min(1),
+  qtyReceived: z.number().positive(),
+  qtyAccepted: z.number().nonnegative(),
+  qtyRejected: z.number().nonnegative().optional().default(0),
+  batchNo: z.string().min(1, 'Batch number is required'),
+  mfgDate: z.string().or(z.date()).optional(),
+  expiryDate: z.string().or(z.date()).optional(),
+  rejectionReason: z.string().optional().default('')
+});
+
+const grnSchema = z.object({
+  poId: objectId,
+  warehouseId: objectId,
+  items: z.array(grnItemInputSchema).min(1, 'At least one GRN item required'),
+  notes: z.string().optional().default('')
+});
+
 // ── Task ─────────────────────────────────────────────────────
 const taskSchema = z.object({
   title: z.string().min(1),
@@ -914,6 +964,9 @@ module.exports = {
   volumeTierSchema,
   consignmentDispatchSchema,
   consignmentSettleSchema,
+  paymentAllocateSchema,
+  purchaseOrderSchema,
+  grnSchema,
   taskSchema,
   campaignSchema,
   complaintSchema,

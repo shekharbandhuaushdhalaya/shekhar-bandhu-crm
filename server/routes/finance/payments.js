@@ -230,31 +230,46 @@ router.get('/ageing', authorize('payment:view'), async (req, res) => {
 });
 
 // POST /api/payments/allocate — Match payment receipt against outstanding invoices (bill-wise)
-router.post('/allocate', authorize('payment:create'), async (req, res) => {
+router.post('/allocate', authorize('payment:create'), validate(schemas.paymentAllocateSchema), async (req, res) => {
   try {
     const { paymentId, allocations } = req.body; // allocations: [{ invoiceId, amount }]
-    if (!paymentId || !allocations || !allocations.length) {
-      return res.status(400).json({ error: 'paymentId and allocations list are required' });
-    }
 
     const payment = await Payment.findById(paymentId);
     if (!payment) return res.status(404).json({ error: 'Payment receipt record not found' });
 
+    let currentUnallocated = payment.unallocatedAmount !== undefined ? payment.unallocatedAmount : payment.amount;
+
     const Invoice = require('../../models/Invoice');
     for (const alloc of allocations) {
+      const allocAmt = Number(alloc.amount);
+      if (allocAmt <= 0) continue;
+
       const inv = await Invoice.findById(alloc.invoiceId);
       if (inv) {
         inv.payments = inv.payments || [];
         inv.payments.push({
           paymentId: payment._id,
-          amountAllocated: alloc.amount,
+          amountAllocated: allocAmt,
           allocatedAt: new Date()
         });
-        inv.amountPaid = (inv.amountPaid || 0) + alloc.amount;
+        inv.amountPaid = (inv.amountPaid || 0) + allocAmt;
         inv.status = inv.amountPaid >= inv.amount ? 'paid' : 'partially_paid';
         await inv.save();
+
+        payment.allocations = payment.allocations || [];
+        payment.allocations.push({
+          invoiceId: inv._id,
+          invoiceNo: inv.invoiceNo,
+          amountAllocated: allocAmt,
+          allocatedAt: new Date()
+        });
+
+        currentUnallocated = Math.max(0, currentUnallocated - allocAmt);
       }
     }
+
+    payment.unallocatedAmount = currentUnallocated;
+    await payment.save();
 
     if (req.io) {
       req.io.emit('payment_updated', payment);

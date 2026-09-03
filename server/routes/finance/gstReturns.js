@@ -305,4 +305,138 @@ router.post('/filing-status', authorize('report:view'), async (req, res) => {
   }
 });
 
+// GET /api/gst/gstr1/export-json — Produce official NIC portal compatible GSTR-1 JSON export
+router.get('/gstr1/export-json', authorize('report:view'), async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const m = month ? parseInt(month) : new Date().getMonth() + 1;
+    const y = year ? parseInt(year) : new Date().getFullYear();
+
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 1);
+
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
+    const gstin = settings.gstin || '09AAAAA0000A1Z5';
+
+    const invoices = await Invoice.find({
+      type: 'sale',
+      isFinalized: true,
+      date: { $gte: start, $lt: end },
+    }).lean();
+
+    const b2bInvoices = invoices.filter(i => i.gstin && i.gstin.trim());
+    const fpStr = `${m.toString().padStart(2, '0')}${y}`;
+
+    // Format B2B section
+    const b2bMap = {};
+    b2bInvoices.forEach(inv => {
+      const ctin = inv.gstin.trim();
+      if (!b2bMap[ctin]) b2bMap[ctin] = { ctin, inv: [] };
+
+      const totalTax = (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0);
+      const effectiveRate = inv.baseAmount > 0 ? Number(((totalTax / inv.baseAmount) * 100).toFixed(2)) : 0;
+
+      b2bMap[ctin].inv.push({
+        inum: inv.invoiceNo,
+        idt: new Date(inv.date).toISOString().split('T')[0].split('-').reverse().join('-'),
+        val: inv.amount,
+        pos: inv.gstin.substring(0, 2),
+        rchrg: 'N',
+        inv_typ: 'R',
+        itms: [
+          {
+            num: 1,
+            itm_det: {
+              txval: inv.baseAmount || 0,
+              rt: effectiveRate,
+              camt: inv.cgst || 0,
+              samt: inv.sgst || 0,
+              iamt: inv.igst || 0,
+              csamt: 0
+            }
+          }
+        ]
+      });
+    });
+
+    const gstr1Export = {
+      gstin,
+      fp: fpStr,
+      version: 'GST3.0.4',
+      hash: 'hash',
+      b2b: Object.values(b2bMap)
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR1_${fpStr}.json`);
+    res.json(gstr1Export);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/gst/gstr3b/export-json — Produce official NIC portal compatible GSTR-3B JSON export
+router.get('/gstr3b/export-json', authorize('report:view'), async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const m = month ? parseInt(month) : new Date().getMonth() + 1;
+    const y = year ? parseInt(year) : new Date().getFullYear();
+
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 1);
+
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
+    const gstin = settings.gstin || '09AAAAA0000A1Z5';
+
+    const [sales, purchases] = await Promise.all([
+      Invoice.find({ type: 'sale', isFinalized: true, date: { $gte: start, $lt: end } }).lean(),
+      Invoice.find({ type: 'purchase', isFinalized: true, date: { $gte: start, $lt: end } }).lean()
+    ]);
+
+    const salesBase = sales.reduce((s, i) => s + (i.baseAmount || 0), 0);
+    const salesCGST = sales.reduce((s, i) => s + (i.cgst || 0), 0);
+    const salesSGST = sales.reduce((s, i) => s + (i.sgst || 0), 0);
+    const salesIGST = sales.reduce((s, i) => s + (i.igst || 0), 0);
+
+    const itcCGST = purchases.reduce((s, i) => s + (i.cgst || 0), 0);
+    const itcSGST = purchases.reduce((s, i) => s + (i.sgst || 0), 0);
+    const itcIGST = purchases.reduce((s, i) => s + (i.igst || 0), 0);
+
+    const retPeriod = `${m.toString().padStart(2, '0')}${y}`;
+
+    const gstr3bExport = {
+      gstin,
+      ret_period: retPeriod,
+      sec_sum: {
+        osup_det: {
+          txval: salesBase,
+          iamt: salesIGST,
+          camt: salesCGST,
+          samt: salesSGST,
+          csamt: 0
+        },
+        itc_elg: {
+          itc_avl: [
+            {
+              ty: 'OTH',
+              iamt: itcIGST,
+              camt: itcCGST,
+              samt: itcSGST,
+              csamt: 0
+            }
+          ]
+        }
+      }
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR3B_${retPeriod}.json`);
+    res.json(gstr3bExport);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

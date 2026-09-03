@@ -230,6 +230,8 @@ app.use('/api/social', (req, res, next) => {
   }
   return authenticateJWT(req, res, next);
 }, socialRoutes);
+const purchaseOrderRoutes = require('./routes/procurement/purchaseOrders');
+app.use('/api/purchase-orders', authenticateJWT, purchaseOrderRoutes);
 app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
 app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);
@@ -284,6 +286,10 @@ mongoose
   .connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
   .then(() => {
     console.log('🔌 Connected to MongoDB');
+    const { startOverdueTaskChecker } = require('./utils/taskOverdueChecker');
+    startOverdueTaskChecker();
+    const { checkExpiriesAndReorders } = require('./utils/expiryAlertChecker');
+    checkExpiriesAndReorders();
     // Run startup migrations asynchronously out of the request path
     runStartupMigrations().catch(err => {
       console.error('❌ Failed running startup migrations:', err.message);

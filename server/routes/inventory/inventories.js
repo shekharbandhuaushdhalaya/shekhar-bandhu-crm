@@ -388,4 +388,62 @@ router.post('/consignment/settle', authorize('inventory:edit'), validate(schemas
   }
 });
 
+// GET /api/inventories/alerts/expiry — Fetch expiring raw material & finished goods batches (30/60/90 days)
+router.get('/alerts/expiry', authorize('inventory:view'), async (req, res) => {
+  try {
+    const RawMaterialEntry = require('../../models/RawMaterialEntry');
+    const now = new Date();
+    const d90 = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+    const expiringBatches = await RawMaterialEntry.find({
+      qty: { $gt: 0 },
+      expiryDate: { $ne: null, $lte: d90 }
+    }).populate('rawMaterialId', 'name sku unit category').sort({ expiryDate: 1 }).lean();
+
+    const categorized = {
+      days30: [],
+      days60: [],
+      days90: [],
+      expired: []
+    };
+
+    expiringBatches.forEach(b => {
+      const expDate = new Date(b.expiryDate);
+      const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+      const item = { ...b, daysLeft };
+
+      if (daysLeft <= 0) categorized.expired.push(item);
+      else if (daysLeft <= 30) categorized.days30.push(item);
+      else if (daysLeft <= 60) categorized.days60.push(item);
+      else categorized.days90.push(item);
+    });
+
+    res.json(categorized);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/inventories/alerts/reorder — Fetch raw materials & finished goods below minimum reorder point
+router.get('/alerts/reorder', authorize('inventory:view'), async (req, res) => {
+  try {
+    const RawMaterial = require('../../models/RawMaterial');
+    const [rawMaterials, products] = await Promise.all([
+      RawMaterial.find({ minReorder: { $gt: 0 } }).lean(),
+      Product.find({ minReorderLevel: { $gt: 0 } }).lean()
+    ]);
+
+    const lowStockRawMaterials = rawMaterials.filter(rm => (rm.stockLevel || 0) <= rm.minReorder);
+    const lowStockProducts = products.filter(p => (p.stockLevel || 0) <= (p.minReorderLevel || 0));
+
+    res.json({
+      rawMaterials: lowStockRawMaterials,
+      products: lowStockProducts,
+      totalAlerts: lowStockRawMaterials.length + lowStockProducts.length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
