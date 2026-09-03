@@ -19,6 +19,7 @@ const billOfMaterialsSchema = new mongoose.Schema({
       qtyRequired: { type: Number, required: true }, // formulation: qty required per 100 output units (100 Liter/100 Kg/100 pieces), fixed basis, independent of batchYieldSize; packaging: pcs/unit
       itemType: { type: String, enum: ['formulation', 'packaging'], default: 'formulation' },
       stageName: { type: String, default: '', trim: true }, // which manufacturing stage consumes this (empty = consumed at batch start)
+      isPrintedMaterial: { type: Boolean, default: false },
     }
   ],
   isActive: { type: Boolean, default: true },

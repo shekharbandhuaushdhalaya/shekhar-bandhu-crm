@@ -56,7 +56,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               {/* Section I: Batch Identification */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section I: Batch Identification & Shelf Life</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section I: Batch Identification, Pre-Execution Approval & Line Clearance</Text>
                 </View>
                 <View style={{ padding: 12, gap: 8 }}>
                   {[
@@ -65,6 +65,8 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                     { label: 'Planned Run Qty:', val: `${bmrReport.plannedQty} units` },
                     { label: 'Actual Yield Output:', val: `${bmrReport.actualYieldQty} units`, valColor: colors.success },
                     { label: 'Mfg Date / Expiry Date:', val: `${fmtDate(bmrReport.mfgDate)} ➔ ${fmtDate(bmrReport.expiryDate)} (${bmrReport.shelfLifeMonths || 36} Months)` },
+                    { label: 'Pre-Execution BMR Approval:', val: bmrReport.bmrApprovedByName ? `${bmrReport.bmrApprovedByName} (${fmtDateTime(bmrReport.bmrApprovedAt)})` : 'Pending Pre-Approval' },
+                    { label: 'Line Clearance Verification:', val: bmrReport.lineClearance ? `${bmrReport.lineClearance.clearedByName} (${fmtDateTime(bmrReport.lineClearance.clearedAt)}) — Prev: ${bmrReport.lineClearance.previousBatchNo || 'None'}` : 'Pending Line Clearance' },
                     { label: 'Manufacturing Timeline:', val: `${fmtDate(bmrReport.startDate)} ➔ ${bmrReport.endDate ? fmtDate(bmrReport.endDate) : 'Ongoing'}` }
                   ].map(({ label, val, valColor }) => (
                     <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -103,52 +105,56 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                 </View>
               </View>
 
-              {/* Section III: Consumed Raw Ingredients Costing */}
-              <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section III: Consumed Raw Ingredients Details & Costing</Text>
-                </View>
-                <View style={{ padding: 8 }}>
-                  <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
-                    {['Ingredient', 'Batch No', 'Qty Consumed', 'Rate', 'Item Cost'].map((h, i) => (
-                      <Text key={h} style={{ flex: i === 0 ? 2 : 1.2, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: i > 1 ? 'right' : 'left' }}>{h}</Text>
-                    ))}
+              {/* Section III: Printed Packaging & Label Reconciliation */}
+              {bmrReport.labelReconciliation && bmrReport.labelReconciliation.length > 0 && (
+                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section III: Printed Packaging & Label Reconciliation</Text>
                   </View>
-                  {bmrReport.ingredients && bmrReport.ingredients.map((ing: any, idx: number) => (
-                    <View key={idx} style={{ flexDirection: 'row', paddingVertical: 4 }}>
-                      <Text style={{ flex: 2, fontSize: 11, color: colors.text.primary }} numberOfLines={1}>{ing.name}</Text>
-                      <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.primary }}>{ing.batchNo}</Text>
-                      <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{ing.qtyConsumed} {ing.unit}</Text>
-                      <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>₹{ing.purchaseRate}</Text>
-                      <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '600', color: colors.text.primary, textAlign: 'right' }}>₹{(ing.itemCost || 0).toFixed(2)}</Text>
+                  <View style={{ padding: 8 }}>
+                    <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
+                      {['Printed Component', 'Issued', 'Used', 'Damaged', 'Returned', 'Status'].map((h, i) => (
+                        <Text key={h} style={{ flex: i === 0 ? 2 : 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: i > 0 && i < 5 ? 'right' : 'left' }}>{h}</Text>
+                      ))}
                     </View>
-                  ))}
-                </View>
-              </View>
-
-              {/* Section IV: Detailed Process Execution Log */}
-              <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
-                <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section IV: Detailed Process Execution & Verification Log</Text>
-                </View>
-                <View style={{ padding: 8 }}>
-                  <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
-                    {[{ label: 'Process Stage', flex: 1.5 }, { label: 'Status', flex: 1 }, { label: 'Performed By', flex: 1.5 }, { label: 'Verified By (4-Eye)', flex: 1.5 }].map(({ label, flex }) => (
-                      <Text key={label} style={{ flex, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>{label}</Text>
-                    ))}
-                  </View>
-                  {bmrReport.stages && bmrReport.stages.map((st: any, idx: number) => (
-                    <View key={idx} style={{ paddingVertical: 6, borderBottomWidth: idx === bmrReport.stages.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: colors.text.primary }} numberOfLines={1}>{st.name}</Text>
-                        <Text style={{ flex: 1, fontSize: 11, color: st.status === 'completed' ? colors.success : st.status === 'skipped' ? colors.warning : colors.text.muted, fontWeight: '600' }}>{st.status.toUpperCase()}</Text>
-                        <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }}>{st.performedByName || st.completedBy || '—'}</Text>
-                        <Text style={{ flex: 1.5, fontSize: 11, color: st.verifiedByName ? colors.success : colors.text.muted, fontWeight: '600' }}>{st.verifiedByName ? `${st.verifiedByName} (${fmtDate(st.verifiedAt)})` : 'Pending Verification'}</Text>
+                    {bmrReport.labelReconciliation.map((rec: any, idx: number) => (
+                      <View key={idx} style={{ flexDirection: 'row', paddingVertical: 4 }}>
+                        <Text style={{ flex: 2, fontSize: 11, color: colors.text.primary }}>{rec.name}</Text>
+                        <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{rec.qtyIssued}</Text>
+                        <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{rec.qtyUsed}</Text>
+                        <Text style={{ flex: 1, fontSize: 11, color: colors.danger, textAlign: 'right' }}>{rec.qtyDamaged}</Text>
+                        <Text style={{ flex: 1, fontSize: 11, color: colors.success, textAlign: 'right' }}>{rec.qtyReturnedToStore}</Text>
+                        <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: rec.reconciled ? colors.success : colors.warning }}>{rec.reconciled ? 'RECONCILED' : 'DISCREPANCY'}</Text>
                       </View>
-                    </View>
-                  ))}
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
+
+              {/* Section IV: Reference / Retention Samples */}
+              {bmrReport.retentionSamples && bmrReport.retentionSamples.length > 0 && (
+                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
+                  <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Section IV: Retention (Reference) Samples Record</Text>
+                  </View>
+                  <View style={{ padding: 8 }}>
+                    <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
+                      {['Product', 'Qty Retained', 'Storage Location', 'Mandatory Retention Until', 'Status'].map((h, i) => (
+                        <Text key={h} style={{ flex: i === 0 || i === 2 ? 1.5 : 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>{h}</Text>
+                      ))}
+                    </View>
+                    {bmrReport.retentionSamples.map((rs: any, idx: number) => (
+                      <View key={idx} style={{ flexDirection: 'row', paddingVertical: 4 }}>
+                        <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }}>{rs.productName}</Text>
+                        <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary }}>{rs.qtyRetained} {rs.unit || 'units'}</Text>
+                        <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }}>{rs.storageLocation || 'QC Shelf'}</Text>
+                        <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: colors.primary }}>{fmtDate(rs.retentionUntil)}</Text>
+                        <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: rs.status === 'stored' ? colors.success : colors.text.muted }}>{rs.status.toUpperCase()}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
 
               {/* Section V: QC Specifications & Limits */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>

@@ -138,6 +138,24 @@ async function checkExpiriesAndReorders() {
         await Notification.create({ title, message, type: 'alert', link: '/vendors' });
       }
     }
+
+    // 5. Check Retention/Reference Samples Approaching Disposal Date
+    const RetentionSample = require('../models/RetentionSample');
+    const dueRetentionSamples = await RetentionSample.find({
+      status: 'stored',
+      retentionUntil: { $ne: null, $lte: d90 }
+    }).lean();
+
+    for (const rs of dueRetentionSamples) {
+      const expDate = new Date(rs.retentionUntil);
+      const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+      const title = `Retention Sample Disposal Warning: ${rs.batchNo}`;
+      const message = `Reference sample for batch ${rs.batchNo} (${rs.productName}) ${daysLeft <= 0 ? 'is DUE for disposal' : `reaches mandatory retention limit on ${expDate.toLocaleDateString()}`}.`;
+      const existing = await Notification.findOne({ title, createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } });
+      if (!existing) {
+        await Notification.create({ title, message, type: 'compliance', link: '/manufacturing' });
+      }
+    }
   } catch (err) {
     console.error('Error running expiry & reorder checker:', err.message);
   }

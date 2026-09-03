@@ -176,6 +176,21 @@ const batchProductionSchema = new mongoose.Schema({
     investigatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     status: { type: String, enum: ['open', 'investigating', 'closed'], default: 'open' }
   }],
+  bmrApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  bmrApprovedByName: { type: String, default: '' },
+  bmrApprovedAt: { type: Date, default: null },
+  labelReconciliation: [{
+    rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial', required: true },
+    name: { type: String, required: true },
+    qtyIssued: { type: Number, required: true, min: 0 },
+    qtyUsed: { type: Number, default: 0, min: 0 },
+    qtyDamaged: { type: Number, default: 0, min: 0 },
+    qtyReturnedToStore: { type: Number, default: 0, min: 0 },
+    reconciled: { type: Boolean, default: false },
+    reconciledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    reconciledAt: { type: Date, default: null },
+    discrepancyNote: { type: String, default: '' }
+  }],
   rawMaterialCost: { type: Number, default: 0 },
   overheadCost: { type: Number, default: 0 },
   unitProductionCost: { type: Number, default: 0 },

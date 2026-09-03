@@ -233,8 +233,10 @@ app.use('/api/social', (req, res, next) => {
 const purchaseOrderRoutes = require('./routes/procurement/purchaseOrders');
 const equipmentRoutes = require('./routes/manufacturing/equipment');
 const deviationRoutes = require('./routes/manufacturing/deviations');
+const retentionSampleRoutes = require('./routes/manufacturing/retentionSamples');
 app.use('/api/manufacturing/equipment', authenticateJWT, equipmentRoutes);
 app.use('/api/manufacturing/deviations', authenticateJWT, deviationRoutes);
+app.use('/api/retention-samples', authenticateJWT, retentionSampleRoutes);
 app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
 app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);

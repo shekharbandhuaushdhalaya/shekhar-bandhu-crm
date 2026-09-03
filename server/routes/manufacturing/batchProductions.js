@@ -456,6 +456,68 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
   }
 });
 
+// POST /api/batch-productions/:id/line-clearance — Record pre-batch line clearance
+router.post('/:id/line-clearance', authorize('manufacturing:edit'), async (req, res) => {
+  try {
+    const { previousBatchNo, checklist, notes } = req.body;
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+
+    if (!checklist || !checklist.equipmentCleaned || !checklist.previousMaterialsRemoved || !checklist.previousLabelsDocumentsRemoved || !checklist.areaVisuallyInspected) {
+      return res.status(400).json({ error: 'All 4 line clearance checklist items must be verified true before clearing line' });
+    }
+
+    const LineClearance = require('../../models/LineClearance');
+    let record = await LineClearance.findOne({ batchId: batch._id });
+    if (record) {
+      record.checklist = checklist;
+      record.notes = notes || '';
+      record.clearedBy = req.user ? req.user.id : null;
+      record.clearedByName = req.user ? req.user.name : 'Line Inspector';
+      record.clearedAt = new Date();
+      await record.save();
+    } else {
+      record = await LineClearance.create({
+        batchId: batch._id,
+        manufacturingUnitId: batch.manufacturingUnitId,
+        previousBatchNo: previousBatchNo || '',
+        checklist,
+        notes: notes || '',
+        clearedBy: req.user ? req.user.id : null,
+        clearedByName: req.user ? req.user.name : 'Line Inspector',
+        clearedAt: new Date()
+      });
+    }
+
+    if (req.io) {
+      req.io.emit('line_clearance_updated', record);
+    }
+    res.status(201).json(record);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PATCH /api/batch-productions/:id/approve-bmr — Pre-execution BMR recipe snapshot approval
+router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+
+    batch.bmrApprovedBy = req.user ? req.user.id : null;
+    batch.bmrApprovedByName = req.user ? req.user.name : 'Authorized Approver';
+    batch.bmrApprovedAt = new Date();
+
+    await batch.save();
+    if (req.io) {
+      req.io.emit('mfg_batch_updated', batch);
+    }
+    res.json(batch);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // PATCH /api/batch-productions/:id/stage/:stageIndex — Advance a manufacturing stage
 router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate(schemas.batchStageUpdateSchema), async (req, res) => {
   try {
@@ -478,6 +540,18 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
 
     if (stageIndex < 0 || stageIndex >= batch.stages.length) {
       return res.status(400).json({ error: 'Invalid stage index' });
+    }
+
+    // Gate Stage 1 start on Line Clearance & BMR Approval
+    if (stageIndex === 0 && (status === 'in_progress' || !status)) {
+      const LineClearance = require('../../models/LineClearance');
+      const clearance = await LineClearance.findOne({ batchId: batch._id });
+      if (!clearance) {
+        return res.status(400).json({ error: 'Line clearance required before starting production' });
+      }
+      if (!batch.bmrApprovedBy) {
+        return res.status(400).json({ error: 'BMR pre-execution approval required before starting production' });
+      }
     }
 
     const validStatuses = ['pending', 'in_progress', 'completed', 'skipped', 'failed'];
@@ -798,6 +872,30 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
             error: `Out-of-tolerance result (Variance: ${varianceVal}%, Tolerance: ±${tolerance}%) requires a populated deviation record (root cause & corrective action) before approval.`
           });
         }
+      }
+
+      // Label reconciliation check for printed BOM ingredients
+      if (batch.bomSnapshot && batch.bomSnapshot.ingredients) {
+        const printedIngs = batch.bomSnapshot.ingredients.filter(i => i.isPrintedMaterial);
+        if (printedIngs.length > 0) {
+          for (const ing of printedIngs) {
+            const rec = (batch.labelReconciliation || []).find(r => r.rawMaterialId.toString() === ing.rawMaterialId.toString());
+            if (!rec) {
+              return res.status(400).json({ error: `Label & printed packaging reconciliation required for material ID ${ing.rawMaterialId}` });
+            }
+            const validSum = Math.abs(rec.qtyIssued - (rec.qtyUsed + rec.qtyDamaged + rec.qtyReturnedToStore)) <= 0.01;
+            if (!validSum && !rec.discrepancyNote) {
+              return res.status(400).json({ error: `Discrepancy in label reconciliation for "${rec.name}": Issued ${rec.qtyIssued} vs Sum ${rec.qtyUsed + rec.qtyDamaged + rec.qtyReturnedToStore}. Provide a discrepancy note.` });
+            }
+          }
+        }
+      }
+
+      // Retention sample check
+      const RetentionSample = require('../../models/RetentionSample');
+      const sampleCount = await RetentionSample.countDocuments({ batchId: batch._id });
+      if (sampleCount === 0) {
+        return res.status(400).json({ error: 'At least one reference/retention sample record is required before batch QC approval' });
       }
     }
 
@@ -1303,6 +1401,13 @@ router.get('/:id/bmr-report', async (req, res) => {
     const yieldProdMap = {};
     yieldProducts.forEach(p => { yieldProdMap[p._id.toString()] = p; });
 
+    const LineClearance = require('../../models/LineClearance');
+    const RetentionSample = require('../../models/RetentionSample');
+    const [lineClearance, retentionSamples] = await Promise.all([
+      LineClearance.findOne({ batchId: batch._id }).lean(),
+      RetentionSample.find({ batchId: batch._id }).lean()
+    ]);
+
     res.json({
       batchNo: batch.batchNo,
       productName: productPopulated ? productPopulated.name : 'Unknown Product',
@@ -1311,6 +1416,15 @@ router.get('/:id/bmr-report', async (req, res) => {
       productSize: productPopulated ? productPopulated.size : '',
       plannedQty: batch.plannedQty,
       actualYieldQty: batch.actualYieldQty || 0,
+      mfgDate: batch.mfgDate || null,
+      expiryDate: batch.expiryDate || null,
+      shelfLifeMonths: batch.shelfLifeMonths || null,
+      bmrApprovedBy: batch.bmrApprovedBy || null,
+      bmrApprovedByName: batch.bmrApprovedByName || '',
+      bmrApprovedAt: batch.bmrApprovedAt || null,
+      releasedBy: batch.releasedBy || null,
+      releasedByName: batch.releasedByName || '',
+      releasedAt: batch.releasedAt || null,
       plannedYields: (batch.plannedYields || []).map(y => ({
         productId: y.productId ? y.productId.toString() : '',
         plannedQty: y.plannedQty,
@@ -1339,7 +1453,10 @@ router.get('/:id/bmr-report', async (req, res) => {
       unitProductionCost: batch.unitProductionCost || 0,
       stages: batch.stages || [],
       ingredients: enrichedIngredients,
-      bomSnapshot: batch.bomSnapshot || null
+      bomSnapshot: batch.bomSnapshot || null,
+      lineClearance: lineClearance || null,
+      labelReconciliation: batch.labelReconciliation || [],
+      retentionSamples: retentionSamples || []
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
