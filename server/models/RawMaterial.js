@@ -18,6 +18,9 @@ const rawMaterialSchema = new mongoose.Schema({
       'Inflammable',
       'Packaging',
       'Herb',
+      'General',
+      'Raw Material',
+      'Packaging Material',
       'Other'
     ],
     default: 'Dry Herb'
