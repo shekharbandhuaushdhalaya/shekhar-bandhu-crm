@@ -25,7 +25,16 @@ const orderSchema = new mongoose.Schema({
   trackingId: { type: String, default: '', trim: true },
   courierLink: { type: String, default: '', trim: true },
   adminNotes: { type: String, default: '', trim: true },
-  notifications: [{ type: String }]
+  notifications: [{ type: String }],
+  approvalStatus: {
+    type: String,
+    enum: ['none', 'pending_approval', 'approved', 'rejected'],
+    default: 'none'
+  },
+  approvalRequired: { type: Boolean, default: false },
+  approvedBy: { type: String, default: '' },
+  approvedAt: { type: Date, default: null },
+  rejectionReason: { type: String, default: '' }
 }, { timestamps: true });
 
 orderSchema.index({ createdAt: -1 });

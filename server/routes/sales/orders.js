@@ -270,6 +270,7 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
       });
     }
 
+    const approvalRequired = totalAmount >= 50000;
     const newOrder = await Order.create({
       name,
       email,
@@ -277,13 +278,52 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
       shippingAddress,
       items: validatedItems,
       totalAmount,
-      status: 'pending'
+      status: approvalRequired ? 'pending' : 'pending',
+      approvalRequired,
+      approvalStatus: approvalRequired ? 'pending_approval' : 'none'
     });
 
     if (req.io) {
       req.io.emit('order_updated', { type: 'created', id: newOrder._id });
     }
     res.status(201).json({ message: 'Order placed successfully', order: newOrder });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/orders/:id/approve — Manager approve a large-value order
+router.patch('/:id/approve', async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    order.approvalStatus = 'approved';
+    order.approvedBy = req.user ? req.user.name : 'Manager';
+    order.approvedAt = new Date();
+    await order.save();
+
+    if (req.io) req.io.emit('order_updated', { type: 'approved', id: order._id });
+    res.json({ message: 'Order approved successfully', order });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/orders/:id/reject — Manager reject a large-value order
+router.patch('/:id/reject', async (req, res) => {
+  try {
+    const { rejectionReason } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    order.approvalStatus = 'rejected';
+    order.rejectionReason = rejectionReason || 'Large value order rejected by manager';
+    order.status = 'cancelled';
+    await order.save();
+
+    if (req.io) req.io.emit('order_updated', { type: 'rejected', id: order._id });
+    res.json({ message: 'Order rejected', order });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

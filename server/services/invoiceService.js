@@ -52,6 +52,25 @@ function calculateInvoiceTotals(items = [], isIntraState = true) {
 }
 
 /**
+ * Calculates TDS (Section 194Q - 0.1%) or TCS (Section 206C(1H) - 0.1%) for transactions over ₹50L.
+ */
+function calculateTdsTcs(type = 'sale', baseAmount = 0, partyCumulativeAnnualTurnover = 0) {
+  let tdsAmount = 0;
+  let tcsAmount = 0;
+  const threshold = 5000000;
+
+  if (partyCumulativeAnnualTurnover > threshold) {
+    if (type === 'purchase') {
+      tdsAmount = Number((baseAmount * 0.001).toFixed(2));
+    } else if (type === 'sale') {
+      tcsAmount = Number((baseAmount * 0.001).toFixed(2));
+    }
+  }
+
+  return { tdsAmount, tcsAmount };
+}
+
+/**
  * Resolves a warehouse by ID, fallback to default or first warehouse.
  */
 async function resolveWarehouse(warehouseId) {
@@ -128,6 +147,7 @@ async function deductInventoryForInvoice(invoice) {
 
 module.exports = {
   calculateInvoiceTotals,
+  calculateTdsTcs,
   resolveWarehouse,
   deductInventoryForInvoice
 };

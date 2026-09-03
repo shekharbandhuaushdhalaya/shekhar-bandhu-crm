@@ -16,7 +16,22 @@ const equipmentSchema = new mongoose.Schema({
     enum: ['active', 'under_maintenance', 'calibration_due', 'decommissioned'],
     default: 'active'
   },
-  notes: { type: String, default: '', trim: true }
+  notes: { type: String, default: '', trim: true },
+  calibrationFrequencyDays: { type: Number, default: 180 },
+  calibrationLogs: [{
+    calibratedOn: { type: Date, default: Date.now },
+    calibratedBy: String,
+    nextDue: Date,
+    certificateNo: String,
+    notes: String
+  }],
+  maintenanceLogs: [{
+    maintainedOn: { type: Date, default: Date.now },
+    maintainedBy: String,
+    type: { type: String, enum: ['preventive', 'breakdown', 'routine'], default: 'preventive' },
+    details: String,
+    cost: Number
+  }]
 }, { timestamps: true });
 
 equipmentSchema.index({ code: 'text', name: 'text', category: 'text' });
