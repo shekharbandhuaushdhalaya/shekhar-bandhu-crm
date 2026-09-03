@@ -45,7 +45,14 @@ export default function RawMaterialModal({
           {rmError ? <Text style={styles.modalError}>{rmError}</Text> : null}
           <ScrollView style={styles.modalForm}>
             <Text style={styles.inputLabel}>Ingredient Name *</Text>
-            <TextInput style={styles.input} placeholder="e.g. Purified Guggulu" placeholderTextColor={colors.text.muted} value={rmName} onChangeText={setRmName} />
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. PURIFIED GUGGULU"
+              placeholderTextColor={colors.text.muted}
+              value={rmName}
+              onChangeText={(v) => setRmName(v.toUpperCase())}
+              autoCapitalize="characters"
+            />
 
             <Text style={styles.inputLabel}>SKU / Code {editingMaterialId ? '' : '(Auto-Generated)'}</Text>
             <TextInput style={[styles.input, { backgroundColor: colors.bg.secondary, color: colors.text.muted }]} placeholder={editingMaterialId ? 'Material SKU' : 'Auto-generated on save'} placeholderTextColor={colors.text.muted} value={rmSku} editable={false} />

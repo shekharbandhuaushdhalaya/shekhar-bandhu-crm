@@ -42,6 +42,14 @@ const rawMaterialSchema = new mongoose.Schema({
 rawMaterialSchema.index({ name: 1 });
 rawMaterialSchema.index({ category: 1 });
 
+// Pre-save hook: convert raw material name to uppercase & collapse whitespace to eliminate casing variations
+rawMaterialSchema.pre('save', function (next) {
+  if (this.name) {
+    this.name = this.name.trim().replace(/\s+/g, ' ').toUpperCase();
+  }
+  next();
+});
+
 // Compound unique index for name + unit + category (case-insensitive)
 rawMaterialSchema.index(
   { name: 1, unit: 1, category: 1 },

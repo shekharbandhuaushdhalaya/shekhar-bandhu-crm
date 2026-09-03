@@ -74,11 +74,12 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
+    const formattedName = name.trim().replace(/\s+/g, ' ').toUpperCase();
     const resolvedUnit = unit || 'kg';
     const resolvedCategory = category || 'Herb';
 
     // Application-level duplicate check (case- and whitespace-insensitive name + unit + category)
-    const duplicate = await RawMaterial.findDuplicateByName(name, {
+    const duplicate = await RawMaterial.findDuplicateByName(formattedName, {
       unit: resolvedUnit,
       category: resolvedCategory
     });
@@ -95,17 +96,18 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
     }
 
     const { generateRawMaterialSku } = require('../../utils/skuGenerator');
-    let computedSku = generateRawMaterialSku(name);
+    let computedSku = generateRawMaterialSku(formattedName);
     let skuConflict = await RawMaterial.findOne({ sku: computedSku }).lean();
     let counter = 1;
     while (skuConflict) {
-      computedSku = `${generateRawMaterialSku(name)}-${counter}`;
+      computedSku = `${generateRawMaterialSku(formattedName)}-${counter}`;
       skuConflict = await RawMaterial.findOne({ sku: computedSku }).lean();
       counter++;
     }
 
     const newRM = await RawMaterial.create({
-      name: name.trim(),
+      ...req.body,
+      name: formattedName,
       sku: computedSku,
       unit: resolvedUnit,
       minReorder: Number(minReorder) || 0,
@@ -131,8 +133,13 @@ router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, re
     const existingRM = await RawMaterial.findById(req.params.id);
     if (!existingRM) return res.status(404).json({ error: 'Raw material not found' });
 
+    let formattedName = existingRM.name;
+    if (name !== undefined) {
+      formattedName = name.trim().replace(/\s+/g, ' ').toUpperCase();
+    }
+
     if (name !== undefined || unit !== undefined || category !== undefined) {
-      const effectiveName = name !== undefined ? name.trim() : existingRM.name;
+      const effectiveName = formattedName;
       const effectiveUnit = unit !== undefined ? unit : existingRM.unit;
       const effectiveCategory = category !== undefined ? category : existingRM.category;
 
@@ -154,9 +161,9 @@ router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, re
       }
     }
 
-    const updateFields = {};
+    const updateFields = { ...req.body };
     if (name !== undefined) {
-      updateFields.name = name.trim();
+      updateFields.name = formattedName;
       const { generateRawMaterialSku } = require('../../utils/skuGenerator');
       let computedSku = generateRawMaterialSku(name);
       let skuConflict = await RawMaterial.findOne({ sku: computedSku, _id: { $ne: req.params.id } }).lean();
