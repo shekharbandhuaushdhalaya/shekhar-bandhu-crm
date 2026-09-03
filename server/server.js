@@ -256,6 +256,10 @@ const bankReconciliationRoutes = require('./routes/finance/bankReconciliations')
 const demandForecastingRoutes = require('./routes/analytics/demandForecasting');
 const dripCampaignRoutes = require('./routes/marketing/dripCampaigns');
 const reportDigestRoutes = require('./routes/analytics/reportDigests');
+const sampleConversionRoutes = require('./routes/crm/sampleConversions');
+const loyaltySchemeRoutes = require('./routes/sales/loyaltySchemes');
+const customReportRoutes = require('./routes/analytics/customReports');
+const swaggerDocRoutes = require('./routes/system/swaggerDoc');
 app.use('/api/credit-notes', authenticateJWT, creditNoteRoutes);
 app.use('/api/debit-notes', authenticateJWT, debitNoteRoutes);
 app.use('/api/recurring-invoices', authenticateJWT, recurringInvoiceRoutes);
@@ -272,6 +276,10 @@ app.use('/api/bank-reconciliations', authenticateJWT, bankReconciliationRoutes);
 app.use('/api/analytics/demand-forecasting', authenticateJWT, demandForecastingRoutes);
 app.use('/api/drip-campaigns', authenticateJWT, dripCampaignRoutes);
 app.use('/api/analytics/digests', authenticateJWT, reportDigestRoutes);
+app.use('/api/sample-conversions', authenticateJWT, sampleConversionRoutes);
+app.use('/api/loyalty-schemes', authenticateJWT, loyaltySchemeRoutes);
+app.use('/api/analytics/custom-reports', authenticateJWT, customReportRoutes);
+app.use('/api/docs', swaggerDocRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
 app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);
 
