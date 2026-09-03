@@ -1,6 +1,3 @@
-const RawMaterialEntry = require('../models/RawMaterialEntry');
-const RawMaterial = require('../models/RawMaterial');
-
 describe('Pharma Batch Expiry & Low Stock Reorder Alerts', () => {
   it('categorizes expiring batches into 30/60/90 day buckets', () => {
     const now = new Date();
@@ -27,8 +24,8 @@ describe('Pharma Batch Expiry & Low Stock Reorder Alerts', () => {
   });
 
   it('detects low stock items below minimum reorder level', () => {
-    const rm1 = new RawMaterial({ name: 'Ashwagandha', minReorder: 100, stockLevel: 40, unit: 'kg' });
-    const rm2 = new RawMaterial({ name: 'Tulsi Extract', minReorder: 50, stockLevel: 80, unit: 'kg' });
+    const rm1 = { name: 'Ashwagandha', minReorder: 100, stockLevel: 40, unit: 'kg' };
+    const rm2 = { name: 'Tulsi Extract', minReorder: 50, stockLevel: 80, unit: 'kg' };
 
     expect((rm1.stockLevel || 0) <= rm1.minReorder).toBe(true);
     expect((rm2.stockLevel || 0) <= rm2.minReorder).toBe(false);
