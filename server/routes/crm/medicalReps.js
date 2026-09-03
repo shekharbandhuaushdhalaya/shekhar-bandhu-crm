@@ -1051,4 +1051,48 @@ router.get('/analytics/leaderboard', authorize('mr:view'), async (req, res) => {
   }
 });
 
+// POST /api/medical-reps/visits/check-in — Geo-tagged check-in for MR visit
+router.post('/visits/check-in', authorize('mr:edit'), async (req, res) => {
+  try {
+    const { mrId, doctorName, latitude, longitude, photo } = req.body;
+    if (!mrId || !doctorName) return res.status(400).json({ error: 'mrId and doctorName are required' });
+
+    const visit = await MrVisit.create({
+      mrId,
+      doctorName,
+      date: new Date(),
+      latitude: latitude ? Number(latitude) : null,
+      longitude: longitude ? Number(longitude) : null,
+      checkIn: { time: new Date(), photo: photo || '' },
+      status: 'checked_in'
+    });
+
+    if (req.io) req.io.emit('medrep_updated', { type: 'check_in', id: visit._id });
+    res.status(201).json(visit);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/medical-reps/visits/:id/check-out — Geo-tagged check-out for MR visit
+router.post('/visits/:id/check-out', authorize('mr:edit'), async (req, res) => {
+  try {
+    const { photo, feedback, orderTaken, orderAmount } = req.body;
+    const visit = await MrVisit.findById(req.params.id);
+    if (!visit) return res.status(404).json({ error: 'MR Visit record not found' });
+
+    visit.checkOut = { time: new Date(), photo: photo || '' };
+    visit.status = 'checked_out';
+    if (feedback) visit.feedback = feedback;
+    if (orderTaken !== undefined) visit.orderTaken = Boolean(orderTaken);
+    if (orderAmount !== undefined) visit.orderAmount = Number(orderAmount);
+
+    await visit.save();
+    if (req.io) req.io.emit('medrep_updated', { type: 'check_out', id: visit._id });
+    res.json(visit);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
