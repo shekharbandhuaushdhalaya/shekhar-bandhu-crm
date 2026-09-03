@@ -85,7 +85,7 @@ const invoiceSchema = new mongoose.Schema({
   vehicleNo: { type: String, default: '', trim: true },
   currency: { type: String, enum: ['INR', 'USD', 'EUR', 'AED', 'GBP'], default: 'INR' },
   exchangeRate: { type: Number, default: 1.0 },
-  foreignAmount: { type: Number, default: 0 }
+  foreignAmount: { type: Number, default: 0 },
   transport: { type: String, default: '', trim: true },
   irn: { type: String, default: '', trim: true },
   type: { type: String, enum: ['sale', 'purchase'], required: true },
