@@ -3,6 +3,7 @@ import { Invoice } from './api/types';
 import { LOGO_BASE64 } from './logo';
 import { FIRM_DETAILS } from '../constants/firm';
 import { getStateStrWithCode } from './gst';
+import { printHtmlInWeb } from './webPrint';
 
 const numberToWords = (num: number): string => {
   if (num === 0) return "Zero";
@@ -423,9 +424,5 @@ export const printInvoice = (invoice: Invoice) => {
 </body>
 </html>`;
 
-  const win = window.open('', '_blank', 'width=800,height=900');
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-  }
+  printHtmlInWeb(html);
 };
