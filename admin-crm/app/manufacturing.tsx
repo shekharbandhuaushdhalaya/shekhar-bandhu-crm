@@ -49,6 +49,7 @@ import BatchProductionsTab from './manufacturing/components/BatchProductionsTab'
 import ProductionSchedulerTab from './manufacturing/components/ProductionSchedulerTab';
 import ManufacturingUnitsTab from './manufacturing/components/ManufacturingUnitsTab';
 import StockTraceModal from './manufacturing/modals/StockTraceModal';
+import ConfirmDeleteModal from './manufacturing/modals/ConfirmDeleteModal';
 
 const isIntegerQty = (unit?: string, category?: string) => {
   const u = (unit || '').toLowerCase().trim();
@@ -93,6 +94,18 @@ export default function ManufacturingScreen() {
   const [loadingCoa, setLoadingCoa] = useState(false);
 
   const [materialModalVisible, setMaterialModalVisible] = useState(false);
+  const [deleteConfirmModalVisible, setDeleteConfirmModalVisible] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState<any>(null);
+
+  const handleOpenDeleteMaterial = (rm: any) => {
+    setMaterialToDelete(rm);
+    setDeleteConfirmModalVisible(true);
+  };
+
+  const handleConfirmDeleteMaterial = async (rm: any) => {
+    await api.deleteRawMaterial(rm._id);
+    setMaterials(prev => prev.filter(m => m._id !== rm._id));
+  };
   const [pharmacopoeiaModalVisible, setPharmacopoeiaModalVisible] = useState(false);
   const [bomModalVisible, setBomModalVisible] = useState(false);
   const [productionModalVisible, setProductionModalVisible] = useState(false);
@@ -1804,6 +1817,7 @@ export default function ManufacturingScreen() {
             isDesktop={isDesktop}
             isIntegerQty={isIntegerQty}
             onEditMaterial={handleEditMaterial}
+            onDeleteMaterial={handleOpenDeleteMaterial}
             onTraceMaterial={async (rm) => {
               const rawName = rm.name ? rm.name.trim() : rm._id;
               setTraceBatchNo(rawName);
@@ -2387,6 +2401,17 @@ export default function ManufacturingScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Confirm Delete Raw Material / Ingredient Modal */}
+      <ConfirmDeleteModal
+        visible={deleteConfirmModalVisible}
+        rawMaterial={materialToDelete}
+        onClose={() => {
+          setDeleteConfirmModalVisible(false);
+          setMaterialToDelete(null);
+        }}
+        onConfirmDelete={handleConfirmDeleteMaterial}
+      />
     </View>
   );
 }

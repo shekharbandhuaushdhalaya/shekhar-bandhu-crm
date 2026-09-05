@@ -984,9 +984,13 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/raw-materials/${id}`, { method: 'PUT', body: JSON.stringify(data) });
     return res.json();
   }
-  async deleteRawMaterial(id: string): Promise<boolean> {
+  async deleteRawMaterial(id: string): Promise<{ success: boolean; message?: string }> {
     const res = await this.request(`${API_BASE}/raw-materials/${id}`, { method: 'DELETE' });
-    return res.ok;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to delete raw material');
+    }
+    return { success: true, message: data.message };
   }
 
   // --- Raw Material Entries ---

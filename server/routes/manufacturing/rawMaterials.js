@@ -242,13 +242,29 @@ router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, re
 // DELETE /api/raw-materials/:id — Delete raw material definition
 router.delete('/:id', async (req, res) => {
   try {
-    // Check if there are any stock entries
-    const entries = await RawMaterialEntry.countDocuments({ rawMaterialId: req.params.id });
-    if (entries > 0) {
-      return res.status(400).json({ error: 'Cannot delete raw material with active stock entries' });
+    const rawMaterial = await RawMaterial.findById(req.params.id);
+    if (!rawMaterial) return res.status(404).json({ error: 'Raw material not found' });
+
+    // Aggregate remaining stock quantity across all stock entries for this raw material
+    const mongoose = require('mongoose');
+    const stockAgg = await RawMaterialEntry.aggregate([
+      { $match: { rawMaterialId: new mongoose.Types.ObjectId(req.params.id) } },
+      { $group: { _id: null, totalQty: { $sum: '$qty' } } }
+    ]);
+    const currentStock = stockAgg.length > 0 ? Number((stockAgg[0].totalQty || 0).toFixed(2)) : 0;
+
+    // Safety rule: Raw material cannot be deleted if stock quantity > 0
+    if (currentStock > 0) {
+      return res.status(400).json({
+        error: `Cannot delete raw material "${rawMaterial.name}". Remaining stock quantity is ${currentStock} ${rawMaterial.unit}. Stock must be 0 before deletion.`
+      });
     }
+
+    // Clean up historical zero-qty entry records and delete the raw material master
+    await RawMaterialEntry.deleteMany({ rawMaterialId: req.params.id, qty: { $lte: 0 } });
     const deleted = await RawMaterial.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Raw material not found' });
+
     if (req.io) {
       req.io.emit('raw_material_updated', { type: 'deleted', id: req.params.id });
     }

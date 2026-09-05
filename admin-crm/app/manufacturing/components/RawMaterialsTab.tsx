@@ -18,12 +18,13 @@ interface Props {
   isIntegerQty: (unit: string, category: string) => boolean;
   onEditMaterial: (rm: any) => void;
   onTraceMaterial: (rm: any) => void;
+  onDeleteMaterial: (rm: any) => void;
 }
 
 const RawMaterialsTab = React.memo(function RawMaterialsTab({
   expiryAlerts, manufacturingUnits, mfgUnitFilter, setMfgUnitFilter,
   materialSearch, setMaterialSearch, stockFilter, setStockFilter,
-  filteredMaterials, isDesktop, isIntegerQty, onEditMaterial, onTraceMaterial
+  filteredMaterials, isDesktop, isIntegerQty, onEditMaterial, onTraceMaterial, onDeleteMaterial
 }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
@@ -159,11 +160,12 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
             <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
             <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
             <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
-            <Text style={{ width: 140, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
+            <Text style={{ width: 210, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
           </View>
           {/* Body */}
           {filteredMaterials.map((rm, idx) => {
             const lowStock = (rm.stockLevel || 0) < rm.minReorder;
+            const hasStock = (rm.stockLevel || 0) > 0;
 
             return (
               <View key={rm._id} style={{ borderBottomWidth: idx === filteredMaterials.length - 1 ? 0 : 0.5, borderBottomColor: colors.border, paddingVertical: 4 }}>
@@ -207,7 +209,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                   <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
                     {rm.minReorder} {rm.unit}
                   </Text>
-                  <View style={{ width: 140, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
+                  <View style={{ width: 210, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
                     <TouchableOpacity
                       onPress={() => onEditMaterial(rm)}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: colors.primary + '10', borderWidth: 0.5, borderColor: colors.primary + '30' }}
@@ -221,6 +223,13 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                     >
                       <Ionicons name="list-outline" size={13} color={colors.success} />
                       <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>Ledger</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => onDeleteMaterial(rm)}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: hasStock ? colors.border + '30' : colors.danger + '10', borderWidth: 0.5, borderColor: hasStock ? colors.border : colors.danger + '30' }}
+                    >
+                      <Ionicons name="trash-outline" size={13} color={hasStock ? colors.text.muted : colors.danger} />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: hasStock ? colors.text.muted : colors.danger }}>Delete</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
