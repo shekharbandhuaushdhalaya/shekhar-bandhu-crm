@@ -1458,15 +1458,12 @@ router.get('/:mrId/scorecard', authorize('mr:view'), async (req, res) => {
       : 0;
 
     // 4. Incentive Payout
-    const incentiveMonthStr = month || `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}`;
-    let incentivePayout = 0;
-    try {
-      const MrIncentive = require('../../models/MrIncentive');
-      const incRecord = await MrIncentive.findOne({ mrId, month: incentiveMonthStr }).lean();
-      if (incRecord) incentivePayout = incRecord.calculatedIncentive || incRecord.finalPayout || 0;
-    } catch (_) {
-      // MrIncentive optional model lookup fallback
-    }
+    const { calculateMrIncentive } = require('../../services/mrIncentiveService');
+    const targetMonth = startOfMonth.getMonth() + 1;
+    const targetYear = startOfMonth.getFullYear();
+    const incentiveMonthStr = month || `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+    const incCalc = await calculateMrIncentive(mrId, targetYear, targetMonth);
+    const incentivePayout = incCalc.incentivePayoutAmount;
 
     res.json({
       mrId,

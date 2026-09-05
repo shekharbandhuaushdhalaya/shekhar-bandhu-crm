@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
-import { getApiBaseUrl } from './api';
+import { getApiBaseUrl, api } from './api';
+import { authStorage } from './storage';
 
 const getSocketUrl = () => {
   const baseUrl = getApiBaseUrl();
@@ -20,6 +21,14 @@ export const getSocket = (): Socket => {
       autoConnect: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
+      auth: async (cb: (data: { token?: string }) => void) => {
+        try {
+          const token = (await authStorage.getItem('vp_crm_token')) || api.getAuthToken() || '';
+          cb({ token });
+        } catch (e) {
+          cb({});
+        }
+      }
     });
 
     socket.on('connect', () => {

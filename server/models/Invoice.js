@@ -99,6 +99,8 @@ const invoiceSchema = new mongoose.Schema({
   isFinalized: { type: Boolean, default: false },
   saleType: { type: String, enum: ['b2b', 'b2c_physical', 'b2c_website', 'doctor_sampling', 'damage'], default: 'b2b' },
   websiteOrderRef: { type: String, default: '', trim: true },
+  mrId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative' },
+  assignedMrId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative' },
   medicalRepName: { type: String, default: '', trim: true },
   doctorName: { type: String, default: '', trim: true },
   damageReason: { type: String, default: '', trim: true },

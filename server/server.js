@@ -86,19 +86,6 @@ const io = new Server(server, {
   },
 });
 
-// Attach socket.io instance to req object
-app.use((req, res, next) => {
-  req.io = io;
-  next();
-});
-
-io.on('connection', (socket) => {
-  console.log('⚡ Client connected via WebSocket:', socket.id);
-  socket.on('disconnect', () => {
-    console.log('🔌 Client disconnected:', socket.id);
-  });
-});
-
 const PORT = config.port;
 const MONGODB_URI = config.mongoUri;
 const JWT_SECRET = config.jwtSecret;
@@ -106,6 +93,34 @@ if (!JWT_SECRET) {
   console.error('❌ JWT_SECRET is not set. Please set it in .env');
   process.exit(1);
 }
+
+// Socket.io Handshake JWT Authentication Middleware
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (!token) {
+    return next(new Error('Unauthorized: No authentication token provided'));
+  }
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return next(new Error('Unauthorized: Invalid or expired token'));
+    }
+    socket.user = user;
+    next();
+  });
+});
+
+// Attach socket.io instance to req object
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+io.on('connection', (socket) => {
+  console.log('⚡ Authenticated client connected via WebSocket:', socket.id, `(User: ${socket.user?.name || socket.user?.id})`);
+  socket.on('disconnect', () => {
+    console.log('🔌 Client disconnected:', socket.id);
+  });
+});
 
 function authenticateJWT(req, res, next) {
   const authHeader = req.headers['authorization'];
