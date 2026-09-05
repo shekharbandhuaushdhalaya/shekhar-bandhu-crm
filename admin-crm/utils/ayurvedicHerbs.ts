@@ -494,6 +494,20 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     partUsed: 'Leaf (Patra)',
     category: 'Dry Herb',
     monographRef: 'API Part I, Vol IV, Page 119'
+  },
+  {
+    commonNames: ['KALMEGH', 'KALMEGHA', 'BHUNIMBA', 'ANDROGRAPHIS', 'KING OF BITTERS', 'GREEN CHIRETTA'],
+    botanicalName: 'Andrographis paniculata (Burm.f.) Nees',
+    partUsed: 'Whole Plant (Panchang)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 61'
+  },
+  {
+    commonNames: ['VAJRAVALLI', 'ASTHISAMHARAKA', 'HADJOD', 'HAD JORA', 'BONE SETTER', 'CISSUS QUADRANGULARIS'],
+    botanicalName: 'Cissus quadrangularis L.',
+    partUsed: 'Stem (Kanda)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 21'
   }
 ];
 

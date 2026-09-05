@@ -2264,6 +2264,112 @@ const PHARMACOPOEIA_SEED_DATA = [
     ],
     "dosage": "2 - 3 g leaf powder per day",
     "description": "Dried leaves of Abies webbiana, key ingredient in Talisadi Churna for bronchodilative and respiratory support."
+  },
+  {
+    "ayurvedicName": "VATSANABHA",
+    "botanicalName": "Aconitum ferox Wall. ex Ser.",
+    "family": "Ranunculaceae",
+    "partUsed": "Purified Root (Shodhita Root)",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 123 (Schedule E1 Item)",
+    "synonyms": [
+      "Monkshood",
+      "Indian Aconite",
+      "Amrita",
+      "Visha",
+      "Meetha Zahar"
+    ],
+    "therapeuticUses": [
+      "Jwarahara",
+      "Vatashoolahara",
+      "Sannipatajwarahara",
+      "Yogavahi"
+    ],
+    "rasa": [
+      "Madhura"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Madhura",
+    "guna": [
+      "Laghu",
+      "Ruksha",
+      "Tikshna",
+      "Vyavayi",
+      "Vikasi"
+    ],
+    "dosage": "15 - 30 mg Shodhita root powder per day under strict supervision",
+    "description": "Schedule E1 toxic root of Aconitum ferox, requires mandatory Gomutra/Godugdha Shodhana prior to formulation."
+  },
+  {
+    "ayurvedicName": "KALMEGH",
+    "botanicalName": "Andrographis paniculata (Burm.f.) Nees",
+    "family": "Acanthaceae",
+    "partUsed": "Whole Plant / Leaf",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 61",
+    "synonyms": [
+      "Andrographis",
+      "Bhunimba",
+      "King of Bitters",
+      "Green Chiretta",
+      "Kalmegha",
+      "Yavatikta",
+      "Kirata-bhed"
+    ],
+    "therapeuticUses": [
+      "Yakrid-rakshaka (Hepatoprotective)",
+      "Jwarahara",
+      "Krimighna",
+      "Kaphapitta-hara",
+      "Raktashodhaka"
+    ],
+    "rasa": [
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "1 - 3 g powder or 5 - 10 ml juice per day",
+    "description": "Whole plant of Andrographis paniculata, premier Ayurvedic bitter hepatoprotective (Bhunimba), anti-pyretic and immuno-stimulant herb."
+  },
+  {
+    "ayurvedicName": "VAJRAVALLI",
+    "botanicalName": "Cissus quadrangularis L.",
+    "family": "Vitaceae",
+    "partUsed": "Stem",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 21",
+    "synonyms": [
+      "Asthisamharaka",
+      "Hadjod",
+      "Had Jora",
+      "Vajravalli",
+      "Bone Setter",
+      "Asthisrnkhala",
+      "Asthisamhara"
+    ],
+    "therapeuticUses": [
+      "Asthi-sandhanakara (Bone Fracture Healing)",
+      "Vranaropana",
+      "Vatashamana",
+      "Deepana",
+      "Pachana"
+    ],
+    "rasa": [
+      "Madhura",
+      "Katu"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Madhura",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "3 - 6 g stem powder or 10 - 20 ml fresh juice per day",
+    "description": "Dried jointed quadrangular stem of Cissus quadrangularis, premier Ayurvedic bone-healer (Asthisamharaka / Vajravalli), fracture healer and tissue rejuvenator."
   }
 ];
 

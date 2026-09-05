@@ -209,6 +209,15 @@ const HERB_DATABASE = [
     pharmacopoeialStandard: 'API',
     category: 'Dry Herb',
     synonyms: ['Sandalwood', 'Shrikhanda']
+  },
+  {
+    names: ['vajravalli', 'asthisamharaka', 'hadjod', 'had jora', 'cissus quadrangularis', 'bone setter'],
+    matchedName: 'Vajravalli',
+    scientificName: 'Cissus quadrangularis',
+    partUsed: 'Stem',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Asthisamharaka', 'Hadjod', 'Bone Setter', 'Asthisrnkhala']
   }
 ];
 
