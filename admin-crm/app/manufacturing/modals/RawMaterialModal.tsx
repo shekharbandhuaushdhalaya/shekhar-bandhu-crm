@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Pressable, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
 import { lookupAyurvedicHerb, AYURVEDIC_HERB_DICTIONARY, HerbDictionaryEntry } from '../../../utils/ayurvedicHerbs';
+import { api } from '../../../utils/api';
 
 interface Props {
   visible: boolean;
@@ -51,6 +52,7 @@ export default function RawMaterialModal({
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const [autoFilledBadge, setAutoFilledBadge] = useState<string | null>(null);
+  const [dbSuggestions, setDbSuggestions] = useState<any[]>([]);
 
   const PLANT_PARTS = [
     { key: 'Root (Mool)', label: '🪵 Root' },
@@ -92,8 +94,34 @@ export default function RawMaterialModal({
   const isExcipient = rmCategory === 'Excipient';
   const isHerb = !isPackaging && rmCategory !== 'General';
 
-  const applyHerbData = (entry: HerbDictionaryEntry, nameToSet?: string) => {
-    if (nameToSet) setRmName(nameToSet.toUpperCase());
+  // Live query to backend database for matching pharmacopoeia monographs
+  useEffect(() => {
+    if (!rmName || rmName.length < 2 || isPackaging) {
+      setDbSuggestions([]);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const results = await api.getPharmacopoeia(rmName);
+        if (active) {
+          setDbSuggestions(results || []);
+        }
+      } catch (err) {
+        // Silently ignore network search errors
+      }
+    }, 200);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [rmName, isPackaging]);
+
+  const applyHerbData = (entry: { commonNames?: string[]; ayurvedicName?: string; botanicalName: string; partUsed?: string; category?: string; monographRef?: string; isScheduleE1?: boolean }, nameToSet?: string) => {
+    const finalName = nameToSet || entry.ayurvedicName || (entry.commonNames ? entry.commonNames[0] : '');
+    if (finalName) setRmName(finalName.toUpperCase());
     setRmBotanicalName(entry.botanicalName);
     if (entry.partUsed) setRmPartUsed(entry.partUsed);
     if (entry.category) setRmCategory(entry.category);
@@ -107,6 +135,13 @@ export default function RawMaterialModal({
     setRmCategory(preset.category);
     setRmUnit(preset.unit);
     setRmPharmacopoeialStandard(preset.std);
+  };
+
+  const applyCustomHerbPreset = () => {
+    if (!rmCategory || rmCategory === 'Packaging') setRmCategory('Dry Herb');
+    if (!rmUnit) setRmUnit('kg');
+    if (!rmPharmacopoeialStandard) setRmPharmacopoeialStandard('API');
+    setAutoFilledBadge(rmName);
   };
 
   const handleNameChange = (text: string) => {
@@ -135,14 +170,44 @@ export default function RawMaterialModal({
     }
   };
 
-  // Live Herb Search Suggestions
+  // Live Herb Search Suggestions — Combines static dictionary + live backend pharmacopoeia search results
   const suggestions = useMemo(() => {
     if (!rmName || rmName.length < 2 || isPackaging) return [];
     const search = rmName.toUpperCase();
-    return AYURVEDIC_HERB_DICTIONARY.filter(h =>
+
+    // 1. Static Dictionary
+    const staticMatches = AYURVEDIC_HERB_DICTIONARY.filter(h =>
       h.commonNames.some(cn => cn.includes(search))
-    ).slice(0, 6);
-  }, [rmName, isPackaging]);
+    ).map(h => ({
+      name: h.commonNames[0],
+      botanicalName: h.botanicalName,
+      partUsed: h.partUsed,
+      category: h.category,
+      monographRef: h.monographRef,
+      isScheduleE1: h.isScheduleE1
+    }));
+
+    // 2. Database Pharmacopoeia Matches
+    const dbMatches = dbSuggestions.map(d => ({
+      name: d.ayurvedicName,
+      botanicalName: d.botanicalName,
+      partUsed: d.partUsed,
+      category: d.pharmacopoeialStandard === 'AFI' ? 'Metallic/Mineral' : 'Dry Herb',
+      monographRef: d.monographRef,
+      isScheduleE1: d.isScheduleE1
+    }));
+
+    // Merge and deduplicate by botanicalName
+    const seen = new Set<string>();
+    const merged: any[] = [];
+    for (const item of [...staticMatches, ...dbMatches]) {
+      if (!seen.has(item.botanicalName.toLowerCase())) {
+        seen.add(item.botanicalName.toLowerCase());
+        merged.push(item);
+      }
+    }
+    return merged.slice(0, 6);
+  }, [rmName, isPackaging, dbSuggestions]);
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -250,33 +315,49 @@ export default function RawMaterialModal({
                 </View>
               )}
 
-              {/* Herb Suggestions chips */}
-              {suggestions.length > 0 && (
+              {/* Live & Static Herb Suggestions chips */}
+              {suggestions.length > 0 ? (
                 <View style={{ marginBottom: 10 }}>
                   <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, marginBottom: 4 }}>
-                    Suggested Ayurvedic Herbs:
+                    Suggested Ayurvedic Herbs (Auto-matched from Library):
                   </Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                     {suggestions.map((herb, idx) => {
-                      const primaryName = herb.commonNames[0];
+                      const displayName = herb.name;
                       return (
                         <TouchableOpacity
                           key={idx}
-                          onPress={() => applyHerbData(herb, primaryName)}
+                          onPress={() => applyHerbData(herb, displayName)}
                           style={{
                             paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
                             backgroundColor: colors.primary + '15', borderWidth: 0.5, borderColor: colors.primary + '40'
                           }}
                         >
                           <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.primary }}>
-                            🌿 {primaryName} <Text style={{ fontStyle: 'italic', fontWeight: '400', color: colors.text.secondary }}>({herb.botanicalName})</Text>
+                            🌿 {displayName} <Text style={{ fontStyle: 'italic', fontWeight: '400', color: colors.text.secondary }}>({herb.botanicalName})</Text>
                           </Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
                 </View>
-              )}
+              ) : (rmName.length >= 2 && !isPackaging ? (
+                <View style={{ marginBottom: 10 }}>
+                  <TouchableOpacity
+                    onPress={applyCustomHerbPreset}
+                    style={{
+                      paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6,
+                      backgroundColor: colors.success + '15', borderWidth: 1, borderColor: colors.success + '50',
+                      flexDirection: 'row', alignItems: 'center', gap: 6
+                    }}
+                  >
+                    <Ionicons name="sparkles-outline" size={14} color={colors.success} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>
+                      New Ingredient: Quick-Setup "{rmName.toUpperCase()}" as Ayurvedic Herb
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null)}
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
                 <Text style={styles.inputLabel}>
