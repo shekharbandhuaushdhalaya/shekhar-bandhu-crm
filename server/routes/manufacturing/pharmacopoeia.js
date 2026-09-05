@@ -3,19 +3,28 @@ const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
 const { PHARMACOPOEIA_SEED_DATA } = require('../../utils/pharmacopoeiaSeedData');
 const router = express.Router();
 
-// Helper to seed defaults if collection is empty
-async function seedPharmacopoeiaIfEmpty() {
-  const count = await PharmacopoeiaEntry.countDocuments();
-  if (count === 0) {
-    await PharmacopoeiaEntry.insertMany(PHARMACOPOEIA_SEED_DATA);
-    console.log(`✅ Seeded ${PHARMACOPOEIA_SEED_DATA.length} Pharmacopoeia monographs into MongoDB`);
+// Helper to sync/upsert seed defaults into MongoDB
+async function syncPharmacopoeiaSeedData() {
+  try {
+    const ops = PHARMACOPOEIA_SEED_DATA.map(item => ({
+      updateOne: {
+        filter: { ayurvedicName: item.ayurvedicName },
+        update: { $set: item },
+        upsert: true
+      }
+    }));
+    if (ops.length > 0) {
+      await PharmacopoeiaEntry.bulkWrite(ops);
+    }
+  } catch (err) {
+    console.error('Error syncing pharmacopoeia seed data:', err.message);
   }
 }
 
 // GET /api/pharmacopoeia — List / Search pharmacopoeia monographs
 router.get('/', async (req, res) => {
   try {
-    await seedPharmacopoeiaIfEmpty();
+    await syncPharmacopoeiaSeedData();
 
     const { search, q, standard } = req.query;
     const queryTerm = (search || q || '').trim();
@@ -43,7 +52,7 @@ router.get('/', async (req, res) => {
 // GET /api/pharmacopoeia/search — Instant search by herb name or alias
 router.get('/search', async (req, res) => {
   try {
-    await seedPharmacopoeiaIfEmpty();
+    await syncPharmacopoeiaSeedData();
     const queryTerm = (req.query.q || req.query.query || '').trim();
     if (!queryTerm) return res.status(400).json({ error: 'Search query parameter q is required' });
 
@@ -85,7 +94,7 @@ router.post('/import-to-raw-materials', async (req, res) => {
       if (!entry) return res.status(404).json({ error: 'Monograph entry not found' });
       itemsToImport.push(entry);
     } else if (importAll) {
-      await seedPharmacopoeiaIfEmpty();
+      await syncPharmacopoeiaSeedData();
       itemsToImport = await PharmacopoeiaEntry.find({}).lean();
     } else {
       return res.status(400).json({ error: 'Specify monographId or importAll: true' });
