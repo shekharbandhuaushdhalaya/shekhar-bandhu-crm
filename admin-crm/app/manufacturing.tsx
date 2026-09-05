@@ -271,7 +271,7 @@ export default function ManufacturingScreen() {
     if (selectedBatchRun && qcModalVisible) {
       const planned = (selectedBatchRun as any).plannedYields;
       const actualYieldQty = selectedBatchRun.actualYieldQty || 0;
-      const existingYields = selectedBatchRun.yields || [];
+      const existingYields = (selectedBatchRun as any).yields || [];
       
       if (planned && planned.length > 0) {
         const mapped = planned.map((y: any) => {
@@ -303,7 +303,10 @@ export default function ManufacturingScreen() {
         setQcYieldQty(String(sum || actualYieldQty || ''));
       } else {
         const val = actualYieldQty > 0 ? String(actualYieldQty) : '';
-        setQcYields([{ productId: selectedBatchRun.productId || '', actualYieldQty: val, packing: '1' }]);
+        const mainPId = typeof selectedBatchRun.productId === 'object'
+          ? (selectedBatchRun.productId as any)?._id || ''
+          : (selectedBatchRun.productId || '');
+        setQcYields([{ productId: mainPId, actualYieldQty: val, packing: '1' }]);
         setQcEnableSplit(false);
         setQcYieldQty(val);
       }
