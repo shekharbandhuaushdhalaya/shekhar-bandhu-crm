@@ -644,6 +644,9 @@ const mrVisitSchema = z.object({
   date: z.string().or(z.date()).optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  doctorSignature: z.string().optional().default(''),
+  sampleAckOtp: z.string().optional().default(''),
+  sampleOtpVerified: z.boolean().optional().default(false),
   sampleDetails: z.array(z.object({
     productId: objectId.optional(),
     name: z.string().optional(),

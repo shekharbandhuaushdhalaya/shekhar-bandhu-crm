@@ -85,6 +85,11 @@ function getDefaultPermissionsForRole(role) {
         'mr:attendance', 'mr:visits', 'mr:expenses',
         'stockmovement:view',
       ];
+    case 'mr':
+      return [
+        'mr:view', 'mr:attendance', 'mr:visits', 'mr:expenses',
+        'contact:view', 'customer:view', 'product:view'
+      ];
     default:
       return [];
   }

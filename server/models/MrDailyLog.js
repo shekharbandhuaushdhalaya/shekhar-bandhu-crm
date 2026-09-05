@@ -23,6 +23,13 @@ const mrDailyLogSchema = new mongoose.Schema({
   gpsDistance:     { type: Number, default: 0 },   // GPS straight-line (Haversine) in km
   status:          { type: String, enum: ['checked_in', 'checked_out'], default: 'checked_in' },
   notes:           { type: String, default: '' },
+  locationHistory: [{
+    latitude: { type: Number, required: true },
+    longitude: { type: Number, required: true },
+    timestamp: { type: Date, default: Date.now },
+    speed: { type: Number, default: 0 },
+    accuracy: { type: Number, default: 0 }
+  }]
 }, { timestamps: true });
 
 mrDailyLogSchema.index({ mrId: 1, date: 1 }, { unique: true });

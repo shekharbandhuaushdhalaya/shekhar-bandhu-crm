@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const MedicalRepresentative = require('../../models/MedicalRepresentative');
 const MrDailyLog = require('../../models/MrDailyLog');
 const MrVisit = require('../../models/MrVisit');
@@ -15,6 +16,26 @@ const { getHaversineDistanceInMeters, compileMRDailyCallReport, calculateMRLeade
 const { safeEscapeRegex, sendWhatsAppNotification } = require('../../utils/whatsappService');
 
 const router = express.Router();
+
+// Helper: Enforces MR Self-Scoping (MR users can only access their own field data)
+async function verifyMrAccess(req, targetMrId) {
+  if (!req.user || !targetMrId) return true;
+  const role = (req.user.role || '').toLowerCase();
+
+  // Admins, managers, and owners have organization-wide access
+  if (role === 'admin' || role === 'manager' || role === 'owner') {
+    return true;
+  }
+
+  // Scoped MR check
+  if (req.user.email) {
+    const mr = await MedicalRepresentative.findOne({ email: req.user.email.toLowerCase() }).lean();
+    if (mr && mr._id.toString() !== targetMrId.toString()) {
+      return false;
+    }
+  }
+  return true;
+}
 
 // ─── MR Master CRUD ───
 
@@ -268,6 +289,62 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
           doctorVerified = true;
           data.doctorVerified = true;
           data.doctorVerifiedAt = new Date();
+        }
+      }
+    }
+
+    // Doctor Monthly Sample Quota Validation
+    if (data.sampleDetails && data.sampleDetails.length > 0) {
+      const requestedQty = data.sampleDetails.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
+      if (requestedQty > 0) {
+        let doctorObj = null;
+        if (data.doctorId) {
+          doctorObj = data.doctorRefModel === 'Customer'
+            ? await Customer.findById(data.doctorId)
+            : await Contact.findById(data.doctorId);
+        }
+        if (!doctorObj && data.doctorName) {
+          const escaped = safeEscapeRegex(data.doctorName.trim());
+          doctorObj = await Contact.findOne({ name: { $regex: new RegExp(escaped, 'i') } }) ||
+                      await Customer.findOne({ name: { $regex: new RegExp(escaped, 'i') } });
+        }
+
+        let monthlyQuota = doctorObj && doctorObj.monthlySampleQuota ? doctorObj.monthlySampleQuota : null;
+        if (!monthlyQuota) {
+          const category = (doctorObj ? doctorObj.category || '' : '').toUpperCase();
+          if (category === 'A') monthlyQuota = 10;
+          else if (category === 'B') monthlyQuota = 5;
+          else if (category === 'C') monthlyQuota = 2;
+          else monthlyQuota = 5;
+        }
+
+        const visitDate = new Date(data.date || Date.now());
+        const startOfMonth = new Date(visitDate.getFullYear(), visitDate.getMonth(), 1);
+        const endOfMonth = new Date(visitDate.getFullYear(), visitDate.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        const filterDoc = {};
+        if (doctorObj) {
+          filterDoc.$or = [{ doctorId: doctorObj._id }, { doctorName: data.doctorName }];
+        } else {
+          filterDoc.doctorName = data.doctorName;
+        }
+        filterDoc.date = { $gte: startOfMonth, $lte: endOfMonth };
+
+        const monthVisits = await MrVisit.find(filterDoc).lean();
+        let alreadyGivenQty = 0;
+        for (const mv of monthVisits) {
+          if (mv.sampleDetails && mv.sampleDetails.length > 0) {
+            alreadyGivenQty += mv.sampleDetails.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
+          }
+        }
+
+        if (alreadyGivenQty + requestedQty > monthlyQuota) {
+          return res.status(400).json({
+            error: `Sample monthly quota exceeded for doctor "${data.doctorName}". Monthly limit: ${monthlyQuota} units, Already issued this month: ${alreadyGivenQty} units, Requested: ${requestedQty} units.`,
+            monthlyQuota,
+            alreadyGivenQty,
+            requestedQty
+          });
         }
       }
     }
@@ -692,12 +769,45 @@ router.get('/doctors/events', authorize('mr:view'), async (req, res) => {
 
 // ─── MR Sample Bag Inventory ───
 
+// ─── MR Sample Bag Inventory ───
+
+const sampleOtpStore = new Map();
+
 router.get('/:mrId/sample-bag', authorize('mr:view'), async (req, res) => {
   try {
+    if (!(await verifyMrAccess(req, req.params.mrId))) {
+      return res.status(403).json({ error: 'Access denied: You can only view your own sample bag.' });
+    }
+
     const items = await MrSampleBag.find({ mrId: req.params.mrId })
       .populate('productId', 'name sku unit category')
       .lean();
-    res.json(items);
+
+    const now = Date.now();
+    const enriched = items.map(item => {
+      let daysToExpiry = null;
+      let isNearExpiry = false;
+      let isExpired = false;
+
+      if (item.expiryDate) {
+        const diffMs = new Date(item.expiryDate).getTime() - now;
+        daysToExpiry = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        if (daysToExpiry <= 0) {
+          isExpired = true;
+        } else if (daysToExpiry <= 30) {
+          isNearExpiry = true;
+        }
+      }
+
+      return {
+        ...item,
+        daysToExpiry,
+        isNearExpiry,
+        isExpired
+      };
+    });
+
+    res.json(enriched);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -705,15 +815,25 @@ router.get('/:mrId/sample-bag', authorize('mr:view'), async (req, res) => {
 
 router.post('/:mrId/sample-bag/issue', authorize('mr:edit'), validate(schemas.mrSampleIssueSchema), async (req, res) => {
   try {
-    const { productId, batchNo = '', qty } = req.body;
+    const { productId, batchNo = '', qty, expiryDate } = req.body;
     const mrId = req.params.mrId;
-    const currentUserId = req.user ? req.user.id : null;
+    const currentUserId = (req.user && req.user.id && mongoose.Types.ObjectId.isValid(req.user.id)) ? req.user.id : null;
+
+    let finalExpiryDate = expiryDate ? new Date(expiryDate) : null;
+    if (!finalExpiryDate && batchNo) {
+      const InventoryEntry = require('../../models/InventoryEntry');
+      const invEntry = await InventoryEntry.findOne({ productId, batchNo }).lean();
+      if (invEntry && invEntry.expiryDate) {
+        finalExpiryDate = invEntry.expiryDate;
+      }
+    }
 
     let sampleBagItem = await MrSampleBag.findOne({ mrId, productId, batchNo });
     if (sampleBagItem) {
       sampleBagItem.qty += Number(qty);
       sampleBagItem.allocatedBy = currentUserId;
       sampleBagItem.allocatedAt = new Date();
+      if (finalExpiryDate) sampleBagItem.expiryDate = finalExpiryDate;
       await sampleBagItem.save();
     } else {
       sampleBagItem = await MrSampleBag.create({
@@ -721,6 +841,7 @@ router.post('/:mrId/sample-bag/issue', authorize('mr:edit'), validate(schemas.mr
         productId,
         batchNo,
         qty: Number(qty),
+        expiryDate: finalExpiryDate,
         allocatedBy: currentUserId
       });
     }
@@ -738,6 +859,53 @@ router.post('/:mrId/sample-bag/issue', authorize('mr:edit'), validate(schemas.mr
     res.status(201).json(sampleBagItem);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// ─── Doctor Sample OTP Acknowledgment ───
+
+router.post('/sample-otp/send', authorize('mr:visits'), async (req, res) => {
+  try {
+    const { doctorId, doctorPhone, doctorName } = req.body;
+    if (!doctorId && !doctorPhone && !doctorName) {
+      return res.status(400).json({ error: 'doctorId, doctorPhone, or doctorName is required' });
+    }
+
+    const otpKey = doctorId || doctorPhone || doctorName;
+    const otp = '1234'; // Standard mock OTP for field verification
+    sampleOtpStore.set(otpKey.toString().toLowerCase(), { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
+
+    res.json({
+      success: true,
+      message: `Sample verification OTP sent to doctor. (Mock OTP: ${otp})`,
+      otpKey,
+      otp
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/sample-otp/verify', authorize('mr:visits'), async (req, res) => {
+  try {
+    const { otpKey, otp } = req.body;
+    if (!otpKey || !otp) {
+      return res.status(400).json({ error: 'otpKey and otp are required' });
+    }
+
+    const record = sampleOtpStore.get(otpKey.toString().toLowerCase());
+    if (!record || record.expiresAt < Date.now()) {
+      return res.status(400).json({ verified: false, error: 'OTP expired or not requested' });
+    }
+
+    if (record.otp !== otp.toString().trim()) {
+      return res.status(400).json({ verified: false, error: 'Invalid OTP entered' });
+    }
+
+    sampleOtpStore.delete(otpKey.toString().toLowerCase());
+    res.json({ verified: true, message: 'Doctor sample acknowledgment OTP verified successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -1307,6 +1475,173 @@ router.get('/:mrId/scorecard', authorize('mr:view'), async (req, res) => {
       totalSamplesGiven,
       convertedCount,
       incentivePayout
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Doctor Portfolio Mapping, Area Turns & GPS Footprints ───
+
+// POST /api/medical-reps/assign-doctors — Bulk assign doctors to MR & area turn schedule
+router.post('/assign-doctors', authorize('mr:edit'), async (req, res) => {
+  try {
+    const { mrId, contactIds = [], customerIds = [], areaName, preferredVisitDay } = req.body;
+    if (!mrId) return res.status(400).json({ error: 'mrId is required' });
+
+    const updateObj = {};
+    if (mrId) updateObj.assignedMrId = mrId;
+    if (areaName !== undefined) updateObj.areaName = areaName.trim();
+    if (preferredVisitDay !== undefined) updateObj.preferredVisitDay = preferredVisitDay;
+
+    let updatedContacts = 0, updatedCustomers = 0;
+    if (contactIds.length > 0) {
+      const res1 = await Contact.updateMany({ _id: { $in: contactIds } }, { $set: updateObj });
+      updatedContacts = res1.modifiedCount || 0;
+    }
+    if (customerIds.length > 0) {
+      const res2 = await Customer.updateMany({ _id: { $in: customerIds } }, { $set: updateObj });
+      updatedCustomers = res2.modifiedCount || 0;
+    }
+
+    res.json({
+      message: 'Doctors successfully assigned to MR and area turn schedule',
+      mrId,
+      updatedContacts,
+      updatedCustomers,
+      totalAssigned: updatedContacts + updatedCustomers
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/medical-reps/:mrId/assigned-doctors — MR's assigned doctor portfolio & area turn call sheet (MR Scoped)
+router.get('/:mrId/assigned-doctors', authorize('mr:view'), async (req, res) => {
+  try {
+    if (!(await verifyMrAccess(req, req.params.mrId))) {
+      return res.status(403).json({ error: 'Access denied: You can only view your own assigned doctors list.' });
+    }
+
+    const { dayOfWeek, areaName } = req.query;
+    const filter = { assignedMrId: req.params.mrId };
+    if (dayOfWeek) filter.preferredVisitDay = dayOfWeek;
+    if (areaName) filter.areaName = { $regex: areaName.trim(), $options: 'i' };
+
+    const [contacts, customers] = await Promise.all([
+      Contact.find(filter).lean(),
+      Customer.find(filter).lean()
+    ]);
+
+    const doctors = [
+      ...contacts.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', phone: c.phone, areaName: c.areaName, preferredVisitDay: c.preferredVisitDay, category: c.category, latitude: c.latitude, longitude: c.longitude, type: 'Contact' })),
+      ...customers.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', phone: c.phone, areaName: c.areaName, preferredVisitDay: c.preferredVisitDay, category: c.category, latitude: c.latitude, longitude: c.longitude, type: 'Customer' }))
+    ];
+
+    res.json(doctors);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/medical-reps/:mrId/location-ping — Background GPS location breadcrumbs ping (MR Scoped)
+router.post('/:mrId/location-ping', authorize('mr:attendance'), async (req, res) => {
+  try {
+    if (!(await verifyMrAccess(req, req.params.mrId))) {
+      return res.status(403).json({ error: 'Access denied: You can only record location pings for yourself.' });
+    }
+
+    const { latitude, longitude, speed = 0, accuracy = 0 } = req.body;
+    if (!latitude || !longitude) {
+      return res.status(400).json({ error: 'latitude and longitude are required' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let log = await MrDailyLog.findOne({ mrId: req.params.mrId, date: today });
+    if (!log) {
+      log = await MrDailyLog.create({
+        mrId: req.params.mrId,
+        date: today,
+        status: 'checked_in',
+        checkIn: { time: new Date(), latitude, longitude }
+      });
+    }
+
+    log.locationHistory = log.locationHistory || [];
+    log.locationHistory.push({ latitude, longitude, speed, accuracy, timestamp: new Date() });
+
+    if (log.locationHistory.length >= 2) {
+      let totalGpsDistMeters = 0;
+      for (let i = 1; i < log.locationHistory.length; i++) {
+        const p1 = log.locationHistory[i - 1];
+        const p2 = log.locationHistory[i];
+        const dMeters = getHaversineDistanceInMeters(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
+        if (dMeters) totalGpsDistMeters += dMeters;
+      }
+      log.gpsDistance = Math.round((totalGpsDistMeters / 1000) * 100) / 100;
+    }
+
+    await log.save();
+    res.json({ success: true, totalPings: log.locationHistory.length, gpsDistance: log.gpsDistance });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/medical-reps/:mrId/footprint-trail — Full GPS route map, check-ins & verified clinic pins (MR Scoped)
+router.get('/:mrId/footprint-trail', authorize('mr:view'), async (req, res) => {
+  try {
+    if (!(await verifyMrAccess(req, req.params.mrId))) {
+      return res.status(403).json({ error: 'Access denied: You can only view your own footprint trail.' });
+    }
+
+    const { date } = req.query;
+    const targetDate = date ? new Date(date) : new Date();
+    const startOfDay = new Date(targetDate); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate); endOfDay.setHours(23, 59, 59, 999);
+
+    const mr = await MedicalRepresentative.findById(req.params.mrId).lean();
+    if (!mr) return res.status(404).json({ error: 'MR not found' });
+
+    const log = await MrDailyLog.findOne({ mrId: req.params.mrId, date: { $gte: startOfDay, $lte: endOfDay } }).lean();
+    const visits = await MrVisit.find({ mrId: req.params.mrId, date: { $gte: startOfDay, $lte: endOfDay } }).lean();
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayOfWeekStr = dayNames[targetDate.getDay()];
+
+    const [plannedContacts, plannedCustomers] = await Promise.all([
+      Contact.find({ assignedMrId: req.params.mrId, preferredVisitDay: dayOfWeekStr }).lean(),
+      Customer.find({ assignedMrId: req.params.mrId, preferredVisitDay: dayOfWeekStr }).lean()
+    ]);
+
+    const totalPlanned = plannedContacts.length + plannedCustomers.length;
+    const verifiedVisits = visits.filter(v => v.doctorVerified);
+
+    res.json({
+      mrId: mr._id,
+      mrName: mr.name,
+      date: startOfDay,
+      dayOfWeek: dayOfWeekStr,
+      status: log ? log.status : 'not_checked_in',
+      checkIn: log ? log.checkIn : null,
+      checkOut: log ? log.checkOut : null,
+      totalDistance: log ? (log.totalDistance || log.gpsDistance || 0) : 0,
+      breadcrumbs: log ? (log.locationHistory || []) : [],
+      plannedDoctorsCount: totalPlanned,
+      actualVisitsCount: visits.length,
+      verifiedVisitsCount: verifiedVisits.length,
+      visitedClinics: visits.map(v => ({
+        visitId: v._id,
+        doctorName: v.doctorName,
+        clinicName: v.clinicName || '',
+        latitude: v.latitude,
+        longitude: v.longitude,
+        doctorVerified: !!v.doctorVerified,
+        doctorVerifiedAt: v.doctorVerifiedAt || null,
+        date: v.date
+      }))
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
