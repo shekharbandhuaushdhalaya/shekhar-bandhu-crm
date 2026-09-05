@@ -755,6 +755,41 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     category: 'Schedule E1',
     isScheduleE1: true,
     monographRef: 'API Part I, Vol II, Page 73'
+  },
+  {
+    commonNames: ['LATAKARANJA', 'LATAKARANJ', 'KARANJU', 'FEVER NUT', 'BONDUC NUT', 'CAESALPINIA BONDUC'],
+    botanicalName: 'Caesalpinia bonduc (L.) Roxb.',
+    partUsed: 'Seed Kernel (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 71'
+  },
+  {
+    commonNames: ['JIVANTI', 'JEEVANTI', 'LEPTADENIA', 'JEEVANI'],
+    botanicalName: 'Leptadenia reticulata (Retz.) Wight & Arn.',
+    partUsed: 'Root (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 43'
+  },
+  {
+    commonNames: ['PASHANABHEDA', 'PAHANBHED', 'BERGENIA', 'ROCK FOIL', 'SAXIFRAGA'],
+    botanicalName: 'Bergenia ligulata (Wall.) Engl.',
+    partUsed: 'Rhizome (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 89'
+  },
+  {
+    commonNames: ['KAMPILLAKA', 'KABILA', 'MALLOTUS', 'ROHINI', 'KAMALA POWDER'],
+    botanicalName: 'Mallotus philippensis (Lam.) Müll.Arg.',
+    partUsed: 'Fruit Powder (Phala)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 53'
+  },
+  {
+    commonNames: ['MADANAPHALA', 'MAINPHAL', 'RANDIA', 'EMETIC NUT'],
+    botanicalName: 'Randia dumetorum Lam.',
+    partUsed: 'Fruit (Phala)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 89'
   }
 ];
 

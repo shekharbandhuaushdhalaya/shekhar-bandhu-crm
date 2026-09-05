@@ -3513,6 +3513,172 @@ const PHARMACOPOEIA_SEED_DATA = [
     ],
     "dosage": "15 - 30 mg Shodhita tuber under medical Supervision",
     "description": "Schedule E1 toxic tuber of Gloriosa superba, source of colchicine, purified prior to specialized anti-inflammatory use."
+  },
+  {
+    "ayurvedicName": "LATAKARANJA",
+    "botanicalName": "Caesalpinia bonduc (L.) Roxb.",
+    "family": "Fabaceae / Caesalpiniaceae",
+    "partUsed": "Seed Kernel",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 71",
+    "synonyms": [
+      "Latakaranj",
+      "Karanju",
+      "Fever Nut",
+      "Bonduc Nut",
+      "Kuberakshi"
+    ],
+    "therapeuticUses": [
+      "Jwarahara (Anti-pyretic)",
+      "Krimighna",
+      "Deepana",
+      "Shoolahara",
+      "Pramehahara"
+    ],
+    "rasa": [
+      "Tikta",
+      "Kashaya"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "1 - 3 g seed kernel powder per day",
+    "description": "Dried seed kernels of Caesalpinia bonduc, master Ayurvedic bitter antipyretic for malarial & intermittent fevers."
+  },
+  {
+    "ayurvedicName": "JIVANTI",
+    "botanicalName": "Leptadenia reticulata (Retz.) Wight & Arn.",
+    "family": "Apocynaceae / Asclepiadaceae",
+    "partUsed": "Root / Stem",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 43",
+    "synonyms": [
+      "Jeevanti",
+      "Leptadenia",
+      "Jeevani",
+      "Shaka-shreshta"
+    ],
+    "therapeuticUses": [
+      "Rasayana",
+      "Chakshushya (Eye Tonic)",
+      "Stanyajanana",
+      "Balya",
+      "Tridoshashamaka"
+    ],
+    "rasa": [
+      "Madhura"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Madhura",
+    "guna": [
+      "Laghu",
+      "Snigdha"
+    ],
+    "dosage": "3 - 6 g root powder per day",
+    "description": "Roots of Leptadenia reticulata, celebrated Jeevaneeya Rasayana for eye health, nourishment, and galactagogue action."
+  },
+  {
+    "ayurvedicName": "PASHANABHEDA",
+    "botanicalName": "Bergenia ligulata (Wall.) Engl.",
+    "family": "Saxifragaceae",
+    "partUsed": "Rhizome",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 89",
+    "synonyms": [
+      "Pahanbhed",
+      "Bergenia",
+      "Rock Foil",
+      "Saxifraga",
+      "Ashmaribheda"
+    ],
+    "therapeuticUses": [
+      "Ashmarihara (Renal Lithontriptic)",
+      "Mutrakrichrahara",
+      "Grahi",
+      "Hridya"
+    ],
+    "rasa": [
+      "Kashaya",
+      "Tikta"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Snigdha"
+    ],
+    "dosage": "3 - 6 g rhizome powder per day",
+    "description": "Rhizomes of Bergenia ligulata, master Ayurvedic rock-breaking herb for disintegrating kidney stones."
+  },
+  {
+    "ayurvedicName": "KAMPILLAKA",
+    "botanicalName": "Mallotus philippensis (Lam.) Müll.Arg.",
+    "family": "Euphorbiaceae",
+    "partUsed": "Fruit Glandular Powder (Kapila)",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 53",
+    "synonyms": [
+      "Kabila",
+      "Mallotus",
+      "Rohini",
+      "Kamala Powder",
+      "Rechanaka"
+    ],
+    "therapeuticUses": [
+      "Krimighna (Anthelmintic)",
+      "Rechana",
+      "Kushthaghna",
+      "Vranaropana"
+    ],
+    "rasa": [
+      "Katu"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha",
+      "Tikshna"
+    ],
+    "dosage": "1 - 3 g fruit powder per day",
+    "description": "Red glandular hair powder from fruits of Mallotus philippensis, classic anthelmintic for intestinal tapeworms."
+  },
+  {
+    "ayurvedicName": "MADANAPHALA",
+    "botanicalName": "Randia dumetorum Lam. (Catunaregam spinosa (Jacq.) Tirveng.)",
+    "family": "Rubiaceae",
+    "partUsed": "Fruit",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 89",
+    "synonyms": [
+      "Mainphal",
+      "Emetic Nut",
+      "Randia",
+      "Vamana-shreshta"
+    ],
+    "therapeuticUses": [
+      "Vamana-dravya (Master Emetic)",
+      "Shothahara",
+      "Krimighna",
+      "Kushthaghna"
+    ],
+    "rasa": [
+      "Kashaya",
+      "Tikta",
+      "Madhura",
+      "Katu"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "3 - 6 g fruit pulp for therapeutic Vamana Panchakarma",
+    "description": "Fruit pulp of Randia dumetorum, premier therapeutic emetic herb (Vamana Dravya) in classic Panchakarma."
   }
 ];
 

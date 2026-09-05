@@ -733,6 +733,113 @@ const HERB_DATABASE = [
       "Langali",
       "Agnishikha"
     ]
+  },
+  {
+    "names": [
+      "latakaranja",
+      "latakaranj",
+      "karanju",
+      "fever nut",
+      "bonduc nut",
+      "kuberakshi",
+      "caesalpinia"
+    ],
+    "matchedName": "LATAKARANJA",
+    "scientificName": "Caesalpinia bonduc",
+    "partUsed": "Seed Kernel",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Latakaranj",
+      "Karanju",
+      "Fever Nut",
+      "Bonduc Nut",
+      "Kuberakshi"
+    ]
+  },
+  {
+    "names": [
+      "jivanti",
+      "jeevanti",
+      "leptadenia",
+      "jeevani",
+      "shaka-shreshta"
+    ],
+    "matchedName": "JIVANTI",
+    "scientificName": "Leptadenia reticulata",
+    "partUsed": "Root / Stem",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Jeevanti",
+      "Leptadenia",
+      "Jeevani",
+      "Shaka-shreshta"
+    ]
+  },
+  {
+    "names": [
+      "pashanabheda",
+      "pahanbhed",
+      "bergenia",
+      "rock foil",
+      "saxifraga",
+      "ashmaribheda"
+    ],
+    "matchedName": "PASHANABHEDA",
+    "scientificName": "Bergenia ligulata",
+    "partUsed": "Rhizome",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Pahanbhed",
+      "Bergenia",
+      "Rock Foil",
+      "Saxifraga",
+      "Ashmaribheda"
+    ]
+  },
+  {
+    "names": [
+      "kampillaka",
+      "kabila",
+      "mallotus",
+      "rohini",
+      "kamala powder",
+      "rechanaka"
+    ],
+    "matchedName": "KAMPILLAKA",
+    "scientificName": "Mallotus philippensis",
+    "partUsed": "Fruit Glandular Powder (Kapila)",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Kabila",
+      "Mallotus",
+      "Rohini",
+      "Kamala Powder",
+      "Rechanaka"
+    ]
+  },
+  {
+    "names": [
+      "madanaphala",
+      "mainphal",
+      "emetic nut",
+      "randia",
+      "vamana-shreshta"
+    ],
+    "matchedName": "MADANAPHALA",
+    "scientificName": "Randia dumetorum Lam.",
+    "partUsed": "Fruit",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Mainphal",
+      "Emetic Nut",
+      "Randia",
+      "Vamana-shreshta"
+    ]
   }
 ];
 
