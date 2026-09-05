@@ -3,7 +3,9 @@ const mongoose = require('mongoose');
 const customerSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   company: { type: String, default: '', trim: true },
-  email: { type: String, default: '', trim: true, lowercase: true },
+  email: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
+  passwordHash: { type: String, default: null },
+  portalEnabled: { type: Boolean, default: false },
   phone: { type: String, default: '' },
   regularBalance: { type: Number, default: 0 },
   cashBalance: { type: Number, default: 0 },

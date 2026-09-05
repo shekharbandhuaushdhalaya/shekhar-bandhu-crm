@@ -274,6 +274,50 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
 
     const visit = await MrVisit.create(data);
 
+    // Check & update Permanent Journey Plan (PJP) adherence if plan exists for MR + date
+    try {
+      const PermanentJourneyPlan = require('../../models/PermanentJourneyPlan');
+      const visitDate = new Date(data.date || Date.now());
+      const startOfDay = new Date(visitDate); startOfDay.setHours(0,0,0,0);
+      const endOfDay = new Date(visitDate); endOfDay.setHours(23,59,59,999);
+
+      const pjp = await PermanentJourneyPlan.findOne({
+        mrId: req.params.mrId,
+        plannedDate: { $gte: startOfDay, $lte: endOfDay }
+      });
+
+      if (pjp && pjp.targetDoctors && pjp.targetDoctors.length > 0) {
+        let matched = false;
+        const vDoctorName = (data.doctorName || '').trim().toLowerCase();
+        const vDoctorId = data.doctorId ? data.doctorId.toString() : null;
+
+        for (const target of pjp.targetDoctors) {
+          const tName = (target.doctorName || '').trim().toLowerCase();
+          const tId = target.doctorId ? target.doctorId.toString() : null;
+
+          if ((vDoctorId && tId === vDoctorId) || (vDoctorName && tName === vDoctorName)) {
+            target.visited = true;
+            target.visitedAt = new Date();
+            matched = true;
+          }
+        }
+
+        if (matched) {
+          const visitedCount = pjp.targetDoctors.filter(t => t.visited).length;
+          const totalPlanned = pjp.targetDoctors.length;
+          pjp.adherencePercentage = Math.round((visitedCount / totalPlanned) * 100 * 10) / 10;
+          if (pjp.adherencePercentage >= 100) {
+            pjp.status = 'completed';
+          } else if (pjp.adherencePercentage > 0) {
+            pjp.status = 'partially_completed';
+          }
+          await pjp.save();
+        }
+      }
+    } catch (_) {
+      // Non-blocking PJP update catch
+    }
+
     if (data.sampleDetails && data.sampleDetails.length > 0) {
       const StockMovement = require('../../models/StockMovement');
       const Product = require('../../models/Product');
@@ -1120,6 +1164,150 @@ router.get('/analytics/territory-heatmap', authorize('mr:view'), async (req, res
     })).sort((a, b) => b.totalVisits - a.totalVisits);
 
     res.json(heatmapData);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Permanent Journey Plan (PJP) & Performance Scorecard ───
+
+// POST /api/medical-reps/:mrId/journey-plans — Create a PJP for a date
+router.post('/:mrId/journey-plans', authorize('mr:visits'), async (req, res) => {
+  try {
+    const PermanentJourneyPlan = require('../../models/PermanentJourneyPlan');
+    const { plannedDate, targetDoctors } = req.body;
+    const mrId = req.params.mrId;
+
+    if (!plannedDate || !Array.isArray(targetDoctors)) {
+      return res.status(400).json({ error: 'plannedDate and targetDoctors array are required' });
+    }
+
+    const d = new Date(plannedDate);
+    const startOfDay = new Date(d); startOfDay.setHours(0,0,0,0);
+    const endOfDay = new Date(d); endOfDay.setHours(23,59,59,999);
+
+    let pjp = await PermanentJourneyPlan.findOne({ mrId, plannedDate: { $gte: startOfDay, $lte: endOfDay } });
+    if (pjp) {
+      pjp.targetDoctors = targetDoctors;
+      await pjp.save();
+    } else {
+      pjp = await PermanentJourneyPlan.create({
+        mrId,
+        plannedDate: d,
+        targetDoctors,
+        status: 'planned',
+        createdBy: req.user ? (req.user.name || 'Admin') : 'Admin'
+      });
+    }
+
+    res.status(201).json(pjp);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/medical-reps/:mrId/journey-plans?date=YYYY-MM-DD — Fetch PJP for a day
+router.get('/:mrId/journey-plans', authorize('mr:view'), async (req, res) => {
+  try {
+    const PermanentJourneyPlan = require('../../models/PermanentJourneyPlan');
+    const { date } = req.query;
+    const mrId = req.params.mrId;
+
+    const filter = { mrId };
+    if (date) {
+      const d = new Date(date);
+      const startOfDay = new Date(d); startOfDay.setHours(0,0,0,0);
+      const endOfDay = new Date(d); endOfDay.setHours(23,59,59,999);
+      filter.plannedDate = { $gte: startOfDay, $lte: endOfDay };
+    }
+
+    const pjps = await PermanentJourneyPlan.find(filter).sort({ plannedDate: -1 }).lean();
+    res.json(date ? (pjps[0] || null) : pjps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/medical-reps/:mrId/scorecard?month=YYYY-MM — MR Performance Scorecard
+router.get('/:mrId/scorecard', authorize('mr:view'), async (req, res) => {
+  try {
+    const PermanentJourneyPlan = require('../../models/PermanentJourneyPlan');
+    const SampleConversion = require('../../models/SampleConversion');
+
+    const { month } = req.query; // YYYY-MM
+    const mrId = req.params.mrId;
+
+    let startOfMonth, endOfMonth;
+    if (month && month.includes('-')) {
+      const [yr, mo] = month.split('-').map(Number);
+      startOfMonth = new Date(yr, mo - 1, 1, 0, 0, 0, 0);
+      endOfMonth = new Date(yr, mo, 0, 23, 59, 59, 999);
+    } else {
+      const now = new Date();
+      startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    }
+
+    // 1. PJP Planned Visits & Adherence
+    const pjps = await PermanentJourneyPlan.find({
+      mrId,
+      plannedDate: { $gte: startOfMonth, $lte: endOfMonth }
+    }).lean();
+
+    let totalPlannedVisits = 0;
+    let totalMatchedVisits = 0;
+    pjps.forEach(p => {
+      if (p.targetDoctors) {
+        totalPlannedVisits += p.targetDoctors.length;
+        totalMatchedVisits += p.targetDoctors.filter(t => t.visited).length;
+      }
+    });
+
+    // 2. Actual Visits Logged
+    const actualVisitsCount = await MrVisit.countDocuments({
+      mrId,
+      date: { $gte: startOfMonth, $lte: endOfMonth }
+    });
+
+    const adherencePercentage = totalPlannedVisits > 0
+      ? Math.round((totalMatchedVisits / totalPlannedVisits) * 100 * 10) / 10
+      : 0;
+
+    // 3. Sample-to-Conversion Ratio
+    const conversions = await SampleConversion.find({
+      mrId,
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth }
+    }).lean();
+
+    const totalSamplesGiven = conversions.reduce((sum, c) => sum + (c.samplesQtyGiven || 1), 0);
+    const convertedCount = conversions.filter(c => c.conversionStatus === 'converted').length;
+    const sampleToConversionRatio = totalSamplesGiven > 0
+      ? Math.round((convertedCount / totalSamplesGiven) * 100 * 10) / 10
+      : 0;
+
+    // 4. Incentive Payout
+    const incentiveMonthStr = month || `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}`;
+    let incentivePayout = 0;
+    try {
+      const MrIncentive = require('../../models/MrIncentive');
+      const incRecord = await MrIncentive.findOne({ mrId, month: incentiveMonthStr }).lean();
+      if (incRecord) incentivePayout = incRecord.calculatedIncentive || incRecord.finalPayout || 0;
+    } catch (_) {
+      // MrIncentive optional model lookup fallback
+    }
+
+    res.json({
+      mrId,
+      month: incentiveMonthStr,
+      totalPlannedVisits,
+      actualVisits: actualVisitsCount,
+      matchedPjpVisits: totalMatchedVisits,
+      adherencePercentage,
+      sampleToConversionRatio,
+      totalSamplesGiven,
+      convertedCount,
+      incentivePayout
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

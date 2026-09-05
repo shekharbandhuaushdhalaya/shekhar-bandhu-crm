@@ -347,6 +347,9 @@ router.get('/manufacturing', async (req, res) => {
   } catch (err) {
     console.error('Mfg Analytics Error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/analytics/receivables-ageing — Ageing analysis for B2B customer sales invoices
 router.get('/receivables-ageing', authorize('report:view'), async (req, res) => {
   try {
@@ -428,6 +431,157 @@ router.get('/receivables-ageing', authorize('report:view'), async (req, res) => 
     res.json({
       summary: brackets,
       customers: Object.values(customerMap).sort((a, b) => b.totalOutstanding - a.totalOutstanding)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/ai-insights — Proactive anomaly signals and Gemini AI executive summary
+router.get('/ai-insights', authorize('analytics:query'), async (req, res) => {
+  try {
+    const Invoice = require('../../models/Invoice');
+    const Product = require('../../models/Product');
+    const BatchProduction = require('../../models/BatchProduction');
+    const Order = require('../../models/Order');
+    const SystemSettings = require('../../models/SystemSettings');
+
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+    // 1. MoM Revenue Change
+    const currentInvoices = await Invoice.find({ type: 'sale', isFinalized: true, date: { $gte: currentMonthStart } }).lean();
+    const lastInvoices = await Invoice.find({ type: 'sale', isFinalized: true, date: { $gte: lastMonthStart, $lte: lastMonthEnd } }).lean();
+
+    const currentRevenue = currentInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
+    const lastRevenue = lastInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
+    const momRevenueChangePct = lastRevenue > 0
+      ? Math.round(((currentRevenue - lastRevenue) / lastRevenue) * 100 * 10) / 10
+      : 0;
+
+    // 2. Low Stock Products (stockLevel <= minReorderLevel)
+    const lowStockProducts = await Product.find({
+      $expr: { $lte: ['$stockLevel', { $ifNull: ['$minReorderLevel', 10] }] }
+    }).select('name sku stockLevel minReorderLevel').lean();
+    const lowStockCount = lowStockProducts.length;
+
+    // 3. Batches with yield >15% below trailing-90-day average yield
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const recentBatches = await BatchProduction.find({ status: 'completed', createdAt: { $gte: ninetyDaysAgo } }).lean();
+
+    const productYields = {};
+    recentBatches.forEach(b => {
+      if (!b.productId) return;
+      const pKey = b.productId.toString();
+      const actual = b.actualYieldQty || b.actualYield || 0;
+      const expected = b.plannedQty || b.expectedYield || 1;
+
+      if (!productYields[pKey]) productYields[pKey] = { totalActual: 0, totalExpected: 0, batches: [] };
+      productYields[pKey].totalActual += actual;
+      productYields[pKey].totalExpected += expected;
+      productYields[pKey].batches.push({
+        batchNo: b.batchNo,
+        productName: b.productName || 'Batch Product',
+        actual,
+        expected
+      });
+    });
+
+    const lowYieldBatches = [];
+    Object.keys(productYields).forEach(pKey => {
+      const group = productYields[pKey];
+      const avgYieldPct = group.totalExpected > 0 ? (group.totalActual / group.totalExpected) * 100 : 0;
+      group.batches.forEach(b => {
+        const bYieldPct = b.expected > 0 ? ((b.actual / b.expected) * 100) : 0;
+        if (avgYieldPct > 0 && (avgYieldPct - bYieldPct) > 15) {
+          lowYieldBatches.push({
+            batchNo: b.batchNo,
+            productName: b.productName,
+            actualYield: b.actual,
+            expectedYield: b.expected,
+            batchYieldPct: Math.round(bYieldPct * 10) / 10,
+            avgYieldPct: Math.round(avgYieldPct * 10) / 10,
+            dropPct: Math.round((avgYieldPct - bYieldPct) * 10) / 10
+          });
+        }
+      });
+    });
+
+    // 4. Customers with order frequency down >50% vs trailing 3-month average
+    const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const pastOrders = await Order.find({ createdAt: { $gte: threeMonthsAgo } }).lean();
+
+    const custOrdersMonthMap = {};
+    pastOrders.forEach(o => {
+      const key = (o.email || o.phone || o.name || '').trim().toLowerCase();
+      if (!key) return;
+      if (!custOrdersMonthMap[key]) custOrdersMonthMap[key] = { name: o.name || key, currentMonth: 0, pastTotal: 0 };
+      const oDate = new Date(o.createdAt);
+      if (oDate >= currentMonthStart) {
+        custOrdersMonthMap[key].currentMonth++;
+      } else {
+        custOrdersMonthMap[key].pastTotal++;
+      }
+    });
+
+    const droppedCustomers = [];
+    Object.values(custOrdersMonthMap).forEach(c => {
+      const avgMonthlyPast = c.pastTotal / 2;
+      if (avgMonthlyPast >= 1.5 && c.currentMonth < (avgMonthlyPast * 0.5)) {
+        const dropPct = Math.round(((avgMonthlyPast - c.currentMonth) / avgMonthlyPast) * 100);
+        droppedCustomers.push({
+          customerName: c.name,
+          avgMonthlyPast: Math.round(avgMonthlyPast * 10) / 10,
+          currentMonthCount: c.currentMonth,
+          dropPct
+        });
+      }
+    });
+
+    let narrative = `Revenue is ${momRevenueChangePct >= 0 ? '+' : ''}${momRevenueChangePct}% MoM. ${lowStockCount} products are below min reorder levels. ${lowYieldBatches.length} production batches showed a yield drop >15% below product 90-day averages, and ${droppedCustomers.length} customers had an order drop >50%.`;
+
+    const sys = await SystemSettings.findOne({ key: 'company_config' }).lean();
+    const apiKey = (sys && sys.geminiApiKey && sys.geminiApiKey.trim()) ? sys.geminiApiKey.trim() : process.env.GEMINI_API_KEY;
+
+    if (apiKey) {
+      try {
+        const genAIClient = new GoogleGenerativeAI(apiKey);
+        const model = genAIClient.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const prompt = `You are an AI Operations & Financial Analyst for Shekhar Bandhu Aushadhalaya (Ayurvedic Pharma/CRM).
+Summarize the following pre-computed operational signals into 2-4 clear, professional narrative sentences:
+
+Signals:
+- Month-over-Month Revenue Change: ${momRevenueChangePct}% (Current Month: ₹${currentRevenue}, Prior Month: ₹${lastRevenue})
+- Products Below Min Stock Reorder Level: ${lowStockCount} items
+- Manufacturing Batches with Yield Drop >15% below 90-day avg: ${lowYieldBatches.length} batches (${lowYieldBatches.map(b => b.batchNo).join(', ') || 'None'})
+- Customers with >50% Order Frequency Drop: ${droppedCustomers.length} accounts (${droppedCustomers.map(c => c.customerName).join(', ') || 'None'})
+
+Write ONLY 2-4 sentences summarizing key risks and executive insights. Do not include bullet points or headers.`;
+
+        const result = await model.generateContent(prompt);
+        if (result && result.response) {
+          narrative = result.response.text().trim();
+        }
+      } catch (err) {
+        // Fallback narrative remains intact
+      }
+    }
+
+    res.json({
+      signals: {
+        momRevenueChangePct,
+        currentMonthRevenue: currentRevenue,
+        lastMonthRevenue: lastRevenue,
+        lowStockProductsCount: lowStockCount,
+        lowStockProducts: lowStockProducts.map(p => ({ name: p.name, stock: p.stockLevel, minReorder: p.minReorderLevel || 10 })),
+        lowYieldBatchesCount: lowYieldBatches.length,
+        lowYieldBatches,
+        customerDropCount: droppedCustomers.length,
+        droppedCustomers
+      },
+      narrative
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

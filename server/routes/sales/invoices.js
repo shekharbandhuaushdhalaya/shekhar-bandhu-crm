@@ -543,6 +543,22 @@ router.patch('/sales/:id/finalize', authorize('invoice:markPaid'), async (req, r
       await deductInventoryForInvoice(invoice);
     }
 
+    // Automatic TCS Section 206C(1H) calculation upon finalization
+    const { calculateTCS } = require('../../utils/tdsTcsCalculator');
+    const custId = invoice.customerId || (cust ? cust._id : null) || invoice.customerName;
+    const tcsResult = await calculateTCS({
+      customerId: custId,
+      invoiceAmount: invoice.amount,
+      invoiceDate: invoice.date || new Date()
+    });
+
+    if (tcsResult.applicable && tcsResult.amount > 0) {
+      invoice.tcsApplicable = true;
+      invoice.tcsRate = 0.1;
+      invoice.tcsAmount = tcsResult.amount;
+      invoice.amount = (invoice.amount || 0) + tcsResult.amount;
+    }
+
     if (invoice.status === 'draft' || invoice.status === 'Cancelled' || !invoice.status) {
       invoice.status = 'unpaid';
     }

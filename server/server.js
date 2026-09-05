@@ -243,6 +243,8 @@ app.use('/api/retention-samples', authenticateJWT, retentionSampleRoutes);
 app.use('/api/stability-studies', authenticateJWT, stabilityStudyRoutes);
 app.use('/api/manufacturing/quality-audits', authenticateJWT, qualityAuditRoutes);
 app.use('/api/pharmacopoeia', authenticateJWT, pharmacopoeiaRoutes);
+const batchTraceRoutes = require('./routes/manufacturing/batchTrace');
+app.use('/api/manufacturing/batch-trace', authenticateJWT, batchTraceRoutes);
 const debitNoteRoutes = require('./routes/finance/debitNotes');
 const recurringInvoiceRoutes = require('./routes/sales/recurringInvoices');
 const recallRoutes = require('./routes/manufacturing/recalls');
@@ -291,7 +293,14 @@ app.use('/api/eway-bills', authenticateJWT, ewayBillRoutes);
 app.use('/api/tally', authenticateJWT, tallySyncRoutes);
 app.use('/api/docs', swaggerDocRoutes);
 app.use('/api/gst', authenticateJWT, gstReturnRoutes);
+const tdsTcsRoutes = require('./routes/finance/tdsTcs');
+app.use('/api/finance', authenticateJWT, tdsTcsRoutes);
 app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);
+
+const portalAuthRoutes = require('./routes/public/portalAuth');
+const portalRoutes = require('./routes/portal/portal');
+app.use('/api/portal/auth', portalAuthRoutes);
+app.use('/api/portal', portalRoutes);
 
 // Global error handler (must be after all routes)
 app.use((err, req, res, next) => {
@@ -356,6 +365,13 @@ mongoose
     const { checkExpiriesAndReorders } = require('./utils/expiryAlertChecker');
     checkExpiriesAndReorders();
     setInterval(() => checkExpiriesAndReorders(), 6 * 60 * 60 * 1000);
+
+    const cron = require('node-cron');
+    const { sendDailyDigest } = require('./utils/digestScheduler');
+    const digestSendHour = process.env.DIGEST_SEND_HOUR || 8;
+    cron.schedule(`0 ${digestSendHour} * * *`, () => {
+      sendDailyDigest().catch(err => console.error('❌ Daily Executive Digest Cron Error:', err.message));
+    });
     // Run startup migrations asynchronously out of the request path
     runStartupMigrations().catch(err => {
       console.error('❌ Failed running startup migrations:', err.message);
