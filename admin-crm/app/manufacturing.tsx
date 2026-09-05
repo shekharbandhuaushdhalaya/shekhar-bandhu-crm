@@ -2040,7 +2040,7 @@ export default function ManufacturingScreen() {
       <PharmacopoeiaModal
         visible={pharmacopoeiaModalVisible}
         onClose={() => setPharmacopoeiaModalVisible(false)}
-        onRefreshMaterials={fetchMaterials}
+        onRefreshMaterials={() => fetchDataset('materials')}
         showToast={showToast}
       />
 
