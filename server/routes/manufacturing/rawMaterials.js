@@ -6,14 +6,26 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const router = express.Router();
 
-const { getBotanicalInfo } = require('../../utils/botanicalLookup');
+const { getBotanicalInfo, resolveHerbDetails } = require('../../utils/botanicalLookup');
 
-// GET /api/raw-materials/botanical-lookup — Auto-lookup botanical / scientific name
-router.get('/botanical-lookup', async (req, res) => {
+// GET /api/raw-materials/herb-service/lookup & GET /api/raw-materials/botanical-lookup
+router.get(['/botanical-lookup', '/herb-service/lookup'], async (req, res) => {
   try {
-    const name = req.query.name || req.query.q;
-    if (!name) return res.status(400).json({ error: 'Raw material name query parameter is required' });
-    const info = await getBotanicalInfo(name);
+    const name = req.query.name || req.query.q || req.query.query;
+    if (!name) return res.status(400).json({ error: 'Herb name query parameter is required' });
+    const info = await resolveHerbDetails(name);
+    res.json(info);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/raw-materials/herb-service/resolve — API Service to resolve herb scientific name & metadata
+router.post('/herb-service/resolve', async (req, res) => {
+  try {
+    const name = req.body.name || req.body.herbName || req.body.query;
+    if (!name) return res.status(400).json({ error: 'Herb name is required in request body' });
+    const info = await resolveHerbDetails(name);
     res.json(info);
   } catch (err) {
     res.status(500).json({ error: err.message });

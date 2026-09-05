@@ -1,80 +1,258 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const SystemSettings = require('../models/SystemSettings');
 
-// Curated Ayurvedic & Botanical Pharmacopoeia Dictionary (API / AFI Standard)
-const BOTANICAL_DICTIONARY = {
-  ashwagandha: { botanicalName: 'Withania somnifera', partUsed: 'Root', pharmacopoeialStandard: 'API' },
-  tulsi: { botanicalName: 'Ocimum sanctum', partUsed: 'Leaf', pharmacopoeialStandard: 'API' },
-  shatavari: { botanicalName: 'Asparagus racemosus', partUsed: 'Tuberous Root', pharmacopoeialStandard: 'API' },
-  neem: { botanicalName: 'Azadirachta indica', partUsed: 'Leaf/Bark', pharmacopoeialStandard: 'API' },
-  guduchi: { botanicalName: 'Tinospora cordifolia', partUsed: 'Stem', pharmacopoeialStandard: 'API' },
-  giloy: { botanicalName: 'Tinospora cordifolia', partUsed: 'Stem', pharmacopoeialStandard: 'API' },
-  amla: { botanicalName: 'Phyllanthus emblica', partUsed: 'Fresh/Dry Fruit', pharmacopoeialStandard: 'API' },
-  haritaki: { botanicalName: 'Terminalia chebula', partUsed: 'Fruit Pericarp', pharmacopoeialStandard: 'API' },
-  bibhitaki: { botanicalName: 'Terminalia bellirica', partUsed: 'Fruit Pericarp', pharmacopoeialStandard: 'API' },
-  brahmi: { botanicalName: 'Bacopa monnieri', partUsed: 'Whole Plant', pharmacopoeialStandard: 'API' },
-  mulethi: { botanicalName: 'Glycyrrhiza glabra', partUsed: 'Root/Rhizome', pharmacopoeialStandard: 'API' },
-  yashtimadhu: { botanicalName: 'Glycyrrhiza glabra', partUsed: 'Root/Rhizome', pharmacopoeialStandard: 'API' },
-  pippali: { botanicalName: 'Piper longum', partUsed: 'Fruit', pharmacopoeialStandard: 'API' },
-  maricha: { botanicalName: 'Piper nigrum', partUsed: 'Fruit', pharmacopoeialStandard: 'API' },
-  blackpepper: { botanicalName: 'Piper nigrum', partUsed: 'Fruit', pharmacopoeialStandard: 'API' },
-  shunthi: { botanicalName: 'Zingiber officinale', partUsed: 'Dry Rhizome', pharmacopoeialStandard: 'API' },
-  ginger: { botanicalName: 'Zingiber officinale', partUsed: 'Rhizome', pharmacopoeialStandard: 'API' },
-  guggulu: { botanicalName: 'Commiphora wightii', partUsed: 'Exudate/Resin', pharmacopoeialStandard: 'API' },
-  guggul: { botanicalName: 'Commiphora wightii', partUsed: 'Exudate/Resin', pharmacopoeialStandard: 'API' },
-  manjistha: { botanicalName: 'Rubia cordifolia', partUsed: 'Stem/Root', pharmacopoeialStandard: 'API' },
-  shankhpushpi: { botanicalName: 'Convolvulus pluricaulis', partUsed: 'Whole Plant', pharmacopoeialStandard: 'API' },
-  bhringraj: { botanicalName: 'Eclipta alba', partUsed: 'Whole Plant', pharmacopoeialStandard: 'API' },
-  arjuna: { botanicalName: 'Terminalia arjuna', partUsed: 'Stem Bark', pharmacopoeialStandard: 'API' },
-  punarnava: { botanicalName: 'Boerhavia diffusa', partUsed: 'Root/Whole Plant', pharmacopoeialStandard: 'API' },
-  gokshura: { botanicalName: 'Tribulus terrestris', partUsed: 'Fruit/Root', pharmacopoeialStandard: 'API' },
-  kutki: { botanicalName: 'Picrorhiza kurroa', partUsed: 'Rhizome/Root', pharmacopoeialStandard: 'API' },
-  vidanga: { botanicalName: 'Embelia ribes', partUsed: 'Fruit', pharmacopoeialStandard: 'API' },
-  musta: { botanicalName: 'Cyperus rotundus', partUsed: 'Tuberous Root', pharmacopoeialStandard: 'API' },
-  nagarmotha: { botanicalName: 'Cyperus rotundus', partUsed: 'Tuberous Root', pharmacopoeialStandard: 'API' },
-  bala: { botanicalName: 'Sida cordifolia', partUsed: 'Root', pharmacopoeialStandard: 'API' },
-  vacha: { botanicalName: 'Acorus calamus', partUsed: 'Rhizome', pharmacopoeialStandard: 'API' },
-  twak: { botanicalName: 'Cinnamomum verum', partUsed: 'Bark', pharmacopoeialStandard: 'API' },
-  cinnamon: { botanicalName: 'Cinnamomum verum', partUsed: 'Bark', pharmacopoeialStandard: 'API' },
-  ela: { botanicalName: 'Elettaria cardamomum', partUsed: 'Fruit/Seed', pharmacopoeialStandard: 'API' },
-  cardamom: { botanicalName: 'Elettaria cardamomum', partUsed: 'Fruit/Seed', pharmacopoeialStandard: 'API' },
-  lavanga: { botanicalName: 'Syzygium aromaticum', partUsed: 'Flower Bud', pharmacopoeialStandard: 'API' },
-  clove: { botanicalName: 'Syzygium aromaticum', partUsed: 'Flower Bud', pharmacopoeialStandard: 'API' },
-  haridra: { botanicalName: 'Curcuma longa', partUsed: 'Rhizome', pharmacopoeialStandard: 'API' },
-  turmeric: { botanicalName: 'Curcuma longa', partUsed: 'Rhizome', pharmacopoeialStandard: 'API' },
-  kumkuma: { botanicalName: 'Crocus sativus', partUsed: 'Stigma', pharmacopoeialStandard: 'API' },
-  saffron: { botanicalName: 'Crocus sativus', partUsed: 'Stigma', pharmacopoeialStandard: 'API' },
-  chandan: { botanicalName: 'Santalum album', partUsed: 'Heartwood', pharmacopoeialStandard: 'API' },
-  sandalwood: { botanicalName: 'Santalum album', partUsed: 'Heartwood', pharmacopoeialStandard: 'API' },
-  vasaka: { botanicalName: 'Adhatoda vasica', partUsed: 'Leaf', pharmacopoeialStandard: 'API' },
-  adulsa: { botanicalName: 'Adhatoda vasica', partUsed: 'Leaf', pharmacopoeialStandard: 'API' },
-  kanchanar: { botanicalName: 'Bauhinia variegata', partUsed: 'Stem Bark', pharmacopoeialStandard: 'API' },
-  bhallataka: { botanicalName: 'Semecarpus anacardium', partUsed: 'Fruit', pharmacopoeialStandard: 'API' },
-  vatsanabha: { botanicalName: 'Aconitum ferox', partUsed: 'Purified Root', pharmacopoeialStandard: 'API' },
-  triphala: { botanicalName: 'Emblica, Chebula & Bellirica Mix', partUsed: 'Fruits', pharmacopoeialStandard: 'API' },
-  trikatu: { botanicalName: 'Sunthi, Maricha & Pippali Mix', partUsed: 'Rhizome/Fruits', pharmacopoeialStandard: 'API' },
-  dashamula: { botanicalName: 'Ten Roots Formulation', partUsed: 'Roots', pharmacopoeialStandard: 'AFI' }
-};
+// Curated Ayurvedic & Botanical Pharmacopoeia Database with Aliases & Synonyms
+const HERB_DATABASE = [
+  {
+    names: ['ashwagandha', 'asgandh', 'asgand', 'indian ginseng', 'winter cherry', 'withania'],
+    matchedName: 'Ashwagandha',
+    scientificName: 'Withania somnifera',
+    partUsed: 'Root',
+    pharmacopoeialStandard: 'API',
+    category: 'Herb',
+    synonyms: ['Asgandh', 'Indian Ginseng', 'Winter Cherry', 'Withania']
+  },
+  {
+    names: ['tulsi', 'tulsy', 'holy basil', 'surasa', 'vrinda'],
+    matchedName: 'Tulsi',
+    scientificName: 'Ocimum sanctum',
+    partUsed: 'Leaf',
+    pharmacopoeialStandard: 'API',
+    category: 'Fresh Herb',
+    synonyms: ['Holy Basil', 'Surasa', 'Vrinda', 'Ocimum tenuiflorum']
+  },
+  {
+    names: ['shatavari', 'satavari', 'shatamull', 'asparagus racemosus'],
+    matchedName: 'Shatavari',
+    scientificName: 'Asparagus racemosus',
+    partUsed: 'Tuberous Root',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Satavari', 'Shatamull', 'Wild Asparagus']
+  },
+  {
+    names: ['neem', 'nimba', 'margosa', 'azadirachta indica'],
+    matchedName: 'Neem',
+    scientificName: 'Azadirachta indica',
+    partUsed: 'Leaf/Bark',
+    pharmacopoeialStandard: 'API',
+    category: 'Fresh Herb',
+    synonyms: ['Nimba', 'Margosa Tree', 'Indian Lilac']
+  },
+  {
+    names: ['guduchi', 'giloy', 'gilo', 'amrita', 'tinospora cordifolia'],
+    matchedName: 'Guduchi',
+    scientificName: 'Tinospora cordifolia',
+    partUsed: 'Stem',
+    pharmacopoeialStandard: 'API',
+    category: 'Fresh Herb',
+    synonyms: ['Giloy', 'Gilo', 'Amrita', 'Heart-leaved Moonseed']
+  },
+  {
+    names: ['amla', 'amalaki', 'avla', 'aonla', 'indian gooseberry', 'phyllanthus emblica', 'emblica officinalis'],
+    matchedName: 'Amla',
+    scientificName: 'Phyllanthus emblica',
+    partUsed: 'Fresh/Dry Fruit',
+    pharmacopoeialStandard: 'API',
+    category: 'Fresh Herb',
+    synonyms: ['Amalaki', 'Indian Gooseberry', 'Emblica officinalis']
+  },
+  {
+    names: ['haritaki', 'harad', 'harde', 'chebulic myrobalan', 'terminalia chebula'],
+    matchedName: 'Haritaki',
+    scientificName: 'Terminalia chebula',
+    partUsed: 'Fruit Pericarp',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Harad', 'Harde', 'Chebulic Myrobalan', 'Abhaya']
+  },
+  {
+    names: ['bibhitaki', 'baheda', 'beleric myrobalan', 'terminalia bellirica'],
+    matchedName: 'Bibhitaki',
+    scientificName: 'Terminalia bellirica',
+    partUsed: 'Fruit Pericarp',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Baheda', 'Beleric Myrobalan', 'Aksha']
+  },
+  {
+    names: ['brahmi', 'water hyssop', 'bacopa monnieri'],
+    matchedName: 'Brahmi',
+    scientificName: 'Bacopa monnieri',
+    partUsed: 'Whole Plant',
+    pharmacopoeialStandard: 'API',
+    category: 'Fresh Herb',
+    synonyms: ['Water Hyssop', 'Jalanimba', 'Bacopa']
+  },
+  {
+    names: ['mulethi', 'yashtimadhu', 'licorice', 'liquorice', 'glycyrrhiza glabra'],
+    matchedName: 'Yashtimadhu',
+    scientificName: 'Glycyrrhiza glabra',
+    partUsed: 'Root/Rhizome',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Mulethi', 'Licorice', 'Sweetwood']
+  },
+  {
+    names: ['pippali', 'piper longum', 'long pepper'],
+    matchedName: 'Pippali',
+    scientificName: 'Piper longum',
+    partUsed: 'Fruit',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Long Pepper', 'Magadhi']
+  },
+  {
+    names: ['maricha', 'kali mirch', 'black pepper', 'piper nigrum'],
+    matchedName: 'Maricha',
+    scientificName: 'Piper nigrum',
+    partUsed: 'Fruit',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Kali Mirch', 'Black Pepper', 'Vellaja']
+  },
+  {
+    names: ['shunthi', 'sonth', 'dry ginger', 'zingiber officinale'],
+    matchedName: 'Shunthi',
+    scientificName: 'Zingiber officinale',
+    partUsed: 'Dry Rhizome',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Sonth', 'Dry Ginger', 'Nagara']
+  },
+  {
+    names: ['guggulu', 'guggul', 'commiphora wightii', 'indian bdellium'],
+    matchedName: 'Guggulu',
+    scientificName: 'Commiphora wightii',
+    partUsed: 'Exudate/Resin',
+    pharmacopoeialStandard: 'API',
+    category: 'Plant Concentrate',
+    synonyms: ['Guggul', 'Indian Bdellium', 'Purified Resin']
+  },
+  {
+    names: ['manjistha', 'rubia cordifolia', 'indian madder'],
+    matchedName: 'Manjistha',
+    scientificName: 'Rubia cordifolia',
+    partUsed: 'Stem/Root',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Indian Madder', 'Aruna']
+  },
+  {
+    names: ['shankhpushpi', 'convolvulus pluricaulis'],
+    matchedName: 'Shankhpushpi',
+    scientificName: 'Convolvulus pluricaulis',
+    partUsed: 'Whole Plant',
+    pharmacopoeialStandard: 'API',
+    category: 'Fresh Herb',
+    synonyms: ['Speedwheel', 'Ksheerapushpi']
+  },
+  {
+    names: ['bhringraj', 'eclipta alba', 'eclipta prostrata', 'false daisy'],
+    matchedName: 'Bhringraj',
+    scientificName: 'Eclipta alba',
+    partUsed: 'Whole Plant',
+    pharmacopoeialStandard: 'API',
+    category: 'Fresh Herb',
+    synonyms: ['False Daisy', 'Keshraja']
+  },
+  {
+    names: ['arjuna', 'terminalia arjuna'],
+    matchedName: 'Arjuna',
+    scientificName: 'Terminalia arjuna',
+    partUsed: 'Stem Bark',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Arjun Bark', 'Kukubha']
+  },
+  {
+    names: ['punarnava', 'boerhavia diffusa', 'spreading hogweed'],
+    matchedName: 'Punarnava',
+    scientificName: 'Boerhavia diffusa',
+    partUsed: 'Root/Whole Plant',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Spreading Hogweed', 'Shothaghni']
+  },
+  {
+    names: ['gokshura', 'tribulus terrestris', 'puncture vine'],
+    matchedName: 'Gokshura',
+    scientificName: 'Tribulus terrestris',
+    partUsed: 'Fruit/Root',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Puncture Vine', 'Gokhru', 'Trikanta']
+  },
+  {
+    names: ['kutki', 'picrorhiza kurroa'],
+    matchedName: 'Kutki',
+    scientificName: 'Picrorhiza kurroa',
+    partUsed: 'Rhizome/Root',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Katuka', 'Picrorhiza']
+  },
+  {
+    names: ['haridra', 'haldi', 'turmeric', 'curcuma longa'],
+    matchedName: 'Haridra',
+    scientificName: 'Curcuma longa',
+    partUsed: 'Rhizome',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Haldi', 'Turmeric', 'Nisha']
+  },
+  {
+    names: ['chandan', 'sandalwood', 'santalum album'],
+    matchedName: 'Chandan',
+    scientificName: 'Santalum album',
+    partUsed: 'Heartwood',
+    pharmacopoeialStandard: 'API',
+    category: 'Dry Herb',
+    synonyms: ['Sandalwood', 'Shrikhanda']
+  }
+];
 
 /**
- * Look up scientific/botanical name, part used, and standard for a raw material.
- * Checks dictionary first, then falls back to Gemini AI if available.
+ * High-performance herb resolution function.
+ * Accepts any query string (herb name / alias / Hindi name / scientific name),
+ * returns standardized common name, Latin scientific name, part used, standard, and synonyms.
  */
-async function getBotanicalInfo(rawMaterialName) {
-  if (!rawMaterialName || !rawMaterialName.trim()) {
-    return { botanicalName: '', partUsed: '', pharmacopoeialStandard: 'API' };
+async function resolveHerbDetails(queryName) {
+  if (!queryName || !queryName.trim()) {
+    return {
+      query: '',
+      matchedName: '',
+      scientificName: '',
+      botanicalName: '',
+      partUsed: '',
+      pharmacopoeialStandard: 'API',
+      category: 'Herb',
+      synonyms: []
+    };
   }
 
-  const cleanName = rawMaterialName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanQuery = queryName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  // 1. Check local pharmacopoeial dictionary
-  for (const [key, info] of Object.entries(BOTANICAL_DICTIONARY)) {
-    if (cleanName.includes(key) || key.includes(cleanName)) {
-      return { ...info };
+  // 1. Search Database using alias/name matching
+  for (const herb of HERB_DATABASE) {
+    for (const alias of herb.names) {
+      const cleanAlias = alias.replace(/[^a-z0-9]/g, '');
+      if (cleanQuery === cleanAlias || cleanQuery.includes(cleanAlias) || cleanAlias.includes(cleanQuery)) {
+        return {
+          query: queryName,
+          matchedName: herb.matchedName,
+          scientificName: herb.scientificName,
+          botanicalName: herb.scientificName,
+          partUsed: herb.partUsed,
+          pharmacopoeialStandard: herb.pharmacopoeialStandard,
+          category: herb.category,
+          synonyms: herb.synonyms
+        };
+      }
     }
   }
 
-  // 2. AI Fallback (Gemini) if API key exists
+  // 2. Gemini AI fallback if not in pre-loaded database
   try {
     const sys = await SystemSettings.findOne({ key: 'company_config' }).lean();
     const apiKey = (sys && sys.geminiApiKey && sys.geminiApiKey.trim()) ? sys.geminiApiKey.trim() : process.env.GEMINI_API_KEY;
@@ -82,34 +260,66 @@ async function getBotanicalInfo(rawMaterialName) {
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-      const prompt = `You are a pharmacognosy expert for Ayurvedic and herbal raw materials.
-Given raw material name: "${rawMaterialName}"
-Provide a JSON object containing:
-- "botanicalName": Latin binomial scientific name (e.g., "Withania somnifera")
+      const prompt = `You are a pharmacognosy expert for Ayurvedic, herbal, and botanical raw materials.
+User entered herb/raw material name: "${queryName}"
+
+Respond with ONLY a valid JSON object with the following fields:
+- "matchedName": Official standardized common English/Ayurvedic name (e.g. "Ashwagandha")
+- "scientificName": Latin binomial botanical/scientific name (e.g. "Withania somnifera")
 - "partUsed": Plant part used in medicine (e.g., "Root", "Leaf", "Bark", "Fruit", "Rhizome")
 - "pharmacopoeialStandard": "API", "AFI", "IP", "BP", or "USP"
+- "category": "Dry Herb", "Fresh Herb", "Excipient", "Volatile Oil", or "Plant Concentrate"
+- "synonyms": Array of 2-4 alternative common/regional names or English names
 
-Return ONLY valid JSON with no extra commentary or markdown syntax.`;
+Do NOT include any extra text, markdown formatting or backticks outside the JSON.`;
 
       const result = await model.generateContent(prompt);
       const text = result.response.text().trim().replace(/```json|```/g, '');
       const parsed = JSON.parse(text);
-      if (parsed && parsed.botanicalName) {
+
+      if (parsed && (parsed.scientificName || parsed.matchedName)) {
         return {
-          botanicalName: parsed.botanicalName || '',
+          query: queryName,
+          matchedName: parsed.matchedName || queryName.trim().toUpperCase(),
+          scientificName: parsed.scientificName || '',
+          botanicalName: parsed.scientificName || '',
           partUsed: parsed.partUsed || '',
-          pharmacopoeialStandard: parsed.pharmacopoeialStandard || 'API'
+          pharmacopoeialStandard: parsed.pharmacopoeialStandard || 'API',
+          category: parsed.category || 'Herb',
+          synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : []
         };
       }
     }
   } catch (err) {
-    console.error('Botanical AI lookup error:', err.message);
+    console.error('Herb Resolution AI Lookup Error:', err.message);
   }
 
-  return { botanicalName: '', partUsed: '', pharmacopoeialStandard: 'API' };
+  return {
+    query: queryName,
+    matchedName: queryName.trim().toUpperCase(),
+    scientificName: '',
+    botanicalName: '',
+    partUsed: '',
+    pharmacopoeialStandard: 'API',
+    category: 'Herb',
+    synonyms: []
+  };
+}
+
+/**
+ * Backward compatibility wrapper
+ */
+async function getBotanicalInfo(rawMaterialName) {
+  const res = await resolveHerbDetails(rawMaterialName);
+  return {
+    botanicalName: res.scientificName || res.botanicalName,
+    partUsed: res.partUsed,
+    pharmacopoeialStandard: res.pharmacopoeialStandard
+  };
 }
 
 module.exports = {
+  resolveHerbDetails,
   getBotanicalInfo,
-  BOTANICAL_DICTIONARY
+  HERB_DATABASE
 };

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { getBotanicalInfo, BOTANICAL_DICTIONARY } = require('../utils/botanicalLookup');
+const { getBotanicalInfo, resolveHerbDetails } = require('../utils/botanicalLookup');
 const RawMaterial = require('../models/RawMaterial');
 
 let mongoServer;
@@ -33,6 +33,22 @@ describe('Botanical & Scientific Name Lookup Test Suite', () => {
 
     const shatavari = await getBotanicalInfo('Shatavari Powder');
     expect(shatavari.botanicalName).toBe('Asparagus racemosus');
+  });
+
+  it('resolves phonetic & regional herb aliases (asgandh, gilo, sonth) via resolveHerbDetails service', async () => {
+    const asgandh = await resolveHerbDetails('asgandh');
+    expect(asgandh.matchedName).toBe('Ashwagandha');
+    expect(asgandh.scientificName).toBe('Withania somnifera');
+    expect(asgandh.partUsed).toBe('Root');
+
+    const gilo = await resolveHerbDetails('gilo');
+    expect(gilo.matchedName).toBe('Guduchi');
+    expect(gilo.scientificName).toBe('Tinospora cordifolia');
+    expect(gilo.partUsed).toBe('Stem');
+
+    const sonth = await resolveHerbDetails('sonth');
+    expect(sonth.matchedName).toBe('Shunthi');
+    expect(sonth.scientificName).toBe('Zingiber officinale');
   });
 
   it('stores botanicalName in RawMaterial model documents', async () => {
