@@ -233,7 +233,40 @@ async function resolveHerbDetails(queryName) {
 
   const cleanQuery = queryName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  // 1. Search Database using alias/name matching
+  // 1. Search PharmacopoeiaEntry MongoDB model
+  try {
+    const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
+    const dbMatch = await PharmacopoeiaEntry.findOne({
+      $or: [
+        { ayurvedicName: { $regex: new RegExp(queryName.trim(), 'i') } },
+        { botanicalName: { $regex: new RegExp(queryName.trim(), 'i') } },
+        { synonyms: { $regex: new RegExp(queryName.trim(), 'i') } }
+      ]
+    }).lean();
+
+    if (dbMatch) {
+      return {
+        query: queryName,
+        matchedName: dbMatch.ayurvedicName,
+        scientificName: dbMatch.botanicalName,
+        botanicalName: dbMatch.botanicalName,
+        partUsed: dbMatch.partUsed,
+        pharmacopoeialStandard: dbMatch.pharmacopoeialStandard || 'API',
+        monographRef: dbMatch.monographRef || '',
+        category: 'Herb',
+        synonyms: dbMatch.synonyms || [],
+        therapeuticUses: dbMatch.therapeuticUses || [],
+        rasa: dbMatch.rasa || [],
+        virya: dbMatch.virya || '',
+        vipaka: dbMatch.vipaka || '',
+        dosage: dbMatch.dosage || ''
+      };
+    }
+  } catch (err) {
+    // Ignore DB search error, proceed to fallback
+  }
+
+  // 2. Search Local HERB_DATABASE array using alias/name matching
   for (const herb of HERB_DATABASE) {
     for (const alias of herb.names) {
       const cleanAlias = alias.replace(/[^a-z0-9]/g, '');
