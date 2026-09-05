@@ -9,15 +9,17 @@ const app = express();
 app.use(express.json());
 app.use('/api/raw-materials', rawMaterialRoutes);
 
+const { MongoMemoryServer } = require('mongodb-memory-server');
+
+let mongoServer;
+
 describe('Raw Material Deletion Safety & Stock Validation API', () => {
   let testMaterialWithStockId;
   let testMaterialZeroStockId;
 
   beforeAll(async () => {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/shekhar-bandhu-crm-test-del';
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
-    }
+    mongoServer = await MongoMemoryServer.create();
+    await mongoose.connect(mongoServer.getUri());
 
     // Create raw material with active stock (10 kg)
     const mat1 = await RawMaterial.create({
@@ -46,10 +48,9 @@ describe('Raw Material Deletion Safety & Stock Validation API', () => {
   }, 30000);
 
   afterAll(async () => {
-    await RawMaterial.deleteMany({ sku: { $in: ['RM-DEL-TEST-001', 'RM-DEL-TEST-002'] } });
-    await RawMaterialEntry.deleteMany({ batchNo: 'BATCH-DEL-001' });
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.disconnect();
+    await mongoose.disconnect();
+    if (mongoServer) {
+      await mongoServer.stop();
     }
   }, 30000);
 
