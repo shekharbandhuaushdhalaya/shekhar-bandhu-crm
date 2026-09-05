@@ -423,7 +423,7 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     botanicalName: 'Woodfordia fruticosa (L.) Kurz',
     partUsed: 'Flower (Pushpa)',
     category: 'Dry Herb',
-    monographRef: 'API Part I, Vol I, Page 33'
+    monographRef: 'API Part I, Vol I, Page 32'
   },
   {
     commonNames: ['DRAKSHA', 'MUNAKKA', 'KISHMISH', 'RAISIN', 'GRAPES'],
@@ -444,7 +444,7 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     botanicalName: 'Picrorhiza kurroa Royle ex Benth.',
     partUsed: 'Root (Mool)',
     category: 'Dry Herb',
-    monographRef: 'API Part I, Vol II, Page 91'
+    monographRef: 'API Part I, Vol II, Page 85'
   },
   {
     commonNames: ['KARPURA', 'KAPOOR', 'CAMPHOR'],
@@ -465,28 +465,28 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     botanicalName: 'Madhuca longifolia (J.Koenig ex L.) J.F.Macbr.',
     partUsed: 'Flower (Pushpa)',
     category: 'Dry Herb',
-    monographRef: 'API Part I, Vol I, Page 73'
+    monographRef: 'API Part I, Vol I, Page 102'
   },
   {
     commonNames: ['VARUNA', 'VARUN', 'VARUNA CHHAL', 'CRATAEVA', 'THREE LEAVED CAPER'],
     botanicalName: 'Crateva nurvala Buch.-Ham.',
     partUsed: 'Bark (Twak)',
     category: 'Dry Herb',
-    monographRef: 'API Part I, Vol I, Page 117'
+    monographRef: 'API Part I, Vol I, Page 120'
   },
   {
     commonNames: ['KANKOLA', 'KANKOL', 'CUBEB', 'TAILPEPPER', 'KANKOLA PHALA'],
     botanicalName: 'Piper cubeba L.f.',
     partUsed: 'Fruit (Phala)',
     category: 'Dry Herb',
-    monographRef: 'API Part I, Vol I, Page 67'
+    monographRef: 'API Part I, Vol I, Page 58'
   },
   {
     commonNames: ['USHEERA', 'KHAS', 'KHAS KHAS', 'VETIVER', 'USHIR', 'USIR'],
     botanicalName: 'Vetiveria zizanioides (L.) Nash',
     partUsed: 'Root (Mool)',
     category: 'Dry Herb',
-    monographRef: 'API Part I, Vol III, Page 213'
+    monographRef: 'API Part I, Vol III, Page 219'
   },
   {
     commonNames: ['TALISPATRA', 'TALISPATRI', 'TALIS', 'HIMALAYAN SILVER FIR'],
