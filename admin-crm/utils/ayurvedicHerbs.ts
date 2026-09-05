@@ -375,6 +375,48 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     partUsed: 'Bhasma / Mineral',
     category: 'Metallic/Mineral',
     monographRef: 'API Part I, Vol I, Page 101'
+  },
+  {
+    commonNames: ['TIL OIL', 'TILA TAILA', 'TIL TAIL', 'SESAME OIL', 'GINGELLY OIL', 'TILA', 'TIL'],
+    botanicalName: 'Sesamum indicum L.',
+    partUsed: 'Seed (Beej) / Oil',
+    category: 'Volatile Oil',
+    monographRef: 'API Part I, Vol I, Page 115'
+  },
+  {
+    commonNames: ['ERANDA TAILA', 'CASTOR OIL', 'ARANDI OIL', 'ERAND TAIL'],
+    botanicalName: 'Ricinus communis L.',
+    partUsed: 'Seed (Beej) / Oil',
+    category: 'Volatile Oil',
+    monographRef: 'API Part I, Vol I, Page 35'
+  },
+  {
+    commonNames: ['SARSHAPA TAILA', 'MUSTARD OIL', 'SARSON OIL', 'SARSON TAIL'],
+    botanicalName: 'Brassica juncea (L.) Czern.',
+    partUsed: 'Seed (Beej) / Oil',
+    category: 'Volatile Oil',
+    monographRef: 'API Part I, Vol I, Page 98'
+  },
+  {
+    commonNames: ['NARIKELA TAILA', 'COCONUT OIL', 'NARIYAL OIL'],
+    botanicalName: 'Cocos nucifera L.',
+    partUsed: 'Fruit (Phala) / Oil',
+    category: 'Volatile Oil',
+    monographRef: 'API Part I, Vol II, Page 129'
+  },
+  {
+    commonNames: ['PURE HONEY', 'HONEY', 'MADHU', 'SHUDDHA MADHU'],
+    botanicalName: 'Apis mellifera L. (Purified Honey)',
+    partUsed: 'Kashaya / Extract',
+    category: 'Animal Source',
+    monographRef: 'API Part I, Vol I, Page 85'
+  },
+  {
+    commonNames: ['COW GHEE', 'GHEE', 'GHRITA', 'GO GHRITA'],
+    botanicalName: 'Clarified Cow Butter (Go Ghrita)',
+    partUsed: 'Bhasma / Mineral',
+    category: 'Animal Source',
+    monographRef: 'API Part I, Vol I, Page 37'
   }
 ];
 

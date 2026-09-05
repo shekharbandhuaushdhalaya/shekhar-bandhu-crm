@@ -72,6 +72,73 @@ router.post('/seed', async (req, res) => {
   }
 });
 
+// POST /api/pharmacopoeia/import-to-raw-materials — Bulk/single import monographs into Raw Materials Master
+router.post('/import-to-raw-materials', async (req, res) => {
+  try {
+    const RawMaterial = require('../../models/RawMaterial');
+    const { generateRawMaterialSku } = require('../../utils/skuGenerator');
+    const { monographId, importAll } = req.body;
+    let itemsToImport = [];
+
+    if (monographId) {
+      const entry = await PharmacopoeiaEntry.findById(monographId).lean();
+      if (!entry) return res.status(404).json({ error: 'Monograph entry not found' });
+      itemsToImport.push(entry);
+    } else if (importAll) {
+      await seedPharmacopoeiaIfEmpty();
+      itemsToImport = await PharmacopoeiaEntry.find({}).lean();
+    } else {
+      return res.status(400).json({ error: 'Specify monographId or importAll: true' });
+    }
+
+    let createdCount = 0;
+    let skippedCount = 0;
+    const createdItems = [];
+
+    for (const item of itemsToImport) {
+      const formattedName = (item.ayurvedicName || item.botanicalName).trim().toUpperCase();
+      const existing = await RawMaterial.findOne({ name: formattedName }).lean();
+      if (existing) {
+        skippedCount++;
+        continue;
+      }
+
+      let computedSku = generateRawMaterialSku(formattedName);
+      let conflict = await RawMaterial.findOne({ sku: computedSku }).lean();
+      let counter = 1;
+      while (conflict) {
+        computedSku = `${generateRawMaterialSku(formattedName)}-${counter}`;
+        conflict = await RawMaterial.findOne({ sku: computedSku }).lean();
+        counter++;
+      }
+
+      const newRM = await RawMaterial.create({
+        name: formattedName,
+        sku: computedSku,
+        unit: 'kg',
+        category: item.category || 'Dry Herb',
+        botanicalName: item.botanicalName || '',
+        partUsed: item.partUsed || '',
+        pharmacopoeialStandard: item.pharmacopoeialStandard || 'API',
+        monographRef: item.monographRef || '',
+        isScheduleE1: item.isScheduleE1 || false,
+        stockLevel: 0
+      });
+      createdItems.push(newRM);
+      createdCount++;
+    }
+
+    res.json({
+      message: `Imported ${createdCount} Ayurvedic ingredients into Raw Materials Master (${skippedCount} already existed).`,
+      importedCount: createdCount,
+      skippedCount,
+      createdItems
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/pharmacopoeia/:id — Get monograph details by ID
 router.get('/:id', async (req, res) => {
   try {

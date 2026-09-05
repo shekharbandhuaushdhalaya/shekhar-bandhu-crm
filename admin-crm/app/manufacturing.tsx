@@ -40,6 +40,7 @@ import LaunchBatchModal from './manufacturing/modals/LaunchBatchModal';
 import QCSignoffModal from './manufacturing/modals/QCSignoffModal';
 import BMRReportModal from './manufacturing/modals/BMRReportModal';
 import CoAModal from './manufacturing/modals/CoAModal';
+import PharmacopoeiaModal from './manufacturing/modals/PharmacopoeiaModal';
 import ManufacturingUnitModal from './manufacturing/modals/ManufacturingUnitModal';
 import { createStyles } from './manufacturing/manufacturingStyles';
 
@@ -92,6 +93,7 @@ export default function ManufacturingScreen() {
   const [loadingCoa, setLoadingCoa] = useState(false);
 
   const [materialModalVisible, setMaterialModalVisible] = useState(false);
+  const [pharmacopoeiaModalVisible, setPharmacopoeiaModalVisible] = useState(false);
   const [bomModalVisible, setBomModalVisible] = useState(false);
   const [productionModalVisible, setProductionModalVisible] = useState(false);
   const [qcModalVisible, setQcModalVisible] = useState(false);
@@ -1751,6 +1753,23 @@ export default function ManufacturingScreen() {
           <Ionicons name="add-circle-outline" size={15} color={colors.primary} style={{ marginRight: 4 }} />
           <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Define Material</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderColor: colors.success,
+            borderWidth: 1,
+            borderRadius: 6,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            backgroundColor: colors.success + '12'
+          }}
+          onPress={() => setPharmacopoeiaModalVisible(true)}
+        >
+          <Ionicons name="book-outline" size={15} color={colors.success} style={{ marginRight: 4 }} />
+          <Text style={{ color: colors.success, fontSize: 12, fontWeight: '700' }}>📖 Ayurvedic Library</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -2016,6 +2035,13 @@ export default function ManufacturingScreen() {
         loadingCoa={loadingCoa}
         coaData={coaData}
         onClose={() => setCoaModalVisible(false)}
+      />
+
+      <PharmacopoeiaModal
+        visible={pharmacopoeiaModalVisible}
+        onClose={() => setPharmacopoeiaModalVisible(false)}
+        onRefreshMaterials={fetchMaterials}
+        showToast={showToast}
       />
 
       {/* ── Genealogy / Trace / Stage Modals ────────────────── */}

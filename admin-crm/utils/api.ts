@@ -1126,6 +1126,17 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/coa`);
     return res.json();
   }
+  async getPharmacopoeia(search?: string): Promise<any[]> {
+    const url = search ? `${API_BASE}/pharmacopoeia?search=${encodeURIComponent(search)}` : `${API_BASE}/pharmacopoeia`;
+    const res = await this.request(url);
+    return res.json();
+  }
+  async importPharmacopoeiaToRawMaterials(data: { monographId?: string; importAll?: boolean }): Promise<any> {
+    const res = await this.request(`${API_BASE}/pharmacopoeia/import-to-raw-materials`, {
+      method: 'POST', body: JSON.stringify(data)
+    });
+    return res.json();
+  }
   async getManufacturingAnalytics(): Promise<ManufacturingAnalytics> {
     const res = await this.request(`${API_BASE}/analytics/manufacturing`);
     return res.json();
