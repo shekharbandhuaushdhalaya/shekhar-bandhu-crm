@@ -58,13 +58,13 @@ const HERB_DATABASE = [
     synonyms: ['Amalaki', 'Indian Gooseberry', 'Emblica officinalis']
   },
   {
-    names: ['haritaki', 'harad', 'harde', 'chebulic myrobalan', 'terminalia chebula'],
+    names: ['haritaki', 'harra', 'harad', 'harde', 'harr', 'harar', 'chebulic myrobalan', 'terminalia chebula'],
     matchedName: 'Haritaki',
     scientificName: 'Terminalia chebula',
     partUsed: 'Fruit Pericarp',
     pharmacopoeialStandard: 'API',
     category: 'Dry Herb',
-    synonyms: ['Harad', 'Harde', 'Chebulic Myrobalan', 'Abhaya']
+    synonyms: ['Harra', 'Harad', 'Harde', 'Chebulic Myrobalan', 'Abhaya', 'Pathya']
   },
   {
     names: ['bibhitaki', 'baheda', 'beleric myrobalan', 'terminalia bellirica'],

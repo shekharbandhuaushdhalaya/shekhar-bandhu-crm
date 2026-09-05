@@ -178,8 +178,11 @@ const PHARMACOPOEIA_SEED_DATA = [
     "pharmacopoeialStandard": "API",
     "monographRef": "API Part I, Vol I, Page 47",
     "synonyms": [
+      "Harra",
       "Harad",
       "Harde",
+      "Harr",
+      "Harar",
       "Chebulic Myrobalan",
       "Abhaya",
       "Pathya"

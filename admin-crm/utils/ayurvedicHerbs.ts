@@ -30,7 +30,7 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     monographRef: 'API Part I, Vol II, Page 165'
   },
   {
-    commonNames: ['HARITAKI', 'HARAD', 'HARDH', 'CHEBULIC MYROBALAN'],
+    commonNames: ['HARITAKI', 'HARRA', 'HARAD', 'HARDH', 'HARR', 'HARAR', 'CHEBULIC MYROBALAN'],
     botanicalName: 'Terminalia chebula Retz.',
     partUsed: 'Fruit (Phala)',
     category: 'Dry Herb',
