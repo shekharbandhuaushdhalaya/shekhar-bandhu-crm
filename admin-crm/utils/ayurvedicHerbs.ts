@@ -452,6 +452,13 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     partUsed: 'Kashaya / Extract',
     category: 'Volatile Oil',
     monographRef: 'API Part I, Vol IV, Page 57'
+  },
+  {
+    commonNames: ['MAIDA LAKDI', 'MAIDA LAKRI', 'MEDA LAKDI', 'MEDASAKA', 'MAIDA LAKDA', 'LITSEA', 'LITSEA GLUTINOSA'],
+    botanicalName: 'Litsea glutinosa (Lour.) C.B.Rob.',
+    partUsed: 'Bark (Twak)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol V, Page 112'
   }
 ];
 

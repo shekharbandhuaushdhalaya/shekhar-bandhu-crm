@@ -501,6 +501,22 @@ const PHARMACOPOEIA_SEED_DATA = [
     guna: ['Guru', 'Snigdha', 'Sukshma', 'Vyavayi'],
     dosage: '10 - 20 ml per day or base for medicated tailas',
     description: 'Pure expressed oil from seeds of Sesamum indicum, primary base oil (Taila Kalpana) for all Ayurvedic medicated oils.'
+  },
+  {
+    ayurvedicName: 'MAIDA LAKDI',
+    botanicalName: 'Litsea glutinosa (Lour.) C.B.Rob.',
+    family: 'Lauraceae',
+    partUsed: 'Stem Bark',
+    pharmacopoeialStandard: 'API',
+    monographRef: 'API Part I, Vol V, pg 112',
+    synonyms: ['Maida Lakri', 'Meda Lakdi', 'Medasaka', 'Litsea glutinosa', 'Maida Lakda'],
+    therapeuticUses: ['Vatashamana', 'Shoolahara', 'Vranaropana', 'Deepana', 'Kapha-Vata-hara'],
+    rasa: ['Katu', 'Tikta', 'Kashaya'],
+    virya: 'Ushna',
+    vipaka: 'Katu',
+    guna: ['Laghu', 'Snigdha'],
+    dosage: '1 - 3 g bark powder per day',
+    description: 'Dried stem bark of Litsea glutinosa, renowned mucilaginous analgesic, Vata-pacifying, and wound-healing bark in API.'
   }
 ];
 
