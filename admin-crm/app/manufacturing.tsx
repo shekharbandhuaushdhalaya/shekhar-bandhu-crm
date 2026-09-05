@@ -903,7 +903,7 @@ export default function ManufacturingScreen() {
       if (qcWasteReason.trim()) payload.wasteReason = qcWasteReason.trim();
 
       const result = await api.completeBatchProduction(selectedBatchRun._id, payload);
-      const grnDocNo = result?.grn?.docNo;
+      const grnDocNo = (result as any)?.grn?.docNo;
 
       setSelectedBatchRun(null);
       showToast(`Batch completed! GRN (${grnDocNo || 'N/A'}) created.`, 'success');
@@ -977,8 +977,8 @@ export default function ManufacturingScreen() {
         setStageYields([]);
       }
       
-      const formulationBasis = batch.bomSnapshot?.formulationBasis || 100;
-      const formulationBasisUnit = (batch.bomSnapshot?.formulationBasisUnit || 'ml').toLowerCase();
+      const formulationBasis = (batch.bomSnapshot as any)?.formulationBasis || 100;
+      const formulationBasisUnit = ((batch.bomSnapshot as any)?.formulationBasisUnit || 'ml').toLowerCase();
       
       // Compute initial yields for packaging stage — include ALL size variants of the batch's product
       const initialYields = (() => {
@@ -992,8 +992,8 @@ export default function ManufacturingScreen() {
         }
         // Build a map of productId → yield data from saved yields
         const yieldMap = new Map<string, { actualYieldQty: number; packing: number; size: string }>();
-        if (batch.yields && batch.yields.length > 0) {
-          batch.yields.forEach((y: any) => {
+        if ((batch as any).yields && (batch as any).yields.length > 0) {
+          (batch as any).yields.forEach((y: any) => {
             const pid = typeof y.productId === 'string' ? y.productId : (y.productId as any)?._id || '';
             yieldMap.set(pid, { actualYieldQty: y.actualYieldQty || 0, packing: y.packing || 1, size: y.size || '' });
           });
@@ -1069,7 +1069,7 @@ export default function ManufacturingScreen() {
       });
 
       // Also include packaging materials (bottles, caps, labels) for packaging stages
-      if (isPacking && batch.packagingMode === 'self_packed') {
+      if (isPacking && (batch as any).packagingMode === 'self_packed') {
         const yieldsForPkg = initialYields.length > 0 ? initialYields : ((batch as any).plannedYields || []);
         // Compute packaging per yield product using each product's BOM
         const pkgFromYields = computePackagingFromYields(yieldsForPkg, batch, computed);
