@@ -417,6 +417,41 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     partUsed: 'Bhasma / Mineral',
     category: 'Animal Source',
     monographRef: 'API Part I, Vol I, Page 37'
+  },
+  {
+    commonNames: ['DHATAKI', 'DHATAKI PUSHPA', 'DHATRI PUSHPA', 'WOODFORDIA', 'FIRE FLAME BUSH', 'DHATKI'],
+    botanicalName: 'Woodfordia fruticosa (L.) Kurz',
+    partUsed: 'Flower (Pushpa)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 33'
+  },
+  {
+    commonNames: ['DRAKSHA', 'MUNAKKA', 'KISHMISH', 'RAISIN', 'GRAPES'],
+    botanicalName: 'Vitis vinifera L.',
+    partUsed: 'Fruit (Phala)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 35'
+  },
+  {
+    commonNames: ['MUSTA', 'MUSTAKA', 'NAGARMOTHA', 'NUT GRASS'],
+    botanicalName: 'Cyperus rotundus L.',
+    partUsed: 'Root (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 129'
+  },
+  {
+    commonNames: ['KATUKA', 'KUTKI', 'KUTAKI', 'PICRORHIZA'],
+    botanicalName: 'Picrorhiza kurroa Royle ex Benth.',
+    partUsed: 'Root (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 91'
+  },
+  {
+    commonNames: ['KARPURA', 'KAPOOR', 'CAMPHOR'],
+    botanicalName: 'Cinnamomum camphora (L.) J.Presl',
+    partUsed: 'Kashaya / Extract',
+    category: 'Volatile Oil',
+    monographRef: 'API Part I, Vol IV, Page 57'
   }
 ];
 
