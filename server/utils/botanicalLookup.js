@@ -308,7 +308,7 @@ async function resolveHerbDetails(queryName) {
 
   // 4. Gemini AI fallback if not in pre-loaded database or GBIF
   try {
-    const sys = await SystemSettings.findOne({ key: 'company_config' }).lean();
+    const sys = await SystemSettings.findOne({ key: 'company_config' }).select('+geminiApiKey').lean();
     const apiKey = (sys && sys.geminiApiKey && sys.geminiApiKey.trim()) ? sys.geminiApiKey.trim() : process.env.GEMINI_API_KEY;
 
     if (apiKey) {

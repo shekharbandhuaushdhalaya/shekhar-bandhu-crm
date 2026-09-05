@@ -1,7 +1,7 @@
 module.exports = {
   port: parseInt(process.env.PORT, 10) || 5000,
   mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/shekhar-bandhu-crm',
-  jwtSecret: process.env.JWT_SECRET || 'shekhar-bandhu-crm-jwt-secret-key-2026',
+  jwtSecret: process.env.JWT_SECRET,
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',

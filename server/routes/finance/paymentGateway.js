@@ -14,7 +14,7 @@ router.post('/create-order', authorize('payment:create'), async (req, res) => {
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
     if (invoice.status === 'paid') return res.status(400).json({ error: 'Invoice is already paid' });
 
-    const settings = await SystemSettings.findOne({ key: 'company_config' });
+    const settings = await SystemSettings.findOne({ key: 'company_config' }).select('+razorpayKeySecret +razorpayWebhookSecret');
     if (!settings || !settings.paymentGatewayEnabled || !settings.razorpayKeyId || !settings.razorpayKeySecret) {
       return res.status(400).json({ error: 'Payment gateway is not configured. Please configure Razorpay keys in Firm Settings.' });
     }
@@ -60,7 +60,7 @@ router.post('/verify', authorize('payment:create'), async (req, res) => {
       return res.status(400).json({ error: 'Missing required payment verification fields' });
     }
 
-    const settings = await SystemSettings.findOne({ key: 'company_config' });
+    const settings = await SystemSettings.findOne({ key: 'company_config' }).select('+razorpayKeySecret +razorpayWebhookSecret');
     if (!settings || !settings.razorpayKeySecret) {
       return res.status(400).json({ error: 'Payment gateway not configured' });
     }
@@ -111,7 +111,7 @@ router.post('/verify', authorize('payment:create'), async (req, res) => {
 // POST /api/payments/gateway/webhook — Razorpay webhook handler
 router.post('/webhook', async (req, res) => {
   try {
-    const secret = (await SystemSettings.findOne({ key: 'company_config' }))?.razorpayWebhookSecret;
+    const secret = (await SystemSettings.findOne({ key: 'company_config' }).select('+razorpayWebhookSecret'))?.razorpayWebhookSecret;
     if (!secret) return res.status(200).json({ status: 'ignored', reason: 'Webhook not configured' });
 
     const crypto = require('crypto');

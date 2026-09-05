@@ -11,12 +11,16 @@ jest.mock('../models/RolePermission', () => ({
   getEffectivePermissions: jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] }),
 }));
 
+const mockFindOne = (settingsObj) => ({
+  select: jest.fn().mockResolvedValue(settingsObj),
+  then: (resolve) => Promise.resolve(settingsObj).then(resolve)
+});
+
 describe('Payment Gateway - Money Critical Paths', () => {
   let app;
 
   beforeAll(() => {
     app = express();
-    // Middleware to parse JSON and store rawBody (matching server.js setup)
     app.use(express.json({
       verify: (req, res, buf) => {
         req.rawBody = buf;
@@ -46,7 +50,7 @@ describe('Payment Gateway - Money Critical Paths', () => {
         razorpayKeySecret: 'test_secret_key',
       };
 
-      SystemSettings.findOne.mockResolvedValue(mockSettings);
+      SystemSettings.findOne.mockReturnValue(mockFindOne(mockSettings));
       Invoice.findById.mockResolvedValue(mockInvoice);
 
       const razorpay_order_id = 'order_abc123';
@@ -78,7 +82,7 @@ describe('Payment Gateway - Money Critical Paths', () => {
         razorpayKeySecret: 'test_secret_key',
       };
 
-      SystemSettings.findOne.mockResolvedValue(mockSettings);
+      SystemSettings.findOne.mockReturnValue(mockFindOne(mockSettings));
 
       const response = await request(app)
         .post('/api/payments/gateway/verify')
@@ -106,7 +110,7 @@ describe('Payment Gateway - Money Critical Paths', () => {
         razorpayWebhookSecret: 'webhook_secret_key',
       };
 
-      SystemSettings.findOne.mockResolvedValue(mockSettings);
+      SystemSettings.findOne.mockReturnValue(mockFindOne(mockSettings));
       Invoice.findById.mockResolvedValue(mockInvoice);
 
       const payloadBody = {
@@ -148,7 +152,7 @@ describe('Payment Gateway - Money Critical Paths', () => {
         razorpayWebhookSecret: 'webhook_secret_key',
       };
 
-      SystemSettings.findOne.mockResolvedValue(mockSettings);
+      SystemSettings.findOne.mockReturnValue(mockFindOne(mockSettings));
 
       const response = await request(app)
         .post('/api/payments/gateway/webhook')

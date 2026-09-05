@@ -184,7 +184,7 @@ router.post('/ask', authenticateToken, async (req, res) => {
     }
 
     // Fetch API key from DB SystemSettings or process.env
-    const sys = await SystemSettings.findOne({ key: 'company_config' }).lean();
+    const sys = await SystemSettings.findOne({ key: 'company_config' }).select('+geminiApiKey').lean();
     const apiKey = (sys && sys.geminiApiKey && sys.geminiApiKey.trim()) ? sys.geminiApiKey.trim() : process.env.GEMINI_API_KEY;
 
     let aiText = '';
@@ -542,7 +542,7 @@ router.get('/ai-insights', authorize('analytics:query'), async (req, res) => {
 
     let narrative = `Revenue is ${momRevenueChangePct >= 0 ? '+' : ''}${momRevenueChangePct}% MoM. ${lowStockCount} products are below min reorder levels. ${lowYieldBatches.length} production batches showed a yield drop >15% below product 90-day averages, and ${droppedCustomers.length} customers had an order drop >50%.`;
 
-    const sys = await SystemSettings.findOne({ key: 'company_config' }).lean();
+    const sys = await SystemSettings.findOne({ key: 'company_config' }).select('+geminiApiKey').lean();
     const apiKey = (sys && sys.geminiApiKey && sys.geminiApiKey.trim()) ? sys.geminiApiKey.trim() : process.env.GEMINI_API_KEY;
 
     if (apiKey) {

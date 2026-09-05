@@ -8,12 +8,27 @@ const schemas = require('../../validation/schemas');
 
 const router = express.Router();
 
-// GET /api/system/settings
-router.get('/settings', async (req, res) => {
+// GET /api/system/settings — Authenticated endpoint for full system settings (excludes secrets by default)
+router.get('/settings', authenticateToken, async (req, res) => {
   try {
     let settings = await SystemSettings.findOne({ key: 'company_config' });
     if (!settings) {
       // Create defaults if not present
+      settings = await SystemSettings.create({ key: 'company_config' });
+    }
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/system/settings/public — Unauthenticated public-safe company details (strictly no secrets)
+router.get('/settings/public', async (req, res) => {
+  try {
+    let settings = await SystemSettings.findOne({ key: 'company_config' })
+      .select('firmName firmAddress firmEmail firmPhone firmGstin bankName bankAccountNo bankIfsc bankBranch bankUpi invoicePrefix quotationPrefix challanPrefix dispatchPrefix defaultTerms defaultGstRate signatureUrl dscSignatoryName dscCertificateName manufacturingLicenseNo gmpCertificateNo licenseValidTill gmpValidTill licenceValidityType stateUtCode licenceSerial qrImageUrl')
+      .lean();
+    if (!settings) {
       settings = await SystemSettings.create({ key: 'company_config' });
     }
     res.json(settings);
