@@ -21,6 +21,8 @@
 - [x] Low stock alerts / reorder notifications
 - [x] Physical stocktake
 - [x] Expiry alerts for finished goods & raw materials
+- [x] Botanical & Scientific Name Auto-Lookup Service
+- [x] Ayurvedic Pharmacopoeia (API/API Part I) Monograph Dictionary (Herbal, Rasa, Animal & Schedule E1)
 
 ## Operational
 - [x] Production planning / scheduling
