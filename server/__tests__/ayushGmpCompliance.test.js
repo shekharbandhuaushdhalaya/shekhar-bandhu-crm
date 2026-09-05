@@ -4,6 +4,7 @@ const coaRouter = require('../routes/manufacturing/coa');
 const quarantineRouter = require('../routes/manufacturing/quarantine');
 const CertificateOfAnalysis = require('../models/CertificateOfAnalysis');
 const RawMaterialQuarantine = require('../models/RawMaterialQuarantine');
+const SystemSettings = require('../models/SystemSettings');
 
 jest.mock('../models/CertificateOfAnalysis');
 jest.mock('../models/RawMaterialQuarantine');
@@ -26,6 +27,9 @@ app.use('/api/manufacturing/quarantine', quarantineRouter);
 describe('Module 2: Ayurvedic Manufacturing & AYUSH / GMP Compliance', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    SystemSettings.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({})
+    });
   });
 
   describe('Certificate of Analysis (CoA)', () => {
