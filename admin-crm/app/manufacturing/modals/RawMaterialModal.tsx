@@ -86,7 +86,11 @@ export default function RawMaterialModal({
     { key: 'House Standard', label: 'House Specification' }
   ];
 
-  const UNITS = ['kg', 'g', 'L', 'ml', 'units'];
+  const UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'units', 'boxes', 'rolls'];
+
+  const isPackaging = rmCategory === 'Packaging';
+  const isExcipient = rmCategory === 'Excipient';
+  const isHerb = !isPackaging && rmCategory !== 'General';
 
   const applyHerbData = (entry: HerbDictionaryEntry, nameToSet?: string) => {
     if (nameToSet) setRmName(nameToSet.toUpperCase());
@@ -96,6 +100,13 @@ export default function RawMaterialModal({
     if (entry.monographRef) setRmMonographRef(entry.monographRef);
     if (entry.isScheduleE1 !== undefined) setRmIsScheduleE1(entry.isScheduleE1);
     setAutoFilledBadge(entry.botanicalName);
+  };
+
+  const applyNonHerbPreset = (preset: { name: string; category: string; unit: string; std: string }) => {
+    setRmName(preset.name);
+    setRmCategory(preset.category);
+    setRmUnit(preset.unit);
+    setRmPharmacopoeialStandard(preset.std);
   };
 
   const handleNameChange = (text: string) => {
@@ -126,12 +137,12 @@ export default function RawMaterialModal({
 
   // Live Herb Search Suggestions
   const suggestions = useMemo(() => {
-    if (!rmName || rmName.length < 2) return [];
+    if (!rmName || rmName.length < 2 || isPackaging) return [];
     const search = rmName.toUpperCase();
     return AYURVEDIC_HERB_DICTIONARY.filter(h =>
       h.commonNames.some(cn => cn.includes(search))
     ).slice(0, 6);
-  }, [rmName]);
+  }, [rmName, isPackaging]);
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -142,10 +153,10 @@ export default function RawMaterialModal({
           <View style={styles.modalHeader}>
             <View>
               <Text style={styles.modalTitle}>
-                {editingMaterialId ? 'Edit Raw Material / Herb' : 'Define New Raw Material / Herb'}
+                {editingMaterialId ? 'Edit Material / Item' : 'Define New Material / Item'}
               </Text>
               <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>
-                AYUSH & GMP Compliant Master • Auto-Botanical Latin Matching
+                Raw Materials Master • Supports Herbs, Packaging (Boxes/Bottles/Labels), Excipients (Sugar/Salt), Oils & Minerals
               </Text>
             </View>
             <TouchableOpacity onPress={onClose}>
@@ -160,26 +171,86 @@ export default function RawMaterialModal({
           ) : null}
 
           <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={true}>
-            {/* SECTION 1: BOTANICAL & MATERIAL IDENTITY */}
+            {/* SECTION 1: ITEM & IDENTITY SPECIFICATION */}
             <View style={{ marginBottom: 16, backgroundColor: colors.bg.secondary + '40', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
               <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 10, letterSpacing: 0.5 }}>
-                🌿 1. INGREDIENT & BOTANICAL IDENTITY
+                {isPackaging ? '📦 1. PACKAGING SPECIFICATION & IDENTITY' : (isExcipient ? '🌾 1. EXCIPIENT & BASE MATERIAL IDENTITY' : '🌿 1. INGREDIENT & BOTANICAL IDENTITY')}
               </Text>
 
-              <Text style={styles.inputLabel}>Ingredient Common / Vernacular Name *</Text>
+              <Text style={styles.inputLabel}>
+                {isPackaging ? 'Packaging Item Name / Description *' : 'Material Item Name *'}
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. ASHWAGANDHA, PURIFIED GUGGULU, TULSI"
+                placeholder={
+                  isPackaging
+                    ? 'e.g. MONO CARTON BOX 100ML, PET BOTTLE AMBER 200ML, FRONT BOTTLE LABEL'
+                    : isExcipient
+                      ? 'e.g. PHARMA GRADE SUGAR, PURIFIED ROCK SALT, SODIUM BENZOATE'
+                      : 'e.g. ASHWAGANDHA, PURIFIED GUGGULU, TULSI'
+                }
                 placeholderTextColor={colors.text.muted}
                 value={rmName}
                 onChangeText={handleNameChange}
                 autoCapitalize="characters"
               />
               <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 6 }}>
-                Standard commercial / vernacular trade name. Type to auto-fill Latin botanical name.
+                {isPackaging
+                  ? 'Standard commercial name or dimension specification for boxes, bottles, caps, foils, or labels.'
+                  : 'Commercial trade name or vernacular ingredient title.'}
               </Text>
 
-              {/* Suggestions chips */}
+              {/* Quick Preset Chips for Packaging / Excipients */}
+              {isPackaging && !rmName && (
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, marginBottom: 4 }}>
+                    Quick Packaging Presets:
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {[
+                      { name: 'MONO CARTON BOX 100ML', category: 'Packaging', unit: 'pcs', std: 'House Standard' },
+                      { name: 'OUTER CORRUGATED BOX (50 PCS)', category: 'Packaging', unit: 'pcs', std: 'House Standard' },
+                      { name: '100ML PET BOTTLE (AMBER)', category: 'Packaging', unit: 'pcs', std: 'House Standard' },
+                      { name: 'FRONT BOTTLE LABEL STICKER', category: 'Packaging', unit: 'pcs', std: 'House Standard' },
+                      { name: 'FLIP TOP BOTTLE CAP 28MM', category: 'Packaging', unit: 'pcs', std: 'House Standard' }
+                    ].map((preset, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        onPress={() => applyNonHerbPreset(preset)}
+                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.primary + '15', borderWidth: 0.5, borderColor: colors.primary + '40' }}
+                      >
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.primary }}>📦 {preset.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {isExcipient && !rmName && (
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, marginBottom: 4 }}>
+                    Quick Excipient Presets:
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {[
+                      { name: 'PHARMA GRADE SUGAR (SHARKARA)', category: 'Excipient', unit: 'kg', std: 'IP' },
+                      { name: 'PURIFIED ROCK SALT (SAINDHAVA)', category: 'Excipient', unit: 'kg', std: 'API' },
+                      { name: 'SODIUM BENZOATE (PRESERVATIVE)', category: 'Excipient', unit: 'kg', std: 'IP' },
+                      { name: 'LIQUID GLUCOSE', category: 'Excipient', unit: 'kg', std: 'IP' }
+                    ].map((preset, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        onPress={() => applyNonHerbPreset(preset)}
+                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.primary + '15', borderWidth: 0.5, borderColor: colors.primary + '40' }}
+                      >
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.primary }}>🌾 {preset.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Herb Suggestions chips */}
               {suggestions.length > 0 && (
                 <View style={{ marginBottom: 10 }}>
                   <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, marginBottom: 4 }}>
@@ -208,7 +279,9 @@ export default function RawMaterialModal({
               )}
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                <Text style={styles.inputLabel}>Botanical / Scientific Binomial (Latin Name)</Text>
+                <Text style={styles.inputLabel}>
+                  {isPackaging ? 'Material Grade / Spec Code (Optional)' : 'Botanical / Scientific Binomial (Latin Name)'}
+                </Text>
                 {autoFilledBadge && (
                   <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success + '40' }}>
                     <Text style={{ fontSize: 9.5, fontWeight: '700', color: colors.success }}>
@@ -219,7 +292,7 @@ export default function RawMaterialModal({
               </View>
               <TextInput
                 style={[styles.input, autoFilledBadge ? { borderColor: colors.success, backgroundColor: colors.success + '05' } : null]}
-                placeholder="e.g. Withania somnifera (L.) Dunal"
+                placeholder={isPackaging ? 'e.g. 300 GSM Duplex Board / Amber PET / Food Grade HDPE' : 'e.g. Withania somnifera (L.) Dunal'}
                 placeholderTextColor={colors.text.muted}
                 value={rmBotanicalName}
                 onChangeText={(v) => {
@@ -228,33 +301,37 @@ export default function RawMaterialModal({
                 }}
               />
               <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 10 }}>
-                Latin botanical binomial for plant herbs / chemical formula for Rasa Shastra minerals.
+                {isPackaging ? 'Physical material grade or thickness specification for boxes, bottles, caps, or labels.' : 'Latin botanical binomial for plant herbs / chemical formula for Rasa Shastra minerals.'}
               </Text>
 
-              <Text style={styles.inputLabel}>Plant Part Used / Plant Organ</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                {PLANT_PARTS.map(part => {
-                  const selected = rmPartUsed === part.key;
-                  return (
-                    <TouchableOpacity
-                      key={part.key}
-                      onPress={() => setRmPartUsed(part.key)}
-                      style={{
-                        paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, borderWidth: 1,
-                        backgroundColor: selected ? colors.primary : colors.bg.secondary,
-                        borderColor: selected ? colors.primary : colors.border
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>
-                        {part.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <Text style={styles.inputLabel}>
+                {isPackaging ? 'Packaging Sub-type / Form Factor' : 'Plant Part Used / Plant Organ'}
+              </Text>
+              {isHerb && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {PLANT_PARTS.map(part => {
+                    const selected = rmPartUsed === part.key;
+                    return (
+                      <TouchableOpacity
+                        key={part.key}
+                        onPress={() => setRmPartUsed(part.key)}
+                        style={{
+                          paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, borderWidth: 1,
+                          backgroundColor: selected ? colors.primary : colors.bg.secondary,
+                          borderColor: selected ? colors.primary : colors.border
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>
+                          {part.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
               <TextInput
                 style={styles.input}
-                placeholder="Or enter custom plant part (e.g. Bark & Leaves)..."
+                placeholder={isPackaging ? 'e.g. Outer Box, Mono Carton, Bottle Cap, Sticker Label...' : 'Or enter plant part (e.g. Bark & Leaves)...'}
                 placeholderTextColor={colors.text.muted}
                 value={rmPartUsed}
                 onChangeText={setRmPartUsed}
