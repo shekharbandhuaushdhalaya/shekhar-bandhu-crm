@@ -285,7 +285,28 @@ async function resolveHerbDetails(queryName) {
     }
   }
 
-  // 2. Gemini AI fallback if not in pre-loaded database
+  // 3. Search GBIF (Global Biodiversity Information Facility) Open Public REST API
+  try {
+    const gbifResult = await lookupGbifTaxonomy(queryName);
+    if (gbifResult && gbifResult.scientificName) {
+      return {
+        query: queryName,
+        matchedName: queryName.trim().toUpperCase(),
+        scientificName: gbifResult.scientificName,
+        botanicalName: gbifResult.scientificName,
+        family: gbifResult.family || '',
+        partUsed: 'Herb/Plant Material',
+        pharmacopoeialStandard: 'API',
+        category: 'Herb',
+        synonyms: gbifResult.synonyms || [],
+        source: 'GBIF Taxonomy API'
+      };
+    }
+  } catch (err) {
+    // Non-blocking GBIF API fallback catch
+  }
+
+  // 4. Gemini AI fallback if not in pre-loaded database or GBIF
   try {
     const sys = await SystemSettings.findOne({ key: 'company_config' }).lean();
     const apiKey = (sys && sys.geminiApiKey && sys.geminiApiKey.trim()) ? sys.geminiApiKey.trim() : process.env.GEMINI_API_KEY;
@@ -340,6 +361,43 @@ Do NOT include any extra text, markdown formatting or backticks outside the JSON
 }
 
 /**
+ * Helper to query GBIF (Global Biodiversity Information Facility) Open Public REST API
+ */
+function lookupGbifTaxonomy(queryTerm) {
+  return new Promise((resolve) => {
+    const https = require('https');
+    const url = `https://api.gbif.org/v1/species/match?name=${encodeURIComponent(queryTerm)}`;
+
+    const req = https.get(url, { timeout: 3000 }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json && (json.canonicalName || json.scientificName) && json.matchType !== 'NONE') {
+            return resolve({
+              scientificName: json.canonicalName || json.scientificName,
+              family: json.family || '',
+              genus: json.genus || '',
+              synonyms: [json.species, json.family].filter(Boolean)
+            });
+          }
+        } catch (e) {
+          // parse error
+        }
+        resolve(null);
+      });
+    });
+
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(null);
+    });
+  });
+}
+
+/**
  * Backward compatibility wrapper
  */
 async function getBotanicalInfo(rawMaterialName) {
@@ -354,5 +412,6 @@ async function getBotanicalInfo(rawMaterialName) {
 module.exports = {
   resolveHerbDetails,
   getBotanicalInfo,
+  lookupGbifTaxonomy,
   HERB_DATABASE
 };
