@@ -1131,6 +1131,11 @@ class ApiClient {
     const res = await this.request(url);
     return res.json();
   }
+  async searchPharmacopoeia(query: string): Promise<any[]> {
+    if (!query || !query.trim()) return [];
+    const res = await this.request(`${API_BASE}/pharmacopoeia/search?q=${encodeURIComponent(query.trim())}`);
+    return res.json();
+  }
   async importPharmacopoeiaToRawMaterials(data: { monographId?: string; importAll?: boolean }): Promise<any> {
     const res = await this.request(`${API_BASE}/pharmacopoeia/import-to-raw-materials`, {
       method: 'POST', body: JSON.stringify(data)

@@ -104,7 +104,7 @@ export default function RawMaterialModal({
     let active = true;
     const timer = setTimeout(async () => {
       try {
-        const results = await api.getPharmacopoeia(rmName);
+        const results = await api.searchPharmacopoeia(rmName);
         if (active) {
           setDbSuggestions(results || []);
         }

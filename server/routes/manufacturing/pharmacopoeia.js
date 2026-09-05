@@ -56,13 +56,38 @@ router.get('/search', async (req, res) => {
     const queryTerm = (req.query.q || req.query.query || '').trim();
     if (!queryTerm) return res.status(400).json({ error: 'Search query parameter q is required' });
 
-    const entries = await PharmacopoeiaEntry.find({
+    let entries = await PharmacopoeiaEntry.find({
       $or: [
         { ayurvedicName: { $regex: queryTerm, $options: 'i' } },
         { botanicalName: { $regex: queryTerm, $options: 'i' } },
         { synonyms: { $regex: queryTerm, $options: 'i' } }
       ]
     }).limit(10).lean();
+
+    // If not found in local pre-seeded database, query global 10,000+ botanical taxonomy engine (GBIF + AI)
+    if (entries.length === 0 && queryTerm.length >= 3) {
+      const { resolveHerbDetails } = require('../../utils/botanicalLookup');
+      const resolved = await resolveHerbDetails(queryTerm);
+      if (resolved && (resolved.scientificName || resolved.matchedName)) {
+        const newEntry = await PharmacopoeiaEntry.findOneAndUpdate(
+          { ayurvedicName: resolved.matchedName },
+          {
+            ayurvedicName: resolved.matchedName,
+            botanicalName: resolved.scientificName || resolved.botanicalName || queryTerm.toUpperCase(),
+            family: resolved.family || '',
+            partUsed: resolved.partUsed || 'Whole Plant / Material',
+            pharmacopoeialStandard: resolved.pharmacopoeialStandard || 'API',
+            monographRef: resolved.monographRef || `API / Botanical Standard (${resolved.source || 'Taxonomy Registry'})`,
+            synonyms: resolved.synonyms || [],
+            description: resolved.description || `Medicinal plant entry dynamically resolved for ${queryTerm}.`
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        ).lean();
+        if (newEntry) {
+          entries = [newEntry];
+        }
+      }
+    }
 
     res.json(entries);
   } catch (err) {

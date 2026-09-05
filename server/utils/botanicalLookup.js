@@ -944,7 +944,7 @@ async function resolveHerbDetails(queryName) {
 
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
       const prompt = `You are a pharmacognosy expert for Ayurvedic, herbal, and botanical raw materials.
 User entered herb/raw material name: "${queryName}"
 
@@ -991,13 +991,76 @@ Do NOT include any extra text, markdown formatting or backticks outside the JSON
   };
 }
 
+const VERNACULAR_TO_LATIN = {
+  'LATAKARANJA': 'Caesalpinia bonduc',
+  'LATAKARANJU': 'Caesalpinia bonduc',
+  'KARANJU': 'Caesalpinia bonduc',
+  'FEVER NUT': 'Caesalpinia bonduc',
+  'BONDUC NUT': 'Caesalpinia bonduc',
+  'VAJRAVALLI': 'Cissus quadrangularis',
+  'HADJOD': 'Cissus quadrangularis',
+  'HADJORA': 'Cissus quadrangularis',
+  'ASTHISAMHARAKA': 'Cissus quadrangularis',
+  'BONE SETTER': 'Cissus quadrangularis',
+  'HARRA': 'Terminalia chebula',
+  'HARAD': 'Terminalia chebula',
+  'HARDH': 'Terminalia chebula',
+  'HARR': 'Terminalia chebula',
+  'HARAR': 'Terminalia chebula',
+  'HARITAKI': 'Terminalia chebula',
+  'CHEBULIC MYROBALAN': 'Terminalia chebula',
+  'KALMEGH': 'Andrographis paniculata',
+  'BHUNIMBA': 'Andrographis paniculata',
+  'KING OF BITTERS': 'Andrographis paniculata',
+  'GOKSHURA': 'Tribulus terrestris',
+  'GOKHRU': 'Tribulus terrestris',
+  'PUNCTURE VINE': 'Tribulus terrestris',
+  'JIVANTI': 'Leptadenia reticulata',
+  'DODEE': 'Leptadenia reticulata',
+  'JEEVANTI': 'Leptadenia reticulata',
+  'PASHANABHEDA': 'Bergenia ligulata',
+  'PAKHANBHED': 'Bergenia ligulata',
+  'ROCK FOIL': 'Bergenia ligulata',
+  'MADANAPHALA': 'Catunaregam spinosa',
+  'MAINPHAL': 'Catunaregam spinosa',
+  'EMETIC NUT': 'Catunaregam spinosa',
+  'KAMPILLAKA': 'Mallotus philippensis',
+  'KABILA': 'Mallotus philippensis',
+  'KAMALA': 'Mallotus philippensis',
+  'SAFED MUSLI': 'Chlorophytum borivilianum',
+  'WHITE MUSLI': 'Chlorophytum borivilianum',
+  'VATSANABHA': 'Aconitum ferox',
+  'INDIAN ACONITE': 'Aconitum ferox',
+  'BHALLATAKA': 'Semecarpus anacardium',
+  'MARKING NUT': 'Semecarpus anacardium',
+  'DHATAKI': 'Woodfordia fruticosa',
+  'FIRE FLAME BUSH': 'Woodfordia fruticosa',
+  'KATUKA': 'Picrorhiza kurroa',
+  'KUTKI': 'Picrorhiza kurroa',
+  'KUTAKI': 'Picrorhiza kurroa',
+  'MAHUA': 'Madhuca indica',
+  'MADHUCA': 'Madhuca indica',
+  'VARUNA': 'Crateva nurvala',
+  'THREE LEAVED CAPER': 'Crateva nurvala',
+  'KANKOLA': 'Piper cubeba',
+  'CUBEB': 'Piper cubeba',
+  'USHEERA': 'Vetiveria zizanioides',
+  'KHAS': 'Vetiveria zizanioides',
+  'VETIVER': 'Vetiveria zizanioides'
+};
+
 /**
  * Helper to query GBIF (Global Biodiversity Information Facility) Open Public REST API
  */
 function lookupGbifTaxonomy(queryTerm) {
   return new Promise((resolve) => {
     const https = require('https');
-    const url = `https://api.gbif.org/v1/species/match?name=${encodeURIComponent(queryTerm)}`;
+    
+    // Resolve Vernacular name to Latin Binomial if available
+    const upperQuery = (queryTerm || '').trim().toUpperCase();
+    const latinTerm = VERNACULAR_TO_LATIN[upperQuery] || queryTerm;
+
+    const url = `https://api.gbif.org/v1/species/match?name=${encodeURIComponent(latinTerm)}`;
 
     const req = https.get(url, { timeout: 3000 }, (res) => {
       let data = '';
