@@ -6,6 +6,20 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const router = express.Router();
 
+const { getBotanicalInfo } = require('../../utils/botanicalLookup');
+
+// GET /api/raw-materials/botanical-lookup — Auto-lookup botanical / scientific name
+router.get('/botanical-lookup', async (req, res) => {
+  try {
+    const name = req.query.name || req.query.q;
+    if (!name) return res.status(400).json({ error: 'Raw material name query parameter is required' });
+    const info = await getBotanicalInfo(name);
+    res.json(info);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/raw-materials — List all raw materials
 // Supports ?warehouseId=&simple=true&search= for filtering
 router.get('/', async (req, res) => {
@@ -16,6 +30,7 @@ router.get('/', async (req, res) => {
         { name: { $regex: search, $options: 'i' } },
         { sku: { $regex: search, $options: 'i' } },
         { category: { $regex: search, $options: 'i' } },
+        { botanicalName: { $regex: search, $options: 'i' } },
       ]
     } : {};
     const rawMaterials = await RawMaterial.find(filter).sort({ name: 1 }).lean();
@@ -78,6 +93,20 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
     const resolvedUnit = unit || 'kg';
     const resolvedCategory = category || 'Herb';
 
+    // Auto-populate botanical/scientific details if missing
+    let botanicalName = req.body.botanicalName;
+    let partUsed = req.body.partUsed;
+    let pharmacopoeialStandard = req.body.pharmacopoeialStandard;
+
+    if (!botanicalName || !botanicalName.trim()) {
+      const autoBotanical = await getBotanicalInfo(formattedName);
+      if (autoBotanical.botanicalName) {
+        botanicalName = autoBotanical.botanicalName;
+        if (!partUsed) partUsed = autoBotanical.partUsed;
+        if (!pharmacopoeialStandard) pharmacopoeialStandard = autoBotanical.pharmacopoeialStandard;
+      }
+    }
+
     // Application-level duplicate check (case- and whitespace-insensitive name + unit + category)
     const duplicate = await RawMaterial.findDuplicateByName(formattedName, {
       unit: resolvedUnit,
@@ -111,7 +140,10 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
       sku: computedSku,
       unit: resolvedUnit,
       minReorder: Number(minReorder) || 0,
-      category: resolvedCategory
+      category: resolvedCategory,
+      botanicalName: botanicalName || '',
+      partUsed: partUsed || '',
+      pharmacopoeialStandard: pharmacopoeialStandard || 'API'
     });
 
     res.status(201).json(newRM);
