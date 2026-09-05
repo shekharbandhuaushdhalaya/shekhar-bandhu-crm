@@ -736,7 +736,7 @@ const HERB_DATABASE = [
   }
 ];
 
-
+/**
  * High-performance herb resolution function.
  * Accepts any query string (herb name / alias / Hindi name / scientific name),
  * returns standardized common name, Latin scientific name, part used, standard, and synonyms.
