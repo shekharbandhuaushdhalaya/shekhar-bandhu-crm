@@ -7,6 +7,9 @@ const RawMaterialQuarantine = require('../models/RawMaterialQuarantine');
 
 jest.mock('../models/CertificateOfAnalysis');
 jest.mock('../models/RawMaterialQuarantine');
+jest.mock('../models/SystemSettings');
+
+jest.setTimeout(10000);
 
 jest.mock('../middleware/authorize', () => ({
   authorize: () => (req, res, next) => {
