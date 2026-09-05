@@ -459,6 +459,41 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     partUsed: 'Bark (Twak)',
     category: 'Dry Herb',
     monographRef: 'API Part I, Vol V, Page 112'
+  },
+  {
+    commonNames: ['MAHUA', 'MADHUKA', 'MADHUKA PUSHPA', 'MAHUA FLOWER', 'MAHWA', 'BUTTER TREE', 'HONEY TREE'],
+    botanicalName: 'Madhuca longifolia (J.Koenig ex L.) J.F.Macbr.',
+    partUsed: 'Flower (Pushpa)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 73'
+  },
+  {
+    commonNames: ['VARUNA', 'VARUN', 'VARUNA CHHAL', 'CRATAEVA', 'THREE LEAVED CAPER'],
+    botanicalName: 'Crateva nurvala Buch.-Ham.',
+    partUsed: 'Bark (Twak)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 117'
+  },
+  {
+    commonNames: ['KANKOLA', 'KANKOL', 'CUBEB', 'TAILPEPPER', 'KANKOLA PHALA'],
+    botanicalName: 'Piper cubeba L.f.',
+    partUsed: 'Fruit (Phala)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 67'
+  },
+  {
+    commonNames: ['USHEERA', 'KHAS', 'KHAS KHAS', 'VETIVER', 'USHIR', 'USIR'],
+    botanicalName: 'Vetiveria zizanioides (L.) Nash',
+    partUsed: 'Root (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 213'
+  },
+  {
+    commonNames: ['TALISPATRA', 'TALISPATRI', 'TALIS', 'HIMALAYAN SILVER FIR'],
+    botanicalName: 'Abies webbiana Lindl.',
+    partUsed: 'Leaf (Patra)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol IV, Page 119'
   }
 ];
 
