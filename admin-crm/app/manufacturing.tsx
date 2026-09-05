@@ -1154,9 +1154,9 @@ export default function ManufacturingScreen() {
           }, 0);
         }
         const qty = batch.plannedQty || 0;
-        const unit = (batch.bomSnapshot?.formulationBasisUnit || 'ml').toLowerCase();
+        const unit = ((batch.bomSnapshot as any)?.formulationBasisUnit || 'ml').toLowerCase();
         const basisVolMl = unit === 'l' ? qty * 1000 : qty;
-        const basis = batch.bomSnapshot?.formulationBasis || 100;
+        const basis = (batch.bomSnapshot as any)?.formulationBasis || 100;
         return basis > 0 ? (basisVolMl / basis) * basis : 0;
       })();
       if (availableMl > 0 && totalVolumeMl > availableMl * 1.02) {
@@ -1260,7 +1260,7 @@ export default function ManufacturingScreen() {
     return 0;
   }
 
-  function computePackagingFromYields(ylds: { productId: string; actualYieldQty: number }[], batch: any, existingPkg: any[]) {
+  function computePackagingFromYields(ylds: { productId: string; actualYieldQty: number; size?: string }[], batch: any, existingPkg: any[]) {
     const pkgMap: Record<string, { rawMaterialId: string; name: string; unit: string; qtyTheoretical: number; qtyRequiredPerUnit: number; itemType: string; stockAvailable: number }> = {};
     for (const y of ylds) {
       if (!y.productId || !y.actualYieldQty) continue;
@@ -2161,9 +2161,9 @@ export default function ManufacturingScreen() {
                         }
                         // Fallback: if single product, use plannedQty converted from basis unit
                         const qty = batch2.plannedQty || 0;
-                        const unit = (batch2.bomSnapshot?.formulationBasisUnit || 'ml').toLowerCase();
+                        const unit = ((batch2.bomSnapshot as any)?.formulationBasisUnit || 'ml').toLowerCase();
                         const basisVolMl = unit === 'l' ? qty * 1000 : qty;
-                        const basis = batch2.bomSnapshot?.formulationBasis || 100;
+                        const basis = (batch2.bomSnapshot as any)?.formulationBasis || 100;
                         return basis > 0 ? (basisVolMl / basis) * basis : 0;
                       })();
                       const overVolume = availableMl > 0 && totalVolumeMl > availableMl;
