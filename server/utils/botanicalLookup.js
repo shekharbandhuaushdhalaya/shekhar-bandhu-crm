@@ -1,227 +1,742 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const SystemSettings = require('../models/SystemSettings');
 
-// Curated Ayurvedic & Botanical Pharmacopoeia Database with Aliases & Synonyms
 const HERB_DATABASE = [
   {
-    names: ['ashwagandha', 'asgandh', 'asgand', 'indian ginseng', 'winter cherry', 'withania'],
-    matchedName: 'Ashwagandha',
-    scientificName: 'Withania somnifera',
-    partUsed: 'Root',
-    pharmacopoeialStandard: 'API',
-    category: 'Herb',
-    synonyms: ['Asgandh', 'Indian Ginseng', 'Winter Cherry', 'Withania']
+    "names": [
+      "ashwagandha",
+      "asgandh",
+      "asgand",
+      "indian ginseng",
+      "winter cherry",
+      "withania"
+    ],
+    "matchedName": "Ashwagandha",
+    "scientificName": "Withania somnifera",
+    "partUsed": "Root",
+    "pharmacopoeialStandard": "API",
+    "category": "Herb",
+    "synonyms": [
+      "Asgandh",
+      "Indian Ginseng",
+      "Winter Cherry",
+      "Withania"
+    ]
   },
   {
-    names: ['tulsi', 'tulsy', 'holy basil', 'surasa', 'vrinda'],
-    matchedName: 'Tulsi',
-    scientificName: 'Ocimum sanctum',
-    partUsed: 'Leaf',
-    pharmacopoeialStandard: 'API',
-    category: 'Fresh Herb',
-    synonyms: ['Holy Basil', 'Surasa', 'Vrinda', 'Ocimum tenuiflorum']
+    "names": [
+      "tulsi",
+      "tulsy",
+      "holy basil",
+      "surasa",
+      "vrinda"
+    ],
+    "matchedName": "Tulsi",
+    "scientificName": "Ocimum sanctum",
+    "partUsed": "Leaf",
+    "pharmacopoeialStandard": "API",
+    "category": "Fresh Herb",
+    "synonyms": [
+      "Holy Basil",
+      "Surasa",
+      "Vrinda",
+      "Ocimum tenuiflorum"
+    ]
   },
   {
-    names: ['shatavari', 'satavari', 'shatamull', 'asparagus racemosus'],
-    matchedName: 'Shatavari',
-    scientificName: 'Asparagus racemosus',
-    partUsed: 'Tuberous Root',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Satavari', 'Shatamull', 'Wild Asparagus']
+    "names": [
+      "shatavari",
+      "satavari",
+      "shatamull",
+      "asparagus racemosus"
+    ],
+    "matchedName": "Shatavari",
+    "scientificName": "Asparagus racemosus",
+    "partUsed": "Tuberous Root",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Satavari",
+      "Shatamull",
+      "Wild Asparagus"
+    ]
   },
   {
-    names: ['neem', 'nimba', 'margosa', 'azadirachta indica'],
-    matchedName: 'Neem',
-    scientificName: 'Azadirachta indica',
-    partUsed: 'Leaf/Bark',
-    pharmacopoeialStandard: 'API',
-    category: 'Fresh Herb',
-    synonyms: ['Nimba', 'Margosa Tree', 'Indian Lilac']
+    "names": [
+      "neem",
+      "nimba",
+      "margosa",
+      "azadirachta indica"
+    ],
+    "matchedName": "Neem",
+    "scientificName": "Azadirachta indica",
+    "partUsed": "Leaf/Bark",
+    "pharmacopoeialStandard": "API",
+    "category": "Fresh Herb",
+    "synonyms": [
+      "Nimba",
+      "Margosa Tree",
+      "Indian Lilac"
+    ]
   },
   {
-    names: ['guduchi', 'giloy', 'gilo', 'amrita', 'tinospora cordifolia'],
-    matchedName: 'Guduchi',
-    scientificName: 'Tinospora cordifolia',
-    partUsed: 'Stem',
-    pharmacopoeialStandard: 'API',
-    category: 'Fresh Herb',
-    synonyms: ['Giloy', 'Gilo', 'Amrita', 'Heart-leaved Moonseed']
+    "names": [
+      "guduchi",
+      "giloy",
+      "gilo",
+      "amrita",
+      "tinospora cordifolia"
+    ],
+    "matchedName": "Guduchi",
+    "scientificName": "Tinospora cordifolia",
+    "partUsed": "Stem",
+    "pharmacopoeialStandard": "API",
+    "category": "Fresh Herb",
+    "synonyms": [
+      "Giloy",
+      "Gilo",
+      "Amrita",
+      "Heart-leaved Moonseed"
+    ]
   },
   {
-    names: ['amla', 'amalaki', 'avla', 'aonla', 'indian gooseberry', 'phyllanthus emblica', 'emblica officinalis'],
-    matchedName: 'Amla',
-    scientificName: 'Phyllanthus emblica',
-    partUsed: 'Fresh/Dry Fruit',
-    pharmacopoeialStandard: 'API',
-    category: 'Fresh Herb',
-    synonyms: ['Amalaki', 'Indian Gooseberry', 'Emblica officinalis']
+    "names": [
+      "amla",
+      "amalaki",
+      "avla",
+      "aonla",
+      "indian gooseberry",
+      "phyllanthus emblica",
+      "emblica officinalis"
+    ],
+    "matchedName": "Amla",
+    "scientificName": "Phyllanthus emblica",
+    "partUsed": "Fresh/Dry Fruit",
+    "pharmacopoeialStandard": "API",
+    "category": "Fresh Herb",
+    "synonyms": [
+      "Amalaki",
+      "Indian Gooseberry",
+      "Emblica officinalis"
+    ]
   },
   {
-    names: ['haritaki', 'harra', 'harad', 'harde', 'harr', 'harar', 'chebulic myrobalan', 'terminalia chebula'],
-    matchedName: 'Haritaki',
-    scientificName: 'Terminalia chebula',
-    partUsed: 'Fruit Pericarp',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Harra', 'Harad', 'Harde', 'Chebulic Myrobalan', 'Abhaya', 'Pathya']
+    "names": [
+      "haritaki",
+      "harra",
+      "harad",
+      "harde",
+      "harr",
+      "harar",
+      "chebulic myrobalan",
+      "terminalia chebula"
+    ],
+    "matchedName": "Haritaki",
+    "scientificName": "Terminalia chebula",
+    "partUsed": "Fruit Pericarp",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Harra",
+      "Harad",
+      "Harde",
+      "Chebulic Myrobalan",
+      "Abhaya",
+      "Pathya"
+    ]
   },
   {
-    names: ['bibhitaki', 'baheda', 'beleric myrobalan', 'terminalia bellirica'],
-    matchedName: 'Bibhitaki',
-    scientificName: 'Terminalia bellirica',
-    partUsed: 'Fruit Pericarp',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Baheda', 'Beleric Myrobalan', 'Aksha']
+    "names": [
+      "bibhitaki",
+      "baheda",
+      "beleric myrobalan",
+      "terminalia bellirica"
+    ],
+    "matchedName": "Bibhitaki",
+    "scientificName": "Terminalia bellirica",
+    "partUsed": "Fruit Pericarp",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Baheda",
+      "Beleric Myrobalan",
+      "Aksha"
+    ]
   },
   {
-    names: ['brahmi', 'water hyssop', 'bacopa monnieri'],
-    matchedName: 'Brahmi',
-    scientificName: 'Bacopa monnieri',
-    partUsed: 'Whole Plant',
-    pharmacopoeialStandard: 'API',
-    category: 'Fresh Herb',
-    synonyms: ['Water Hyssop', 'Jalanimba', 'Bacopa']
+    "names": [
+      "brahmi",
+      "water hyssop",
+      "bacopa monnieri"
+    ],
+    "matchedName": "Brahmi",
+    "scientificName": "Bacopa monnieri",
+    "partUsed": "Whole Plant",
+    "pharmacopoeialStandard": "API",
+    "category": "Fresh Herb",
+    "synonyms": [
+      "Water Hyssop",
+      "Jalanimba",
+      "Bacopa"
+    ]
   },
   {
-    names: ['mulethi', 'yashtimadhu', 'licorice', 'liquorice', 'glycyrrhiza glabra'],
-    matchedName: 'Yashtimadhu',
-    scientificName: 'Glycyrrhiza glabra',
-    partUsed: 'Root/Rhizome',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Mulethi', 'Licorice', 'Sweetwood']
+    "names": [
+      "mulethi",
+      "yashtimadhu",
+      "licorice",
+      "liquorice",
+      "glycyrrhiza glabra"
+    ],
+    "matchedName": "Yashtimadhu",
+    "scientificName": "Glycyrrhiza glabra",
+    "partUsed": "Root/Rhizome",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Mulethi",
+      "Licorice",
+      "Sweetwood"
+    ]
   },
   {
-    names: ['pippali', 'piper longum', 'long pepper'],
-    matchedName: 'Pippali',
-    scientificName: 'Piper longum',
-    partUsed: 'Fruit',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Long Pepper', 'Magadhi']
+    "names": [
+      "pippali",
+      "piper longum",
+      "long pepper"
+    ],
+    "matchedName": "Pippali",
+    "scientificName": "Piper longum",
+    "partUsed": "Fruit",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Long Pepper",
+      "Magadhi"
+    ]
   },
   {
-    names: ['maricha', 'kali mirch', 'black pepper', 'piper nigrum'],
-    matchedName: 'Maricha',
-    scientificName: 'Piper nigrum',
-    partUsed: 'Fruit',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Kali Mirch', 'Black Pepper', 'Vellaja']
+    "names": [
+      "maricha",
+      "kali mirch",
+      "black pepper",
+      "piper nigrum"
+    ],
+    "matchedName": "Maricha",
+    "scientificName": "Piper nigrum",
+    "partUsed": "Fruit",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Kali Mirch",
+      "Black Pepper",
+      "Vellaja"
+    ]
   },
   {
-    names: ['shunthi', 'sonth', 'dry ginger', 'zingiber officinale'],
-    matchedName: 'Shunthi',
-    scientificName: 'Zingiber officinale',
-    partUsed: 'Dry Rhizome',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Sonth', 'Dry Ginger', 'Nagara']
+    "names": [
+      "shunthi",
+      "sonth",
+      "dry ginger",
+      "zingiber officinale"
+    ],
+    "matchedName": "Shunthi",
+    "scientificName": "Zingiber officinale",
+    "partUsed": "Dry Rhizome",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Sonth",
+      "Dry Ginger",
+      "Nagara"
+    ]
   },
   {
-    names: ['guggulu', 'guggul', 'commiphora wightii', 'indian bdellium'],
-    matchedName: 'Guggulu',
-    scientificName: 'Commiphora wightii',
-    partUsed: 'Exudate/Resin',
-    pharmacopoeialStandard: 'API',
-    category: 'Plant Concentrate',
-    synonyms: ['Guggul', 'Indian Bdellium', 'Purified Resin']
+    "names": [
+      "guggulu",
+      "guggul",
+      "commiphora wightii",
+      "indian bdellium"
+    ],
+    "matchedName": "Guggulu",
+    "scientificName": "Commiphora wightii",
+    "partUsed": "Exudate/Resin",
+    "pharmacopoeialStandard": "API",
+    "category": "Plant Concentrate",
+    "synonyms": [
+      "Guggul",
+      "Indian Bdellium",
+      "Purified Resin"
+    ]
   },
   {
-    names: ['manjistha', 'rubia cordifolia', 'indian madder'],
-    matchedName: 'Manjistha',
-    scientificName: 'Rubia cordifolia',
-    partUsed: 'Stem/Root',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Indian Madder', 'Aruna']
+    "names": [
+      "manjistha",
+      "rubia cordifolia",
+      "indian madder"
+    ],
+    "matchedName": "Manjistha",
+    "scientificName": "Rubia cordifolia",
+    "partUsed": "Stem/Root",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Indian Madder",
+      "Aruna"
+    ]
   },
   {
-    names: ['shankhpushpi', 'convolvulus pluricaulis'],
-    matchedName: 'Shankhpushpi',
-    scientificName: 'Convolvulus pluricaulis',
-    partUsed: 'Whole Plant',
-    pharmacopoeialStandard: 'API',
-    category: 'Fresh Herb',
-    synonyms: ['Speedwheel', 'Ksheerapushpi']
+    "names": [
+      "shankhpushpi",
+      "convolvulus pluricaulis"
+    ],
+    "matchedName": "Shankhpushpi",
+    "scientificName": "Convolvulus pluricaulis",
+    "partUsed": "Whole Plant",
+    "pharmacopoeialStandard": "API",
+    "category": "Fresh Herb",
+    "synonyms": [
+      "Speedwheel",
+      "Ksheerapushpi"
+    ]
   },
   {
-    names: ['bhringraj', 'eclipta alba', 'eclipta prostrata', 'false daisy'],
-    matchedName: 'Bhringraj',
-    scientificName: 'Eclipta alba',
-    partUsed: 'Whole Plant',
-    pharmacopoeialStandard: 'API',
-    category: 'Fresh Herb',
-    synonyms: ['False Daisy', 'Keshraja']
+    "names": [
+      "bhringraj",
+      "eclipta alba",
+      "eclipta prostrata",
+      "false daisy"
+    ],
+    "matchedName": "Bhringraj",
+    "scientificName": "Eclipta alba",
+    "partUsed": "Whole Plant",
+    "pharmacopoeialStandard": "API",
+    "category": "Fresh Herb",
+    "synonyms": [
+      "False Daisy",
+      "Keshraja"
+    ]
   },
   {
-    names: ['arjuna', 'terminalia arjuna'],
-    matchedName: 'Arjuna',
-    scientificName: 'Terminalia arjuna',
-    partUsed: 'Stem Bark',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Arjun Bark', 'Kukubha']
+    "names": [
+      "arjuna",
+      "terminalia arjuna"
+    ],
+    "matchedName": "Arjuna",
+    "scientificName": "Terminalia arjuna",
+    "partUsed": "Stem Bark",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Arjun Bark",
+      "Kukubha"
+    ]
   },
   {
-    names: ['punarnava', 'boerhavia diffusa', 'spreading hogweed'],
-    matchedName: 'Punarnava',
-    scientificName: 'Boerhavia diffusa',
-    partUsed: 'Root/Whole Plant',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Spreading Hogweed', 'Shothaghni']
+    "names": [
+      "punarnava",
+      "boerhavia diffusa",
+      "spreading hogweed"
+    ],
+    "matchedName": "Punarnava",
+    "scientificName": "Boerhavia diffusa",
+    "partUsed": "Root/Whole Plant",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Spreading Hogweed",
+      "Shothaghni"
+    ]
   },
   {
-    names: ['gokshura', 'tribulus terrestris', 'puncture vine'],
-    matchedName: 'Gokshura',
-    scientificName: 'Tribulus terrestris',
-    partUsed: 'Fruit/Root',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Puncture Vine', 'Gokhru', 'Trikanta']
+    "names": [
+      "gokshura",
+      "tribulus terrestris",
+      "puncture vine"
+    ],
+    "matchedName": "Gokshura",
+    "scientificName": "Tribulus terrestris",
+    "partUsed": "Fruit/Root",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Puncture Vine",
+      "Gokhru",
+      "Trikanta"
+    ]
   },
   {
-    names: ['kutki', 'picrorhiza kurroa'],
-    matchedName: 'Kutki',
-    scientificName: 'Picrorhiza kurroa',
-    partUsed: 'Rhizome/Root',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Katuka', 'Picrorhiza']
+    "names": [
+      "kutki",
+      "picrorhiza kurroa"
+    ],
+    "matchedName": "Kutki",
+    "scientificName": "Picrorhiza kurroa",
+    "partUsed": "Rhizome/Root",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Katuka",
+      "Picrorhiza"
+    ]
   },
   {
-    names: ['haridra', 'haldi', 'turmeric', 'curcuma longa'],
-    matchedName: 'Haridra',
-    scientificName: 'Curcuma longa',
-    partUsed: 'Rhizome',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Haldi', 'Turmeric', 'Nisha']
+    "names": [
+      "haridra",
+      "haldi",
+      "turmeric",
+      "curcuma longa"
+    ],
+    "matchedName": "Haridra",
+    "scientificName": "Curcuma longa",
+    "partUsed": "Rhizome",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Haldi",
+      "Turmeric",
+      "Nisha"
+    ]
   },
   {
-    names: ['chandan', 'sandalwood', 'santalum album'],
-    matchedName: 'Chandan',
-    scientificName: 'Santalum album',
-    partUsed: 'Heartwood',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Sandalwood', 'Shrikhanda']
+    "names": [
+      "chandan",
+      "sandalwood",
+      "santalum album"
+    ],
+    "matchedName": "Chandan",
+    "scientificName": "Santalum album",
+    "partUsed": "Heartwood",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Sandalwood",
+      "Shrikhanda"
+    ]
   },
   {
-    names: ['vajravalli', 'asthisamharaka', 'hadjod', 'had jora', 'cissus quadrangularis', 'bone setter'],
-    matchedName: 'Vajravalli',
-    scientificName: 'Cissus quadrangularis',
-    partUsed: 'Stem',
-    pharmacopoeialStandard: 'API',
-    category: 'Dry Herb',
-    synonyms: ['Asthisamharaka', 'Hadjod', 'Bone Setter', 'Asthisrnkhala']
+    "names": [
+      "vajravalli",
+      "asthisamharaka",
+      "hadjod",
+      "had jora",
+      "cissus quadrangularis",
+      "bone setter"
+    ],
+    "matchedName": "Vajravalli",
+    "scientificName": "Cissus quadrangularis",
+    "partUsed": "Stem",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Asthisamharaka",
+      "Hadjod",
+      "Bone Setter",
+      "Asthisrnkhala"
+    ]
+  },
+  {
+    "names": [
+      "akarkara",
+      "pellitory root",
+      "akarakarabha",
+      "anacyclus"
+    ],
+    "matchedName": "AKARKARA",
+    "scientificName": "Anacyclus pyrethrum",
+    "partUsed": "Root",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Akarkara",
+      "Pellitory Root",
+      "Akarakarabha",
+      "Anacyclus"
+    ]
+  },
+  {
+    "names": [
+      "agnimantha",
+      "arani",
+      "premna",
+      "tarkari",
+      "dashamula tree"
+    ],
+    "matchedName": "AGNIMANTHA",
+    "scientificName": "Premna integrifolia L.",
+    "partUsed": "Root Bark",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Arani",
+      "Premna",
+      "Tarkari",
+      "Dashamula Tree"
+    ]
+  },
+  {
+    "names": [
+      "safed musli",
+      "safed moosli",
+      "white musli",
+      "swetha musli",
+      "shedheveli",
+      "chlorophytum"
+    ],
+    "matchedName": "SAFED MUSLI",
+    "scientificName": "Chlorophytum borivilianum Santapau & R.R.Fern.",
+    "partUsed": "Tuberous Root",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Safed Moosli",
+      "White Musli",
+      "Swetha Musli",
+      "Shedheveli"
+    ]
+  },
+  {
+    "names": [
+      "jyotishmati",
+      "malkangani",
+      "intellect tree",
+      "staff tree",
+      "jyotishmati oil",
+      "celastrus"
+    ],
+    "matchedName": "JYOTISHMATI",
+    "scientificName": "Celastrus paniculatus Willd.",
+    "partUsed": "Seed / Seed Oil",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Malkangani",
+      "Intellect Tree",
+      "Staff Tree",
+      "Jyotishmati Oil"
+    ]
+  },
+  {
+    "names": [
+      "kalonji",
+      "black seed",
+      "upakunchika",
+      "black cumin",
+      "nigella"
+    ],
+    "matchedName": "KALONJI",
+    "scientificName": "Nigella sativa L.",
+    "partUsed": "Seed",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Black Seed",
+      "Upakunchika",
+      "Black Cumin",
+      "Nigella"
+    ]
+  },
+  {
+    "names": [
+      "majuphal",
+      "oak gall",
+      "manjakani",
+      "mayaphal",
+      "oak apple",
+      "quercus"
+    ],
+    "matchedName": "MAJUPHAL",
+    "scientificName": "Quercus infectoria Olivier",
+    "partUsed": "Insect Gall",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Oak Gall",
+      "Manjakani",
+      "Mayaphal",
+      "Oak Apple"
+    ]
+  },
+  {
+    "names": [
+      "jamun",
+      "jambu",
+      "java plum",
+      "jamun seed",
+      "jambula",
+      "syzygium"
+    ],
+    "matchedName": "JAMUN",
+    "scientificName": "Syzygium cumini",
+    "partUsed": "Seed Kernel / Bark",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Jambu",
+      "Java Plum",
+      "Jamun Seed",
+      "Jambula"
+    ]
+  },
+  {
+    "names": [
+      "hing",
+      "asafoetida",
+      "hingu",
+      "devil’s dung",
+      "shodhita hingu",
+      "ferula"
+    ],
+    "matchedName": "HING",
+    "scientificName": "Ferula foetida Regel / Ferula narthex Boiss.",
+    "partUsed": "Purified Oleo-Gum Resin (Shodhita Hingu)",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Asafoetida",
+      "Hingu",
+      "Devil’s Dung",
+      "Shodhita Hingu"
+    ]
+  },
+  {
+    "names": [
+      "alsi",
+      "flaxseed",
+      "linseed",
+      "atasi",
+      "uma",
+      "linum"
+    ],
+    "matchedName": "ALSI",
+    "scientificName": "Linum usitatissimum L.",
+    "partUsed": "Seed / Seed Oil",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Flaxseed",
+      "Linseed",
+      "Atasi",
+      "Uma"
+    ]
+  },
+  {
+    "names": [
+      "kali jeeri",
+      "kalijiri",
+      "somaraji",
+      "bitter cumin",
+      "krimighna",
+      "centratherum"
+    ],
+    "matchedName": "KALI JEERI",
+    "scientificName": "Centratherum anthelminticum",
+    "partUsed": "Seed",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Kalijiri",
+      "Somaraji",
+      "Bitter Cumin",
+      "Krimighna"
+    ]
+  },
+  {
+    "names": [
+      "ulatkambal",
+      "devil’s cotton",
+      "pivari",
+      "abroma"
+    ],
+    "matchedName": "ULATKAMBAL",
+    "scientificName": "Abroma augusta",
+    "partUsed": "Root Bark",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Devil’s Cotton",
+      "Ulatkambal",
+      "Pivari"
+    ]
+  },
+  {
+    "names": [
+      "putrajeevak",
+      "putranjiva",
+      "child life tree",
+      "pavitra"
+    ],
+    "matchedName": "PUTRAJEEVAK",
+    "scientificName": "Putranjiva roxburghii Wall.",
+    "partUsed": "Seed Kernel",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Putranjiva",
+      "Child Life Tree",
+      "Pavitra"
+    ]
+  },
+  {
+    "names": [
+      "chironji",
+      "charoli",
+      "buchanania",
+      "priyala"
+    ],
+    "matchedName": "CHIRONJI",
+    "scientificName": "Buchanania lanzan Spreng.",
+    "partUsed": "Seed Kernel",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Charoli",
+      "Buchanania",
+      "Priyala"
+    ]
+  },
+  {
+    "names": [
+      "gunja",
+      "rosary pea",
+      "ratti",
+      "raktika",
+      "abrus"
+    ],
+    "matchedName": "GUNJA",
+    "scientificName": "Abrus precatorius L.",
+    "partUsed": "Purified Seed (Shodhita)",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Rosary Pea",
+      "Ratti",
+      "Raktika"
+    ]
+  },
+  {
+    "names": [
+      "kalihari",
+      "flame lily",
+      "gloriosa",
+      "langali",
+      "agnishikha"
+    ],
+    "matchedName": "KALIHARI",
+    "scientificName": "Gloriosa superba L.",
+    "partUsed": "Purified Tuber / Seed (Shodhita)",
+    "pharmacopoeialStandard": "API",
+    "category": "Dry Herb",
+    "synonyms": [
+      "Flame Lily",
+      "Gloriosa",
+      "Langali",
+      "Agnishikha"
+    ]
   }
 ];
 
-/**
+
  * High-performance herb resolution function.
  * Accepts any query string (herb name / alias / Hindi name / scientific name),
  * returns standardized common name, Latin scientific name, part used, standard, and synonyms.

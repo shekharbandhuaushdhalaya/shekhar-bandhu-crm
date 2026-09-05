@@ -3031,6 +3031,488 @@ const PHARMACOPOEIA_SEED_DATA = [
     ],
     "dosage": "10 - 20 g seed decoction per day",
     "description": "Seeds of Macrotyloma uniflorum, master Ayurvedic pulse for breaking kidney stones (Ashmarihara) and reducing fat."
+  },
+  {
+    "ayurvedicName": "AKARKARA",
+    "botanicalName": "Anacyclus pyrethrum (L.) Lag.",
+    "family": "Asteraceae",
+    "partUsed": "Root",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 1",
+    "synonyms": [
+      "Akarkara",
+      "Pellitory Root",
+      "Akarakarabha",
+      "Anacyclus"
+    ],
+    "therapeuticUses": [
+      "Vajikarna",
+      "Dantya (Toothache)",
+      "Mukharogahara",
+      "Nervine Stimulant"
+    ],
+    "rasa": [
+      "Katu"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Ruksha",
+      "Tikshna"
+    ],
+    "dosage": "0.5 - 1 g root powder per day",
+    "description": "Dried roots of Anacyclus pyrethrum, supreme Ayurvedic aphrodisiac, oral analgesic, and nervous system energizer."
+  },
+  {
+    "ayurvedicName": "AGNIMANTHA",
+    "botanicalName": "Premna integrifolia L. (Premna mucronata Roxb.)",
+    "family": "Lamiaceae / Verbenaceae",
+    "partUsed": "Root Bark",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 3",
+    "synonyms": [
+      "Arani",
+      "Premna",
+      "Tarkari",
+      "Dashamula Tree"
+    ],
+    "therapeuticUses": [
+      "Dashamula-constituent",
+      "Shothahara",
+      "Vatashamana",
+      "Kapha-hara",
+      "Pramehahara"
+    ],
+    "rasa": [
+      "Tikta",
+      "Kashaya",
+      "Katu",
+      "Madhura"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "3 - 6 g root bark powder per day",
+    "description": "Root bark of Premna integrifolia, essential Dashamula constituent for edema, anti-inflammatory, and metabolic balance."
+  },
+  {
+    "ayurvedicName": "SAFED MUSLI",
+    "botanicalName": "Chlorophytum borivilianum Santapau & R.R.Fern.",
+    "family": "Liliaceae / Asparagaceae",
+    "partUsed": "Tuberous Root",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol VI, Page 145",
+    "synonyms": [
+      "Safed Moosli",
+      "White Musli",
+      "Swetha Musli",
+      "Shedheveli"
+    ],
+    "therapeuticUses": [
+      "Rasayana",
+      "Vrishya",
+      "Balya",
+      "Brimhana",
+      "Ojo-vardhaka"
+    ],
+    "rasa": [
+      "Madhura"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Madhura",
+    "guna": [
+      "Guru",
+      "Snigdha"
+    ],
+    "dosage": "3 - 6 g root powder per day",
+    "description": "Tuberous roots of Chlorophytum borivilianum, supreme Ayurvedic Rasayana for stamina, vitality, and physical strength."
+  },
+  {
+    "ayurvedicName": "JYOTISHMATI",
+    "botanicalName": "Celastrus paniculatus Willd.",
+    "family": "Celastraceae",
+    "partUsed": "Seed / Seed Oil",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 75",
+    "synonyms": [
+      "Malkangani",
+      "Intellect Tree",
+      "Staff Tree",
+      "Jyotishmati Oil"
+    ],
+    "therapeuticUses": [
+      "Medhya",
+      "Smritida (Memory booster)",
+      "Vata-Kapha-hara",
+      "Deepana"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Tikshna",
+      "Sara"
+    ],
+    "dosage": "1 - 2 g seed powder or 5 - 15 drops oil per day",
+    "description": "Seeds and seed oil of Celastrus paniculatus, renowned brain tonic (Medhya) for memory enhancement and neuro-protection."
+  },
+  {
+    "ayurvedicName": "KALONJI",
+    "botanicalName": "Nigella sativa L.",
+    "family": "Ranunculaceae",
+    "partUsed": "Seed",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 57",
+    "synonyms": [
+      "Black Seed",
+      "Upakunchika",
+      "Black Cumin",
+      "Nigella"
+    ],
+    "therapeuticUses": [
+      "Deepana",
+      "Pachana",
+      "Krimighna",
+      "Stanyajanana",
+      "Kaphavata-hara"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "1 - 3 g seed powder per day",
+    "description": "Seeds of Nigella sativa, classic aromatic digestive, carminative, and immune supportive black seeds."
+  },
+  {
+    "ayurvedicName": "MAJUPHAL",
+    "botanicalName": "Quercus infectoria Olivier",
+    "family": "Fagaceae",
+    "partUsed": "Insect Gall",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 105",
+    "synonyms": [
+      "Oak Gall",
+      "Manjakani",
+      "Mayaphal",
+      "Oak Apple"
+    ],
+    "therapeuticUses": [
+      "Grahi",
+      "Mukharogahara",
+      "Raktastambhana",
+      "Dantya"
+    ],
+    "rasa": [
+      "Kashaya"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "1 - 3 g gall powder per day",
+    "description": "Galls of Quercus infectoria, supreme natural tannin astringent for oral care, tissue tightening, and mucosal hemostasis."
+  },
+  {
+    "ayurvedicName": "JAMUN",
+    "botanicalName": "Syzygium cumini (L.) Skeels (Eugenia jambolana Lam.)",
+    "family": "Myrtaceae",
+    "partUsed": "Seed Kernel / Bark",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 55",
+    "synonyms": [
+      "Jambu",
+      "Java Plum",
+      "Jamun Seed",
+      "Jambula"
+    ],
+    "therapeuticUses": [
+      "Pramehahara (Glycemic Balance)",
+      "Grahi",
+      "Trishnahara",
+      "Pittahara"
+    ],
+    "rasa": [
+      "Kashaya",
+      "Madhura",
+      "Amla"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "3 - 6 g seed powder per day",
+    "description": "Dried seeds of Syzygium cumini, master Ayurvedic botanical for diabetes management (Pramehahara) and intestinal astringency."
+  },
+  {
+    "ayurvedicName": "HING",
+    "botanicalName": "Ferula foetida Regel / Ferula narthex Boiss.",
+    "family": "Apiaceae",
+    "partUsed": "Purified Oleo-Gum Resin (Shodhita Hingu)",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 51",
+    "synonyms": [
+      "Asafoetida",
+      "Hingu",
+      "Devil’s Dung",
+      "Shodhita Hingu"
+    ],
+    "therapeuticUses": [
+      "Deepana",
+      "Pachana",
+      "Anulomana",
+      "Shoolahara",
+      "Hridya"
+    ],
+    "rasa": [
+      "Katu"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Snigdha",
+      "Tikshna"
+    ],
+    "dosage": "125 - 500 mg purified gum resin per day",
+    "description": "Oleo-gum resin of Ferula species, master carminative, anti-spasmodic (Shoolahara), and digestive catalyst in API."
+  },
+  {
+    "ayurvedicName": "ALSI",
+    "botanicalName": "Linum usitatissimum L.",
+    "family": "Linaceae",
+    "partUsed": "Seed / Seed Oil",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 3",
+    "synonyms": [
+      "Flaxseed",
+      "Linseed",
+      "Atasi",
+      "Uma"
+    ],
+    "therapeuticUses": [
+      "Vatashamana",
+      "Balya",
+      "Tvachya",
+      "Hridya",
+      "Medohara"
+    ],
+    "rasa": [
+      "Madhura"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Guru",
+      "Snigdha",
+      "Pichchila"
+    ],
+    "dosage": "3 - 6 g seed powder per day",
+    "description": "Seeds and oil of Linum usitatissimum, natural omega-3 source for cardiovascular, skin, and mucosal health."
+  },
+  {
+    "ayurvedicName": "KALI JEERI",
+    "botanicalName": "Centratherum anthelminticum (L.) Kuntze",
+    "family": "Asteraceae",
+    "partUsed": "Seed",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 73",
+    "synonyms": [
+      "Kalijiri",
+      "Somaraji",
+      "Bitter Cumin",
+      "Krimighna"
+    ],
+    "therapeuticUses": [
+      "Krimighna",
+      "Kushthaghna",
+      "Deepana",
+      "Kandughna"
+    ],
+    "rasa": [
+      "Tikta",
+      "Katu"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Tikshna"
+    ],
+    "dosage": "1 - 3 g seed powder per day",
+    "description": "Seeds of Centratherum anthelminticum, potent antiparasitic (Krimighna) and skin detoxifier."
+  },
+  {
+    "ayurvedicName": "ULATKAMBAL",
+    "botanicalName": "Abroma augusta (L.) L.f.",
+    "family": "Malvaceae / Sterculiaceae",
+    "partUsed": "Root Bark",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol V, Page 155",
+    "synonyms": [
+      "Devil’s Cotton",
+      "Ulatkambal",
+      "Pivari"
+    ],
+    "therapeuticUses": [
+      "Artavajanana (Emmenagogue)",
+      "Garbhashaya-balya",
+      "Vatashamana"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "3 - 6 g root bark powder per day",
+    "description": "Root bark of Abroma augusta, premier Ayurvedic female uterine tonic for painful menstruation (Dysmenorrhea)."
+  },
+  {
+    "ayurvedicName": "PUTRAJEEVAK",
+    "botanicalName": "Putranjiva roxburghii Wall.",
+    "family": "Putranjivaceae / Euphorbiaceae",
+    "partUsed": "Seed Kernel",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol V, Page 129",
+    "synonyms": [
+      "Putranjiva",
+      "Child Life Tree",
+      "Pavitra"
+    ],
+    "therapeuticUses": [
+      "Prajasthapana (Fertility Support)",
+      "Vrishya",
+      "Balya",
+      "Garbhadharana"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta",
+      "Madhura"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Madhura",
+    "guna": [
+      "Guru"
+    ],
+    "dosage": "1 - 3 g seed powder per day",
+    "description": "Seeds of Putranjiva roxburghii, traditional reproductive invigorator and reproductive health seed."
+  },
+  {
+    "ayurvedicName": "CHIRONJI",
+    "botanicalName": "Buchanania lanzan Spreng.",
+    "family": "Anacardiaceae",
+    "partUsed": "Seed Kernel",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol IV, Page 29",
+    "synonyms": [
+      "Charoli",
+      "Buchanania",
+      "Priyala"
+    ],
+    "therapeuticUses": [
+      "Brimhana",
+      "Vrishya",
+      "Pittahara",
+      "Balya",
+      "Varnya"
+    ],
+    "rasa": [
+      "Madhura"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Madhura",
+    "guna": [
+      "Guru",
+      "Snigdha"
+    ],
+    "dosage": "5 - 10 g seed kernel per day",
+    "description": "Kernels of Buchanania lanzan, sweet nutritive seeds for vitality, cooling Rasayana, and complexion."
+  },
+  {
+    "ayurvedicName": "GUNJA",
+    "botanicalName": "Abrus precatorius L.",
+    "family": "Fabaceae",
+    "partUsed": "Purified Seed (Shodhita)",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 37 (Schedule E1 Item)",
+    "synonyms": [
+      "Rosary Pea",
+      "Ratti",
+      "Raktika"
+    ],
+    "therapeuticUses": [
+      "Keshya",
+      "Kushthaghna",
+      "Kandughna",
+      "Vrishya"
+    ],
+    "rasa": [
+      "Tikta",
+      "Kashaya"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha",
+      "Tikshna"
+    ],
+    "dosage": "15 - 30 mg Shodhita seed powder under strict Supervision",
+    "description": "Schedule E1 seed of Abrus precatorius, requires mandatory Shodhana in Milk prior to hair and skin formulations."
+  },
+  {
+    "ayurvedicName": "KALIHARI",
+    "botanicalName": "Gloriosa superba L.",
+    "family": "Colchicaceae / Liliaceae",
+    "partUsed": "Purified Tuber / Seed (Shodhita)",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 73 (Schedule E1 Item)",
+    "synonyms": [
+      "Flame Lily",
+      "Gloriosa",
+      "Langali",
+      "Agnishikha"
+    ],
+    "therapeuticUses": [
+      "Garbhashaya-sankochaka",
+      "Kushthaghna",
+      "Shothahara",
+      "Krimighna"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha",
+      "Tikshna"
+    ],
+    "dosage": "15 - 30 mg Shodhita tuber under medical Supervision",
+    "description": "Schedule E1 toxic tuber of Gloriosa superba, source of colchicine, purified prior to specialized anti-inflammatory use."
   }
 ];
 

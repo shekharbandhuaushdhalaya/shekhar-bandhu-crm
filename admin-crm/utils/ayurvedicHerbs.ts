@@ -648,6 +648,113 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     partUsed: 'Seed (Beej)',
     category: 'Dry Herb',
     monographRef: 'API Part I, Vol I, Page 65'
+  },
+  {
+    commonNames: ['AKARKARA', 'PELLITORY', 'AKARAKARABHA'],
+    botanicalName: 'Anacyclus pyrethrum (L.) Lag.',
+    partUsed: 'Root (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 1'
+  },
+  {
+    commonNames: ['AGNIMANTHA', 'ARANI', 'PREMNA', 'TARKARI'],
+    botanicalName: 'Premna integrifolia L.',
+    partUsed: 'Bark (Twak)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 3'
+  },
+  {
+    commonNames: ['SAFED MUSLI', 'WHITE MUSLI', 'SWETHA MUSLI'],
+    botanicalName: 'Chlorophytum borivilianum Santapau',
+    partUsed: 'Root (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol VI, Page 145'
+  },
+  {
+    commonNames: ['JYOTISHMATI', 'MALKANGANI', 'INTELLECT TREE', 'STAFF TREE'],
+    botanicalName: 'Celastrus paniculatus Willd.',
+    partUsed: 'Seed / Oil (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 75'
+  },
+  {
+    commonNames: ['KALONJI', 'BLACK SEED', 'UPAKUNCHIKA', 'BLACK CUMIN'],
+    botanicalName: 'Nigella sativa L.',
+    partUsed: 'Seed (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 57'
+  },
+  {
+    commonNames: ['MAJUPHAL', 'OAK GALL', 'MANJAKANI', 'MAYAPHAL'],
+    botanicalName: 'Quercus infectoria Olivier',
+    partUsed: 'Gall (Phala)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 105'
+  },
+  {
+    commonNames: ['JAMUN', 'JAMBU', 'JAVA PLUM', 'JAMUN SEED'],
+    botanicalName: 'Syzygium cumini (L.) Skeels',
+    partUsed: 'Seed (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 55'
+  },
+  {
+    commonNames: ['HING', 'ASAFOETIDA', 'HINGU', 'DEVIL DUNG'],
+    botanicalName: 'Ferula foetida Regel',
+    partUsed: 'Resin (Niryasa)',
+    category: 'Plant Concentrate',
+    monographRef: 'API Part I, Vol I, Page 51'
+  },
+  {
+    commonNames: ['ALSI', 'FLAXSEED', 'LINSEED', 'ATASI'],
+    botanicalName: 'Linum usitatissimum L.',
+    partUsed: 'Seed (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 3'
+  },
+  {
+    commonNames: ['KALI JEERI', 'KALIJIRI', 'SOMARAJI', 'BITTER CUMIN'],
+    botanicalName: 'Centratherum anthelminticum (L.) Kuntze',
+    partUsed: 'Seed (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 73'
+  },
+  {
+    commonNames: ['ULATKAMBAL', 'DEVIL COTTON', 'PIVARI'],
+    botanicalName: 'Abroma augusta (L.) L.f.',
+    partUsed: 'Root Bark (Twak)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol V, Page 155'
+  },
+  {
+    commonNames: ['PUTRAJEEVAK', 'PUTRANJIVA'],
+    botanicalName: 'Putranjiva roxburghii Wall.',
+    partUsed: 'Seed (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol V, Page 129'
+  },
+  {
+    commonNames: ['CHIRONJI', 'CHAROLI', 'PRIYALA'],
+    botanicalName: 'Buchanania lanzan Spreng.',
+    partUsed: 'Seed Kernel (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol IV, Page 29'
+  },
+  {
+    commonNames: ['GUNJA', 'ROSARY PEA', 'RATTI'],
+    botanicalName: 'Abrus precatorius L.',
+    partUsed: 'Seed (Beej)',
+    category: 'Schedule E1',
+    isScheduleE1: true,
+    monographRef: 'API Part I, Vol I, Page 37'
+  },
+  {
+    commonNames: ['KALIHARI', 'FLAME LILY', 'GLORIOSA', 'LANGALI'],
+    botanicalName: 'Gloriosa superba L.',
+    partUsed: 'Tuber (Mool)',
+    category: 'Schedule E1',
+    isScheduleE1: true,
+    monographRef: 'API Part I, Vol II, Page 73'
   }
 ];
 
