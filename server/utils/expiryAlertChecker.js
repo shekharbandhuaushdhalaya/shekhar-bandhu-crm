@@ -1,4 +1,3 @@
-const InventoryEntry = require('../models/InventoryEntry');
 const RawMaterialEntry = require('../models/RawMaterialEntry');
 const Product = require('../models/Product');
 const RawMaterial = require('../models/RawMaterial');
@@ -7,8 +6,6 @@ const Notification = require('../models/Notification');
 async function checkExpiriesAndReorders() {
   try {
     const now = new Date();
-    const d30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const d60 = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
     const d90 = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
     // 1. Check Raw Material Entries expiring soon
@@ -61,6 +58,19 @@ async function checkExpiriesAndReorders() {
           await Notification.create({ title, message, type: 'alert', link: '/inventory' });
         }
       }
+    }
+
+    for (const p of productsLow) {
+      if ((p.stockLevel || 0) <= p.minReorderLevel) {
+        const title = `Low Stock Reorder Alert: ${p.name}`;
+        const message = `Product "${p.name}" stock level (${p.stockLevel || 0} ${p.unit || 'units'}) is below minimum reorder point (${p.minReorderLevel} ${p.unit || 'units'}).`;
+        const existing = await Notification.findOne({ title, createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } });
+        if (!existing) {
+          await Notification.create({ title, message, type: 'alert', link: '/inventory' });
+        }
+      }
+    }
+
     // 3. Check MR Field Sample Bag Expiries
     const MrSampleBag = require('../models/MrSampleBag');
     const expiringSampleBags = await MrSampleBag.find({

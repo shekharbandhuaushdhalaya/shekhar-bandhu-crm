@@ -30,17 +30,17 @@ router.get('/query', authorize('analytics:query'), async (req, res) => {
         {
           $group: {
             _id: {
-              year: { $year: { $dateFromString: { dateString: "$date" } } },
-              month: { $month: { $dateFromString: { dateString: "$date" } } }
+              year: { $year: { $dateFromString: { dateString: '$date' } } },
+              month: { $month: { $dateFromString: { dateString: '$date' } } }
             },
-            totalRevenue: { $sum: "$amount" },
+            totalRevenue: { $sum: '$amount' },
             orderCount: { $sum: 1 }
           }
         },
-        { $sort: { "_id.year": -1, "_id.month": -1 } },
+        { $sort: { '_id.year': -1, '_id.month': -1 } },
         { $limit: 5 }
       ]);
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       formattedData = sales.map(s => ({
         month: `${monthNames[s._id.month - 1]} ${s._id.year}`,
         revenue: `₹${s.totalRevenue.toLocaleString('en-IN')}`,
@@ -61,13 +61,13 @@ router.get('/query', authorize('analytics:query'), async (req, res) => {
         { $match: matchStage },
         {
           $group: {
-            _id: "$productId",
-            productType: { $first: "$productType" },
-            size: { $first: "$size" },
-            colour: { $first: "$colour" },
-            shape: { $first: "$shape" },
-            weight: { $first: "$weight" },
-            totalStock: { $sum: "$qtyBoxes" }
+            _id: '$productId',
+            productType: { $first: '$productType' },
+            size: { $first: '$size' },
+            colour: { $first: '$colour' },
+            shape: { $first: '$shape' },
+            weight: { $first: '$weight' },
+            totalStock: { $sum: '$qtyBoxes' }
           }
         },
         { $sort: { totalStock: -1 } },
@@ -90,7 +90,7 @@ router.get('/query', authorize('analytics:query'), async (req, res) => {
           $project: {
             name: 1,
             company: 1,
-            totalOutstanding: "$regularBalance"
+            totalOutstanding: '$regularBalance'
           }
         },
         { $sort: { totalOutstanding: -1 } },
@@ -105,14 +105,14 @@ router.get('/query', authorize('analytics:query'), async (req, res) => {
       dbContextStr = `Outstanding Customers Context: ${JSON.stringify(formattedData)}`;
     }
     else {
-      dbContextStr = `General Context: The user is asking a general question about their CRM. If you don't know the answer, ask them to ask about sales, inventory, or customers.`;
+      dbContextStr = 'General Context: The user is asking a general question about their CRM. If you don\'t know the answer, ask them to ask about sales, inventory, or customers.';
     }
 
     // Call Gemini
     let aiText = '';
     if (genAI) {
       // Using gemini-2.5-flash since 1.5 is deprecated for this key
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const prompt = `You are APEX CRM's friendly AI Assistant. 
 The user is a small business owner using your software. Answer their question concisely and professionally.
 If there is data context provided, reference it to give a helpful, accurate summary of what the data shows in 1-3 sentences. Do not hallucinate data. Do not use markdown tables, just text.
@@ -125,7 +125,7 @@ ${dbContextStr}`;
       const response = await result.response;
       aiText = response.text();
     } else {
-      aiText = "API Key for AI is missing, but here is the data we found based on your request:";
+      aiText = 'API Key for AI is missing, but here is the data we found based on your request:';
     }
 
     return res.json({
@@ -195,8 +195,8 @@ router.post('/ask', authenticateToken, async (req, res) => {
         { $match: { type: 'sale', isFinalized: true } },
         {
           $group: {
-            _id: { $month: "$date" },
-            totalRevenue: { $sum: "$amount" },
+            _id: { $month: '$date' },
+            totalRevenue: { $sum: '$amount' },
             count: { $sum: 1 }
           }
         },
@@ -215,7 +215,7 @@ router.post('/ask', authenticateToken, async (req, res) => {
     if (apiKey) {
       try {
         const customGenAI = new GoogleGenerativeAI(apiKey);
-        const model = customGenAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = customGenAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const fullPrompt = `You are Shekhar Bandhu Aushadhalaya's official AI Business Intelligence Assistant. 
 User Role: ${req.user.role || 'employee'}
 User Question: "${prompt}"
@@ -346,6 +346,90 @@ router.get('/manufacturing', async (req, res) => {
     });
   } catch (err) {
     console.error('Mfg Analytics Error:', err);
+    res.status(500).json({ error: err.message });
+// GET /api/analytics/receivables-ageing — Ageing analysis for B2B customer sales invoices
+router.get('/receivables-ageing', authorize('report:view'), async (req, res) => {
+  try {
+    const Invoice = require('../../models/Invoice');
+    const unpaidInvoices = await Invoice.find({
+      type: 'sale',
+      isFinalized: true,
+      status: { $ne: 'paid' }
+    }).sort({ date: -1 }).lean();
+
+    const now = new Date();
+    const brackets = {
+      b0_30: 0,
+      b31_60: 0,
+      b61_90: 0,
+      b90_plus: 0,
+      totalOutstanding: 0
+    };
+
+    const customerMap = {};
+
+    unpaidInvoices.forEach(inv => {
+      const outstanding = Math.max(0, (inv.amount || 0) - (inv.amountPaid || 0));
+      if (outstanding <= 0) return;
+
+      brackets.totalOutstanding += outstanding;
+
+      const baseDate = inv.dueDate ? new Date(inv.dueDate) : new Date(inv.date || inv.createdAt);
+      const diffTime = now.getTime() - baseDate.getTime();
+      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+
+      let bracket = '0-30';
+      if (diffDays <= 30) {
+        brackets.b0_30 += outstanding;
+        bracket = '0-30';
+      } else if (diffDays <= 60) {
+        brackets.b31_60 += outstanding;
+        bracket = '31-60';
+      } else if (diffDays <= 90) {
+        brackets.b61_90 += outstanding;
+        bracket = '61-90';
+      } else {
+        brackets.b90_plus += outstanding;
+        bracket = '90+';
+      }
+
+      const custName = inv.customerName || 'Walk-in Customer';
+      if (!customerMap[custName]) {
+        customerMap[custName] = {
+          customerName: custName,
+          totalOutstanding: 0,
+          b0_30: 0,
+          b31_60: 0,
+          b61_90: 0,
+          b90_plus: 0,
+          invoices: []
+        };
+      }
+      customerMap[custName].totalOutstanding += outstanding;
+      if (bracket === '0-30') customerMap[custName].b0_30 += outstanding;
+      else if (bracket === '31-60') customerMap[custName].b31_60 += outstanding;
+      else if (bracket === '61-90') customerMap[custName].b61_90 += outstanding;
+      else customerMap[custName].b90_plus += outstanding;
+
+      customerMap[custName].invoices.push({
+        _id: inv._id,
+        invoiceNo: inv.invoiceNo,
+        date: inv.date,
+        dueDate: inv.dueDate || inv.date,
+        amount: inv.amount,
+        amountPaid: inv.amountPaid || 0,
+        balanceDue: outstanding,
+        daysOld: diffDays,
+        daysOverdue: diffDays,
+        bracket
+      });
+    });
+
+    res.json({
+      summary: brackets,
+      customers: Object.values(customerMap).sort((a, b) => b.totalOutstanding - a.totalOutstanding)
+    });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

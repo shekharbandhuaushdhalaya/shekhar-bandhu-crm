@@ -282,7 +282,7 @@ router.post('/consignment/settle', authorize('inventory:edit'), validate(schemas
         qtyBoxes,
         balanceBoxes: destEntry.qtyBoxes,
         reference: `Consignment Return from ${dealerWh.name}`,
-        note: `Returned from dealer consignment stock`,
+        note: 'Returned from dealer consignment stock',
         createdBy: req.user ? req.user.name : 'System',
         packing,
         batchNo

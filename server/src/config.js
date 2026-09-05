@@ -15,6 +15,5 @@ module.exports = {
         'http://localhost:8081',
         'http://localhost:19006',
         'https://shekhar-bandhu-crm.vercel.app',
-        'https://shekhar-bandhu-website.vercel.app',
       ],
 };

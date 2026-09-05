@@ -14,12 +14,12 @@ async function migrate() {
     if (!defaultUnit) {
       console.log('⚠️ No manufacturing units found. Creating a default Plant...');
       defaultUnit = await ManufacturingUnit.create({
-        name: "Shekhar Bandhu Manufacturing Plant 1",
-        code: "MFG-PLANT-1",
-        addressLine1: "Industrial Area Phase 2",
-        city: "Varanasi",
-        state: "Uttar Pradesh",
-        pincode: "221002"
+        name: 'Shekhar Bandhu Manufacturing Plant 1',
+        code: 'MFG-PLANT-1',
+        addressLine1: 'Industrial Area Phase 2',
+        city: 'Varanasi',
+        state: 'Uttar Pradesh',
+        pincode: '221002'
       });
       console.log(`🏭 Created manufacturing unit: ${defaultUnit.name}`);
     }

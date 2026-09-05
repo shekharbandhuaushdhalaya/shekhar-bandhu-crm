@@ -23,7 +23,7 @@ const billOfMaterialsSchema = new mongoose.Schema({
     }
   ],
   isActive: { type: Boolean, default: true },
-  productionNotes: { type: String, default: "" },
+  productionNotes: { type: String, default: '' },
   formulationStandardRef: { type: String, default: '', trim: true }, // e.g. "As per API Part I, Vol IV"
   overheadCost: { type: Number, default: 0 },
   formulationBasis: { type: Number, default: 100, min: 1 }, // qty standard: e.g. 10 (10L), 100 (100ml), 10 (10 pcs)

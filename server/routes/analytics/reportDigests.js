@@ -30,7 +30,7 @@ router.get('/daily-sales', authorize('report:view'), async (req, res) => {
       `• *Invoices Issued*: ${invoices.length}\n` +
       `• *New Orders Placed*: ${orders.length}\n` +
       `• *Low Stock Alerts*: ${lowStockCount} products\n\n` +
-      `_Generated automatically by Shekhar Bandhu CRM System_`;
+      '_Generated automatically by Shekhar Bandhu CRM System_';
 
     res.json({
       date: todayStart,

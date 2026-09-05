@@ -2,7 +2,6 @@ const express = require('express');
 const BatchProduction = require('../../models/BatchProduction');
 const RawMaterialEntry = require('../../models/RawMaterialEntry');
 const InventoryEntry = require('../../models/InventoryEntry');
-const Challan = require('../../models/Challan');
 const Invoice = require('../../models/Invoice');
 const Dispatch = require('../../models/Dispatch');
 
@@ -27,7 +26,7 @@ router.get('/:batchNo', async (req, res) => {
 
     // 1. Search RawMaterialEntry (by batchNo or by RawMaterial ID / name / sku)
     const RawMaterial = require('../../models/RawMaterial');
-    const safeRegex = searchKey.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const safeRegex = searchKey.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
     let rawMaterial = await RawMaterial.findOne({
       $or: [
         { _id: searchKey.length === 24 && /^[0-9a-fA-F]{24}$/.test(searchKey) ? searchKey : null },

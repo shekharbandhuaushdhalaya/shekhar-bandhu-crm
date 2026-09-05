@@ -49,7 +49,7 @@ router.get('/', authorize('payment:view'), async (req, res) => {
 // POST /api/payments — Create a new payment and update balances
 router.post('/', authorize('payment:create'), validate(schemas.paymentSchema), async (req, res) => {
   try {
-    const { type, partyType, partyId, amount, mode } = req.body;
+    const { type, partyType, partyId, amount, mode, allocations } = req.body;
 
     if (!type || !partyType || !partyId || !amount) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -60,7 +60,61 @@ router.post('/', authorize('payment:create'), validate(schemas.paymentSchema), a
       return res.status(403).json({ error: 'Access denied: You do not have permission to perform cash transactions.' });
     }
 
-    const payment = await Payment.create(req.body);
+    const Invoice = require('../../models/Invoice');
+    let totalAllocated = 0;
+    const processedAllocations = [];
+
+    if (allocations && Array.isArray(allocations) && allocations.length > 0) {
+      for (const alloc of allocations) {
+        const allocAmt = Number(alloc.amountApplied !== undefined ? alloc.amountApplied : (alloc.amountAllocated !== undefined ? alloc.amountAllocated : alloc.amount)) || 0;
+        if (allocAmt <= 0) continue;
+        totalAllocated += allocAmt;
+      }
+
+      if (totalAllocated > amount) {
+        return res.status(400).json({ error: `Allocated total (₹${totalAllocated}) cannot exceed total payment amount (₹${amount})` });
+      }
+    }
+
+    const unallocatedAmount = Math.max(0, amount - totalAllocated);
+    const paymentData = {
+      ...req.body,
+      unallocatedAmount,
+      allocations: []
+    };
+
+    const payment = await Payment.create(paymentData);
+
+    if (allocations && Array.isArray(allocations) && allocations.length > 0) {
+      for (const alloc of allocations) {
+        const allocAmt = Number(alloc.amountApplied !== undefined ? alloc.amountApplied : (alloc.amountAllocated !== undefined ? alloc.amountAllocated : alloc.amount)) || 0;
+        if (allocAmt <= 0) continue;
+
+        const inv = await Invoice.findById(alloc.invoiceId);
+        if (inv) {
+          inv.payments = inv.payments || [];
+          inv.payments.push({
+            paymentId: payment._id,
+            amountAllocated: allocAmt,
+            amountApplied: allocAmt,
+            allocatedAt: new Date()
+          });
+          inv.amountPaid = (inv.amountPaid || 0) + allocAmt;
+          inv.status = inv.amountPaid >= inv.amount ? 'paid' : (inv.amountPaid > 0 ? 'partial' : 'unpaid');
+          await inv.save();
+
+          processedAllocations.push({
+            invoiceId: inv._id,
+            invoiceNo: inv.invoiceNo,
+            amountAllocated: allocAmt,
+            amountApplied: allocAmt,
+            allocatedAt: new Date()
+          });
+        }
+      }
+      payment.allocations = processedAllocations;
+      await payment.save();
+    }
 
     // Update balances — branch on mode
     if (partyType === 'Customer') {
@@ -115,6 +169,21 @@ router.delete('/:id', authorize('payment:create'), async (req, res) => {
     }
 
     const { type, partyType, partyId, amount, mode } = payment;
+
+    // Revert allocations from invoices if any
+    const Invoice = require('../../models/Invoice');
+    if (payment.allocations && payment.allocations.length > 0) {
+      for (const alloc of payment.allocations) {
+        const inv = await Invoice.findById(alloc.invoiceId);
+        if (inv) {
+          const allocAmt = alloc.amountApplied || alloc.amountAllocated || 0;
+          inv.amountPaid = Math.max(0, (inv.amountPaid || 0) - allocAmt);
+          inv.status = inv.amountPaid >= inv.amount ? 'paid' : (inv.amountPaid > 0 ? 'partial' : 'unpaid');
+          inv.payments = (inv.payments || []).filter(p => p.paymentId && p.paymentId.toString() !== payment._id.toString());
+          await inv.save();
+        }
+      }
+    }
 
     // Revert balances — branch on mode
     if (partyType === 'Customer') {
@@ -172,31 +241,35 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
       b0_30: 0,
       b31_60: 0,
       b61_90: 0,
-      b90_plus: 0
+      b90_plus: 0,
+      totalOutstanding: 0
     };
 
     const customerMap = {};
 
     unpaidInvoices.forEach(inv => {
-      const outstanding = inv.amount - (inv.amountPaid || 0);
+      const outstanding = Math.max(0, (inv.amount || 0) - (inv.amountPaid || 0));
       if (outstanding <= 0) return;
 
-      const diffTime = Math.abs(now.getTime() - new Date(inv.date).getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      brackets.totalOutstanding += outstanding;
 
-      let bracket = 'b0_30';
+      const baseDate = inv.dueDate ? new Date(inv.dueDate) : new Date(inv.date || inv.createdAt);
+      const diffTime = now.getTime() - baseDate.getTime();
+      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+
+      let bracket = '0-30';
       if (diffDays <= 30) {
         brackets.b0_30 += outstanding;
-        bracket = '0-30 Days';
+        bracket = '0-30';
       } else if (diffDays <= 60) {
         brackets.b31_60 += outstanding;
-        bracket = '31-60 Days';
+        bracket = '31-60';
       } else if (diffDays <= 90) {
         brackets.b61_90 += outstanding;
-        bracket = '61-90 Days';
+        bracket = '61-90';
       } else {
         brackets.b90_plus += outstanding;
-        bracket = '90+ Days';
+        bracket = '90+';
       }
 
       const custName = inv.customerName || 'Walk-in Customer';
@@ -204,18 +277,29 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
         customerMap[custName] = {
           customerName: custName,
           totalOutstanding: 0,
+          b0_30: 0,
+          b31_60: 0,
+          b61_90: 0,
+          b90_plus: 0,
           invoices: []
         };
       }
       customerMap[custName].totalOutstanding += outstanding;
+      if (bracket === '0-30') customerMap[custName].b0_30 += outstanding;
+      else if (bracket === '31-60') customerMap[custName].b31_60 += outstanding;
+      else if (bracket === '61-90') customerMap[custName].b61_90 += outstanding;
+      else customerMap[custName].b90_plus += outstanding;
+
       customerMap[custName].invoices.push({
         _id: inv._id,
         invoiceNo: inv.invoiceNo,
         date: inv.date,
+        dueDate: inv.dueDate || inv.date,
         amount: inv.amount,
         amountPaid: inv.amountPaid || 0,
-        outstanding,
+        balanceDue: outstanding,
         daysOld: diffDays,
+        daysOverdue: diffDays,
         bracket
       });
     });
@@ -244,34 +328,39 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
       b0_30: 0,
       b31_60: 0,
       b61_90: 0,
-      b90_plus: 0
+      b90_plus: 0,
+      totalOutstanding: 0
     };
 
     const vendorMap = {};
 
     unpaidPurchaseInvoices.forEach(inv => {
-      const outstanding = (inv.nettTotal || inv.amount || 0) - (inv.amountPaid || 0);
+      const totalAmt = inv.nettTotal || inv.amount || 0;
+      const outstanding = Math.max(0, totalAmt - (inv.amountPaid || 0));
       if (outstanding <= 0) return;
 
-      const diffTime = Math.abs(now.getTime() - new Date(inv.date).getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      brackets.totalOutstanding += outstanding;
 
-      let bracket = '0-30 Days';
+      const baseDate = inv.dueDate ? new Date(inv.dueDate) : new Date(inv.date || inv.createdAt);
+      const diffTime = now.getTime() - baseDate.getTime();
+      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+
+      let bracket = '0-30';
       if (diffDays <= 30) {
         brackets.b0_30 += outstanding;
-        bracket = '0-30 Days';
+        bracket = '0-30';
       } else if (diffDays <= 60) {
         brackets.b31_60 += outstanding;
-        bracket = '31-60 Days';
+        bracket = '31-60';
       } else if (diffDays <= 90) {
         brackets.b61_90 += outstanding;
-        bracket = '61-90 Days';
+        bracket = '61-90';
       } else {
         brackets.b90_plus += outstanding;
-        bracket = '90+ Days';
+        bracket = '90+';
       }
 
-      const vName = inv.partyName || inv.vendorName || 'Vendor';
+      const vName = inv.partyName || inv.vendorName || inv.supplierName || 'Vendor';
       if (!vendorMap[vName]) {
         vendorMap[vName] = {
           vendorName: vName,
@@ -284,10 +373,12 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
         _id: inv._id,
         invoiceNo: inv.invoiceNo,
         date: inv.date,
-        amount: inv.nettTotal || inv.amount || 0,
+        dueDate: inv.dueDate || inv.date,
+        amount: totalAmt,
         amountPaid: inv.amountPaid || 0,
-        outstanding,
+        balanceDue: outstanding,
         daysOld: diffDays,
+        daysOverdue: diffDays,
         bracket
       });
     });
@@ -304,16 +395,26 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
 // POST /api/payments/allocate — Match payment receipt against outstanding invoices (bill-wise)
 router.post('/allocate', authorize('payment:create'), validate(schemas.paymentAllocateSchema), async (req, res) => {
   try {
-    const { paymentId, allocations } = req.body; // allocations: [{ invoiceId, amount }]
+    const { paymentId, allocations } = req.body;
 
     const payment = await Payment.findById(paymentId);
     if (!payment) return res.status(404).json({ error: 'Payment receipt record not found' });
 
     let currentUnallocated = payment.unallocatedAmount !== undefined ? payment.unallocatedAmount : payment.amount;
 
+    let requestedAllocSum = 0;
+    for (const alloc of allocations) {
+      const allocAmt = Number(alloc.amountApplied !== undefined ? alloc.amountApplied : (alloc.amountAllocated !== undefined ? alloc.amountAllocated : alloc.amount)) || 0;
+      if (allocAmt > 0) requestedAllocSum += allocAmt;
+    }
+
+    if (requestedAllocSum > currentUnallocated) {
+      return res.status(400).json({ error: `Allocations sum (₹${requestedAllocSum}) exceeds unallocated payment amount (₹${currentUnallocated})` });
+    }
+
     const Invoice = require('../../models/Invoice');
     for (const alloc of allocations) {
-      const allocAmt = Number(alloc.amount);
+      const allocAmt = Number(alloc.amountApplied !== undefined ? alloc.amountApplied : (alloc.amountAllocated !== undefined ? alloc.amountAllocated : alloc.amount)) || 0;
       if (allocAmt <= 0) continue;
 
       const inv = await Invoice.findById(alloc.invoiceId);
@@ -322,10 +423,11 @@ router.post('/allocate', authorize('payment:create'), validate(schemas.paymentAl
         inv.payments.push({
           paymentId: payment._id,
           amountAllocated: allocAmt,
+          amountApplied: allocAmt,
           allocatedAt: new Date()
         });
         inv.amountPaid = (inv.amountPaid || 0) + allocAmt;
-        inv.status = inv.amountPaid >= inv.amount ? 'paid' : 'partially_paid';
+        inv.status = inv.amountPaid >= inv.amount ? 'paid' : (inv.amountPaid > 0 ? 'partial' : 'unpaid');
         await inv.save();
 
         payment.allocations = payment.allocations || [];
@@ -333,6 +435,7 @@ router.post('/allocate', authorize('payment:create'), validate(schemas.paymentAl
           invoiceId: inv._id,
           invoiceNo: inv.invoiceNo,
           amountAllocated: allocAmt,
+          amountApplied: allocAmt,
           allocatedAt: new Date()
         });
 

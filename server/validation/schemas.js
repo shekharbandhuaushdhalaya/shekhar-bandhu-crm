@@ -370,7 +370,14 @@ const inventoryEntrySchema = z.object({
   purchaseRate: z.number().default(0),
 });
 
-// ── Payment ──────────────────────────────────────────────────
+// ── Payment & Allocation ──────────────────────────────────────
+const allocationItemSchema = z.object({
+  invoiceId: objectId,
+  amount: z.number().nonnegative().optional(),
+  amountAllocated: z.number().nonnegative().optional(),
+  amountApplied: z.number().nonnegative().optional(),
+});
+
 const paymentSchema = z.object({
   type: z.enum(['receive', 'make']),
   partyType: z.enum(['Customer', 'Vendor']),
@@ -382,6 +389,7 @@ const paymentSchema = z.object({
   referenceNo: z.string().default(''),
   notes: z.string().default(''),
   date: z.string().or(z.date()).optional(),
+  allocations: z.array(allocationItemSchema).optional().default([]),
 });
 
 // ── Credit / Debit Note ──────────────────────────────────────
@@ -750,11 +758,6 @@ const consignmentSettleSchema = z.object({
 });
 
 // ── Bill-Wise Payment Allocation ─────────────────────────────
-const allocationItemSchema = z.object({
-  invoiceId: objectId,
-  amount: z.number().positive(),
-});
-
 const paymentAllocateSchema = z.object({
   paymentId: objectId,
   allocations: z.array(allocationItemSchema).min(1, 'At least one allocation required')

@@ -882,8 +882,8 @@ router.get('/commission/calculate', authorize('mr:view'), async (req, res) => {
       },
       {
         $group: {
-          _id: "$mrId",
-          totalSales: { $sum: "$orderAmount" }
+          _id: '$mrId',
+          totalSales: { $sum: '$orderAmount' }
         }
       }
     ]);

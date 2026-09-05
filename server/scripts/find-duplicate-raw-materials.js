@@ -41,7 +41,7 @@ async function findDuplicateRawMaterials() {
       console.log(`\n⚠️  FOUND ${duplicateGroups.length} DUPLICATE GROUP(S):\n`);
 
       for (const group of duplicateGroups) {
-        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log(`📦 Duplicate Group: "${group.records[0].name}" [Unit: ${group.unit}, Category: ${group.category}]`);
         console.log(`   Matching key: ${group.normalizedName}::${group.unit.toLowerCase()}::${group.category.toLowerCase()}`);
         console.log(`   Records (${group.records.length}):`);

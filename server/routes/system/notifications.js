@@ -59,7 +59,7 @@ router.get('/alerts/check', async (req, res) => {
 
     // 1. Check low stock levels
     const lowStockProducts = await Product.find({
-      $expr: { $lte: ["$stockLevel", "$minReorder"] }
+      $expr: { $lte: ['$stockLevel', '$minReorder'] }
     }).lean();
 
     for (const p of lowStockProducts) {

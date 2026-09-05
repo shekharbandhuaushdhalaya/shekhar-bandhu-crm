@@ -181,7 +181,6 @@ const authLimiter = rateLimit({
 });
 
 // ─── Try MongoDB connection & start server ───
-const { seedDatabase } = require('./utils/seed');
 
 // Register all routes synchronously
 app.use('/api/auth', authLimiter, authRoutes);
@@ -231,6 +230,7 @@ app.use('/api/social', (req, res, next) => {
   return authenticateJWT(req, res, next);
 }, socialRoutes);
 const purchaseOrderRoutes = require('./routes/procurement/purchaseOrders');
+app.use('/api/purchase-orders', authenticateJWT, purchaseOrderRoutes);
 const equipmentRoutes = require('./routes/manufacturing/equipment');
 const deviationRoutes = require('./routes/manufacturing/deviations');
 const retentionSampleRoutes = require('./routes/manufacturing/retentionSamples');
@@ -311,7 +311,9 @@ async function runStartupMigrations() {
     const Product = require('./models/Product');
     await Product.collection.dropIndex('productType_1_size_1_colour_1_shape_1_weight_1');
     console.log('✅ Dropped unique product characteristics index');
-  } catch (_) { }
+  } catch (_) {
+    // intentionally ignored — index may not exist
+  }
 
   // await seedDatabase();
   await require('./models/RolePermission').seedDefaults();
@@ -321,17 +323,23 @@ async function runStartupMigrations() {
     const InventoryEntry = require('./models/InventoryEntry');
     await InventoryEntry.collection.dropIndex('warehouseId_1_productId_1_packing_1');
     console.log('✅ Dropped old inventory index — new vendorId-aware index will be created');
-  } catch (_) { }
+  } catch (_) {
+    // intentionally ignored — index may not exist
+  }
   try {
     const InventoryEntry = require('./models/InventoryEntry');
     await InventoryEntry.collection.dropIndex('warehouseId_1_productId_1_vendorId_1_packing_1');
     console.log('✅ Dropped 4-field inventory index — new batchNo-aware index will be created');
-  } catch (_) { }
+  } catch (_) {
+    // intentionally ignored — index may not exist
+  }
   try {
     const Payment = require('./models/Payment');
     await Payment.collection.dropIndex('paymentNo_1');
     console.log('✅ Dropped old paymentNo index from payments collection');
-  } catch (_) { }
+  } catch (_) {
+    // intentionally ignored — index may not exist
+  }
   await require('./models/InventoryEntry').syncIndexes();
   console.log('✅ Using MongoDB for data');
 }

@@ -138,7 +138,7 @@ router.post('/write-off', async (req, res) => {
 router.get('/low-stock', async (req, res) => {
   try {
     const products = await Product.find({
-      $expr: { $lte: ["$stockLevel", "$minReorder"] }
+      $expr: { $lte: ['$stockLevel', '$minReorder'] }
     }).select('name sku stockLevel minReorder category').lean();
 
     res.json(products);

@@ -111,12 +111,17 @@ const invoiceSchema = new mongoose.Schema({
   payments: [
     {
       paymentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment' },
-      amountAllocated: { type: Number, required: true },
+      amountAllocated: { type: Number },
+      amountApplied: { type: Number },
       allocatedAt: { type: Date, default: Date.now }
     }
   ],
   items: [invoiceItemSchema]
-}, { timestamps: true });
+}, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
+
+invoiceSchema.virtual('balanceDue').get(function () {
+  return Math.max(0, (this.amount || 0) - (this.amountPaid || 0));
+});
 
 invoiceSchema.index({ invoiceNo: 'text', customerName: 'text', supplierName: 'text', status: 'text' });
 invoiceSchema.index({ createdAt: -1 });

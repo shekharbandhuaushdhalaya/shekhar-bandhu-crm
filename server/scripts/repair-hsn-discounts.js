@@ -24,7 +24,9 @@ async function run() {
       const refId = invoice.reference || invoice.sourceDocId;
       try {
         movement = await StockMovement.findById(refId).lean();
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally ignore invalid ObjectId lookup errors
+      }
     }
 
     for (let it of invoice.items) {
