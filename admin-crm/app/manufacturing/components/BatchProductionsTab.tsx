@@ -18,6 +18,7 @@ interface Props {
   onDeleteBatchDoc: (batchId: string, docUrl: string) => void;
   onUploadBatchDoc: (batchId: string) => void;
   onOpenBMR: (batchId: string) => void;
+  onOpenCoA?: (batchId: string) => void;
   onCancelProduction: (batchId: string) => void;
   onQcSignOff: (batch: any) => void;
   isIntegerQty: (unit: string, category: string) => boolean;
@@ -27,7 +28,7 @@ interface Props {
 const BatchProductionsTab = React.memo(function BatchProductionsTab({
   batches, products, warehouses, expandedBatchIds, toggleBatchExpanded,
   onStartProductionBatch, onTraceBatch, onAdvanceStage, onSkipStage, onFailStage,
-  onDeleteBatchDoc, onUploadBatchDoc, onOpenBMR, onCancelProduction, onQcSignOff,
+  onDeleteBatchDoc, onUploadBatchDoc, onOpenBMR, onOpenCoA, onCancelProduction, onQcSignOff,
   isIntegerQty, getStatusColor
 }: Props) {
   const { colors } = useTheme();
@@ -384,13 +385,24 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
               {/* Left Side: Report & Genealogy Actions */}
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {isFinished && (
-                  <TouchableOpacity
-                    style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12 }]}
-                    onPress={() => onOpenBMR(batch._id)}
-                  >
-                    <Ionicons name="document-text-outline" size={15} color={colors.primary} />
-                    <Text style={styles.outlineBtnText}>BMR Report</Text>
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity
+                      style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12 }]}
+                      onPress={() => onOpenBMR(batch._id)}
+                    >
+                      <Ionicons name="document-text-outline" size={15} color={colors.primary} />
+                      <Text style={styles.outlineBtnText}>BMR Report</Text>
+                    </TouchableOpacity>
+                    {onOpenCoA && (
+                      <TouchableOpacity
+                        style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.success }]}
+                        onPress={() => onOpenCoA(batch._id)}
+                      >
+                        <Ionicons name="ribbon-outline" size={15} color={colors.success} />
+                        <Text style={[styles.outlineBtnText, { color: colors.success }]}>AYUSH CoA</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
                 )}
                 {!isCancelled && (
                   <>

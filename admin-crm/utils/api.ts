@@ -1122,6 +1122,10 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/bmr-report`);
     return res.json();
   }
+  async getBatchCoA(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/coa`);
+    return res.json();
+  }
   async getManufacturingAnalytics(): Promise<ManufacturingAnalytics> {
     const res = await this.request(`${API_BASE}/analytics/manufacturing`);
     return res.json();

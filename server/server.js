@@ -245,6 +245,10 @@ app.use('/api/manufacturing/quality-audits', authenticateJWT, qualityAuditRoutes
 app.use('/api/pharmacopoeia', authenticateJWT, pharmacopoeiaRoutes);
 const batchTraceRoutes = require('./routes/manufacturing/batchTrace');
 app.use('/api/manufacturing/batch-trace', authenticateJWT, batchTraceRoutes);
+const coaRoutes = require('./routes/manufacturing/coa');
+const quarantineRoutes = require('./routes/manufacturing/quarantine');
+app.use('/api/manufacturing/coa', authenticateJWT, coaRoutes);
+app.use('/api/manufacturing/quarantine', authenticateJWT, quarantineRoutes);
 const debitNoteRoutes = require('./routes/finance/debitNotes');
 const recurringInvoiceRoutes = require('./routes/sales/recurringInvoices');
 const recallRoutes = require('./routes/manufacturing/recalls');

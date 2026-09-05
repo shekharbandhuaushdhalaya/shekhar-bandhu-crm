@@ -39,6 +39,7 @@ import BOMModal from './manufacturing/modals/BOMModal';
 import LaunchBatchModal from './manufacturing/modals/LaunchBatchModal';
 import QCSignoffModal from './manufacturing/modals/QCSignoffModal';
 import BMRReportModal from './manufacturing/modals/BMRReportModal';
+import CoAModal from './manufacturing/modals/CoAModal';
 import ManufacturingUnitModal from './manufacturing/modals/ManufacturingUnitModal';
 import { createStyles } from './manufacturing/manufacturingStyles';
 
@@ -86,6 +87,10 @@ export default function ManufacturingScreen() {
   const [bmrModalVisible, setBmrModalVisible] = useState(false);
   const [loadingBmr, setLoadingBmr] = useState(false);
 
+  const [coaData, setCoaData] = useState<any>(null);
+  const [coaModalVisible, setCoaModalVisible] = useState(false);
+  const [loadingCoa, setLoadingCoa] = useState(false);
+
   const [materialModalVisible, setMaterialModalVisible] = useState(false);
   const [bomModalVisible, setBomModalVisible] = useState(false);
   const [productionModalVisible, setProductionModalVisible] = useState(false);
@@ -126,10 +131,16 @@ export default function ManufacturingScreen() {
 
   // Form States — Raw Material
   const [rmName, setRmName] = useState('');
+  const [rmBotanicalName, setRmBotanicalName] = useState('');
+  const [rmPartUsed, setRmPartUsed] = useState('');
   const [rmSku, setRmSku] = useState('');
   const [rmUnit, setRmUnit] = useState('kg');
-  const [rmCategory, setRmCategory] = useState<string>('Herb');
+  const [rmCategory, setRmCategory] = useState<string>('Dry Herb');
+  const [rmPharmacopoeialStandard, setRmPharmacopoeialStandard] = useState('API');
+  const [rmMonographRef, setRmMonographRef] = useState('');
+  const [rmIsScheduleE1, setRmIsScheduleE1] = useState(false);
   const [rmMinReorder, setRmMinReorder] = useState('10');
+  const [rmCleaningLossPercent, setRmCleaningLossPercent] = useState('0');
 
   const [rmError, setRmError] = useState('');
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
@@ -515,29 +526,32 @@ export default function ManufacturingScreen() {
         }
         await api.updateRawMaterial(editingMaterialId, {
           name: rmName.trim(),
+          botanicalName: rmBotanicalName.trim(),
+          partUsed: rmPartUsed.trim(),
           unit: rmUnit,
           category: rmCategory,
+          pharmacopoeialStandard: rmPharmacopoeialStandard,
+          monographRef: rmMonographRef.trim(),
+          isScheduleE1: rmIsScheduleE1,
           minReorder: Number(rmMinReorder) || 0,
+          cleaningLossPercent: Number(rmCleaningLossPercent) || 0,
         });
       } else {
         await api.createRawMaterial({
           name: rmName.trim(),
+          botanicalName: rmBotanicalName.trim(),
+          partUsed: rmPartUsed.trim(),
           sku: rmSku.trim() || undefined,
           unit: rmUnit,
           category: rmCategory,
+          pharmacopoeialStandard: rmPharmacopoeialStandard,
+          monographRef: rmMonographRef.trim(),
+          isScheduleE1: rmIsScheduleE1,
           minReorder: Number(rmMinReorder) || 0,
+          cleaningLossPercent: Number(rmCleaningLossPercent) || 0,
         });
       }
-      setRmName('');
-      setRmSku('');
-      setRmUnit('kg');
-      setRmCategory('Herb');
-      setRmMinReorder('10');
-      setRmStockLevel('');
-      setRmOriginalStockLevel(0);
-      setRmAdjustmentReason('');
-      setEditingMaterialId(null);
-      setMaterialModalVisible(false);
+      handleCloseMaterialModal();
       loadData();
     } catch (err: any) {
       setRmError(err.message || 'Failed to save material definition');
@@ -547,10 +561,16 @@ export default function ManufacturingScreen() {
   const handleEditMaterial = (rm: RawMaterial) => {
     setEditingMaterialId(rm._id);
     setRmName(rm.name);
+    setRmBotanicalName(rm.botanicalName || '');
+    setRmPartUsed(rm.partUsed || '');
     setRmSku(rm.sku || '');
     setRmUnit(rm.unit);
-    setRmCategory(rm.category || 'Herb');
-    setRmMinReorder(rm.minReorder ? rm.minReorder.toString() : '0');
+    setRmCategory(rm.category || 'Dry Herb');
+    setRmPharmacopoeialStandard(rm.pharmacopoeialStandard || 'API');
+    setRmMonographRef(rm.monographRef || '');
+    setRmIsScheduleE1(!!rm.isScheduleE1);
+    setRmMinReorder(rm.minReorder !== undefined ? rm.minReorder.toString() : '0');
+    setRmCleaningLossPercent(rm.cleaningLossPercent !== undefined ? rm.cleaningLossPercent.toString() : '0');
     const currentStock = (rm as any).stockLevel || 0;
     setRmStockLevel(currentStock.toString());
     setRmOriginalStockLevel(currentStock);
@@ -561,10 +581,16 @@ export default function ManufacturingScreen() {
 
   const handleCloseMaterialModal = () => {
     setRmName('');
+    setRmBotanicalName('');
+    setRmPartUsed('');
     setRmSku('');
     setRmUnit('kg');
-    setRmCategory('Herb');
+    setRmCategory('Dry Herb');
+    setRmPharmacopoeialStandard('API');
+    setRmMonographRef('');
+    setRmIsScheduleE1(false);
     setRmMinReorder('10');
+    setRmCleaningLossPercent('0');
     setEditingMaterialId(null);
     setRmStockLevel('');
     setRmOriginalStockLevel(0);
@@ -1466,6 +1492,19 @@ export default function ManufacturingScreen() {
     }
   };
 
+  const handleOpenCoA = async (batchId: string) => {
+    try {
+      setLoadingCoa(true);
+      const coa = await api.getBatchCoA(batchId);
+      setCoaData(coa);
+      setCoaModalVisible(true);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to retrieve Certificate of Analysis.', 'error');
+    } finally {
+      setLoadingCoa(false);
+    }
+  };
+
   const handlePrintBMR = () => {
     if (Platform.OS === 'web') {
       window.print();
@@ -1796,6 +1835,7 @@ export default function ManufacturingScreen() {
             onDeleteBatchDoc={handleDeleteBatchDoc}
             onUploadBatchDoc={handleUploadBatchDoc}
             onOpenBMR={handleOpenBMR}
+            onOpenCoA={handleOpenCoA}
             onCancelProduction={handleCancelProduction}
             onQcSignOff={(batch) => {
               setSelectedBatchRun(batch);
@@ -1854,10 +1894,16 @@ export default function ManufacturingScreen() {
         visible={materialModalVisible}
         editingMaterialId={editingMaterialId}
         rmName={rmName} setRmName={setRmName}
+        rmBotanicalName={rmBotanicalName} setRmBotanicalName={setRmBotanicalName}
+        rmPartUsed={rmPartUsed} setRmPartUsed={setRmPartUsed}
         rmSku={rmSku}
         rmUnit={rmUnit} setRmUnit={setRmUnit}
         rmCategory={rmCategory} setRmCategory={setRmCategory}
+        rmPharmacopoeialStandard={rmPharmacopoeialStandard} setRmPharmacopoeialStandard={setRmPharmacopoeialStandard}
+        rmMonographRef={rmMonographRef} setRmMonographRef={setRmMonographRef}
+        rmIsScheduleE1={rmIsScheduleE1} setRmIsScheduleE1={setRmIsScheduleE1}
         rmMinReorder={rmMinReorder} setRmMinReorder={setRmMinReorder}
+        rmCleaningLossPercent={rmCleaningLossPercent} setRmCleaningLossPercent={setRmCleaningLossPercent}
         rmError={rmError}
         rmStockLevel={rmStockLevel} setRmStockLevel={setRmStockLevel}
         rmOriginalStockLevel={rmOriginalStockLevel}
@@ -1963,6 +2009,13 @@ export default function ManufacturingScreen() {
         bmrReport={bmrReport}
         onClose={() => setBmrModalVisible(false)}
         onPrint={handlePrintBMR}
+      />
+
+      <CoAModal
+        visible={coaModalVisible}
+        loadingCoa={loadingCoa}
+        coaData={coaData}
+        onClose={() => setCoaModalVisible(false)}
       />
 
       {/* ── Genealogy / Trace / Stage Modals ────────────────── */}

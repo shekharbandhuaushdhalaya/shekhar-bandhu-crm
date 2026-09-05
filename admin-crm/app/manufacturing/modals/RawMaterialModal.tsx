@@ -1,17 +1,24 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Pressable } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Pressable, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
+import { lookupAyurvedicHerb, AYURVEDIC_HERB_DICTIONARY, HerbDictionaryEntry } from '../../../utils/ayurvedicHerbs';
 
 interface Props {
   visible: boolean;
   editingMaterialId: string | null;
   rmName: string; setRmName: (v: string) => void;
+  rmBotanicalName: string; setRmBotanicalName: (v: string) => void;
+  rmPartUsed: string; setRmPartUsed: (v: string) => void;
   rmSku: string;
   rmUnit: string; setRmUnit: (v: string) => void;
   rmCategory: string; setRmCategory: (v: string) => void;
+  rmPharmacopoeialStandard: string; setRmPharmacopoeialStandard: (v: string) => void;
+  rmMonographRef: string; setRmMonographRef: (v: string) => void;
+  rmIsScheduleE1: boolean; setRmIsScheduleE1: (v: boolean) => void;
   rmMinReorder: string; setRmMinReorder: (v: string) => void;
+  rmCleaningLossPercent: string; setRmCleaningLossPercent: (v: string) => void;
   rmError: string;
   rmStockLevel?: string; setRmStockLevel?: (v: string) => void;
   rmOriginalStockLevel?: number;
@@ -21,84 +28,409 @@ interface Props {
 }
 
 export default function RawMaterialModal({
-  visible, editingMaterialId, rmName, setRmName, rmSku, rmUnit, setRmUnit,
-  rmCategory, setRmCategory, rmMinReorder, setRmMinReorder,
-  rmError, onClose, onSave,
+  visible,
+  editingMaterialId,
+  rmName, setRmName,
+  rmBotanicalName, setRmBotanicalName,
+  rmPartUsed, setRmPartUsed,
+  rmSku,
+  rmUnit, setRmUnit,
+  rmCategory, setRmCategory,
+  rmPharmacopoeialStandard, setRmPharmacopoeialStandard,
+  rmMonographRef, setRmMonographRef,
+  rmIsScheduleE1, setRmIsScheduleE1,
+  rmMinReorder, setRmMinReorder,
+  rmCleaningLossPercent, setRmCleaningLossPercent,
+  rmError,
+  onClose,
+  onSave,
   rmStockLevel = '', setRmStockLevel,
   rmOriginalStockLevel = 0,
   rmAdjustmentReason = '', setRmAdjustmentReason
 }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const [autoFilledBadge, setAutoFilledBadge] = useState<string | null>(null);
+
+  const PLANT_PARTS = [
+    { key: 'Root (Mool)', label: '🪵 Root' },
+    { key: 'Leaf (Patra)', label: '🍃 Leaf' },
+    { key: 'Bark (Twak)', label: '🌳 Bark' },
+    { key: 'Fruit (Phala)', label: '🫐 Fruit' },
+    { key: 'Seed (Beej)', label: '🌾 Seed' },
+    { key: 'Whole Plant (Panchang)', label: '🌿 Whole Plant' },
+    { key: 'Resin / Gum (Niryasa)', label: '🍯 Resin / Gum' },
+    { key: 'Flower (Pushpa)', label: '🌸 Flower' },
+    { key: 'Bhasma / Mineral', label: '🪨 Bhasma / Mineral' },
+    { key: 'Kashaya / Extract', label: '🧪 Extract' }
+  ];
+
+  const CATEGORIES = [
+    { key: 'Dry Herb', label: '🌿 Dry Herb' },
+    { key: 'Fresh Herb', label: '🌱 Fresh Herb' },
+    { key: 'Metallic/Mineral', label: '🪨 Mineral / Bhasma' },
+    { key: 'Animal Source', label: '🥛 Milk / Honey / Ghee' },
+    { key: 'Plant Concentrate', label: '🧪 Plant Extract' },
+    { key: 'Volatile Oil', label: '💧 Essential Oil' },
+    { key: 'Excipient', label: '🌾 Excipient / Base' },
+    { key: 'Packaging', label: '📦 Bottle / Label / Box' },
+    { key: 'General', label: '⚙️ General Material' }
+  ];
+
+  const STANDARDS = [
+    { key: 'API', label: 'API (Ayurvedic Pharmacopoeia)' },
+    { key: 'AFI', label: 'AFI (Ayurvedic Formulary)' },
+    { key: 'IP', label: 'IP (Indian Pharmacopoeia)' },
+    { key: 'BP', label: 'BP' },
+    { key: 'USP', label: 'USP' },
+    { key: 'House Standard', label: 'House Specification' }
+  ];
+
+  const UNITS = ['kg', 'g', 'L', 'ml', 'units'];
+
+  const applyHerbData = (entry: HerbDictionaryEntry, nameToSet?: string) => {
+    if (nameToSet) setRmName(nameToSet.toUpperCase());
+    setRmBotanicalName(entry.botanicalName);
+    if (entry.partUsed) setRmPartUsed(entry.partUsed);
+    if (entry.category) setRmCategory(entry.category);
+    if (entry.monographRef) setRmMonographRef(entry.monographRef);
+    if (entry.isScheduleE1 !== undefined) setRmIsScheduleE1(entry.isScheduleE1);
+    setAutoFilledBadge(entry.botanicalName);
+  };
+
+  const handleNameChange = (text: string) => {
+    const upper = text.toUpperCase();
+    setRmName(upper);
+
+    // Auto-populate parallel Latin botanical name if matched
+    const matched = lookupAyurvedicHerb(upper);
+    if (matched) {
+      setRmBotanicalName(matched.botanicalName);
+      if (matched.partUsed && (!rmPartUsed || rmPartUsed.trim() === '')) {
+        setRmPartUsed(matched.partUsed);
+      }
+      if (matched.category && (!rmCategory || rmCategory === 'Herb')) {
+        setRmCategory(matched.category);
+      }
+      if (matched.monographRef && (!rmMonographRef || rmMonographRef.trim() === '')) {
+        setRmMonographRef(matched.monographRef);
+      }
+      if (matched.isScheduleE1 !== undefined) {
+        setRmIsScheduleE1(matched.isScheduleE1);
+      }
+      setAutoFilledBadge(matched.botanicalName);
+    } else {
+      setAutoFilledBadge(null);
+    }
+  };
+
+  // Live Herb Search Suggestions
+  const suggestions = useMemo(() => {
+    if (!rmName || rmName.length < 2) return [];
+    const search = rmName.toUpperCase();
+    return AYURVEDIC_HERB_DICTIONARY.filter(h =>
+      h.commonNames.some(cn => cn.includes(search))
+    ).slice(0, 6);
+  }, [rmName]);
 
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { maxWidth: 640 }]}>
+          {/* Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{editingMaterialId ? 'Edit Raw Material' : 'Define New Raw Material'}</Text>
+            <View>
+              <Text style={styles.modalTitle}>
+                {editingMaterialId ? 'Edit Raw Material / Herb' : 'Define New Raw Material / Herb'}
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>
+                AYUSH & GMP Compliant Master • Auto-Botanical Latin Matching
+              </Text>
+            </View>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={20} color={colors.text.primary} />
+              <Ionicons name="close" size={22} color={colors.text.primary} />
             </TouchableOpacity>
           </View>
-          {rmError ? <Text style={styles.modalError}>{rmError}</Text> : null}
-          <ScrollView style={styles.modalForm}>
-            <Text style={styles.inputLabel}>Ingredient Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. PURIFIED GUGGULU"
-              placeholderTextColor={colors.text.muted}
-              value={rmName}
-              onChangeText={(v) => setRmName(v.toUpperCase())}
-              autoCapitalize="characters"
-            />
 
-            <Text style={styles.inputLabel}>SKU / Code {editingMaterialId ? '' : '(Auto-Generated)'}</Text>
-            <TextInput style={[styles.input, { backgroundColor: colors.bg.secondary, color: colors.text.muted }]} placeholder={editingMaterialId ? 'Material SKU' : 'Auto-generated on save'} placeholderTextColor={colors.text.muted} value={rmSku} editable={false} />
-
-            <Text style={styles.inputLabel}>Material Classification / Category *</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-              {[
-                { key: 'Herb', label: '🌿 Herb / Extract' },
-                { key: 'Packaging', label: '📦 Bottle / Label / Box' },
-                { key: 'Excipient', label: '💧 Liquid / Base' },
-                { key: 'General', label: '⚙️ General Material' }
-              ].map(c => (
-                <TouchableOpacity
-                  key={c.key}
-                  onPress={() => setRmCategory(c.key)}
-                  style={{
-                    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1,
-                    backgroundColor: rmCategory === c.key ? colors.primary : colors.bg.secondary,
-                    borderColor: rmCategory === c.key ? colors.primary : colors.border
-                  }}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: rmCategory === c.key ? '#fff' : colors.text.secondary }}>
-                    {c.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {rmError ? (
+            <View style={{ backgroundColor: colors.danger + '15', borderRadius: 6, padding: 10, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: colors.danger }}>
+              <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>{rmError}</Text>
             </View>
-            <TextInput
-              style={[styles.input, { marginBottom: 12 }]}
-              placeholder="Or enter custom classification..."
-              placeholderTextColor={colors.text.muted}
-              value={rmCategory}
-              onChangeText={setRmCategory}
-            />
+          ) : null}
 
-            <Text style={styles.inputLabel}>Measurement Unit *</Text>
-            <TextInput style={styles.input} placeholder="e.g. kg, liters, g, units" placeholderTextColor={colors.text.muted} value={rmUnit} onChangeText={setRmUnit} />
+          <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={true}>
+            {/* SECTION 1: BOTANICAL & MATERIAL IDENTITY */}
+            <View style={{ marginBottom: 16, backgroundColor: colors.bg.secondary + '40', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 10, letterSpacing: 0.5 }}>
+                🌿 1. INGREDIENT & BOTANICAL IDENTITY
+              </Text>
 
-            <Text style={styles.inputLabel}>Min Reorder Stock level</Text>
-            <TextInput style={styles.input} placeholder="e.g. 10" placeholderTextColor={colors.text.muted} value={rmMinReorder} onChangeText={setRmMinReorder} keyboardType="numeric" />
+              <Text style={styles.inputLabel}>Ingredient Common / Vernacular Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. ASHWAGANDHA, PURIFIED GUGGULU, TULSI"
+                placeholderTextColor={colors.text.muted}
+                value={rmName}
+                onChangeText={handleNameChange}
+                autoCapitalize="characters"
+              />
+              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 6 }}>
+                Standard commercial / vernacular trade name. Type to auto-fill Latin botanical name.
+              </Text>
 
+              {/* Suggestions chips */}
+              {suggestions.length > 0 && (
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, marginBottom: 4 }}>
+                    Suggested Ayurvedic Herbs:
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {suggestions.map((herb, idx) => {
+                      const primaryName = herb.commonNames[0];
+                      return (
+                        <TouchableOpacity
+                          key={idx}
+                          onPress={() => applyHerbData(herb, primaryName)}
+                          style={{
+                            paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+                            backgroundColor: colors.primary + '15', borderWidth: 0.5, borderColor: colors.primary + '40'
+                          }}
+                        >
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.primary }}>
+                            🌿 {primaryName} <Text style={{ fontStyle: 'italic', fontWeight: '400', color: colors.text.secondary }}>({herb.botanicalName})</Text>
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <Text style={styles.inputLabel}>Botanical / Scientific Binomial (Latin Name)</Text>
+                {autoFilledBadge && (
+                  <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success + '40' }}>
+                    <Text style={{ fontSize: 9.5, fontWeight: '700', color: colors.success }}>
+                      ✨ Auto-matched Latin Binomial
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <TextInput
+                style={[styles.input, autoFilledBadge ? { borderColor: colors.success, backgroundColor: colors.success + '05' } : null]}
+                placeholder="e.g. Withania somnifera (L.) Dunal"
+                placeholderTextColor={colors.text.muted}
+                value={rmBotanicalName}
+                onChangeText={(v) => {
+                  setRmBotanicalName(v);
+                  setAutoFilledBadge(null);
+                }}
+              />
+              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 10 }}>
+                Latin botanical binomial for plant herbs / chemical formula for Rasa Shastra minerals.
+              </Text>
+
+              <Text style={styles.inputLabel}>Plant Part Used / Plant Organ</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {PLANT_PARTS.map(part => {
+                  const selected = rmPartUsed === part.key;
+                  return (
+                    <TouchableOpacity
+                      key={part.key}
+                      onPress={() => setRmPartUsed(part.key)}
+                      style={{
+                        paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, borderWidth: 1,
+                        backgroundColor: selected ? colors.primary : colors.bg.secondary,
+                        borderColor: selected ? colors.primary : colors.border
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>
+                        {part.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Or enter custom plant part (e.g. Bark & Leaves)..."
+                placeholderTextColor={colors.text.muted}
+                value={rmPartUsed}
+                onChangeText={setRmPartUsed}
+              />
+            </View>
+
+            {/* SECTION 2: CATEGORY & AYUSH COMPLIANCE */}
+            <View style={{ marginBottom: 16, backgroundColor: colors.bg.secondary + '40', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 10, letterSpacing: 0.5 }}>
+                🏷️ 2. AYUSH CLASSIFICATION & STANDARDS
+              </Text>
+
+              <Text style={styles.inputLabel}>Material Category / AYUSH Type *</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {CATEGORIES.map(c => {
+                  const selected = rmCategory === c.key;
+                  return (
+                    <TouchableOpacity
+                      key={c.key}
+                      onPress={() => setRmCategory(c.key)}
+                      style={{
+                        paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, borderWidth: 1,
+                        backgroundColor: selected ? colors.primary : colors.bg.secondary,
+                        borderColor: selected ? colors.primary : colors.border
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>
+                        {c.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TextInput
+                style={[styles.input, { marginBottom: 10 }]}
+                placeholder="Or custom classification..."
+                placeholderTextColor={colors.text.muted}
+                value={rmCategory}
+                onChangeText={setRmCategory}
+              />
+
+              <Text style={styles.inputLabel}>Pharmacopoeial Standard</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {STANDARDS.map(s => {
+                  const selected = rmPharmacopoeialStandard === s.key;
+                  return (
+                    <TouchableOpacity
+                      key={s.key}
+                      onPress={() => setRmPharmacopoeialStandard(s.key)}
+                      style={{
+                        paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, borderWidth: 1,
+                        backgroundColor: selected ? colors.primary + '20' : colors.bg.secondary,
+                        borderColor: selected ? colors.primary : colors.border
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: selected ? colors.primary : colors.text.secondary }}>
+                        {s.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.inputLabel}>Monograph Reference / Page</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. API Part I, Vol II, Page 45"
+                placeholderTextColor={colors.text.muted}
+                value={rmMonographRef}
+                onChangeText={setRmMonographRef}
+              />
+
+              {/* Schedule E1 Toxic Drug Flag */}
+              <View style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: rmIsScheduleE1 ? colors.danger + '15' : colors.bg.secondary,
+                padding: 10, borderRadius: 8, borderWidth: 1,
+                borderColor: rmIsScheduleE1 ? colors.danger : colors.border, marginTop: 4
+              }}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: rmIsScheduleE1 ? colors.danger : colors.text.primary }}>
+                    ⚠️ Schedule E1 Controlled Toxic Herb / Poison Flag
+                  </Text>
+                  <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
+                    Mark true if ingredient is listed under Schedule E1 of Drugs & Cosmetics Act (e.g. Vatsanabha, Bhang, Jayapala, Gunja).
+                  </Text>
+                </View>
+                <Switch
+                  value={rmIsScheduleE1}
+                  onValueChange={setRmIsScheduleE1}
+                  trackColor={{ false: colors.border, true: colors.danger }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+
+            {/* SECTION 3: INVENTORY & YIELD SETTINGS */}
+            <View style={{ marginBottom: 16, backgroundColor: colors.bg.secondary + '40', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 10, letterSpacing: 0.5 }}>
+                ⚖️ 3. INVENTORY & YIELD SETTINGS
+              </Text>
+
+              <Text style={styles.inputLabel}>Unit of Measurement *</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {UNITS.map(u => {
+                  const selected = rmUnit === u;
+                  return (
+                    <TouchableOpacity
+                      key={u}
+                      onPress={() => setRmUnit(u)}
+                      style={{
+                        paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1,
+                        backgroundColor: selected ? colors.primary : colors.bg.secondary,
+                        borderColor: selected ? colors.primary : colors.border
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>
+                        {u}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Custom unit (e.g. drum, quintal)..."
+                placeholderTextColor={colors.text.muted}
+                value={rmUnit}
+                onChangeText={setRmUnit}
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Min Reorder Stock Level ({rmUnit})</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 10"
+                    placeholderTextColor={colors.text.muted}
+                    value={rmMinReorder}
+                    onChangeText={setRmMinReorder}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Process Cleaning Loss %</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 5"
+                    placeholderTextColor={colors.text.muted}
+                    value={rmCleaningLossPercent}
+                    onChangeText={setRmCleaningLossPercent}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -4 }}>
+                Cleaning loss % accounts for dirt, sifting, sorting, and drying moisture loss during raw material processing.
+              </Text>
+            </View>
+
+            {/* SECTION 4: SKU & PHYSICAL STOCK (IF EDITING) */}
             {editingMaterialId !== null && (
-              <View style={{ marginTop: 8, padding: 12, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginBottom: 12 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, marginBottom: 6 }}>📦 PHYSICAL STOCK LEVEL ADJUSTMENT</Text>
-                
-                <Text style={styles.inputLabel}>Current Stock Quantity ({rmUnit})</Text>
+              <View style={{ marginTop: 4, padding: 12, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, marginBottom: 6 }}>
+                  📦 MATERIAL CODE & PHYSICAL STOCK LEVEL
+                </Text>
+
+                <Text style={styles.inputLabel}>SKU / System Code</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.bg.secondary, color: colors.text.muted }]}
+                  value={rmSku}
+                  editable={false}
+                />
+
+                <Text style={styles.inputLabel}>Current Physical Stock Quantity ({rmUnit})</Text>
                 <TextInput
                   style={[styles.input, { fontWeight: '700' }]}
                   placeholder="Enter current physical stock qty"
@@ -107,13 +439,13 @@ export default function RawMaterialModal({
                   onChangeText={setRmStockLevel}
                   keyboardType="numeric"
                 />
-                
-                {parseFloat(rmStockLevel) !== rmOriginalStockLevel && (
+
+                {setRmStockLevel && parseFloat(rmStockLevel) !== rmOriginalStockLevel && (
                   <View style={{ marginTop: 4 }}>
                     <Text style={[styles.inputLabel, { color: colors.warning }]}>Reason for Stock Adjustment *</Text>
                     <TextInput
                       style={styles.input}
-                      placeholder="e.g. Physical count mismatch, spillage loss, moisture absorption adjustment"
+                      placeholder="e.g. Sorting loss mismatch, moisture absorption, spillage"
                       placeholderTextColor={colors.text.muted}
                       value={rmAdjustmentReason}
                       onChangeText={setRmAdjustmentReason}
@@ -123,12 +455,16 @@ export default function RawMaterialModal({
               </View>
             )}
           </ScrollView>
+
+          {/* Footer */}
           <View style={styles.modalFooter}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.submitBtn} onPress={onSave}>
-              <Text style={styles.submitBtnText}>{editingMaterialId ? 'Save Changes' : 'Define Material'}</Text>
+              <Text style={styles.submitBtnText}>
+                {editingMaterialId ? 'Save Material Changes' : 'Define Material'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

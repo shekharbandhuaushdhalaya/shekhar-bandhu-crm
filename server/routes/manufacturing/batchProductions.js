@@ -1375,17 +1375,34 @@ router.get('/:id/bmr-report', async (req, res) => {
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
 
     const RawMaterialEntry = require('../../models/RawMaterialEntry');
-    const enrichedIngredients = [];
+    const SystemSettings = require('../../models/SystemSettings');
+    const LineClearance = require('../../models/LineClearance');
+    const RetentionSample = require('../../models/RetentionSample');
 
+    const [settings, lineClearance, retentionSamples] = await Promise.all([
+      SystemSettings.findOne().lean(),
+      LineClearance.findOne({ batchId: batch._id }).lean(),
+      RetentionSample.find({ batchId: batch._id }).lean()
+    ]);
+
+    const sysSettings = settings || {};
+
+    const enrichedIngredients = [];
     for (const ing of batch.ingredientsConsumed) {
       const entry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).lean();
       const rate = entry ? (entry.purchaseRate || 0) : 0;
+      const rm = ing.rawMaterialId || {};
       enrichedIngredients.push({
-        name: ing.rawMaterialId ? ing.rawMaterialId.name : 'Unknown Material',
-        code: ing.rawMaterialId ? ing.rawMaterialId.code : 'N/A',
+        name: rm.name || 'Unknown Material',
+        botanicalName: rm.botanicalName || '',
+        partUsed: rm.partUsed || '',
+        pharmacopoeialStandard: rm.pharmacopoeialStandard || 'API',
+        monographRef: rm.monographRef || '',
+        isScheduleE1: Boolean(rm.isScheduleE1),
+        code: rm.sku || rm.code || 'N/A',
         batchNo: ing.batchNo,
         qtyConsumed: ing.qtyConsumed,
-        unit: ing.rawMaterialId ? ing.rawMaterialId.unit : 'kg',
+        unit: rm.unit || 'kg',
         purchaseRate: rate,
         itemCost: Number((ing.qtyConsumed * rate).toFixed(2))
       });
@@ -1397,23 +1414,24 @@ router.get('/:id/bmr-report', async (req, res) => {
     const yieldProdIds = new Set();
     if (batch.plannedYields) batch.plannedYields.forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
     if (batch.yields) batch.yields.forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
-    const yieldProducts = yieldProdIds.size > 0 ? await Product.find({ _id: { $in: [...yieldProdIds] } }).select('name size sku').lean() : [];
+    const yieldProducts = yieldProdIds.size > 0 ? await Product.find({ _id: { $in: [...yieldProdIds] } }).select('name size sku category').lean() : [];
     const yieldProdMap = {};
     yieldProducts.forEach(p => { yieldProdMap[p._id.toString()] = p; });
 
-    const LineClearance = require('../../models/LineClearance');
-    const RetentionSample = require('../../models/RetentionSample');
-    const [lineClearance, retentionSamples] = await Promise.all([
-      LineClearance.findOne({ batchId: batch._id }).lean(),
-      RetentionSample.find({ batchId: batch._id }).lean()
-    ]);
-
     res.json({
       batchNo: batch.batchNo,
+      ayushHeader: {
+        firmName: sysSettings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
+        firmAddress: sysSettings.firmAddress || 'PILIKOTHI, VARANASI (U.P.)',
+        manufacturingLicenseNo: sysSettings.manufacturingLicenseNo || 'AYUSH-1983-UP',
+        gmpCertificateNo: sysSettings.gmpCertificateNo || 'GMP-AYUSH-2026-VNS',
+        stateUtCode: sysSettings.stateUtCode || 'UP'
+      },
       productName: productPopulated ? productPopulated.name : 'Unknown Product',
       productSku: productPopulated ? productPopulated.sku : 'N/A',
       productPrice: productPopulated ? productPopulated.price : 0,
       productSize: productPopulated ? productPopulated.size : '',
+      productCategory: productPopulated ? (productPopulated.category || 'Ayurvedic Medicine') : 'Ayurvedic Medicine',
       plannedQty: batch.plannedQty,
       actualYieldQty: batch.actualYieldQty || 0,
       mfgDate: batch.mfgDate || null,

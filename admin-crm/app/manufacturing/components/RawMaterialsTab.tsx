@@ -173,11 +173,33 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                       <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{rm.name}</Text>
                       <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
                         <Text style={{ fontSize: 9, fontWeight: '700', color: colors.text.secondary }}>
-                          {rm.category === 'Packaging' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 Herb'))}
+                          {rm.category === 'Packaging' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 ' + (rm.category || 'Herb')))}
                         </Text>
                       </View>
+                      {rm.pharmacopoeialStandard ? (
+                        <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, borderWidth: 0.5, borderColor: colors.primary + '40' }}>
+                          <Text style={{ fontSize: 8.5, fontWeight: '800', color: colors.primary }}>{rm.pharmacopoeialStandard}</Text>
+                        </View>
+                      ) : null}
+                      {rm.isScheduleE1 ? (
+                        <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, borderWidth: 0.5, borderColor: colors.danger }}>
+                          <Text style={{ fontSize: 8.5, fontWeight: '800', color: colors.danger }}>⚠️ Schedule E1 Poison</Text>
+                        </View>
+                      ) : null}
                     </View>
-                    {rm.sku ? <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>SKU: {rm.sku}</Text> : null}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                      {rm.botanicalName ? (
+                        <Text style={{ fontSize: 10.5, fontStyle: 'italic', color: colors.text.secondary }}>
+                          {rm.botanicalName}
+                        </Text>
+                      ) : null}
+                      {rm.partUsed ? (
+                        <Text style={{ fontSize: 9.5, fontWeight: '600', color: colors.primary }}>
+                          Part: {rm.partUsed}
+                        </Text>
+                      ) : null}
+                      {rm.sku ? <Text style={{ fontSize: 9.5, color: colors.text.muted }}>SKU: {rm.sku}</Text> : null}
+                    </View>
                   </View>
                   <Text style={{ flex: 1.2, fontSize: 13, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
                     {rm.stockLevel !== undefined ? (isIntegerQty(rm.unit, rm.category) ? rm.stockLevel.toFixed(0) : rm.stockLevel.toFixed(1)) : (isIntegerQty(rm.unit, rm.category) ? '0' : '0.0')} {rm.unit}

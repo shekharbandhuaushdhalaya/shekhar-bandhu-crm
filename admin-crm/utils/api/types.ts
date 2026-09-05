@@ -444,6 +444,12 @@ export type RawMaterial = {
   category?: string;
   minReorder: number;
   stockLevel?: number;
+  botanicalName?: string;
+  partUsed?: string;
+  pharmacopoeialStandard?: string;
+  monographRef?: string;
+  isScheduleE1?: boolean;
+  cleaningLossPercent?: number;
 };
 
 export type RawMaterialEntry = {
