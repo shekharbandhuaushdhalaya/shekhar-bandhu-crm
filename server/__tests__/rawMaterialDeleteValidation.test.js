@@ -16,7 +16,7 @@ describe('Raw Material Deletion Safety & Stock Validation API', () => {
   beforeAll(async () => {
     const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/shekhar-bandhu-crm-test-del';
     if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(mongoUri);
+      await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
     }
 
     // Create raw material with active stock (10 kg)
@@ -43,7 +43,7 @@ describe('Raw Material Deletion Safety & Stock Validation API', () => {
       unit: 'kg'
     });
     testMaterialZeroStockId = mat2._id.toString();
-  });
+  }, 30000);
 
   afterAll(async () => {
     await RawMaterial.deleteMany({ sku: { $in: ['RM-DEL-TEST-001', 'RM-DEL-TEST-002'] } });
@@ -51,7 +51,7 @@ describe('Raw Material Deletion Safety & Stock Validation API', () => {
     if (mongoose.connection.readyState !== 0) {
       await mongoose.disconnect();
     }
-  });
+  }, 30000);
 
   it('should REJECT deleting raw material if stock quantity > 0 (HTTP 400)', async () => {
     const res = await request(app)
