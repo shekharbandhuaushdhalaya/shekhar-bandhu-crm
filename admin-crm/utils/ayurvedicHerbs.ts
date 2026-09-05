@@ -508,6 +508,146 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     partUsed: 'Stem (Kanda)',
     category: 'Dry Herb',
     monographRef: 'API Part I, Vol III, Page 21'
+  },
+  {
+    commonNames: ['BILVA', 'BAEL', 'SRIPHAL', 'BAEL FRUIT', 'GOLDEN APPLE', 'BEL'],
+    botanicalName: 'Aegle marmelos (L.) Correa',
+    partUsed: 'Unripe Fruit (Phala)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 27'
+  },
+  {
+    commonNames: ['KHADIRA', 'BLACK CATECHU', 'CUTCH TREE', 'KATHA'],
+    botanicalName: 'Acacia catechu (L.f.) Willd.',
+    partUsed: 'Bark / Heartwood (Twak/Niryasa)',
+    category: 'Plant Concentrate',
+    monographRef: 'API Part I, Vol I, Page 69'
+  },
+  {
+    commonNames: ['VACHA', 'SWEET FLAG', 'BACH', 'UGRAGANDHA'],
+    botanicalName: 'Acorus calamus L.',
+    partUsed: 'Rhizome (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 169'
+  },
+  {
+    commonNames: ['ARAGVADHA', 'GOLDEN SHOWER', 'AMALTAS', 'KRITAMALA'],
+    botanicalName: 'Cassia fistula L.',
+    partUsed: 'Fruit Pod Pulp (Phala)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 11'
+  },
+  {
+    commonNames: ['NIRGUNDI', 'FIVE LEAVED CHASTE TREE', 'SAMBHALU', 'SINDUVARA'],
+    botanicalName: 'Vitex negundo L.',
+    partUsed: 'Leaf (Patra)',
+    category: 'Fresh Herb',
+    monographRef: 'API Part I, Vol III, Page 143'
+  },
+  {
+    commonNames: ['APAMARGA', 'PRICKLY CHAFF FLOWER', 'CHIRCHITA', 'LATJIRA'],
+    botanicalName: 'Achyranthes aspera L.',
+    partUsed: 'Whole Plant (Panchang)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 7'
+  },
+  {
+    commonNames: ['YAVANI', 'AJWAIN', 'CAROM SEEDS', 'BISHOP WEED'],
+    botanicalName: 'Trachyspermum ammi (L.) Sprague',
+    partUsed: 'Fruit (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 125'
+  },
+  {
+    commonNames: ['DHANIYAKA', 'DHANIA', 'CORIANDER', 'KUSTUMBURU'],
+    botanicalName: 'Coriandrum sativum L.',
+    partUsed: 'Fruit (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 30'
+  },
+  {
+    commonNames: ['JIRAKA', 'JEERA', 'CUMIN', 'SHWETA JIRA'],
+    botanicalName: 'Cuminum cyminum L.',
+    partUsed: 'Fruit (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 55'
+  },
+  {
+    commonNames: ['MISREYA', 'SAUNF', 'FENNEL', 'MADHURIKA'],
+    botanicalName: 'Foeniculum vulgare Mill.',
+    partUsed: 'Fruit (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 81'
+  },
+  {
+    commonNames: ['METHI', 'FENUGREEK', 'METHIKA'],
+    botanicalName: 'Trigonella foenum-graecum L.',
+    partUsed: 'Seed (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 109'
+  },
+  {
+    commonNames: ['RASNA', 'RAYASAN', 'PLUCHEA'],
+    botanicalName: 'Pluchea lanceolata (DC.) Oliv. & Hiern',
+    partUsed: 'Leaf / Root (Patra)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 161'
+  },
+  {
+    commonNames: ['SHALAPARNI', 'SARIVAN', 'DESMODIUM'],
+    botanicalName: 'Desmodium gangeticum (L.) DC.',
+    partUsed: 'Root (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 179'
+  },
+  {
+    commonNames: ['PRISHNIPARNI', 'PITHVAN', 'URARIA'],
+    botanicalName: 'Uraria picta (Jacq.) DC.',
+    partUsed: 'Root (Mool)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 153'
+  },
+  {
+    commonNames: ['KANTAKARI', 'CHHOTI KATERI', 'YELLOW BERRIED NIGHTSHADE'],
+    botanicalName: 'Solanum surattense Burm.f.',
+    partUsed: 'Whole Plant (Panchang)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 59'
+  },
+  {
+    commonNames: ['GAMBHARI', 'KASHMARI', 'COOMB TEAK'],
+    botanicalName: 'Gmelina arborea Roxb.',
+    partUsed: 'Bark / Fruit (Twak)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 47'
+  },
+  {
+    commonNames: ['SHYONAKA', 'SONAPATHA', 'ARLU'],
+    botanicalName: 'Oroxylum indicum (L.) Kurz',
+    partUsed: 'Bark (Twak)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 187'
+  },
+  {
+    commonNames: ['PATALA', 'PADAL', 'STEREOSPERMUM'],
+    botanicalName: 'Stereospermum suaveolens (Roxb.) DC.',
+    partUsed: 'Bark (Twak)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol III, Page 149'
+  },
+  {
+    commonNames: ['TRIVRIT', 'NISHOTH', 'TURPETH'],
+    botanicalName: 'Operculina turpethum (L.) Silva Manso',
+    partUsed: 'Root Bark (Twak)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 161'
+  },
+  {
+    commonNames: ['KULATTHA', 'HORSE GRAM', 'KULTHI'],
+    botanicalName: 'Macrotyloma uniflorum (Lam.) Verdc.',
+    partUsed: 'Seed (Beej)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol I, Page 65'
   }
 ];
 

@@ -2373,6 +2373,664 @@ const PHARMACOPOEIA_SEED_DATA = [
     ],
     "dosage": "3 - 6 g stem powder or 10 - 20 ml fresh juice per day",
     "description": "Dried jointed quadrangular stem of Cissus quadrangularis, premier Ayurvedic bone-healer (Asthisamharaka / Vajravalli), fracture healer and tissue rejuvenator."
+  },
+  {
+    "ayurvedicName": "BILVA",
+    "botanicalName": "Aegle marmelos (L.) Correa",
+    "family": "Rutaceae",
+    "partUsed": "Unripe Fruit / Leaf / Root",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 27",
+    "synonyms": [
+      "Bael",
+      "Sriphal",
+      "Bael Fruit",
+      "Golden Apple",
+      "Bilva Fruit",
+      "Shandilya"
+    ],
+    "therapeuticUses": [
+      "Grahi",
+      "Deepana",
+      "Pachana",
+      "Atisarahara",
+      "Grahani-hara"
+    ],
+    "rasa": [
+      "Kashaya",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "3 - 6 g fruit pulp powder per day",
+    "description": "Unripe fruit pulp of Aegle marmelos, supreme Ayurvedic intestinal astringent, digestive, and anti-diarrheal."
+  },
+  {
+    "ayurvedicName": "KHADIRA",
+    "botanicalName": "Acacia catechu (L.f.) Willd.",
+    "family": "Fabaceae / Mimosaceae",
+    "partUsed": "Heartwood Extract (Katha)",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 69",
+    "synonyms": [
+      "Black Catechu",
+      "Cutch Tree",
+      "Katha",
+      "Dantadhavana"
+    ],
+    "therapeuticUses": [
+      "Kushthaghna",
+      "Raktashodhaka",
+      "Dantya (Oral Health)",
+      "Vranaropana",
+      "Kandughna"
+    ],
+    "rasa": [
+      "Tikta",
+      "Kashaya"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "1 - 3 g heartwood extract per day",
+    "description": "Concentrated heartwood extract of Acacia catechu, master Ayurvedic skin purifier (Kushthaghna) and oral care astringent."
+  },
+  {
+    "ayurvedicName": "VACHA",
+    "botanicalName": "Acorus calamus L.",
+    "family": "Acoraceae / Araceae",
+    "partUsed": "Rhizome",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 169",
+    "synonyms": [
+      "Sweet Flag",
+      "Bach",
+      "Ugragandha",
+      "Sanjna-sthapana",
+      "Vacha Rhizome"
+    ],
+    "therapeuticUses": [
+      "Medhya",
+      "Kanthya",
+      "Sanjna-sthapana (Restoring Consciousness)",
+      "Unmadahara",
+      "Deepana"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Tikshna"
+    ],
+    "dosage": "125 - 500 mg rhizome powder per day",
+    "description": "Dried rhizome of Acorus calamus, supreme nervous system stimulant, speech enhancer (Kanthya), and brain tonic."
+  },
+  {
+    "ayurvedicName": "ARAGVADHA",
+    "botanicalName": "Cassia fistula L.",
+    "family": "Fabaceae / Caesalpiniaceae",
+    "partUsed": "Fruit Pod Pulp",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 11",
+    "synonyms": [
+      "Golden Shower Tree",
+      "Amaltas",
+      "Kritamala",
+      "Sramshana"
+    ],
+    "therapeuticUses": [
+      "Sramshana (Mild Laxative)",
+      "Kushthaghna",
+      "Jwarahara",
+      "Kaphapittahara"
+    ],
+    "rasa": [
+      "Madhura"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Madhura",
+    "guna": [
+      "Guru",
+      "Mridu",
+      "Snigdha"
+    ],
+    "dosage": "5 - 10 g fruit pulp per day",
+    "description": "Fruit pulp of Cassia fistula, safest gentle laxative for children, elderly, and skin conditions."
+  },
+  {
+    "ayurvedicName": "NIRGUNDI",
+    "botanicalName": "Vitex negundo L.",
+    "family": "Verbenaceae / Lamiaceae",
+    "partUsed": "Leaf",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 143",
+    "synonyms": [
+      "Five-Leaved Chaste Tree",
+      "Sambhalu",
+      "Nirgundi Patra",
+      "Sindhuvara"
+    ],
+    "therapeuticUses": [
+      "Vedanasthapana (Analgesic)",
+      "Shothahara",
+      "Vatashamana",
+      "Krimighna",
+      "Kashahara"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "10 - 20 ml leaf juice or 3 - 6 g powder",
+    "description": "Leaves of Vitex negundo, master Ayurvedic anti-inflammatory (Shothahara) and natural joint pain reliever."
+  },
+  {
+    "ayurvedicName": "APAMARGA",
+    "botanicalName": "Achyranthes aspera L.",
+    "family": "Amaranthaceae",
+    "partUsed": "Whole Plant / Seed / Root",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 7",
+    "synonyms": [
+      "Prickly Chaff Flower",
+      "Chirchita",
+      "Latjira",
+      "Shikhari"
+    ],
+    "therapeuticUses": [
+      "Kshara-kalpana",
+      "Mutral",
+      "Arshoghna",
+      "Kapha-Vata-hara",
+      "Lekhana"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha",
+      "Tikshna"
+    ],
+    "dosage": "3 - 6 g plant powder or 1 - 2 g Kshara per day",
+    "description": "Whole plant of Achyranthes aspera, primary source of Apamarga Kshara for anorectal care and metabolic detox."
+  },
+  {
+    "ayurvedicName": "YAVANI",
+    "botanicalName": "Trachyspermum ammi (L.) Sprague",
+    "family": "Apiaceae",
+    "partUsed": "Fruit",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 125",
+    "synonyms": [
+      "Ajwain",
+      "Carom Seeds",
+      "Bishop’s Weed",
+      "Deepaniya"
+    ],
+    "therapeuticUses": [
+      "Deepana",
+      "Pachana",
+      "Shoolahara",
+      "Anulomana",
+      "Kaphavata-hara"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha",
+      "Tikshna"
+    ],
+    "dosage": "1 - 3 g carom fruit powder per day",
+    "description": "Dried fruits of Trachyspermum ammi, potent thymol source for immediate digestive relief, flatulence, and colic."
+  },
+  {
+    "ayurvedicName": "DHANIYAKA",
+    "botanicalName": "Coriandrum sativum L.",
+    "family": "Apiaceae",
+    "partUsed": "Fruit / Seed",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 30",
+    "synonyms": [
+      "Dhania",
+      "Coriander",
+      "Dhanya",
+      "Kustumburu"
+    ],
+    "therapeuticUses": [
+      "Trishnahara",
+      "Dahaprashamana",
+      "Deepana",
+      "Pachana",
+      "Mutra-shodhaka"
+    ],
+    "rasa": [
+      "Kashaya",
+      "Tikta",
+      "Madhura"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Madhura",
+    "guna": [
+      "Laghu",
+      "Snigdha"
+    ],
+    "dosage": "1 - 3 g coriander seed powder per day",
+    "description": "Dried fruits of Coriandrum sativum, cooling aromatic carminative and urinary tonic."
+  },
+  {
+    "ayurvedicName": "JIRAKA (SHWETA JIRA)",
+    "botanicalName": "Cuminum cyminum L.",
+    "family": "Apiaceae",
+    "partUsed": "Fruit / Seed",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 55",
+    "synonyms": [
+      "Jeera",
+      "Cumin",
+      "Shweta Jiraka",
+      "Ajaji"
+    ],
+    "therapeuticUses": [
+      "Deepana",
+      "Pachana",
+      "Grahi",
+      "Garbhashaya-shodhaka",
+      "Chakshushya"
+    ],
+    "rasa": [
+      "Katu"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "1 - 3 g cumin seed powder per day",
+    "description": "Dried seeds of Cuminum cyminum, classic digestive stimulant, galactagogue, and uterine detoxifier."
+  },
+  {
+    "ayurvedicName": "MISREYA",
+    "botanicalName": "Foeniculum vulgare Mill.",
+    "family": "Apiaceae",
+    "partUsed": "Fruit",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 81",
+    "synonyms": [
+      "Saunf",
+      "Fennel",
+      "Shatapushpa-bhed",
+      "Madhurika"
+    ],
+    "therapeuticUses": [
+      "Anulomana",
+      "Deepana",
+      "Pachana",
+      "Stanyajanana",
+      "Dahaprashamana"
+    ],
+    "rasa": [
+      "Madhura",
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Madhura",
+    "guna": [
+      "Laghu",
+      "Snigdha"
+    ],
+    "dosage": "3 - 6 g fennel fruit powder per day",
+    "description": "Dried fruits of Foeniculum vulgare, sweet cooling carminative and lactation promoter."
+  },
+  {
+    "ayurvedicName": "METHI",
+    "botanicalName": "Trigonella foenum-graecum L.",
+    "family": "Fabaceae",
+    "partUsed": "Seed",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 109",
+    "synonyms": [
+      "Fenugreek",
+      "Methika",
+      "Kunchika"
+    ],
+    "therapeuticUses": [
+      "Deepana",
+      "Vatashamana",
+      "Pramehahara (Glycemic Control)",
+      "Medohara",
+      "Ruchya"
+    ],
+    "rasa": [
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Snigdha"
+    ],
+    "dosage": "3 - 6 g seed powder per day",
+    "description": "Dried seeds of Trigonella foenum-graecum, master metabolic seed for glycemic balance and joint Vata care."
+  },
+  {
+    "ayurvedicName": "RASNA",
+    "botanicalName": "Pluchea lanceolata (DC.) Oliv. & Hiern",
+    "family": "Asteraceae",
+    "partUsed": "Leaf / Root",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 161",
+    "synonyms": [
+      "Rayasan",
+      "Pluchea",
+      "Yukta",
+      "Elaparni"
+    ],
+    "therapeuticUses": [
+      "Amavata-hara",
+      "Sandhivata-hara",
+      "Vatapashamana",
+      "Shothahara"
+    ],
+    "rasa": [
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Guru"
+    ],
+    "dosage": "3 - 6 g powder or decoction per day",
+    "description": "Leaves of Pluchea lanceolata, premier Ayurvedic anti-rheumatic (Rasna Saptaka) and Vata pacifier."
+  },
+  {
+    "ayurvedicName": "SHALAPARNI",
+    "botanicalName": "Desmodium gangeticum (L.) DC.",
+    "family": "Fabaceae",
+    "partUsed": "Root / Whole Plant",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 179",
+    "synonyms": [
+      "Sarivan",
+      "Desmodium",
+      "Vidarigandha",
+      "Dashamula Root"
+    ],
+    "therapeuticUses": [
+      "Dashamula-constituent",
+      "Rasayana",
+      "Balya",
+      "Hridya",
+      "Tridoshahara"
+    ],
+    "rasa": [
+      "Madhura",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Madhura",
+    "guna": [
+      "Guru",
+      "Snigdha"
+    ],
+    "dosage": "3 - 6 g root powder per day",
+    "description": "Root of Desmodium gangeticum, key constituent of Dashamula for cardiac, respiratory, and nervine strength."
+  },
+  {
+    "ayurvedicName": "PRISHNIPARNI",
+    "botanicalName": "Uraria picta (Jacq.) DC.",
+    "family": "Fabaceae",
+    "partUsed": "Root / Whole Plant",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 153",
+    "synonyms": [
+      "Pithvan",
+      "Uraria",
+      "Chitraparni",
+      "Dashamula Root"
+    ],
+    "therapeuticUses": [
+      "Dashamula-constituent",
+      "Sandhanakara",
+      "Vatapittahara",
+      "Vranaropana",
+      "Balya"
+    ],
+    "rasa": [
+      "Madhura",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Madhura",
+    "guna": [
+      "Laghu",
+      "Snigdha"
+    ],
+    "dosage": "3 - 6 g root powder per day",
+    "description": "Root of Uraria picta, essential Dashamula herb for bone fracture healing and cellular restorative action."
+  },
+  {
+    "ayurvedicName": "KANTAKARI",
+    "botanicalName": "Solanum surattense Burm.f. (Solanum xanthocarpum Schrad. & Wendl.)",
+    "family": "Solanaceae",
+    "partUsed": "Whole Plant",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 59",
+    "synonyms": [
+      "Chhoti Kateri",
+      "Yellow Berried Nightshade",
+      "Kshudra",
+      "Dashamula Plant"
+    ],
+    "therapeuticUses": [
+      "Dashamula-constituent",
+      "Kasahara",
+      "Shvasahara",
+      "Kaphachitta-hara",
+      "Deepana"
+    ],
+    "rasa": [
+      "Katu",
+      "Tikta"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "3 - 6 g powder or 10 - 20 ml decoction",
+    "description": "Whole plant of Solanum surattense, premier Dashamula bronchodilator for asthma and broncho-spasm."
+  },
+  {
+    "ayurvedicName": "GAMBHARI",
+    "botanicalName": "Gmelina arborea Roxb.",
+    "family": "Lamiaceae / Verbenaceae",
+    "partUsed": "Root Bark / Fruit",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 47",
+    "synonyms": [
+      "Kashmari",
+      "Coomb Teak",
+      "Gambhri",
+      "Dashamula Tree"
+    ],
+    "therapeuticUses": [
+      "Dashamula-constituent",
+      "Rasayana",
+      "Balya",
+      "Dahaprashamana",
+      "Vatapittahara"
+    ],
+    "rasa": [
+      "Tikta",
+      "Kashaya",
+      "Madhura"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Guru"
+    ],
+    "dosage": "3 - 6 g root bark powder per day",
+    "description": "Root bark and sweet fruit of Gmelina arborea, major Dashamula Rasayana tree."
+  },
+  {
+    "ayurvedicName": "SHYONAKA",
+    "botanicalName": "Oroxylum indicum (L.) Kurz",
+    "family": "Bignoniaceae",
+    "partUsed": "Root Bark",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 187",
+    "synonyms": [
+      "Sonapatha",
+      "Arlu",
+      "Oroxylum",
+      "Dashamula Bark"
+    ],
+    "therapeuticUses": [
+      "Dashamula-constituent",
+      "Deepana",
+      "Pachana",
+      "Amavata-hara",
+      "Atisarahara"
+    ],
+    "rasa": [
+      "Tikta",
+      "Kashaya"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "3 - 6 g root bark powder per day",
+    "description": "Root bark of Oroxylum indicum, Dashamula anti-inflammatory for digestion and joint care."
+  },
+  {
+    "ayurvedicName": "PATALA",
+    "botanicalName": "Stereospermum suaveolens (Roxb.) DC.",
+    "family": "Bignoniaceae",
+    "partUsed": "Root Bark",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol III, Page 149",
+    "synonyms": [
+      "Padal",
+      "Stereospermum",
+      "Amogha",
+      "Dashamula Bark"
+    ],
+    "therapeuticUses": [
+      "Dashamula-constituent",
+      "Trishnahara",
+      "Dahaprashamana",
+      "Hridya",
+      "Kaphavata-hara"
+    ],
+    "rasa": [
+      "Tikta",
+      "Kashaya"
+    ],
+    "virya": "Anushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu"
+    ],
+    "dosage": "3 - 6 g root bark powder per day",
+    "description": "Root bark of Stereospermum suaveolens, Dashamula cooling cardiac and thirst relieving root."
+  },
+  {
+    "ayurvedicName": "TRIVRIT",
+    "botanicalName": "Operculina turpethum (L.) Silva Manso",
+    "family": "Convolvulaceae",
+    "partUsed": "Root Bark",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 161",
+    "synonyms": [
+      "Nishoth",
+      "Turpeth",
+      "Tribhandi",
+      "Sukha-Virechana"
+    ],
+    "therapeuticUses": [
+      "Sukha-Virechana (Gentle Purgative)",
+      "Pittavirechana",
+      "Shothahara",
+      "Jwarahara"
+    ],
+    "rasa": [
+      "Tikta",
+      "Katu"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha",
+      "Tikshna"
+    ],
+    "dosage": "1 - 3 g root bark powder per day",
+    "description": "Root bark of Operculina turpethum, supreme mild laxative (Sukha Virechana) in Panchakarma detox."
+  },
+  {
+    "ayurvedicName": "KULATTHA",
+    "botanicalName": "Vigna unguiculata (L.) Walp. / Macrotyloma uniflorum (Lam.) Verdc.",
+    "family": "Fabaceae",
+    "partUsed": "Seed",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol I, Page 65",
+    "synonyms": [
+      "Horse Gram",
+      "Kulthi",
+      "Kulattha Beej",
+      "Ashmarihara"
+    ],
+    "therapeuticUses": [
+      "Ashmarihara (Renal Lithontriptic)",
+      "Mutrakrichrahara",
+      "Medohara",
+      "Kaphavata-hara"
+    ],
+    "rasa": [
+      "Kashaya",
+      "Madhura"
+    ],
+    "virya": "Ushna",
+    "vipaka": "Katu",
+    "guna": [
+      "Laghu",
+      "Ruksha"
+    ],
+    "dosage": "10 - 20 g seed decoction per day",
+    "description": "Seeds of Macrotyloma uniflorum, master Ayurvedic pulse for breaking kidney stones (Ashmarihara) and reducing fat."
   }
 ];
 
