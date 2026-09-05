@@ -1046,7 +1046,13 @@ const VERNACULAR_TO_LATIN = {
   'CUBEB': 'Piper cubeba',
   'USHEERA': 'Vetiveria zizanioides',
   'KHAS': 'Vetiveria zizanioides',
-  'VETIVER': 'Vetiveria zizanioides'
+  'VETIVER': 'Vetiveria zizanioides',
+  'VIDARI': 'Pueraria tuberosa',
+  'VIDARIKAND': 'Pueraria tuberosa',
+  'VIDARI KAND': 'Pueraria tuberosa',
+  'INDIAN KUDZU': 'Pueraria tuberosa',
+  'KUDZU': 'Pueraria tuberosa',
+  'BILAIKAND': 'Pueraria tuberosa'
 };
 
 /**

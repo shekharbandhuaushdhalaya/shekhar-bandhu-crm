@@ -790,6 +790,13 @@ export const AYURVEDIC_HERB_DICTIONARY: HerbDictionaryEntry[] = [
     partUsed: 'Fruit (Phala)',
     category: 'Dry Herb',
     monographRef: 'API Part I, Vol II, Page 89'
+  },
+  {
+    commonNames: ['VIDARI', 'VIDARIKAND', 'VIDARI KAND', 'INDIAN KUDZU', 'KUDZU', 'BILAIKAND'],
+    botanicalName: 'Pueraria tuberosa (Roxb. ex Willd.) DC.',
+    partUsed: 'Tuberous Root (Kanda)',
+    category: 'Dry Herb',
+    monographRef: 'API Part I, Vol II, Page 168'
   }
 ];
 

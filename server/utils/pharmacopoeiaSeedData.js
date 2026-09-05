@@ -2837,6 +2837,41 @@ const PHARMACOPOEIA_SEED_DATA = [
     "description": "Root of Uraria picta, essential Dashamula herb for bone fracture healing and cellular restorative action."
   },
   {
+    "ayurvedicName": "VIDARI",
+    "botanicalName": "Pueraria tuberosa (Roxb. ex Willd.) DC.",
+    "family": "Fabaceae",
+    "partUsed": "Tuberous Root (Kanda)",
+    "pharmacopoeialStandard": "API",
+    "monographRef": "API Part I, Vol II, Page 168",
+    "synonyms": [
+      "Vidarikand",
+      "Vidari Kand",
+      "Indian Kudzu",
+      "Kudzu",
+      "Bilaikand",
+      "Kanda"
+    ],
+    "therapeuticUses": [
+      "Rasayana",
+      "Vrishya",
+      "Balya",
+      "Brimhana",
+      "Stanyajanana",
+      "Vatapittahara"
+    ],
+    "rasa": [
+      "Madhura"
+    ],
+    "virya": "Sheeta",
+    "vipaka": "Madhura",
+    "guna": [
+      "Guru",
+      "Snigdha"
+    ],
+    "dosage": "3 - 6 g tuber powder per day",
+    "description": "Tuberous root of Pueraria tuberosa (Vidarikand), prime nutritive rejuvenative (Rasayana) and tonic herb in API Part I, Vol II, Page 168."
+  },
+  {
     "ayurvedicName": "KANTAKARI",
     "botanicalName": "Solanum surattense Burm.f. (Solanum xanthocarpum Schrad. & Wendl.)",
     "family": "Solanaceae",
