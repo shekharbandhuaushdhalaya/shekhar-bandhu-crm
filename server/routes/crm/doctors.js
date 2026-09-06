@@ -217,6 +217,47 @@ router.get('/:id/rx-analytics', authorize('mr:view'), async (req, res) => {
   }
 });
 
+// GET /api/doctors/:id/sample-roi — Doctor Sample ROI Report (Sample Cost vs Rx Revenue)
+router.get('/:id/sample-roi', authorize('mr:view'), async (req, res) => {
+  try {
+    const Invoice = require('../../models/Invoice');
+    const MrSampleIssuance = require('../../models/MrSampleIssuance');
+
+    const doctor = await Doctor.findById(req.params.id).lean();
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor not found' });
+    }
+
+    const [invoices, issuances] = await Promise.all([
+      Invoice.find({
+        $or: [
+          { prescribingDoctorId: doctor._id },
+          { doctorName: { $regex: new RegExp(`^${doctor.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } }
+        ]
+      }).lean(),
+      MrSampleIssuance.find({ doctorId: doctor._id }).lean()
+    ]);
+
+    const totalRxRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const invoiceCount = invoices.length;
+
+    const totalSampleCost = issuances.reduce((sum, iss) => sum + ((iss.qty || 0) * (iss.unitCost || 0)), 0);
+    const roiRatio = totalSampleCost > 0 ? Number((totalRxRevenue / totalSampleCost).toFixed(2)) : 0;
+
+    res.json({
+      doctorId: doctor._id,
+      doctorName: doctor.name,
+      totalSampleCost: Number(totalSampleCost.toFixed(2)),
+      totalRxRevenue: Number(totalRxRevenue.toFixed(2)),
+      roiRatio,
+      invoiceCount,
+      sampleIssuanceCount: issuances.length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/doctors — Create doctor
 router.post('/', authorize('mr:create'), async (req, res) => {
   try {

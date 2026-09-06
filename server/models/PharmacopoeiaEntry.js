@@ -18,7 +18,13 @@ const pharmacopoeiaEntrySchema = new mongoose.Schema({
   vipaka: { type: String, default: '', trim: true },// Post-digestive effect (e.g. Madhura, Katu)
   guna: [{ type: String, trim: true }],           // Qualities (e.g. Laghu, Ruksha)
   dosage: { type: String, default: '', trim: true },
-  description: { type: String, default: '', trim: true }
+  description: { type: String, default: '', trim: true },
+  source: {
+    type: String,
+    enum: ['manual', 'AI-generated', 'GBIF'],
+    default: 'manual'
+  },
+  verified: { type: Boolean, default: true, index: true }
 }, { timestamps: true });
 
 pharmacopoeiaEntrySchema.index({

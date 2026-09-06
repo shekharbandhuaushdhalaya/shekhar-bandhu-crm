@@ -136,6 +136,16 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/pharmacopoeia/unverified — List all unverified pharmacopoeia monographs
+router.get('/unverified', async (req, res) => {
+  try {
+    const unverifiedEntries = await PharmacopoeiaEntry.find({ verified: false }).sort({ createdAt: -1 }).lean();
+    res.json(unverifiedEntries);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/pharmacopoeia/search — Instant search by herb name or alias
 router.get('/search', async (req, res) => {
   try {
@@ -291,6 +301,18 @@ router.post('/', async (req, res) => {
     }
     const entry = await PharmacopoeiaEntry.create(req.body);
     res.status(201).json(entry);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/pharmacopoeia/:id/verify — Approve and optionally update monograph fields
+router.put('/:id/verify', async (req, res) => {
+  try {
+    const updateData = { ...req.body, verified: true };
+    const updated = await PharmacopoeiaEntry.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+    if (!updated) return res.status(404).json({ error: 'Monograph not found' });
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

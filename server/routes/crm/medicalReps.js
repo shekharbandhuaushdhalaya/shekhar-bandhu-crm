@@ -85,7 +85,10 @@ router.post('/', authorize('mr:create'), validate(schemas.medicalRepSchema), asy
   }
 });
 
-router.get('/:id', authorize('mr:view'), async (req, res) => {
+router.get('/:id', authorize('mr:view'), async (req, res, next) => {
+  if (['suggest', 'tour-plans', 'sample-stock', 'matrix', 'events'].includes(req.params.id)) {
+    return next();
+  }
   try {
     const mr = await MedicalRepresentative.findById(req.params.id)
       .populate('reportingTo', 'name email')
@@ -692,6 +695,68 @@ router.get('/tour-plans/compliance', authorize('mr:view'), async (req, res) => {
   }
 });
 
+// GET /api/medical-reps/tour-plans/suggest — Suggest doctors for beat/tour plan for a given day
+router.get(['/tour-plans/suggest', '/suggest'], authorize('mr:view'), async (req, res) => {
+  try {
+    const { mrId, date, lat, lng } = req.query;
+    if (!mrId || !date) {
+      return res.status(400).json({ error: 'mrId and date query parameters are required' });
+    }
+
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const targetDay = daysOfWeek[new Date(date).getDay()];
+
+    const doctors = await Doctor.find({ assignedMrId: mrId, preferredVisitDay: targetDay }).lean();
+
+    const reqLat = parseFloat(lat);
+    const reqLng = parseFloat(lng);
+    const hasCoords = !isNaN(reqLat) && !isNaN(reqLng);
+
+    const suggestions = doctors.map(doc => {
+      let distanceKm = null;
+      if (hasCoords && doc.latitude && doc.longitude) {
+        const distMeters = getHaversineDistanceInMeters(reqLat, reqLng, doc.latitude, doc.longitude);
+        if (distMeters !== null) {
+          distanceKm = Number((distMeters / 1000).toFixed(2));
+        }
+      }
+      return {
+        _id: doc._id,
+        name: doc.name,
+        clinicName: doc.clinicName || '',
+        specialization: doc.specialization || '',
+        category: doc.category || '',
+        preferredTime: doc.preferredTime || '',
+        preferredVisitDay: doc.preferredVisitDay || '',
+        address: doc.address || '',
+        city: doc.city || '',
+        latitude: doc.latitude,
+        longitude: doc.longitude,
+        distanceKm
+      };
+    });
+
+    if (hasCoords) {
+      suggestions.sort((a, b) => {
+        if (a.distanceKm !== null && b.distanceKm !== null) return a.distanceKm - b.distanceKm;
+        if (a.distanceKm !== null) return -1;
+        if (b.distanceKm !== null) return 1;
+        return 0;
+      });
+    }
+
+    res.json({
+      mrId,
+      date,
+      dayOfWeek: targetDay,
+      suggestedCount: suggestions.length,
+      doctors: suggestions
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Doctor Classification & Event Matrix ───
 
 router.get('/doctors/matrix', authorize('mr:view'), async (req, res) => {
@@ -981,6 +1046,91 @@ router.post('/:mrId/sample-stock/issue', authorize('mr:create'), async (req, res
     res.json({
       message: `Successfully issued ${updatedStock.length} sample products to ${mr.name}'s bag stock`,
       stock: updatedStock
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/mr-sample-stock/issue — Issue sample stock to Doctor and create issuance audit log
+router.post(['/sample-stock/issue-to-doctor', '/issue-to-doctor'], authorize('mr:visits'), async (req, res) => {
+  try {
+    const MrSampleStock = require('../../models/MrSampleStock');
+    const MrSampleIssuance = require('../../models/MrSampleIssuance');
+    const Product = require('../../models/Product');
+
+    const { mrId, doctorId, productId, qty, unitCost, date } = req.body;
+    if (!mrId || !doctorId || !productId || !qty) {
+      return res.status(400).json({ error: 'mrId, doctorId, productId, and qty are required' });
+    }
+
+    const qtyVal = Math.max(1, parseInt(qty, 10) || 1);
+
+    await MrSampleStock.findOneAndUpdate(
+      { mrId, productId },
+      { $inc: { qty: -qtyVal } },
+      { upsert: false }
+    );
+
+    let effectiveUnitCost = Number(unitCost);
+    if (isNaN(effectiveUnitCost) || effectiveUnitCost <= 0) {
+      const prod = await Product.findById(productId).lean();
+      effectiveUnitCost = prod ? (prod.price || prod.mrp || 0) : 0;
+    }
+
+    const issuance = await MrSampleIssuance.create({
+      mrId,
+      doctorId,
+      productId,
+      qty: qtyVal,
+      unitCost: effectiveUnitCost,
+      date: date ? new Date(date) : new Date()
+    });
+
+    res.status(201).json(issuance);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/medical-reps/:id/sample-roi — MR-level aggregate Sample ROI across assigned doctors
+router.get('/:id/sample-roi', authorize('mr:view'), async (req, res) => {
+  try {
+    const Invoice = require('../../models/Invoice');
+    const MrSampleIssuance = require('../../models/MrSampleIssuance');
+    const Doctor = require('../../models/Doctor');
+
+    const mrId = req.params.id;
+    const mr = await MedicalRepresentative.findById(mrId).lean();
+    if (!mr) return res.status(404).json({ error: 'MR not found' });
+
+    const doctors = await Doctor.find({ assignedMrId: mrId }).lean();
+    const docIds = doctors.map(d => d._id);
+    const docNames = doctors.map(d => d.name.trim());
+
+    const [issuances, invoices] = await Promise.all([
+      MrSampleIssuance.find({ mrId }).lean(),
+      Invoice.find({
+        $or: [
+          { prescribingDoctorId: { $in: docIds } },
+          { doctorName: { $in: docNames } }
+        ]
+      }).lean()
+    ]);
+
+    const totalSampleCost = issuances.reduce((sum, iss) => sum + ((iss.qty || 0) * (iss.unitCost || 0)), 0);
+    const totalRxRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const roiRatio = totalSampleCost > 0 ? Number((totalRxRevenue / totalSampleCost).toFixed(2)) : 0;
+
+    res.json({
+      mrId,
+      mrName: mr.name,
+      doctorCount: doctors.length,
+      totalSampleCost: Number(totalSampleCost.toFixed(2)),
+      totalRxRevenue: Number(totalRxRevenue.toFixed(2)),
+      roiRatio,
+      invoiceCount: invoices.length,
+      sampleIssuanceCount: issuances.length
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

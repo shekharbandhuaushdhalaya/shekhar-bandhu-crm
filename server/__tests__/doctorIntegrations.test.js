@@ -15,6 +15,12 @@ jest.mock('../models/LineClearance');
 jest.mock('../models/RetentionSample');
 jest.mock('../models/Product');
 jest.mock('../models/RolePermission');
+jest.mock('../models/PharmacopoeiaEntry');
+jest.mock('../utils/botanicalLookup', () => ({
+  getBotanicalProfile: jest.fn().mockResolvedValue({ latinName: 'Withania somnifera', partUsed: 'Root', standard: 'API', monographRef: 'API Part I, Vol I, Pg 15' })
+}));
+
+jest.setTimeout(15000);
 
 const Doctor = require('../models/Doctor');
 const Invoice = require('../models/Invoice');
@@ -26,6 +32,7 @@ const BatchProduction = require('../models/BatchProduction');
 const RawMaterialEntry = require('../models/RawMaterialEntry');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
+const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
 
 RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
 
@@ -53,6 +60,9 @@ describe('5 CRM Enhancements Integration Suite', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     RolePermission.getEffectivePermissions.mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
+    if (PharmacopoeiaEntry.findOne) {
+      PharmacopoeiaEntry.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({ verified: true, source: 'manual' }) });
+    }
   });
 
   describe('1. Doctor Rx Sales Analytics', () => {
@@ -134,7 +144,9 @@ describe('5 CRM Enhancements Integration Suite', () => {
       const LineClearance = require('../models/LineClearance');
       const RetentionSample = require('../models/RetentionSample');
       const Product = require('../models/Product');
+      const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
 
+      PharmacopoeiaEntry.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({ verified: true, source: 'manual' }) });
       SystemSettings.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({}) });
       LineClearance.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
       RetentionSample.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });

@@ -504,9 +504,71 @@ router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), async (r
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
 
+    const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
+    const RawMaterial = require('../../models/RawMaterial');
+
+    // Collect all raw material IDs referenced by batch
+    const rmIds = new Set();
+    if (batch.bomSnapshot && Array.isArray(batch.bomSnapshot.ingredients)) {
+      batch.bomSnapshot.ingredients.forEach(i => {
+        if (i.rawMaterialId) rmIds.add(i.rawMaterialId.toString());
+      });
+    }
+    if (Array.isArray(batch.ingredientsConsumed)) {
+      batch.ingredientsConsumed.forEach(i => {
+        if (i.rawMaterialId) rmIds.add(i.rawMaterialId.toString());
+      });
+    }
+    if (Array.isArray(batch.ingredientsReserved)) {
+      batch.ingredientsReserved.forEach(i => {
+        if (i.rawMaterialId) rmIds.add(i.rawMaterialId.toString());
+      });
+    }
+
+    const rawMaterials = await RawMaterial.find({ _id: { $in: Array.from(rmIds) } }).lean();
+    const unverifiedIngredients = [];
+
+    for (const rm of rawMaterials) {
+      let entry = null;
+      if (rm.name) {
+        const escapedName = rm.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedBot = (rm.botanicalName || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const searchConds = [{ ayurvedicName: new RegExp(`^${escapedName}$`, 'i') }];
+        if (escapedBot) {
+          searchConds.push({ botanicalName: new RegExp(`^${escapedBot}$`, 'i') });
+        }
+        entry = await PharmacopoeiaEntry.findOne({ $or: searchConds }).lean();
+      }
+
+      if (entry && entry.verified === false) {
+        unverifiedIngredients.push({
+          rawMaterialId: rm._id,
+          name: rm.name,
+          botanicalName: rm.botanicalName || entry.botanicalName || '',
+          monographRef: rm.monographRef || entry.monographRef || '',
+          source: entry.source || 'AI-generated'
+        });
+      }
+    }
+
+    if (unverifiedIngredients.length > 0 && req.body.acknowledgeUnverifiedRefs !== true) {
+      return res.status(400).json({
+        error: 'Batch contains raw materials with unverified pharmacopoeia monograph citations.',
+        warning: `Unverified pharmacopoeia monograph citations found for ${unverifiedIngredients.length} ingredient(s). Set acknowledgeUnverifiedRefs: true in request body to proceed.`,
+        unverifiedIngredients
+      });
+    }
+
     batch.bmrApprovedBy = req.user ? req.user.id : null;
     batch.bmrApprovedByName = req.user ? req.user.name : 'Authorized Approver';
     batch.bmrApprovedAt = new Date();
+
+    if (unverifiedIngredients.length > 0) {
+      batch.bmrUnverifiedAcknowledged = true;
+      batch.bmrUnverifiedAcknowledgedBy = req.user ? req.user.id : null;
+      batch.bmrUnverifiedAcknowledgedByName = req.user ? req.user.name : 'Authorized Approver';
+      batch.bmrUnverifiedAcknowledgedAt = new Date();
+    }
 
     await batch.save();
     if (req.io) {
@@ -1427,8 +1489,33 @@ router.get('/:id/bmr-report', async (req, res) => {
     const yieldProdMap = {};
     yieldProducts.forEach(p => { yieldProdMap[p._id.toString()] = p; });
 
+    const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
+    const unverifiedIngredients = [];
+
+    for (const ing of enrichedIngredients) {
+      if (ing.name) {
+        const escapedName = ing.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedBot = (ing.botanicalName || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const searchConds = [{ ayurvedicName: new RegExp(`^${escapedName}$`, 'i') }];
+        if (escapedBot) searchConds.push({ botanicalName: new RegExp(`^${escapedBot}$`, 'i') });
+        const pEntry = await PharmacopoeiaEntry.findOne({ $or: searchConds }).lean();
+        if (pEntry && pEntry.verified === false) {
+          unverifiedIngredients.push({
+            name: ing.name,
+            botanicalName: ing.botanicalName || pEntry.botanicalName || '',
+            monographRef: ing.monographRef || pEntry.monographRef || '',
+            source: pEntry.source || 'AI-generated'
+          });
+        }
+      }
+    }
+
+    const hasUnverifiedReferences = unverifiedIngredients.length > 0;
+
     res.json({
       batchNo: batch.batchNo,
+      hasUnverifiedReferences,
+      unverifiedIngredients,
       ayushHeader: {
         firmName: sysSettings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
         firmAddress: sysSettings.firmAddress || 'PILIKOTHI, VARANASI (U.P.)',

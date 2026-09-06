@@ -239,6 +239,8 @@ app.use('/api/payments/gateway', authenticateJWT, paymentGatewayRoutes);
 app.use('/api/payments/gateway/webhook', paymentGatewayRoutes);
 app.use('/api/rbac', authenticateJWT, rbacRoutes);
 app.use('/api/medical-reps', authenticateJWT, medicalRepRoutes);
+app.use('/api/mr-sample-stock', authenticateJWT, medicalRepRoutes);
+app.use('/api/mr-tour-plans', authenticateJWT, medicalRepRoutes);
 app.use('/api/campaigns', authenticateJWT, campaignRoutes);
 app.use('/api/social', (req, res, next) => {
   if (req.path === '/callback' || req.path === '/auth-url') {

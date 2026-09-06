@@ -91,18 +91,19 @@ export default function DoctorsScreen() {
         setTotalDoctors(res.length);
         setTotalPages(1);
       } else {
+        const rawData = Array.isArray(res?.data) ? res.data : [];
         if (isAppend) {
           setDoctors(prev => {
-            const existingIds = new Set(prev.map(d => d._id));
-            const newItems = res.data.filter(d => !existingIds.has(d._id));
+            const existingIds = new Set(prev.map(d => (d && d._id) ? String(d._id) : '').filter(Boolean));
+            const newItems = rawData.filter(d => d && d._id && !existingIds.has(String(d._id)));
             return [...prev, ...newItems];
           });
         } else {
-          setDoctors(res.data);
+          setDoctors(rawData);
         }
-        setTotalDoctors(res.total);
-        setTotalPages(res.totalPages);
-        setPage(res.page);
+        setTotalDoctors(res?.total ?? rawData.length);
+        setTotalPages(res?.totalPages ?? 1);
+        setPage(res?.page ?? targetPage);
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to load doctors', 'error');
@@ -417,6 +418,22 @@ export default function DoctorsScreen() {
                             </Text>
                           </View>
                         ) : null}
+                        <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <TouchableOpacity
+                            style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                            onPress={async () => {
+                              try {
+                                const roi = await api.getDoctorSampleROI(doc._id);
+                                showToast(`Dr. ${doc.name} ROI: ${roi.roiRatio}x (Revenue: ₹${roi.totalRxRevenue.toLocaleString()} | Sample Cost: ₹${roi.totalSampleCost.toLocaleString()})`, 'info');
+                              } catch (err: any) {
+                                showToast(err.message || 'Failed to fetch ROI metrics', 'error');
+                              }
+                            }}
+                          >
+                            <Ionicons name="trending-up-outline" size={13} color={colors.primary} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Sample ROI</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
                   );

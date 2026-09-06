@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const tourPlanEntrySchema = new mongoose.Schema({
   date: { type: Date, required: true },
   territory: { type: String, default: '', trim: true },
+  targetDoctorIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' }],
   targetDoctorNames: [{ type: String, trim: true }],
   targetChemistNames: [{ type: String, trim: true }],
   notes: { type: String, default: '', trim: true },

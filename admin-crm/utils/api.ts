@@ -1194,6 +1194,37 @@ class ApiClient {
     });
     return res.json();
   }
+  async getUnverifiedPharmacopoeia(): Promise<any[]> {
+    const res = await this.request(`${API_BASE}/pharmacopoeia/unverified`);
+    return res.json();
+  }
+  async verifyPharmacopoeia(id: string, data?: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/pharmacopoeia/${id}/verify`, {
+      method: 'PUT', body: JSON.stringify(data || {})
+    });
+    return res.json();
+  }
+  async issueSampleToDoctor(data: { mrId: string; doctorId: string; productId: string; qty: number; unitCost?: number; date?: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/mr-sample-stock/issue-to-doctor`, {
+      method: 'POST', body: JSON.stringify(data)
+    });
+    return res.json();
+  }
+  async getDoctorSampleROI(doctorId: string): Promise<{ totalSampleCost: number; totalRxRevenue: number; roiRatio: number; invoiceCount: number }> {
+    const res = await this.request(`${API_BASE}/doctors/${doctorId}/sample-roi`);
+    return res.json();
+  }
+  async getMRSampleROI(mrId: string): Promise<{ mrId: string; mrName: string; doctorCount: number; totalSampleCost: number; totalRxRevenue: number; roiRatio: number; invoiceCount: number }> {
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/sample-roi`);
+    return res.json();
+  }
+  async getTourPlanSuggestions(mrId: string, date: string, lat?: number, lng?: number): Promise<{ mrId: string; date: string; dayOfWeek: string; suggestedCount: number; doctors: any[] }> {
+    const params = new URLSearchParams({ mrId, date });
+    if (lat !== undefined) params.set('lat', lat.toString());
+    if (lng !== undefined) params.set('lng', lng.toString());
+    const res = await this.request(`${API_BASE}/mr-tour-plans/suggest?${params}`);
+    return res.json();
+  }
   async getManufacturingAnalytics(): Promise<ManufacturingAnalytics> {
     const res = await this.request(`${API_BASE}/analytics/manufacturing`);
     return res.json();
