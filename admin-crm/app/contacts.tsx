@@ -318,17 +318,50 @@ export default function ContactsScreen() {
   const styles = useStyles(createStyles);
   const stageColors = getStageColors(colors);
 
-  const load = useCallback(async () => {
-    const res = await api.getContacts(search, filterStage);
-    setContacts(res);
-  }, [search, filterStage]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
-  useEffect(() => { load(); }, [load]);
+  const load = useCallback(async (resetPage = true) => {
+    const targetPage = resetPage ? 1 : page;
+    const res = await api.getContacts(search, filterStage, targetPage, 25);
+    const list = Array.isArray(res) ? res : (res?.data || []);
+    const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
+
+    if (resetPage) {
+      setContacts(list);
+      setPage(1);
+    } else {
+      setContacts(prev => [...prev, ...list]);
+    }
+    setTotalPages(totalP);
+    setHasMore(targetPage < totalP || list.length === 25);
+  }, [search, filterStage, page]);
+
+  useEffect(() => { load(true); }, [search, filterStage]);
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const res = await api.getContacts(search, filterStage, nextPage, 25);
+      const list = Array.isArray(res) ? res : (res?.data || []);
+      const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
+      setContacts(prev => [...prev, ...list]);
+      setPage(nextPage);
+      setTotalPages(totalP);
+      setHasMore(nextPage < totalP || list.length === 25);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
-    await load();
+    await load(true);
     setRefreshing(false);
   }, [load]);
 
@@ -452,6 +485,18 @@ export default function ContactsScreen() {
               )}
             </View>
           </ScrollView>
+
+          {hasMore && (
+            <TouchableOpacity
+              style={{ padding: 12, borderRadius: Radius.md, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, alignItems: 'center', marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}
+              disabled={loadingMore}
+              onPress={handleLoadMore}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                {loadingMore ? 'Loading More...' : `Load More Contacts (Page ${page + 1} of ${totalPages})`}
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </View>
 

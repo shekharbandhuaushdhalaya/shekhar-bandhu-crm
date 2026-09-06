@@ -53,23 +53,64 @@ export default function ProductsScreen() {
   const perm = usePermission();
   const styles = useStyles(createStyles);
 
-  const load = useCallback(async () => {
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+
+  const load = useCallback(async (resetPage = true) => {
     try {
-      const res = await api.getProducts(search);
-      setProducts(res);
+      const targetPage = resetPage ? 1 : page;
+      const res = await api.getProducts(search, targetPage, 50);
+      const list = Array.isArray(res) ? res : (res?.data || []);
+      const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
+
+      if (resetPage) {
+        setProducts(list);
+        setPage(1);
+      } else {
+        setProducts(prev => {
+          const existingIds = new Set(prev.map(p => p._id));
+          const nextItems = list.filter(p => !existingIds.has(p._id));
+          return [...prev, ...nextItems];
+        });
+      }
+      setTotalPages(totalP);
+      setHasMore(targetPage < totalP || list.length === 50);
     } catch (e: any) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, page]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { load(true); }, [load]));
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const res = await api.getProducts(search, nextPage, 50);
+      const list = Array.isArray(res) ? res : (res?.data || []);
+      const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
+      setProducts(prev => {
+        const existingIds = new Set(prev.map(p => p._id));
+        const nextItems = list.filter(p => !existingIds.has(p._id));
+        return [...prev, ...nextItems];
+      });
+      setPage(nextPage);
+      setTotalPages(totalP);
+      setHasMore(nextPage < totalP || list.length === 50);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
-    const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
-    const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => load());
-    const sub3 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => load());
+    const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => load(true));
+    const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => load(true));
+    const sub3 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => load(true));
     return () => {
       sub1.remove();
       sub2.remove();
@@ -109,7 +150,7 @@ export default function ProductsScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
-    await load();
+    await load(true);
     setRefreshing(false);
   }, [load]);
 
@@ -292,6 +333,17 @@ export default function ProductsScreen() {
                   </View>
                 }
               />
+              {hasMore && (
+                <TouchableOpacity
+                  style={{ padding: 12, borderRadius: Radius.md, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, alignItems: 'center', marginTop: 10 }}
+                  disabled={loadingMore}
+                  onPress={handleLoadMore}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                    {loadingMore ? 'Loading More...' : `Load More Products (Page ${page + 1} of ${totalPages})`}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 

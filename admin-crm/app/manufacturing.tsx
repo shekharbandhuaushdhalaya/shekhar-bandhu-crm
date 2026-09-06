@@ -19,6 +19,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useRouter } from 'expo-router';
 import AyurvedicLoader from '../components/AyurvedicLoader';
 import { useToast } from '../utils/ToastContext';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 import {
   api,
   RawMaterial,
@@ -71,6 +72,11 @@ export default function ManufacturingScreen() {
 
   // Core Data Lists
   const [materials, setMaterials] = useState<RawMaterial[]>([]);
+  const [materialsPage, setMaterialsPage] = useState(1);
+  const [materialsTotalPages, setMaterialsTotalPages] = useState(1);
+  const [loadingMoreMaterials, setLoadingMoreMaterials] = useState(false);
+  const [hasMoreMaterials, setHasMoreMaterials] = useState(false);
+  const loadingMoreMaterialsRef = useRef(false);
   const [entries, setEntries] = useState<RawMaterialEntry[]>([]);
   const [boms, setBoms] = useState<BillOfMaterials[]>([]);
   const [batches, setBatches] = useState<BatchProduction[]>([]);
@@ -347,8 +353,19 @@ export default function ManufacturingScreen() {
     try {
       switch (key) {
         case 'materials': {
-          const data = await api.getRawMaterials(mfgUnitFilter === 'all' ? undefined : mfgUnitFilter);
-          setMaterials(data);
+          const res = await api.getRawMaterials(
+            mfgUnitFilter === 'all' ? undefined : mfgUnitFilter,
+            undefined,
+            materialSearch ? materialSearch.trim() : undefined,
+            1,
+            50
+          );
+          const list = Array.isArray(res) ? res : (res?.data || []);
+          const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
+          setMaterials(list);
+          setMaterialsPage(1);
+          setMaterialsTotalPages(totalP);
+          setHasMoreMaterials(1 < totalP || list.length === 50);
           break;
         }
         case 'entries': {
@@ -437,6 +454,35 @@ export default function ManufacturingScreen() {
     }
   };
 
+  const handleLoadMoreMaterials = async () => {
+    if (loadingMoreMaterialsRef.current || !hasMoreMaterials) return;
+    loadingMoreMaterialsRef.current = true;
+    setLoadingMoreMaterials(true);
+    try {
+      const nextPage = materialsPage + 1;
+      const res = await api.getRawMaterials(
+        mfgUnitFilter === 'all' ? undefined : mfgUnitFilter,
+        undefined,
+        materialSearch ? materialSearch.trim() : undefined,
+        nextPage,
+        50
+      );
+      const list = Array.isArray(res) ? res : (res?.data || []);
+      const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
+      setMaterials(prev => {
+        const existingIds = new Set(prev.map(m => m._id));
+        const nextItems = list.filter(m => !existingIds.has(m._id));
+        return [...prev, ...nextItems];
+      });
+      setMaterialsPage(nextPage);
+      setMaterialsTotalPages(totalP);
+      setHasMoreMaterials(nextPage < totalP || list.length === 50);
+    } finally {
+      loadingMoreMaterialsRef.current = false;
+      setLoadingMoreMaterials(false);
+    }
+  };
+
   const fetchTabDataBackground = useCallback((tab: string) => {
     const needs = tabDataRequirements[tab] || [];
     needs.forEach(key => {
@@ -467,6 +513,14 @@ export default function ManufacturingScreen() {
     fetchDataset('materials');
     fetchDataset('entries');
   }, [mfgUnitFilter, fetchDataset]);
+
+  const debouncedMaterialSearch = useDebouncedValue(materialSearch, 300);
+  useEffect(() => {
+    if (activeTab === 'materials') {
+      loadedRef.current.delete('materials');
+      fetchDataset('materials');
+    }
+  }, [debouncedMaterialSearch, fetchDataset, activeTab]);
 
   // Socket handlers — selective state updates
   const inventoryDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -1818,6 +1872,11 @@ export default function ManufacturingScreen() {
             isIntegerQty={isIntegerQty}
             onEditMaterial={handleEditMaterial}
             onDeleteMaterial={handleOpenDeleteMaterial}
+            hasMore={hasMoreMaterials}
+            loadingMore={loadingMoreMaterials}
+            materialsPage={materialsPage}
+            materialsTotalPages={materialsTotalPages}
+            onLoadMore={handleLoadMoreMaterials}
             onTraceMaterial={async (rm) => {
               const rawName = rm.name ? rm.name.trim() : rm._id;
               setTraceBatchNo(rawName);

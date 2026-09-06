@@ -18,6 +18,9 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
   const styles = useStyles(createStyles);
 
   const [monographs, setMonographs] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [search, setSearch] = useState('');
@@ -37,9 +40,12 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
         } else {
           setIsSearching(true);
         }
-        const data = await api.getPharmacopoeia(debouncedSearch, selectedStandard, { all: true });
+        const data = await api.getPharmacopoeia(debouncedSearch, selectedStandard, { page: 1, limit: 50 });
         if (active) {
-          setMonographs(data || []);
+          const list = Array.isArray(data) ? data : (data?.data || []);
+          setMonographs(list);
+          setPage(1);
+          setHasMore(list.length === 50);
         }
       } catch (err: any) {
         if (active) {
@@ -59,6 +65,23 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
       active = false;
     };
   }, [visible, debouncedSearch, selectedStandard]);
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const data = await api.getPharmacopoeia(debouncedSearch, selectedStandard, { page: nextPage, limit: 50 });
+      const list = Array.isArray(data) ? data : (data?.data || []);
+      setMonographs(prev => [...prev, ...list]);
+      setPage(nextPage);
+      setHasMore(list.length === 50);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to load more monographs', 'error');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleImportSingle = async (monograph: any) => {
     try {
@@ -299,6 +322,24 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                     )}
                   </View>
                 ))
+              )}
+              {hasMore && (
+                <TouchableOpacity
+                  style={{
+                    padding: 12, borderRadius: 8, backgroundColor: colors.bg.secondary,
+                    borderWidth: 1, borderColor: colors.border, alignItems: 'center', marginVertical: 8
+                  }}
+                  disabled={loadingMore}
+                  onPress={handleLoadMore}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                      Load More Monographs (Page {page + 1})
+                    </Text>
+                  )}
+                </TouchableOpacity>
               )}
             </ScrollView>
           )}

@@ -372,6 +372,19 @@ async function runStartupMigrations() {
   }
   await require('./models/InventoryEntry').syncIndexes();
   console.log('✅ Using MongoDB for data');
+
+  try {
+    const pharmacopoeiaRoutes = require('./routes/manufacturing/pharmacopoeia');
+    if (pharmacopoeiaRoutes.ensureSeedSynced) {
+      await pharmacopoeiaRoutes.ensureSeedSynced();
+      console.log('✅ Pharmacopoeia seed dataset verified and synced');
+    }
+    if (pharmacopoeiaRoutes.checkDuplicatePharmacopoeiaEntries) {
+      await pharmacopoeiaRoutes.checkDuplicatePharmacopoeiaEntries();
+    }
+  } catch (pharmErr) {
+    console.error('❌ Error during pharmacopoeia startup sync:', pharmErr.message);
+  }
 }
 
 // Connect to MongoDB asynchronously

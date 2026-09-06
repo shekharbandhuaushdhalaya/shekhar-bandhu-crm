@@ -27,9 +27,20 @@ describe('Ayurvedic Pharmacopoeia Monograph Suite & API Endpoints', () => {
 
   beforeEach(async () => {
     await PharmacopoeiaEntry.deleteMany({});
+    if (pharmacopoeiaRoutes.ensureSeedSynced) {
+      await pharmacopoeiaRoutes.ensureSeedSynced();
+    }
   });
 
-  it('GET /api/pharmacopoeia auto-seeds dataset and lists monographs', async () => {
+  it('does NOT invoke countDocuments on GET /api/pharmacopoeia or /search requests', async () => {
+    const countSpy = jest.spyOn(PharmacopoeiaEntry, 'countDocuments');
+    await request(app).get('/api/pharmacopoeia');
+    await request(app).get('/api/pharmacopoeia/search?q=Tulsi');
+    expect(countSpy).not.toHaveBeenCalled();
+    countSpy.mockRestore();
+  });
+
+  it('GET /api/pharmacopoeia lists monographs from seeded database', async () => {
     const res = await request(app).get('/api/pharmacopoeia');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);

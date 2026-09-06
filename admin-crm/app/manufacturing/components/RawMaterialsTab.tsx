@@ -19,12 +19,18 @@ interface Props {
   onEditMaterial: (rm: any) => void;
   onTraceMaterial: (rm: any) => void;
   onDeleteMaterial: (rm: any) => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  materialsPage?: number;
+  materialsTotalPages?: number;
+  onLoadMore?: () => void;
 }
 
 const RawMaterialsTab = React.memo(function RawMaterialsTab({
   expiryAlerts, manufacturingUnits, mfgUnitFilter, setMfgUnitFilter,
   materialSearch, setMaterialSearch, stockFilter, setStockFilter,
-  filteredMaterials, isDesktop, isIntegerQty, onEditMaterial, onTraceMaterial, onDeleteMaterial
+  filteredMaterials, isDesktop, isIntegerQty, onEditMaterial, onTraceMaterial, onDeleteMaterial,
+  hasMore, loadingMore, materialsPage, materialsTotalPages, onLoadMore
 }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
@@ -238,6 +244,20 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
           })}
         </View>
         {filteredMaterials.length === 0 && <Text style={styles.emptyText}>No matching materials found.</Text>}
+        {hasMore && onLoadMore && (
+          <TouchableOpacity
+            style={{
+              padding: 10, borderRadius: 6, backgroundColor: colors.bg.secondary,
+              borderWidth: 1, borderColor: colors.border, alignItems: 'center', marginTop: 12
+            }}
+            disabled={loadingMore}
+            onPress={onLoadMore}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+              {loadingMore ? 'Loading More Materials...' : `Load More Materials (Page ${(materialsPage || 1) + 1} of ${materialsTotalPages || 1})`}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

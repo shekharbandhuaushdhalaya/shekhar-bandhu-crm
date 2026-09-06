@@ -49,7 +49,8 @@ router.get('/', async (req, res) => {
     const limitNum = parseInt(limit) || 50;
     const isPaginated = !isNaN(pageNum) && pageNum > 0;
 
-    let query = RawMaterial.find(filter).sort({ name: 1 });
+    const rawMaterialFields = 'name sku unit category isScheduleE1 minReorder cleaningLossPercent botanicalName partUsed pharmacopoeialStandard monographRef createdAt updatedAt';
+    let query = RawMaterial.find(filter).select(rawMaterialFields).sort({ name: 1 });
     if (isPaginated) {
       query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
     }

@@ -11,7 +11,7 @@ function escapeRegex(str) {
 
 let isSeedSynced = false;
 
-// Helper to ensure seed data is present in MongoDB
+// Helper to ensure seed data is present in MongoDB (run once at startup)
 async function ensureSeedSynced() {
   try {
     const count = await PharmacopoeiaEntry.countDocuments();
@@ -65,11 +65,45 @@ async function ensureSeedSynced() {
   }
 }
 
+// Startup safety check: detect duplicate ayurvedicName entries before index reliance (Gap 5)
+async function checkDuplicatePharmacopoeiaEntries() {
+  try {
+    const duplicates = await PharmacopoeiaEntry.aggregate([
+      {
+        $project: {
+          ayurvedicName: 1,
+          normalizedName: { $toUpper: { $trim: { input: '$ayurvedicName' } } }
+        }
+      },
+      {
+        $group: {
+          _id: '$normalizedName',
+          count: { $sum: 1 },
+          docs: { $push: { id: '$_id', originalName: '$ayurvedicName' } }
+        }
+      },
+      {
+        $match: {
+          count: { $gt: 1 }
+        }
+      }
+    ]);
+
+    if (duplicates.length > 0) {
+      console.warn('⚠️ WARNING: Duplicate Pharmacopoeia entries detected in database:');
+      duplicates.forEach(dup => {
+        console.warn(` - Name "${dup._id}": ${dup.count} duplicates found (${dup.docs.map(d => d.id).join(', ')})`);
+      });
+    }
+  } catch (err) {
+    console.error('Error checking duplicate pharmacopoeia entries:', err.message);
+  }
+}
+
 // GET /api/pharmacopoeia — List / Search pharmacopoeia monographs
 router.get('/', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=300');
-    await ensureSeedSynced();
 
     const { search, q, standard, page, limit, all } = req.query;
     const queryTerm = (search || q || '').trim();
@@ -105,7 +139,6 @@ router.get('/', async (req, res) => {
 // GET /api/pharmacopoeia/search — Instant search by herb name or alias
 router.get('/search', async (req, res) => {
   try {
-    await ensureSeedSynced();
     const queryTerm = (req.query.q || req.query.query || '').trim();
     if (!queryTerm) return res.status(400).json({ error: 'Search query parameter q is required' });
 
@@ -273,5 +306,8 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+router.ensureSeedSynced = ensureSeedSynced;
+router.checkDuplicatePharmacopoeiaEntries = checkDuplicatePharmacopoeiaEntries;
 
 module.exports = router;

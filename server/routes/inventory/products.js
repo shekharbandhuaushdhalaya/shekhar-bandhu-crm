@@ -53,7 +53,8 @@ router.get('/', authorize('product:view'), async (req, res) => {
     const limitNum = parseInt(limit) || 50;
     const isPaginated = !isNaN(pageNum) && pageNum > 0;
 
-    let query = Product.find(filter);
+    const productFields = 'name sku price mrp discount discountLabel websitePromoActive stockLevel category minReorder hsnCode gstRate productType size colour shape weight vendorId vendorName image description disease ingredients suggestedDosage benefits rating ratingCount parentId specificProductCode spcComponents createdAt updatedAt';
+    let query = Product.find(filter).select(productFields);
     const rolePerms = await getRolePermissions(req.user.role);
     if (!rolePerms.includes('product:viewPricing') && !rolePerms.includes('*')) {
       query = query.select('-price');
