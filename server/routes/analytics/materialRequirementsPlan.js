@@ -80,8 +80,8 @@ router.get('/', authorize('report:view'), async (req, res) => {
       const requiredForProduction = reqData ? Number(reqData.requiredForProduction.toFixed(4)) : 0;
       const minReorderThreshold = rm.minReorder || 0;
 
-      // Calculate current net available stock from non-expired lots
-      const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id })
+      // Calculate current net available stock from non-expired & approved lots
+      const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, qcStatus: 'approved' })
         .sort({ createdAt: -1 })
         .lean();
 

@@ -222,25 +222,38 @@ router.get('/:id/sample-roi', authorize('mr:view'), async (req, res) => {
   try {
     const Invoice = require('../../models/Invoice');
     const MrSampleIssuance = require('../../models/MrSampleIssuance');
+    const SampleConversion = require('../../models/SampleConversion');
 
     const doctor = await Doctor.findById(req.params.id).lean();
     if (!doctor) {
       return res.status(404).json({ error: 'Doctor not found' });
     }
 
-    const [invoices, issuances] = await Promise.all([
+    const [invoices, issuances, conversions] = await Promise.all([
       Invoice.find({
         $or: [
           { prescribingDoctorId: doctor._id },
           { doctorName: { $regex: new RegExp(`^${doctor.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } }
         ]
       }).lean(),
-      MrSampleIssuance.find({ doctorId: doctor._id }).lean()
+      MrSampleIssuance.find({ doctorId: doctor._id }).lean(),
+      SampleConversion.find({ doctorId: doctor._id }).lean()
     ]);
 
-    const totalRxRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
-    const invoiceCount = invoices.length;
+    const convertedRecords = conversions.filter(c => c.conversionStatus === 'converted');
+    const pendingRecords = conversions.filter(c => c.conversionStatus === 'pending');
 
+    const convertedRevenue = convertedRecords.reduce((sum, c) => sum + (c.prescriptionOrderAmount || 0), 0);
+    const estimatedInvoiceRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+
+    let totalRxRevenue = 0;
+    if (convertedRecords.length > 0) {
+      totalRxRevenue = convertedRevenue + (pendingRecords.length > 0 ? estimatedInvoiceRevenue : 0);
+    } else {
+      totalRxRevenue = estimatedInvoiceRevenue;
+    }
+
+    const invoiceCount = invoices.length;
     const totalSampleCost = issuances.reduce((sum, iss) => sum + ((iss.qty || 0) * (iss.unitCost || 0)), 0);
     const roiRatio = totalSampleCost > 0 ? Number((totalRxRevenue / totalSampleCost).toFixed(2)) : 0;
 

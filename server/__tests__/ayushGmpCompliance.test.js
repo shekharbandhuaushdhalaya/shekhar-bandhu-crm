@@ -9,6 +9,8 @@ const SystemSettings = require('../models/SystemSettings');
 jest.mock('../models/CertificateOfAnalysis');
 jest.mock('../models/RawMaterialQuarantine');
 jest.mock('../models/SystemSettings');
+jest.mock('../models/RawMaterialEntry');
+jest.mock('../models/RawMaterial');
 
 jest.setTimeout(10000);
 

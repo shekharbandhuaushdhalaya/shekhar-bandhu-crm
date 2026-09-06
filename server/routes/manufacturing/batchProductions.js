@@ -89,7 +89,7 @@ router.get('/preview', authorize('manufacturing:view'), async (req, res) => {
       let totalAvailable = 0;
 
       if (manufacturingUnitId) {
-        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, warehouseId: manufacturingUnitId });
+        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, warehouseId: manufacturingUnitId, qcStatus: 'approved' });
         totalAvailable = entries.reduce((s, e) => s + (e.qty || 0), 0);
       } else {
         totalAvailable = rm.stockLevel || 0;
@@ -287,7 +287,8 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
         for (const item of immediateDeductGroup) {
           const entries = await RawMaterialEntry.find({
             rawMaterialId: item.rawMaterialId,
-            warehouseId: manufacturingUnitId
+            warehouseId: manufacturingUnitId,
+            qcStatus: 'approved'
           }).session(session);
 
           entries.sort((a, b) => {
@@ -330,7 +331,8 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
         for (const item of blockGroup) {
           const entries = await RawMaterialEntry.find({
             rawMaterialId: item.rawMaterialId,
-            warehouseId: manufacturingUnitId
+            warehouseId: manufacturingUnitId,
+            qcStatus: 'approved'
           }).session(session);
 
           entries.sort((a, b) => {
@@ -1138,7 +1140,7 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
           ? Number(((ing.qtyRequired || 0) * totalYield).toFixed(2))
           : Number(((ing.qtyRequired || 0) * (totalPlanned / 100)).toFixed(2));
         if (qtyNeeded <= 0) continue;
-        const entries = await RawMaterialEntry.find({ rawMaterialId: ing.rawMaterialId, warehouseId: batch.manufacturingUnitId }).sort({ createdAt: 1 }).lean();
+        const entries = await RawMaterialEntry.find({ rawMaterialId: ing.rawMaterialId, warehouseId: batch.manufacturingUnitId, qcStatus: 'approved' }).sort({ createdAt: 1 }).lean();
         let needed = qtyNeeded;
         for (const entry of entries) {
           if (needed <= 0.0001) break;

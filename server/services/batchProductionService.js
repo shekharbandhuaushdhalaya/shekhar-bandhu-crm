@@ -78,7 +78,7 @@ async function consumeFromReservation(batch, rawMaterialId, qtyNeeded, session) 
     let query = RawMaterialEntry.find({
       rawMaterialId,
       warehouseId: batch.manufacturingUnitId,
-      qcStatus: { $ne: 'rejected' }
+      qcStatus: 'approved'
     });
     if (session) query = query.session(session);
     const entries = await query;
@@ -232,7 +232,7 @@ async function calculateAggregateMaterialSufficiency(batchIds = []) {
 
   const rmIds = Object.keys(demandMap);
   const rawMaterials = await RawMaterial.find({ _id: { $in: rmIds } }).lean();
-  const rmEntries = await RawMaterialEntry.find({ rawMaterialId: { $in: rmIds } }).lean();
+  const rmEntries = await RawMaterialEntry.find({ rawMaterialId: { $in: rmIds }, qcStatus: 'approved' }).lean();
 
   const report = [];
   let overallSufficient = true;
@@ -240,7 +240,7 @@ async function calculateAggregateMaterialSufficiency(batchIds = []) {
   for (const rmIdStr of rmIds) {
     const demand = demandMap[rmIdStr];
     const rm = rawMaterials.find(r => r._id.toString() === rmIdStr);
-    const rmLots = rmEntries.filter(e => e.rawMaterialId.toString() === rmIdStr && e.qcStatus !== 'rejected');
+    const rmLots = rmEntries.filter(e => e.rawMaterialId.toString() === rmIdStr && e.qcStatus === 'approved');
 
     const availableStock = rmLots.reduce((sum, e) => sum + Math.max(0, (e.qty || 0) - (e.reservedQty || 0)), 0);
     const totalRequired = Number(demand.totalRequired.toFixed(2));

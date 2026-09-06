@@ -10,6 +10,7 @@ jest.mock('../models/MrVisit');
 jest.mock('../models/MrTourPlan');
 jest.mock('../models/Product');
 jest.mock('../models/RolePermission');
+jest.mock('../models/SampleConversion');
 
 const Doctor = require('../models/Doctor');
 const Invoice = require('../models/Invoice');
@@ -18,6 +19,7 @@ const MrSampleIssuance = require('../models/MrSampleIssuance');
 const MedicalRepresentative = require('../models/MedicalRepresentative');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
+const SampleConversion = require('../models/SampleConversion');
 
 RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
 
@@ -46,13 +48,23 @@ describe('Task 3: Sample Issuance Log, Doctor ROI & Doctor-Linked Tour Planning'
   });
 
   describe('3a. Sample Issuance Log', () => {
-    test('POST /api/mr-sample-stock/issue-to-doctor decrements stock and creates MrSampleIssuance record', async () => {
+    test('POST /api/mr-sample-stock/issue-to-doctor decrements stock and creates MrSampleIssuance and SampleConversion records', async () => {
       MrSampleStock.findOneAndUpdate.mockResolvedValue({ mrId: 'mr_101', productId: 'prod_101', qty: 20 });
       Product.findById.mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ price: 150 })
+        lean: jest.fn().mockResolvedValue({ price: 150, name: 'Ashwagandha Churna' })
+      });
+      MedicalRepresentative.findById.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ _id: 'mr_101', name: 'Ramesh' })
+      });
+      Doctor.findById.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ _id: 'doc_101', name: 'Dr. S. K. Roy' })
       });
       MrSampleIssuance.create.mockImplementation(async (data) => ({
         _id: 'issuance_1',
+        ...data
+      }));
+      SampleConversion.create.mockImplementation(async (data) => ({
+        _id: 'conversion_1',
         ...data
       }));
 
@@ -79,6 +91,13 @@ describe('Task 3: Sample Issuance Log, Doctor ROI & Doctor-Linked Tour Planning'
         qty: 5,
         unitCost: 150
       }));
+      expect(SampleConversion.create).toHaveBeenCalledWith(expect.objectContaining({
+        mrId: 'mr_101',
+        doctorId: 'doc_101',
+        productId: 'prod_101',
+        samplesQtyGiven: 5,
+        conversionStatus: 'pending'
+      }));
     });
   });
 
@@ -86,6 +105,9 @@ describe('Task 3: Sample Issuance Log, Doctor ROI & Doctor-Linked Tour Planning'
     test('GET /api/doctors/:id/sample-roi computes total sample cost, rx revenue, and ROI ratio', async () => {
       Doctor.findById.mockReturnValue({
         lean: jest.fn().mockResolvedValue({ _id: 'doc_101', name: 'Dr. S. K. Roy' })
+      });
+      SampleConversion.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([])
       });
       Invoice.find.mockReturnValue({
         lean: jest.fn().mockResolvedValue([
@@ -108,6 +130,33 @@ describe('Task 3: Sample Issuance Log, Doctor ROI & Doctor-Linked Tour Planning'
       expect(res.body.roiRatio).toBe(7.5); // 15000 / 2000 = 7.5
     });
 
+    test('GET /api/doctors/:id/sample-roi uses converted SampleConversion revenue when available', async () => {
+      Doctor.findById.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ _id: 'doc_101', name: 'Dr. S. K. Roy' })
+      });
+      SampleConversion.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([
+          { conversionStatus: 'converted', prescriptionOrderAmount: 25000 }
+        ])
+      });
+      Invoice.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([
+          { _id: 'inv_1', amount: 5000 }
+        ])
+      });
+      MrSampleIssuance.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([
+          { qty: 10, unitCost: 100 }
+        ])
+      });
+
+      const res = await request(app).get('/api/doctors/doc_101/sample-roi');
+      expect(res.status).toBe(200);
+      expect(res.body.totalRxRevenue).toBe(25000);
+      expect(res.body.totalSampleCost).toBe(1000);
+      expect(res.body.roiRatio).toBe(25);
+    });
+
     test('GET /api/medical-reps/:id/sample-roi computes MR aggregate ROI across assigned doctors', async () => {
       MedicalRepresentative.findById.mockReturnValue({
         lean: jest.fn().mockResolvedValue({ _id: 'mr_101', name: 'Ramesh' })
@@ -117,6 +166,9 @@ describe('Task 3: Sample Issuance Log, Doctor ROI & Doctor-Linked Tour Planning'
           { _id: 'doc_101', name: 'Dr. S. K. Roy' },
           { _id: 'doc_102', name: 'Dr. P. Sharma' }
         ])
+      });
+      SampleConversion.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([])
       });
       MrSampleIssuance.find.mockReturnValue({
         lean: jest.fn().mockResolvedValue([

@@ -1087,6 +1087,40 @@ router.post(['/sample-stock/issue-to-doctor', '/issue-to-doctor'], authorize('mr
       date: date ? new Date(date) : new Date()
     });
 
+    // Also write to SampleConversion log (conversionStatus: 'pending') for unified tracking
+    const SampleConversion = require('../../models/SampleConversion');
+    const Doctor = require('../../models/Doctor');
+
+    let mrName = req.body.mrName;
+    if (!mrName) {
+      const mrObj = await MedicalRepresentative.findById(mrId).lean();
+      mrName = mrObj ? mrObj.name : 'Medical Rep';
+    }
+
+    let doctorName = req.body.doctorName;
+    if (!doctorName) {
+      const docObj = await Doctor.findById(doctorId).lean();
+      doctorName = docObj ? docObj.name : 'Doctor';
+    }
+
+    let productName = req.body.productName;
+    if (!productName) {
+      const prodObj = await Product.findById(productId).lean();
+      productName = prodObj ? prodObj.name : 'Sample Product';
+    }
+
+    await SampleConversion.create({
+      mrId,
+      mrName,
+      doctorId,
+      doctorName,
+      productId,
+      productName,
+      samplesQtyGiven: qtyVal,
+      givenDate: date ? new Date(date) : new Date(),
+      conversionStatus: 'pending'
+    });
+
     res.status(201).json(issuance);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1098,6 +1132,7 @@ router.get('/:id/sample-roi', authorize('mr:view'), async (req, res) => {
   try {
     const Invoice = require('../../models/Invoice');
     const MrSampleIssuance = require('../../models/MrSampleIssuance');
+    const SampleConversion = require('../../models/SampleConversion');
     const Doctor = require('../../models/Doctor');
 
     const mrId = req.params.id;
@@ -1108,8 +1143,9 @@ router.get('/:id/sample-roi', authorize('mr:view'), async (req, res) => {
     const docIds = doctors.map(d => d._id);
     const docNames = doctors.map(d => d.name.trim());
 
-    const [issuances, invoices] = await Promise.all([
+    const [issuances, conversions, invoices] = await Promise.all([
       MrSampleIssuance.find({ mrId }).lean(),
+      SampleConversion.find({ mrId }).lean(),
       Invoice.find({
         $or: [
           { prescribingDoctorId: { $in: docIds } },
@@ -1119,7 +1155,20 @@ router.get('/:id/sample-roi', authorize('mr:view'), async (req, res) => {
     ]);
 
     const totalSampleCost = issuances.reduce((sum, iss) => sum + ((iss.qty || 0) * (iss.unitCost || 0)), 0);
-    const totalRxRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+
+    const convertedRecords = conversions.filter(c => c.conversionStatus === 'converted');
+    const pendingRecords = conversions.filter(c => c.conversionStatus === 'pending');
+
+    const convertedRevenue = convertedRecords.reduce((sum, c) => sum + (c.prescriptionOrderAmount || 0), 0);
+    const estimatedInvoiceRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+
+    let totalRxRevenue = 0;
+    if (convertedRecords.length > 0) {
+      totalRxRevenue = convertedRevenue + (pendingRecords.length > 0 ? estimatedInvoiceRevenue : 0);
+    } else {
+      totalRxRevenue = estimatedInvoiceRevenue;
+    }
+
     const roiRatio = totalSampleCost > 0 ? Number((totalRxRevenue / totalSampleCost).toFixed(2)) : 0;
 
     res.json({

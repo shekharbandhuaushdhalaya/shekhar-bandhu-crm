@@ -21,6 +21,8 @@ const rawMaterialQuarantineSchema = new mongoose.Schema({
   testedBy: { type: String, default: '' },
   releasedBy: { type: String, default: '' },
   remarks: { type: String, default: '' },
+  rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial', default: null },
+  rawMaterialEntryId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterialEntry', default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model('RawMaterialQuarantine', rawMaterialQuarantineSchema);

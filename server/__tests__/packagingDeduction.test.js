@@ -41,7 +41,8 @@ describe('Item 5: Packaging Material Deduction Guard Unit Suite', () => {
       batchNo: 'PKG-LOT-001',
       initialQty: 5000,
       qty: 5000,
-      purchaseRate: 2.5
+      purchaseRate: 2.5,
+      qcStatus: 'approved'
     });
 
     const product = await Product.create({

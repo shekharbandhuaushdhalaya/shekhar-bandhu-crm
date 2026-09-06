@@ -55,25 +55,55 @@ router.get('/near-expiry', authorize('inventory:view'), async (req, res) => {
 // POST /api/manufacturing/quarantine — Log new botanical raw material into quarantine
 router.post('/', authorize('inventory:create'), async (req, res) => {
   try {
-    const { herbName, botanicalName, batchNo, supplierName, qty, unit, expiryDate } = req.body;
+    const RawMaterialEntry = require('../../models/RawMaterialEntry');
+    const RawMaterial = require('../../models/RawMaterial');
+
+    const { herbName, botanicalName, batchNo, supplierName, qty, unit, expiryDate, rawMaterialId, rawMaterialEntryId } = req.body;
 
     if (!herbName || !batchNo || !qty || !expiryDate) {
       return res.status(400).json({ error: 'herbName, batchNo, qty, and expiryDate are required' });
+    }
+
+    let linkedEntry = null;
+    let targetRawMatId = rawMaterialId || null;
+    try {
+      if (rawMaterialEntryId && typeof RawMaterialEntry.findById === 'function') {
+        linkedEntry = await RawMaterialEntry.findById(rawMaterialEntryId);
+      }
+      if (!linkedEntry && batchNo && typeof RawMaterialEntry.findOne === 'function') {
+        linkedEntry = await RawMaterialEntry.findOne({ batchNo: batchNo.trim() });
+      }
+      if (linkedEntry) targetRawMatId = linkedEntry.rawMaterialId;
+      if (!linkedEntry && !targetRawMatId && herbName && typeof RawMaterial.findOne === 'function') {
+        const rawMat = await RawMaterial.findOne({
+          name: { $regex: new RegExp(`^${herbName.trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') }
+        });
+        if (rawMat) {
+          targetRawMatId = rawMat._id;
+          if (typeof RawMaterialEntry.findOne === 'function') {
+            linkedEntry = await RawMaterialEntry.findOne({ rawMaterialId: rawMat._id });
+          }
+        }
+      }
+    } catch (e) {
+      linkedEntry = null;
     }
 
     const quarantineLotNo = `QRM-${Date.now().toString().slice(-8)}`;
 
     const lot = await RawMaterialQuarantine.create({
       quarantineLotNo,
-      herbName,
+      herbName: herbName.trim(),
       botanicalName: botanicalName || '',
-      batchNo,
+      batchNo: batchNo.trim(),
       supplierName: supplierName || 'Herbal Vendor',
       qty: parseFloat(qty),
       unit: unit || 'kg',
       expiryDate: new Date(expiryDate),
       quarantineStatus: 'under_testing',
-      receivedDate: new Date()
+      receivedDate: new Date(),
+      rawMaterialId: targetRawMatId || null,
+      rawMaterialEntryId: linkedEntry ? linkedEntry._id : null
     });
 
     res.status(201).json(lot);
@@ -85,6 +115,9 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
 // PATCH /api/manufacturing/quarantine/:id/release — Quality release or rejection of quarantine lot
 router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
   try {
+    const RawMaterialEntry = require('../../models/RawMaterialEntry');
+    const RawMaterial = require('../../models/RawMaterial');
+
     const { quarantineStatus, testReportNo, remarks } = req.body;
     if (!['released', 'rejected'].includes(quarantineStatus)) {
       return res.status(400).json({ error: 'quarantineStatus must be "released" or "rejected"' });
@@ -99,6 +132,30 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
     lot.testedBy = req.user ? req.user.name : 'QC Chemist';
     lot.releasedBy = req.user ? req.user.name : 'QC Head';
     if (remarks) lot.remarks = remarks;
+
+    // Update linked RawMaterialEntry qcStatus
+    let entry = null;
+    if (lot.rawMaterialEntryId) {
+      entry = await RawMaterialEntry.findById(lot.rawMaterialEntryId);
+    }
+    if (!entry && lot.batchNo) {
+      entry = await RawMaterialEntry.findOne({ batchNo: lot.batchNo });
+    }
+    if (!entry && lot.herbName) {
+      const rawMat = await RawMaterial.findOne({
+        name: { $regex: new RegExp(`^${lot.herbName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') }
+      });
+      if (rawMat) {
+        entry = await RawMaterialEntry.findOne({ rawMaterialId: rawMat._id });
+      }
+    }
+
+    if (entry) {
+      entry.qcStatus = quarantineStatus === 'released' ? 'approved' : 'rejected';
+      await entry.save();
+      lot.rawMaterialEntryId = entry._id;
+      if (!lot.rawMaterialId) lot.rawMaterialId = entry.rawMaterialId;
+    }
 
     await lot.save();
     res.json(lot);
