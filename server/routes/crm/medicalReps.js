@@ -1878,5 +1878,44 @@ router.post('/visits/:visitId/acknowledge-samples', async (req, res) => {
   }
 });
 
+// GET /api/medical-reps/:mrId/sales-performance — MR sales order ledger, commissions & target progress
+router.get('/:mrId/sales-performance', authorize('mr:view'), async (req, res) => {
+  try {
+    const Order = require('../../models/Order');
+    const SalesTarget = require('../../models/SalesTarget');
+    const mrId = req.params.mrId;
+
+    const orders = await Order.find({ mrId }).sort({ createdAt: -1 }).lean();
+    const totalSalesBooked = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalCommissionEarned = orders.reduce((sum, o) => sum + (o.commissionAmount || 0), 0);
+
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    const targetDoc = await SalesTarget.findOne({ agentId: mrId, month, year }).lean();
+
+    const targetAmount = targetDoc ? targetDoc.targetAmount : 100000;
+    const achievedAmount = targetDoc ? (targetDoc.achievedAmount || totalSalesBooked) : totalSalesBooked;
+    const achievementPercentage = targetAmount > 0 ? Number(((achievedAmount / targetAmount) * 100).toFixed(1)) : 100;
+
+    res.json({
+      mrId,
+      totalOrdersBooked: orders.length,
+      totalSalesBooked,
+      totalCommissionEarned,
+      monthlyTarget: {
+        month,
+        year,
+        targetAmount,
+        achievedAmount,
+        achievementPercentage
+      },
+      orders
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
 

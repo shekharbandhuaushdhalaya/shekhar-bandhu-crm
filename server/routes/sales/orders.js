@@ -204,7 +204,7 @@ router.put('/:id', validate(schemas.orderSchema.partial()), async (req, res) => 
 // POST /api/orders/public/create — Create an order from public website storefront (Unauthenticated)
 router.post('/public/create', validate(schemas.orderSchema), async (req, res) => {
   try {
-    const { name, email, phone, shippingAddress, items } = req.body;
+    const { name, email, phone, shippingAddress, items, mrId, mrName, visitId } = req.body;
     if (!name || !email || !phone || !shippingAddress || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Missing required order fields or items list' });
     }
@@ -298,6 +298,8 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
     }
 
     const approvalRequired = totalAmount >= 50000;
+    const commissionAmount = mrId ? Number((totalAmount * 0.02).toFixed(2)) : 0;
+
     const newOrder = await Order.create({
       name,
       email,
@@ -307,8 +309,26 @@ router.post('/public/create', validate(schemas.orderSchema), async (req, res) =>
       totalAmount,
       status: approvalRequired ? 'pending' : 'pending',
       approvalRequired,
-      approvalStatus: approvalRequired ? 'pending_approval' : 'none'
+      approvalStatus: approvalRequired ? 'pending_approval' : 'none',
+      mrId: mrId || null,
+      mrName: mrName || '',
+      visitId: visitId || null,
+      commissionAmount,
+      incentiveCredited: !!mrId
     });
+
+    // Update MR Sales Target
+    if (mrId) {
+      const SalesTarget = require('../../models/SalesTarget');
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+      await SalesTarget.findOneAndUpdate(
+        { agentId: mrId, month, year },
+        { $inc: { achievedAmount: totalAmount } },
+        { upsert: true }
+      ).catch(() => {});
+    }
 
     if (req.io) {
       req.io.emit('order_updated', { type: 'created', id: newOrder._id });

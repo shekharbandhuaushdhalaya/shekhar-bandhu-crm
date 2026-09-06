@@ -9,6 +9,11 @@ const complaintSchema = new mongoose.Schema({
   invoiceId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
   invoiceNo:    { type: String, default: '', trim: true },
   productName:  { type: String, default: '', trim: true },
+  productId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
+  batchNo:      { type: String, default: '', trim: true },
+  batchId:      { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', default: null },
+  autoCapaTriggered: { type: Boolean, default: false },
+  capaId:       { type: mongoose.Schema.Types.ObjectId, ref: 'DeviationCapa', default: null },
   description:  { type: String, required: true, trim: true },
   status: {
     type: String,

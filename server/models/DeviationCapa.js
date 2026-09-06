@@ -2,13 +2,13 @@ const mongoose = require('mongoose');
 
 const deviationCapaSchema = new mongoose.Schema({
   deviationNo: { type: String, required: true, unique: true, trim: true },
-  batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', required: true },
+  batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', default: null },
   batchNo: { type: String, required: true, trim: true },
   stageId: { type: String, default: '' },
   stageName: { type: String, default: '', trim: true },
   deviationType: {
     type: String,
-    enum: ['qc_failure', 'abnormal_loss', 'equipment_breakdown', 'temp_excursion', 'material_mismatch', 'other'],
+    enum: ['qc_failure', 'abnormal_loss', 'equipment_breakdown', 'temp_excursion', 'material_mismatch', 'customer_complaint_cluster', 'other'],
     required: true
   },
   description: { type: String, required: true, trim: true },

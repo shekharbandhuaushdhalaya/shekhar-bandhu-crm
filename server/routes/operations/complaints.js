@@ -30,11 +30,74 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST create
+// GET /api/complaints/batch-clusters — List batch complaint clusters (batches with 2+ complaints)
+router.get('/batch-clusters', async (req, res) => {
+  try {
+    const clusters = await Complaint.aggregate([
+      { $match: { batchNo: { $exists: true, $ne: '' } } },
+      {
+        $group: {
+          _id: '$batchNo',
+          complaintCount: { $sum: 1 },
+          productName: { $first: '$productName' },
+          lastComplaintDate: { $max: '$createdAt' },
+          complaints: { $push: { id: '$_id', complaintNo: '$complaintNo', customerName: '$customerName', description: '$description' } },
+          autoCapaTriggered: { $max: '$autoCapaTriggered' }
+        }
+      },
+      { $match: { complaintCount: { $gte: 2 } } },
+      { $sort: { complaintCount: -1 } }
+    ]);
+    res.json(clusters);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST create complaint
 router.post('/', validate(schemas.complaintSchema), async (req, res) => {
   try {
     const complaintNo = await nextComplaintNo();
-    const complaint = await Complaint.create({ ...req.body, complaintNo });
+    const complaintData = { ...req.body, complaintNo };
+    const complaint = await Complaint.create(complaintData);
+
+    // Option 1: Check for Complaint Cluster on same batchNo
+    if (complaint.batchNo) {
+      const batchNoClean = complaint.batchNo.trim();
+      const existingCount = await Complaint.countDocuments({ batchNo: batchNoClean });
+
+      if (existingCount >= 2) {
+        const DeviationCapa = require('../../models/DeviationCapa');
+        let capa = await DeviationCapa.findOne({ batchNo: batchNoClean, deviationType: 'customer_complaint_cluster' });
+        
+        if (!capa) {
+          const capaNo = `CAPA-CMP-${Date.now().toString().slice(-6)}`;
+          capa = await DeviationCapa.create({
+            deviationNo: capaNo,
+            batchNo: batchNoClean,
+            batchId: complaint.batchId || null,
+            deviationType: 'customer_complaint_cluster',
+            description: `Customer Complaint Cluster Alert: ${existingCount} customer complaints reported on Batch ${batchNoClean} (${complaint.productName || 'Product'}).`,
+            reportedBy: 'QA Auto Audit System',
+            status: 'open'
+          });
+        }
+
+        complaint.autoCapaTriggered = true;
+        complaint.capaId = capa._id;
+        await complaint.save();
+
+        if (req.io) {
+          req.io.emit('quality_alert', {
+            type: 'customer_complaint_cluster',
+            batchNo: batchNoClean,
+            complaintCount: existingCount,
+            capaNo: capa.deviationNo
+          });
+        }
+      }
+    }
+
     if (req.io) {
       req.io.emit('complaint_updated', { type: 'created', id: complaint._id });
     }

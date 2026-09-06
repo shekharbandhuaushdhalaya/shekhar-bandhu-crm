@@ -15,7 +15,7 @@ import type {
   RBACPermissionsResponse, PaymentOrderResponse, PaymentVerifyResponse,
   ManufacturingAnalytics, OrderItem, Order, MedicalRepresentative, MrDailyLog,
   MrVisit, Doctor, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics,
-  ManufacturingUnit, ExpiryAlert
+  ManufacturingUnit, ExpiryAlert, MrSampleStock
 } from './api/types';
 
 export * from './api/types';
@@ -1564,6 +1564,14 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+    return res.json();
+  }
+  async getBatchComplaintClusters(): Promise<any> {
+    const res = await this.request(`${API_BASE}/complaints/batch-clusters`);
+    return res.json();
+  }
+  async getMrSalesPerformance(mrId: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/sales-performance`);
     return res.json();
   }
 

@@ -21,6 +21,11 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
     default: 'pending'
   },
+  mrId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative', default: null },
+  mrName: { type: String, default: '', trim: true },
+  visitId: { type: mongoose.Schema.Types.ObjectId, ref: 'MrVisit', default: null },
+  commissionAmount: { type: Number, default: 0, min: 0 },
+  incentiveCredited: { type: Boolean, default: false },
   courierName: { type: String, default: '', trim: true },
   trackingId: { type: String, default: '', trim: true },
   courierLink: { type: String, default: '', trim: true },
