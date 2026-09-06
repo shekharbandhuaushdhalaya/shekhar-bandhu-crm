@@ -494,12 +494,23 @@ class ApiClient {
   }
 
   // --- Products ---
-  async getProducts(search = '', vendorId = '', page?: number, limit?: number): Promise<any> {
+  async getProducts(search = '', vendorId: string | number = '', page?: number, limit?: number): Promise<any> {
+    let actualVendorId = '';
+    let actualPage = page;
+    let actualLimit = limit;
+    if (typeof vendorId === 'number') {
+      actualLimit = page;
+      actualPage = vendorId;
+      actualVendorId = '';
+    } else {
+      actualVendorId = vendorId;
+    }
+
     const params = new URLSearchParams();
     if (search) params.append('search', search);
-    if (vendorId) params.append('vendorId', vendorId);
-    if (page !== undefined) params.append('page', page.toString());
-    if (limit !== undefined) params.append('limit', limit.toString());
+    if (actualVendorId) params.append('vendorId', actualVendorId);
+    if (actualPage !== undefined) params.append('page', actualPage.toString());
+    if (actualLimit !== undefined) params.append('limit', actualLimit.toString());
     const query = params.toString() ? `?${params.toString()}` : '';
     const res = await this.request(`${API_BASE}/products${query}`);
     return res.json();

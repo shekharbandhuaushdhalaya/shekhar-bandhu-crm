@@ -61,7 +61,7 @@ export default function ProductsScreen() {
   const load = useCallback(async (resetPage = true) => {
     try {
       const targetPage = resetPage ? 1 : page;
-      const res = await api.getProducts(search, targetPage, 50);
+      const res = await api.getProducts(search, '', targetPage, 50);
       const list = Array.isArray(res) ? res : (res?.data || []);
       const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
 
@@ -91,7 +91,7 @@ export default function ProductsScreen() {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const res = await api.getProducts(search, nextPage, 50);
+      const res = await api.getProducts(search, '', nextPage, 50);
       const list = Array.isArray(res) ? res : (res?.data || []);
       const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
       setProducts(prev => {
