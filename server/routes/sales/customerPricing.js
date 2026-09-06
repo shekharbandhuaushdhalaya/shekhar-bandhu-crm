@@ -70,6 +70,43 @@ function calculateEffectivePricing(rule, standardPrice, qty) {
   };
 }
 
+const DEFAULT_TRADE_MATRIX = {
+  super_stockist: 45,
+  distributor: 35,
+  retailer: 20,
+  hospital: 15,
+  direct: 0
+};
+
+// GET /api/customer-pricing/trade-matrix — Retrieve trade category discount matrix
+router.get('/trade-matrix', authorize('pricing:view'), async (req, res) => {
+  try {
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne().lean() || {};
+    const matrix = settings.tradeDiscountMatrix || DEFAULT_TRADE_MATRIX;
+    res.json(matrix);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/customer-pricing/trade-matrix — Update trade category discount matrix
+router.post('/trade-matrix', authorize('pricing:edit'), async (req, res) => {
+  try {
+    const SystemSettings = require('../../models/SystemSettings');
+    const matrix = req.body;
+    let settings = await SystemSettings.findOne();
+    if (!settings) {
+      settings = new SystemSettings({});
+    }
+    settings.tradeDiscountMatrix = { ...DEFAULT_TRADE_MATRIX, ...matrix };
+    await settings.save();
+    res.json({ success: true, tradeDiscountMatrix: settings.tradeDiscountMatrix });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/customer-pricing/resolve — Resolution engine for billing UI auto-fill
 router.post('/resolve', authorize('pricing:view'), validate(schemas.pricingResolveSchema), async (req, res) => {
   try {
@@ -77,6 +114,15 @@ router.post('/resolve', authorize('pricing:view'), validate(schemas.pricingResol
 
     const customer = await Customer.findById(customerId).lean();
     const customerDefaultDiscount = customer ? (customer.discountPercent || 0) : 0;
+    const tradeCategory = customer ? (customer.tradeCategory || 'distributor') : 'distributor';
+
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne().lean() || {};
+    const tradeMatrix = settings.tradeDiscountMatrix || DEFAULT_TRADE_MATRIX;
+
+    const categoryDiscount = customer && customer.tradeDiscountOverride !== null && customer.tradeDiscountOverride !== undefined
+      ? customer.tradeDiscountOverride
+      : (tradeMatrix[tradeCategory] !== undefined ? tradeMatrix[tradeCategory] : 35);
 
     const resolvedItems = [];
 
@@ -110,11 +156,14 @@ router.post('/resolve', authorize('pricing:view'), validate(schemas.pricingResol
 
       const pricing = calculateEffectivePricing(rule, standardPrice, Number(qty));
 
-      // Fallback to customer default discount if no specific rule discount applied
-      if (!rule && customerDefaultDiscount > 0 && pricing.effectiveDiscountPercent === 0) {
-        pricing.effectiveDiscountPercent = customerDefaultDiscount;
-        pricing.pricingSource = 'customer_default_discount';
-        pricing.finalUnitPrice = Number((pricing.effectiveRate * (1 - customerDefaultDiscount / 100)).toFixed(2));
+      // Fallback to customer Trade Category Discount Matrix if no specific product rule discount applied
+      if (!rule && pricing.effectiveDiscountPercent === 0) {
+        const effectiveDisc = categoryDiscount > 0 ? categoryDiscount : customerDefaultDiscount;
+        if (effectiveDisc > 0) {
+          pricing.effectiveDiscountPercent = effectiveDisc;
+          pricing.pricingSource = categoryDiscount > 0 ? 'trade_category_matrix' : 'customer_default_discount';
+          pricing.finalUnitPrice = Number((pricing.effectiveRate * (1 - effectiveDisc / 100)).toFixed(2));
+        }
       }
 
       resolvedItems.push({
@@ -130,13 +179,16 @@ router.post('/resolve', authorize('pricing:view'), validate(schemas.pricingResol
         finalUnitPrice: pricing.finalUnitPrice,
         totalAmount: Number((pricing.finalUnitPrice * Number(qty)).toFixed(2)),
         pricingSource: pricing.pricingSource,
-        appliedTier: pricing.appliedTier
+        appliedTier: pricing.appliedTier,
+        appliedTradeCategory: tradeCategory
       });
     }
 
     res.json({
       customerId,
       customerDefaultDiscount,
+      tradeCategory,
+      appliedCategoryDiscount: categoryDiscount,
       items: resolvedItems
     });
   } catch (err) {

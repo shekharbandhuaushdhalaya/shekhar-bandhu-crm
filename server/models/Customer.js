@@ -33,6 +33,12 @@ const customerSchema = new mongoose.Schema({
   customerType: { type: String, enum: ['gst', 'cash'], default: 'gst' },
   recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' },
   discountPercent: { type: Number, default: 0, min: 0, max: 100 },
+  tradeCategory: {
+    type: String,
+    enum: ['super_stockist', 'distributor', 'retailer', 'hospital', 'direct'],
+    default: 'distributor'
+  },
+  tradeDiscountOverride: { type: Number, default: null, min: 0, max: 100 },
   drugLicenseNo: { type: String, default: '', trim: true },
   drugLicenseExpiry: { type: Date, default: null },
   areaName: { type: String, default: '', trim: true },

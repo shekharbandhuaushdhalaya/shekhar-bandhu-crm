@@ -1574,6 +1574,17 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/medical-reps/${mrId}/sales-performance`);
     return res.json();
   }
+  async getTradeDiscountMatrix(): Promise<Record<string, number>> {
+    const res = await this.request(`${API_BASE}/customer-pricing/trade-matrix`);
+    return res.json();
+  }
+  async updateTradeDiscountMatrix(matrix: Record<string, number>): Promise<any> {
+    const res = await this.request(`${API_BASE}/customer-pricing/trade-matrix`, {
+      method: 'POST',
+      body: JSON.stringify(matrix)
+    });
+    return res.json();
+  }
 
   // ─── MR API Methods ───
   async getMRs(search?: string, active?: string): Promise<MedicalRepresentative[]> {
