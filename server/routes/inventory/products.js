@@ -35,10 +35,10 @@ function uploadToCloudinary(buffer, folder = 'shekhar-bandhu/products') {
 
 const router = express.Router();
 
-// GET /api/products — List products with optional search filter
+// GET /api/products — List products with optional search filter and optional pagination
 router.get('/', authorize('product:view'), async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, page, limit } = req.query;
     const filter = {};
 
     if (search) {
@@ -49,13 +49,35 @@ router.get('/', authorize('product:view'), async (req, res) => {
       ];
     }
 
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
     let query = Product.find(filter);
     const rolePerms = await getRolePermissions(req.user.role);
     if (!rolePerms.includes('product:viewPricing') && !rolePerms.includes('*')) {
       query = query.select('-price');
     }
 
-    const products = await query.sort({ createdAt: -1 }).lean();
+    query = query.sort({ createdAt: -1 });
+
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const products = await query.lean();
+
+    if (isPaginated) {
+      const total = await Product.countDocuments(filter);
+      return res.json({
+        data: products,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
     res.json(products);
   } catch (err) {
     res.status(500).json({ error: err.message });

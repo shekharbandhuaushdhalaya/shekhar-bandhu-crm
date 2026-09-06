@@ -11,6 +11,8 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import * as Sharing from 'expo-sharing';
 import { LOGO_BASE64 } from '../utils/logo';
 import { FIRM_DETAILS } from '../constants/firm';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { DataTable, Column } from '../components/DataTable';
 
 // ── Print Quotation ──────────────────────────────────────────────────────────────
 const numberToWords = (num: number): string => {
@@ -1484,11 +1486,10 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
       </KeyboardAvoidingView>
     </Modal>
   );
-}
-
 export default function QuotationsScreen() {
   const [invoices, setQuotations] = useState<Quotation[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedInv, setSelectedInv] = useState<Quotation | null>(null);
   const [invoiceToEdit, setQuotationToEdit] = useState<Quotation | null>(null);
@@ -1500,9 +1501,9 @@ export default function QuotationsScreen() {
   const styles = useStyles(createStyles);
 
   const load = useCallback(async () => {
-    const res = await api.getQuotations(search, modeFilter);
+    const res = await api.getQuotations(debouncedSearch, modeFilter);
     setQuotations(res);
-  }, [search, modeFilter]);
+  }, [debouncedSearch, modeFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1512,6 +1513,83 @@ export default function QuotationsScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
+
+  const columns: Column<Quotation>[] = [
+    {
+      key: 'quotationNo',
+      title: 'Quotation No',
+      width: 140,
+      render: (item) => (
+        <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.quotationNo}</Text>
+      )
+    },
+    {
+      key: 'customerName',
+      title: 'Customer Name',
+      flex: 2,
+      width: 200,
+      render: (item) => (
+        <Text style={styles.tableCell} numberOfLines={1}>{item.customerName || 'N/A'}</Text>
+      )
+    },
+    {
+      key: 'date',
+      title: 'Date',
+      width: 120,
+      render: (item) => (
+        <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
+      )
+    },
+    {
+      key: 'amount',
+      title: 'Amount',
+      width: 120,
+      render: (item) => (
+        <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString()}</Text>
+      )
+    },
+    {
+      key: 'docStatus',
+      title: 'Doc Status',
+      width: 130,
+      render: (item) => (
+        <View style={[styles.statusBadge, {
+          borderColor: item.isFinalized ? colors.success : colors.warning,
+          backgroundColor: (item.isFinalized ? colors.success : colors.warning) + '12'
+        }]}>
+          <Text style={[styles.statusText, {
+            color: item.isFinalized ? colors.success : colors.warning
+          }]}>{item.isFinalized ? 'FINALIZED' : 'DRAFT'}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      width: 130,
+      render: (item) => (
+        <View style={[styles.statusBadge, {
+          borderColor: item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning,
+          backgroundColor: (item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning) + '12'
+        }]}>
+          <Text style={[styles.statusText, {
+            color: item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning
+          }]}>{item.status.toUpperCase()}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'action',
+      title: 'Action',
+      width: 100,
+      align: 'center',
+      render: (item) => (
+        <TouchableOpacity style={styles.actionIconButton} onPress={() => { setSelectedInv(item); setDetailVisible(true); }}>
+          <Ionicons name="eye" size={16} color={colors.primary} />
+        </TouchableOpacity>
+      )
+    }
+  ];
 
   return (
     <View style={styles.screen}>
@@ -1545,75 +1623,22 @@ export default function QuotationsScreen() {
           </View>
         </View>
 
-
-
-        <ScrollView style={{ flex: 1 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
-            <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
-              {/* Table Header Row */}
-              <View style={styles.tableHeaderRow}>
-                <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>Quotation No</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Status</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
+        <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          <DataTable
+            data={invoices}
+            columns={columns}
+            keyExtractor={item => item._id}
+            isRefreshing={refreshing}
+            onRefresh={onRefresh}
+            onRowPress={(item) => { setSelectedInv(item); setDetailVisible(true); }}
+            ListEmptyComponent={
+              <View style={styles.emptyTableContainer}>
+                <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
+                <Text style={styles.emptyText}>No quotations found</Text>
               </View>
-
-              {/* Table Body Rows */}
-              {invoices.map((item) => (
-                <View key={item._id} style={styles.tableBodyRow}>
-                  <View style={[styles.tableCellContainer, { width: 140 }]}>
-                    <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.quotationNo}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
-                    <Text style={styles.tableCell} numberOfLines={1}>{item.customerName || 'N/A'}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 120 }]}>
-                    <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 120 }]}>
-                    <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString()}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 130 }]}>
-                    <View style={[styles.statusBadge, {
-                      borderColor: item.isFinalized ? colors.success : colors.warning,
-                      backgroundColor: (item.isFinalized ? colors.success : colors.warning) + '12'
-                    }]}>
-                      <Text style={[styles.statusText, {
-                        color: item.isFinalized ? colors.success : colors.warning
-                      }]}>{item.isFinalized ? 'FINALIZED' : 'DRAFT'}</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.tableCellContainer, { width: 130 }]}>
-                    <View style={[styles.statusBadge, {
-                      borderColor: item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning,
-                      backgroundColor: (item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning) + '12'
-                    }]}>
-                      <Text style={[styles.statusText, {
-                        color: item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning
-                      }]}>{item.status.toUpperCase()}</Text>
-                    </View>
-                  </View>
-
-                  <View style={[styles.tableCellContainer, { width: 100, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
-                    <TouchableOpacity style={styles.actionIconButton} onPress={() => { setSelectedInv(item); setDetailVisible(true); }}>
-                      <Ionicons name="eye" size={16} color={colors.primary} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-
-              {invoices.length === 0 && (
-                <View style={styles.emptyTableContainer}>
-                  <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                  <Text style={styles.emptyText}>No quotations found</Text>
-                </View>
-              )}
-            </View>
-          </ScrollView>
-        </ScrollView>
+            }
+          />
+        </View>
       </View>
 
       <QuotationDetailModal

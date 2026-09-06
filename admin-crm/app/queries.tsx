@@ -4,10 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
 import { api, ProductQuery, getImageUrl } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 export default function QueriesScreen() {
   const [queries, setQueries] = useState<ProductQuery[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'contacted' | 'converted' | 'closed'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -68,8 +70,8 @@ export default function QueriesScreen() {
   const filteredQueries = queries.filter(q => {
     const matchesTab = activeTab === 'all' || q.status === activeTab;
     if (!matchesTab) return false;
-    if (!search) return true;
-    const lower = search.toLowerCase();
+    if (!debouncedSearch) return true;
+    const lower = debouncedSearch.toLowerCase();
     return (
       q.name.toLowerCase().includes(lower) ||
       q.email.toLowerCase().includes(lower) ||

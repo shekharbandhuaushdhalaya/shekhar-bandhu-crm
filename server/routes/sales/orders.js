@@ -53,24 +53,51 @@ router.get('/', async (req, res) => {
     const orders = await query.lean();
     const Invoice = require('../../models/Invoice');
     const StockMovement = require('../../models/StockMovement');
+    const Dispatch = require('../../models/Dispatch');
 
-    const enrichedOrders = await Promise.all(orders.map(async (order) => {
-      const invoice = await Invoice.findOne({ reference: order._id }).select('invoiceNo').lean();
-      const challan = await StockMovement.findOne({ sourceDocId: order._id }).select('docNo').lean();
-      
+    const orderIds = orders.map(o => o._id);
+
+    const [invoices, challans] = await Promise.all([
+      Invoice.find({ reference: { $in: orderIds } }).select('_id reference invoiceNo').lean(),
+      StockMovement.find({ sourceDocId: { $in: orderIds } }).select('_id sourceDocId docNo').lean()
+    ]);
+
+    const invoiceMap = new Map();
+    invoices.forEach(inv => {
+      if (inv.reference) invoiceMap.set(inv.reference.toString(), inv);
+    });
+
+    const challanMap = new Map();
+    challans.forEach(ch => {
+      if (ch.sourceDocId) challanMap.set(ch.sourceDocId.toString(), ch);
+    });
+
+    const invoiceIds = invoices.map(i => i._id);
+    const challanIds = challans.map(c => c._id);
+
+    let dispatches = [];
+    if (invoiceIds.length > 0 || challanIds.length > 0) {
+      const dOr = [];
+      if (invoiceIds.length > 0) dOr.push({ invoiceId: { $in: invoiceIds } });
+      if (challanIds.length > 0) dOr.push({ challanId: { $in: challanIds } });
+      dispatches = await Dispatch.find({ $or: dOr }).select('_id invoiceId challanId dispatchNo').lean();
+    }
+
+    const dispatchByInvoiceMap = new Map();
+    const dispatchByChallanMap = new Map();
+    dispatches.forEach(d => {
+      if (d.invoiceId) dispatchByInvoiceMap.set(d.invoiceId.toString(), d);
+      if (d.challanId) dispatchByChallanMap.set(d.challanId.toString(), d);
+    });
+
+    const enrichedOrders = orders.map((order) => {
+      const orderIdStr = order._id.toString();
+      const invoice = invoiceMap.get(orderIdStr);
+      const challan = challanMap.get(orderIdStr);
+
       let dispatch = null;
-      const Dispatch = require('../../models/Dispatch');
-      if (invoice || challan) {
-        const dQuery = {};
-        if (invoice && challan) {
-          dQuery.$or = [{ invoiceId: invoice._id }, { challanId: challan._id }];
-        } else if (invoice) {
-          dQuery.invoiceId = invoice._id;
-        } else {
-          dQuery.challanId = challan._id;
-        }
-        dispatch = await Dispatch.findOne(dQuery).select('dispatchNo').lean();
-      }
+      if (invoice) dispatch = dispatchByInvoiceMap.get(invoice._id.toString());
+      if (!dispatch && challan) dispatch = dispatchByChallanMap.get(challan._id.toString());
 
       return {
         ...order,
@@ -81,7 +108,7 @@ router.get('/', async (req, res) => {
         hasDispatch: !!dispatch,
         dispatchNo: dispatch ? dispatch.dispatchNo : null,
       };
-    }));
+    });
 
     if (isPaginated) {
       const total = await Order.countDocuments({});

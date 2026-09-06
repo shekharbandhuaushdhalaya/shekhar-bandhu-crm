@@ -11,6 +11,7 @@ import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, StockMovement, StockMovementItem, Product, Warehouse, Customer, InventoryEntry } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { FIRM_DETAILS } from '../constants/firm';
 import { LOGO_BASE64 } from '../utils/logo';
 import InventoryDispatchScreen from './inventorydispatch';
@@ -398,6 +399,7 @@ export default function StockMovementsScreen() {
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -508,11 +510,11 @@ export default function StockMovementsScreen() {
         direction: dir,
         type: filterType || undefined,
         status: filterStatus || undefined,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
       });
       setMovements(data);
     } catch { setMovements([]); }
-  }, [filterType, filterStatus, search]);
+  }, [filterType, filterStatus, debouncedSearch]);
 
   const loadWarehouses = useCallback(async () => {
     try {

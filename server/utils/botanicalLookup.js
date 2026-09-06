@@ -1,852 +1,165 @@
+const https = require('https');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const SystemSettings = require('../models/SystemSettings');
+const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
+const { PHARMACOPOEIA_SEED_DATA } = require('./pharmacopoeiaSeedData');
 
-const HERB_DATABASE = [
-  {
-    "names": [
-      "ashwagandha",
-      "asgandh",
-      "asgand",
-      "indian ginseng",
-      "winter cherry",
-      "withania"
-    ],
-    "matchedName": "Ashwagandha",
-    "scientificName": "Withania somnifera",
-    "partUsed": "Root",
-    "pharmacopoeialStandard": "API",
-    "category": "Herb",
-    "synonyms": [
-      "Asgandh",
-      "Indian Ginseng",
-      "Winter Cherry",
-      "Withania"
-    ]
-  },
-  {
-    "names": [
-      "tulsi",
-      "tulsy",
-      "holy basil",
-      "surasa",
-      "vrinda"
-    ],
-    "matchedName": "Tulsi",
-    "scientificName": "Ocimum sanctum",
-    "partUsed": "Leaf",
-    "pharmacopoeialStandard": "API",
-    "category": "Fresh Herb",
-    "synonyms": [
-      "Holy Basil",
-      "Surasa",
-      "Vrinda",
-      "Ocimum tenuiflorum"
-    ]
-  },
-  {
-    "names": [
-      "shatavari",
-      "satavari",
-      "shatamull",
-      "asparagus racemosus"
-    ],
-    "matchedName": "Shatavari",
-    "scientificName": "Asparagus racemosus",
-    "partUsed": "Tuberous Root",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Satavari",
-      "Shatamull",
-      "Wild Asparagus"
-    ]
-  },
-  {
-    "names": [
-      "neem",
-      "nimba",
-      "margosa",
-      "azadirachta indica"
-    ],
-    "matchedName": "Neem",
-    "scientificName": "Azadirachta indica",
-    "partUsed": "Leaf/Bark",
-    "pharmacopoeialStandard": "API",
-    "category": "Fresh Herb",
-    "synonyms": [
-      "Nimba",
-      "Margosa Tree",
-      "Indian Lilac"
-    ]
-  },
-  {
-    "names": [
-      "guduchi",
-      "giloy",
-      "gilo",
-      "amrita",
-      "tinospora cordifolia"
-    ],
-    "matchedName": "Guduchi",
-    "scientificName": "Tinospora cordifolia",
-    "partUsed": "Stem",
-    "pharmacopoeialStandard": "API",
-    "category": "Fresh Herb",
-    "synonyms": [
-      "Giloy",
-      "Gilo",
-      "Amrita",
-      "Heart-leaved Moonseed"
-    ]
-  },
-  {
-    "names": [
-      "amla",
-      "amalaki",
-      "avla",
-      "aonla",
-      "indian gooseberry",
-      "phyllanthus emblica",
-      "emblica officinalis"
-    ],
-    "matchedName": "Amla",
-    "scientificName": "Phyllanthus emblica",
-    "partUsed": "Fresh/Dry Fruit",
-    "pharmacopoeialStandard": "API",
-    "category": "Fresh Herb",
-    "synonyms": [
-      "Amalaki",
-      "Indian Gooseberry",
-      "Emblica officinalis"
-    ]
-  },
-  {
-    "names": [
-      "haritaki",
-      "harra",
-      "harad",
-      "harde",
-      "harr",
-      "harar",
-      "chebulic myrobalan",
-      "terminalia chebula"
-    ],
-    "matchedName": "Haritaki",
-    "scientificName": "Terminalia chebula",
-    "partUsed": "Fruit Pericarp",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Harra",
-      "Harad",
-      "Harde",
-      "Chebulic Myrobalan",
-      "Abhaya",
-      "Pathya"
-    ]
-  },
-  {
-    "names": [
-      "bibhitaki",
-      "baheda",
-      "beleric myrobalan",
-      "terminalia bellirica"
-    ],
-    "matchedName": "Bibhitaki",
-    "scientificName": "Terminalia bellirica",
-    "partUsed": "Fruit Pericarp",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Baheda",
-      "Beleric Myrobalan",
-      "Aksha"
-    ]
-  },
-  {
-    "names": [
-      "brahmi",
-      "water hyssop",
-      "bacopa monnieri"
-    ],
-    "matchedName": "Brahmi",
-    "scientificName": "Bacopa monnieri",
-    "partUsed": "Whole Plant",
-    "pharmacopoeialStandard": "API",
-    "category": "Fresh Herb",
-    "synonyms": [
-      "Water Hyssop",
-      "Jalanimba",
-      "Bacopa"
-    ]
-  },
-  {
-    "names": [
-      "mulethi",
-      "yashtimadhu",
-      "licorice",
-      "liquorice",
-      "glycyrrhiza glabra"
-    ],
-    "matchedName": "Yashtimadhu",
-    "scientificName": "Glycyrrhiza glabra",
-    "partUsed": "Root/Rhizome",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Mulethi",
-      "Licorice",
-      "Sweetwood"
-    ]
-  },
-  {
-    "names": [
-      "pippali",
-      "piper longum",
-      "long pepper"
-    ],
-    "matchedName": "Pippali",
-    "scientificName": "Piper longum",
-    "partUsed": "Fruit",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Long Pepper",
-      "Magadhi"
-    ]
-  },
-  {
-    "names": [
-      "maricha",
-      "kali mirch",
-      "black pepper",
-      "piper nigrum"
-    ],
-    "matchedName": "Maricha",
-    "scientificName": "Piper nigrum",
-    "partUsed": "Fruit",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Kali Mirch",
-      "Black Pepper",
-      "Vellaja"
-    ]
-  },
-  {
-    "names": [
-      "shunthi",
-      "sonth",
-      "dry ginger",
-      "zingiber officinale"
-    ],
-    "matchedName": "Shunthi",
-    "scientificName": "Zingiber officinale",
-    "partUsed": "Dry Rhizome",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Sonth",
-      "Dry Ginger",
-      "Nagara"
-    ]
-  },
-  {
-    "names": [
-      "guggulu",
-      "guggul",
-      "commiphora wightii",
-      "indian bdellium"
-    ],
-    "matchedName": "Guggulu",
-    "scientificName": "Commiphora wightii",
-    "partUsed": "Exudate/Resin",
-    "pharmacopoeialStandard": "API",
-    "category": "Plant Concentrate",
-    "synonyms": [
-      "Guggul",
-      "Indian Bdellium",
-      "Purified Resin"
-    ]
-  },
-  {
-    "names": [
-      "manjistha",
-      "rubia cordifolia",
-      "indian madder"
-    ],
-    "matchedName": "Manjistha",
-    "scientificName": "Rubia cordifolia",
-    "partUsed": "Stem/Root",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Indian Madder",
-      "Aruna"
-    ]
-  },
-  {
-    "names": [
-      "shankhpushpi",
-      "convolvulus pluricaulis"
-    ],
-    "matchedName": "Shankhpushpi",
-    "scientificName": "Convolvulus pluricaulis",
-    "partUsed": "Whole Plant",
-    "pharmacopoeialStandard": "API",
-    "category": "Fresh Herb",
-    "synonyms": [
-      "Speedwheel",
-      "Ksheerapushpi"
-    ]
-  },
-  {
-    "names": [
-      "bhringraj",
-      "eclipta alba",
-      "eclipta prostrata",
-      "false daisy"
-    ],
-    "matchedName": "Bhringraj",
-    "scientificName": "Eclipta alba",
-    "partUsed": "Whole Plant",
-    "pharmacopoeialStandard": "API",
-    "category": "Fresh Herb",
-    "synonyms": [
-      "False Daisy",
-      "Keshraja"
-    ]
-  },
-  {
-    "names": [
-      "arjuna",
-      "terminalia arjuna"
-    ],
-    "matchedName": "Arjuna",
-    "scientificName": "Terminalia arjuna",
-    "partUsed": "Stem Bark",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Arjun Bark",
-      "Kukubha"
-    ]
-  },
-  {
-    "names": [
-      "punarnava",
-      "boerhavia diffusa",
-      "spreading hogweed"
-    ],
-    "matchedName": "Punarnava",
-    "scientificName": "Boerhavia diffusa",
-    "partUsed": "Root/Whole Plant",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Spreading Hogweed",
-      "Shothaghni"
-    ]
-  },
-  {
-    "names": [
-      "gokshura",
-      "tribulus terrestris",
-      "puncture vine"
-    ],
-    "matchedName": "Gokshura",
-    "scientificName": "Tribulus terrestris",
-    "partUsed": "Fruit/Root",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Puncture Vine",
-      "Gokhru",
-      "Trikanta"
-    ]
-  },
-  {
-    "names": [
-      "kutki",
-      "picrorhiza kurroa"
-    ],
-    "matchedName": "Kutki",
-    "scientificName": "Picrorhiza kurroa",
-    "partUsed": "Rhizome/Root",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Katuka",
-      "Picrorhiza"
-    ]
-  },
-  {
-    "names": [
-      "haridra",
-      "haldi",
-      "turmeric",
-      "curcuma longa"
-    ],
-    "matchedName": "Haridra",
-    "scientificName": "Curcuma longa",
-    "partUsed": "Rhizome",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Haldi",
-      "Turmeric",
-      "Nisha"
-    ]
-  },
-  {
-    "names": [
-      "chandan",
-      "sandalwood",
-      "santalum album"
-    ],
-    "matchedName": "Chandan",
-    "scientificName": "Santalum album",
-    "partUsed": "Heartwood",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Sandalwood",
-      "Shrikhanda"
-    ]
-  },
-  {
-    "names": [
-      "vajravalli",
-      "asthisamharaka",
-      "hadjod",
-      "had jora",
-      "cissus quadrangularis",
-      "bone setter"
-    ],
-    "matchedName": "Vajravalli",
-    "scientificName": "Cissus quadrangularis",
-    "partUsed": "Stem",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Asthisamharaka",
-      "Hadjod",
-      "Bone Setter",
-      "Asthisrnkhala"
-    ]
-  },
-  {
-    "names": [
-      "akarkara",
-      "pellitory root",
-      "akarakarabha",
-      "anacyclus"
-    ],
-    "matchedName": "AKARKARA",
-    "scientificName": "Anacyclus pyrethrum",
-    "partUsed": "Root",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Akarkara",
-      "Pellitory Root",
-      "Akarakarabha",
-      "Anacyclus"
-    ]
-  },
-  {
-    "names": [
-      "agnimantha",
-      "arani",
-      "premna",
-      "tarkari",
-      "dashamula tree"
-    ],
-    "matchedName": "AGNIMANTHA",
-    "scientificName": "Premna integrifolia L.",
-    "partUsed": "Root Bark",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Arani",
-      "Premna",
-      "Tarkari",
-      "Dashamula Tree"
-    ]
-  },
-  {
-    "names": [
-      "safed musli",
-      "safed moosli",
-      "white musli",
-      "swetha musli",
-      "shedheveli",
-      "chlorophytum"
-    ],
-    "matchedName": "SAFED MUSLI",
-    "scientificName": "Chlorophytum borivilianum Santapau & R.R.Fern.",
-    "partUsed": "Tuberous Root",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Safed Moosli",
-      "White Musli",
-      "Swetha Musli",
-      "Shedheveli"
-    ]
-  },
-  {
-    "names": [
-      "jyotishmati",
-      "malkangani",
-      "intellect tree",
-      "staff tree",
-      "jyotishmati oil",
-      "celastrus"
-    ],
-    "matchedName": "JYOTISHMATI",
-    "scientificName": "Celastrus paniculatus Willd.",
-    "partUsed": "Seed / Seed Oil",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Malkangani",
-      "Intellect Tree",
-      "Staff Tree",
-      "Jyotishmati Oil"
-    ]
-  },
-  {
-    "names": [
-      "kalonji",
-      "black seed",
-      "upakunchika",
-      "black cumin",
-      "nigella"
-    ],
-    "matchedName": "KALONJI",
-    "scientificName": "Nigella sativa L.",
-    "partUsed": "Seed",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Black Seed",
-      "Upakunchika",
-      "Black Cumin",
-      "Nigella"
-    ]
-  },
-  {
-    "names": [
-      "majuphal",
-      "oak gall",
-      "manjakani",
-      "mayaphal",
-      "oak apple",
-      "quercus"
-    ],
-    "matchedName": "MAJUPHAL",
-    "scientificName": "Quercus infectoria Olivier",
-    "partUsed": "Insect Gall",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Oak Gall",
-      "Manjakani",
-      "Mayaphal",
-      "Oak Apple"
-    ]
-  },
-  {
-    "names": [
-      "jamun",
-      "jambu",
-      "java plum",
-      "jamun seed",
-      "jambula",
-      "syzygium"
-    ],
-    "matchedName": "JAMUN",
-    "scientificName": "Syzygium cumini",
-    "partUsed": "Seed Kernel / Bark",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Jambu",
-      "Java Plum",
-      "Jamun Seed",
-      "Jambula"
-    ]
-  },
-  {
-    "names": [
-      "hing",
-      "asafoetida",
-      "hingu",
-      "devil’s dung",
-      "shodhita hingu",
-      "ferula"
-    ],
-    "matchedName": "HING",
-    "scientificName": "Ferula foetida Regel / Ferula narthex Boiss.",
-    "partUsed": "Purified Oleo-Gum Resin (Shodhita Hingu)",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Asafoetida",
-      "Hingu",
-      "Devil’s Dung",
-      "Shodhita Hingu"
-    ]
-  },
-  {
-    "names": [
-      "alsi",
-      "flaxseed",
-      "linseed",
-      "atasi",
-      "uma",
-      "linum"
-    ],
-    "matchedName": "ALSI",
-    "scientificName": "Linum usitatissimum L.",
-    "partUsed": "Seed / Seed Oil",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Flaxseed",
-      "Linseed",
-      "Atasi",
-      "Uma"
-    ]
-  },
-  {
-    "names": [
-      "kali jeeri",
-      "kalijiri",
-      "somaraji",
-      "bitter cumin",
-      "krimighna",
-      "centratherum"
-    ],
-    "matchedName": "KALI JEERI",
-    "scientificName": "Centratherum anthelminticum",
-    "partUsed": "Seed",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Kalijiri",
-      "Somaraji",
-      "Bitter Cumin",
-      "Krimighna"
-    ]
-  },
-  {
-    "names": [
-      "ulatkambal",
-      "devil’s cotton",
-      "pivari",
-      "abroma"
-    ],
-    "matchedName": "ULATKAMBAL",
-    "scientificName": "Abroma augusta",
-    "partUsed": "Root Bark",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Devil’s Cotton",
-      "Ulatkambal",
-      "Pivari"
-    ]
-  },
-  {
-    "names": [
-      "putrajeevak",
-      "putranjiva",
-      "child life tree",
-      "pavitra"
-    ],
-    "matchedName": "PUTRAJEEVAK",
-    "scientificName": "Putranjiva roxburghii Wall.",
-    "partUsed": "Seed Kernel",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Putranjiva",
-      "Child Life Tree",
-      "Pavitra"
-    ]
-  },
-  {
-    "names": [
-      "chironji",
-      "charoli",
-      "buchanania",
-      "priyala"
-    ],
-    "matchedName": "CHIRONJI",
-    "scientificName": "Buchanania lanzan Spreng.",
-    "partUsed": "Seed Kernel",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Charoli",
-      "Buchanania",
-      "Priyala"
-    ]
-  },
-  {
-    "names": [
-      "gunja",
-      "rosary pea",
-      "ratti",
-      "raktika",
-      "abrus"
-    ],
-    "matchedName": "GUNJA",
-    "scientificName": "Abrus precatorius L.",
-    "partUsed": "Purified Seed (Shodhita)",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Rosary Pea",
-      "Ratti",
-      "Raktika"
-    ]
-  },
-  {
-    "names": [
-      "kalihari",
-      "flame lily",
-      "gloriosa",
-      "langali",
-      "agnishikha"
-    ],
-    "matchedName": "KALIHARI",
-    "scientificName": "Gloriosa superba L.",
-    "partUsed": "Purified Tuber / Seed (Shodhita)",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Flame Lily",
-      "Gloriosa",
-      "Langali",
-      "Agnishikha"
-    ]
-  },
-  {
-    "names": [
-      "latakaranja",
-      "latakaranj",
-      "karanju",
-      "fever nut",
-      "bonduc nut",
-      "kuberakshi",
-      "caesalpinia"
-    ],
-    "matchedName": "LATAKARANJA",
-    "scientificName": "Caesalpinia bonduc",
-    "partUsed": "Seed Kernel",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Latakaranj",
-      "Karanju",
-      "Fever Nut",
-      "Bonduc Nut",
-      "Kuberakshi"
-    ]
-  },
-  {
-    "names": [
-      "jivanti",
-      "jeevanti",
-      "leptadenia",
-      "jeevani",
-      "shaka-shreshta"
-    ],
-    "matchedName": "JIVANTI",
-    "scientificName": "Leptadenia reticulata",
-    "partUsed": "Root / Stem",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Jeevanti",
-      "Leptadenia",
-      "Jeevani",
-      "Shaka-shreshta"
-    ]
-  },
-  {
-    "names": [
-      "pashanabheda",
-      "pahanbhed",
-      "bergenia",
-      "rock foil",
-      "saxifraga",
-      "ashmaribheda"
-    ],
-    "matchedName": "PASHANABHEDA",
-    "scientificName": "Bergenia ligulata",
-    "partUsed": "Rhizome",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Pahanbhed",
-      "Bergenia",
-      "Rock Foil",
-      "Saxifraga",
-      "Ashmaribheda"
-    ]
-  },
-  {
-    "names": [
-      "kampillaka",
-      "kabila",
-      "mallotus",
-      "rohini",
-      "kamala powder",
-      "rechanaka"
-    ],
-    "matchedName": "KAMPILLAKA",
-    "scientificName": "Mallotus philippensis",
-    "partUsed": "Fruit Glandular Powder (Kapila)",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Kabila",
-      "Mallotus",
-      "Rohini",
-      "Kamala Powder",
-      "Rechanaka"
-    ]
-  },
-  {
-    "names": [
-      "madanaphala",
-      "mainphal",
-      "emetic nut",
-      "randia",
-      "vamana-shreshta"
-    ],
-    "matchedName": "MADANAPHALA",
-    "scientificName": "Randia dumetorum Lam.",
-    "partUsed": "Fruit",
-    "pharmacopoeialStandard": "API",
-    "category": "Dry Herb",
-    "synonyms": [
-      "Mainphal",
-      "Emetic Nut",
-      "Randia",
-      "Vamana-shreshta"
-    ]
+function escapeRegex(str) {
+  if (!str) return '';
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeKey(str) {
+  if (!str) return '';
+  return String(str).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// In-memory 24h TTL cache for external GBIF / Gemini dynamic lookups
+const LOOKUP_CACHE = new Map();
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+// Build fast O(1) in-memory alias map and backward-compatible data structures from PHARMACOPOEIA_SEED_DATA
+const ALIAS_MAP = new Map();
+const HERB_DATABASE = [];
+const VERNACULAR_TO_LATIN = {};
+
+function toTitleCase(str) {
+  if (!str) return '';
+  return String(str).toLowerCase().replace(/(?:^|\s|-)\S/g, a => a.toUpperCase());
+}
+
+function extractBinomial(botanicalStr) {
+  if (!botanicalStr) return '';
+  const parts = botanicalStr.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    const genus = parts[0];
+    const species = parts[1].replace(/[^a-zA-Z]/g, '');
+    return `${genus} ${species}`;
   }
-];
+  return botanicalStr;
+}
+
+for (const seedItem of PHARMACOPOEIA_SEED_DATA) {
+  const cleanScientific = extractBinomial(seedItem.botanicalName);
+  const titleMatchedName = toTitleCase(seedItem.ayurvedicName);
+
+  const formattedEntry = {
+    matchedName: titleMatchedName,
+    scientificName: cleanScientific,
+    botanicalName: cleanScientific,
+    rawBotanicalName: seedItem.botanicalName,
+    family: seedItem.family || '',
+    partUsed: seedItem.partUsed || 'Whole Plant / Material',
+    pharmacopoeialStandard: seedItem.pharmacopoeialStandard || 'API',
+    monographRef: seedItem.monographRef || '',
+    category: 'Herb',
+    synonyms: seedItem.synonyms || [],
+    therapeuticUses: seedItem.therapeuticUses || [],
+    rasa: seedItem.rasa || [],
+    virya: seedItem.virya || '',
+    vipaka: seedItem.vipaka || '',
+    dosage: seedItem.dosage || ''
+  };
+
+  const namesList = [
+    seedItem.ayurvedicName.toLowerCase(),
+    ...(seedItem.synonyms || []).map(s => s.toLowerCase()),
+    seedItem.botanicalName.toLowerCase()
+  ];
+
+  HERB_DATABASE.push({
+    names: namesList,
+    matchedName: seedItem.ayurvedicName,
+    scientificName: cleanScientific || seedItem.botanicalName,
+    partUsed: seedItem.partUsed,
+    pharmacopoeialStandard: seedItem.pharmacopoeialStandard,
+    category: 'Herb',
+    synonyms: seedItem.synonyms
+  });
+
+  // Map ayurvedicName
+  const ayurKey = normalizeKey(seedItem.ayurvedicName);
+  if (ayurKey && !ALIAS_MAP.has(ayurKey)) ALIAS_MAP.set(ayurKey, formattedEntry);
+
+  // Map botanicalName
+  const botKey = normalizeKey(seedItem.botanicalName);
+  if (botKey && !ALIAS_MAP.has(botKey)) ALIAS_MAP.set(botKey, formattedEntry);
+  const cleanBotKey = normalizeKey(cleanScientific);
+  if (cleanBotKey && !ALIAS_MAP.has(cleanBotKey)) ALIAS_MAP.set(cleanBotKey, formattedEntry);
+
+  // Map synonyms & VERNACULAR_TO_LATIN
+  if (Array.isArray(seedItem.synonyms)) {
+    for (const syn of seedItem.synonyms) {
+      const synKey = normalizeKey(syn);
+      if (synKey && !ALIAS_MAP.has(synKey)) ALIAS_MAP.set(synKey, formattedEntry);
+      VERNACULAR_TO_LATIN[syn.toUpperCase()] = seedItem.botanicalName;
+    }
+  }
+  VERNACULAR_TO_LATIN[seedItem.ayurvedicName.toUpperCase()] = seedItem.botanicalName;
+}
+
+// Add extra common vernacular shortcuts
+const EXTRA_VERNACULAR_MAP = {
+  'LATAKARANJA': 'Caesalpinia bonduc',
+  'LATAKARANJU': 'Caesalpinia bonduc',
+  'KARANJU': 'Caesalpinia bonduc',
+  'VAJRAVALLI': 'Cissus quadrangularis',
+  'HADJOD': 'Cissus quadrangularis',
+  'HARRA': 'Terminalia chebula',
+  'HARAD': 'Terminalia chebula',
+  'KALMEGH': 'Andrographis paniculata',
+  'BHUNIMBA': 'Andrographis paniculata',
+  'GOKSHURA': 'Tribulus terrestris',
+  'GOKHRU': 'Tribulus terrestris',
+  'JIVANTI': 'Leptadenia reticulata',
+  'PASHANABHEDA': 'Bergenia ligulata',
+  'PAKHANBHED': 'Bergenia ligulata',
+  'MADANAPHALA': 'Catunaregam spinosa',
+  'KAMPILLAKA': 'Mallotus philippensis',
+  'SAFED MUSLI': 'Chlorophytum borivilianum',
+  'VATSANABHA': 'Aconitum ferox',
+  'BHALLATAKA': 'Semecarpus anacardium',
+  'DHATAKI': 'Woodfordia fruticosa',
+  'KATUKA': 'Picrorhiza kurroa',
+  'KUTKI': 'Picrorhiza kurroa',
+  'MAHUA': 'Madhuca indica',
+  'VARUNA': 'Crateva nurvala',
+  'KANKOLA': 'Piper cubeba',
+  'USHEERA': 'Vetiveria zizanioides',
+  'VIDARI': 'Pueraria tuberosa',
+  'VIDARIKAND': 'Pueraria tuberosa'
+};
+
+for (const [vKey, vVal] of Object.entries(EXTRA_VERNACULAR_MAP)) {
+  VERNACULAR_TO_LATIN[vKey] = vVal;
+  const nKey = normalizeKey(vKey);
+  if (!ALIAS_MAP.has(nKey)) {
+    const matchedSeed = PHARMACOPOEIA_SEED_DATA.find(s => s.botanicalName.toLowerCase().includes(vVal.toLowerCase()));
+    if (matchedSeed) {
+      ALIAS_MAP.set(nKey, {
+        matchedName: matchedSeed.ayurvedicName,
+        scientificName: matchedSeed.botanicalName,
+        botanicalName: matchedSeed.botanicalName,
+        family: matchedSeed.family || '',
+        partUsed: matchedSeed.partUsed || 'Whole Plant / Material',
+        pharmacopoeialStandard: matchedSeed.pharmacopoeialStandard || 'API',
+        monographRef: matchedSeed.monographRef || '',
+        category: 'Herb',
+        synonyms: matchedSeed.synonyms || []
+      });
+    }
+  }
+}
 
 /**
  * High-performance herb resolution function.
- * Accepts any query string (herb name / alias / Hindi name / scientific name),
- * returns standardized common name, Latin scientific name, part used, standard, and synonyms.
+ * Lookup Order:
+ *  1. In-memory ALIAS_MAP (O(1))
+ *  2. MongoDB PharmacopoeiaEntry query
+ *  3. GBIF Taxonomy API (if query >= 3 chars)
+ *  4. Gemini AI Pharmacognosy Engine
+ * 
+ * Results from GBIF and Gemini are cached in memory for 24h.
  */
 async function resolveHerbDetails(queryName) {
   if (!queryName || !queryName.trim()) {
@@ -862,21 +175,73 @@ async function resolveHerbDetails(queryName) {
     };
   }
 
-  const cleanQuery = queryName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanKey = normalizeKey(queryName);
+  if (!cleanKey) {
+    return {
+      query: queryName,
+      matchedName: queryName.trim().toUpperCase(),
+      scientificName: '',
+      botanicalName: '',
+      partUsed: '',
+      pharmacopoeialStandard: 'API',
+      category: 'Herb',
+      synonyms: []
+    };
+  }
 
-  // 1. Search PharmacopoeiaEntry MongoDB model
+  // 1. Check O(1) In-Memory Seed Alias Map
+  if (ALIAS_MAP.has(cleanKey)) {
+    const hit = ALIAS_MAP.get(cleanKey);
+    return {
+      query: queryName,
+      ...hit
+    };
+  }
+
+  // Substring / word token match against in-memory ALIAS_MAP
+  let bestMatch = null;
+  let maxMatchLength = 0;
+
+  for (const [mapKey, mapEntry] of ALIAS_MAP.entries()) {
+    if (mapKey.length >= 3 && cleanKey.includes(mapKey)) {
+      if (mapKey.length > maxMatchLength) {
+        maxMatchLength = mapKey.length;
+        bestMatch = mapEntry;
+      }
+    } else if (cleanKey.length >= 5 && mapKey.length >= cleanKey.length && mapKey.startsWith(cleanKey)) {
+      if (mapKey.length > maxMatchLength) {
+        maxMatchLength = mapKey.length;
+        bestMatch = mapEntry;
+      }
+    }
+  }
+
+  if (bestMatch) {
+    return {
+      query: queryName,
+      ...bestMatch
+    };
+  }
+
+  // Check TTL cache for previous GBIF/Gemini dynamic resolutions
+  const cached = LOOKUP_CACHE.get(cleanKey);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  // 2. Search PharmacopoeiaEntry MongoDB model
   try {
-    const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
+    const escaped = escapeRegex(queryName.trim());
     const dbMatch = await PharmacopoeiaEntry.findOne({
       $or: [
-        { ayurvedicName: { $regex: new RegExp(queryName.trim(), 'i') } },
-        { botanicalName: { $regex: new RegExp(queryName.trim(), 'i') } },
-        { synonyms: { $regex: new RegExp(queryName.trim(), 'i') } }
+        { ayurvedicName: { $regex: new RegExp(escaped, 'i') } },
+        { botanicalName: { $regex: new RegExp(escaped, 'i') } },
+        { synonyms: { $regex: new RegExp(escaped, 'i') } }
       ]
     }).lean();
 
     if (dbMatch) {
-      return {
+      const res = {
         query: queryName,
         matchedName: dbMatch.ayurvedicName,
         scientificName: dbMatch.botanicalName,
@@ -892,49 +257,36 @@ async function resolveHerbDetails(queryName) {
         vipaka: dbMatch.vipaka || '',
         dosage: dbMatch.dosage || ''
       };
+      LOOKUP_CACHE.set(cleanKey, { data: res, timestamp: Date.now() });
+      return res;
     }
   } catch (err) {
-    // Ignore DB search error, proceed to fallback
+    // Non-blocking DB catch
   }
 
-  // 2. Search Local HERB_DATABASE array using alias/name matching
-  for (const herb of HERB_DATABASE) {
-    for (const alias of herb.names) {
-      const cleanAlias = alias.replace(/[^a-z0-9]/g, '');
-      if (cleanQuery === cleanAlias || cleanQuery.includes(cleanAlias) || cleanAlias.includes(cleanQuery)) {
-        return {
+  // 3. Search GBIF Open Public REST API (only for queries >= 3 characters)
+  if (cleanKey.length >= 3) {
+    try {
+      const gbifResult = await lookupGbifTaxonomy(queryName);
+      if (gbifResult && gbifResult.scientificName) {
+        const res = {
           query: queryName,
-          matchedName: herb.matchedName,
-          scientificName: herb.scientificName,
-          botanicalName: herb.scientificName,
-          partUsed: herb.partUsed,
-          pharmacopoeialStandard: herb.pharmacopoeialStandard,
-          category: herb.category,
-          synonyms: herb.synonyms
+          matchedName: queryName.trim().toUpperCase(),
+          scientificName: gbifResult.scientificName,
+          botanicalName: gbifResult.scientificName,
+          family: gbifResult.family || '',
+          partUsed: 'Herb/Plant Material',
+          pharmacopoeialStandard: 'API',
+          category: 'Herb',
+          synonyms: gbifResult.synonyms || [],
+          source: 'GBIF Taxonomy API'
         };
+        LOOKUP_CACHE.set(cleanKey, { data: res, timestamp: Date.now() });
+        return res;
       }
+    } catch (err) {
+      // Non-blocking GBIF catch
     }
-  }
-
-  // 3. Search GBIF (Global Biodiversity Information Facility) Open Public REST API
-  try {
-    const gbifResult = await lookupGbifTaxonomy(queryName);
-    if (gbifResult && gbifResult.scientificName) {
-      return {
-        query: queryName,
-        matchedName: queryName.trim().toUpperCase(),
-        scientificName: gbifResult.scientificName,
-        botanicalName: gbifResult.scientificName,
-        family: gbifResult.family || '',
-        partUsed: 'Herb/Plant Material',
-        pharmacopoeialStandard: 'API',
-        category: 'Herb',
-        synonyms: gbifResult.synonyms || [],
-        source: 'GBIF Taxonomy API'
-      };
-    }
-  } catch (err) {
-    // Non-blocking GBIF API fallback catch
   }
 
   // 4. Gemini AI fallback if not in pre-loaded database or GBIF
@@ -963,7 +315,7 @@ Do NOT include any extra text, markdown formatting or backticks outside the JSON
       const parsed = JSON.parse(text);
 
       if (parsed && (parsed.scientificName || parsed.matchedName)) {
-        return {
+        const res = {
           query: queryName,
           matchedName: parsed.matchedName || queryName.trim().toUpperCase(),
           scientificName: parsed.scientificName || '',
@@ -973,13 +325,15 @@ Do NOT include any extra text, markdown formatting or backticks outside the JSON
           category: parsed.category || 'Herb',
           synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : []
         };
+        LOOKUP_CACHE.set(cleanKey, { data: res, timestamp: Date.now() });
+        return res;
       }
     }
   } catch (err) {
     console.error('Herb Resolution AI Lookup Error:', err.message);
   }
 
-  return {
+  const fallback = {
     query: queryName,
     matchedName: queryName.trim().toUpperCase(),
     scientificName: '',
@@ -989,80 +343,14 @@ Do NOT include any extra text, markdown formatting or backticks outside the JSON
     category: 'Herb',
     synonyms: []
   };
+  return fallback;
 }
-
-const VERNACULAR_TO_LATIN = {
-  'LATAKARANJA': 'Caesalpinia bonduc',
-  'LATAKARANJU': 'Caesalpinia bonduc',
-  'KARANJU': 'Caesalpinia bonduc',
-  'FEVER NUT': 'Caesalpinia bonduc',
-  'BONDUC NUT': 'Caesalpinia bonduc',
-  'VAJRAVALLI': 'Cissus quadrangularis',
-  'HADJOD': 'Cissus quadrangularis',
-  'HADJORA': 'Cissus quadrangularis',
-  'ASTHISAMHARAKA': 'Cissus quadrangularis',
-  'BONE SETTER': 'Cissus quadrangularis',
-  'HARRA': 'Terminalia chebula',
-  'HARAD': 'Terminalia chebula',
-  'HARDH': 'Terminalia chebula',
-  'HARR': 'Terminalia chebula',
-  'HARAR': 'Terminalia chebula',
-  'HARITAKI': 'Terminalia chebula',
-  'CHEBULIC MYROBALAN': 'Terminalia chebula',
-  'KALMEGH': 'Andrographis paniculata',
-  'BHUNIMBA': 'Andrographis paniculata',
-  'KING OF BITTERS': 'Andrographis paniculata',
-  'GOKSHURA': 'Tribulus terrestris',
-  'GOKHRU': 'Tribulus terrestris',
-  'PUNCTURE VINE': 'Tribulus terrestris',
-  'JIVANTI': 'Leptadenia reticulata',
-  'DODEE': 'Leptadenia reticulata',
-  'JEEVANTI': 'Leptadenia reticulata',
-  'PASHANABHEDA': 'Bergenia ligulata',
-  'PAKHANBHED': 'Bergenia ligulata',
-  'ROCK FOIL': 'Bergenia ligulata',
-  'MADANAPHALA': 'Catunaregam spinosa',
-  'MAINPHAL': 'Catunaregam spinosa',
-  'EMETIC NUT': 'Catunaregam spinosa',
-  'KAMPILLAKA': 'Mallotus philippensis',
-  'KABILA': 'Mallotus philippensis',
-  'KAMALA': 'Mallotus philippensis',
-  'SAFED MUSLI': 'Chlorophytum borivilianum',
-  'WHITE MUSLI': 'Chlorophytum borivilianum',
-  'VATSANABHA': 'Aconitum ferox',
-  'INDIAN ACONITE': 'Aconitum ferox',
-  'BHALLATAKA': 'Semecarpus anacardium',
-  'MARKING NUT': 'Semecarpus anacardium',
-  'DHATAKI': 'Woodfordia fruticosa',
-  'FIRE FLAME BUSH': 'Woodfordia fruticosa',
-  'KATUKA': 'Picrorhiza kurroa',
-  'KUTKI': 'Picrorhiza kurroa',
-  'KUTAKI': 'Picrorhiza kurroa',
-  'MAHUA': 'Madhuca indica',
-  'MADHUCA': 'Madhuca indica',
-  'VARUNA': 'Crateva nurvala',
-  'THREE LEAVED CAPER': 'Crateva nurvala',
-  'KANKOLA': 'Piper cubeba',
-  'CUBEB': 'Piper cubeba',
-  'USHEERA': 'Vetiveria zizanioides',
-  'KHAS': 'Vetiveria zizanioides',
-  'VETIVER': 'Vetiveria zizanioides',
-  'VIDARI': 'Pueraria tuberosa',
-  'VIDARIKAND': 'Pueraria tuberosa',
-  'VIDARI KAND': 'Pueraria tuberosa',
-  'INDIAN KUDZU': 'Pueraria tuberosa',
-  'KUDZU': 'Pueraria tuberosa',
-  'BILAIKAND': 'Pueraria tuberosa'
-};
 
 /**
  * Helper to query GBIF (Global Biodiversity Information Facility) Open Public REST API
  */
 function lookupGbifTaxonomy(queryTerm) {
   return new Promise((resolve) => {
-    const https = require('https');
-    
-    // Resolve Vernacular name to Latin Binomial if available
     const upperQuery = (queryTerm || '').trim().toUpperCase();
     const latinTerm = VERNACULAR_TO_LATIN[upperQuery] || queryTerm;
 

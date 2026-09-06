@@ -157,7 +157,8 @@ describe('MR Doctor Assignment, Day Turns, GPS Footprints & Access Control', () 
       .post(`/api/medical-reps/${mr._id}/location-ping`)
       .send({ latitude: 25.3176, longitude: 82.9739 });
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const trailRes = await request(app)
       .get(`/api/medical-reps/${mr._id}/footprint-trail?date=${todayStr}`);

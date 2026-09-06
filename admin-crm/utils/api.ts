@@ -363,8 +363,14 @@ class ApiClient {
   }
 
   // --- Contacts ---
-  async getContacts(search = '', stage = 'all'): Promise<Contact[]> {
-    const res = await this.request(`${API_BASE}/contacts?search=${search}&stage=${stage}`);
+  async getContacts(search = '', stage = 'all', page?: number, limit?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (stage && stage !== 'all') params.append('stage', stage);
+    if (page !== undefined) params.append('page', page.toString());
+    if (limit !== undefined) params.append('limit', limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await this.request(`${API_BASE}/contacts${query}`);
     return res.json();
   }
   async getContact(id: string): Promise<Contact | null> {
@@ -488,8 +494,14 @@ class ApiClient {
   }
 
   // --- Products ---
-  async getProducts(search = '', vendorId = ''): Promise<Product[]> {
-    const res = await this.request(`${API_BASE}/products?search=${encodeURIComponent(search)}&vendorId=${encodeURIComponent(vendorId)}`);
+  async getProducts(search = '', vendorId = '', page?: number, limit?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (vendorId) params.append('vendorId', vendorId);
+    if (page !== undefined) params.append('page', page.toString());
+    if (limit !== undefined) params.append('limit', limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await this.request(`${API_BASE}/products${query}`);
     return res.json();
   }
   async getProduct(id: string): Promise<Product | null> {
@@ -961,12 +973,26 @@ class ApiClient {
     return res.json();
   }
 
+  // --- Leads ---
+  async getLeads(search = '', stage = 'all', page?: number, limit?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (stage && stage !== 'all') params.append('stage', stage);
+    if (page !== undefined) params.append('page', page.toString());
+    if (limit !== undefined) params.append('limit', limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await this.request(`${API_BASE}/leads${query}`);
+    return res.json();
+  }
+
   // --- Raw Materials ---
-  async getRawMaterials(warehouseId?: string, simple?: boolean, search?: string): Promise<RawMaterial[]> {
+  async getRawMaterials(warehouseId?: string, simple?: boolean, search?: string, page?: number, limit?: number): Promise<any> {
     const params = new URLSearchParams();
     if (warehouseId) params.set('warehouseId', warehouseId);
     if (simple) params.set('simple', 'true');
     if (search) params.set('search', search);
+    if (page !== undefined) params.set('page', page.toString());
+    if (limit !== undefined) params.set('limit', limit.toString());
     const qs = params.toString();
     const url = qs ? `${API_BASE}/raw-materials?${qs}` : `${API_BASE}/raw-materials`;
     const res = await this.request(url);
@@ -1016,8 +1042,12 @@ class ApiClient {
   }
 
   // --- Bill of Materials (BOM) ---
-  async getBOMs(): Promise<BillOfMaterials[]> {
-    const res = await this.request(`${API_BASE}/bom`);
+  async getBOMs(page?: number, limit?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (page !== undefined) params.append('page', page.toString());
+    if (limit !== undefined) params.append('limit', limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await this.request(`${API_BASE}/bom${query}`);
     return res.json();
   }
   async getBOMForProduct(productId: string): Promise<BillOfMaterials | null> {
@@ -1130,8 +1160,15 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/coa`);
     return res.json();
   }
-  async getPharmacopoeia(search?: string): Promise<any[]> {
-    const url = search ? `${API_BASE}/pharmacopoeia?search=${encodeURIComponent(search)}` : `${API_BASE}/pharmacopoeia`;
+  async getPharmacopoeia(search?: string, standard?: string, options?: { all?: boolean; page?: number; limit?: number }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (standard && standard !== 'all') params.set('standard', standard);
+    if (options?.all) params.set('all', 'true');
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.limit) params.set('limit', String(options.limit));
+    const qs = params.toString();
+    const url = qs ? `${API_BASE}/pharmacopoeia?${qs}` : `${API_BASE}/pharmacopoeia`;
     const res = await this.request(url);
     return res.json();
   }

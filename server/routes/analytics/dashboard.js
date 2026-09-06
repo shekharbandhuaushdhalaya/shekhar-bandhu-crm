@@ -11,29 +11,54 @@ const router = express.Router();
 // GET /api/dashboard/stats — aggregate pipeline metrics & e-commerce stats
 router.get('/stats', authorize('analytics:query'), async (req, res) => {
   try {
-    const contacts = await Contact.find().lean();
-    const tasks = await Task.find().lean();
+    const [
+      contactStats,
+      pendingTasksCount,
+      orderSalesAgg,
+      activeWebOrdersCount,
+      completedWebOrdersCount,
+      webQueriesCount
+    ] = await Promise.all([
+      Contact.aggregate([
+        {
+          $group: {
+            _id: '$stage',
+            totalValue: { $sum: { $ifNull: ['$dealValue', 0] } },
+            count: { $sum: 1 }
+          }
+        }
+      ]),
+      Task.countDocuments({ completed: { $ne: true } }),
+      Order.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalSales: { $sum: { $ifNull: ['$totalAmount', 0] } }
+          }
+        }
+      ]),
+      Order.countDocuments({ status: { $in: ['pending', 'processing'] } }),
+      Order.countDocuments({ status: { $in: ['shipped', 'delivered'] } }),
+      ProductQuery.countDocuments()
+    ]);
 
-    const totalPipeline = contacts
-      .filter(c => !['won', 'lost'].includes(c.stage))
-      .reduce((sum, c) => sum + c.dealValue, 0);
+    let totalPipeline = 0;
+    let closedWon = 0;
+    let activeLeadsCount = 0;
 
-    const closedWon = contacts
-      .filter(c => c.stage === 'won')
-      .reduce((sum, c) => sum + c.dealValue, 0);
+    for (const stat of contactStats) {
+      const stage = stat._id;
+      if (stage === 'won') {
+        closedWon += stat.totalValue;
+      } else if (stage !== 'lost') {
+        totalPipeline += stat.totalValue;
+      }
+      if (['lead', 'contacted'].includes(stage)) {
+        activeLeadsCount += stat.count;
+      }
+    }
 
-    const activeLeadsCount = contacts
-      .filter(c => ['lead', 'contacted'].includes(c.stage))
-      .length;
-
-    const pendingTasksCount = tasks.filter(t => !t.completed).length;
-
-    // E-Commerce Stats
-    const activeOrders = await Order.find({ status: { $in: ['pending', 'processing'] } }).lean();
-    const completedOrders = await Order.find({ status: { $in: ['shipped', 'delivered'] } }).lean();
-    const allWebOrders = await Order.find().lean();
-    const totalWebSales = allWebOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-    const webQueriesCount = await ProductQuery.countDocuments();
+    const totalWebSales = orderSalesAgg.length > 0 ? (orderSalesAgg[0].totalSales || 0) : 0;
 
     res.json({ 
       totalPipeline, 
@@ -41,8 +66,8 @@ router.get('/stats', authorize('analytics:query'), async (req, res) => {
       activeLeadsCount, 
       pendingTasksCount,
       totalWebSales,
-      activeWebOrdersCount: activeOrders.length,
-      completedWebOrdersCount: completedOrders.length,
+      activeWebOrdersCount,
+      completedWebOrdersCount,
       webQueriesCount
     });
   } catch (err) {

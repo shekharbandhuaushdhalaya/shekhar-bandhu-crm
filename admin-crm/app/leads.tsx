@@ -5,6 +5,7 @@ import { Spacing, Radius, STAGES, Stage, getStageColors, LightColors } from '../
 import { api, Contact } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { AddContactModal, ContactDetailModal } from './contacts';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 function PipelineColumn({ stage, contacts, onMoveContact, onClickContact, width }: { stage: Stage; contacts: Contact[]; onMoveContact: (id: string, newStage: string) => void; onClickContact: (c: Contact) => void; width: number }) {
   const { colors } = useTheme();
@@ -74,6 +75,7 @@ function PipelineColumn({ stage, contacts, onMoveContact, onClickContact, width 
 export default function LeadsScreen() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -107,8 +109,8 @@ export default function LeadsScreen() {
 
   // Filter contacts by search query
   const filteredContacts = contacts.filter(c => {
-    if (!search) return true;
-    const q = search.toLowerCase();
+    if (!debouncedSearch) return true;
+    const q = debouncedSearch.toLowerCase();
     return c.name.toLowerCase().includes(q) || (c.company && c.company.toLowerCase().includes(q)) || (c.email && c.email.toLowerCase().includes(q));
   });
 

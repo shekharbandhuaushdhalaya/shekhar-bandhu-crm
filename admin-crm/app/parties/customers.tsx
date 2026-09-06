@@ -10,6 +10,8 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
 import { validateGstinWithState, formatPhoneWithCountryCode, toTitleCase } from '../../utils/gst';
+import { useDebouncedValue } from '../../utils/useDebouncedValue';
+import { DataTable, Column } from '../../components/DataTable';
 
 const GST_STATE_CODES: { [key: string]: string } = {
   '01': 'Jammu & Kashmir',
@@ -1536,11 +1538,10 @@ function CustomerLedgerModal({
       />
     </Modal>
   );
-}
-
 export default function CustomersScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [activeTab, setActiveTab] = useState<'gst' | 'cash'>('gst');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -1563,7 +1564,7 @@ export default function CustomersScreen() {
   const limit = 50;
 
   const load = useCallback(async () => {
-    const res = await api.getCustomers(search, activeTab, page, limit);
+    const res = await api.getCustomers(debouncedSearch, activeTab, page, limit);
     if (res && res.data) {
       if (page === 1) {
         setCustomers(res.data);
@@ -1579,9 +1580,9 @@ export default function CustomersScreen() {
       setCustomers(Array.isArray(res) ? res : []);
       setTotalPages(1);
     }
-  }, [search, activeTab, page]);
+  }, [debouncedSearch, activeTab, page]);
 
-  useEffect(() => { setPage(1); }, [search, activeTab]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, activeTab]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1597,6 +1598,125 @@ export default function CustomersScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
+  const columns: Column<Customer>[] = [
+    {
+      key: 'name',
+      title: 'Registered Name / Customer',
+      width: 240,
+      render: (c) => {
+        const compName = toTitleCase(c.company || c.name) || 'N/A';
+        const avatar = getAvatarColor(compName, colors);
+        return (
+          <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }} onPress={() => { setSelectedCust(c); setLedgerVisible(true); }}>
+            <View style={[styles.avatarCircle, { backgroundColor: avatar.bg }]}>
+              <Text style={[styles.avatarCircleText, { color: avatar.text }]}>
+                {compName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.primaryText} numberOfLines={1}>{compName}</Text>
+              {c.name && c.company ? <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(c.name)}</Text> : null}
+            </View>
+          </Pressable>
+        );
+      }
+    },
+    {
+      key: 'gstin',
+      title: 'GSTIN',
+      width: 150,
+      render: (c) => {
+        const isCash = !c.gstin || !c.gstin.trim();
+        return isCash ? (
+          <View style={[styles.gstinBadge, { backgroundColor: colors.warning + '0c', borderColor: colors.warning + '20' }]}>
+            <Ionicons name="cash" size={10} color={colors.warning} />
+            <Text style={[styles.gstinText, { color: colors.warning }]}>CASH ONLY</Text>
+          </View>
+        ) : c.gstin ? (
+          <View style={styles.gstinBadge}>
+            <Ionicons name="shield-checkmark" size={10} color={colors.primary} />
+            <Text style={styles.gstinText} numberOfLines={1}>{c.gstin}</Text>
+          </View>
+        ) : (
+          <Text style={styles.naText}>—</Text>
+        );
+      }
+    },
+    {
+      key: 'contactPerson',
+      title: 'Contact Person',
+      width: 160,
+      render: (c) => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="person-outline" size={12} color={colors.text.muted} />
+          <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
+            {toTitleCase(c.contactPerson || c.name) || '—'}
+          </Text>
+        </View>
+      )
+    },
+    {
+      key: 'phone',
+      title: 'Phone',
+      width: 150,
+      render: (c) => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="call-outline" size={12} color={colors.success} />
+          <Text style={styles.monoText} numberOfLines={1}>{formatPhoneWithCountryCode(c.phone)}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'city',
+      title: 'City',
+      width: 140,
+      render: (c) => {
+        const billing = c.billingAddress || { city: '', state: '', street: '' };
+        return (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="location-outline" size={13} color={colors.danger} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>{toTitleCase(billing.city) || '—'}</Text>
+              {c.state || billing.state ? <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(c.state || billing.state)}</Text> : null}
+            </View>
+          </View>
+        );
+      }
+    },
+    {
+      key: 'balance',
+      title: 'Balance',
+      width: 140,
+      align: 'right',
+      render: (c) => {
+        const isCash = c.recordTracking === 'cash_ledger';
+        const amount = isCash ? (c.cashBalance || 0) : (c.regularBalance || 0);
+        const label = amount > 0 ? 'DR.' : amount < 0 ? 'CR.' : '';
+        const color = amount > 0 ? (isCash ? colors.warning : colors.success) : amount < 0 ? colors.danger : colors.text.muted;
+        const bg = amount > 0 ? (isCash ? colors.warning + '12' : colors.success + '12') : amount < 0 ? colors.danger + '12' : colors.bg.secondary;
+        return (
+          <View style={[styles.balanceBadge, { backgroundColor: bg, borderColor: color + '30', borderWidth: 1 }]}>
+            <Text style={[styles.balanceText, { color, fontSize: 13, fontWeight: '800' }]}>
+              {label} {Math.abs(amount).toLocaleString('en-IN')}
+            </Text>
+          </View>
+        );
+      }
+    },
+    {
+      key: 'action',
+      title: 'Action',
+      width: 100,
+      align: 'center',
+      render: (c) => (
+        <TouchableOpacity style={styles.viewBtn} onPress={() => { setSelectedCust(c); setDetailVisible(true); }}>
+          <Ionicons name="eye-outline" size={13} color={colors.primary} />
+          <Text style={styles.viewBtnText}>View</Text>
+        </TouchableOpacity>
+      )
+    }
+  ];
+
   return (
     <View style={styles.screen}>
       <View style={styles.innerContainer}>
@@ -1662,166 +1782,28 @@ export default function CustomersScreen() {
           </View>
         </View>
 
-        <ScrollView 
-          style={{ flex: 1 }} 
-          showsVerticalScrollIndicator={true}
-          scrollEventThrottle={400}
-          onScroll={({ nativeEvent }) => {
-            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-            const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
-            if (isCloseToBottom && page < totalPages) {
-              setPage(p => p + 1);
-            }
-          }}
-        >
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
-            <View style={styles.table}>
-              {/* Table Header Row */}
-              <View style={styles.tableHeaderRow}>
-                <View style={[styles.tableHeaderCellContainer, { width: 240 }]}><Text style={styles.tableHeaderCell}>Registered Name / Customer</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 150 }]}><Text style={styles.tableHeaderCell}>GSTIN</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Contact Person</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 150 }]}><Text style={styles.tableHeaderCell}>Phone</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>City</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Balance</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
+        <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          <DataTable
+            data={customers}
+            columns={columns}
+            keyExtractor={item => item._id}
+            isRefreshing={refreshing}
+            onRefresh={onRefresh}
+            onLoadMore={() => {
+              if (page < totalPages) setPage(p => p + 1);
+            }}
+            isLoadingMore={page < totalPages}
+            onRowPress={(c) => { setSelectedCust(c); setLedgerVisible(true); }}
+            ListEmptyComponent={
+              <View style={styles.emptyTableContainer}>
+                <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
+                <Text style={styles.emptyText}>
+                  No {activeTab === 'gst' ? 'GST' : 'Cash / Unregistered'} customers registered
+                </Text>
               </View>
-
-              {/* Table Body Rows */}
-              {customers.map((c) => {
-                const isCash = !c.gstin || !c.gstin.trim();
-
-                const bal = c.regularBalance;
-                const drCrLabel = bal > 0 ? 'DR' : bal < 0 ? 'CR' : null;
-                const balColor = bal > 0 ? colors.success : bal < 0 ? colors.danger : colors.text.muted;
-                const balBg = bal > 0 ? colors.success + '12' : bal < 0 ? colors.danger + '12' : colors.bg.secondary;
-
-
-
-                const billing = c.billingAddress || { city: '', state: '', street: '' };
-                const compName = toTitleCase(c.company || c.name) || 'N/A';
-                const avatar = getAvatarColor(compName, colors);
-
-                return (
-                  <Pressable
-                    key={c._id}
-                    style={({ pressed }) => [styles.tableBodyRow, pressed && { backgroundColor: colors.bg.secondary }]}
-                    onPress={() => { setSelectedCust(c); setLedgerVisible(true); }}
-                  >
-                    {/* Registered/Company Name + Avatar */}
-                    <View style={[styles.tableCellContainer, { width: 240, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-                      <View style={[styles.avatarCircle, { backgroundColor: avatar.bg }]}>
-                        <Text style={[styles.avatarCircleText, { color: avatar.text }]}>
-                          {compName.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.primaryText} numberOfLines={1}>
-                          {compName}
-                        </Text>
-                        {c.name && c.company ? (
-                          <Text style={styles.secondaryText} numberOfLines={1}>
-                            {toTitleCase(c.name)}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </View>
-
-                    {/* GSTIN Pill Badge or Cash Tag */}
-                    <View style={[styles.tableCellContainer, { width: 150 }]}>
-                      {isCash ? (
-                        <View style={[styles.gstinBadge, { backgroundColor: colors.warning + '0c', borderColor: colors.warning + '20' }]}>
-                          <Ionicons name="cash" size={10} color={colors.warning} />
-                          <Text style={[styles.gstinText, { color: colors.warning }]}>CASH ONLY</Text>
-                        </View>
-                      ) : c.gstin ? (
-                        <View style={styles.gstinBadge}>
-                          <Ionicons name="shield-checkmark" size={10} color={colors.primary} />
-                          <Text style={styles.gstinText} numberOfLines={1}>{c.gstin}</Text>
-                        </View>
-                      ) : (
-                        <Text style={styles.naText}>—</Text>
-                      )}
-                    </View>
-
-                    {/* Contact Person */}
-                    <View style={[styles.tableCellContainer, { width: 160, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-                      <Ionicons name="person-outline" size={12} color={colors.text.muted} />
-                      <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
-                        {toTitleCase(c.contactPerson || c.name) || '—'}
-                      </Text>
-                    </View>
-
-                    {/* Phone */}
-                    <View style={[styles.tableCellContainer, { width: 150, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-                      <Ionicons name="call-outline" size={12} color={colors.success} />
-                      <Text style={styles.monoText} numberOfLines={1}>
-                        {formatPhoneWithCountryCode(c.phone)}
-                      </Text>
-                    </View>
-
-                    {/* City */}
-                    <View style={[styles.tableCellContainer, { width: 140, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-                      <Ionicons name="location-outline" size={13} color={colors.danger} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
-                          {toTitleCase(billing.city) || '—'}
-                        </Text>
-                        {c.state || billing.state ? (
-                          <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(c.state || billing.state)}</Text>
-                        ) : null}
-                      </View>
-                    </View>
-
-                    {/* Dynamic Balance Badges based on selected recordTracking ledger */}
-                    <View style={[styles.tableCellContainer, { width: 140, alignItems: 'flex-end', justifyContent: 'center' }]}>
-                      {(() => {
-                        const isCash = c.recordTracking === 'cash_ledger';
-                        const amount = isCash ? (c.cashBalance || 0) : (c.regularBalance || 0);
-                        const label = amount > 0 ? 'DR.' : amount < 0 ? 'CR.' : '';
-                        const color = amount > 0 ? (isCash ? colors.warning : colors.success) : amount < 0 ? colors.danger : colors.text.muted;
-                        const bg = amount > 0 ? (isCash ? colors.warning + '12' : colors.success + '12') : amount < 0 ? colors.danger + '12' : colors.bg.secondary;
-                        return (
-                          <View style={[styles.balanceBadge, { backgroundColor: bg, borderColor: color + '30', borderWidth: 1 }]}>
-                            <Text style={[styles.balanceText, { color, fontSize: 13, fontWeight: '800' }]}>
-                              {label} {Math.abs(amount).toLocaleString('en-IN')}
-                            </Text>
-                          </View>
-                        );
-                      })()}
-                    </View>
-
-                    {/* Action */}
-                    <View style={[styles.tableCellContainer, { width: 100, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
-                      <TouchableOpacity
-                        style={styles.viewBtn}
-                        onPress={(e) => { e.stopPropagation?.(); setSelectedCust(c); setDetailVisible(true); }}
-                      >
-                        <Ionicons name="eye-outline" size={13} color={colors.primary} />
-                        <Text style={styles.viewBtnText}>View</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </Pressable>
-                );
-              })}
-
-              {customers.length === 0 && (
-                <View style={styles.emptyTableContainer}>
-                  <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                  <Text style={styles.emptyText}>
-                    No {activeTab === 'gst' ? 'GST' : 'Cash / Unregistered'} customers registered
-                  </Text>
-                </View>
-              )}
-            </View>
-          </ScrollView>
-          
-          {page < totalPages && (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
-            </View>
-          )}
-        </ScrollView>
+            }
+          />
+        </View>
       </View>
 
       <CustomerDetailModal

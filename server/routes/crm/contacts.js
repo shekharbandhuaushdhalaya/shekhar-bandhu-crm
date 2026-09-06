@@ -10,7 +10,7 @@ const router = express.Router();
 // GET /api/contacts — list contacts with optional search and stage filter
 router.get('/', async (req, res) => {
   try {
-    const { search, stage } = req.query;
+    const { search, stage, page, limit } = req.query;
     const filter = {};
 
     if (search) {
@@ -25,7 +25,31 @@ router.get('/', async (req, res) => {
       filter.stage = stage;
     }
 
-    const contacts = await Contact.find(filter).sort({ createdAt: -1 }).lean();
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = Contact.find(filter)
+      .select('name company email phone stage dealValue interactions createdAt updatedAt')
+      .sort({ createdAt: -1 });
+
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const contacts = await query.lean();
+
+    if (isPaginated) {
+      const total = await Contact.countDocuments(filter);
+      return res.json({
+        data: contacts,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
     res.json(contacts);
   } catch (err) {
     res.status(500).json({ error: err.message });

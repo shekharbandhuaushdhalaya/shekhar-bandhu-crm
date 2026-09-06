@@ -93,4 +93,42 @@ describe('Ayurvedic Pharmacopoeia Monograph Suite & API Endpoints', () => {
     expect(res.body.ayurvedicName).toBe('KUTAJ');
     expect(res.body._id).toBeDefined();
   });
+
+  it('handles regex special characters safely without throwing', async () => {
+    await request(app).get('/api/pharmacopoeia');
+    const res = await request(app).get('/api/pharmacopoeia/search?q=Ashwa(gandha+.*');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('does not trigger bulkWrite when collection is already populated', async () => {
+    await request(app).get('/api/pharmacopoeia');
+    const spy = jest.spyOn(PharmacopoeiaEntry, 'bulkWrite');
+
+    await request(app).get('/api/pharmacopoeia');
+    await request(app).get('/api/pharmacopoeia/search?q=Tulsi');
+
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('GET /api/pharmacopoeia paginates to 50 by default and returns all when all=true', async () => {
+    await request(app).get('/api/pharmacopoeia');
+
+    const defaultRes = await request(app).get('/api/pharmacopoeia');
+    expect(defaultRes.status).toBe(200);
+    expect(defaultRes.body.length).toBeLessThanOrEqual(50);
+
+    const allRes = await request(app).get('/api/pharmacopoeia?all=true');
+    expect(allRes.status).toBe(200);
+    expect(allRes.body.length).toBeGreaterThan(100);
+  });
+
+  it('POST /api/pharmacopoeia/import-to-raw-materials with importAll:true executes without throwing', async () => {
+    await request(app).get('/api/pharmacopoeia');
+
+    const res = await request(app).post('/api/pharmacopoeia/import-to-raw-materials').send({ importAll: true });
+    expect(res.status).toBe(200);
+    expect(res.body.importedCount).toBeDefined();
+  }, 15000);
 });

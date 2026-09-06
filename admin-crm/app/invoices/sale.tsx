@@ -12,6 +12,8 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 import { LOGO_BASE64 } from '../../utils/logo';
 import { FIRM_DETAILS } from '../../constants/firm';
 import { printInvoice } from '../../utils/printInvoiceTemplate';
+import { useDebouncedValue } from '../../utils/useDebouncedValue';
+import { DataTable, Column } from '../../components/DataTable';
 
 // ── Share on WhatsApp ──────────────────────────────────────────────────────────
 const shareInvoiceOnWhatsApp = (invoice: Invoice, customers: Customer[]) => {
@@ -1688,31 +1690,15 @@ const getOverdueText = (item: Invoice, customers: Customer[], colors: any) => {
 
   const diffTime = today.getTime() - dueDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
   if (diffDays > 0) {
-    return { text: `Overdue by ${diffDays} day${diffDays > 1 ? 's' : ''}`, color: colors.danger };
-  } else if (diffDays === 0) {
-    return { text: 'Due Today', color: colors.warning };
-  } else {
-    const remainingDays = Math.abs(diffDays);
-    return { text: `Due in ${remainingDays} day${remainingDays > 1 ? 's' : ''}`, color: colors.text.secondary };
+    return <Text style={{ fontSize: 10, color: colors.danger, fontWeight: '700' }}>Overdue {diffDays}d</Text>;
   }
-};
-
-function getFinancialYearString(date = new Date()) {
-  const year = date.getFullYear();
-  const month = date.getMonth(); // 0-indexed, 0 = Jan, 3 = Apr
-  if (month >= 3) {
-    return `${year}-${(year + 1).toString().slice(-2)}`;
-  } else {
-    return `${year - 1}-${year.toString().slice(-2)}`;
-  }
-}
 
 export default function SaleInvoicesScreen() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [fyFilter, setFyFilter] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedInv, setSelectedInv] = useState<Invoice | null>(null);
@@ -1736,7 +1722,7 @@ export default function SaleInvoicesScreen() {
 
   const load = useCallback(async () => {
     const [resInvoices, resCustomers] = await Promise.all([
-      api.getSaleInvoices(search, modeFilter, page, limit),
+      api.getSaleInvoices(debouncedSearch, modeFilter, page, limit),
       api.getCustomers()
     ]);
     if (resInvoices && resInvoices.data) {
@@ -1758,7 +1744,9 @@ export default function SaleInvoicesScreen() {
     if (page === 1) {
       setCustomers(resCustomers);
     }
-  }, [search, modeFilter, page]);
+  }, [debouncedSearch, modeFilter, page]);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useEffect(() => {
@@ -1782,6 +1770,110 @@ export default function SaleInvoicesScreen() {
     }
     return true;
   });
+
+  const columns: Column<Invoice>[] = [
+    {
+      key: 'invoiceNo',
+      title: 'Invoice No',
+      width: 160,
+      render: (item) => (
+        <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.invoiceNo}</Text>
+      )
+    },
+    {
+      key: 'customerName',
+      title: 'Customer Name',
+      flex: 2,
+      width: 200,
+      render: (item) => (
+        <Text style={styles.tableCell} numberOfLines={1}>{item.customerName || 'N/A'}</Text>
+      )
+    },
+    {
+      key: 'date',
+      title: 'Date',
+      width: 120,
+      render: (item) => (
+        <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
+      )
+    },
+    {
+      key: 'amount',
+      title: 'Amount',
+      width: 120,
+      render: (item) => (
+        <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+      )
+    },
+    {
+      key: 'status',
+      title: 'Doc Status',
+      width: 120,
+      render: (item) => (
+        <View style={[styles.statusBadge, {
+          borderColor: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning),
+          backgroundColor: (item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)) + '12'
+        }]}>
+          <Text style={[styles.statusText, {
+            color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
+          }]}>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'overdue',
+      title: 'Overdue Status',
+      width: 130,
+      render: (item) => {
+        const overdueInfo = getOverdueText(item, customers, colors);
+        return (
+          <Text style={{ fontSize: 13, fontWeight: '600', color: overdueInfo.color }}>
+            {overdueInfo.text}
+          </Text>
+        );
+      }
+    },
+    {
+      key: 'actions',
+      title: 'Actions',
+      width: 160,
+      align: 'center',
+      render: (item) => (
+        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              backgroundColor: colors.primary,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 6
+            }}
+            onPress={(e) => { e.stopPropagation?.(); printInvoice(item); }}
+          >
+            <Ionicons name="print-outline" size={13} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Print</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              backgroundColor: '#25D366',
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 6
+            }}
+            onPress={(e) => { e.stopPropagation?.(); shareInvoiceOnWhatsApp(item, customers); }}
+          >
+            <Ionicons name="logo-whatsapp" size={13} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Share</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
+  ];
 
   return (
     <View style={styles.screen}>
@@ -1848,113 +1940,26 @@ export default function SaleInvoicesScreen() {
           </View>
         </View>
 
-        <ScrollView 
-          style={{ flex: 1 }}
-          scrollEventThrottle={400}
-          onScroll={({ nativeEvent }) => {
-            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-            const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
-            if (isCloseToBottom && page < totalPages) {
-              setPage(p => p + 1);
-            }
-          }}
-        >
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
-            <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
-              {/* Table Header Row */}
-              <View style={styles.tableHeaderRow}>
-                <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Invoice No</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Overdue Status</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 160, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Actions</Text></View>
+        <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          <DataTable
+            data={filteredInvoices}
+            columns={columns}
+            keyExtractor={item => item._id}
+            isRefreshing={refreshing}
+            onRefresh={onRefresh}
+            onLoadMore={() => {
+              if (page < totalPages) setPage(p => p + 1);
+            }}
+            isLoadingMore={page < totalPages}
+            onRowPress={(item) => { setSelectedInv(item); setDetailVisible(true); }}
+            ListEmptyComponent={
+              <View style={styles.emptyTableContainer}>
+                <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
+                <Text style={styles.emptyText}>No invoices found</Text>
               </View>
-
-              {/* Table Body Rows */}
-              {filteredInvoices.map((item) => {
-                const overdueInfo = getOverdueText(item, customers, colors);
-                return (
-                  <TouchableOpacity key={item._id} style={styles.tableBodyRow} onPress={() => { setSelectedInv(item); setDetailVisible(true); }}>
-                    <View style={[styles.tableCellContainer, { width: 160 }]}>
-                      <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.invoiceNo}</Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
-                      <Text style={styles.tableCell} numberOfLines={1}>{item.customerName || 'N/A'}</Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 120 }]}>
-                      <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 120 }]}>
-                      <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 120 }]}>
-                      <View style={[styles.statusBadge, {
-                        borderColor: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning),
-                        backgroundColor: (item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)) + '12'
-                      }]}>
-                        <Text style={[styles.statusText, {
-                          color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
-                        }]}>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</Text>
-                      </View>
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 130 }]}>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: overdueInfo.color }}>
-                        {overdueInfo.text}
-                      </Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 160, borderRightWidth: 0, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }]}>
-                      <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          backgroundColor: colors.primary,
-                          paddingHorizontal: 10,
-                          paddingVertical: 6,
-                          borderRadius: 6
-                        }}
-                        onPress={(e) => { e.stopPropagation(); printInvoice(item); }}
-                      >
-                        <Ionicons name="print-outline" size={13} color="#fff" />
-                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Print</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          backgroundColor: '#25D366',
-                          paddingHorizontal: 10,
-                          paddingVertical: 6,
-                          borderRadius: 6
-                        }}
-                        onPress={(e) => { e.stopPropagation(); shareInvoiceOnWhatsApp(item, customers); }}
-                      >
-                        <Ionicons name="logo-whatsapp" size={13} color="#fff" />
-                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Share</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-
-              {filteredInvoices.length === 0 && (
-                <View style={styles.emptyTableContainer}>
-                  <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                  <Text style={styles.emptyText}>No invoices found</Text>
-                </View>
-              )}
-            </View>
-          </ScrollView>
-          
-          {page < totalPages && (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
-            </View>
-          )}
-        </ScrollView>
+            }
+          />
+        </View>
       </View>
 
       <InvoiceDetailModal

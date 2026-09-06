@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { getBotanicalInfo, resolveHerbDetails } = require('../utils/botanicalLookup');
+const botanicalLookupModule = require('../utils/botanicalLookup');
+const { getBotanicalInfo, resolveHerbDetails } = botanicalLookupModule;
 const RawMaterial = require('../models/RawMaterial');
 
 let mongoServer;
@@ -65,5 +66,22 @@ describe('Botanical & Scientific Name Lookup Test Suite', () => {
     expect(rm.botanicalName).toBe('Withania somnifera');
     expect(rm.partUsed).toBe('Root');
     expect(rm.pharmacopoeialStandard).toBe('API');
+  });
+
+  it('resolves seed-derived aliases in-memory without invoking GBIF API', async () => {
+    const gbifSpy = jest.spyOn(botanicalLookupModule, 'lookupGbifTaxonomy');
+
+    const res1 = await resolveHerbDetails('Vidari');
+    expect(res1.matchedName.toUpperCase()).toBe('VIDARI');
+    expect(res1.botanicalName).toContain('Pueraria tuberosa');
+
+    const res2 = await resolveHerbDetails('Ashwagandha');
+    expect(res2.matchedName).toBe('Ashwagandha');
+
+    const res3 = await resolveHerbDetails('asgandh');
+    expect(res3.matchedName).toBe('Ashwagandha');
+
+    expect(gbifSpy).not.toHaveBeenCalled();
+    gbifSpy.mockRestore();
   });
 });

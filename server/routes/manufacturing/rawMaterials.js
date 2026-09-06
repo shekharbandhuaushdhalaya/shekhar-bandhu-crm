@@ -32,11 +32,10 @@ router.post('/herb-service/resolve', async (req, res) => {
   }
 });
 
-// GET /api/raw-materials — List all raw materials
-// Supports ?warehouseId=&simple=true&search= for filtering
+// GET /api/raw-materials — List raw materials with optional pagination & filtering
 router.get('/', async (req, res) => {
   try {
-    const { warehouseId, simple, search } = req.query;
+    const { warehouseId, simple, search, page, limit } = req.query;
     const filter = search ? {
       $or: [
         { name: { $regex: search, $options: 'i' } },
@@ -45,9 +44,29 @@ router.get('/', async (req, res) => {
         { botanicalName: { $regex: search, $options: 'i' } },
       ]
     } : {};
-    const rawMaterials = await RawMaterial.find(filter).sort({ name: 1 }).lean();
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = RawMaterial.find(filter).sort({ name: 1 });
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const rawMaterials = await query.lean();
 
     if (simple === 'true') {
+      if (isPaginated) {
+        const total = await RawMaterial.countDocuments(filter);
+        return res.json({
+          data: rawMaterials,
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum)
+        });
+      }
       return res.json(rawMaterials);
     }
 
@@ -86,6 +105,17 @@ router.get('/', async (req, res) => {
         availableQty: data.availableQty
       };
     });
+
+    if (isPaginated) {
+      const total = await RawMaterial.countDocuments(filter);
+      return res.json({
+        data: enriched,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
 
     res.json(enriched);
   } catch (err) {

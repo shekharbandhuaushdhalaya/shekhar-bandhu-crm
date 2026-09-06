@@ -19,6 +19,7 @@ import { usePermission } from '../utils/permissions';
 import { api } from '../utils/api';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import UnauthorizedScreen from '../components/UnauthorizedScreen';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 type AuditLogItem = {
   _id: string;
@@ -45,6 +46,7 @@ export default function AuditLogsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const debouncedSearchText = useDebouncedValue(searchText, 300);
   const [searchVal, setSearchVal] = useState('');
 
   // Date range
@@ -89,13 +91,15 @@ export default function AuditLogsScreen() {
     }
   }, [dateFrom, dateTo]);
 
+  const activeSearch = debouncedSearchText || searchVal;
+
   useEffect(() => {
     if (perm.can('audit:view')) {
-      fetchLogs(page, searchVal);
+      fetchLogs(page, activeSearch);
     } else {
       setLoading(false);
     }
-  }, [page, searchVal, user, fetchLogs]);
+  }, [page, activeSearch, user, fetchLogs]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

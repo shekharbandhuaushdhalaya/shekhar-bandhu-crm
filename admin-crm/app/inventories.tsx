@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product, DeadStockItem } from '../utils/api';
 import { useAuth } from '../utils/auth';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 
@@ -1151,6 +1152,7 @@ export default function InventoriesScreen() {
   const [warehouseEntries, setWarehouseEntries] = useState<InventoryEntry[]>([]);
   
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
 
   // Modals Visibility
@@ -1198,16 +1200,16 @@ export default function InventoriesScreen() {
 
       // 2. Fetch inventory based on selected godown
       if (selectedWarehouseId === 'all') {
-        const cons = await api.getConsolidatedInventory(search);
+        const cons = await api.getConsolidatedInventory(debouncedSearch);
         setConsolidatedItems(cons);
       } else {
-        const entries = await api.getInventoryEntries(selectedWarehouseId, search);
+        const entries = await api.getInventoryEntries(selectedWarehouseId, debouncedSearch);
         setWarehouseEntries(entries);
       }
     } catch (err) {
       console.error('Error fetching inventories details:', err);
     }
-  }, [selectedWarehouseId, search]);
+  }, [selectedWarehouseId, debouncedSearch]);
 
   const loadedOnce = useRef(false);
   useEffect(() => {

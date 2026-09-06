@@ -8,10 +8,15 @@ const schemas = require('../../validation/schemas');
 
 const router = express.Router();
 
-// GET /api/system/settings — Authenticated endpoint for full system settings (excludes secrets by default)
+// GET /api/system/settings — Authenticated endpoint for system settings (excludes raw base64 blobs by default)
 router.get('/settings', authenticateToken, async (req, res) => {
   try {
-    let settings = await SystemSettings.findOne({ key: 'company_config' });
+    const { includeAssets } = req.query;
+    let query = SystemSettings.findOne({ key: 'company_config' });
+    if (includeAssets !== 'true') {
+      query = query.select('-signatureBase64 -qrImageBase64');
+    }
+    let settings = await query.lean();
     if (!settings) {
       // Create defaults if not present
       settings = await SystemSettings.create({ key: 'company_config' });
@@ -25,6 +30,7 @@ router.get('/settings', authenticateToken, async (req, res) => {
 // GET /api/system/settings/public — Unauthenticated public-safe company details (strictly no secrets)
 router.get('/settings/public', async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'public, max-age=300');
     let settings = await SystemSettings.findOne({ key: 'company_config' })
       .select('firmName firmAddress firmEmail firmPhone firmGstin bankName bankAccountNo bankIfsc bankBranch bankUpi invoicePrefix quotationPrefix challanPrefix dispatchPrefix defaultTerms defaultGstRate signatureUrl dscSignatoryName dscCertificateName manufacturingLicenseNo gmpCertificateNo licenseValidTill gmpValidTill licenceValidityType stateUtCode licenceSerial qrImageUrl')
       .lean();

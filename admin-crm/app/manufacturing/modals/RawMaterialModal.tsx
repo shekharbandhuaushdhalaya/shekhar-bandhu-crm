@@ -111,7 +111,7 @@ export default function RawMaterialModal({
       } catch (err) {
         // Silently ignore network search errors
       }
-    }, 200);
+    }, 300);
 
     return () => {
       active = false;

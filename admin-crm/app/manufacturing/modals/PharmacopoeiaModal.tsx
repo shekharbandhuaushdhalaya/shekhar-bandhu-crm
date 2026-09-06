@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
 import { api } from '../../../utils/api';
+import { useDebouncedValue } from '../../../utils/useDebouncedValue';
 
 interface Props {
   visible: boolean;
@@ -18,28 +19,46 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
 
   const [monographs, setMonographs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [selectedStandard, setSelectedStandard] = useState('all');
   const [importingId, setImportingId] = useState<string | null>(null);
   const [importingAll, setImportingAll] = useState(false);
 
   useEffect(() => {
-    if (visible) {
-      loadMonographs();
-    }
-  }, [visible, search, selectedStandard]);
+    if (!visible) return;
 
-  const loadMonographs = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getPharmacopoeia(search);
-      setMonographs(data || []);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to load Ayurvedic pharmacopoeia monographs', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+    let active = true;
+    const fetchMonographs = async () => {
+      try {
+        if (monographs.length === 0) {
+          setLoading(true);
+        } else {
+          setIsSearching(true);
+        }
+        const data = await api.getPharmacopoeia(debouncedSearch, selectedStandard, { all: true });
+        if (active) {
+          setMonographs(data || []);
+        }
+      } catch (err: any) {
+        if (active) {
+          showToast(err.message || 'Failed to load Ayurvedic pharmacopoeia monographs', 'error');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+          setIsSearching(false);
+        }
+      }
+    };
+
+    fetchMonographs();
+
+    return () => {
+      active = false;
+    };
+  }, [visible, debouncedSearch, selectedStandard]);
 
   const handleImportSingle = async (monograph: any) => {
     try {
@@ -129,6 +148,9 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                 value={search}
                 onChangeText={setSearch}
               />
+              {isSearching && (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 6 }} />
+              )}
               {search.length > 0 && (
                 <TouchableOpacity onPress={() => setSearch('')}>
                   <Ionicons name="close-circle" size={15} color={colors.text.muted} />

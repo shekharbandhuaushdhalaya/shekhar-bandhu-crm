@@ -3,18 +3,62 @@ const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
 const { PHARMACOPOEIA_SEED_DATA } = require('../../utils/pharmacopoeiaSeedData');
 const router = express.Router();
 
-// Helper to sync/upsert seed defaults into MongoDB
-async function syncPharmacopoeiaSeedData() {
+// Helper to escape special characters in regex patterns
+function escapeRegex(str) {
+  if (!str) return '';
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+let isSeedSynced = false;
+
+// Helper to ensure seed data is present in MongoDB
+async function ensureSeedSynced() {
   try {
-    const ops = PHARMACOPOEIA_SEED_DATA.map(item => ({
-      updateOne: {
-        filter: { ayurvedicName: item.ayurvedicName },
-        update: { $set: item },
-        upsert: true
+    const count = await PharmacopoeiaEntry.countDocuments();
+    if (count === 0) {
+      const ops = PHARMACOPOEIA_SEED_DATA.map(item => ({
+        updateOne: {
+          filter: { ayurvedicName: item.ayurvedicName },
+          update: { $set: item },
+          upsert: true
+        }
+      }));
+      if (ops.length > 0) {
+        await PharmacopoeiaEntry.bulkWrite(ops);
       }
-    }));
-    if (ops.length > 0) {
-      await PharmacopoeiaEntry.bulkWrite(ops);
+      isSeedSynced = true;
+      return;
+    }
+
+    if (!isSeedSynced) {
+      if (count < PHARMACOPOEIA_SEED_DATA.length) {
+        const ops = PHARMACOPOEIA_SEED_DATA.map(item => ({
+          updateOne: {
+            filter: { ayurvedicName: item.ayurvedicName },
+            update: { $set: item },
+            upsert: true
+          }
+        }));
+        if (ops.length > 0) {
+          await PharmacopoeiaEntry.bulkWrite(ops);
+        }
+      } else {
+        const existingNames = new Set(
+          (await PharmacopoeiaEntry.find({}, 'ayurvedicName').lean()).map(e => e.ayurvedicName)
+        );
+        const missingSeeds = PHARMACOPOEIA_SEED_DATA.filter(item => !existingNames.has(item.ayurvedicName));
+        if (missingSeeds.length > 0) {
+          const ops = missingSeeds.map(item => ({
+            updateOne: {
+              filter: { ayurvedicName: item.ayurvedicName },
+              update: { $set: item },
+              upsert: true
+            }
+          }));
+          await PharmacopoeiaEntry.bulkWrite(ops);
+        }
+      }
+      isSeedSynced = true;
     }
   } catch (err) {
     console.error('Error syncing pharmacopoeia seed data:', err.message);
@@ -24,25 +68,34 @@ async function syncPharmacopoeiaSeedData() {
 // GET /api/pharmacopoeia — List / Search pharmacopoeia monographs
 router.get('/', async (req, res) => {
   try {
-    await syncPharmacopoeiaSeedData();
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    await ensureSeedSynced();
 
-    const { search, q, standard } = req.query;
+    const { search, q, standard, page, limit, all } = req.query;
     const queryTerm = (search || q || '').trim();
 
     const filter = {};
     if (queryTerm) {
+      const escaped = escapeRegex(queryTerm);
       filter.$or = [
-        { ayurvedicName: { $regex: queryTerm, $options: 'i' } },
-        { botanicalName: { $regex: queryTerm, $options: 'i' } },
-        { synonyms: { $regex: queryTerm, $options: 'i' } },
-        { family: { $regex: queryTerm, $options: 'i' } }
+        { ayurvedicName: { $regex: escaped, $options: 'i' } },
+        { botanicalName: { $regex: escaped, $options: 'i' } },
+        { synonyms: { $regex: escaped, $options: 'i' } },
+        { family: { $regex: escaped, $options: 'i' } }
       ];
     }
     if (standard && standard !== 'all') {
       filter.pharmacopoeialStandard = standard;
     }
 
-    const entries = await PharmacopoeiaEntry.find(filter).sort({ ayurvedicName: 1 }).lean();
+    let query = PharmacopoeiaEntry.find(filter).sort({ ayurvedicName: 1 });
+    if (all !== 'true' && limit !== 'all') {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, parseInt(limit, 10) || 50);
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const entries = await query.lean();
     res.json(entries);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -52,15 +105,16 @@ router.get('/', async (req, res) => {
 // GET /api/pharmacopoeia/search — Instant search by herb name or alias
 router.get('/search', async (req, res) => {
   try {
-    await syncPharmacopoeiaSeedData();
+    await ensureSeedSynced();
     const queryTerm = (req.query.q || req.query.query || '').trim();
     if (!queryTerm) return res.status(400).json({ error: 'Search query parameter q is required' });
 
+    const escaped = escapeRegex(queryTerm);
     let entries = await PharmacopoeiaEntry.find({
       $or: [
-        { ayurvedicName: { $regex: queryTerm, $options: 'i' } },
-        { botanicalName: { $regex: queryTerm, $options: 'i' } },
-        { synonyms: { $regex: queryTerm, $options: 'i' } }
+        { ayurvedicName: { $regex: escaped, $options: 'i' } },
+        { botanicalName: { $regex: escaped, $options: 'i' } },
+        { synonyms: { $regex: escaped, $options: 'i' } }
       ]
     }).limit(10).lean();
 
@@ -69,22 +123,33 @@ router.get('/search', async (req, res) => {
       const { resolveHerbDetails } = require('../../utils/botanicalLookup');
       const resolved = await resolveHerbDetails(queryTerm);
       if (resolved && (resolved.scientificName || resolved.matchedName)) {
-        const newEntry = await PharmacopoeiaEntry.findOneAndUpdate(
-          { ayurvedicName: resolved.matchedName },
-          {
-            ayurvedicName: resolved.matchedName,
-            botanicalName: resolved.scientificName || resolved.botanicalName || queryTerm.toUpperCase(),
-            family: resolved.family || '',
-            partUsed: resolved.partUsed || 'Whole Plant / Material',
-            pharmacopoeialStandard: resolved.pharmacopoeialStandard || 'API',
-            monographRef: resolved.monographRef || `API / Botanical Standard (${resolved.source || 'Taxonomy Registry'})`,
-            synonyms: resolved.synonyms || [],
-            description: resolved.description || `Medicinal plant entry dynamically resolved for ${queryTerm}.`
-          },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        ).lean();
-        if (newEntry) {
-          entries = [newEntry];
+        const searchRegex = new RegExp(`^${escapeRegex(resolved.matchedName)}$`, 'i');
+        let existing = await PharmacopoeiaEntry.findOne({
+          $or: [
+            { ayurvedicName: searchRegex },
+            { botanicalName: { $regex: new RegExp(`^${escapeRegex(resolved.scientificName || resolved.botanicalName)}$`, 'i') } }
+          ]
+        }).lean();
+
+        if (existing) {
+          entries = [existing];
+        } else {
+          try {
+            const newDoc = await PharmacopoeiaEntry.create({
+              ayurvedicName: resolved.matchedName.toUpperCase(),
+              botanicalName: resolved.scientificName || resolved.botanicalName || queryTerm.toUpperCase(),
+              family: resolved.family || '',
+              partUsed: resolved.partUsed || 'Whole Plant / Material',
+              pharmacopoeialStandard: resolved.pharmacopoeialStandard || 'API',
+              monographRef: resolved.monographRef || `API / Botanical Standard (${resolved.source || 'Taxonomy Registry'})`,
+              synonyms: resolved.synonyms || [],
+              description: resolved.description || `Medicinal plant entry dynamically resolved for ${queryTerm}.`
+            });
+            entries = [newDoc.toObject ? newDoc.toObject() : newDoc];
+          } catch (createErr) {
+            existing = await PharmacopoeiaEntry.findOne({ ayurvedicName: searchRegex }).lean();
+            if (existing) entries = [existing];
+          }
         }
       }
     }
@@ -119,7 +184,7 @@ router.post('/import-to-raw-materials', async (req, res) => {
       if (!entry) return res.status(404).json({ error: 'Monograph entry not found' });
       itemsToImport.push(entry);
     } else if (importAll) {
-      await syncPharmacopoeiaSeedData();
+      await ensureSeedSynced();
       itemsToImport = await PharmacopoeiaEntry.find({}).lean();
     } else {
       return res.status(400).json({ error: 'Specify monographId or importAll: true' });

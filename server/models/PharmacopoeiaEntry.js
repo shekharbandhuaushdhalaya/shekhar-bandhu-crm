@@ -27,4 +27,13 @@ pharmacopoeiaEntrySchema.index({
   synonyms: 'text'
 });
 
+pharmacopoeiaEntrySchema.index(
+  { ayurvedicName: 1 },
+  {
+    name: 'ayurvedicName_unique_ci',
+    unique: true,
+    collation: { locale: 'en', strength: 2 }
+  }
+);
+
 module.exports = mongoose.model('PharmacopoeiaEntry', pharmacopoeiaEntrySchema);

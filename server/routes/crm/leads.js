@@ -7,7 +7,7 @@ const router = express.Router();
 // GET /api/leads — List lead opportunities
 router.get('/', authorize('contact:view'), async (req, res) => {
   try {
-    const { stage, search } = req.query;
+    const { stage, search, page, limit } = req.query;
     const filter = {};
     if (stage && stage !== 'all') filter.stage = stage;
     if (search) {
@@ -16,7 +16,31 @@ router.get('/', authorize('contact:view'), async (req, res) => {
         { customerName: { $regex: search, $options: 'i' } }
       ];
     }
-    const leads = await Lead.find(filter).sort({ updatedAt: -1 }).lean();
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = Lead.find(filter)
+      .select('title customerName dealValue stage winProbability expectedCloseDate notes lostReason createdAt updatedAt')
+      .sort({ updatedAt: -1 });
+
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const leads = await query.lean();
+
+    if (isPaginated) {
+      const total = await Lead.countDocuments(filter);
+      return res.json({
+        data: leads,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
     res.json(leads);
   } catch (err) {
     res.status(500).json({ error: err.message });

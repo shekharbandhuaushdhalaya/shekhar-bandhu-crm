@@ -8,6 +8,8 @@ import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
 import { CustomDatePicker } from '../../components/CustomDatePicker';
+import { useDebouncedValue } from '../../utils/useDebouncedValue';
+import { DataTable, Column } from '../../components/DataTable';
 
 const toTitleCase = (str?: string) => {
   if (!str) return '';
@@ -1654,6 +1656,7 @@ const getOverdueText = (item: Invoice, vendors: Vendor[], colors: any) => {
 export default function PurchaseInvoicesScreen() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedInv, setSelectedInv] = useState<Invoice | null>(null);
   const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
@@ -1678,7 +1681,7 @@ export default function PurchaseInvoicesScreen() {
 
   const load = useCallback(async () => {
     const [res, vends, rms] = await Promise.all([
-      api.getPurchaseInvoices(search, modeFilter, page, limit),
+      api.getPurchaseInvoices(debouncedSearch, modeFilter, page, limit),
       api.getVendors(),
       api.getRawMaterials().catch(() => [])
     ]);
@@ -1701,7 +1704,9 @@ export default function PurchaseInvoicesScreen() {
       setVendors(vends);
       setRawMaterials(rms);
     }
-  }, [search, modeFilter, page]);
+  }, [debouncedSearch, modeFilter, page]);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, modeFilter]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useEffect(() => {
@@ -1742,37 +1747,124 @@ export default function PurchaseInvoicesScreen() {
               onPress={() => setShowFilterDropdown(false)}
             />
           )}
+          
+  const columns: Column<Invoice>[] = [
+    {
+      key: 'invoiceNo',
+      title: 'Invoice No',
+      width: 160,
+      render: (item) => (
+        <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.invoiceNo}</Text>
+      )
+    },
+    {
+      key: 'supplierName',
+      title: 'Supplier Name',
+      flex: 2,
+      width: 200,
+      render: (item) => (
+        <Text style={styles.tableCell} numberOfLines={1}>{item.supplierName || 'N/A'}</Text>
+      )
+    },
+    {
+      key: 'date',
+      title: 'Date',
+      width: 120,
+      render: (item) => (
+        <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
+      )
+    },
+    {
+      key: 'amount',
+      title: 'Amount',
+      width: 120,
+      render: (item) => (
+        <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+      )
+    },
+    {
+      key: 'status',
+      title: 'Doc Status',
+      width: 120,
+      render: (item) => (
+        <View style={[styles.statusBadge, {
+          borderColor: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning),
+          backgroundColor: (item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)) + '12'
+        }]}>
+          <Text style={[styles.statusText, {
+            color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
+          }]}>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'overdue',
+      title: 'Overdue Status',
+      width: 130,
+      render: (item) => {
+        const overdueInfo = getOverdueText(item, vendors, colors);
+        return (
+          <Text style={{ fontSize: 13, fontWeight: '600', color: overdueInfo.color }}>
+            {overdueInfo.text}
+          </Text>
+        );
+      }
+    },
+    {
+      key: 'action',
+      title: 'Action',
+      width: 100,
+      align: 'center',
+      render: (item) => (
+        <TouchableOpacity 
+          style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 }} 
+          onPress={() => { setSelectedInv(item); setDetailVisible(true); }}
+        >
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>View</Text>
+        </TouchableOpacity>
+      )
+    }
+  ];
+
+  return (
+    <View style={styles.screen}>
+      <View style={styles.innerContainer}>
+        <View style={{ zIndex: 1100, position: 'relative' }}>
           <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
             <Ionicons name="search" size={18} color={colors.text.muted} />
             <TextInput
               style={[styles.searchInput, { minWidth: 100 }]}
-              placeholder="Search supplier bills..."
+              placeholder="Search purchase bills..."
               placeholderTextColor={colors.text.muted}
               value={search}
               onChangeText={setSearch}
             />
 
             {canAccessCash && (
-              <View style={{ position: 'relative', marginRight: 8, zIndex: 1200 }}>
+              <View style={{ position: 'relative', zIndex: 2000 }}>
                 <TouchableOpacity
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
                     paddingHorizontal: 12,
-                    paddingVertical: 7,
+                    paddingVertical: 8,
                     borderRadius: Radius.sm,
+                    backgroundColor: colors.bg.secondary,
                     borderWidth: 1,
-                    borderColor: colors.border,
-                    backgroundColor: colors.bg.card
+                    borderColor: colors.border
                   }}
                   onPress={() => setShowFilterDropdown(!showFilterDropdown)}
                 >
-                  <Ionicons name="funnel-outline" size={14} color={colors.primary} />
+                  <Ionicons 
+                    name={modeFilter === 'all' ? 'globe-outline' : modeFilter === 'regular' ? 'document-text-outline' : 'cash-outline'} 
+                    size={16} 
+                    color={modeFilter === 'cash' ? colors.warning : colors.primary} 
+                  />
                   <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>
-                    {modeFilter === 'all' ? 'All Bills' : modeFilter === 'regular' ? 'GST Invoices' : 'Non-GST / Cash'}
+                    {modeFilter === 'all' ? 'All Bills' : modeFilter === 'regular' ? 'GST Invoices' : 'Cash / Non-GST'}
                   </Text>
-                  <Ionicons name={showFilterDropdown ? "chevron-up" : "chevron-down"} size={14} color={colors.text.muted} />
+                  <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
                 </TouchableOpacity>
 
                 {showFilterDropdown && (
@@ -1828,87 +1920,26 @@ export default function PurchaseInvoicesScreen() {
           </View>
         </View>
 
-      <ScrollView 
-        style={{ flex: 1 }}
-        scrollEventThrottle={400}
-        onScroll={({ nativeEvent }) => {
-          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
-          if (isCloseToBottom && page < totalPages) {
-            setPage(p => p + 1);
-          }
-        }}
-      >
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
-          <View style={[styles.table, { width: '100%', minWidth: 950 }]}>
-            {/* Table Header Row */}
-            <View style={styles.tableHeaderRow}>
-              <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Invoice No</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}><Text style={styles.tableHeaderCell}>Supplier Name</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Date</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Amount</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Doc Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 130 }]}><Text style={styles.tableHeaderCell}>Overdue Status</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
-            </View>
-
-            {/* Table Body Rows */}
-            {invoices.map((item) => {
-              const overdueInfo = getOverdueText(item, vendors, colors);
-              return (
-              <TouchableOpacity key={item._id} style={styles.tableBodyRow} onPress={() => { setSelectedInv(item); setDetailVisible(true); }}>
-                <View style={[styles.tableCellContainer, { width: 160 }]}>
-                  <Text style={[styles.tableCell, { fontWeight: '700' }]} numberOfLines={1}>{item.invoiceNo}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
-                  <Text style={styles.tableCell} numberOfLines={1}>{item.supplierName || 'N/A'}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 120 }]}>
-                  <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 110 }]}>
-                  <Text style={[styles.tableCell, { fontWeight: '800' }]}>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 120 }]}>
-                  <View style={[styles.statusBadge, {
-                    borderColor: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning),
-                    backgroundColor: (item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)) + '12'
-                  }]}>
-                    <Text style={[styles.statusText, {
-                      color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
-                    }]}>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</Text>
-                  </View>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 130 }]}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: overdueInfo.color }}>
-                    {overdueInfo.text}
-                  </Text>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 100, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
-                  <TouchableOpacity 
-                    style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 }} 
-                    onPress={() => { setSelectedInv(item); setDetailVisible(true); }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>View</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            )})}
-
-            {invoices.length === 0 && (
+        <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          <DataTable
+            data={invoices}
+            columns={columns}
+            keyExtractor={item => item._id}
+            isRefreshing={refreshing}
+            onRefresh={onRefresh}
+            onLoadMore={() => {
+              if (page < totalPages) setPage(p => p + 1);
+            }}
+            isLoadingMore={page < totalPages}
+            onRowPress={(item) => { setSelectedInv(item); setDetailVisible(true); }}
+            ListEmptyComponent={
               <View style={styles.emptyTableContainer}>
                 <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
                 <Text style={styles.emptyText}>No invoices found</Text>
               </View>
-            )}
-          </View>
-        </ScrollView>
-        {page < totalPages && (
-          <View style={{ padding: 20, alignItems: 'center' }}>
-            <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
-          </View>
-        )}
-      </ScrollView>
+            }
+          />
+        </View>
       </View>
 
       <InvoiceDetailModal

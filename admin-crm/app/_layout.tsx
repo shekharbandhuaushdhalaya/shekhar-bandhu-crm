@@ -26,34 +26,41 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
   const router = useRouter();
   const pathname = usePathname();
 
+  const ROUTE_TITLE_MAP: [string, string][] = [
+    ['/parties/customers', 'Customers'],
+    ['/parties/vendors', 'Vendors'],
+    ['/invoices/sale', 'Sale Invoices'],
+    ['/invoices/purchase', 'Purchase Invoices'],
+    ['/products', 'Products'],
+    ['/inventories', 'Inventories'],
+    ['/leads', 'Leads'],
+    ['/queries', 'Web Queries'],
+    ['/orders', 'Orders'],
+    ['/quotations', 'Quotations'],
+    ['/payments', 'Payments'],
+    ['/ageing', 'Receivable Ageing'],
+    ['/reports', 'Reports'],
+    ['/rbac', 'Access Control'],
+    ['/audit', 'System Audit Logs'],
+    ['/pricing', 'Pricing & Discounts'],
+    ['/manufacturing', 'Manufacturing / BMR'],
+    ['/salescrm', 'Sales & CRM'],
+    ['/inventorydispatch', 'Inventory & Dispatch'],
+    ['/stockmovements', 'Delivery Challans'],
+    ['/profile', 'My Details'],
+    ['/campaigns', 'Campaigns'],
+    ['/ai-analytics', 'AI Business Assistant'],
+    ['/credit-notes', 'Credit / Debit Notes'],
+    ['/gst-returns', 'GST Returns'],
+    ['/medicalreps', 'Medical Representatives'],
+  ];
+
   const getPageName = (path: string) => {
-    if (path === '/') return 'Dashboard';
-    if (path.startsWith('/parties/customers')) return 'Customers';
-    if (path.startsWith('/parties/vendors')) return 'Vendors';
-    if (path.startsWith('/products')) return 'Products';
-    if (path.startsWith('/inventories')) return 'Inventories';
-    if (path.startsWith('/leads')) return 'Leads';
-    if (path.startsWith('/queries')) return 'Web Queries';
-    if (path.startsWith('/orders')) return 'Orders';
-    if (path.startsWith('/quotations')) return 'Quotations';
-    if (path.startsWith('/invoices/sale')) return 'Sale Invoices';
-    if (path.startsWith('/invoices/purchase')) return 'Purchase Invoices';
-    if (path.startsWith('/payments')) return 'Payments';
-    if (path.startsWith('/ageing')) return 'Receivable Ageing';
-    if (path.startsWith('/reports')) return 'Reports';
-    if (path.startsWith('/rbac')) return 'Access Control';
-    if (path.startsWith('/audit')) return 'System Audit Logs';
-    if (path.startsWith('/pricing')) return 'Pricing & Discounts';
-    if (path.startsWith('/manufacturing')) return 'Manufacturing / BMR';
-    if (path.startsWith('/salescrm')) return 'Sales & CRM';
-    if (path.startsWith('/inventorydispatch')) return 'Inventory & Dispatch';
-    if (path.startsWith('/stockmovements')) return 'Delivery Challans';
-    if (path.startsWith('/profile')) return 'My Details';
-    if (path.startsWith('/campaigns')) return 'Campaigns';
-    if (path.startsWith('/ai-analytics')) return 'AI Business Assistant';
-    if (path.startsWith('/credit-notes')) return 'Credit / Debit Notes';
-    if (path.startsWith('/gst-returns')) return 'GST Returns';
-    if (path.startsWith('/medicalreps')) return 'Medical Representatives';
+    if (path === '/' || path === '') return 'Dashboard';
+    for (let i = 0; i < ROUTE_TITLE_MAP.length; i++) {
+      const [prefix, title] = ROUTE_TITLE_MAP[i];
+      if (path.startsWith(prefix)) return title;
+    }
     return '';
   };
 

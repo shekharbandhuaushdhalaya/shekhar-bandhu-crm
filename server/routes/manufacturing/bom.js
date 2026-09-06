@@ -9,10 +9,32 @@ const router = express.Router();
 // GET /api/bom — List all BOM formulations
 router.get('/', authorize('manufacturing:view'), async (req, res) => {
   try {
-    const boms = await BillOfMaterials.find({})
+    const { page, limit } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit) || 50;
+    const isPaginated = !isNaN(pageNum) && pageNum > 0;
+
+    let query = BillOfMaterials.find({})
       .populate('productId', 'name sku size')
-      .populate('ingredients.rawMaterialId', 'name sku unit')
-      .lean();
+      .populate('ingredients.rawMaterialId', 'name sku unit');
+
+    if (isPaginated) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const boms = await query.lean();
+
+    if (isPaginated) {
+      const total = await BillOfMaterials.countDocuments({});
+      return res.json({
+        data: boms,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
     res.json(boms);
   } catch (err) {
     res.status(500).json({ error: err.message });

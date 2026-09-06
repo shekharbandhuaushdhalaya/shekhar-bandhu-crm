@@ -9,6 +9,7 @@ import { Spacing, Radius, LightColors } from '../constants/theme';
 import { api, CreditNote, Customer, Vendor } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { FIRM_DETAILS } from '../constants/firm';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 // ── Print CGST Rule 53 Compliant Credit / Debit Note ──────────────────────────
 const printCreditNote = (note: CreditNote) => {
@@ -141,6 +142,7 @@ export default function CreditNotesPage() {
   const [notes, setNotes] = useState<CreditNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [filterType, setFilterType] = useState('all');
   const [showModal, setShowModal] = useState(false);
 
@@ -148,7 +150,7 @@ export default function CreditNotesPage() {
     try {
       setLoading(true);
       api.clearCache();
-      const res = await api.getCreditNotes(search, filterType);
+      const res = await api.getCreditNotes(debouncedSearch, filterType);
       setNotes(res || []);
     } catch (err) {
       console.error('Error fetching credit notes:', err);
@@ -156,7 +158,7 @@ export default function CreditNotesPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterType]);
+  }, [debouncedSearch, filterType]);
 
   useEffect(() => {
     fetchNotes();

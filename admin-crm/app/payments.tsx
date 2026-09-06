@@ -6,6 +6,8 @@ import { api, Payment, Customer, Vendor } from '../utils/api';
 import { shortenPartyName } from '../utils/string';
 import { useAuth } from '../utils/auth';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { DataTable, Column } from '../components/DataTable';
 
 export const GATEWAY_CLEARING_ACCOUNTS = [
   { _id: 'clearing_razorpay', name: 'Razorpay Online Gateway Clearing Account', code: 'RAZORPAY', type: 'online_gateway' },
@@ -557,8 +559,6 @@ export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boo
       </KeyboardAvoidingView>
     </Modal>
   );
-}
-
 export default function PaymentsScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
@@ -568,6 +568,7 @@ export default function PaymentsScreen() {
   
   const [payments, setPayments] = useState<Payment[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
   const [addType, setAddType] = useState<'receive' | 'make'>('receive');
@@ -582,8 +583,8 @@ export default function PaymentsScreen() {
     try {
       const res = await api.getPayments(undefined, undefined, undefined, filterType);
       const filtered = res.filter(p => 
-        p.partyName.toLowerCase().includes(search.toLowerCase()) || 
-        (p.referenceNo && p.referenceNo.toLowerCase().includes(search.toLowerCase()))
+        p.partyName.toLowerCase().includes(debouncedSearch.toLowerCase()) || 
+        (p.referenceNo && p.referenceNo.toLowerCase().includes(debouncedSearch.toLowerCase()))
       );
       setPayments(filtered);
     } catch (err) {
@@ -595,7 +596,7 @@ export default function PaymentsScreen() {
     load();
     const sub = DeviceEventEmitter.addListener('payment_updated_event', () => load());
     return () => sub.remove();
-  }, [search, filterType]);
+  }, [debouncedSearch, filterType]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -685,15 +686,15 @@ export default function PaymentsScreen() {
             <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
               <TouchableOpacity
                 style={{
-                  height: 36,
-                  paddingHorizontal: 12,
-                  borderRadius: Radius.md,
-                  backgroundColor: colors.primary + '18',
+                  height: 34,
+                  paddingHorizontal: 10,
+                  borderRadius: Radius.sm,
+                  backgroundColor: colors.primary + '15',
+                  borderColor: colors.primary + '30',
                   borderWidth: 1,
-                  borderColor: colors.primary,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  gap: 6
+                  gap: 4
                 }}
                 onPress={() => setSettleVisible(true)}
               >
@@ -733,67 +734,23 @@ export default function PaymentsScreen() {
           );
         })()}
 
-        {/* Table */}
-        <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.lg }}>
-            <View style={[styles.tableCard, { minWidth: 950, width: '100%' }]}>
-              <View style={styles.tableHeader}>
-                <View style={[styles.tableHeaderCellContainer, { flex: 0.9, minWidth: 95 }]}><Text style={styles.th}>DATE</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 2.2, minWidth: 220 }]}><Text style={styles.th}>PARTY</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 1.3, minWidth: 140 }]}><Text style={styles.th}>METHOD/REF</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 1.1, minWidth: 110 }]}><Text style={[styles.th, { textAlign: 'right' }]}>AMOUNT</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { flex: 1.2, minWidth: 130, borderRightWidth: 0 }]}><Text style={[styles.th, { textAlign: 'center' }]}>ACTIONS</Text></View>
+        {/* DataTable */}
+        <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          <DataTable
+            data={sortedPayments}
+            columns={columns}
+            keyExtractor={item => item._id}
+            isRefreshing={refreshing}
+            onRefresh={onRefresh}
+            onRowPress={(p) => { setSelectedPayment(p); setDetailVisible(true); }}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="wallet-outline" size={32} color={colors.text.muted} />
+                <Text style={styles.emptyText}>No payments recorded.</Text>
               </View>
-              
-              {[...payments].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => (
-                <TouchableOpacity key={p._id} style={styles.tableRow} onPress={() => { setSelectedPayment(p); setDetailVisible(true); }}>
-                  <View style={[styles.tableCellContainer, { flex: 0.9, minWidth: 95 }]}>
-                    <Text style={[styles.td, { color: colors.text.secondary }]}>{new Date(p.date).toLocaleDateString('en-IN')}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { flex: 2.2, minWidth: 220 }]}>
-                    <Text style={[styles.td, { fontWeight: '600' }]} numberOfLines={1}>{shortenPartyName(p.partyName, winWidth < 768)}</Text>
-                    <Text style={[styles.td, { fontSize: 11, color: colors.text.muted, marginTop: 2 }]}>{p.partyType}</Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { flex: 1.3, minWidth: 140 }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <Text style={styles.td}>{p.paymentMethod}</Text>
-                      {canAccessCash && (
-                        <View style={[styles.badge, { backgroundColor: p.mode === 'cash' ? '#FFF3E0' : colors.primaryLight }]}>
-                          <Text style={[styles.badgeText, { color: p.mode === 'cash' ? '#F57C00' : colors.primary }]}>
-                            {p.mode === 'cash' ? 'Cash' : 'Regular'}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    {!!p.referenceNo && <Text style={[styles.td, { fontSize: 11, color: colors.text.muted, marginTop: 2 }]}>{p.referenceNo}</Text>}
-                  </View>
-                  <View style={[styles.tableCellContainer, { flex: 1.1, minWidth: 110 }]}>
-                    <Text style={[styles.td, { textAlign: 'right', fontWeight: '800', color: p.type === 'receive' ? colors.success : colors.danger }]}>
-                      {p.type === 'receive' ? '+ ' : '- '}₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCellContainer, { flex: 1.2, minWidth: 130, borderRightWidth: 0, flexDirection: 'row', gap: 6, justifyContent: 'center' }]}>
-                    <TouchableOpacity style={styles.actionPillBtn} onPress={() => { setSelectedPayment(p); setDetailVisible(true); }}>
-                      <Ionicons name="eye-outline" size={12} color={colors.primary} />
-                      <Text style={[styles.actionPillText, { color: colors.primary }]}>View</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionPillBtn, { backgroundColor: colors.danger + '12', borderColor: colors.danger + '40' }]} onPress={(e) => { e.stopPropagation(); handleDelete(p._id); }}>
-                      <Ionicons name="trash-outline" size={12} color={colors.danger} />
-                      <Text style={[styles.actionPillText, { color: colors.danger }]}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))}
-
-              {payments.length === 0 && (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="wallet-outline" size={32} color={colors.text.muted} />
-                  <Text style={styles.emptyText}>No payments recorded.</Text>
-                </View>
-              )}
-            </View>
-          </ScrollView>
-        </ScrollView>
+            }
+          />
+        </View>
       </View>
       <AddPaymentModal visible={addVisible} onClose={() => setAddVisible(false)} onSaved={load} initialType={addType} />
       <SettleGatewayModal visible={settleVisible} onClose={() => setSettleVisible(false)} onSaved={load} />

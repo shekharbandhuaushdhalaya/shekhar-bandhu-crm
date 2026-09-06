@@ -6,10 +6,12 @@ import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
 import { api, Order } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'processing' | 'shipped' | 'delivered'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -174,8 +176,8 @@ export default function OrdersScreen() {
   const filteredOrders = orders.filter(o => {
     const matchesTab = activeTab === 'all' || o.status === activeTab;
     if (!matchesTab) return false;
-    if (!search) return true;
-    const lower = search.toLowerCase();
+    if (!debouncedSearch) return true;
+    const lower = debouncedSearch.toLowerCase();
     return (
       o.name.toLowerCase().includes(lower) ||
       o.email.toLowerCase().includes(lower) ||
