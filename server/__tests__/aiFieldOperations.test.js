@@ -3,13 +3,11 @@ const express = require('express');
 const medicalRepsRouter = require('../routes/crm/medicalReps');
 const MedicalRepresentative = require('../models/MedicalRepresentative');
 const MrVisit = require('../models/MrVisit');
-const Contact = require('../models/Contact');
-const Customer = require('../models/Customer');
+const Doctor = require('../models/Doctor');
 
 jest.mock('../models/MedicalRepresentative');
 jest.mock('../models/MrVisit');
-jest.mock('../models/Contact');
-jest.mock('../models/Customer');
+jest.mock('../models/Doctor');
 jest.mock('../models/MrDailyLog', () => ({
   findOne: jest.fn(),
   create: jest.fn(),
@@ -36,14 +34,11 @@ describe('Module 1: AI & Intelligent Field Operations', () => {
 
   describe('POST /api/medical-reps/:mrId/optimize-route', () => {
     test('clusters assigned doctors by priority tier & generates optimized itinerary', async () => {
-      Contact.find.mockReturnValue({
+      Doctor.find.mockReturnValue({
         lean: jest.fn().mockResolvedValue([
           { _id: 'c1', name: 'Dr. Sharma', category: 'B', preferredVisitDay: 'Monday', latitude: 25.31, longitude: 82.97 },
           { _id: 'c2', name: 'Dr. Gupta (Key KOL)', category: 'A', preferredVisitDay: 'Monday', latitude: 25.32, longitude: 82.98 }
         ])
-      });
-      Customer.find.mockReturnValue({
-        lean: jest.fn().mockResolvedValue([])
       });
 
       const res = await request(app)

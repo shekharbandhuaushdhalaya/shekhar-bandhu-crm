@@ -35,24 +35,10 @@ const customerSchema = new mongoose.Schema({
   discountPercent: { type: Number, default: 0, min: 0, max: 100 },
   drugLicenseNo: { type: String, default: '', trim: true },
   drugLicenseExpiry: { type: Date, default: null },
-  latitude: { type: Number },
-  longitude: { type: Number },
-  category: { type: String, enum: ['A', 'B', 'C', ''], default: '' },
-  specialty: { type: String, default: '', trim: true },
-  birthday: { type: Date, default: null },
-  anniversary: { type: Date, default: null },
-  preferredTime: { type: String, default: '', trim: true },
-  assignedMrId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative', default: null },
   areaName: { type: String, default: '', trim: true },
-  preferredVisitDay: {
-    type: String,
-    enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', ''],
-    default: ''
-  },
   creditLimit: { type: Number, default: 0 },  // 0 = unlimited
   tags: [{ type: String, trim: true }],
   volumeTier: { type: String, enum: ['tier_1', 'tier_2', 'tier_3', 'none'], default: 'none' },
-  monthlySampleQuota: { type: Number, default: null }, // Monthly max sample units allowed (falls back to category default if null)
 }, { timestamps: true });
 
 customerSchema.index({ name: 'text', company: 'text', email: 'text' });

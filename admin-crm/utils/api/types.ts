@@ -999,6 +999,7 @@ export type MrVisit = {
   mrId: string | { _id: string; name: string; code?: string; phone?: string };
   dailyLogId?: string;
   date: string;
+  doctorId?: string;
   doctorName: string;
   clinicName?: string;
   specialization?: string;
@@ -1016,6 +1017,34 @@ export type MrVisit = {
   doctorVerified: boolean;
   status: string;
   notes?: string;
+};
+
+export type Doctor = {
+  _id: string;
+  name: string;
+  clinicName?: string;
+  specialization?: string;
+  specialty?: string;
+  category?: 'A' | 'B' | 'C' | '';
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
+  birthday?: string | Date;
+  anniversary?: string | Date;
+  preferredTime?: string;
+  preferredVisitDay?: string;
+  monthlySampleQuota?: number | null;
+  assignedMrId?: any;
+  areaName?: string;
+  linkedContactId?: string;
+  linkedCustomerId?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type MrExpense = {

@@ -9,7 +9,7 @@ import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
-import { api, MedicalRepresentative, MrDailyLog, MrVisit, MrExpense, MrDashboardSummary, Product } from '../utils/api';
+import { api, MedicalRepresentative, MrDailyLog, MrVisit, Doctor, MrExpense, MrDashboardSummary, Product } from '../utils/api';
 import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
 
 type Tab = 'dashboard' | 'mrs' | 'attendance' | 'visits' | 'expenses';
@@ -57,6 +57,7 @@ export default function MedicalRepsScreen() {
   const [visits, setVisits] = useState<MrVisit[]>([]);
   const [visitModal, setVisitModal] = useState(false);
   const [visitForm, setVisitForm] = useState<{
+    doctorId?: string;
     doctorName: string;
     clinicName: string;
     specialization: string;
@@ -70,6 +71,7 @@ export default function MedicalRepsScreen() {
     latitude?: number;
     longitude?: number;
   }>({
+    doctorId: undefined,
     doctorName: '',
     clinicName: '',
     specialization: '',
@@ -83,6 +85,8 @@ export default function MedicalRepsScreen() {
     latitude: undefined,
     longitude: undefined,
   });
+  const [doctorSuggestions, setDoctorSuggestions] = useState<Doctor[]>([]);
+  const [showDoctorSuggestions, setShowDoctorSuggestions] = useState(false);
   const [sampleProdId, setSampleProdId] = useState('');
   const [sampleQty, setSampleQty] = useState<string>('1');
 
@@ -374,6 +378,37 @@ export default function MedicalRepsScreen() {
     }
   };
 
+  const handleDoctorNameChange = async (text: string) => {
+    setVisitForm(prev => ({ ...prev, doctorName: text, doctorId: undefined }));
+    if (text.trim().length >= 2) {
+      try {
+        const res = await api.getDoctors(text, undefined, undefined, 1, 5);
+        const docs = res.doctors || [];
+        setDoctorSuggestions(docs);
+        setShowDoctorSuggestions(docs.length > 0);
+      } catch {
+        setDoctorSuggestions([]);
+        setShowDoctorSuggestions(false);
+      }
+    } else {
+      setDoctorSuggestions([]);
+      setShowDoctorSuggestions(false);
+    }
+  };
+
+  const handleSelectDoctorSuggestion = (doc: Doctor) => {
+    setVisitForm(prev => ({
+      ...prev,
+      doctorId: doc._id,
+      doctorName: doc.name,
+      clinicName: doc.clinicName || prev.clinicName,
+      specialization: doc.specialization || prev.specialization,
+      city: doc.city || prev.city,
+    }));
+    setShowDoctorSuggestions(false);
+    setDoctorSuggestions([]);
+  };
+
   const handleSaveVisit = async () => {
     if (!visitForm.doctorName.trim()) {
       showToast('Doctor name is required', 'info');
@@ -387,8 +422,10 @@ export default function MedicalRepsScreen() {
       await api.createMrVisit(selectedMrForVisits, visitForm);
       showToast('Doctor visit recorded with verified GPS location', 'success');
       setVisitModal(false);
+      setShowDoctorSuggestions(false);
+      setDoctorSuggestions([]);
       setVisitForm({
-        doctorName: '', clinicName: '', specialization: '', city: '',
+        doctorId: undefined, doctorName: '', clinicName: '', specialization: '', city: '',
         purpose: 'promotion', orderTaken: false, orderAmount: 0, sampleDetails: [],
         feedback: '', notes: '', latitude: undefined, longitude: undefined
       });
@@ -1269,9 +1306,51 @@ export default function MedicalRepsScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.formField}>
+              <View style={[styles.formField, { zIndex: 10 }]}>
                 <Text style={styles.fieldLabelText}>Doctor Name *</Text>
-                <TextInput style={styles.fieldInput} value={visitForm.doctorName} onChangeText={v => setVisitForm({ ...visitForm, doctorName: v })} placeholder="e.g. Dr. A. K. Sharma" placeholderTextColor={colors.text.muted} />
+                <TextInput
+                  style={styles.fieldInput}
+                  value={visitForm.doctorName}
+                  onChangeText={handleDoctorNameChange}
+                  placeholder="e.g. Dr. A. K. Sharma"
+                  placeholderTextColor={colors.text.muted}
+                  onFocus={() => { if (doctorSuggestions.length > 0) setShowDoctorSuggestions(true); }}
+                />
+                {showDoctorSuggestions && doctorSuggestions.length > 0 && (
+                  <View style={{
+                    backgroundColor: colors.bg.card,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: Radius.md,
+                    marginTop: 4,
+                    maxHeight: 180,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    elevation: 4,
+                  }}>
+                    <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                      {doctorSuggestions.map((doc) => (
+                        <TouchableOpacity
+                          key={doc._id}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderBottomWidth: 1,
+                            borderBottomColor: colors.border,
+                          }}
+                          onPress={() => handleSelectDoctorSuggestion(doc)}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{doc.name}</Text>
+                          <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                            {[doc.clinicName, doc.specialization, doc.city].filter(Boolean).join(' • ')}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
               <View style={styles.formField}>
                 <Text style={styles.fieldLabelText}>Clinic / Hospital Name</Text>

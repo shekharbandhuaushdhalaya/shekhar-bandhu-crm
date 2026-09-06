@@ -53,6 +53,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     ['/credit-notes', 'Credit / Debit Notes'],
     ['/gst-returns', 'GST Returns'],
     ['/medicalreps', 'Medical Representatives'],
+    ['/doctors', 'Doctor Directory'],
   ];
 
   const getPageName = (path: string) => {
@@ -372,6 +373,7 @@ function MainLayout() {
             <Tabs.Screen name="pricing" options={{ href: null }} />
             <Tabs.Screen name="manufacturing" options={{ href: null }} />
             <Tabs.Screen name="medicalreps" options={{ href: null }} />
+            <Tabs.Screen name="doctors" options={{ href: null }} />
             <Tabs.Screen name="profile" options={{ href: null }} />
             <Tabs.Screen name="campaigns" options={{ href: null }} />
           </Tabs>

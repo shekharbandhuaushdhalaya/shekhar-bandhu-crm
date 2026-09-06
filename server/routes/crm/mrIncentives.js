@@ -3,8 +3,7 @@ const SalesTarget = require('../../models/SalesTarget');
 const MedicalRepresentative = require('../../models/MedicalRepresentative');
 const Invoice = require('../../models/Invoice');
 const MrVisit = require('../../models/MrVisit');
-const Contact = require('../../models/Contact');
-const Customer = require('../../models/Customer');
+const Doctor = require('../../models/Doctor');
 const { authorize } = require('../../middleware/authorize');
 
 const { calculateCommissionSlabPercent, calculateMrIncentive } = require('../../services/mrIncentiveService');
@@ -61,9 +60,8 @@ router.get('/:mrId/scorecard', authorize('mr:view'), async (req, res) => {
     const startDate = new Date(targetYear, targetMonth - 1, 1);
     const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
 
-    const [assignedContacts, assignedCustomers, visits, salesInvoices] = await Promise.all([
-      Contact.find({ assignedMrId: req.params.mrId }).lean(),
-      Customer.find({ assignedMrId: req.params.mrId }).lean(),
+    const [assignedDoctors, visits, salesInvoices] = await Promise.all([
+      Doctor.find({ assignedMrId: req.params.mrId }).lean(),
       MrVisit.find({ mrId: req.params.mrId, date: { $gte: startDate, $lte: endDate } }).lean(),
       Invoice.find({
         type: 'sale',
@@ -73,8 +71,8 @@ router.get('/:mrId/scorecard', authorize('mr:view'), async (req, res) => {
       }).lean()
     ]);
 
-    const totalAssignedDoctors = assignedContacts.length + assignedCustomers.length;
-    const uniqueVisitedDoctorIds = new Set(visits.map(v => (v.doctorId || v.contactId || v.customerId || '').toString()));
+    const totalAssignedDoctors = assignedDoctors.length;
+    const uniqueVisitedDoctorIds = new Set(visits.map(v => (v.doctorId || '').toString()));
     const doctorCoveragePercent = totalAssignedDoctors > 0
       ? Number(((uniqueVisitedDoctorIds.size / totalAssignedDoctors) * 100).toFixed(1))
       : 100;
@@ -127,14 +125,14 @@ router.get('/leaderboard', authorize('mr:view'), async (req, res) => {
       const startDate = new Date(targetYear, targetMonth - 1, 1);
       const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
 
-      const [assignedContacts, visits, salesInvoices] = await Promise.all([
-        Contact.find({ assignedMrId: mr._id }).lean(),
+      const [assignedDoctors, visits, salesInvoices] = await Promise.all([
+        Doctor.find({ assignedMrId: mr._id }).lean(),
         MrVisit.find({ mrId: mr._id, date: { $gte: startDate, $lte: endDate } }).lean(),
         Invoice.find({ type: 'sale', isFinalized: true, date: { $gte: startDate, $lte: endDate }, $or: [{ mrId: mr._id }, { assignedMrId: mr._id }] }).lean()
       ]);
 
       const sales = salesInvoices.reduce((sum, inv) => sum + (inv.nettTotal || inv.amount || 0), 0);
-      const totalAssigned = Math.max(1, assignedContacts.length);
+      const totalAssigned = Math.max(1, assignedDoctors.length);
       const coverage = Math.min(100, Number(((visits.length / totalAssigned) * 100).toFixed(1)));
       const compositeScore = Number((sales * 0.7 + coverage * 100 + visits.length * 50).toFixed(0));
 

@@ -21,6 +21,7 @@ const traceRoutes = require('./routes/system/trace');
 const queryRoutes = require('./routes/system/queries');
 
 const contactRoutes = require('./routes/crm/contacts');
+const doctorRoutes = require('./routes/crm/doctors');
 const taskRoutes = require('./routes/crm/tasks');
 const medicalRepRoutes = require('./routes/crm/medicalReps');
 
@@ -203,6 +204,7 @@ app.use('/api/auth/mfa', authLimiter, mfaRoutes);
 app.use('/api/system', systemRoutes);
 
 app.use('/api/contacts', authenticateJWT, contactRoutes);
+app.use('/api/doctors', authenticateJWT, doctorRoutes);
 app.use('/api/tasks', authenticateJWT, taskRoutes);
 app.use('/api/dashboard', authenticateJWT, dashboardRoutes);
 app.use('/api/customers', authenticateJWT, customerRoutes);

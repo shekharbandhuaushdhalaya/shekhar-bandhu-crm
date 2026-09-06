@@ -5,6 +5,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const MedicalRepresentative = require('../models/MedicalRepresentative');
 const Contact = require('../models/Contact');
 const Customer = require('../models/Customer');
+const Doctor = require('../models/Doctor');
 const MrDailyLog = require('../models/MrDailyLog');
 const MrVisit = require('../models/MrVisit');
 const medicalRepRoutes = require('../routes/crm/medicalReps');
@@ -39,6 +40,7 @@ describe('MR Doctor Assignment, Day Turns, GPS Footprints & Access Control', () 
     await MedicalRepresentative.deleteMany({});
     await Contact.deleteMany({});
     await Customer.deleteMany({});
+    await Doctor.deleteMany({});
     await MrDailyLog.deleteMany({});
     await MrVisit.deleteMany({});
     currentUser = { id: 'admin1', role: 'admin', email: 'admin@company.com' };
@@ -53,15 +55,15 @@ describe('MR Doctor Assignment, Day Turns, GPS Footprints & Access Control', () 
       territory: 'Lanka Varanasi'
     });
 
-    const doc1 = await Contact.create({
+    const doc1 = await Doctor.create({
       name: 'Dr. Amit Patel',
-      company: 'Patel Clinic',
+      clinicName: 'Patel Clinic',
       phone: '9876543210'
     });
 
-    const doc2 = await Customer.create({
+    const doc2 = await Doctor.create({
       name: 'Dr. Sunita Rao',
-      company: 'Rao Medicos',
+      clinicName: 'Rao Medicos',
       phone: '9123456789'
     });
 
@@ -69,8 +71,7 @@ describe('MR Doctor Assignment, Day Turns, GPS Footprints & Access Control', () 
       .post('/api/medical-reps/assign-doctors')
       .send({
         mrId: mr._id.toString(),
-        contactIds: [doc1._id.toString()],
-        customerIds: [doc2._id.toString()],
+        doctorIds: [doc1._id.toString(), doc2._id.toString()],
         areaName: 'Lanka Market',
         preferredVisitDay: 'Monday'
       });
@@ -78,12 +79,12 @@ describe('MR Doctor Assignment, Day Turns, GPS Footprints & Access Control', () 
     expect(assignRes.status).toBe(200);
     expect(assignRes.body.totalAssigned).toBe(2);
 
-    const updatedDoc1 = await Contact.findById(doc1._id);
+    const updatedDoc1 = await Doctor.findById(doc1._id);
     expect(updatedDoc1.assignedMrId.toString()).toBe(mr._id.toString());
     expect(updatedDoc1.areaName).toBe('Lanka Market');
     expect(updatedDoc1.preferredVisitDay).toBe('Monday');
 
-    const updatedDoc2 = await Customer.findById(doc2._id);
+    const updatedDoc2 = await Doctor.findById(doc2._id);
     expect(updatedDoc2.assignedMrId.toString()).toBe(mr._id.toString());
     expect(updatedDoc2.preferredVisitDay).toBe('Monday');
   });
@@ -96,14 +97,14 @@ describe('MR Doctor Assignment, Day Turns, GPS Footprints & Access Control', () 
       code: 'MR-101'
     });
 
-    await Contact.create({
+    await Doctor.create({
       name: 'Dr. Monday Doctor',
       assignedMrId: mr._id,
       areaName: 'Zone A',
       preferredVisitDay: 'Monday'
     });
 
-    await Contact.create({
+    await Doctor.create({
       name: 'Dr. Tuesday Doctor',
       assignedMrId: mr._id,
       areaName: 'Zone B',

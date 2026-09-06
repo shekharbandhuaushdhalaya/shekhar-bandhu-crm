@@ -5,15 +5,13 @@ const MedicalRepresentative = require('../models/MedicalRepresentative');
 const SalesTarget = require('../models/SalesTarget');
 const Invoice = require('../models/Invoice');
 const MrVisit = require('../models/MrVisit');
-const Contact = require('../models/Contact');
-const Customer = require('../models/Customer');
+const Doctor = require('../models/Doctor');
 
 jest.mock('../models/MedicalRepresentative');
 jest.mock('../models/SalesTarget');
 jest.mock('../models/Invoice');
 jest.mock('../models/MrVisit');
-jest.mock('../models/Contact');
-jest.mock('../models/Customer');
+jest.mock('../models/Doctor');
 
 jest.mock('../middleware/authorize', () => ({
   authorize: () => (req, res, next) => {
@@ -36,11 +34,8 @@ describe('Module 3: Analytics & MR Performance Incentives', () => {
       MedicalRepresentative.findById.mockReturnValue({
         lean: jest.fn().mockResolvedValue({ _id: 'mr101', name: 'Rohan Sharma' })
       });
-      Contact.find.mockReturnValue({
+      Doctor.find.mockReturnValue({
         lean: jest.fn().mockResolvedValue([{ _id: 'c1' }, { _id: 'c2' }])
-      });
-      Customer.find.mockReturnValue({
-        lean: jest.fn().mockResolvedValue([])
       });
       MrVisit.find.mockReturnValue({
         lean: jest.fn().mockResolvedValue([
@@ -75,7 +70,7 @@ describe('Module 3: Analytics & MR Performance Incentives', () => {
           { _id: 'mr2', name: 'Priya Singh', headquarter: 'Lucknow' }
         ])
       });
-      Contact.find.mockReturnValue({
+      Doctor.find.mockReturnValue({
         lean: jest.fn().mockResolvedValue([{ _id: 'c1' }])
       });
       MrVisit.find.mockReturnValue({

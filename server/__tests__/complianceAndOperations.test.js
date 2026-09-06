@@ -13,6 +13,7 @@ jest.mock('../models/MrVisit');
 jest.mock('../models/StockTransfer');
 jest.mock('../models/StockLedger');
 jest.mock('../models/Contact');
+jest.mock('../models/Doctor');
 jest.mock('../models/Invoice');
 jest.mock('../models/Warehouse');
 jest.mock('../models/Payment');
@@ -33,6 +34,7 @@ const MrVisit = require('../models/MrVisit');
 const StockTransfer = require('../models/StockTransfer');
 const StockLedger = require('../models/StockLedger');
 const Contact = require('../models/Contact');
+const Doctor = require('../models/Doctor');
 const Invoice = require('../models/Invoice');
 const Warehouse = require('../models/Warehouse');
 const Payment = require('../models/Payment');
@@ -63,6 +65,10 @@ describe('Compliance and Operations Features', () => {
     app.use('/api/finance/export/tally', tallyRouter);
     app.use('/api/notifications', notificationsRouter);
     app.use('/api/medical-reps', mrRouter);
+  });
+
+  beforeEach(() => {
+    RolePermission.getEffectivePermissions.mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
   });
 
   afterEach(() => {
@@ -154,6 +160,8 @@ describe('Compliance and Operations Features', () => {
       const mockDocLoc = { name: 'Dr. Ramesh', latitude: 25.3176, longitude: 82.9739 }; // Varanasi Coordinates
       Customer.findOne.mockResolvedValue(null);
       Contact.findOne.mockResolvedValue(mockDocLoc);
+      Doctor.findById.mockResolvedValue(null);
+      Doctor.findOne.mockResolvedValue(mockDocLoc);
 
       MrVisit.create.mockImplementation(data => Promise.resolve({ _id: 'visit_99', ...data }));
       MedicalRepresentative.findById.mockResolvedValue({ name: 'Rajesh' });

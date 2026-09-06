@@ -14,7 +14,7 @@ import type {
   TraceChallan, TraceInvoice, TraceDispatch, TraceResult, RolePermissionConfig,
   RBACPermissionsResponse, PaymentOrderResponse, PaymentVerifyResponse,
   ManufacturingAnalytics, OrderItem, Order, MedicalRepresentative, MrDailyLog,
-  MrVisit, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics,
+  MrVisit, Doctor, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics,
   ManufacturingUnit, ExpiryAlert
 } from './api/types';
 
@@ -1473,6 +1473,43 @@ class ApiClient {
   }
   async getDeadStock(): Promise<DeadStockItem[]> {
     const res = await this.request(`${API_BASE}/dispatches/dead-stock`);
+    return res.json();
+  }
+
+  // ─── Doctor API Methods ───
+  async getDoctors(search?: string, category?: string, assignedMrId?: string, page?: number, limit?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (category) params.set('category', category);
+    if (assignedMrId) params.set('assignedMrId', assignedMrId);
+    if (page !== undefined && page > 0) params.set('page', page.toString());
+    if (limit !== undefined) params.set('limit', limit.toString());
+    const res = await this.request(`${API_BASE}/doctors?${params}`);
+    return res.json();
+  }
+  async getDoctor(id: string): Promise<Doctor> {
+    const res = await this.request(`${API_BASE}/doctors/${id}`);
+    return res.json();
+  }
+  async createDoctor(data: Partial<Doctor>): Promise<Doctor> {
+    const res = await this.request(`${API_BASE}/doctors`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async updateDoctor(id: string, data: Partial<Doctor>): Promise<Doctor> {
+    const res = await this.request(`${API_BASE}/doctors/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async deleteDoctor(id: string): Promise<void> {
+    await this.request(`${API_BASE}/doctors/${id}`, { method: 'DELETE' });
+  }
+  async getDoctorEvents(): Promise<any[]> {
+    const res = await this.request(`${API_BASE}/doctors/events`);
+    return res.json();
+  }
+  async getDoctorMatrix(mrId?: string): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (mrId) params.set('mrId', mrId);
+    const res = await this.request(`${API_BASE}/doctors/matrix?${params}`);
     return res.json();
   }
 

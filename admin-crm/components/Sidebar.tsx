@@ -39,6 +39,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Delivery Challan & Dispatch', route: 'stockmovements', icon: 'bus-outline', activeIcon: 'bus', permission: 'stockmovement:view' },
       { label: 'Sales Invoices', route: 'invoices/sale', icon: 'receipt-outline', activeIcon: 'receipt' },
       { label: 'Medical Reps & Targets', route: 'medicalreps', icon: 'briefcase-outline', activeIcon: 'briefcase', permission: 'mr:view' },
+      { label: 'Doctor Directory', route: 'doctors', icon: 'medkit-outline', activeIcon: 'medkit', permission: 'mr:view' },
       { label: 'Campaigns', route: 'campaigns', icon: 'megaphone-outline', activeIcon: 'megaphone', permission: 'campaign:view' },
     ],
   },

@@ -3,18 +3,16 @@ const MrLeave = require('../models/MrLeave');
 const { safeEscapeRegex } = require('../utils/whatsappService');
 
 describe('MR Advanced Suite & Doctor Linking', () => {
-  it('instantiates MrVisit schema with doctorId reference and doctorRefModel', () => {
+  it('instantiates MrVisit schema with doctorId reference', () => {
     const visit = new MrVisit({
       mrId: '507f1f77bcf86cd799439011',
       date: new Date(),
       doctorId: '507f1f77bcf86cd799439022',
-      doctorRefModel: 'Contact',
       doctorName: 'Dr. (Sharma) Clinic',
       clinicName: 'Sharma Health Care'
     });
 
     expect(visit.doctorId.toString()).toBe('507f1f77bcf86cd799439022');
-    expect(visit.doctorRefModel).toBe('Contact');
     expect(visit.doctorName).toBe('Dr. (Sharma) Clinic');
   });
 

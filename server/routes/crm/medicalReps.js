@@ -8,6 +8,7 @@ const MrTourPlan = require('../../models/MrTourPlan');
 const MrSampleBag = require('../../models/MrSampleBag');
 const Contact = require('../../models/Contact');
 const Customer = require('../../models/Customer');
+const Doctor = require('../../models/Doctor');
 const MrLeave = require('../../models/MrLeave');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
@@ -271,24 +272,34 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
     const data = { ...req.body, mrId: req.params.mrId };
     if (!data.date) data.date = new Date();
 
+    // Auto-find or auto-create Doctor record
+    let doctorObj = null;
+    if (data.doctorId) {
+      doctorObj = await Doctor.findById(data.doctorId);
+    }
+    if (!doctorObj && data.doctorName) {
+      const escaped = safeEscapeRegex(data.doctorName.trim());
+      doctorObj = await Doctor.findOne({ name: { $regex: new RegExp(escaped, 'i') } });
+      if (!doctorObj) {
+        doctorObj = await Doctor.create({
+          name: data.doctorName.trim(),
+          clinicName: data.clinicName || '',
+          specialization: data.specialization || '',
+          city: data.city || '',
+          latitude: data.latitude,
+          longitude: data.longitude
+        });
+      }
+      data.doctorId = doctorObj._id;
+    } else if (doctorObj) {
+      data.doctorId = doctorObj._id;
+      if (!data.doctorName) data.doctorName = doctorObj.name;
+    }
+
     let doctorVerified = false;
-    if (data.latitude && data.longitude && (data.doctorId || data.doctorName)) {
-      let target = null;
-      if (data.doctorId) {
-        if (data.doctorRefModel === 'Customer') {
-          target = await Customer.findById(data.doctorId);
-        } else {
-          target = await Contact.findById(data.doctorId);
-        }
-      }
-      if (!target && data.doctorName) {
-        const escaped = safeEscapeRegex(data.doctorName.trim());
-        target = await Contact.findOne({ name: { $regex: new RegExp(escaped, 'i') } }) ||
-                 await Customer.findOne({ $or: [{ name: { $regex: new RegExp(escaped, 'i') } }, { company: { $regex: new RegExp(escaped, 'i') } }] });
-      }
-      
-      if (target && target.latitude && target.longitude) {
-        const dist = getHaversineDistanceInMeters(data.latitude, data.longitude, target.latitude, target.longitude);
+    if (data.latitude && data.longitude && doctorObj) {
+      if (doctorObj.latitude && doctorObj.longitude) {
+        const dist = getHaversineDistanceInMeters(data.latitude, data.longitude, doctorObj.latitude, doctorObj.longitude);
         if (dist !== null && dist <= 200) {
           doctorVerified = true;
           data.doctorVerified = true;
@@ -301,18 +312,6 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
     if (data.sampleDetails && data.sampleDetails.length > 0) {
       const requestedQty = data.sampleDetails.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
       if (requestedQty > 0) {
-        let doctorObj = null;
-        if (data.doctorId) {
-          doctorObj = data.doctorRefModel === 'Customer'
-            ? await Customer.findById(data.doctorId)
-            : await Contact.findById(data.doctorId);
-        }
-        if (!doctorObj && data.doctorName) {
-          const escaped = safeEscapeRegex(data.doctorName.trim());
-          doctorObj = await Contact.findOne({ name: { $regex: new RegExp(escaped, 'i') } }) ||
-                      await Customer.findOne({ name: { $regex: new RegExp(escaped, 'i') } });
-        }
-
         let monthlyQuota = doctorObj && doctorObj.monthlySampleQuota ? doctorObj.monthlySampleQuota : null;
         if (!monthlyQuota) {
           const category = (doctorObj ? doctorObj.category || '' : '').toUpperCase();
@@ -687,15 +686,9 @@ router.get('/doctors/matrix', authorize('mr:view'), async (req, res) => {
     const filter = { category: { $in: ['A', 'B', 'C'] } };
     if (mrId) filter.assignedMrId = mrId;
 
-    const [contacts, customers] = await Promise.all([
-      Contact.find(filter).populate('assignedMrId', 'name code').lean(),
-      Customer.find(filter).populate('assignedMrId', 'name code').lean(),
-    ]);
-
-    const allDoctors = [
-      ...contacts.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', category: c.category, specialty: c.specialty, preferredTime: c.preferredTime, assignedMr: c.assignedMrId, type: 'Contact' })),
-      ...customers.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', category: c.category, specialty: c.specialty, preferredTime: c.preferredTime, assignedMr: c.assignedMrId, type: 'Customer' }))
-    ];
+    const doctors = await Doctor.find(filter)
+      .populate('assignedMrId', 'name code')
+      .lean();
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -707,19 +700,32 @@ router.get('/doctors/matrix', authorize('mr:view'), async (req, res) => {
 
     const visitCounts = {};
     visitsThisMonth.forEach(v => {
+      if (v.doctorId) {
+        const idKey = v.doctorId.toString();
+        visitCounts[idKey] = (visitCounts[idKey] || 0) + 1;
+      }
       if (v.doctorName) {
-        const key = v.doctorName.trim().toLowerCase();
-        visitCounts[key] = (visitCounts[key] || 0) + 1;
+        const nameKey = v.doctorName.trim().toLowerCase();
+        visitCounts[nameKey] = (visitCounts[nameKey] || 0) + 1;
       }
     });
 
-    const report = allDoctors.map(doc => {
+    const report = doctors.map(doc => {
       const requiredVisits = doc.category === 'A' ? 4 : (doc.category === 'B' ? 2 : 1);
-      const actualVisits = visitCounts[doc.name.trim().toLowerCase()] || 0;
+      const idKey = doc._id.toString();
+      const nameKey = doc.name.trim().toLowerCase();
+      const actualVisits = visitCounts[idKey] || visitCounts[nameKey] || 0;
       const compliancePct = Math.min(100, Number(((actualVisits / requiredVisits) * 100).toFixed(1)));
 
       return {
-        ...doc,
+        _id: doc._id,
+        name: doc.name,
+        clinic: doc.clinicName || '',
+        category: doc.category,
+        specialty: doc.specialization,
+        specialization: doc.specialization,
+        preferredTime: doc.preferredTime,
+        assignedMr: doc.assignedMrId,
         requiredVisits,
         actualVisits,
         compliancePct
@@ -734,20 +740,18 @@ router.get('/doctors/matrix', authorize('mr:view'), async (req, res) => {
 
 router.get('/doctors/events', authorize('mr:view'), async (req, res) => {
   try {
-    const [contacts, customers] = await Promise.all([
-      Contact.find({ $or: [{ birthday: { $ne: null } }, { anniversary: { $ne: null } }] }).populate('assignedMrId', 'name phone').lean(),
-      Customer.find({ $or: [{ birthday: { $ne: null } }, { anniversary: { $ne: null } }] }).populate('assignedMrId', 'name phone').lean(),
-    ]);
+    const doctors = await Doctor.find({
+      $or: [{ birthday: { $ne: null } }, { anniversary: { $ne: null } }]
+    }).populate('assignedMrId', 'name phone').lean();
 
-    const all = [...contacts, ...customers];
     const events = [];
 
-    all.forEach(doc => {
+    doctors.forEach(doc => {
       if (doc.birthday) {
         events.push({
           doctorId: doc._id,
           doctorName: doc.name,
-          clinic: doc.company || '',
+          clinic: doc.clinicName || '',
           eventType: 'Birthday',
           date: new Date(doc.birthday),
           assignedMr: doc.assignedMrId
@@ -757,7 +761,7 @@ router.get('/doctors/events', authorize('mr:view'), async (req, res) => {
         events.push({
           doctorId: doc._id,
           doctorName: doc.name,
-          clinic: doc.company || '',
+          clinic: doc.clinicName || '',
           eventType: 'Anniversary',
           date: new Date(doc.anniversary),
           assignedMr: doc.assignedMrId
@@ -765,6 +769,7 @@ router.get('/doctors/events', authorize('mr:view'), async (req, res) => {
       }
     });
 
+    events.sort((a, b) => a.date.getTime() - b.date.getTime());
     res.json(events);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1487,7 +1492,7 @@ router.get('/:mrId/scorecard', authorize('mr:view'), async (req, res) => {
 // POST /api/medical-reps/assign-doctors — Bulk assign doctors to MR & area turn schedule
 router.post('/assign-doctors', authorize('mr:edit'), async (req, res) => {
   try {
-    const { mrId, contactIds = [], customerIds = [], areaName, preferredVisitDay } = req.body;
+    const { mrId, doctorIds = [], contactIds = [], customerIds = [], areaName, preferredVisitDay } = req.body;
     if (!mrId) return res.status(400).json({ error: 'mrId is required' });
 
     const updateObj = {};
@@ -1495,22 +1500,18 @@ router.post('/assign-doctors', authorize('mr:edit'), async (req, res) => {
     if (areaName !== undefined) updateObj.areaName = areaName.trim();
     if (preferredVisitDay !== undefined) updateObj.preferredVisitDay = preferredVisitDay;
 
-    let updatedContacts = 0, updatedCustomers = 0;
-    if (contactIds.length > 0) {
-      const res1 = await Contact.updateMany({ _id: { $in: contactIds } }, { $set: updateObj });
-      updatedContacts = res1.modifiedCount || 0;
-    }
-    if (customerIds.length > 0) {
-      const res2 = await Customer.updateMany({ _id: { $in: customerIds } }, { $set: updateObj });
-      updatedCustomers = res2.modifiedCount || 0;
+    const combinedIds = [...doctorIds, ...contactIds, ...customerIds];
+
+    let totalAssigned = 0;
+    if (combinedIds.length > 0) {
+      const docRes = await Doctor.updateMany({ _id: { $in: combinedIds } }, { $set: updateObj });
+      totalAssigned += docRes.modifiedCount || 0;
     }
 
     res.json({
       message: 'Doctors successfully assigned to MR and area turn schedule',
       mrId,
-      updatedContacts,
-      updatedCustomers,
-      totalAssigned: updatedContacts + updatedCustomers
+      totalAssigned
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1529,17 +1530,22 @@ router.get('/:mrId/assigned-doctors', authorize('mr:view'), async (req, res) => 
     if (dayOfWeek) filter.preferredVisitDay = dayOfWeek;
     if (areaName) filter.areaName = { $regex: areaName.trim(), $options: 'i' };
 
-    const [contacts, customers] = await Promise.all([
-      Contact.find(filter).lean(),
-      Customer.find(filter).lean()
-    ]);
+    const doctors = await Doctor.find(filter).lean();
 
-    const doctors = [
-      ...contacts.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', phone: c.phone, areaName: c.areaName, preferredVisitDay: c.preferredVisitDay, category: c.category, latitude: c.latitude, longitude: c.longitude, type: 'Contact' })),
-      ...customers.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', phone: c.phone, areaName: c.areaName, preferredVisitDay: c.preferredVisitDay, category: c.category, latitude: c.latitude, longitude: c.longitude, type: 'Customer' }))
-    ];
+    const result = doctors.map(c => ({
+      _id: c._id,
+      name: c.name,
+      clinic: c.clinicName || '',
+      phone: c.phone,
+      areaName: c.areaName,
+      preferredVisitDay: c.preferredVisitDay,
+      category: c.category,
+      latitude: c.latitude,
+      longitude: c.longitude,
+      type: 'Doctor'
+    }));
 
-    res.json(doctors);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1612,12 +1618,8 @@ router.get('/:mrId/footprint-trail', authorize('mr:view'), async (req, res) => {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const dayOfWeekStr = dayNames[targetDate.getDay()];
 
-    const [plannedContacts, plannedCustomers] = await Promise.all([
-      Contact.find({ assignedMrId: req.params.mrId, preferredVisitDay: dayOfWeekStr }).lean(),
-      Customer.find({ assignedMrId: req.params.mrId, preferredVisitDay: dayOfWeekStr }).lean()
-    ]);
-
-    const totalPlanned = plannedContacts.length + plannedCustomers.length;
+    const plannedDoctors = await Doctor.find({ assignedMrId: req.params.mrId, preferredVisitDay: dayOfWeekStr }).lean();
+    const totalPlanned = plannedDoctors.length;
     const verifiedVisits = visits.filter(v => v.doctorVerified);
 
     res.json({
@@ -1661,15 +1663,21 @@ router.post('/:mrId/optimize-route', authorize('mr:view'), async (req, res) => {
     if (dayOfWeek) filter.preferredVisitDay = dayOfWeek;
     if (areaName) filter.areaName = { $regex: areaName.trim(), $options: 'i' };
 
-    const [contacts, customers] = await Promise.all([
-      Contact.find(filter).lean(),
-      Customer.find(filter).lean()
-    ]);
+    const rawDoctors = await Doctor.find(filter).lean();
 
-    const doctors = [
-      ...contacts.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', phone: c.phone, areaName: c.areaName, preferredVisitDay: c.preferredVisitDay, category: c.category || 'B', opdTiming: c.opdTiming || 'Morning (09:00 AM - 01:00 PM)', latitude: c.latitude || 25.3176, longitude: c.longitude || 82.9739, type: 'Contact' })),
-      ...customers.map(c => ({ _id: c._id, name: c.name, clinic: c.company || '', phone: c.phone, areaName: c.areaName, preferredVisitDay: c.preferredVisitDay, category: c.category || 'B', opdTiming: c.opdTiming || 'Morning (09:00 AM - 01:00 PM)', latitude: c.latitude || 25.3176, longitude: c.longitude || 82.9739, type: 'Customer' }))
-    ];
+    const doctors = rawDoctors.map(c => ({
+      _id: c._id,
+      name: c.name,
+      clinic: c.clinicName || '',
+      phone: c.phone,
+      areaName: c.areaName,
+      preferredVisitDay: c.preferredVisitDay,
+      category: c.category || 'B',
+      opdTiming: c.preferredTime || 'Morning (09:00 AM - 01:00 PM)',
+      latitude: c.latitude || 25.3176,
+      longitude: c.longitude || 82.9739,
+      type: 'Doctor'
+    }));
 
     const categoryOrder = { A: 1, B: 2, C: 3 };
     const sortedDoctors = [...doctors].sort((a, b) => {
