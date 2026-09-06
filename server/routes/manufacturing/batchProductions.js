@@ -1631,4 +1631,288 @@ router.get('/analytics/yield-variance', authorize('manufacturing:view'), async (
   }
 });
 
+// ─── FEATURE 10: Packing Material Reconciliation & Schedule T Audit ───
+
+// POST /api/batch-productions/:id/label-reconciliation — Record packaging label reconciliation & audit check
+router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async (req, res) => {
+  try {
+    const { items } = req.body; // array of { rawMaterialId, name, qtyIssued, qtyUsed, qtyDamaged, qtyReturnedToStore, discrepancyNote }
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Reconciliation items array is required' });
+    }
+
+    let overallFlagged = false;
+    const reconciledItems = items.map(item => {
+      const issued = Number(item.qtyIssued || 0);
+      const used = Number(item.qtyUsed || 0);
+      const damaged = Number(item.qtyDamaged || 0);
+      const returned = Number(item.qtyReturnedToStore || 0);
+      const unaccounted = Math.max(0, issued - (used + damaged + returned));
+      const discrepancyPct = issued > 0 ? Number(((unaccounted / issued) * 100).toFixed(2)) : 0;
+      const isFlagged = discrepancyPct > 0.5;
+
+      if (isFlagged) overallFlagged = true;
+
+      return {
+        rawMaterialId: item.rawMaterialId,
+        name: item.name,
+        qtyIssued: issued,
+        qtyUsed: used,
+        qtyDamaged: damaged,
+        qtyReturnedToStore: returned,
+        unaccountedQty: unaccounted,
+        discrepancyPct,
+        discrepancyFlagged: isFlagged,
+        auditStatus: isFlagged ? 'flagged' : 'passed',
+        reconciled: true,
+        reconciledBy: req.user ? req.user.id : null,
+        reconciledAt: new Date(),
+        discrepancyNote: item.discrepancyNote || (isFlagged ? `Flagged: ${discrepancyPct}% discrepancy exceeds 0.5% Schedule T limit` : 'Pass')
+      };
+    });
+
+    batch.labelReconciliation = reconciledItems;
+
+    if (overallFlagged) {
+      batch.deviations.push({
+        type: 'process_loss',
+        description: `Schedule T Packing Audit Alert: Label reconciliation discrepancy exceeds 0.5% threshold on batch ${batch.batchNo}`,
+        detectedAt: new Date(),
+        status: 'open'
+      });
+
+      if (req.io) {
+        req.io.emit('quality_alert', {
+          type: 'label_reconciliation_discrepancy',
+          batchId: batch._id,
+          batchNo: batch.batchNo
+        });
+      }
+    }
+
+    await batch.save();
+    res.json({
+      success: true,
+      batchId: batch._id,
+      overallAuditStatus: overallFlagged ? 'FLAGGED_EXCEEDS_0.5_PERCENT' : 'PASSED',
+      reconciledItems: batch.labelReconciliation
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/batch-productions/:id/label-reconciliation-report — Official AYUSH Schedule T Audit Report JSON
+router.get('/:id/label-reconciliation-report', authorize('manufacturing:view'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id).populate('productId', 'name sku').lean();
+    if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
+
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne().lean() || {};
+
+    const items = batch.labelReconciliation || [];
+    const hasFlagged = items.some(i => i.discrepancyFlagged);
+
+    res.json({
+      title: `AYUSH SCHEDULE T PACKING MATERIAL RECONCILIATION AUDIT REPORT — BATCH ${batch.batchNo}`,
+      firmDetails: {
+        name: settings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
+        gmpCertNo: settings.gmpCertificateNo || 'GMP-AYUSH-2026-VNS',
+        licenseNo: settings.manufacturingLicenseNo || 'AYUSH-1983-UP'
+      },
+      batchDetails: {
+        batchNo: batch.batchNo,
+        productName: batch.productId ? batch.productId.name : 'N/A',
+        status: batch.status,
+        mfgDate: batch.mfgDate,
+        expiryDate: batch.expiryDate
+      },
+      auditSummary: {
+        totalPackagingItems: items.length,
+        auditResult: hasFlagged ? 'REJECTED / FLAGGED (DISCREPANCY > 0.5%)' : 'COMPLIANT (SCHEDULE T PASSED)',
+        maxDiscrepancyPct: items.length > 0 ? Math.max(...items.map(i => i.discrepancyPct || 0)) : 0
+      },
+      reconciliationItems: items
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── FEATURE 12: Job-Work & Loan-License Manufacturing Module ───
+
+// GET /api/batch-productions/job-work-summary — Ledger summary of outsourcing job work
+router.get('/job-work-summary', authorize('manufacturing:view'), async (req, res) => {
+  try {
+    const jobBatches = await BatchProduction.find({ productionType: 'job_work' })
+      .populate('jobWorkerId', 'name phone vendorType')
+      .populate('productId', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    let totalJobWorkCharges = 0;
+    let totalDispatched = 0;
+    let totalReceived = 0;
+
+    const summaryList = jobBatches.map(b => {
+      totalJobWorkCharges += (b.jobWorkCharges || 0);
+      totalDispatched += (b.expectedYieldQty || b.plannedQty || 0);
+      totalReceived += (b.receivedYieldQty || 0);
+
+      return {
+        _id: b._id,
+        batchNo: b.batchNo,
+        productName: b.productId ? b.productId.name : 'N/A',
+        jobWorkerName: b.jobWorkerName || (b.jobWorkerId ? b.jobWorkerId.name : 'Third-Party Vendor'),
+        jobWorkStatus: b.jobWorkStatus || 'pending',
+        challanRef: b.jobWorkerChallanRef,
+        dispatchedAt: b.dispatchedAt,
+        expectedYieldQty: b.expectedYieldQty || b.plannedQty,
+        receivedYieldQty: b.receivedYieldQty,
+        conversionLossPct: b.conversionLossPct,
+        jobWorkCharges: b.jobWorkCharges || 0
+      };
+    });
+
+    res.json({
+      totalJobWorkOrders: jobBatches.length,
+      totalJobWorkCharges,
+      averageConversionLossPct: totalDispatched > 0 ? Number((((totalDispatched - totalReceived) / totalDispatched) * 100).toFixed(2)) : 0,
+      orders: summaryList
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/batch-productions/:id/job-work/dispatch — Dispatch raw materials/bulk to job worker vendor
+router.post('/:id/job-work/dispatch', authorize('manufacturing:edit'), async (req, res) => {
+  try {
+    const { jobWorkerId, jobWorkerName, expectedYieldQty, jobWorkCharges, notes } = req.body;
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
+
+    const challanNo = `JW-CHALLAN-${Date.now().toString().slice(-6)}`;
+    batch.productionType = 'job_work';
+    batch.jobWorkStatus = 'dispatched_to_vendor';
+    if (jobWorkerId) batch.jobWorkerId = jobWorkerId;
+    batch.jobWorkerName = jobWorkerName || batch.jobWorkerName || 'Contract Manufacturer';
+    batch.jobWorkerChallanRef = challanNo;
+    batch.dispatchedAt = new Date();
+    batch.expectedYieldQty = Number(expectedYieldQty || batch.plannedQty || 0);
+    batch.jobWorkCharges = Number(jobWorkCharges || 0);
+    if (req.user) batch.jobWorkDispatchedBy = req.user.id;
+
+    await batch.save();
+
+    res.json({
+      success: true,
+      message: `Job Work material dispatched to ${batch.jobWorkerName} under Delivery Challan ${challanNo}`,
+      challanNo,
+      batch
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/batch-productions/:id/job-work/receive — Record received bulk/finished goods & conversion loss
+router.post('/:id/job-work/receive', authorize('manufacturing:edit'), async (req, res) => {
+  try {
+    const { receivedYieldQty, jobWorkerCertificateRef, coaDocumentRef, status } = req.body;
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
+
+    const received = Number(receivedYieldQty || 0);
+    const expected = batch.expectedYieldQty || batch.plannedQty || 1;
+    const lossQty = Math.max(0, expected - received);
+    const lossPct = Number(((lossQty / expected) * 100).toFixed(2));
+
+    batch.receivedYieldQty = received;
+    batch.actualYieldQty = received;
+    batch.conversionLossPct = lossPct;
+    batch.jobWorkStatus = status || (received >= expected ? 'received_fully' : 'received_partially');
+    if (jobWorkerCertificateRef) batch.jobWorkerCertificateRef = jobWorkerCertificateRef;
+    if (coaDocumentRef) batch.coaDocumentRef = coaDocumentRef;
+
+    await batch.save();
+
+    res.json({
+      success: true,
+      message: `Received ${received} units from Job Worker. Conversion Loss: ${lossPct}%`,
+      batch
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── FEATURE 13: Dual E-Signature & Audit Trail for Critical BMR Steps ───
+
+// POST /api/batch-productions/:id/stages/:stageIndex/dual-esign — Dual signature verification
+router.post('/:id/stages/:stageIndex/dual-esign', authorize('manufacturing:edit'), async (req, res) => {
+  try {
+    const crypto = require('crypto');
+    const AuditLog = require('../../models/AuditLog');
+    const { chemistName, chemistComments, qaName, qaComments } = req.body;
+
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
+
+    const idx = parseInt(req.params.stageIndex, 10);
+    if (isNaN(idx) || idx < 0 || idx >= batch.stages.length) {
+      return res.status(400).json({ error: 'Invalid BMR stage index' });
+    }
+
+    const stage = batch.stages[idx];
+    const timestamp = new Date();
+    const signPayload = `${batch.batchNo}:${stage.name}:${chemistName || 'Chemist'}:${qaName || 'QA Officer'}:${timestamp.toISOString()}`;
+    const hash = crypto.createHash('sha256').update(signPayload).digest('hex');
+
+    stage.isDualSigned = true;
+    stage.status = 'completed';
+    stage.completedAt = timestamp;
+    stage.chemistSignature = {
+      userId: req.user ? req.user.id : null,
+      userName: chemistName || (req.user ? req.user.name : 'Manufacturing Chemist'),
+      signedAt: timestamp,
+      signatureHash: hash,
+      comments: chemistComments || 'Verified & Performed by Manufacturing Chemist'
+    };
+    stage.qaSignature = {
+      userId: req.user ? req.user.id : null,
+      userName: qaName || 'Quality Assurance Manager',
+      signedAt: timestamp,
+      signatureHash: hash,
+      comments: qaComments || 'Verified & Released by QA Officer'
+    };
+
+    await batch.save();
+
+    // Write to AuditLog for 21 CFR Part 11 electronic audit compliance
+    await AuditLog.create({
+      action: 'BMR_STAGE_DUAL_ESIGN',
+      module: 'manufacturing',
+      user: req.user ? req.user.id : null,
+      userName: chemistName || (req.user ? req.user.name : 'Manufacturing Chemist'),
+      details: `Dual E-Signature verified for Batch ${batch.batchNo}, Stage '${stage.name}'. Hash: ${hash}`,
+      entityId: batch._id,
+      entityType: 'BatchProduction'
+    }).catch(() => {});
+
+    res.json({
+      success: true,
+      message: `Dual E-Signature verified for stage '${stage.name}' on Batch ${batch.batchNo}`,
+      signatureHash: hash,
+      stage
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

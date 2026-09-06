@@ -47,6 +47,22 @@ const stageSchema = new mongoose.Schema({
   temperatureCelsius: { type: Number, default: null },
   humidityPct: { type: Number, default: null },
   ambientVerified: { type: Boolean, default: false },
+  // Feature 13: Dual E-Signature Audit Trail
+  isDualSigned: { type: Boolean, default: false },
+  chemistSignature: {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    userName: { type: String, default: '' },
+    signedAt: { type: Date, default: null },
+    signatureHash: { type: String, default: '' },
+    comments: { type: String, default: '' }
+  },
+  qaSignature: {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    userName: { type: String, default: '' },
+    signedAt: { type: Date, default: null },
+    signatureHash: { type: String, default: '' },
+    comments: { type: String, default: '' }
+  }
 }, { _id: false });
 
 const batchProductionSchema = new mongoose.Schema({
@@ -186,6 +202,10 @@ const batchProductionSchema = new mongoose.Schema({
     qtyUsed: { type: Number, default: 0, min: 0 },
     qtyDamaged: { type: Number, default: 0, min: 0 },
     qtyReturnedToStore: { type: Number, default: 0, min: 0 },
+    unaccountedQty: { type: Number, default: 0 },
+    discrepancyPct: { type: Number, default: 0 },
+    discrepancyFlagged: { type: Boolean, default: false },
+    auditStatus: { type: String, enum: ['passed', 'flagged', 'pending'], default: 'pending' },
     reconciled: { type: Boolean, default: false },
     reconciledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     reconciledAt: { type: Date, default: null },
@@ -219,6 +239,16 @@ const batchProductionSchema = new mongoose.Schema({
   jobWorkerCertificateRef: { type: String, default: '' }, // Job Worker Batch Certificate number
   coaDocumentRef: { type: String, default: '' }, // Certificate of Analysis uploaded reference
   jobWorkCharges: { type: Number, default: 0 }, // Billable service charges for outsourcing
+  jobWorkStatus: {
+    type: String,
+    enum: ['pending', 'dispatched_to_vendor', 'received_partially', 'received_fully', 'closed'],
+    default: 'pending'
+  },
+  dispatchedAt: { type: Date, default: null },
+  expectedYieldQty: { type: Number, default: 0 },
+  receivedYieldQty: { type: Number, default: 0 },
+  conversionLossPct: { type: Number, default: 0 },
+  jobWorkDispatchedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   supportingDocuments: [
     {
       name: { type: String, required: true },

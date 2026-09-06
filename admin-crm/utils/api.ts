@@ -1529,6 +1529,44 @@ class ApiClient {
     return res.json();
   }
 
+  // ─── Manufacturing Advanced API Methods ───
+  async submitLabelReconciliation(batchId: string, items: any[]): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${batchId}/label-reconciliation`, {
+      method: 'POST',
+      body: JSON.stringify({ items })
+    });
+    return res.json();
+  }
+  async getLabelReconciliationReport(batchId: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${batchId}/label-reconciliation-report`);
+    return res.json();
+  }
+  async getJobWorkSummary(): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/job-work-summary`);
+    return res.json();
+  }
+  async dispatchJobWork(batchId: string, payload: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${batchId}/job-work/dispatch`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    return res.json();
+  }
+  async receiveJobWork(batchId: string, payload: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${batchId}/job-work/receive`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    return res.json();
+  }
+  async submitBmrDualEsign(batchId: string, stageIndex: number, payload: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${batchId}/stages/${stageIndex}/dual-esign`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    return res.json();
+  }
+
   // ─── MR API Methods ───
   async getMRs(search?: string, active?: string): Promise<MedicalRepresentative[]> {
     const params = new URLSearchParams();
