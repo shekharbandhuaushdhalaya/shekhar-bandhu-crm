@@ -29,7 +29,8 @@ import {
   Product,
   Vendor,
   Warehouse,
-  ManufacturingUnit
+  ManufacturingUnit,
+  MrpResponse
 } from '../utils/api';
 import { Spacing, Radius, LightColors } from '../constants/theme';
 import { FIRM_DETAILS } from '../constants/firm';
@@ -49,6 +50,7 @@ import RawMaterialsTab from './manufacturing/components/RawMaterialsTab';
 import BatchProductionsTab from './manufacturing/components/BatchProductionsTab';
 import ProductionSchedulerTab from './manufacturing/components/ProductionSchedulerTab';
 import ManufacturingUnitsTab from './manufacturing/components/ManufacturingUnitsTab';
+import MRPPlanTab from './manufacturing/components/MRPPlanTab';
 import StockTraceModal from './manufacturing/modals/StockTraceModal';
 import ConfirmDeleteModal from './manufacturing/modals/ConfirmDeleteModal';
 
@@ -66,7 +68,10 @@ export default function ManufacturingScreen() {
   const isDesktop = winWidth > 768;
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'materials' | 'batches' | 'scheduler' | 'units'>('materials');
+  const [activeTab, setActiveTab] = useState<'materials' | 'batches' | 'scheduler' | 'units' | 'mrp'>('materials');
+  const [mrpData, setMrpData] = useState<MrpResponse | null>(null);
+  const [mrpLoading, setMrpLoading] = useState(false);
+  const [mrpCreatingPlan, setMrpCreatingPlan] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -342,6 +347,7 @@ export default function ManufacturingScreen() {
     batches: ['batches', 'boms', 'products', 'mfgUnits', 'warehouses', 'vendors'],
     scheduler: ['batches', 'mfgUnits', 'analytics'],
     units: ['mfgUnits'],
+    mrp: ['mrp'],
   };
 
   // Track which datasets have been loaded (to avoid redundant fetches)
@@ -422,11 +428,23 @@ export default function ManufacturingScreen() {
           setMfgAnalytics(data);
           break;
         }
+        case 'mrp': {
+          setMrpLoading(true);
+          try {
+            const data = await api.getMaterialRequirementsPlan();
+            setMrpData(data);
+          } catch (err: any) {
+            showToast(err.message || 'Failed to calculate Material Requirements Plan', 'error');
+          } finally {
+            setMrpLoading(false);
+          }
+          break;
+        }
       }
     } catch {
       loadedRef.current.delete(key); // allow retry on failure
     }
-  }, [mfgUnitFilter]);
+  }, [mfgUnitFilter, materialSearch, showToast]);
 
   const fetchTabData = useCallback(async (tab: string) => {
     const needs = tabDataRequirements[tab] || [];
@@ -1768,6 +1786,19 @@ export default function ManufacturingScreen() {
     return matchText;
   });
 
+  const handleCreateProductionPlansFromMRP = async (productIds?: string[]) => {
+    try {
+      setMrpCreatingPlan(true);
+      const res = await api.createProductionPlansFromMRP(productIds);
+      showToast(res.message || 'Draft production plan created successfully!', 'success');
+      loadedRef.current.delete('batches');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to create production plan', 'error');
+    } finally {
+      setMrpCreatingPlan(false);
+    }
+  };
+
   return (
     <View style={styles.screen}>
       {/* Sub tabs Row */}
@@ -1776,6 +1807,7 @@ export default function ManufacturingScreen() {
           { id: 'materials', label: 'Raw Materials & Batches', icon: 'leaf-outline' },
           { id: 'batches', label: 'Production Runs (BMR)', icon: 'hammer-outline' },
           { id: 'scheduler', label: 'Production Timeline', icon: 'calendar-outline' },
+          { id: 'mrp', label: 'Material Requirements Plan (MRP)', icon: 'cart-outline' },
         ].map(t => (
           <TouchableOpacity
             key={t.id}
@@ -1964,6 +1996,20 @@ export default function ManufacturingScreen() {
           <ManufacturingUnitsTab
             manufacturingUnits={manufacturingUnits}
             onAddUnit={() => setUnitModalVisible(true)}
+          />
+        )}
+
+        {activeTab === 'mrp' && (
+          <MRPPlanTab
+            mrpData={mrpData}
+            loading={mrpLoading}
+            creatingPlan={mrpCreatingPlan}
+            isDesktop={isDesktop}
+            onRefresh={() => {
+              loadedRef.current.delete('mrp');
+              fetchDataset('mrp');
+            }}
+            onCreateProductionPlans={handleCreateProductionPlansFromMRP}
           />
         )}
       </ScrollView>

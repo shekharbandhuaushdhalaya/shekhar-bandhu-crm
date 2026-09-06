@@ -1229,6 +1229,17 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/analytics/manufacturing`);
     return res.json();
   }
+  async getMaterialRequirementsPlan(): Promise<MrpResponse> {
+    const res = await this.request(`${API_BASE}/analytics/material-requirements-plan`);
+    return res.json();
+  }
+  async createProductionPlansFromMRP(productIds?: string[]): Promise<{ message: string; count: number; plans: any[] }> {
+    const res = await this.request(`${API_BASE}/analytics/material-requirements-plan/create-production-plans`, {
+      method: 'POST',
+      body: JSON.stringify({ productIds })
+    });
+    return res.json();
+  }
 
   async uploadFile(fileUri: string, filename = 'document.pdf'): Promise<{ name: string, url: string }> {
     let processedUri = fileUri;

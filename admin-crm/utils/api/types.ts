@@ -1122,3 +1122,31 @@ export type MrSampleStock = {
   createdAt?: string;
   updatedAt?: string;
 };
+
+export type MrpDrivenByProduct = {
+  productId: string;
+  productName: string;
+  shortfallUnits: number;
+  requiredQtyForProduct: number;
+};
+
+export type MrpSuggestion = {
+  rawMaterialId: string;
+  rawMaterialName: string;
+  unit: string;
+  category?: string;
+  requiredForProduction: number;
+  currentAvailableStock: number;
+  minReorderThreshold: number;
+  suggestedPurchaseQty: number;
+  drivenByProducts: MrpDrivenByProduct[];
+  preferredVendor: {
+    vendorId: string | null;
+    vendorName: string;
+  };
+};
+
+export type MrpResponse = {
+  generatedAt: string;
+  suggestions: MrpSuggestion[];
+};
