@@ -237,7 +237,9 @@ router.get('/sales', async (req, res) => {
     const limitNum = parseInt(limit) || 50;
     const isPaginated = !isNaN(pageNum) && pageNum > 0;
 
-    let query = Invoice.find(filter).sort({ date: -1, createdAt: -1 });
+    let query = Invoice.find(filter)
+      .populate('prescribingDoctorId', 'name clinicName specialization category city')
+      .sort({ date: -1, createdAt: -1 });
     
     if (isPaginated) {
       query = query.skip((pageNum - 1) * limitNum).limit(limitNum);

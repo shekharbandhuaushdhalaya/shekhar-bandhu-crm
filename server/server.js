@@ -401,10 +401,11 @@ mongoose
     setInterval(() => checkExpiriesAndReorders(), 6 * 60 * 60 * 1000);
 
     const cron = require('node-cron');
-    const { sendDailyDigest } = require('./utils/digestScheduler');
+    const { sendDailyDigest, sendDoctorGreetings } = require('./utils/digestScheduler');
     const digestSendHour = process.env.DIGEST_SEND_HOUR || 8;
     cron.schedule(`0 ${digestSendHour} * * *`, () => {
       sendDailyDigest().catch(err => console.error('❌ Daily Executive Digest Cron Error:', err.message));
+      sendDoctorGreetings().catch(err => console.error('❌ Daily Doctor Greetings Cron Error:', err.message));
     });
     // Run startup migrations asynchronously out of the request path
     runStartupMigrations().catch(err => {

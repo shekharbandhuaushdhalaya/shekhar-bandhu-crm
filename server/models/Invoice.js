@@ -102,6 +102,7 @@ const invoiceSchema = new mongoose.Schema({
   mrId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative' },
   assignedMrId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative' },
   medicalRepName: { type: String, default: '', trim: true },
+  prescribingDoctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor', default: null },
   doctorName: { type: String, default: '', trim: true },
   damageReason: { type: String, default: '', trim: true },
   reference: { type: String, default: '', trim: true },
@@ -135,5 +136,6 @@ invoiceSchema.index({ createdAt: -1 });
 invoiceSchema.index({ type: 1, date: -1 });
 invoiceSchema.index({ type: 1, isFinalized: 1, status: 1 });
 invoiceSchema.index({ isFinalized: 1, status: 1 });
+invoiceSchema.index({ prescribingDoctorId: 1 });
 
 module.exports = mongoose.model('Invoice', invoiceSchema);

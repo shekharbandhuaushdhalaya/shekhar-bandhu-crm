@@ -121,4 +121,65 @@ router.get('/receivables-ageing', async (req, res) => {
   }
 });
 
+// GET /api/portal/orders — List customer orders
+router.get('/orders', async (req, res) => {
+  try {
+    const Order = require('../../models/Order');
+    const orders = await Order.find({
+      $or: [
+        { customerId: req.customer._id },
+        { customerName: req.customer.name },
+        { customerPhone: req.customer.phone }
+      ]
+    }).sort({ createdAt: -1 }).lean();
+
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/portal/orders/:id/track — Live order dispatch & tracking status
+router.get('/orders/:id/track', async (req, res) => {
+  try {
+    const Order = require('../../models/Order');
+    const Dispatch = require('../../models/Dispatch');
+
+    const order = await Order.findById(req.params.id).lean();
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const belongsToCustomer = (order.customerId && order.customerId.toString() === req.customer._id.toString()) ||
+      (order.customerName && order.customerName.toLowerCase() === req.customer.name.toLowerCase()) ||
+      (order.customerPhone && req.customer.phone && order.customerPhone === req.customer.phone);
+
+    if (!belongsToCustomer) {
+      return res.status(403).json({ error: 'Forbidden: You do not have access to this order' });
+    }
+
+    const dispatch = await Dispatch.findOne({ orderId: order._id }).lean();
+
+    res.json({
+      orderId: order._id,
+      orderNo: order.orderNo || order._id,
+      orderStatus: order.status || 'processing',
+      orderDate: order.createdAt || order.date,
+      totalAmount: order.totalAmount || order.amount || 0,
+      tracking: {
+        dispatched: !!dispatch,
+        dispatchStatus: dispatch ? dispatch.status : 'Pending Dispatch',
+        carrier: dispatch ? (dispatch.carrier || dispatch.transport || dispatch.carrierName || 'Surface Express') : 'N/A',
+        courierName: dispatch ? (dispatch.transport || dispatch.carrierName || dispatch.carrier || 'Surface Express') : 'N/A',
+        vehicleNo: dispatch ? (dispatch.vehicleNo || 'N/A') : 'N/A',
+        ewayBillNo: dispatch ? (dispatch.ewayBillNo || 'N/A') : 'N/A',
+        lrNo: dispatch ? (dispatch.lrNo || 'N/A') : 'N/A',
+        shippedAt: dispatch ? dispatch.createdAt : null
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

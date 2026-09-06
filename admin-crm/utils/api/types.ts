@@ -326,6 +326,8 @@ export type Invoice = {
   invoiceNo: string;
   customerName?: string;
   supplierName?: string;
+  prescribingDoctorId?: any;
+  doctorName?: string;
   partyAddress?: string;
   shippingAddress?: string;
   date: string;
@@ -1109,4 +1111,14 @@ export type Campaign = {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type MrSampleStock = {
+  _id: string;
+  mrId: string;
+  productId: any;
+  qty: number;
+  lastIssuedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };

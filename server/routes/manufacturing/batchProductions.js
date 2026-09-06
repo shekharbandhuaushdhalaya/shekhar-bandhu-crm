@@ -1387,17 +1387,26 @@ router.get('/:id/bmr-report', async (req, res) => {
 
     const sysSettings = settings || {};
 
+    const botanicalLookup = require('../../utils/botanicalLookup');
     const enrichedIngredients = [];
     for (const ing of batch.ingredientsConsumed) {
       const entry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).lean();
       const rate = entry ? (entry.purchaseRate || 0) : 0;
       const rm = ing.rawMaterialId || {};
+      const botProfile = await botanicalLookup.getBotanicalProfile(rm.name || '');
+
       enrichedIngredients.push({
         name: rm.name || 'Unknown Material',
-        botanicalName: rm.botanicalName || '',
-        partUsed: rm.partUsed || '',
-        pharmacopoeialStandard: rm.pharmacopoeialStandard || 'API',
-        monographRef: rm.monographRef || '',
+        botanicalName: rm.botanicalName || botProfile.latinName || '',
+        partUsed: rm.partUsed || botProfile.partUsed || '',
+        pharmacopoeialStandard: rm.pharmacopoeialStandard || botProfile.standard || 'API',
+        monographRef: rm.monographRef || botProfile.monographRef || '',
+        pharmacopoeiaSpecs: {
+          standard: botProfile.standard || 'API',
+          latinName: botProfile.latinName || '',
+          ashValue: botProfile.ashValue || null,
+          extractiveValue: botProfile.extractiveValue || null
+        },
         isScheduleE1: Boolean(rm.isScheduleE1),
         code: rm.sku || rm.code || 'N/A',
         batchNo: ing.batchNo,

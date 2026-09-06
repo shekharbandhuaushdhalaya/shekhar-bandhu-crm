@@ -354,6 +354,20 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
 
     const visit = await MrVisit.create(data);
 
+    // Deduct sample quantities from MR Field Bag Stock (MrSampleStock)
+    if (data.sampleDetails && data.sampleDetails.length > 0) {
+      const MrSampleStock = require('../../models/MrSampleStock');
+      for (const s of data.sampleDetails) {
+        if (s.productId && (Number(s.qty) > 0)) {
+          await MrSampleStock.findOneAndUpdate(
+            { mrId: req.params.mrId, productId: s.productId },
+            { $inc: { qty: -Number(s.qty) } },
+            { upsert: false }
+          );
+        }
+      }
+    }
+
     // Check & update Permanent Journey Plan (PJP) adherence if plan exists for MR + date
     try {
       const PermanentJourneyPlan = require('../../models/PermanentJourneyPlan');
@@ -913,6 +927,61 @@ router.post('/sample-otp/verify', authorize('mr:visits'), async (req, res) => {
 
     sampleOtpStore.delete(otpKey.toString().toLowerCase());
     res.json({ verified: true, message: 'Doctor sample acknowledgment OTP verified successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── MR Field Bag Sample Stock API ───
+
+// GET /api/medical-reps/:mrId/sample-stock — Get current sample stock in MR bag
+router.get('/:mrId/sample-stock', authorize('mr:view'), async (req, res) => {
+  try {
+    const MrSampleStock = require('../../models/MrSampleStock');
+    const stock = await MrSampleStock.find({ mrId: req.params.mrId })
+      .populate('productId', 'name sku productType packing stockLevel')
+      .lean();
+    res.json(stock);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/medical-reps/:mrId/sample-stock/issue — Issue/dispatch sample stock to MR bag
+router.post('/:mrId/sample-stock/issue', authorize('mr:create'), async (req, res) => {
+  try {
+    const MrSampleStock = require('../../models/MrSampleStock');
+    const { items } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items array is required' });
+    }
+
+    const mrId = req.params.mrId;
+    const mr = await MedicalRepresentative.findById(mrId);
+    if (!mr) return res.status(404).json({ error: 'MR not found' });
+
+    const updatedStock = [];
+    for (const item of items) {
+      if (!item.productId || !item.qty) continue;
+      const qtyNum = Math.max(0, parseInt(item.qty, 10) || 0);
+      if (qtyNum <= 0) continue;
+
+      const record = await MrSampleStock.findOneAndUpdate(
+        { mrId, productId: item.productId },
+        {
+          $inc: { qty: qtyNum },
+          $set: { lastIssuedAt: new Date() }
+        },
+        { upsert: true, new: true, runValidators: true }
+      ).populate('productId', 'name sku productType packing');
+
+      updatedStock.push(record);
+    }
+
+    res.json({
+      message: `Successfully issued ${updatedStock.length} sample products to ${mr.name}'s bag stock`,
+      stock: updatedStock
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1710,12 +1779,20 @@ router.post('/:mrId/optimize-route', authorize('mr:view'), async (req, res) => {
       };
     });
 
+    const areaClustersMap = {};
+    doctors.forEach(d => {
+      const area = d.areaName || 'General Territory';
+      areaClustersMap[area] = (areaClustersMap[area] || 0) + 1;
+    });
+    const areaClusters = Object.keys(areaClustersMap).map(area => ({ areaName: area, doctorCount: areaClustersMap[area] }));
+
     res.json({
       success: true,
       mrId: req.params.mrId,
       totalDoctorsPlanned: doctors.length,
       estimatedDistanceSavingsPercent: doctors.length > 1 ? 28.5 : 0,
       estimatedTimeSavedMinutes: doctors.length * 15,
+      areaClusters,
       itinerary: optimizedSequence
     });
   } catch (err) {
@@ -1746,6 +1823,55 @@ router.post('/visits/:visitId/send-summary-whatsapp', authorize('mr:visit'), asy
       channel: 'WhatsApp & SMS',
       messageText,
       dispatchedAt: new Date()
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/medical-reps/visits/:visitId/send-sample-ack-whatsapp — Dispatch 1-tap sample acknowledgment link via WhatsApp
+router.post('/visits/:visitId/send-sample-ack-whatsapp', authorize('mr:visits'), async (req, res) => {
+  try {
+    const visit = await MrVisit.findById(req.params.visitId);
+    if (!visit) return res.status(404).json({ error: 'Visit record not found' });
+
+    const doctorPhone = req.body.doctorPhone || visit.phone || '9876543210';
+    const sampleItemsStr = (visit.sampleDetails || []).map(s => `${s.qty}x ${s.name}`).join(', ') || 'AYUSH Promotional Samples';
+    const ackUrl = `https://shekharbandhuaushdhalaya.com/ack-sample?visitId=${visit._id}`;
+    const messageText = `Respected Dr. ${visit.doctorName}, please tap the link to digitally confirm sample receipt (${sampleItemsStr}): ${ackUrl}`;
+
+    const { sendMultiChannelNotification } = require('../../services/smsFallbackService');
+    await sendMultiChannelNotification(doctorPhone, messageText);
+
+    res.json({
+      success: true,
+      visitId: visit._id,
+      recipient: doctorPhone,
+      ackUrl,
+      status: 'dispatched'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/medical-reps/visits/:visitId/acknowledge-samples — Digitally confirm doctor sample receipt
+router.post('/visits/:visitId/acknowledge-samples', async (req, res) => {
+  try {
+    const { doctorSignature } = req.body;
+    const visit = await MrVisit.findById(req.params.visitId);
+    if (!visit) return res.status(404).json({ error: 'Visit record not found' });
+
+    visit.sampleAcknowledged = true;
+    visit.sampleAcknowledgedAt = new Date();
+    if (doctorSignature) visit.doctorSignature = doctorSignature;
+
+    await visit.save();
+
+    res.json({
+      success: true,
+      message: `Sample receipt acknowledged digitally for Dr. ${visit.doctorName}`,
+      visit
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

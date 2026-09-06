@@ -179,6 +179,44 @@ router.get('/:id', authorize('mr:view'), async (req, res) => {
   }
 });
 
+// GET /api/doctors/:id/rx-analytics — Prescription Revenue Analytics for a Doctor
+router.get('/:id/rx-analytics', authorize('mr:view'), async (req, res) => {
+  try {
+    const Invoice = require('../../models/Invoice');
+    const doctor = await Doctor.findById(req.params.id).lean();
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor not found' });
+    }
+
+    const invoices = await Invoice.find({
+      $or: [
+        { prescribingDoctorId: doctor._id },
+        { doctorName: { $regex: new RegExp(`^${doctor.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } }
+      ]
+    }).lean();
+
+    const totalRxRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const invoiceCount = invoices.length;
+
+    res.json({
+      doctorId: doctor._id,
+      doctorName: doctor.name,
+      totalRxRevenue,
+      invoiceCount,
+      invoices: invoices.map(i => ({
+        _id: i._id,
+        invoiceNo: i.invoiceNo,
+        customerName: i.customerName,
+        amount: i.amount,
+        date: i.date,
+        status: i.status
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/doctors — Create doctor
 router.post('/', authorize('mr:create'), async (req, res) => {
   try {

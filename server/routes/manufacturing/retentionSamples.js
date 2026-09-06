@@ -68,10 +68,23 @@ router.post('/', authorize('manufacturing:edit'), async (req, res) => {
   }
 });
 
-// PATCH /api/retention-samples/:id/dispose — Mark reference sample as disposed
+// GET /api/retention-samples/due-for-disposal — List samples reaching 3-year expiration/disposal date
+router.get('/due-for-disposal', authorize('manufacturing:view'), async (req, res) => {
+  try {
+    const dueList = await RetentionSample.find({
+      retentionUntil: { $lte: new Date() },
+      status: 'stored'
+    }).sort({ retentionUntil: 1 }).lean();
+    res.json(dueList);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/retention-samples/:id/dispose — Mark reference sample as disposed with method & witness
 router.patch('/:id/dispose', authorize('manufacturing:edit'), async (req, res) => {
   try {
-    const { disposalNotes, status = 'disposed' } = req.body;
+    const { disposalNotes, disposalMethod = 'autoclaving', witnessedBy = '', status = 'disposed' } = req.body;
 
     const sample = await RetentionSample.findById(req.params.id);
     if (!sample) return res.status(404).json({ error: 'Retention sample record not found' });
@@ -79,7 +92,7 @@ router.patch('/:id/dispose', authorize('manufacturing:edit'), async (req, res) =
     sample.status = status;
     sample.disposedAt = new Date();
     sample.disposedBy = req.user ? req.user.id : null;
-    sample.disposalNotes = disposalNotes || '';
+    sample.disposalNotes = `Method: ${disposalMethod}. Witness: ${witnessedBy || 'QC Officer'}. ${disposalNotes || ''}`.trim();
 
     await sample.save();
 

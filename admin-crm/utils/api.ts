@@ -1512,6 +1512,22 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/doctors/matrix?${params}`);
     return res.json();
   }
+  async getDoctorRxAnalytics(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/doctors/${id}/rx-analytics`);
+    return res.json();
+  }
+
+  async getMrSampleStock(mrId: string): Promise<MrSampleStock[]> {
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/sample-stock`);
+    return res.json();
+  }
+  async issueMrSampleStock(mrId: string, items: { productId: string; qty: number }[]): Promise<any> {
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/sample-stock/issue`, {
+      method: 'POST',
+      body: JSON.stringify({ items })
+    });
+    return res.json();
+  }
 
   // ─── MR API Methods ───
   async getMRs(search?: string, active?: string): Promise<MedicalRepresentative[]> {

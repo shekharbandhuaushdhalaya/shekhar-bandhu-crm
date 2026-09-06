@@ -399,6 +399,7 @@ async function getBotanicalInfo(rawMaterialName) {
 
 module.exports = {
   resolveHerbDetails,
+  getBotanicalProfile: resolveHerbDetails,
   getBotanicalInfo,
   lookupGbifTaxonomy,
   HERB_DATABASE

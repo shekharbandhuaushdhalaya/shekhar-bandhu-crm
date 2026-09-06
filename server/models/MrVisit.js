@@ -32,6 +32,8 @@ const mrVisitSchema = new mongoose.Schema({
   doctorSignature: { type: String, default: '' }, // base64, SVG or URL of doctor signature acknowledgment
   sampleOtpVerified:{ type: Boolean, default: false },
   sampleAckOtp:    { type: String, default: '' },
+  sampleAcknowledged: { type: Boolean, default: false },
+  sampleAcknowledgedAt: { type: Date, default: null },
   status:        { type: String, enum: ['planned', 'checked_in', 'checked_out', 'cancelled'], default: 'planned' },
   notes:         { type: String, default: '' },
 }, { timestamps: true });

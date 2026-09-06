@@ -115,4 +115,50 @@ router.patch('/:id/status', authorize('manufacturing:batchManage'), async (req, 
   }
 });
 
+// GET /api/recalls/:id/audit-report — Auto-generate official AYUSH Drug Inspector recall audit report JSON
+router.get('/:id/audit-report', authorize('manufacturing:view'), async (req, res) => {
+  try {
+    const recall = await Recall.findById(req.params.id).lean();
+    if (!recall) return res.status(404).json({ error: 'Recall record not found' });
+
+    const SystemSettings = require('../../models/SystemSettings');
+    const settings = await SystemSettings.findOne().lean() || {};
+
+    const totalAffected = recall.totalAffectedQty || 0;
+    const recalled = recall.recalledQty || 0;
+    const reconciliationPct = totalAffected > 0 ? Number(((recalled / totalAffected) * 100).toFixed(1)) : 100;
+    const notifiedCount = (recall.affectedCustomers || []).filter(c => c.notified).length;
+
+    res.json({
+      title: `AYUSH DRUG INSPECTOR BATCH RECALL AUDIT REPORT — ${recall.recallNo}`,
+      firmDetails: {
+        name: settings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
+        licenseNo: settings.manufacturingLicenseNo || 'AYUSH-1983-UP',
+        gmpCertNo: settings.gmpCertificateNo || 'GMP-AYUSH-2026-VNS'
+      },
+      recallDetails: {
+        recallNo: recall.recallNo,
+        batchNo: recall.batchNo,
+        productName: recall.productName,
+        severityClass: recall.severity,
+        reason: recall.reason,
+        initiatedAt: recall.createdAt,
+        initiatedBy: recall.initiatedBy,
+        status: recall.status,
+        closureNotes: recall.closureNotes || 'N/A'
+      },
+      reconciliationMetrics: {
+        totalDistributedQty: totalAffected,
+        recalledQty: recalled,
+        unrecoveredQty: Math.max(0, totalAffected - recalled),
+        reconciliationPercentage: reconciliationPct,
+        totalCustomersNotified: `${notifiedCount} of ${(recall.affectedCustomers || []).length}`
+      },
+      affectedDistributionList: recall.affectedCustomers || []
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
