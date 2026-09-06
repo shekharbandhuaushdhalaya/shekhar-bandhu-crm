@@ -70,8 +70,8 @@ export default function ProductsScreen() {
         setPage(1);
       } else {
         setProducts(prev => {
-          const existingIds = new Set(prev.map(p => p._id));
-          const nextItems = list.filter(p => !existingIds.has(p._id));
+          const existingIds = new Set(prev.map(p => String(p._id)));
+          const nextItems = list.filter((p: any) => p && p._id && !existingIds.has(String(p._id)));
           return [...prev, ...nextItems];
         });
       }
@@ -95,8 +95,8 @@ export default function ProductsScreen() {
       const list = Array.isArray(res) ? res : (res?.data || []);
       const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
       setProducts(prev => {
-        const existingIds = new Set(prev.map(p => p._id));
-        const nextItems = list.filter(p => !existingIds.has(p._id));
+        const existingIds = new Set(prev.map(p => String(p._id)));
+        const nextItems = list.filter((p: any) => p && p._id && !existingIds.has(String(p._id)));
         return [...prev, ...nextItems];
       });
       setPage(nextPage);

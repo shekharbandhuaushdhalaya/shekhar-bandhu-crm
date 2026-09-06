@@ -470,8 +470,8 @@ export default function ManufacturingScreen() {
       const list = Array.isArray(res) ? res : (res?.data || []);
       const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
       setMaterials(prev => {
-        const existingIds = new Set(prev.map(m => m._id));
-        const nextItems = list.filter(m => !existingIds.has(m._id));
+        const existingIds = new Set(prev.map(m => String(m._id)));
+        const nextItems = list.filter((m: any) => m && m._id && !existingIds.has(String(m._id)));
         return [...prev, ...nextItems];
       });
       setMaterialsPage(nextPage);
