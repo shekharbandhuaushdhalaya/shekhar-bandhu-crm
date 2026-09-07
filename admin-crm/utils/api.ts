@@ -29,21 +29,21 @@ const getBaseUrl = () => {
   if (envApiUrl) return envApiUrl;
 
   if (Platform.OS === 'web') return 'http://localhost:5000/api';
-  
+
   // Try to use the Expo Host URI if running in Expo Go
   const hostUri = Constants?.expoConfig?.hostUri;
   if (hostUri) {
     const ip = hostUri.split(':')[0];
     // If it resolves to localhost (e.g. in some iOS simulators), map it correctly
     if (ip === 'localhost' || ip === '127.0.0.1') {
-       return Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+      return Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
     }
     return `http://${ip}:5000/api`;
   }
-  
+
   // Fallback for Android Emulator
   if (Platform.OS === 'android' && !Constants.isDevice) return 'http://10.0.2.2:5000/api';
-  
+
   // Fallback — user can configure the correct URL from Profile > Server URL
   return 'http://localhost:5000/api';
 };
@@ -156,7 +156,7 @@ class ApiClient {
       if (!this.authToken) {
         try {
           this.authToken = await authStorage.getItem('vp_crm_token');
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (this.authToken) {
@@ -182,17 +182,17 @@ class ApiClient {
         if (!res.ok) {
           let errMsg = 'API Error';
           try {
-              const errData = await res.json();
-              errMsg = errData.error || errData.message || res.statusText;
-              if (errData.issues && Array.isArray(errData.issues) && errData.issues.length > 0) {
-                const details = errData.issues.map((i: any) => `${i.path || 'field'}: ${i.message}`).join(', ');
-                errMsg = `${errMsg} (${details})`;
-              } else if (errData.fields && typeof errData.fields === 'object') {
-                const details = Object.entries(errData.fields).map(([k, v]) => `${k}: ${v}`).join(', ');
-                if (details) errMsg = `${errMsg} (${details})`;
-              }
+            const errData = await res.json();
+            errMsg = errData.error || errData.message || res.statusText;
+            if (errData.issues && Array.isArray(errData.issues) && errData.issues.length > 0) {
+              const details = errData.issues.map((i: any) => `${i.path || 'field'}: ${i.message}`).join(', ');
+              errMsg = `${errMsg} (${details})`;
+            } else if (errData.fields && typeof errData.fields === 'object') {
+              const details = Object.entries(errData.fields).map(([k, v]) => `${k}: ${v}`).join(', ');
+              if (details) errMsg = `${errMsg} (${details})`;
+            }
           } catch {
-              errMsg = res.statusText;
+            errMsg = res.statusText;
           }
           throw new Error(errMsg);
         }
@@ -217,7 +217,7 @@ class ApiClient {
                   json: async () => data
                 })
               } as any;
-            } catch (errInner) {}
+            } catch (errInner) { }
           }
         }
 
@@ -537,7 +537,7 @@ class ApiClient {
     return res.json();
   }
 
-  
+
   async uploadProductImage(id: string, imageUri: string): Promise<Product> {
     const formData = new FormData();
     let cleanFilename = 'image.jpg';
@@ -572,7 +572,7 @@ class ApiClient {
 
     const headers: Record<string, string> = {};
     if (!this.authToken) {
-      try { this.authToken = await authStorage.getItem('vp_crm_token'); } catch (e) {}
+      try { this.authToken = await authStorage.getItem('vp_crm_token'); } catch (e) { }
     }
     if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
 
@@ -634,7 +634,7 @@ class ApiClient {
 
     const headers: Record<string, string> = {};
     if (!this.authToken) {
-      try { this.authToken = await authStorage.getItem('vp_crm_token'); } catch (e) {}
+      try { this.authToken = await authStorage.getItem('vp_crm_token'); } catch (e) { }
     }
     if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
 
@@ -739,7 +739,7 @@ class ApiClient {
     const res = await this.request(url);
     return res.json();
   }
-  
+
   // No generic getInvoice as backend doesn't support it
 
   async createSaleInvoice(data: Partial<Invoice>): Promise<Invoice> {
@@ -750,7 +750,7 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/invoices/purchases`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
-  
+
   async updateInvoice(id: string, data: Partial<Invoice>): Promise<Invoice> {
     const res = await this.request(`${API_BASE}/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
     return res.json();
@@ -889,8 +889,8 @@ class ApiClient {
 
   // --- Inventory Entries (Direct Stock adjustments) ---
   async getInventoryEntries(warehouseId?: string, search = "", showZero = false): Promise<InventoryEntry[]> {
-    let url = `${API_BASE}/inventory-entries?search=${encodeURIComponent(search)}`; 
-    if (warehouseId && warehouseId !== "all") url += `&warehouseId=${encodeURIComponent(warehouseId)}`; 
+    let url = `${API_BASE}/inventory-entries?search=${encodeURIComponent(search)}`;
+    if (warehouseId && warehouseId !== "all") url += `&warehouseId=${encodeURIComponent(warehouseId)}`;
     if (showZero) url += `&showZero=true`;
     const res = await this.request(url);
     return res.json();
@@ -918,9 +918,9 @@ class ApiClient {
 
   // --- Payments ---
   async getPayments(partyId?: string, mode?: string, partyType?: string, type?: string): Promise<Payment[]> {
-    let url = `${API_BASE}/payments?`; 
-    if (partyId) url += `partyId=${encodeURIComponent(partyId)}&`; 
-    if (mode) url += `mode=${encodeURIComponent(mode)}&`; 
+    let url = `${API_BASE}/payments?`;
+    if (partyId) url += `partyId=${encodeURIComponent(partyId)}&`;
+    if (mode) url += `mode=${encodeURIComponent(mode)}&`;
     if (partyType) url += `partyType=${encodeURIComponent(partyType)}&`;
     if (type) url += `type=${encodeURIComponent(type)}`;
     const res = await this.request(url);
@@ -1317,7 +1317,7 @@ class ApiClient {
 
     const headers: Record<string, string> = {};
     if (!this.authToken) {
-      try { this.authToken = await authStorage.getItem('vp_crm_token'); } catch (e) {}
+      try { this.authToken = await authStorage.getItem('vp_crm_token'); } catch (e) { }
     }
     if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
 

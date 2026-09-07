@@ -688,7 +688,13 @@ router.post('/:id/convert-to-invoice', authorize('stockmovement:edit'), async (r
         nextNum = Math.max(...nums) + 1;
       }
     }
-    const invoiceNo = `${prefix}${nextNum.toString().padStart(3, '0')}`;
+    let invoiceNo = `${prefix}${nextNum.toString().padStart(3, '0')}`;
+    let attempts = 0;
+    while (await Invoice.findOne({ invoiceNo }) && attempts < 20) {
+      nextNum++;
+      invoiceNo = `${prefix}${nextNum.toString().padStart(3, '0')}`;
+      attempts++;
+    }
 
     const isIntraState = isOrder ? true : (movement.partyGstin || '').startsWith('09');
     let totalBase = 0;

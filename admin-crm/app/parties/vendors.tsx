@@ -238,7 +238,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
   const [terms, setTerms] = useState('Net 30');
   const [selectedDropdownTerm, setSelectedDropdownTerm] = useState('Net 30');
   const [showTermsDropdown, setShowTermsDropdown] = useState(false);
-  
+
   const standardTerms = ['Due on Receipt', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Net 90'];
 
   const handleDropdownTermChange = (value: string) => {
@@ -281,7 +281,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setCashBalance(vendor.cashBalance ? vendor.cashBalance.toString() : '0');
       setRecordTracking((vendor as any).recordTracking || 'invoice_ledger');
 
-      
+
       const currentTerms = vendor.paymentTerms || 'Net 30';
       setTerms(currentTerms);
       if (standardTerms.includes(currentTerms)) {
@@ -289,7 +289,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       } else {
         setSelectedDropdownTerm('Custom');
       }
-      
+
       setGstin(vendor.gstin || '');
       setPan(vendor.pan || '');
       setAddressPin(vendor.addressPin || '');
@@ -353,11 +353,11 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
       setDisplayName(data.companyName.split('(')[0].trim());
       setAddressCity(data.billingAddress.split(',')[3]?.trim() || 'Varanasi');
       setState(data.state);
-      
+
       if (gstin.length >= 12) {
         setPan(gstin.substring(2, 12).toUpperCase());
       }
-      
+
       alert('GSTIN verified & profile auto-filled!');
     } catch (err: any) {
       alert(err.message || 'Verification failed. Please check GSTIN format.');
@@ -484,7 +484,7 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
 
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
           <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>General Profiles</Text></View>
-          
+
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Registered Business Name</Text>
             <View style={styles.formInput}>
@@ -756,12 +756,12 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
               <Text style={styles.formLabel}>Custom Payment Terms</Text>
               <View style={styles.formInput}>
                 <Ionicons name="create-outline" size={16} color={colors.text.muted} />
-                <TextInput 
-                  style={styles.formInputText} 
-                  placeholder="e.g. Net 7 or 10 Days" 
-                  placeholderTextColor={colors.text.muted} 
-                  value={terms} 
-                  onChangeText={setTerms} 
+                <TextInput
+                  style={styles.formInputText}
+                  placeholder="e.g. Net 7 or 10 Days"
+                  placeholderTextColor={colors.text.muted}
+                  value={terms}
+                  onChangeText={setTerms}
                 />
               </View>
             </View>
@@ -781,7 +781,7 @@ function VendorLedgerModal({
   const styles = useStyles(createStyles);
   const canAccessCash = user?.canAccessCash ?? false;
   const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading]   = useState(false);
+  const [loading, setLoading] = useState(false);
   const [initialBalance, setInitialBalance] = useState(0);
   const [closingBalance, setClosingBalance] = useState(0);
   const [activeLedgerMode, setActiveLedgerMode] = useState<'regular' | 'cash'>('regular');
@@ -800,22 +800,22 @@ function VendorLedgerModal({
     setLoading(true);
     try {
       const name = vendor.displayName || vendor.name || vendor.company || '';
-      
+
       const [allInvoices, allPayments] = await Promise.all([
         api.getPurchaseInvoices(name),
         api.getPayments(vendor._id, 'all', 'Vendor')
       ]);
 
-      const filteredInvoices = allInvoices.filter(i => 
+      const filteredInvoices = allInvoices.filter(i =>
         i.isFinalized && (i.supplierName || '').toLowerCase().includes(name.toLowerCase()) && i.mode === activeLedgerMode
       );
-      const filteredPayments = allPayments.filter(p => 
+      const filteredPayments = allPayments.filter(p =>
         ((p.partyName || '').toLowerCase().includes(name.toLowerCase()) || p.partyId === vendor._id) && p.mode === activeLedgerMode
       );
 
       type Row = { _id: string; date: string; no: string; mode: string; status: string; amount: number; isInvoice: boolean; dueDate?: string };
       let items: Row[] = [];
-      
+
       filteredInvoices.forEach(inv => {
         items.push({
           _id: inv._id,
@@ -846,7 +846,7 @@ function VendorLedgerModal({
 
       // Compute Total Current Balance
       const currentTotalBalance = activeLedgerMode === 'cash' ? (vendor.cashBalance || 0) : (vendor.regularBalance || 0);
-      
+
       // Calculate Initial Balance
       const totalAmountChange = items.reduce((sum, item) => sum + item.amount, 0);
       const startBalance = currentTotalBalance - totalAmountChange;
@@ -857,7 +857,7 @@ function VendorLedgerModal({
         running += item.amount;
         return { ...item, balance: running };
       });
-      
+
       // Filter by date range
       let finalRows = allRows;
       let periodInitialBalance = startBalance;
@@ -883,7 +883,7 @@ function VendorLedgerModal({
       } else {
         periodClosingBalance = periodInitialBalance;
       }
-      
+
       setRows([...finalRows].reverse());
       setInitialBalance(periodInitialBalance);
       setClosingBalance(periodClosingBalance);
@@ -926,7 +926,7 @@ function VendorLedgerModal({
       const cr = r.amount > 0 ? fmt(r.amount) : '';
       const dr = r.amount < 0 ? fmt(-r.amount) : '';
       const balStr = `${bDC(r.balance)} ${fmt(r.balance)}`;
-      
+
       return `
         <tr>
           <td>${d}</td>
@@ -1039,9 +1039,9 @@ function VendorLedgerModal({
   //   positive balance = we owe vendor → CR (credit for vendor)
   //   negative balance = they owe us   → DR (debit for vendor)
   const drCrOf = (n: number) =>
-    n > 0 ? { label: 'CR', color: colors.danger  } :
-    n < 0 ? { label: 'DR', color: colors.success } :
-            { label: '',   color: colors.text.muted };
+    n > 0 ? { label: 'CR', color: colors.danger } :
+      n < 0 ? { label: 'DR', color: colors.success } :
+        { label: '', color: colors.text.muted };
 
   const fmt = (n: number) => `₹${Math.abs(n).toLocaleString('en-IN')}`;
   const bal = drCrOf(closingBalance);
@@ -1050,7 +1050,7 @@ function VendorLedgerModal({
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.ledgerOverlay} onPress={onClose}>
-        <Pressable style={styles.ledgerSheet} onPress={() => {}}>
+        <Pressable style={styles.ledgerSheet} onPress={() => { }}>
           {/* Header */}
           <View style={styles.ledgerHeader}>
             <View style={{ flex: 1 }}>
@@ -1140,8 +1140,8 @@ function VendorLedgerModal({
                 <View style={styles.ledgerHeaderRow}>
                   <Text style={[styles.ledgerHeaderCell, { width: 100 }]}>Date</Text>
                   <Text style={[styles.ledgerHeaderCell, { width: 160 }]}>Invoice / Ref #</Text>
-                  <Text style={[styles.ledgerHeaderCell, { width: 80  }]}>Mode</Text>
-                  <Text style={[styles.ledgerHeaderCell, { width: 80  }]}>Status</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 80 }]}>Mode</Text>
+                  <Text style={[styles.ledgerHeaderCell, { width: 80 }]}>Status</Text>
                   <Text style={[styles.ledgerHeaderCell, { width: 120, textAlign: 'right' }]}>Amount</Text>
                   <Text style={[styles.ledgerHeaderCell, { width: 130, textAlign: 'right' }]}>Balance</Text>
                 </View>
@@ -1151,8 +1151,8 @@ function VendorLedgerModal({
                   <View style={[styles.ledgerRow, { backgroundColor: colors.bg.secondary, borderBottomWidth: 2, borderBottomColor: colors.border }]}>
                     <Text style={[styles.ledgerCell, { width: 100 }]}></Text>
                     <Text style={[styles.ledgerCell, { width: 160, fontWeight: '800', color: colors.text.primary }]}>Closing Balance</Text>
-                    <Text style={[styles.ledgerCell, { width: 80  }]}></Text>
-                    <Text style={[styles.ledgerCell, { width: 80  }]}></Text>
+                    <Text style={[styles.ledgerCell, { width: 80 }]}></Text>
+                    <Text style={[styles.ledgerCell, { width: 80 }]}></Text>
                     <Text style={[styles.ledgerCell, { width: 120 }]}></Text>
                     <Text style={[styles.ledgerCell, { width: 130, textAlign: 'right', fontWeight: '800', fontSize: 14, color: bal.color }]}>
                       {bal.label} {fmt(closingBalance)}
@@ -1172,9 +1172,9 @@ function VendorLedgerModal({
                     <Text style={{ color: colors.text.muted, marginTop: 8, fontSize: 12 }}>No transactions found for this vendor</Text>
                   </View>
                 ) : rows.map((row) => {
-                  const d   = new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
+                  const d = new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
                   const bDC = drCrOf(row.balance);
-                  
+
                   let displayStatus = row.status;
                   let isOverdue = false;
                   if (row.isInvoice && row.status === 'pending') {
@@ -1185,9 +1185,9 @@ function VendorLedgerModal({
                       const termDays = match ? parseInt(match[0], 10) : 30;
                       due = new Date(new Date(row.date).getTime() + termDays * 24 * 60 * 60 * 1000);
                     }
-                    due.setHours(0,0,0,0);
+                    due.setHours(0, 0, 0, 0);
                     const today = new Date();
-                    today.setHours(0,0,0,0);
+                    today.setHours(0, 0, 0, 0);
                     if (today.getTime() > due.getTime()) {
                       isOverdue = true;
                       const diffDays = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
@@ -1201,17 +1201,19 @@ function VendorLedgerModal({
                       <Text style={[styles.ledgerCell, { width: 160, fontWeight: '600' }]} numberOfLines={1}>{row.no}</Text>
                       <View style={[{ width: 80, paddingRight: 8, justifyContent: 'center' }]}>
                         <Text style={[styles.modeBadge,
-                          row.mode === 'regular'
-                            ? { backgroundColor: colors.primary + '18', color: colors.primary }
-                            : { backgroundColor: colors.warning + '18', color: colors.warning }]}>
+                        row.mode === 'regular'
+                          ? { backgroundColor: colors.primary + '18', color: colors.primary }
+                          : { backgroundColor: colors.warning + '18', color: colors.warning }]}>
                           {row.mode === 'regular' ? 'GST' : 'Cash'}
                         </Text>
                       </View>
-                      <Text style={[styles.ledgerCell, { width: 80, fontSize: 11, fontWeight: isOverdue ? 'bold' : 'normal',
+                      <Text style={[styles.ledgerCell, {
+                        width: 80, fontSize: 11, fontWeight: isOverdue ? 'bold' : 'normal',
                         color: row.status === 'paid' ? colors.success
-                             : isOverdue ? colors.danger
-                             : row.status === 'Paid' ? colors.success
-                             : colors.text.muted }]}>
+                          : isOverdue ? colors.danger
+                            : row.status === 'Paid' ? colors.success
+                              : colors.text.muted
+                      }]}>
                         {displayStatus}
                       </Text>
                       <Text style={[styles.ledgerCell, { width: 120, textAlign: 'right', fontWeight: '700', color: row.amount > 0 ? colors.danger : colors.success }]}>
@@ -1228,8 +1230,8 @@ function VendorLedgerModal({
                 <View style={[styles.ledgerRow, { backgroundColor: colors.bg.secondary, borderTopWidth: 2, borderTopColor: colors.border }]}>
                   <Text style={[styles.ledgerCell, { width: 100, color: colors.text.muted, fontSize: 11 }]}>Opening</Text>
                   <Text style={[styles.ledgerCell, { width: 160, color: colors.text.muted }]}>Opening Balance</Text>
-                  <Text style={[styles.ledgerCell, { width: 80  }]}></Text>
-                  <Text style={[styles.ledgerCell, { width: 80  }]}></Text>
+                  <Text style={[styles.ledgerCell, { width: 80 }]}></Text>
+                  <Text style={[styles.ledgerCell, { width: 80 }]}></Text>
                   <Text style={[styles.ledgerCell, { width: 120 }]}></Text>
                   <Text style={[styles.ledgerCell, { width: 130, textAlign: 'right', fontWeight: '800', color: startBal.color }]}>
                     {startBal.label} {fmt(initialBalance)}
@@ -1260,362 +1262,362 @@ function VendorLedgerModal({
       />
     </Modal>
   );
-export default function VendorsScreen() {
+  export default function VendorsScreen() {
 
-  const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [search, setSearch]     = useState('');
-  const debouncedSearch = useDebouncedValue(search, 300);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedVend, setSelectedVend] = useState<Vendor | null>(null);
-  const [detailVisible, setDetailVisible] = useState(false);
-  const [ledgerVisible, setLedgerVisible] = useState(false);
-  const [addVisible, setAddVisible]     = useState(false);
-  const [isEditing, setIsEditing]       = useState(false);
+    const [vendors, setVendors] = useState<Vendor[]>([]);
+    const [search, setSearch] = useState('');
+    const debouncedSearch = useDebouncedValue(search, 300);
+    const [refreshing, setRefreshing] = useState(false);
+    const [selectedVend, setSelectedVend] = useState<Vendor | null>(null);
+    const [detailVisible, setDetailVisible] = useState(false);
+    const [ledgerVisible, setLedgerVisible] = useState(false);
+    const [addVisible, setAddVisible] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
 
-  const { colors } = useTheme();
-  const { user } = useAuth();
-  const perm = usePermission();
-  const styles = useStyles(createStyles);
-  const canAccessCash = user?.canAccessCash ?? false;
+    const { colors } = useTheme();
+    const { user } = useAuth();
+    const perm = usePermission();
+    const styles = useStyles(createStyles);
+    const canAccessCash = user?.canAccessCash ?? false;
 
-  // Lazy loading state
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 50;
+    // Lazy loading state
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const limit = 50;
 
-  const load = useCallback(async () => {
-    const res = await api.getVendors(debouncedSearch, page, limit);
-    if (res && res.data) {
-      if (page === 1) {
-        setVendors(res.data);
+    const load = useCallback(async () => {
+      const res = await api.getVendors(debouncedSearch, page, limit);
+      if (res && res.data) {
+        if (page === 1) {
+          setVendors(res.data);
+        } else {
+          setVendors(prev => {
+            const existingIds = new Set(prev.map(v => v._id));
+            const newVendors = res.data.filter((v: any) => !existingIds.has(v._id));
+            return [...prev, ...newVendors];
+          });
+        }
+        setTotalPages(res.totalPages || 1);
       } else {
-        setVendors(prev => {
-          const existingIds = new Set(prev.map(v => v._id));
-          const newVendors = res.data.filter((v: any) => !existingIds.has(v._id));
-          return [...prev, ...newVendors];
-        });
+        setVendors(Array.isArray(res) ? res : []);
+        setTotalPages(1);
       }
-      setTotalPages(res.totalPages || 1);
-    } else {
-      setVendors(Array.isArray(res) ? res : []);
-      setTotalPages(1);
+    }, [debouncedSearch, page]);
+
+    useEffect(() => { setPage(1); }, [debouncedSearch]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const onRefresh = useCallback(async () => {
+      setRefreshing(true);
+      api.clearCache();
+      await load();
+      setRefreshing(false);
+    }, [load]);
+
+    if (perm.permissions && !perm.can('vendor:view')) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
+          <Ionicons name="lock-closed" size={48} color={colors.danger} />
+          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
+          <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>You do not have permission to access vendor data.</Text>
+        </View>
+      );
     }
-  }, [debouncedSearch, page]);
 
-  useEffect(() => { setPage(1); }, [debouncedSearch]);
+    const columns: Column<Vendor>[] = [
+      {
+        key: 'name',
+        title: 'Registered Name',
+        width: 240,
+        render: (v) => {
+          const compName = toTitleCase(v.company || v.registeredName || v.name) || 'N/A';
+          const subName = (v.displayName && v.displayName !== compName) ? toTitleCase(v.displayName) : (v.name && v.name !== compName) ? toTitleCase(v.name) : '';
+          const avatar = getAvatarColor(compName, colors);
+          return (
+            <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }} onPress={() => { setSelectedVend(v); setLedgerVisible(true); }}>
+              <View style={[styles.avatarCircle, { backgroundColor: avatar.bg }]}>
+                <Text style={[styles.avatarCircleText, { color: avatar.text }]}>
+                  {compName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.primaryText} numberOfLines={1}>{compName}</Text>
+                {subName ? <Text style={styles.secondaryText} numberOfLines={1}>{subName}</Text> : null}
+              </View>
+            </Pressable>
+          );
+        }
+      },
+      {
+        key: 'gstin',
+        title: 'GSTIN',
+        width: 160,
+        render: (v) => {
+          const isUnregistered = !v.gstin || !v.gstin.trim();
+          return isUnregistered ? (
+            <View style={[styles.gstinBadge, { backgroundColor: colors.warning + '0c', borderColor: colors.warning + '20' }]}>
+              <Ionicons name="cash" size={10} color={colors.warning} />
+              <Text style={[styles.gstinText, { color: colors.warning }]}>UNREGISTERED</Text>
+            </View>
+          ) : (
+            <View style={styles.gstinBadge}>
+              <Ionicons name="shield-checkmark" size={10} color={colors.primary} />
+              <Text style={styles.gstinText} numberOfLines={1}>{v.gstin}</Text>
+            </View>
+          );
+        }
+      },
+      {
+        key: 'contactPerson',
+        title: 'Contact Person',
+        width: 150,
+        render: (v) => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="person-outline" size={12} color={colors.text.muted} />
+            <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
+              {toTitleCase(v.contactPerson) || '—'}
+            </Text>
+          </View>
+        )
+      },
+      {
+        key: 'phone',
+        title: 'Contact No.',
+        width: 150,
+        render: (v) => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="call-outline" size={12} color={colors.success} />
+            <Text style={styles.monoText} numberOfLines={1}>{formatPhoneWithCountryCode(v.phone)}</Text>
+          </View>
+        )
+      },
+      {
+        key: 'city',
+        title: 'City',
+        width: 140,
+        render: (v) => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="location-outline" size={13} color={colors.danger} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>{toTitleCase(v.addressCity) || '—'}</Text>
+              {v.state ? <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(v.state)}</Text> : null}
+            </View>
+          </View>
+        )
+      },
+      {
+        key: 'balance',
+        title: 'Balance',
+        width: 140,
+        align: 'right',
+        render: (v) => {
+          const isCash = (v as any).recordTracking === 'cash_ledger';
+          const amount = isCash ? (v.cashBalance || 0) : (v.regularBalance || 0);
+          const label = amount > 0 ? 'CR.' : amount < 0 ? 'DR.' : '';
+          const color = amount > 0 ? colors.danger : amount < 0 ? colors.success : colors.text.muted;
+          const bg = amount > 0 ? colors.danger + '12' : amount < 0 ? colors.success + '12' : colors.bg.secondary;
 
-  useEffect(() => { load(); }, [load]);
+          return (
+            <View style={[styles.balanceBadge, { backgroundColor: bg, borderColor: color + '30', borderWidth: 1 }]}>
+              <Text style={[styles.balanceText, { color, fontSize: 13, fontWeight: '800' }]}>
+                {label} {Math.abs(amount).toLocaleString('en-IN')}
+              </Text>
+            </View>
+          );
+        }
+      },
+      {
+        key: 'action',
+        title: 'Action',
+        width: 100,
+        align: 'center',
+        render: (v) => (
+          <TouchableOpacity style={styles.viewBtn} onPress={() => { setSelectedVend(v); setDetailVisible(true); }}>
+            <Ionicons name="eye-outline" size={13} color={colors.primary} />
+            <Text style={styles.viewBtnText}>View</Text>
+          </TouchableOpacity>
+        )
+      }
+    ];
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    api.clearCache();
-    await load();
-    setRefreshing(false);
-  }, [load]);
-
-  if (perm.permissions && !perm.can('vendor:view')) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
-        <Ionicons name="lock-closed" size={48} color={colors.danger} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
-        <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>You do not have permission to access vendor data.</Text>
+      <View style={styles.screen}>
+        <View style={styles.innerContainer}>
+          <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
+            <Ionicons name="search" size={18} color={colors.text.muted} />
+            <TextInput
+              style={[styles.searchInput, { minWidth: 100 }]}
+              placeholder="Search vendors..."
+              placeholderTextColor={colors.text.muted}
+              value={search}
+              onChangeText={setSearch}
+            />
+            <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedVend(null); setIsEditing(false); setAddVisible(true); }}>
+              <Ionicons name="add" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+            <DataTable
+              data={vendors}
+              columns={columns}
+              keyExtractor={item => item._id}
+              isRefreshing={refreshing}
+              onRefresh={onRefresh}
+              onLoadMore={() => {
+                if (page < totalPages) setPage(p => p + 1);
+              }}
+              isLoadingMore={page < totalPages}
+              onRowPress={(v) => { setSelectedVend(v); setLedgerVisible(true); }}
+              ListEmptyComponent={
+                <View style={styles.emptyTableContainer}>
+                  <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
+                  <Text style={styles.emptyText}>No vendors registered</Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+
+        <VendorLedgerModal
+          vendor={selectedVend}
+          visible={ledgerVisible}
+          onClose={() => { setLedgerVisible(false); load(); }}
+        />
+
+        <VendorDetailModal
+          vendor={selectedVend}
+          visible={detailVisible}
+          onClose={() => { setDetailVisible(false); load(); }}
+          onDeleted={load}
+          onEdit={() => {
+            setDetailVisible(false);
+            setIsEditing(true);
+            setAddVisible(true);
+          }}
+        />
+
+        <AddEditVendorModal
+          visible={addVisible}
+          onClose={() => { setAddVisible(false); setSelectedVend(null); setIsEditing(false); }}
+          onSaved={load}
+          vendor={isEditing ? selectedVend : null}
+        />
       </View>
     );
   }
 
-  const columns: Column<Vendor>[] = [
-    {
-      key: 'name',
-      title: 'Registered Name',
-      width: 240,
-      render: (v) => {
-        const compName = toTitleCase(v.company || v.registeredName || v.name) || 'N/A';
-        const subName = (v.displayName && v.displayName !== compName) ? toTitleCase(v.displayName) : (v.name && v.name !== compName) ? toTitleCase(v.name) : '';
-        const avatar = getAvatarColor(compName, colors);
-        return (
-          <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }} onPress={() => { setSelectedVend(v); setLedgerVisible(true); }}>
-            <View style={[styles.avatarCircle, { backgroundColor: avatar.bg }]}>
-              <Text style={[styles.avatarCircleText, { color: avatar.text }]}>
-                {compName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.primaryText} numberOfLines={1}>{compName}</Text>
-              {subName ? <Text style={styles.secondaryText} numberOfLines={1}>{subName}</Text> : null}
-            </View>
-          </Pressable>
-        );
-      }
+  const createStyles = (colors: typeof LightColors) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.bg.primary },
+    innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
+    searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
+    searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+    addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 10, fontSize: 13 },
+
+    table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
+    tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+    tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+    tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
+    tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
+    tableCell: { fontSize: 13, color: colors.text.primary },
+    tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
+
+    // Text styles
+    primaryText: { fontSize: 13, fontWeight: '800', color: colors.text.primary },
+    secondaryText: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
+    monoText: { fontSize: 12, color: colors.text.secondary, fontFamily: 'monospace' },
+    naText: { fontSize: 12, color: colors.text.muted, fontStyle: 'italic' },
+    balanceText: { fontSize: 14, fontWeight: '800' },
+
+    // Action button (text + icon)
+    viewBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+    viewBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+
+    emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
+
+    // Modals
+    modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+    modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text.primary },
+    profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
+    profileAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.purple + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+    profileAvatarText: { fontSize: 28, fontWeight: '800', color: colors.purple },
+    profileName: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
+    profileCompany: { fontSize: 14, color: colors.text.secondary },
+    infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 14 },
+    infoSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 10, marginBottom: 4 },
+    infoSectionTitle: { fontSize: 12, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+    infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    infoIcon: { width: 22, textAlign: 'center' },
+    infoLabel: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+    infoValue: { fontSize: 13, color: colors.text.primary, fontWeight: '600' },
+
+    editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, flex: 1 },
+    editBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, width: 120 },
+    deleteBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+    formSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 20, marginBottom: 12 },
+    formSectionTitle: { fontSize: 12, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' },
+    formGroup: { marginBottom: 16 },
+    formLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
+    formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
+    formInputText: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+
+    typeSelectorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
+    typeSelectorText: { fontSize: 13, fontWeight: '700' },
+
+    // Ledger modal
+    ledgerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center' },
+    ledgerSheet: { backgroundColor: colors.bg.primary, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', borderTopWidth: 1, borderColor: colors.border, width: '100%' },
+    ledgerHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+    ledgerTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+    ledgerTable: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
+    ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, marginTop: 12 },
+    ledgerHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, paddingRight: 8 },
+    ledgerRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border + '80', paddingVertical: 10, alignItems: 'center' },
+    ledgerCell: { fontSize: 13, color: colors.text.primary, paddingRight: 8 },
+    modeBadge: { fontSize: 10, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
+    ledgerFooter: { padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary },
+    closeBtn: { alignItems: 'center', padding: 12, borderRadius: Radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border },
+    tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
+    tabText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+
+    // Avatar styles
+    avatarCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+    avatarCircleText: { fontSize: 13, fontWeight: '800' },
+
+    // GSTIN Pill Badge
+    gstinBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '0a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary + '20', alignSelf: 'flex-start' },
+    gstinText: { fontSize: 11, color: colors.primary, fontFamily: 'monospace', fontWeight: '600' },
+
+    // Balance Pill Badge
+    balanceBadge: { flexDirection: 'row', alignItems: 'baseline', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.md },
+    balanceBadgeLabel: { fontSize: 9, fontWeight: '900' },
+
+    customSelectPanel: {
+      position: 'absolute',
+      top: 60,
+      left: 0,
+      right: 0,
+      backgroundColor: colors.bg.card,
+      borderRadius: Radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      zIndex: 9999,
+      boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
+      elevation: 8
     },
-    {
-      key: 'gstin',
-      title: 'GSTIN',
-      width: 160,
-      render: (v) => {
-        const isUnregistered = !v.gstin || !v.gstin.trim();
-        return isUnregistered ? (
-          <View style={[styles.gstinBadge, { backgroundColor: colors.warning + '0c', borderColor: colors.warning + '20' }]}>
-            <Ionicons name="cash" size={10} color={colors.warning} />
-            <Text style={[styles.gstinText, { color: colors.warning }]}>UNREGISTERED</Text>
-          </View>
-        ) : (
-          <View style={styles.gstinBadge}>
-            <Ionicons name="shield-checkmark" size={10} color={colors.primary} />
-            <Text style={styles.gstinText} numberOfLines={1}>{v.gstin}</Text>
-          </View>
-        );
-      }
+    customSelectItem: {
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border
     },
-    {
-      key: 'contactPerson',
-      title: 'Contact Person',
-      width: 150,
-      render: (v) => (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="person-outline" size={12} color={colors.text.muted} />
-          <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
-            {toTitleCase(v.contactPerson) || '—'}
-          </Text>
-        </View>
-      )
+    customSelectItemText: {
+      fontSize: 14,
+      color: colors.text.primary
     },
-    {
-      key: 'phone',
-      title: 'Contact No.',
-      width: 150,
-      render: (v) => (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="call-outline" size={12} color={colors.success} />
-          <Text style={styles.monoText} numberOfLines={1}>{formatPhoneWithCountryCode(v.phone)}</Text>
-        </View>
-      )
-    },
-    {
-      key: 'city',
-      title: 'City',
-      width: 140,
-      render: (v) => (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="location-outline" size={13} color={colors.danger} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>{toTitleCase(v.addressCity) || '—'}</Text>
-            {v.state ? <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(v.state)}</Text> : null}
-          </View>
-        </View>
-      )
-    },
-    {
-      key: 'balance',
-      title: 'Balance',
-      width: 140,
-      align: 'right',
-      render: (v) => {
-        const isCash = (v as any).recordTracking === 'cash_ledger';
-        const amount = isCash ? (v.cashBalance || 0) : (v.regularBalance || 0);
-        const label = amount > 0 ? 'CR.' : amount < 0 ? 'DR.' : '';
-        const color = amount > 0 ? colors.danger : amount < 0 ? colors.success : colors.text.muted;
-        const bg = amount > 0 ? colors.danger + '12' : amount < 0 ? colors.success + '12' : colors.bg.secondary;
-
-        return (
-          <View style={[styles.balanceBadge, { backgroundColor: bg, borderColor: color + '30', borderWidth: 1 }]}>
-            <Text style={[styles.balanceText, { color, fontSize: 13, fontWeight: '800' }]}>
-              {label} {Math.abs(amount).toLocaleString('en-IN')}
-            </Text>
-          </View>
-        );
-      }
-    },
-    {
-      key: 'action',
-      title: 'Action',
-      width: 100,
-      align: 'center',
-      render: (v) => (
-        <TouchableOpacity style={styles.viewBtn} onPress={() => { setSelectedVend(v); setDetailVisible(true); }}>
-          <Ionicons name="eye-outline" size={13} color={colors.primary} />
-          <Text style={styles.viewBtnText}>View</Text>
-        </TouchableOpacity>
-      )
-    }
-  ];
-
-  return (
-    <View style={styles.screen}>
-      <View style={styles.innerContainer}>
-        <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
-          <Ionicons name="search" size={18} color={colors.text.muted} />
-          <TextInput
-            style={[styles.searchInput, { minWidth: 100 }]}
-            placeholder="Search vendors..."
-            placeholderTextColor={colors.text.muted}
-            value={search}
-            onChangeText={setSearch}
-          />
-          <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedVend(null); setIsEditing(false); setAddVisible(true); }}>
-            <Ionicons name="add" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
-          <DataTable
-            data={vendors}
-            columns={columns}
-            keyExtractor={item => item._id}
-            isRefreshing={refreshing}
-            onRefresh={onRefresh}
-            onLoadMore={() => {
-              if (page < totalPages) setPage(p => p + 1);
-            }}
-            isLoadingMore={page < totalPages}
-            onRowPress={(v) => { setSelectedVend(v); setLedgerVisible(true); }}
-            ListEmptyComponent={
-              <View style={styles.emptyTableContainer}>
-                <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                <Text style={styles.emptyText}>No vendors registered</Text>
-              </View>
-            }
-          />
-        </View>
-      </View>
-
-      <VendorLedgerModal
-        vendor={selectedVend}
-        visible={ledgerVisible}
-        onClose={() => { setLedgerVisible(false); load(); }}
-      />
-
-      <VendorDetailModal 
-        vendor={selectedVend} 
-        visible={detailVisible} 
-        onClose={() => { setDetailVisible(false); load(); }} 
-        onDeleted={load} 
-        onEdit={() => {
-          setDetailVisible(false);
-          setIsEditing(true);
-          setAddVisible(true);
-        }} 
-      />
-
-      <AddEditVendorModal 
-        visible={addVisible} 
-        onClose={() => { setAddVisible(false); setSelectedVend(null); setIsEditing(false); }} 
-        onSaved={load} 
-        vendor={isEditing ? selectedVend : null} 
-      />
-    </View>
-  );
-}
-
-const createStyles = (colors: typeof LightColors) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg.primary },
-  innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
-  searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
-  addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 10, fontSize: 13 },
-
-  table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
-  tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
-  tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
-  tableCell: { fontSize: 13, color: colors.text.primary },
-  tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
-
-  // Text styles
-  primaryText: { fontSize: 13, fontWeight: '800', color: colors.text.primary },
-  secondaryText: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
-  monoText: { fontSize: 12, color: colors.text.secondary, fontFamily: 'monospace' },
-  naText: { fontSize: 12, color: colors.text.muted, fontStyle: 'italic' },
-  balanceText: { fontSize: 14, fontWeight: '800' },
-
-  // Action button (text + icon)
-  viewBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10' },
-  viewBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
-
-  emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-
-  // Modals
-  modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text.primary },
-  profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
-  profileAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.purple + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  profileAvatarText: { fontSize: 28, fontWeight: '800', color: colors.purple },
-  profileName: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
-  profileCompany: { fontSize: 14, color: colors.text.secondary },
-  infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 14 },
-  infoSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 10, marginBottom: 4 },
-  infoSectionTitle: { fontSize: 12, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
-  infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  infoIcon: { width: 22, textAlign: 'center' },
-  infoLabel: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
-  infoValue: { fontSize: 13, color: colors.text.primary, fontWeight: '600' },
-  
-  editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, flex: 1 },
-  editBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, width: 120 },
-  deleteBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-
-  formSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 20, marginBottom: 12 },
-  formSectionTitle: { fontSize: 12, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' },
-  formGroup: { marginBottom: 16 },
-  formLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
-  formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
-  formInputText: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
-
-  typeSelectorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  typeSelectorText: { fontSize: 13, fontWeight: '700' },
-
-  // Ledger modal
-  ledgerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center' },
-  ledgerSheet: { backgroundColor: colors.bg.primary, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', borderTopWidth: 1, borderColor: colors.border, width: '100%' },
-  ledgerHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  ledgerTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
-  ledgerTable: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
-  ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, marginTop: 12 },
-  ledgerHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, paddingRight: 8 },
-  ledgerRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border + '80', paddingVertical: 10, alignItems: 'center' },
-  ledgerCell: { fontSize: 13, color: colors.text.primary, paddingRight: 8 },
-  modeBadge: { fontSize: 10, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
-  ledgerFooter: { padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary },
-  closeBtn: { alignItems: 'center', padding: 12, borderRadius: Radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border },
-  tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  tabText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-
-  // Avatar styles
-  avatarCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  avatarCircleText: { fontSize: 13, fontWeight: '800' },
-
-  // GSTIN Pill Badge
-  gstinBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '0a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary + '20', alignSelf: 'flex-start' },
-  gstinText: { fontSize: 11, color: colors.primary, fontFamily: 'monospace', fontWeight: '600' },
-
-  // Balance Pill Badge
-  balanceBadge: { flexDirection: 'row', alignItems: 'baseline', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.md },
-  balanceBadgeLabel: { fontSize: 9, fontWeight: '900' },
-
-  customSelectPanel: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.bg.card,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    zIndex: 9999,
-    boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
-    elevation: 8
-  },
-  customSelectItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border
-  },
-  customSelectItemText: {
-    fontSize: 14,
-    color: colors.text.primary
-  },
-});
+  });
 

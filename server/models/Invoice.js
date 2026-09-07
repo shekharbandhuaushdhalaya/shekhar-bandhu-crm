@@ -46,7 +46,7 @@ const invoiceItemSchema = new mongoose.Schema({
 }, { _id: false });
 
 const invoiceSchema = new mongoose.Schema({
-  invoiceNo: { type: String, required: true, unique: true, trim: true },
+  invoiceNo: { type: String, required: true, trim: true },
   firmDetails: {
     name: { type: String },
     address: { type: String },
@@ -136,6 +136,7 @@ invoiceSchema.index({ createdAt: -1 });
 invoiceSchema.index({ type: 1, date: -1 });
 invoiceSchema.index({ type: 1, isFinalized: 1, status: 1 });
 invoiceSchema.index({ isFinalized: 1, status: 1 });
-invoiceSchema.index({ prescribingDoctorId: 1 });
+invoiceSchema.index({ invoiceNo: 1 }, { unique: true, partialFilterExpression: { type: 'sale' } });
+invoiceSchema.index({ invoiceNo: 1, supplierName: 1 }, { unique: true, partialFilterExpression: { type: 'purchase' } });
 
 module.exports = mongoose.model('Invoice', invoiceSchema);

@@ -330,9 +330,7 @@ router.get('/purchases', authorize('invoice:view'), async (req, res) => {
 // POST /api/invoices/sales — Create sale invoice in DRAFT status (no inventory/balance changes yet)
 router.post('/sales', validate(schemas.invoiceSchema), async (req, res) => {
   try {
-
-
-    let invoiceNo = req.body.invoiceNo;
+    let invoiceNo = req.body.invoiceNo ? req.body.invoiceNo.trim() : '';
     if (!invoiceNo) {
       const fy = getFinancialYearString();
       const SystemSettings = require('../../models/SystemSettings');
@@ -341,6 +339,17 @@ router.post('/sales', validate(schemas.invoiceSchema), async (req, res) => {
       const prefix = `${pfx}/${fy}/`;
       const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
       invoiceNo = await generateAtomicDocumentNumber(`invoiceNo_${prefix}`, prefix, 3);
+
+      let attempts = 0;
+      while (await Invoice.findOne({ invoiceNo }) && attempts < 10) {
+        attempts++;
+        invoiceNo = await generateAtomicDocumentNumber(`invoiceNo_${prefix}`, prefix, 3);
+      }
+    } else {
+      const existing = await Invoice.findOne({ invoiceNo });
+      if (existing) {
+        return res.status(400).json({ error: `Invoice number "${invoiceNo}" already exists. Please specify a unique invoice number.` });
+      }
     }
 
     if (req.body.date) {
@@ -406,6 +415,10 @@ router.post('/sales', validate(schemas.invoiceSchema), async (req, res) => {
       req
     });
   } catch (err) {
+    if (err.code === 11000 || (err.message && err.message.includes('E11000'))) {
+      const dupField = err.keyValue ? (err.keyValue.invoiceNo || Object.values(err.keyValue)[0]) : '';
+      return res.status(400).json({ error: `Invoice number "${dupField}" already exists. Please use a unique invoice number.` });
+    }
     res.status(400).json({ error: err.message });
   }
 });
@@ -416,10 +429,17 @@ router.post('/purchases', authorize('invoice:create'), validate(schemas.invoiceS
     const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
 
+    const invoiceNo = req.body.invoiceNo ? req.body.invoiceNo.trim() : ('INV-PURCH-' + Date.now().toString().slice(-6));
+    const supplierName = req.body.supplierName ? req.body.supplierName.trim() : '';
+    const existing = await Invoice.findOne({ type: 'purchase', invoiceNo, supplierName });
+    if (existing) {
+      return res.status(400).json({ error: `Purchase invoice number "${invoiceNo}" already exists for supplier "${supplierName || 'this supplier'}".` });
+    }
+
     const data = {
       ...req.body,
       type: 'purchase',
-      invoiceNo: req.body.invoiceNo || 'INV-PURCH-' + Date.now().toString().slice(-6),
+      invoiceNo,
       isFinalized: false,
       firmDetails: {
         name: settings.firmName || settings.name || '',
@@ -447,6 +467,10 @@ router.post('/purchases', authorize('invoice:create'), validate(schemas.invoiceS
       req
     });
   } catch (err) {
+    if (err.code === 11000 || (err.message && err.message.includes('E11000'))) {
+      const dupField = err.keyValue ? (err.keyValue.invoiceNo || Object.values(err.keyValue)[0]) : '';
+      return res.status(400).json({ error: `Purchase invoice number "${dupField}" already exists for this supplier.` });
+    }
     res.status(400).json({ error: err.message });
   }
 });
