@@ -12,7 +12,7 @@ import { api } from '../utils/api';
 
 const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded_v2';
 
-export const SIDEBAR_WIDTH = 230;
+export const SIDEBAR_WIDTH = 224;
 
 type NavGroup = {
   key: string;
@@ -171,10 +171,10 @@ function NavItemRow({
 
 const createSidebarStyles = (colors: typeof LightColors) =>
   StyleSheet.create({
-    firmSelector: { flexDirection: 'row', alignItems: 'center', margin: Spacing.xs, marginBottom: 4, padding: 9, borderRadius: Radius.md, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border },
+    firmSelector: { flexDirection: 'row', alignItems: 'center', margin: Spacing.xs, marginBottom: 4, padding: 9, borderRadius: Radius.md, backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary + '12' },
     firmIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight, marginRight: 8 },
-    firmCaption: { fontSize: 8, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.8 },
-    firmName: { fontSize: 12, fontWeight: '700', color: colors.text.primary, marginTop: 1 },
+    firmCaption: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8 },
+    firmName: { fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 1 },
     firmModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 24 },
     firmModalCard: { width: '100%', maxWidth: 420, backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: colors.border },
     firmModalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: 10 },
@@ -232,14 +232,14 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: 6,
+      paddingVertical: 8,
       paddingHorizontal: Spacing.sm,
       marginHorizontal: Spacing.xs,
       borderRadius: Radius.md,
       marginTop: 2,
     },
     groupHeaderExpanded: {
-      backgroundColor: colors.primary + '08',
+      backgroundColor: colors.primaryLight,
     },
     groupHeaderLeft: {
       flexDirection: 'row',
@@ -247,22 +247,22 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       flex: 1,
     },
     groupIconBox: {
-      width: 22,
-      height: 22,
-      borderRadius: 6,
+      width: 24,
+      height: 24,
+      borderRadius: 8,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.bg.primary,
     },
     groupIconBoxExpanded: {
-      backgroundColor: colors.primary + '15',
+      backgroundColor: colors.primaryLight,
     },
     groupLabel: {
-      fontSize: 10,
+      fontSize: 10.5,
       fontWeight: '700',
       color: colors.text.muted,
-      marginLeft: 6,
-      letterSpacing: 0.3,
+      marginLeft: 8,
+      letterSpacing: 0.5,
       textTransform: 'uppercase',
     },
     groupLabelExpanded: {
@@ -280,16 +280,16 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     navItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 7,
+      paddingVertical: 8,
       paddingHorizontal: 8,
-      borderRadius: Radius.sm,
+      borderRadius: Radius.md,
       position: 'relative',
     },
     navItemActive: {
       backgroundColor: colors.primaryLight,
     },
     navItemText: {
-      fontSize: 12.5,
+      fontSize: 13,
       fontWeight: '600',
       color: colors.text.secondary,
       marginLeft: 8,
@@ -357,7 +357,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       borderRadius: 3,
     },
     badgeText: {
-      fontSize: 10,
+      fontSize: 10.5,
       fontWeight: '700',
       marginLeft: 6,
     },

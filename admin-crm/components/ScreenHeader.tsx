@@ -24,23 +24,21 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: Spacing.sm,
     backgroundColor: colors.bg.primary,
   },
   titleArea: {
     flex: 1,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 21,
+    fontWeight: '750',
     color: colors.text.primary,
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.text.secondary,
-    marginTop: 2,
+    marginTop: 4,
   },
   actions: {
     flexDirection: 'row',
@@ -54,6 +52,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 6,
     borderRadius: Radius.sm,
     backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primary + '18',
   },
   actionText: {
     fontSize: 13,

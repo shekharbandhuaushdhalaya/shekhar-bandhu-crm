@@ -113,7 +113,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
                 <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, letterSpacing: 0.5, lineHeight: 15 }}>
                   SHEKHAR BANDHU
                 </Text>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, letterSpacing: 0.8, marginTop: 1 }}>
+                <Text style={{ fontSize: 9.5, fontWeight: '700', color: colors.primary, letterSpacing: 0.8, marginTop: 1 }}>
                   AUSHADHALAYA
                 </Text>
               </View>
@@ -123,7 +123,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
 
         {isDesktop && pageName ? (
           <View style={{ paddingHorizontal: 20 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text.primary }}>
               {pageName}
             </Text>
           </View>
@@ -414,7 +414,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   // Global Top Header Styles
   topHeader: {
-    height: 64,
+    height: 62,
     backgroundColor: colors.bg.secondary,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,

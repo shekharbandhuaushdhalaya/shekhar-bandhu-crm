@@ -156,19 +156,18 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: Spacing.md,
     borderBottomWidth: 1,
   },
   headerText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.35,
   },
   row: {
     flexDirection: 'row',
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: Spacing.md,
     borderBottomWidth: 1,
   },

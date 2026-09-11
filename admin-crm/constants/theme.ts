@@ -1,106 +1,83 @@
-// Design System Constants — Premium Light & Dark Themes (Atlassian inspired)
-
+// Calm, accessible design system for the CRM
 export const LightColors = {
   bg: {
-    primary: '#f4f5f7',     // Atlassian light background
-    secondary: '#ffffff',   // White panels
-    card: '#ffffff',
-    cardHover: '#fafbfc',
+    primary: '#F7F9F7',
+    secondary: '#FFFFFF',
+    card: '#FFFFFF',
+    cardHover: '#F4F7F4',
   },
-  border: '#dfe1e6',        // Muted gray borders
+  border: '#E4EAE5',
   text: {
-    primary: '#172b4d',     // Atlassian deep navy gray
-    secondary: '#5e6c84',   // Medium slate gray
-    muted: '#8993a4',       // Muted gray
+    primary: '#26332D',
+    secondary: '#617068',
+    muted: '#8A9890',
   },
-  primary: '#9C2A0E',       // Terracotta
-  primaryLight: 'rgba(156, 42, 14, 0.08)',
-  success: '#36b37e',       // Atlassian Green
-  successLight: 'rgba(54, 179, 126, 0.08)',
-  warning: '#ffab00',       // Atlassian Yellow
-  warningLight: 'rgba(255, 171, 0, 0.08)',
-  danger: '#ff5630',        // Atlassian Red
-  dangerLight: 'rgba(255, 86, 48, 0.08)',
-  info: '#00b8d9',          // Atlassian Teal
-  infoLight: 'rgba(0, 184, 217, 0.08)',
-  purple: '#6554c0',        // Atlassian Purple
+  primary: '#58796C',
+  primaryLight: 'rgba(88, 121, 108, 0.10)',
+  success: '#4F8A6A',
+  successLight: 'rgba(79, 138, 106, 0.10)',
+  warning: '#B58A4A',
+  warningLight: 'rgba(181, 138, 74, 0.10)',
+  danger: '#B8645A',
+  dangerLight: 'rgba(184, 100, 90, 0.10)',
+  info: '#5C8490',
+  infoLight: 'rgba(92, 132, 144, 0.10)',
+  purple: '#786C91',
   pipeline: {
-    lead: '#9C2A0E',
-    contacted: '#00b8d9',
-    proposal: '#ffab00',
-    negotiation: '#6554c0',
-    won: '#36b37e',
-    lost: '#ff5630',
+    lead: '#58796C',
+    contacted: '#5C8490',
+    proposal: '#B58A4A',
+    negotiation: '#786C91',
+    won: '#4F8A6A',
+    lost: '#B8645A',
   },
 };
 
 export const DarkColors = {
   bg: {
-    primary: '#07090e',     // Midnight charcoal
-    secondary: '#0f131a',   // Dark panel blue-gray
-    card: '#161b22',        // Slate card background
-    cardHover: '#1f242c',
+    primary: '#111714',
+    secondary: '#171E1A',
+    card: '#1C2520',
+    cardHover: '#243029',
   },
-  border: 'rgba(255, 255, 255, 0.08)',
+  border: 'rgba(226, 238, 230, 0.10)',
   text: {
-    primary: '#f0f6fc',     // Near white
-    secondary: '#8b949e',   // Cool gray
-    muted: '#484f58',       // Dark slate gray
+    primary: '#EDF4EF',
+    secondary: '#A9B8AF',
+    muted: '#718078',
   },
-  primary: '#ff6b4a',       // Vibrant Terracotta Light
-  primaryLight: 'rgba(255, 107, 74, 0.15)',
-
-  success: '#30a46c',       // Muted green
-  successLight: 'rgba(48, 164, 108, 0.1)',
-  warning: '#e3b341',       // Muted yellow
-  warningLight: 'rgba(227, 179, 65, 0.1)',
-  danger: '#f85149',        // Muted red
-  dangerLight: 'rgba(248, 81, 73, 0.1)',
-  info: '#38bdf8',          // Electric cyan
-  infoLight: 'rgba(56, 189, 248, 0.1)',
-  purple: '#bc8cff',        // Neon lavender
+  primary: '#91B4A5',
+  primaryLight: 'rgba(145, 180, 165, 0.14)',
+  success: '#79B58E',
+  successLight: 'rgba(121, 181, 142, 0.12)',
+  warning: '#D0AA67',
+  warningLight: 'rgba(208, 170, 103, 0.12)',
+  danger: '#D8897F',
+  dangerLight: 'rgba(216, 137, 127, 0.12)',
+  info: '#82AEB9',
+  infoLight: 'rgba(130, 174, 185, 0.12)',
+  purple: '#A99BC1',
   pipeline: {
-    lead: '#58a6ff',
-    contacted: '#38bdf8',
-    proposal: '#e3b341',
-    negotiation: '#bc8cff',
-    won: '#30a46c',
-    lost: '#f85149',
+    lead: '#91B4A5',
+    contacted: '#82AEB9',
+    proposal: '#D0AA67',
+    negotiation: '#A99BC1',
+    won: '#79B58E',
+    lost: '#D8897F',
   },
 };
 
-export const Spacing = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-};
+export const Spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
 
-export const Radius = {
-  sm: 8,
-  md: 14,
-  lg: 20,
-  xl: 30,
-};
+export const Radius = { sm: 8, md: 12, lg: 16, xl: 24 };
 
 export const Shadows = {
-  card: {
-    boxShadow: '0px 4px 12px rgba(0,0,0,0.05)',
-    elevation: 3,
-  },
-  header: {
-    boxShadow: '0px 2px 6px rgba(0,0,0,0.03)',
-    elevation: 2,
-  },
-  hover: {
-    boxShadow: '0px 8px 16px rgba(0,0,0,0.08)',
-    elevation: 5,
-  }
+  card: { boxShadow: '0px 2px 10px rgba(39, 56, 47, 0.04)', elevation: 1 },
+  header: { boxShadow: '0px 1px 6px rgba(39, 56, 47, 0.03)', elevation: 1 },
+  hover: { boxShadow: '0px 5px 14px rgba(39, 56, 47, 0.07)', elevation: 2 },
 };
 
 export type Stage = 'lead' | 'contacted' | 'proposal' | 'negotiation' | 'won' | 'lost';
-
 export const STAGES: Stage[] = ['lead', 'contacted', 'proposal', 'negotiation', 'won', 'lost'];
 export const getStageColors = (colors: typeof LightColors) => ({
   lead: colors.pipeline.lead,
