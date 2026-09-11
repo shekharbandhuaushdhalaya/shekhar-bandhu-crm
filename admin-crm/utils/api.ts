@@ -15,7 +15,7 @@ import type {
   RBACPermissionsResponse, PaymentOrderResponse, PaymentVerifyResponse,
   ManufacturingAnalytics, OrderItem, Order, MedicalRepresentative, MrDailyLog,
   MrVisit, Doctor, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics,
-  ManufacturingUnit, ExpiryAlert, MrSampleStock
+  ManufacturingUnit, ExpiryAlert, MrSampleStock, MrpResponse
 } from './api/types';
 
 export * from './api/types';
@@ -106,9 +106,13 @@ class ApiClient {
     return this.refreshInFlight;
   }
 
-  setToken(token: string | null, user: any = null) {
+  setToken(token: string | null, user?: any) {
     this.authToken = token;
-    this.currentUser = user;
+    this.user = user || null;
+  }
+
+  getAuthToken(): string {
+    return this.authToken || '';
   }
 
   async checkConnection(): Promise<boolean> {
@@ -289,7 +293,7 @@ class ApiClient {
   }
 
   // --- Auth ---
-  async login(email: string, password: string): Promise<{ token: string; user: any }> {
+  async login(email: string, password: string): Promise<{ token?: string; refreshToken?: string; user?: any; mfaRequired?: boolean; mfaToken?: string }> {
     const res = await this.request(`${API_BASE}/auth/login`, {
       method: 'POST',
       body: JSON.stringify({ email, password }),
