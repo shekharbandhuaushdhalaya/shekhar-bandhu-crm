@@ -218,9 +218,19 @@ class ApiClient {
       }
 
       try {
-        const res = await fetch(fetchUrl, { ...options, headers }).catch((netErr: any) => {
-          throw new Error(`Connection Error: Unable to reach backend server (${netErr?.message || 'Network Failure'}). Please ensure the server is running.`);
-        });
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeout = setTimeout(() => controller?.abort(), 30000);
+        let res: Response;
+        try {
+          res = await fetch(fetchUrl, { ...options, headers, ...(controller ? { signal: controller.signal } : {}) });
+        } catch (netErr: any) {
+          const message = netErr?.name === 'AbortError'
+            ? 'The server took too long to respond. Please try again.'
+            : `Connection Error: Unable to reach backend server (${netErr?.message || 'Network Failure'}). Please check your connection and try again.`;
+          throw new Error(message);
+        } finally {
+          clearTimeout(timeout);
+        }
         if (!res.ok && res.status === 401 && !url.includes('/auth/refresh') && this.authToken) {
           const nextToken = await this.refreshAccessToken();
           if (nextToken) {
@@ -234,6 +244,7 @@ class ApiClient {
           try {
             const errData = await res.json();
             errMsg = errData.error || errData.message || res.statusText;
+            if (res.status === 429) errMsg = 'Too many requests. Please wait a moment and try again.';
             if (errData.issues && Array.isArray(errData.issues) && errData.issues.length > 0) {
               const details = errData.issues.map((i: any) => `${i.path || 'field'}: ${i.message}`).join(', ');
               errMsg = `${errMsg} (${details})`;
@@ -648,6 +659,7 @@ class ApiClient {
         try {
           const errData = await res.json();
           errMsg = errData.error || errData.message || res.statusText;
+            if (res.status === 429) errMsg = 'Too many requests. Please wait a moment and try again.';
         } catch { errMsg = res.statusText; }
         throw new Error(errMsg);
       }
@@ -710,6 +722,7 @@ class ApiClient {
         try {
           const errData = await res.json();
           errMsg = errData.error || errData.message || res.statusText;
+            if (res.status === 429) errMsg = 'Too many requests. Please wait a moment and try again.';
         } catch { errMsg = res.statusText; }
         throw new Error(errMsg);
       }
@@ -1422,6 +1435,7 @@ class ApiClient {
         try {
           const errData = await res.json();
           errMsg = errData.error || errData.message || res.statusText;
+            if (res.status === 429) errMsg = 'Too many requests. Please wait a moment and try again.';
         } catch { errMsg = res.statusText; }
         throw new Error(errMsg);
       }

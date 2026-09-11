@@ -21,3 +21,10 @@ This release includes the following production-readiness changes:
 - Node syntax check passed for all 289 server JavaScript files.
 - Production configuration checks passed for exact-origin enforcement and short-JWT rejection.
 - Full dependency-backed lint/Jest/frontend builds could not be run in this workspace because the uploaded project does not contain its dependency tree and package installation was unavailable/time-limited. CI is configured to run those gates with `npm ci`.
+
+## Additional release polish
+- Added a GitHub Actions production gate workflow for backend lint/tests and frontend TypeScript/web export.
+- Added SPA fallback and baseline security headers to the frontend Nginx image.
+- Added a 30-second API request timeout and clearer 429/network errors in the frontend client.
+- ErrorBoundary no longer exposes exception details in production builds.
+- Modernized the manufacturing modal shell with a wider, calmer, more premium layout and stronger hierarchy.

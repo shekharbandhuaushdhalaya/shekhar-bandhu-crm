@@ -6,8 +6,16 @@ function required(name) {
   return value || '';
 }
 
-const origins = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
+const defaultProdOrigins = [
+  'https://shekhar-bandhu-crm.vercel.app',
+  ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL] : [])
+];
+
+const rawOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : (isProduction ? defaultProdOrigins : []);
+
+const origins = rawOrigins
   .map(s => s.trim())
   .filter(Boolean);
 

@@ -38,7 +38,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <View style={styles.container}>
           <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
           <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.message}>{this.state.error?.message || 'An unexpected error occurred.'}</Text>
+          <Text style={styles.message}>{__DEV__ ? (this.state.error?.message || 'An unexpected error occurred.') : 'An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'}</Text>
           <TouchableOpacity style={styles.button} onPress={this.handleReset}>
             <Ionicons name="refresh-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
             <Text style={styles.buttonText}>Try Again</Text>
@@ -53,13 +53,13 @@ export class ErrorBoundary extends Component<Props, State> {
 const styles = StyleSheet.create({
   container: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
-    padding: 24, backgroundColor: '#fafafa', gap: 12
+    padding: 24, backgroundColor: '#F7F9F7', gap: 12
   },
-  title: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
-  message: { fontSize: 13, color: '#64748b', textAlign: 'center', maxWidth: 300 },
+  title: { fontSize: 18, fontWeight: '800', color: '#26332D' },
+  message: { fontSize: 13, color: '#617068', textAlign: 'center', maxWidth: 300 },
   button: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#0891b2', paddingHorizontal: 20, paddingVertical: 10,
+    backgroundColor: '#58796C', paddingHorizontal: 20, paddingVertical: 10,
     borderRadius: 8, marginTop: 8
   },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 14 }
