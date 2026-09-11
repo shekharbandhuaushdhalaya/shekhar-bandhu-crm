@@ -387,8 +387,14 @@ async function runStartupMigrations() {
 // Connect to MongoDB asynchronously
 mongoose
   .connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
-  .then(() => {
+  .then(async () => {
     console.log('🔌 Connected to MongoDB');
+    const { seedDatabase } = require('./utils/seed');
+    try {
+      await seedDatabase();
+    } catch (seedErr) {
+      console.error('❌ Database seed error:', seedErr.message);
+    }
     const { startOverdueTaskChecker } = require('./utils/taskOverdueChecker');
     startOverdueTaskChecker();
     const { checkExpiriesAndReorders } = require('./utils/expiryAlertChecker');
