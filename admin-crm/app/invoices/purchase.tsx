@@ -1751,23 +1751,6 @@ export default function PurchaseInvoicesScreen() {
     );
   }
 
-  return (
-    <View style={styles.screen}>
-      <View style={styles.innerContainer}>
-        <View style={{ zIndex: 1100, position: 'relative' }}>
-          {showFilterDropdown && (
-            <Pressable
-              style={[
-                StyleSheet.absoluteFill,
-                { 
-                  zIndex: 900,
-                  ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {})
-                }
-              ]}
-              onPress={() => setShowFilterDropdown(false)}
-            />
-          )}
-          
   const columns: Column<Invoice>[] = [
     {
       key: 'invoiceNo',

@@ -1262,7 +1262,9 @@ function VendorLedgerModal({
       />
     </Modal>
   );
-  export default function VendorsScreen() {
+}
+
+export default function VendorsScreen() {
 
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [search, setSearch] = useState('');

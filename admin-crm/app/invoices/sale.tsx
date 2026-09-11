@@ -1691,8 +1691,14 @@ const getOverdueText = (item: Invoice, customers: Customer[], colors: any) => {
   const diffTime = today.getTime() - dueDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   if (diffDays > 0) {
-    return <Text style={{ fontSize: 10, color: colors.danger, fontWeight: '700' }}>Overdue {diffDays}d</Text>;
+    return { text: `Overdue by ${diffDays} day${diffDays > 1 ? 's' : ''}`, color: colors.danger };
+  } else if (diffDays === 0) {
+    return { text: 'Due Today', color: colors.warning };
+  } else {
+    const remainingDays = Math.abs(diffDays);
+    return { text: `Due in ${remainingDays} day${remainingDays > 1 ? 's' : ''}`, color: colors.text.secondary };
   }
+};
 
 export default function SaleInvoicesScreen() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);

@@ -1538,6 +1538,8 @@ function CustomerLedgerModal({
       />
     </Modal>
   );
+}
+
 export default function CustomersScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');

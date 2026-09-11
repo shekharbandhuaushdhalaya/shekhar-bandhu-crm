@@ -1486,6 +1486,8 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
       </KeyboardAvoidingView>
     </Modal>
   );
+}
+
 export default function QuotationsScreen() {
   const [invoices, setQuotations] = useState<Quotation[]>([]);
   const [search, setSearch] = useState('');

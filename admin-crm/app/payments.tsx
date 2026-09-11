@@ -559,6 +559,8 @@ export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boo
       </KeyboardAvoidingView>
     </Modal>
   );
+}
+
 export default function PaymentsScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
@@ -630,6 +632,71 @@ export default function PaymentsScreen() {
       );
     }
   };
+
+  const sortedPayments = [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const columns: Column<Payment>[] = [
+    {
+      key: 'date',
+      title: 'Date',
+      width: 120,
+      render: (p) => <Text style={{ fontSize: 13, color: colors.text.primary }}>{new Date(p.date).toLocaleDateString('en-IN')}</Text>
+    },
+    {
+      key: 'partyName',
+      title: 'Party Name',
+      flex: 2,
+      width: 200,
+      render: (p) => (
+        <View>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }} numberOfLines={1}>{p.partyName}</Text>
+          <Text style={{ fontSize: 10, color: colors.text.muted }}>{p.partyType}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'type',
+      title: 'Type',
+      width: 100,
+      render: (p) => (
+        <View style={[styles.badge, { backgroundColor: p.type === 'receive' ? colors.success + '15' : colors.danger + '15' }]}>
+          <Text style={[styles.badgeText, { color: p.type === 'receive' ? colors.success : colors.danger }]}>
+            {p.type === 'receive' ? 'RECEIVED' : 'PAID'}
+          </Text>
+        </View>
+      )
+    },
+    {
+      key: 'mode',
+      title: 'Mode',
+      width: 100,
+      render: (p) => (
+        <Text style={{ fontSize: 12, color: colors.text.secondary }}>{p.mode === 'regular' ? 'GST' : 'Cash'} ({p.paymentMethod})</Text>
+      )
+    },
+    {
+      key: 'amount',
+      title: 'Amount',
+      width: 120,
+      align: 'right',
+      render: (p) => (
+        <Text style={{ fontSize: 13, fontWeight: '800', color: p.type === 'receive' ? colors.success : colors.danger }}>
+          {p.type === 'receive' ? '+' : '-'} ₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+        </Text>
+      )
+    },
+    {
+      key: 'action',
+      title: 'Action',
+      width: 90,
+      align: 'center',
+      render: (p) => (
+        <TouchableOpacity style={styles.actionPillBtn} onPress={() => { setSelectedPayment(p); setDetailVisible(true); }}>
+          <Text style={[styles.actionPillText, { color: colors.primary }]}>View</Text>
+        </TouchableOpacity>
+      )
+    }
+  ];
 
   return (
     <View style={styles.screen}>
