@@ -73,8 +73,13 @@ router.post('/', authorize('mr:create'), validate(schemas.medicalRepSchema), asy
   try {
     const data = { ...req.body };
     if (!data.code || !data.code.trim()) {
-      const count = await MedicalRepresentative.countDocuments();
-      data.code = `MR-${(count + 1).toString().padStart(3, '0')}`;
+      let num = (await MedicalRepresentative.countDocuments()) + 1;
+      let nextCode = `MR-${num.toString().padStart(3, '0')}`;
+      while (await MedicalRepresentative.exists({ code: nextCode })) {
+        num++;
+        nextCode = `MR-${num.toString().padStart(3, '0')}`;
+      }
+      data.code = nextCode;
     }
     const mr = await MedicalRepresentative.create(data);
     if (req.io) {
@@ -82,6 +87,12 @@ router.post('/', authorize('mr:create'), validate(schemas.medicalRepSchema), asy
     }
     res.status(201).json(mr);
   } catch (err) {
+    if (err.code === 11000) {
+      const isCode = err.keyPattern && err.keyPattern.code;
+      const isPhone = err.keyPattern && err.keyPattern.phone;
+      const fieldMsg = isCode ? 'code' : (isPhone ? 'phone number' : 'unique key');
+      return res.status(400).json({ error: `A Medical Representative with this ${fieldMsg} already exists.` });
+    }
     res.status(400).json({ error: err.message });
   }
 });
