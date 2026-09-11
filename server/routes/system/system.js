@@ -13,15 +13,25 @@ const router = express.Router();
 router.get('/settings', authenticateToken, authorize('settings:view'), async (req, res) => {
   try {
     const { includeAssets } = req.query;
-    let query = SystemSettings.findOne({ key: 'company_config' });
-    if (includeAssets !== 'true') {
-      query = query.select('-signatureBase64 -qrImageBase64');
+    const projection = includeAssets === 'true' ? null : '-signatureBase64 -qrImageBase64';
+    
+    let settings;
+    try {
+      settings = await SystemSettings.findOneAndUpdate(
+        { key: 'company_config' },
+        { $setOnInsert: { key: 'company_config' } },
+        { upsert: true, new: true, setDefaultsOnInsert: true, select: projection }
+      ).lean();
+    } catch (upsertErr) {
+      if (upsertErr.code === 11000) {
+        settings = await SystemSettings.findOne({ key: 'company_config' })
+          .select(projection)
+          .lean();
+      } else {
+        throw upsertErr;
+      }
     }
-    let settings = await query.lean();
-    if (!settings) {
-      // Create defaults if not present
-      settings = await SystemSettings.create({ key: 'company_config' });
-    }
+
     res.json(settings);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -32,12 +42,25 @@ router.get('/settings', authenticateToken, authorize('settings:view'), async (re
 router.get('/settings/public', publicTenant, async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=300');
-    let settings = await SystemSettings.findOne({ key: 'company_config' })
-      .select('firmName firmAddress firmEmail firmPhone firmGstin invoicePrefix quotationPrefix challanPrefix dispatchPrefix defaultTerms defaultGstRate signatureUrl dscSignatoryName dscCertificateName manufacturingLicenseNo gmpCertificateNo licenseValidTill gmpValidTill licenceValidityType stateUtCode licenceSerial qrImageUrl')
-      .lean();
-    if (!settings) {
-      settings = await SystemSettings.create({ key: 'company_config' });
+    const publicFields = 'firmName firmAddress firmEmail firmPhone firmGstin invoicePrefix quotationPrefix challanPrefix dispatchPrefix defaultTerms defaultGstRate signatureUrl dscSignatoryName dscCertificateName manufacturingLicenseNo gmpCertificateNo licenseValidTill gmpValidTill licenceValidityType stateUtCode licenceSerial qrImageUrl';
+    
+    let settings;
+    try {
+      settings = await SystemSettings.findOneAndUpdate(
+        { key: 'company_config' },
+        { $setOnInsert: { key: 'company_config' } },
+        { upsert: true, new: true, setDefaultsOnInsert: true, select: publicFields }
+      ).lean();
+    } catch (upsertErr) {
+      if (upsertErr.code === 11000) {
+        settings = await SystemSettings.findOne({ key: 'company_config' })
+          .select(publicFields)
+          .lean();
+      } else {
+        throw upsertErr;
+      }
     }
+
     res.json(settings);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -47,10 +70,17 @@ router.get('/settings/public', publicTenant, async (req, res) => {
 // PUT /api/system/settings
 router.put('/settings', authenticateToken, authorize('settings:edit'), validate(schemas.systemSettingsSchema), async (req, res) => {
   try {
-
     let settings = await SystemSettings.findOne({ key: 'company_config' });
     if (!settings) {
-      settings = new SystemSettings({ key: 'company_config' });
+      try {
+        settings = await SystemSettings.create({ key: 'company_config' });
+      } catch (createErr) {
+        if (createErr.code === 11000) {
+          settings = await SystemSettings.findOne({ key: 'company_config' });
+        } else {
+          throw createErr;
+        }
+      }
     }
 
     // Update fields
