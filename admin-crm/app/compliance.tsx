@@ -1,14 +1,56 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import {
+  ScrollView, View, Text, StyleSheet, ActivityIndicator, TouchableOpacity,
+  Modal, TextInput, FlatList, Pressable
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../utils/themeContext';
+import { useToast } from '../utils/ToastContext';
+
+type ModuleKey = 'equipment' | 'deviations' | 'stability' | 'recalls' | 'vendors' | 'specifications';
 
 export default function ComplianceScreen() {
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>({ eq: [], dev: [], st: [], rec: [], vq: [], spec: [] });
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+
+  // Selected Category Detail Modal
+  const [activeCategory, setActiveCategory] = useState<ModuleKey | null>(null);
+
+  // Add Equipment Modal
+  const [addEquipmentModal, setAddEquipmentModal] = useState(false);
+  const [eqForm, setEqForm] = useState({
+    code: '',
+    name: '',
+    category: 'tableting',
+    manufacturingUnitId: '',
+    calibrationFrequencyDays: '180',
+    notes: ''
+  });
+
+  // Calibrate Modal
+  const [calibrateModal, setCalibrateModal] = useState(false);
+  const [selectedEqId, setSelectedEqId] = useState<string | null>(null);
+  const [calibForm, setCalibForm] = useState({
+    certificateNo: '',
+    calibratedBy: '',
+    nextCalibrationDue: '',
+    notes: ''
+  });
+
+  const loadWarehouses = useCallback(async () => {
+    try {
+      const list = await api.getWarehouses();
+      setWarehouses(list || []);
+      if (list && list.length > 0) {
+        setEqForm(prev => ({ ...prev, manufacturingUnitId: prev.manufacturingUnitId || list[0]._id }));
+      }
+    } catch { }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,32 +80,239 @@ export default function ComplianceScreen() {
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadWarehouses();
+  }, [load, loadWarehouses]);
 
-  const cards: [string, any[], string, string][] = [
-    ['Equipment & Calibration', data.eq, 'equipment', 'build-outline'],
-    ['Deviations & CAPA', data.dev, 'deviations', 'alert-circle-outline'],
-    ['Stability Studies', data.st, 'stability', 'flask-outline'],
-    ['Recalls & Traceability', data.rec, 'recalls', 'archive-outline'],
-    ['Vendor Qualification', data.vq, 'vendors', 'shield-checkmark-outline'],
-    ['AYUSH QC Specifications', data.spec, 'specifications', 'ribbon-outline'],
+  const handleCreateEquipment = async () => {
+    if (!eqForm.code.trim() || !eqForm.name.trim()) {
+      showToast('Machine Code and Name are required', 'info');
+      return;
+    }
+    try {
+      await api.createManufacturingEquipment({
+        ...eqForm,
+        calibrationFrequencyDays: parseInt(eqForm.calibrationFrequencyDays, 10) || 180,
+        manufacturingUnitId: eqForm.manufacturingUnitId || warehouses[0]?._id
+      });
+      showToast('Manufacturing equipment / machine registered successfully!', 'success');
+      setAddEquipmentModal(false);
+      setEqForm({
+        code: '',
+        name: '',
+        category: 'tableting',
+        manufacturingUnitId: warehouses[0]?._id || '',
+        calibrationFrequencyDays: '180',
+        notes: ''
+      });
+      load();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to register machine', 'error');
+    }
+  };
+
+  const handleCalibrateSubmit = async () => {
+    if (!selectedEqId) return;
+    try {
+      await api.calibrateEquipment(selectedEqId, calibForm);
+      showToast('Equipment calibration log recorded!', 'success');
+      setCalibrateModal(false);
+      setCalibForm({ certificateNo: '', calibratedBy: '', nextCalibrationDue: '', notes: '' });
+      setSelectedEqId(null);
+      load();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to record calibration', 'error');
+    }
+  };
+
+  const cards: [string, any[], ModuleKey, string, string][] = [
+    ['Equipment & Machines', data.eq, 'equipment', 'build-outline', 'Mixers, Driers, Tablet Presses, Filling & Packaging Machines'],
+    ['Deviations & CAPA', data.dev, 'deviations', 'alert-circle-outline', 'Quality Non-Conformances & Corrective Action Logs'],
+    ['Stability Studies', data.st, 'stability', 'flask-outline', 'Real-time & Accelerated Shelf-Life Testing Protocols'],
+    ['Recalls & Traceability', data.rec, 'recalls', 'archive-outline', 'Mock Recalls, Genealogies & Batch Quarantine Trace'],
+    ['Vendor Qualification', data.vq, 'vendors', 'shield-checkmark-outline', 'Approved Raw Material Supplier Audit Scorecards'],
+    ['AYUSH QC Specifications', data.spec, 'specifications', 'ribbon-outline', 'Botanical Limits, Organoleptic & Heavy Metal Tests'],
   ];
+
+  const renderActiveCategoryDetails = () => {
+    if (!activeCategory) return null;
+    let title = '';
+    let items: any[] = [];
+
+    switch (activeCategory) {
+      case 'equipment':
+        title = 'Manufacturing Equipment & Machinery Roster';
+        items = data.eq;
+        break;
+      case 'deviations':
+        title = 'Deviations & CAPA Records';
+        items = data.dev;
+        break;
+      case 'stability':
+        title = 'Stability Testing Protocols';
+        items = data.st;
+        break;
+      case 'recalls':
+        title = 'Product Recalls & Tracing Logs';
+        items = data.rec;
+        break;
+      case 'vendors':
+        title = 'Vendor Audit Qualifications';
+        items = data.vq;
+        break;
+      case 'specifications':
+        title = 'AYUSH Quality Specifications';
+        items = data.spec;
+        break;
+    }
+
+    return (
+      <Modal visible={!!activeCategory} animationType="slide" transparent onRequestClose={() => setActiveCategory(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
+                <Text style={[styles.modalSub, { color: colors.textSecondary }]}>{items.length} Total Records</Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {activeCategory === 'equipment' && (
+                  <TouchableOpacity
+                    style={[styles.smallAddBtn, { backgroundColor: colors.primary }]}
+                    onPress={() => setAddEquipmentModal(true)}
+                  >
+                    <Ionicons name="add" size={16} color="#fff" />
+                    <Text style={styles.smallAddBtnText}>+ Machine</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => setActiveCategory(null)}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <ScrollView style={{ flex: 1, padding: 16 }}>
+              {items.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="documents-outline" size={36} color={colors.textSecondary} />
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No records found in this category.</Text>
+                  {activeCategory === 'equipment' && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
+                      onPress={() => setAddEquipmentModal(true)}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>Register First Machine</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : (
+                items.map((item: any, idx: number) => (
+                  <View key={item._id || idx} style={[styles.detailItemCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                    {activeCategory === 'equipment' && (
+                      <View>
+                        <View style={styles.detailHeader}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={styles.codePill}>{item.code || `EQ-${idx + 1}`}</Text>
+                            <Text style={[styles.itemTitle, { color: colors.text }]}>{item.name}</Text>
+                          </View>
+                          <View style={[styles.statusBadge, { backgroundColor: item.status === 'active' ? colors.success + '20' : colors.warning + '20' }]}>
+                            <Text style={[styles.statusBadgeText, { color: item.status === 'active' ? colors.success : colors.warning }]}>
+                              {(item.status || 'ACTIVE').toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={[styles.itemDetailText, { color: colors.textSecondary }]}>
+                          ⚙️ Category: <Text style={{ fontWeight: '700', color: colors.text }}>{item.category?.toUpperCase() || 'MANUFACTURING'}</Text>
+                          {'  |  '}
+                          🏭 Unit: <Text style={{ fontWeight: '700', color: colors.text }}>{item.manufacturingUnitId?.name || 'Main Plant'}</Text>
+                        </Text>
+
+                        {item.calibrationDueDate && (
+                          <Text style={[styles.itemDetailText, { color: colors.textSecondary, marginTop: 4 }]}>
+                            📅 Next Calibration Due: <Text style={{ fontWeight: '700', color: colors.primary }}>{new Date(item.calibrationDueDate).toLocaleDateString()}</Text>
+                          </Text>
+                        )}
+
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                          <TouchableOpacity
+                            style={[styles.miniActionBtn, { backgroundColor: colors.primary }]}
+                            onPress={() => {
+                              setSelectedEqId(item._id);
+                              setCalibForm({
+                                certificateNo: `CAL-${Date.now().toString().slice(-5)}`,
+                                calibratedBy: '',
+                                nextCalibrationDue: new Date(Date.now() + (item.calibrationFrequencyDays || 180) * 86400000).toISOString().slice(0, 10),
+                                notes: ''
+                              });
+                              setCalibrateModal(true);
+                            }}
+                          >
+                            <Ionicons name="checkmark-done-circle-outline" size={14} color="#fff" />
+                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Log Calibration</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
+                    {activeCategory !== 'equipment' && (
+                      <View>
+                        <Text style={[styles.itemTitle, { color: colors.text }]}>
+                          {item.name || item.title || item.code || item.productName || `Record #${idx + 1}`}
+                        </Text>
+                        <Text style={[styles.itemDetailText, { color: colors.textSecondary, marginTop: 4 }]}>
+                          {item.notes || item.reason || item.description || item.status || 'Connected GMP Quality Record'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setActiveCategory(null)}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Close Panel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={styles.container}>
-      <ScreenHeader title="GMP & AYUSH Compliance" subtitle="Connected manufacturing quality controls" />
+      <ScreenHeader
+        title="GMP & AYUSH Compliance"
+        subtitle="Connected manufacturing quality controls & machinery mechanisms"
+      />
+
+      <View style={[styles.headerBanner, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
+        <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.bannerTitle, { color: colors.primary }]}>Manufacturing & Quality Mechanisms</Text>
+          <Text style={[styles.bannerSub, { color: colors.textSecondary }]}>
+            Includes Equipment/Machinery calibration tracking, Line Clearance checks, Deviations (CAPA), Stability Studies, and Vendor Qualification.
+          </Text>
+        </View>
+      </View>
+
       {loading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={{ marginTop: 10, color: colors.textSecondary }}>Loading compliance modules...</Text>
         </View>
       ) : (
-        cards.map(([title, items, key, iconName]) => (
-          <View key={key} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        cards.map(([title, items, key, iconName, desc]) => (
+          <TouchableOpacity
+            key={key}
+            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => setActiveCategory(key)}
+            activeOpacity={0.7}
+          >
             <View style={styles.row}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <View style={[styles.iconBadge, { backgroundColor: colors.primary + '15' }]}>
-                  <Ionicons name={iconName as any} size={20} color={colors.primary} />
+                  <Ionicons name={iconName as any} size={22} color={colors.primary} />
                 </View>
                 <View>
                   <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
@@ -72,34 +321,234 @@ export default function ComplianceScreen() {
                   </Text>
                 </View>
               </View>
-              <View style={[styles.badgePill, { backgroundColor: colors.success + '15' }]}>
-                <Text style={[styles.badgeText, { color: colors.success }]}>CONNECTED</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[styles.badgePill, { backgroundColor: colors.success + '15' }]}>
+                  <Text style={[styles.badgeText, { color: colors.success }]}>CONNECTED</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
               </View>
             </View>
-            <Text style={[styles.note, { color: colors.textSecondary }]}>
-              This quality module is integrated with production logs, BMR release gates, and AYUSH GMP compliance records.
-            </Text>
-          </View>
+            <Text style={[styles.note, { color: colors.textSecondary }]}>{desc}</Text>
+          </TouchableOpacity>
         ))
       )}
-      <TouchableOpacity onPress={load} style={[styles.refresh, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
-        <Ionicons name="refresh-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
-        <Text style={{ color: '#fff', fontWeight: '700' }}>Refresh compliance data</Text>
-      </TouchableOpacity>
+
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: 6, marginBottom: 20 }}>
+        <TouchableOpacity
+          onPress={() => setAddEquipmentModal(true)}
+          style={[styles.actionBtn, { backgroundColor: colors.primary, flex: 1 }]}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add-circle-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={{ color: '#fff', fontWeight: '700' }}>+ Register Machine</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={load}
+          style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, flex: 1 }]}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="refresh-outline" size={18} color={colors.text} style={{ marginRight: 6 }} />
+          <Text style={{ color: colors.text, fontWeight: '700' }}>Refresh Data</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Modal: Add Equipment */}
+      <Modal visible={addEquipmentModal} animationType="fade" transparent onRequestClose={() => setAddEquipmentModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Register Manufacturing Machine</Text>
+              <TouchableOpacity onPress={() => setAddEquipmentModal(false)}>
+                <Ionicons name="close" size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ padding: 16 }}>
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Machine Code / Tag ID *</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="e.g. EQ-MIX-001 or TAB-PRESS-02"
+                  placeholderTextColor={colors.textSecondary}
+                  value={eqForm.code}
+                  onChangeText={v => setEqForm({ ...eqForm, code: v })}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Machine / Equipment Name *</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="e.g. High Speed Rotary Tablet Press"
+                  placeholderTextColor={colors.textSecondary}
+                  value={eqForm.name}
+                  onChangeText={v => setEqForm({ ...eqForm, name: v })}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Category</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                  {['tableting', 'mixer', 'drier', 'pulverizer', 'filling', 'packaging', 'qc_instrument'].map(cat => (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[styles.chip, eqForm.category === cat && { backgroundColor: colors.primary }]}
+                      onPress={() => setEqForm({ ...eqForm, category: cat })}
+                    >
+                      <Text style={[styles.chipText, eqForm.category === cat && { color: '#fff' }]}>{cat.toUpperCase()}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Calibration Frequency (Days)</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="180"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.textSecondary}
+                  value={eqForm.calibrationFrequencyDays}
+                  onChangeText={v => setEqForm({ ...eqForm, calibrationFrequencyDays: v })}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Notes / Specifications</Text>
+                <TextInput
+                  style={[styles.input, { height: 60, borderColor: colors.border, color: colors.text }]}
+                  placeholder="Capacity, model, maintenance rules..."
+                  multiline
+                  placeholderTextColor={colors.textSecondary}
+                  value={eqForm.notes}
+                  onChangeText={v => setEqForm({ ...eqForm, notes: v })}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooterRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setAddEquipmentModal(false)}>
+                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleCreateEquipment}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Register Machine</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Calibrate Machine */}
+      <Modal visible={calibrateModal} animationType="fade" transparent onRequestClose={() => setCalibrateModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Record Calibration Certificate</Text>
+              <TouchableOpacity onPress={() => setCalibrateModal(false)}>
+                <Ionicons name="close" size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ padding: 16 }}>
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Certificate Number</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  value={calibForm.certificateNo}
+                  onChangeText={v => setCalibForm({ ...calibForm, certificateNo: v })}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Calibrated By (Inspector / Agency)</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="e.g. NABL Accredited QC Lab / Inspector Name"
+                  placeholderTextColor={colors.textSecondary}
+                  value={calibForm.calibratedBy}
+                  onChangeText={v => setCalibForm({ ...calibForm, calibratedBy: v })}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Next Calibration Due Date (YYYY-MM-DD)</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  value={calibForm.nextCalibrationDue}
+                  onChangeText={v => setCalibForm({ ...calibForm, nextCalibrationDue: v })}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Notes</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="Calibration observations..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={calibForm.notes}
+                  onChangeText={v => setCalibForm({ ...calibForm, notes: v })}
+                />
+              </View>
+            </View>
+
+            <View style={styles.modalFooterRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setCalibrateModal(false)}>
+                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleCalibrateSubmit}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Save Calibration Log</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {renderActiveCategoryDetails()}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { padding: 20, gap: 14 },
+  headerBanner: { padding: 16, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 12, alignItems: 'center' },
+  bannerTitle: { fontSize: 15, fontWeight: '700' },
+  bannerSub: { fontSize: 13, marginTop: 2, lineHeight: 18 },
   loadingBox: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   card: { padding: 18, borderWidth: 1, borderRadius: 12 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  iconBadge: { width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  iconBadge: { width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 16, fontWeight: '700' },
   count: { fontSize: 13, marginTop: 2 },
   badgePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
   badgeText: { fontSize: 11, fontWeight: '800' },
   note: { marginTop: 12, fontSize: 13, lineHeight: 18 },
-  refresh: { padding: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  actionBtn: { padding: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+  modalContent: { width: '100%', maxWidth: 700, maxHeight: '85%', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column' },
+  modalCard: { width: '100%', maxWidth: 500, borderRadius: 14, padding: 16 },
+  modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)' },
+  modalTitle: { fontSize: 17, fontWeight: '800' },
+  modalSub: { fontSize: 12, marginTop: 2 },
+  emptyCard: { padding: 40, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { marginTop: 10, fontSize: 14 },
+  detailItemCard: { padding: 14, borderWidth: 1, borderRadius: 10, marginBottom: 10 },
+  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  codePill: { backgroundColor: 'rgba(0,0,0,0.06)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 11, fontWeight: '800' },
+  itemTitle: { fontSize: 15, fontWeight: '700' },
+  itemDetailText: { fontSize: 13 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+  statusBadgeText: { fontSize: 10, fontWeight: '800' },
+  miniActionBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  smallAddBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  smallAddBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  closeBtn: { padding: 14, backgroundColor: '#333', borderRadius: 10, alignItems: 'center', marginTop: 10 },
+  field: { marginBottom: 12 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', marginBottom: 4 },
+  input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 },
+  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.06)' },
+  chipText: { fontSize: 11, fontWeight: '700', color: '#555' },
+  modalFooterRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)' },
+  modalCancelBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
+  modalSubmitBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
 });

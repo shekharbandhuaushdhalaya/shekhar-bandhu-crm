@@ -1232,6 +1232,14 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/manufacturing/quality-specifications/${id}/approve`, { method:'PATCH' }); return res.json();
   }
   async getManufacturingEquipment(): Promise<any[]> { const res=await this.request(`${API_BASE}/manufacturing/equipment`); return res.json(); }
+  async createManufacturingEquipment(data: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/equipment`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async calibrateEquipment(id: string, data: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/equipment/${id}/calibrate`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
   async getManufacturingDeviations(): Promise<any[]> { const res=await this.request(`${API_BASE}/manufacturing/deviations`); return res.json(); }
   async getStabilityStudies(): Promise<any[]> { const res=await this.request(`${API_BASE}/stability-studies`); return res.json(); }
   async getRecalls(): Promise<any[]> { const res=await this.request(`${API_BASE}/recalls`); return res.json(); }
