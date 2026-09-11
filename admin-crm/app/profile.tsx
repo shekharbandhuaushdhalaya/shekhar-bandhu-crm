@@ -29,7 +29,7 @@ import { Spacing, Radius, LightColors } from '../constants/theme';
 import AyurvedicLoader from '../components/AyurvedicLoader';
 
 export default function ProfileScreen() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, switchFirm } = useAuth();
   const perm = usePermission();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
@@ -38,6 +38,28 @@ export default function ProfileScreen() {
   const isDesktop = winWidth > 768;
 
   const [initialLoading, setInitialLoading] = useState(true);
+  const [firmsList, setFirmsList] = useState<any[]>([]);
+  const [switchingFirmId, setSwitchingFirmId] = useState<string | null>(null);
+
+  const loadFirmsList = async () => {
+    try {
+      const list = await api.getFirms();
+      setFirmsList(list || []);
+    } catch (_) {}
+  };
+
+  const handleSelectFirm = async (firmId: string) => {
+    if (String(firmId) === String(user?.firmId)) return;
+    setSwitchingFirmId(firmId);
+    try {
+      await switchFirm(firmId);
+      showToast('Active business firm switched successfully!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to switch active firm.', 'error');
+    } finally {
+      setSwitchingFirmId(null);
+    }
+  };
 
   // Tab State for Admin & Profile
   const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'units'>('profile');
@@ -343,7 +365,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     const init = async () => {
       setInitialLoading(true);
-      await Promise.all([loadSessionDetails(), loadCompanyConfig(), loadManufacturingUnits(), fetchSocialAccounts()]);
+      await Promise.all([loadSessionDetails(), loadCompanyConfig(), loadManufacturingUnits(), fetchSocialAccounts(), loadFirmsList()]);
       setInitialLoading(false);
     };
     init();
@@ -356,6 +378,7 @@ export default function ProfileScreen() {
     await loadCompanyConfig();
     await loadManufacturingUnits();
     await fetchSocialAccounts();
+    await loadFirmsList();
     setRefreshing(false);
   };
 
@@ -659,6 +682,65 @@ export default function ProfileScreen() {
 
     return (
       <View style={styles.formContainer}>
+        {/* Active Firm Selection Card */}
+        {firmsList.length > 0 && (
+          <View style={[styles.card, { width: '100%', marginBottom: 16 }]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="business-outline" size={18} color={colors.primary} />
+              <Text style={styles.cardTitle}>Active Business Entity / Firm Context</Text>
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={[styles.label, { marginBottom: 10, textTransform: 'none' }]}>
+                Select the active firm context for processing invoices, orders, inventory, and reports:
+              </Text>
+              <View style={{ gap: 10 }}>
+                {firmsList.map((f) => {
+                  const isSelected = String(f._id) === String(user?.firmId) || (!user?.firmId && f.isDefault);
+                  const isLoadingThis = switchingFirmId === String(f._id);
+                  return (
+                    <TouchableOpacity
+                      key={String(f._id)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        padding: 14,
+                        borderRadius: Radius.md,
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                        backgroundColor: isSelected ? colors.primaryLight : colors.bg.primary,
+                      }}
+                      disabled={switchingFirmId !== null}
+                      onPress={() => handleSelectFirm(String(f._id))}
+                      activeOpacity={0.75}
+                    >
+                      <View style={{ marginRight: 12 }}>
+                        <Ionicons
+                          name={isSelected ? 'checkmark-circle' : 'business-outline'}
+                          size={22}
+                          color={isSelected ? colors.primary : colors.text.muted}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary }}>{f.name}</Text>
+                        <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>
+                          {f.role || 'Member Entity'} {f.firmGstin ? `• GSTIN: ${f.firmGstin}` : ''}
+                        </Text>
+                      </View>
+                      {isLoadingThis ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : isSelected ? (
+                        <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.primary }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#ffffff' }}>ACTIVE</Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+        )}
+
         <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16, alignItems: 'stretch' }}>
           {/* Personal Details Card */}
           <View style={[styles.card, { flex: 1, width: '100%' }]}>

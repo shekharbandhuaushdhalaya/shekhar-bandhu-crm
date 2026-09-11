@@ -432,35 +432,15 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
     if (onNavigate) onNavigate();
   };
 
-  useEffect(() => { api.getFirms().then(setFirms).catch(() => {}); }, [user?.id, user?.firmId]);
-  const activeFirm = firms.find(f => String(f._id) === String(user?.firmId)) || firms.find(f => f.isDefault) || firms[0];
-  const handleFirmSwitch = async (firmId: string) => {
-    if (String(firmId) === String(user?.firmId)) { setFirmPickerOpen(false); return; }
-    setFirmLoading(true);
-    try { await switchFirm(firmId); setFirmPickerOpen(false); } finally { setFirmLoading(false); }
-  };
-
   return (
     <View style={styles.sidebar}>
-      <TouchableOpacity style={styles.firmSelector} onPress={() => setFirmPickerOpen(true)} activeOpacity={0.75}>
-        <View style={styles.firmIcon}><Ionicons name="business-outline" size={16} color={colors.primary} /></View>
+      <View style={styles.firmSelector}>
+        <View style={styles.firmIcon}><Ionicons name="leaf-outline" size={16} color={colors.primary} /></View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.firmCaption}>ACTIVE FIRM</Text>
-          <Text style={styles.firmName} numberOfLines={1}>{activeFirm?.name || 'Select firm'}</Text>
+          <Text style={styles.firmCaption}>CRM DASHBOARD</Text>
+          <Text style={styles.firmName} numberOfLines={1}>Shekhar Bandhu</Text>
         </View>
-        <Ionicons name="chevron-down" size={14} color={colors.text.muted} />
-      </TouchableOpacity>
-      <Modal visible={firmPickerOpen} transparent animationType="fade" onRequestClose={() => setFirmPickerOpen(false)}>
-        <TouchableOpacity style={styles.firmModalBackdrop} activeOpacity={1} onPress={() => setFirmPickerOpen(false)}>
-          <View style={styles.firmModalCard}>
-            <Text style={styles.firmModalTitle}>Switch firm</Text>
-            {firms.map(f => <TouchableOpacity key={String(f._id)} style={styles.firmOption} disabled={firmLoading} onPress={() => handleFirmSwitch(String(f._id))}>
-              <Ionicons name={String(f._id) === String(user?.firmId) ? 'checkmark-circle' : 'business-outline'} size={18} color={String(f._id) === String(user?.firmId) ? colors.primary : colors.text.secondary} />
-              <View style={{ flex: 1 }}><Text style={styles.firmOptionName}>{f.name}</Text><Text style={styles.firmOptionRole}>{f.role || 'Member'}</Text></View>
-            </TouchableOpacity>)}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
