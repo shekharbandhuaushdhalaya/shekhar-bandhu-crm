@@ -643,13 +643,18 @@ const interactionSchema = z.object({
 
 // ── MedicalRep ───────────────────────────────────────────────
 const medicalRepSchema = z.object({
-  code: z.string().optional().default(''),
-  name: z.string().min(1),
+  code: z.string().trim().optional().default(''),
+  name: z.string().trim().min(1, 'Name is required'),
   email,
-  phone,
-  territory: z.string().default(''),
-  joiningDate: z.string().or(z.date()).optional(),
-  notes: z.string().default(''),
+  phone: z.string().trim().min(1, 'Phone number is required'),
+  territory: z.string().trim().optional().default(''),
+  dateOfJoining: z.string().or(z.date()).optional(),
+  monthlyTarget: z.coerce.number().finite().min(0).optional().default(0),
+  address: z.string().trim().optional().default(''),
+  alternatePhone: z.string().trim().optional().default(''),
+  notes: z.string().trim().optional().default(''),
+  isActive: z.boolean().optional().default(true),
+  reportingTo: objectId.optional().nullable(),
 });
 
 const mrCheckinSchema = z.object({

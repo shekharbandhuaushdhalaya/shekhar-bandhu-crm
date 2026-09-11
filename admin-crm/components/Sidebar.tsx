@@ -32,7 +32,7 @@ type NavItem = {
 const NAV_GROUPS: NavGroup[] = [
   {
     key: 'sales',
-    label: 'Sales & Store',
+    label: 'Sales',
     icon: 'trending-up-outline',
     items: [
       { label: 'Customers', route: 'parties/customers', icon: 'people-outline', activeIcon: 'people' },
@@ -48,7 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: 'purchases',
-    label: 'Purchase & Vendors',
+    label: 'Purchasing',
     icon: 'bag-handle-outline',
     items: [
       { label: 'Vendors', route: 'parties/vendors', icon: 'storefront-outline', activeIcon: 'storefront' },
@@ -57,7 +57,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: 'inventory',
-    label: 'Inventory & Production',
+    label: 'Inventory',
     icon: 'cube-outline',
     items: [
       { label: 'Products & Pricing', route: 'products', icon: 'cube-outline', activeIcon: 'cube' },
@@ -68,7 +68,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: 'finance',
-    label: 'Finance & Accounting',
+    label: 'Finance',
     icon: 'cash-outline',
     items: [
       { label: 'Payments', route: 'payments', icon: 'cash-outline', activeIcon: 'cash' },
@@ -86,7 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: 'administration',
-    label: 'Administration',
+    label: 'Admin',
     icon: 'settings-outline',
     items: [
       { label: 'AI Business Assistant', route: 'ai-analytics', icon: 'sparkles-outline', activeIcon: 'sparkles' },
@@ -232,7 +232,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: 8,
+      paddingVertical: 6,
       paddingHorizontal: Spacing.sm,
       marginHorizontal: Spacing.xs,
       borderRadius: Radius.md,
@@ -258,7 +258,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       backgroundColor: colors.primary + '15',
     },
     groupLabel: {
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: '700',
       color: colors.text.muted,
       marginLeft: 6,
@@ -271,8 +271,8 @@ const createSidebarStyles = (colors: typeof LightColors) =>
 
     // ── Child Items ──
     childGroup: {
-      paddingLeft: 4,
-      marginLeft: Spacing.md + 16,
+      paddingLeft: 2,
+      marginLeft: Spacing.md + 12,
       gap: 1,
       marginBottom: 4,
       marginTop: 2,
@@ -280,7 +280,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     navItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 6,
+      paddingVertical: 7,
       paddingHorizontal: 8,
       borderRadius: Radius.sm,
       position: 'relative',
@@ -380,7 +380,7 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     // Keep the navigation compact. The active group is automatically expanded
     // when its route is opened.
-    return Object.fromEntries(NAV_GROUPS.map((g) => [g.key, g.key === 'sales'])) as Record<string, boolean>;
+    return Object.fromEntries(NAV_GROUPS.map((g) => [g.key, false])) as Record<string, boolean>;
   });
   const loadedRef = useRef(false);
 
@@ -397,20 +397,27 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
   }, []);
 
   useEffect(() => {
+    const activeGroup = NAV_GROUPS.find((g) =>
+      g.items.some((i) => pathname.startsWith(`/${i.route}`))
+    );
+    if (!activeGroup) return;
     setExpandedGroups((prev) => {
-      const next = { ...prev };
-      for (const g of NAV_GROUPS) {
-        if (routeIncludes(...g.items.map((i) => i.route.split('/')[0]))) {
-          next[g.key] = true;
-        }
-      }
+      const next = Object.fromEntries(
+        NAV_GROUPS.map((g) => [g.key, g.key === activeGroup.key])
+      ) as Record<string, boolean>;
+      if (loadedRef.current) authStorage.setItem(SIDEBAR_EXPANDED_KEY, JSON.stringify(next));
       return next;
     });
   }, [pathname]);
 
   const toggleGroup = (key: string) =>
     setExpandedGroups((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
+      const willOpen = !prev[key];
+      // Keep only one section open at a time. This prevents a long, cluttered
+      // navigation while still auto-expanding the section the user is in.
+      const next = Object.fromEntries(
+        NAV_GROUPS.map((g) => [g.key, willOpen && g.key === key])
+      ) as Record<string, boolean>;
       authStorage.setItem(SIDEBAR_EXPANDED_KEY, JSON.stringify(next));
       return next;
     });

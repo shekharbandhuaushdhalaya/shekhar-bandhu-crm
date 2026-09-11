@@ -30,6 +30,7 @@ export default function MedicalRepsScreen() {
   const [mrs, setMrs] = useState<MedicalRepresentative[]>([]);
   const [mrSearch, setMrSearch] = useState('');
   const [mrModal, setMrModal] = useState(false);
+  const [mrSaving, setMrSaving] = useState(false);
   const [editMr, setEditMr] = useState<MedicalRepresentative | null>(null);
   const [mrForm, setMrForm] = useState({ name: '', phone: '', email: '', code: '', territory: '', monthlyTarget: 0, address: '', notes: '' });
 
@@ -326,24 +327,33 @@ export default function MedicalRepsScreen() {
   };
 
   const handleSaveMr = async () => {
-    if (!mrForm.name.trim() || !mrForm.phone.trim()) {
-      showToast('Name and phone are required', 'info');
-      return;
-    }
+    const name = mrForm.name.trim();
+    const phone = mrForm.phone.trim();
+    const email = mrForm.email.trim();
+    if (!name) { showToast('Please enter the Medical Representative name', 'info'); return; }
+    if (!phone) { showToast('Please enter a phone number', 'info'); return; }
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) { showToast('Please enter a valid email address', 'info'); return; }
+    if (mrForm.monthlyTarget < 0 || !Number.isFinite(mrForm.monthlyTarget)) { showToast('Monthly target must be 0 or more', 'info'); return; }
+
+    setMrSaving(true);
     try {
-      if (editMr) {
-        await api.updateMR(editMr._id, mrForm);
-        showToast('Medical Representative updated', 'success');
-      } else {
-        await api.createMR(mrForm);
-        showToast('Medical Representative created', 'success');
-      }
+      const payload = { ...mrForm, name, phone, email, monthlyTarget: Number(mrForm.monthlyTarget) || 0 };
+      const saved = editMr
+        ? await api.updateMR(editMr._id, payload)
+        : await api.createMR(payload);
+      showToast(editMr ? 'Medical Representative updated successfully' : 'Medical Representative created successfully', 'success');
       setMrModal(false);
       setEditMr(null);
       setMrForm({ name: '', phone: '', email: '', code: '', territory: '', monthlyTarget: 0, address: '', notes: '' });
-      loadMrs();
+      await loadMrs();
+      if (!editMr && saved?._id) {
+        setSelectedMrForAttendance(saved._id);
+        setSelectedMrForVisits(saved._id);
+      }
     } catch (err: any) {
-      showToast(err.message || 'Failed to save MR', 'error');
+      showToast(err?.message || 'Unable to save Medical Representative. Please check the highlighted data and try again.', 'error');
+    } finally {
+      setMrSaving(false);
     }
   };
 
@@ -482,11 +492,11 @@ export default function MedicalRepsScreen() {
   };
 
   const TABS: { id: Tab; label: string; icon: keyof typeof Ionicons.glyphMap; desc: string }[] = [
-    { id: 'dashboard', label: 'Analytics Dashboard', icon: 'stats-chart', desc: 'Performance & ROI' },
-    { id: 'mrs', label: 'MR Roster', icon: 'people', desc: 'Field Team Directory' },
-    { id: 'attendance', label: 'Daily Logs & GPS', icon: 'location', desc: 'Check-ins & Distance' },
-    { id: 'visits', label: 'Doctor Visits', icon: 'medkit', desc: 'Clinic Calls & Orders' },
-    { id: 'expenses', label: 'Expense Claims', icon: 'wallet', desc: 'T&E & Approvals' },
+    { id: 'dashboard', label: 'Overview', icon: 'stats-chart', desc: 'Performance & ROI' },
+    { id: 'mrs', label: 'Team', icon: 'people', desc: 'Field Team Directory' },
+    { id: 'attendance', label: 'Attendance', icon: 'location', desc: 'Check-ins & Distance' },
+    { id: 'visits', label: 'Visits', icon: 'medkit', desc: 'Clinic Calls & Orders' },
+    { id: 'expenses', label: 'Expenses', icon: 'wallet', desc: 'T&E & Approvals' },
   ];
 
   const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -716,6 +726,23 @@ export default function MedicalRepsScreen() {
   // ── 2. MR LIST RENDER ───────────────────────────────────────────────────────
   const renderMrList = () => (
     <View style={{ flex: 1 }}>
+      <View style={styles.rosterToolbar}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.pageSectionTitle}>Medical Representatives</Text>
+          <Text style={styles.pageSectionSubtitle}>Manage your field team and sales targets.</Text>
+        </View>
+        <View style={styles.searchBox}>
+          <Ionicons name="search-outline" size={17} color={colors.text.muted} />
+          <TextInput
+            value={mrSearch}
+            onChangeText={setMrSearch}
+            placeholder="Search name, phone or territory"
+            placeholderTextColor={colors.text.muted}
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+        </View>
+      </View>
       <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <View style={styles.cardsGrid}>
           {mrs.map(m => (
@@ -732,7 +759,7 @@ export default function MedicalRepsScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                     <View style={[styles.statusDot, { backgroundColor: m.isActive ? colors.success : colors.danger }]} />
                     <Text style={{ fontSize: 11, fontWeight: '700', color: m.isActive ? colors.success : colors.danger }}>
-                      {m.isActive ? 'ACTIVE FIELD AGENT' : 'INACTIVE'}
+                      {m.isActive ? 'Active' : 'Inactive'}
                     </Text>
                   </View>
                 </View>
@@ -769,7 +796,7 @@ export default function MedicalRepsScreen() {
                 <View style={styles.directoryInfoRow}>
                   <Ionicons name="trophy-outline" size={14} color={colors.warning} />
                   <Text style={styles.directoryInfoText}>
-                    Monthly Target: <Text style={{ fontWeight: '800', color: colors.text.primary }}>₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
+                    Target: <Text style={{ fontWeight: '800', color: colors.text.primary }}>₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
                   </Text>
                 </View>
               </View>
@@ -785,7 +812,7 @@ export default function MedicalRepsScreen() {
           <View style={styles.emptyCardContainer}>
             <Ionicons name="people-outline" size={40} color={colors.text.muted} />
             <Text style={styles.emptyCardTitle}>No Medical Representatives Found</Text>
-            <Text style={styles.emptyCardSubtitle}>Create your first Medical Representative using the + New MR button.</Text>
+            <Text style={styles.emptyCardSubtitle}>Add your first representative to start tracking visits, targets and field activity.</Text>
           </View>
         )}
       </ScrollView>
@@ -795,7 +822,7 @@ export default function MedicalRepsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitleText}>{editMr ? 'Edit Medical Representative' : 'Add New Medical Representative'}</Text>
+              <Text style={styles.modalTitleText}>{editMr ? 'Edit representative' : 'Add representative'}</Text>
               <TouchableOpacity onPress={() => setMrModal(false)}>
                 <Ionicons name="close" size={22} color={colors.text.primary} />
               </TouchableOpacity>
@@ -857,8 +884,8 @@ export default function MedicalRepsScreen() {
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setMrModal(false)}>
                 <Text style={styles.modalCancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleSaveMr}>
-                <Text style={styles.modalSubmitBtnText}>Save MR</Text>
+              <TouchableOpacity style={[styles.modalSubmitBtn, mrSaving && { opacity: 0.65 }]} onPress={handleSaveMr} disabled={mrSaving}>
+                <>{mrSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSubmitBtnText}>{editMr ? 'Save changes' : 'Create representative'}</Text>}</>
               </TouchableOpacity>
             </View>
           </View>
@@ -1686,7 +1713,7 @@ export default function MedicalRepsScreen() {
                   onPress={() => setActiveTab(t.id)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name={t.icon} size={15} color={isActive ? '#fff' : colors.text.secondary} />
+                  <Ionicons name={t.icon} size={15} color={isActive ? colors.primary : colors.text.secondary} />
                   <Text style={[styles.subNavTabText, isActive && styles.subNavTabTextActive]}>{t.label}</Text>
                 </TouchableOpacity>
               );
@@ -1739,37 +1766,27 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Top Control Bar
   topControlBar: {
     paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.xs,
+    marginTop: 8,
+    marginBottom: 4,
   },
   topBarContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.bg.card,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
     gap: 10,
-    minHeight: 46,
-    ...Shadows.header,
+    minHeight: 42,
   },
   subNavTab: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: Radius.sm,
-    backgroundColor: colors.bg.secondary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: 'transparent',
   },
   subNavTabActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   subNavTabText: {
     fontSize: 12,
@@ -1777,7 +1794,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     color: colors.text.primary,
   },
   subNavTabTextActive: {
-    color: '#fff',
+    color: colors.primary,
   },
   primaryCtaBtn: {
     height: 34,
@@ -1798,6 +1815,46 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,
+  },
+
+  rosterToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 14,
+    paddingVertical: 10,
+    marginBottom: 2,
+    flexWrap: 'wrap',
+  },
+  pageSectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text.primary,
+  },
+  pageSectionSubtitle: {
+    fontSize: 12,
+    color: colors.text.muted,
+    marginTop: 2,
+  },
+  searchBox: {
+    minWidth: 220,
+    maxWidth: 380,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 38,
+    paddingHorizontal: 11,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bg.card,
+  },
+  searchInput: {
+    flex: 1,
+    height: 38,
+    fontSize: 12,
+    color: colors.text.primary,
   },
 
   loadingBox: {
@@ -2041,7 +2098,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: Spacing.md,
+    padding: 14,
   },
   directoryCardHeader: {
     flexDirection: 'row',
@@ -2081,9 +2138,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'center',
   },
   directoryInfoBox: {
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: 'transparent',
     borderRadius: Radius.sm,
-    padding: Spacing.sm,
+    padding: 0,
     gap: 6,
   },
   directoryInfoRow: {
