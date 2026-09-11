@@ -13,10 +13,26 @@ async function authenticateJWT(req, res, next) {
     const decoded = jwt.verify(token, config.jwtSecret);
     const dbUser = await User.findById(decoded.id).select('_id name email role canAccessCash mustChangePassword mfaEnabled').lean();
     if (!dbUser) return res.status(401).json({ error: 'User account no longer exists' });
-    let requestedFirmId = req.headers['x-firm-id'] || decoded.firmId || null;
-    let membership = requestedFirmId ? await UserFirm.findOne({ userId: dbUser._id, firmId: requestedFirmId, active: true }).lean() : null;
-    if (!membership) membership = await UserFirm.findOne({ userId: dbUser._id, isDefault: true, active: true }).lean();
-    if (!membership) membership = await UserFirm.findOne({ userId: dbUser._id, active: true }).sort({ createdAt: 1 }).lean();
+    const headerFirmId = req.headers['x-firm-id'];
+    const tokenFirmId = decoded.firmId || null;
+    const requestedFirmId = headerFirmId || tokenFirmId || null;
+    let membership = null;
+
+    if (requestedFirmId) {
+      membership = await UserFirm.findOne({
+        userId: dbUser._id,
+        firmId: requestedFirmId,
+        active: true
+      }).lean();
+      // An explicit firm selection must never silently fall back to another firm.
+      if (!membership) {
+        return res.status(403).json({ error: 'You do not have access to the requested firm' });
+      }
+    } else {
+      membership = await UserFirm.findOne({ userId: dbUser._id, isDefault: true, active: true }).lean();
+      if (!membership) membership = await UserFirm.findOne({ userId: dbUser._id, active: true }).sort({ createdAt: 1 }).lean();
+    }
+
     if (config.enforceTenancy && !membership) return res.status(403).json({ error: 'No active firm membership' });
     const firmId = membership?.firmId || null;
     req.user = { ...dbUser, id: String(dbUser._id), firmId: firmId ? String(firmId) : null, firmRole: membership?.role || dbUser.role, role: membership?.role || dbUser.role };

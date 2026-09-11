@@ -17,6 +17,8 @@
 - Accounting/GST mutations are transaction-safe and auditable.
 - Backup restore test completed.
 - Monitor 5xx rate, DB health, worker dead jobs and external integration failures.
+- CI must pass backend lint/tests and frontend TypeScript/web export gates before release.
+- Production CORS is exact HTTPS-origin only; deployment-provider subdomains are not implicitly trusted.
 
 ## Operational rules
 - Never run destructive reset endpoints in production.

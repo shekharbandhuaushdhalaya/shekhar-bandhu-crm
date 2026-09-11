@@ -101,22 +101,31 @@ router.get('/audit-logs', authenticateToken, authorize('audit:view'), async (req
     const filter = {};
 
     if (search) {
+      const escaped = String(search).slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { userName: { $regex: search, $options: 'i' } },
-        { userEmail: { $regex: search, $options: 'i' } },
-        { action: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { userName: { $regex: escaped, $options: 'i' } },
+        { userEmail: { $regex: escaped, $options: 'i' } },
+        { action: { $regex: escaped, $options: 'i' } },
+        { description: { $regex: escaped, $options: 'i' } }
       ];
     }
 
     if (dateFrom || dateTo) {
       filter.createdAt = {};
-      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
-      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+      if (dateFrom) {
+        const parsed = new Date(dateFrom);
+        if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: 'Invalid dateFrom' });
+        filter.createdAt.$gte = parsed;
+      }
+      if (dateTo) {
+        const parsed = new Date(dateTo);
+        if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: 'Invalid dateTo' });
+        filter.createdAt.$lte = parsed;
+      }
     }
 
-    const parsedLimit = parseInt(limit, 10);
-    const parsedPage = parseInt(page, 10);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+    const parsedPage = Math.min(Math.max(parseInt(page, 10) || 1, 1), 10000);
 
     const logs = await AuditLog.find(filter)
       .sort({ createdAt: -1 })

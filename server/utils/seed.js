@@ -8,11 +8,15 @@ const StockLedger = require('../models/StockLedger');
 
 // Seed database on first run
 async function seedDatabase() {
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PRODUCTION_SEED !== 'true') {
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && process.env.ALLOW_PRODUCTION_SEED !== 'true') {
     throw new Error('Production seeding is disabled. Create/bootstrap users through a controlled administrative process.');
   }
 
   const userCount = await User.countDocuments();
+  if (isProduction && userCount > 0) {
+    throw new Error('Production seed is only allowed for an empty environment; existing users were detected.');
+  }
   if (userCount === 0) {
     console.log('👤 Seeding database with initial users...');
     const adminEmail = process.env.SEED_ADMIN_EMAIL || (process.env.NODE_ENV === 'production' ? '' : 'admin@shekharbandhu.com');

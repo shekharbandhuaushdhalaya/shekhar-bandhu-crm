@@ -189,9 +189,18 @@ router.post('/refresh', async (req, res) => {
     const session = await RefreshSession.findOne({ tokenHash: hashRefreshToken(raw), revokedAt: null }).lean();
     if (!session || session.expiresAt <= new Date()) return res.status(401).json({ error: 'Refresh token expired or revoked' });
     const user = await User.findById(session.userId).lean();
+    if (!user) return res.status(401).json({ error: 'Session is no longer valid' });
     const membership = await UserFirm.findOne({ userId: user._id, firmId: session.firmId, active: true }).lean();
-    if (!user || !membership) return res.status(401).json({ error: 'Session is no longer valid' });
-    await RefreshSession.updateOne({ _id: session._id }, { $set: { revokedAt: new Date() } });
+    if (!membership) return res.status(401).json({ error: 'Session is no longer valid' });
+
+    // Atomically consume the refresh token so concurrent refresh requests cannot
+    // successfully rotate the same session more than once.
+    const consumed = await RefreshSession.findOneAndUpdate(
+      { _id: session._id, revokedAt: null, expiresAt: { $gt: new Date() } },
+      { $set: { revokedAt: new Date() } },
+      { new: true }
+    ).lean();
+    if (!consumed) return res.status(401).json({ error: 'Refresh token expired or already used' });
     const nextRefresh = await issueRefreshToken({ userId: user._id, firmId: membership.firmId, req });
     const token = issueAccessToken(user, membership.firmId, membership.role);
     res.json({ token, refreshToken: nextRefresh, expiresIn: config.accessTokenTtl, firmId: String(membership.firmId) });

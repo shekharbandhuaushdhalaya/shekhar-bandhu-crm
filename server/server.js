@@ -77,19 +77,22 @@ const app = express();
 app.set('trust proxy', config.trustProxy ? 1 : false);
 app.disable('x-powered-by');
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: (origin, callback) => {
-      if (config.isOriginAllowed(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
-    },
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
-    credentials: true,
+// Keep HTTP connection handling explicit for predictable reverse-proxy behaviour.
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 70_000;
+server.requestTimeout = 120_000;
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (config.isOriginAllowed(origin)) return callback(null, true);
+    return callback(new Error('Origin is not allowed by CORS'));
   },
-});
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
+const io = new Server(server, { cors: corsOptions });
 
 const PORT = config.port;
 const MONGODB_URI = config.mongoUri;
@@ -130,31 +133,29 @@ io.on('connection', (socket) => {
 // Middleware
 app.use(requestId);
 app.use(compression());
-app.use(cors({
-  origin: (origin, callback) => {
-    if (config.isOriginAllowed(origin)) {
-      callback(null, true);
-    } else {
-      callback(null, false);
-    }
-  },
-  credentials: true,
-}));
-app.options('*', cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({
   limit: '2mb',
   verify: (req, res, buf) => {
     req.rawBody = buf;
   }
 }));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
-morgan.token('request-id', req => req.requestId || '-');
-app.use(morgan(':method :url :status :response-time ms req=:request-id'));
-
 // Security headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: false,
+}));
+
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
+  maxAge: config.isProduction ? '1d' : 0,
+  dotfiles: 'deny',
+}));
+morgan.token('request-id', req => req.requestId || '-');
+morgan.token('request-path', req => req.path || '/');
+// Log paths, not raw URLs, to avoid leaking query-string credentials/codes into logs.
+app.use(morgan(':method :request-path :status :response-time ms req=:request-id', {
+  stream: { write: message => process.stdout.write(message) }
 }));
 
 // Rate limit: 100 req/min per IP
@@ -317,6 +318,11 @@ const portalRoutes = require('./routes/portal/portal');
 app.use('/api/portal/auth', portalAuthRoutes);
 app.use('/api/portal', portalRoutes);
 
+// Keep API responses consistent for unknown routes.
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found', requestId: req.requestId });
+});
+
 // Global error handler (must be after all routes)
 app.use((err, req, res, next) => {
   console.error(JSON.stringify({ level: 'error', requestId: req.requestId, path: req.path, method: req.method, error: err.message, stack: config.isProduction ? undefined : err.stack }));
@@ -443,12 +449,29 @@ process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION:', err.message, err.stack);
   process.exit(1);
 });
+let shuttingDown = false;
 async function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log(`Received ${signal}; shutting down gracefully`);
   stopWorker();
-  await new Promise(resolve => server.close(resolve));
-  await mongoose.connection.close(false);
-  process.exit(0);
+
+  const forceExit = setTimeout(() => {
+    console.error('Graceful shutdown timed out; forcing exit');
+    process.exit(1);
+  }, 10000);
+  forceExit.unref();
+
+  try {
+    if (server.listening) await new Promise(resolve => server.close(resolve));
+    await mongoose.connection.close(false);
+    clearTimeout(forceExit);
+    process.exit(0);
+  } catch (err) {
+    console.error('Graceful shutdown failed:', err.message);
+    clearTimeout(forceExit);
+    process.exit(1);
+  }
 }
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));

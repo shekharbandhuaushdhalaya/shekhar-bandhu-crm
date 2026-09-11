@@ -1236,7 +1236,7 @@ class ApiClient {
   }
   async lookupHerbDetails(name: string): Promise<any> {
     const res = await this.request(`${API_BASE}/raw-materials/botanical-lookup?name=${encodeURIComponent(name.trim())}`);
-    return res.data || res;
+    return res.json();
   }
 
   async searchPharmacopoeia(query: string): Promise<any[]> {
@@ -1820,6 +1820,9 @@ class ApiClient {
   async completeCampaign(id: string): Promise<Campaign> {
     const res = await this.request(`${API_BASE}/campaigns/${id}/complete`, { method: 'POST' });
     return res.json();
+  }
+  async deleteCampaign(id: string): Promise<void> {
+    await this.request(`${API_BASE}/campaigns/${id}`, { method: 'DELETE' });
   }
 
   // ─── Stock Transfers ───
