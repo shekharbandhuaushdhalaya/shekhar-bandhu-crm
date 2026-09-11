@@ -23,6 +23,18 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
   const [editingRefId, setEditingRefId] = useState<string | null>(null);
   const [refText, setRefText] = useState<string>('');
 
+  const [search, setSearch] = useState<string>('');
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const [selectedStandard, setSelectedStandard] = useState<string>('all');
+  const [monographs, setMonographs] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [importingId, setImportingId] = useState<string | null>(null);
+  const [importingAll, setImportingAll] = useState<boolean>(false);
+
   const fetchUnverifiedCount = async () => {
     try {
       const list = await api.getUnverifiedPharmacopoeia();
