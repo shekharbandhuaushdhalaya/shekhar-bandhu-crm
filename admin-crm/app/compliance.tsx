@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, ActivityIndicator, TouchableOpacity,
-  Modal, TextInput, FlatList, Pressable
+  Modal, TextInput
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
@@ -168,11 +168,11 @@ export default function ComplianceScreen() {
     return (
       <Modal visible={!!activeCategory} animationType="slide" transparent onRequestClose={() => setActiveCategory(null)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.bg.card }]}>
             <View style={styles.modalHeaderRow}>
               <View>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
-                <Text style={[styles.modalSub, { color: colors.textSecondary }]}>{items.length} Total Records</Text>
+                <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{title}</Text>
+                <Text style={[styles.modalSub, { color: colors.text.secondary }]}>{items.length} Total Records</Text>
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -186,7 +186,7 @@ export default function ComplianceScreen() {
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity onPress={() => setActiveCategory(null)}>
-                  <Ionicons name="close" size={24} color={colors.text} />
+                  <Ionicons name="close" size={24} color={colors.text.primary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -194,8 +194,8 @@ export default function ComplianceScreen() {
             <ScrollView style={{ flex: 1, padding: 16 }}>
               {items.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="documents-outline" size={36} color={colors.textSecondary} />
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No records found in this category.</Text>
+                  <Ionicons name="documents-outline" size={36} color={colors.text.secondary} />
+                  <Text style={[styles.emptyText, { color: colors.text.secondary }]}>No records found in this category.</Text>
                   {activeCategory === 'equipment' && (
                     <TouchableOpacity
                       style={[styles.actionBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
@@ -207,29 +207,29 @@ export default function ComplianceScreen() {
                 </View>
               ) : (
                 items.map((item: any, idx: number) => (
-                  <View key={item._id || idx} style={[styles.detailItemCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                  <View key={item._id || idx} style={[styles.detailItemCard, { borderColor: colors.border, backgroundColor: colors.bg.primary }]}>
                     {activeCategory === 'equipment' && (
                       <View>
                         <View style={styles.detailHeader}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                             <Text style={styles.codePill}>{item.code || `EQ-${idx + 1}`}</Text>
-                            <Text style={[styles.itemTitle, { color: colors.text }]}>{item.name}</Text>
+                            <Text style={[styles.itemTitle, { color: colors.text.primary }]}>{item.name}</Text>
                           </View>
-                          <View style={[styles.statusBadge, { backgroundColor: item.status === 'active' ? colors.success + '20' : colors.warning + '20' }]}>
+                          <View style={[styles.statusBadge, { backgroundColor: item.status === 'active' ? colors.successLight : colors.warningLight }]}>
                             <Text style={[styles.statusBadgeText, { color: item.status === 'active' ? colors.success : colors.warning }]}>
                               {(item.status || 'ACTIVE').toUpperCase()}
                             </Text>
                           </View>
                         </View>
 
-                        <Text style={[styles.itemDetailText, { color: colors.textSecondary }]}>
-                          ⚙️ Category: <Text style={{ fontWeight: '700', color: colors.text }}>{item.category?.toUpperCase() || 'MANUFACTURING'}</Text>
+                        <Text style={[styles.itemDetailText, { color: colors.text.secondary }]}>
+                          ⚙️ Category: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{item.category?.toUpperCase() || 'MANUFACTURING'}</Text>
                           {'  |  '}
-                          🏭 Unit: <Text style={{ fontWeight: '700', color: colors.text }}>{item.manufacturingUnitId?.name || 'Main Plant'}</Text>
+                          🏭 Unit: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{item.manufacturingUnitId?.name || 'Main Plant'}</Text>
                         </Text>
 
                         {item.calibrationDueDate && (
-                          <Text style={[styles.itemDetailText, { color: colors.textSecondary, marginTop: 4 }]}>
+                          <Text style={[styles.itemDetailText, { color: colors.text.secondary, marginTop: 4 }]}>
                             📅 Next Calibration Due: <Text style={{ fontWeight: '700', color: colors.primary }}>{new Date(item.calibrationDueDate).toLocaleDateString()}</Text>
                           </Text>
                         )}
@@ -257,10 +257,10 @@ export default function ComplianceScreen() {
 
                     {activeCategory !== 'equipment' && (
                       <View>
-                        <Text style={[styles.itemTitle, { color: colors.text }]}>
+                        <Text style={[styles.itemTitle, { color: colors.text.primary }]}>
                           {item.name || item.title || item.code || item.productName || `Record #${idx + 1}`}
                         </Text>
-                        <Text style={[styles.itemDetailText, { color: colors.textSecondary, marginTop: 4 }]}>
+                        <Text style={[styles.itemDetailText, { color: colors.text.secondary, marginTop: 4 }]}>
                           {item.notes || item.reason || item.description || item.status || 'Connected GMP Quality Record'}
                         </Text>
                       </View>
@@ -280,17 +280,17 @@ export default function ComplianceScreen() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={styles.container}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg.primary }} contentContainerStyle={styles.container}>
       <ScreenHeader
         title="GMP & AYUSH Compliance"
         subtitle="Connected manufacturing quality controls & machinery mechanisms"
       />
 
-      <View style={[styles.headerBanner, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
+      <View style={[styles.headerBanner, { backgroundColor: colors.primaryLight, borderColor: colors.primary + '30' }]}>
         <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.bannerTitle, { color: colors.primary }]}>Manufacturing & Quality Mechanisms</Text>
-          <Text style={[styles.bannerSub, { color: colors.textSecondary }]}>
+          <Text style={[styles.bannerSub, { color: colors.text.secondary }]}>
             Includes Equipment/Machinery calibration tracking, Line Clearance checks, Deviations (CAPA), Stability Studies, and Vendor Qualification.
           </Text>
         </View>
@@ -299,36 +299,36 @@ export default function ComplianceScreen() {
       {loading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ marginTop: 10, color: colors.textSecondary }}>Loading compliance modules...</Text>
+          <Text style={{ marginTop: 10, color: colors.text.secondary }}>Loading compliance modules...</Text>
         </View>
       ) : (
         cards.map(([title, items, key, iconName, desc]) => (
           <TouchableOpacity
             key={key}
-            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+            style={[styles.card, { backgroundColor: colors.bg.card, borderColor: colors.border }]}
             onPress={() => setActiveCategory(key)}
             activeOpacity={0.7}
           >
             <View style={styles.row}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={[styles.iconBadge, { backgroundColor: colors.primary + '15' }]}>
+                <View style={[styles.iconBadge, { backgroundColor: colors.primaryLight }]}>
                   <Ionicons name={iconName as any} size={22} color={colors.primary} />
                 </View>
                 <View>
-                  <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-                  <Text style={[styles.count, { color: colors.textSecondary }]}>
+                  <Text style={[styles.title, { color: colors.text.primary }]}>{title}</Text>
+                  <Text style={[styles.count, { color: colors.text.secondary }]}>
                     {Array.isArray(items) ? items.length : 0} active records
                   </Text>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={[styles.badgePill, { backgroundColor: colors.success + '15' }]}>
+                <View style={[styles.badgePill, { backgroundColor: colors.successLight }]}>
                   <Text style={[styles.badgeText, { color: colors.success }]}>CONNECTED</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                <Ionicons name="chevron-forward" size={18} color={colors.text.secondary} />
               </View>
             </View>
-            <Text style={[styles.note, { color: colors.textSecondary }]}>{desc}</Text>
+            <Text style={[styles.note, { color: colors.text.secondary }]}>{desc}</Text>
           </TouchableOpacity>
         ))
       )}
@@ -345,50 +345,50 @@ export default function ComplianceScreen() {
 
         <TouchableOpacity
           onPress={load}
-          style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, flex: 1 }]}
+          style={[styles.actionBtn, { backgroundColor: colors.bg.card, borderColor: colors.border, borderWidth: 1, flex: 1 }]}
           activeOpacity={0.8}
         >
-          <Ionicons name="refresh-outline" size={18} color={colors.text} style={{ marginRight: 6 }} />
-          <Text style={{ color: colors.text, fontWeight: '700' }}>Refresh Data</Text>
+          <Ionicons name="refresh-outline" size={18} color={colors.text.primary} style={{ marginRight: 6 }} />
+          <Text style={{ color: colors.text.primary, fontWeight: '700' }}>Refresh Data</Text>
         </TouchableOpacity>
       </View>
 
       {/* Modal: Add Equipment */}
       <Modal visible={addEquipmentModal} animationType="fade" transparent onRequestClose={() => setAddEquipmentModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.modalCard, { backgroundColor: colors.bg.card }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Register Manufacturing Machine</Text>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Register Manufacturing Machine</Text>
               <TouchableOpacity onPress={() => setAddEquipmentModal(false)}>
-                <Ionicons name="close" size={22} color={colors.text} />
+                <Ionicons name="close" size={22} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={{ padding: 16 }}>
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Machine Code / Tag ID *</Text>
+                <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Machine Code / Tag ID *</Text>
                 <TextInput
-                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  style={[styles.input, { borderColor: colors.border, color: colors.text.primary }]}
                   placeholder="e.g. EQ-MIX-001 or TAB-PRESS-02"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.text.muted}
                   value={eqForm.code}
                   onChangeText={v => setEqForm({ ...eqForm, code: v })}
                 />
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Machine / Equipment Name *</Text>
+                <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Machine / Equipment Name *</Text>
                 <TextInput
-                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  style={[styles.input, { borderColor: colors.border, color: colors.text.primary }]}
                   placeholder="e.g. High Speed Rotary Tablet Press"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.text.muted}
                   value={eqForm.name}
                   onChangeText={v => setEqForm({ ...eqForm, name: v })}
                 />
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Category</Text>
+                <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Category</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
                   {['tableting', 'mixer', 'drier', 'pulverizer', 'filling', 'packaging', 'qc_instrument'].map(cat => (
                     <TouchableOpacity
@@ -403,24 +403,24 @@ export default function ComplianceScreen() {
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Calibration Frequency (Days)</Text>
+                <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Calibration Frequency (Days)</Text>
                 <TextInput
-                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  style={[styles.input, { borderColor: colors.border, color: colors.text.primary }]}
                   placeholder="180"
                   keyboardType="numeric"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.text.muted}
                   value={eqForm.calibrationFrequencyDays}
                   onChangeText={v => setEqForm({ ...eqForm, calibrationFrequencyDays: v })}
                 />
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Notes / Specifications</Text>
+                <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Notes / Specifications</Text>
                 <TextInput
-                  style={[styles.input, { height: 60, borderColor: colors.border, color: colors.text }]}
+                  style={[styles.input, { height: 60, borderColor: colors.border, color: colors.text.primary }]}
                   placeholder="Capacity, model, maintenance rules..."
                   multiline
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.text.muted}
                   value={eqForm.notes}
                   onChangeText={v => setEqForm({ ...eqForm, notes: v })}
                 />
@@ -429,7 +429,7 @@ export default function ComplianceScreen() {
 
             <View style={styles.modalFooterRow}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setAddEquipmentModal(false)}>
-                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+                <Text style={{ color: colors.text.secondary, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleCreateEquipment}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Register Machine</Text>
@@ -442,50 +442,50 @@ export default function ComplianceScreen() {
       {/* Modal: Calibrate Machine */}
       <Modal visible={calibrateModal} animationType="fade" transparent onRequestClose={() => setCalibrateModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.modalCard, { backgroundColor: colors.bg.card }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Record Calibration Certificate</Text>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Record Calibration Certificate</Text>
               <TouchableOpacity onPress={() => setCalibrateModal(false)}>
-                <Ionicons name="close" size={22} color={colors.text} />
+                <Ionicons name="close" size={22} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
 
             <View style={{ padding: 16 }}>
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Certificate Number</Text>
+                <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Certificate Number</Text>
                 <TextInput
-                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  style={[styles.input, { borderColor: colors.border, color: colors.text.primary }]}
                   value={calibForm.certificateNo}
                   onChangeText={v => setCalibForm({ ...calibForm, certificateNo: v })}
                 />
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Calibrated By (Inspector / Agency)</Text>
+                <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Calibrated By (Inspector / Agency)</Text>
                 <TextInput
-                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  style={[styles.input, { borderColor: colors.border, color: colors.text.primary }]}
                   placeholder="e.g. NABL Accredited QC Lab / Inspector Name"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.text.muted}
                   value={calibForm.calibratedBy}
                   onChangeText={v => setCalibForm({ ...calibForm, calibratedBy: v })}
                 />
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Next Calibration Due Date (YYYY-MM-DD)</Text>
+                <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Next Calibration Due Date (YYYY-MM-DD)</Text>
                 <TextInput
-                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  style={[styles.input, { borderColor: colors.border, color: colors.text.primary }]}
                   value={calibForm.nextCalibrationDue}
                   onChangeText={v => setCalibForm({ ...calibForm, nextCalibrationDue: v })}
                 />
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Notes</Text>
+                <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Notes</Text>
                 <TextInput
-                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  style={[styles.input, { borderColor: colors.border, color: colors.text.primary }]}
                   placeholder="Calibration observations..."
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.text.muted}
                   value={calibForm.notes}
                   onChangeText={v => setCalibForm({ ...calibForm, notes: v })}
                 />
@@ -494,7 +494,7 @@ export default function ComplianceScreen() {
 
             <View style={styles.modalFooterRow}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setCalibrateModal(false)}>
-                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+                <Text style={{ color: colors.text.secondary, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleCalibrateSubmit}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Save Calibration Log</Text>
