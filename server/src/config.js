@@ -14,8 +14,31 @@ module.exports = {
   refreshTokenTtlDays: parseInt(process.env.REFRESH_TOKEN_TTL_DAYS, 10) || 30,
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   cloudinary: { cloudName: process.env.CLOUDINARY_CLOUD_NAME || '', apiKey: process.env.CLOUDINARY_API_KEY || '', apiSecret: process.env.CLOUDINARY_API_SECRET || '' },
-  allowedOrigins: origins.length ? origins : (isProduction ? [] : ['http://localhost:3000','http://localhost:8081','http://localhost:19006','https://shekhar-bandhu-crm.vercel.app']),
+  allowedOrigins: origins.length ? origins : [
+    'http://localhost:3000',
+    'http://localhost:8081',
+    'http://localhost:8082',
+    'http://localhost:19006',
+    'https://shekhar-bandhu-crm.vercel.app'
+  ],
   trustProxy: process.env.TRUST_PROXY === 'true',
   enforceTenancy: process.env.ENFORCE_TENANCY !== 'false',
   workerPollMs: parseInt(process.env.WORKER_POLL_MS, 10) || 2000,
+  isOriginAllowed(origin) {
+    if (!origin) return true;
+    const allowed = this.allowedOrigins || [];
+    if (allowed.includes('*')) return true;
+    if (allowed.includes(origin)) return true;
+    if (/\.vercel\.app$/i.test(origin)) return true;
+    if (/\.onrender\.com$/i.test(origin)) return true;
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true;
+    for (const item of allowed) {
+      if (typeof item === 'string' && item.startsWith('*.')) {
+        const domain = item.slice(2).replace(/\./g, '\\.');
+        const regex = new RegExp(`^https?:\\/\\/([^.]+\\.)*${domain}$`, 'i');
+        if (regex.test(origin)) return true;
+      }
+    }
+    return false;
+  }
 };

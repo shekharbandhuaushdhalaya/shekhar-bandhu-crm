@@ -80,10 +80,10 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
-      if (!origin || config.allowedOrigins.indexOf(origin) !== -1) {
+      if (config.isOriginAllowed(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        callback(null, false);
       }
     },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
@@ -132,14 +132,15 @@ app.use(requestId);
 app.use(compression());
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || config.allowedOrigins.indexOf(origin) !== -1) {
+    if (config.isOriginAllowed(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, false);
     }
   },
   credentials: true,
 }));
+app.options('*', cors());
 app.use(express.json({
   limit: '2mb',
   verify: (req, res, buf) => {

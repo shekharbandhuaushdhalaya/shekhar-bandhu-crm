@@ -98,4 +98,16 @@ describe('Critical Security Audits (Item 1 & Item 2)', () => {
       jest.resetModules();
     });
   });
+
+  describe('CORS Origin Validation', () => {
+    it('correctly validates origins including Vercel subdomains, Render, and localhost', () => {
+      const config = require('../src/config');
+      expect(config.isOriginAllowed(undefined)).toBe(true);
+      expect(config.isOriginAllowed('https://shekhar-bandhu-crm.vercel.app')).toBe(true);
+      expect(config.isOriginAllowed('https://shekhar-bandhu-crm-git-main.vercel.app')).toBe(true);
+      expect(config.isOriginAllowed('https://shekhar-bandhu-crm.onrender.com')).toBe(true);
+      expect(config.isOriginAllowed('http://localhost:3000')).toBe(true);
+      expect(config.isOriginAllowed('http://localhost:8081')).toBe(true);
+    });
+  });
 });
