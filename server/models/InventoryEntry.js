@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 // One record per (product + vendor + warehouse + packing) — qty stored in BOXES
 const inventoryEntrySchema = new mongoose.Schema({
@@ -29,4 +30,5 @@ inventoryEntrySchema.index({ warehouseId: 1, productId: 1, vendorId: 1, packing:
 inventoryEntrySchema.index({ warehouseId: 1, productId: 1, vendorId: 1, packing: 1, createdAt: 1 });
 inventoryEntrySchema.index({ expiryDate: 1, qtyBoxes: 1 });
 
+inventoryEntrySchema.plugin(tenantPlugin);
 module.exports = mongoose.model('InventoryEntry', inventoryEntrySchema);

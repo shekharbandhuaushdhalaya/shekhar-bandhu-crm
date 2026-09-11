@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 // Stock ledger — every IN/OUT movement for a product
 const stockLedgerSchema = new mongoose.Schema({
@@ -23,4 +24,5 @@ const stockLedgerSchema = new mongoose.Schema({
 
 stockLedgerSchema.index({ productId: 1, createdAt: -1 });
 
+stockLedgerSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('StockLedger', stockLedgerSchema);

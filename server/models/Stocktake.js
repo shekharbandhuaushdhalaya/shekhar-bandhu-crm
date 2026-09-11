@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const stocktakeItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -24,4 +25,5 @@ const stocktakeSchema = new mongoose.Schema({
 
 stocktakeSchema.index({ stocktakeNo: 1, warehouseId: 1 });
 
+stocktakeSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Stocktake', stocktakeSchema);

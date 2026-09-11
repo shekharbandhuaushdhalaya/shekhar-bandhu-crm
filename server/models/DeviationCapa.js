@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const deviationCapaSchema = new mongoose.Schema({
   deviationNo: { type: String, required: true, unique: true, trim: true },
@@ -27,4 +28,5 @@ const deviationCapaSchema = new mongoose.Schema({
 
 deviationCapaSchema.index({ deviationNo: 'text', batchNo: 'text', deviationType: 'text' });
 
+deviationCapaSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('DeviationCapa', deviationCapaSchema);

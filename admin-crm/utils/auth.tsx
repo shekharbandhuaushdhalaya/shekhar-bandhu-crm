@@ -7,10 +7,11 @@ export type UserProfile = {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'manager' | 'agent';
+  role: string;
   canAccessCash?: boolean;
   mfaEnabled?: boolean;
   mustChangePassword?: boolean;
+  firmId?: string;
 };
 
 type AuthContextType = {
@@ -21,6 +22,7 @@ type AuthContextType = {
   completeMfaLogin: (mfaToken: string, totpCode: string) => Promise<UserProfile>;
   logout: () => Promise<void>;
   updateUser: (updatedUser: UserProfile) => Promise<void>;
+  switchFirm: (firmId: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -85,6 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       await authStorage.setItem('vp_crm_token', response.token);
+      if (response.refreshToken) await authStorage.setItem('vp_crm_refresh_token', response.refreshToken);
       await authStorage.setItem('vp_crm_user', JSON.stringify(response.user));
 
       setToken(response.token);
@@ -103,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('MFA verification failed');
     }
     await authStorage.setItem('vp_crm_token', response.token);
+    if (response.refreshToken) await authStorage.setItem('vp_crm_refresh_token', response.refreshToken);
     await authStorage.setItem('vp_crm_user', JSON.stringify(response.user));
     setToken(response.token);
     setUser(response.user);
@@ -112,7 +116,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      try { const refreshToken = await authStorage.getItem('vp_crm_refresh_token'); await api.logout(refreshToken || undefined); } catch {}
       await authStorage.removeItem('vp_crm_token');
+      await authStorage.removeItem('vp_crm_refresh_token');
       await authStorage.removeItem('vp_crm_user');
       setToken(null);
       setUser(null);
@@ -120,6 +126,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error('Failed to logout:', err);
     }
+  };
+
+  const switchFirm = async (firmId: string) => {
+    const response = await api.switchFirm(firmId);
+    if (!response?.token) throw new Error('Unable to switch firm');
+    await authStorage.setItem('vp_crm_token', response.token);
+    const updated = user ? { ...user, role: response.role, firmId: response.firmId } : user;
+    if (updated) { await authStorage.setItem('vp_crm_user', JSON.stringify(updated)); setUser(updated as UserProfile); }
+    setToken(response.token); api.setToken(response.token, updated);
+    api.clearCache();
+    try { const config = await api.getSystemSettings(); if (config) updateActiveFirmDetails(config); } catch {}
   };
 
   const updateUser = async (updatedUser: UserProfile) => {
@@ -134,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, completeMfaLogin, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, completeMfaLogin, logout, updateUser, switchFirm }}>
       {children}
     </AuthContext.Provider>
   );

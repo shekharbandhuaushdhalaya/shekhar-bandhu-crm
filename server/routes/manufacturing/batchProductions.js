@@ -228,7 +228,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
           const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
           if (!rm) continue;
 
-          const isPackaging = ing.itemType === 'packaging' || rm.category === 'Packaging';
+          const isPackaging = ing.itemType === 'packaging' || (rm.materialType === 'packaging' || (rm.materialType === 'packaging' || rm.category === 'Packaging' || rm.category === 'Packaging Material') || rm.category === 'Packaging Material');
           const hasStage = ing.stageName && ing.stageName.trim().length > 0;
 
           let qtyNeeded = 0;

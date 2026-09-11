@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const gstFilingSchema = new mongoose.Schema({
   period: { type: String, required: true }, // e.g. "2026-07"
@@ -19,4 +20,5 @@ const gstFilingSchema = new mongoose.Schema({
 // Avoid duplicate filings for same return type & period
 gstFilingSchema.index({ period: 1, returnType: 1 }, { unique: true });
 
+gstFilingSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('GstFiling', gstFilingSchema);

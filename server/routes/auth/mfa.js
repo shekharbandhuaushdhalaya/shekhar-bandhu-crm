@@ -14,22 +14,17 @@ const QRCode = require('qrcode');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../../models/User');
+const UserFirm = require('../../models/UserFirm');
+const RefreshSession = require('../../models/RefreshSession');
+const crypto = require('crypto');
+const { authenticateJWT: hardenedAuthenticateToken } = require('../../middleware/authenticateJWT');
 const { logAction } = require('../../utils/auditLogger');
 const config = require('../../src/config');
 
 const router = express.Router();
 const JWT_SECRET = config.jwtSecret;
 
-// Inline authenticateToken (same as auth.js)
-const authenticateToken = (req, res, next) => {
-  const token = (req.headers['authorization'] || '').split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'No token provided' });
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
-    req.user = decoded;
-    next();
-  });
-};
+const authenticateToken = hardenedAuthenticateToken;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/auth/mfa/setup
@@ -161,12 +156,12 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ error: 'Invalid authentication code. Please try again.' });
     }
 
-    // Issue full session JWT
-    const fullToken = jwt.sign(
-      { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // Issue short-lived access token plus a rotating refresh token.
+    const membership = await UserFirm.findOne({ userId: user._id, active: true }).sort({ isDefault: -1, createdAt: 1 }).lean();
+    if (!membership) return res.status(403).json({ error: 'No active firm membership' });
+    const fullToken = jwt.sign({ id: user._id, name: user.name, email: user.email, role: membership.role, firmRole: membership.role, firmId: membership.firmId, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword }, JWT_SECRET, { expiresIn: config.accessTokenTtl });
+    const refreshRaw = crypto.randomBytes(48).toString('base64url');
+    await RefreshSession.create({ userId: user._id, firmId: membership.firmId, tokenHash: crypto.createHash('sha256').update(refreshRaw).digest('hex'), sessionId: crypto.randomUUID(), expiresAt: new Date(Date.now() + config.refreshTokenTtlDays * 86400000), userAgent: req.headers['user-agent'] || '', ipAddress: req.ip || '' });
 
     await logAction({
       userId: user._id,
@@ -179,6 +174,9 @@ router.post('/verify', async (req, res) => {
 
     res.json({
       token: fullToken,
+      refreshToken: refreshRaw,
+      expiresIn: config.accessTokenTtl,
+      firmId: String(membership.firmId),
       user: { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword },
     });
   } catch (err) {

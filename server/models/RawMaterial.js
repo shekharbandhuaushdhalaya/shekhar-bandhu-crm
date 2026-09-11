@@ -1,6 +1,20 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const rawMaterialSchema = new mongoose.Schema({
+  materialType: {
+    type: String,
+    enum: ['raw_material', 'packaging', 'consumable', 'excipient', 'semi_finished', 'other'],
+    default: 'raw_material',
+    index: true
+  },
+  packagingType: {
+    type: String,
+    enum: ['bottle', 'cap', 'label', 'carton', 'corrugated_box', 'pouch', 'sachet', 'foil', 'shrink_wrap', 'insert', 'tape', 'other', ''],
+    default: ''
+  },
+  materialGrade: { type: String, default: '', trim: true },
+  specification: { type: String, default: '', trim: true },
   name: { type: String, required: true, trim: true },
   sku: { type: String, required: true, unique: true, trim: true },
   unit: { type: String, required: true, default: 'kg' }, // kg, g, l, ml, unit
@@ -29,7 +43,25 @@ const rawMaterialSchema = new mongoose.Schema({
   minReorder: { type: Number, default: 0 },
   cleaningLossPercent: { type: Number, default: 0, min: 0, max: 100 }, // typical % lost during cleaning/sorting
   // GMP Pharmacopoeial Identity
-  botanicalName: { type: String, default: '', trim: true },   // e.g. "Santalum album"
+  botanicalName: { type: String, default: '', trim: true },   // accepted/current botanical name
+  acceptedScientificName: { type: String, default: '', trim: true },
+  family: { type: String, default: '', trim: true },
+  genus: { type: String, default: '', trim: true },
+  species: { type: String, default: '', trim: true },
+  botanicalAuthority: { type: String, default: '', trim: true },
+  taxonomicRank: { type: String, default: '', trim: true },
+  taxonomicStatus: { type: String, default: '', trim: true },
+  botanicalSynonyms: [{ type: String, trim: true }],
+  commonNames: [{ type: String, trim: true }],
+  taxonomySource: { type: String, default: '', trim: true },
+  taxonomyVerifiedAt: { type: Date, default: null },
+  therapeuticUses: [{ type: String, trim: true }],
+  rasa: [{ type: String, trim: true }],
+  virya: { type: String, default: '', trim: true },
+  vipaka: { type: String, default: '', trim: true },
+  guna: [{ type: String, trim: true }],
+  dosage: { type: String, default: '', trim: true },
+  botanicalDescription: { type: String, default: '', trim: true },
   partUsed: { type: String, default: '', trim: true },        // e.g. "Heartwood", "Root", "Leaf"
   pharmacopoeialStandard: {
     type: String,
@@ -41,6 +73,7 @@ const rawMaterialSchema = new mongoose.Schema({
 
 rawMaterialSchema.index({ name: 1 });
 rawMaterialSchema.index({ category: 1 });
+rawMaterialSchema.index({ materialType: 1, packagingType: 1 });
 
 // Pre-save hook: convert raw material name to uppercase & collapse whitespace to eliminate casing variations
 rawMaterialSchema.pre('save', function (next) {
@@ -95,4 +128,5 @@ rawMaterialSchema.statics.findDuplicateByName = async function (name, { unit, ca
   return this.findOne(query);
 };
 
+rawMaterialSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('RawMaterial', rawMaterialSchema);

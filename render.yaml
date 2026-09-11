@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: shekhar-bandhu-crm-api
+    env: docker
+    dockerfilePath: ./server/Dockerfile
+    healthCheckPath: /api/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ENFORCE_TENANCY
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"

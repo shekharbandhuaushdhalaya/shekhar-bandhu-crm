@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const targetDoctorSchema = new mongoose.Schema({
   doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Contact' },
@@ -23,4 +24,5 @@ const pjpSchema = new mongoose.Schema({
 
 pjpSchema.index({ mrId: 1, plannedDate: 1 });
 
+pjpSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('PermanentJourneyPlan', pjpSchema);

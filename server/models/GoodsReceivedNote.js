@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const grnItemSchema = new mongoose.Schema({
   poItemId: { type: String, default: '' },
@@ -30,4 +31,5 @@ const goodsReceivedNoteSchema = new mongoose.Schema({
 
 goodsReceivedNoteSchema.index({ grnNo: 'text', poNo: 'text', vendorName: 'text' });
 
+goodsReceivedNoteSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('GoodsReceivedNote', goodsReceivedNoteSchema);

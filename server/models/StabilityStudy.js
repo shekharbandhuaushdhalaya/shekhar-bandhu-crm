@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const stabilityStudySchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -18,4 +19,5 @@ const stabilityStudySchema = new mongoose.Schema({
 stabilityStudySchema.index({ productId: 1 });
 stabilityStudySchema.index({ realTimeFollowUpDueBy: 1, status: 1 });
 
+stabilityStudySchema.plugin(tenantPlugin);
 module.exports = mongoose.model('StabilityStudy', stabilityStudySchema);

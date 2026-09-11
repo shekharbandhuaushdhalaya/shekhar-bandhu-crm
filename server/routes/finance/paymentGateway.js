@@ -1,5 +1,7 @@
 const express = require('express');
 const SystemSettings = require('../../models/SystemSettings');
+const WebhookEvent = require('../../models/WebhookEvent');
+const idempotency = require('../../middleware/idempotency');
 const Invoice = require('../../models/Invoice');
 const { authorize } = require('../../middleware/authorize');
 const router = express.Router();
@@ -15,14 +17,16 @@ router.post('/create-order', authorize('payment:create'), async (req, res) => {
     if (invoice.status === 'paid') return res.status(400).json({ error: 'Invoice is already paid' });
 
     const settings = await SystemSettings.findOne({ key: 'company_config' }).select('+razorpayKeySecret +razorpayWebhookSecret');
-    if (!settings || !settings.paymentGatewayEnabled || !settings.razorpayKeyId || !settings.razorpayKeySecret) {
+    const keyId = process.env.RAZORPAY_KEY_ID || settings?.razorpayKeyId;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || settings?.razorpayKeySecret;
+    if (!settings || !settings.paymentGatewayEnabled || !keyId || !keySecret) {
       return res.status(400).json({ error: 'Payment gateway is not configured. Please configure Razorpay keys in Firm Settings.' });
     }
 
     const Razorpay = require('razorpay');
     const razorpay = new Razorpay({
-      key_id: settings.razorpayKeyId,
-      key_secret: settings.razorpayKeySecret,
+      key_id: keyId,
+      key_secret: keySecret,
     });
 
     const amountPaise = Math.round(invoice.amount * 100);
@@ -41,7 +45,7 @@ router.post('/create-order', authorize('payment:create'), async (req, res) => {
       amount: order.amount,
       currency: order.currency,
       receipt: order.receipt,
-      keyId: settings.razorpayKeyId,
+      keyId,
       invoiceNo: invoice.invoiceNo,
       customerName: invoice.customerName || invoice.supplierName || '',
       customerEmail: '',
@@ -53,7 +57,7 @@ router.post('/create-order', authorize('payment:create'), async (req, res) => {
 });
 
 // POST /api/payments/gateway/verify — Verify a Razorpay payment signature
-router.post('/verify', authorize('payment:create'), async (req, res) => {
+router.post('/verify', idempotency, authorize('payment:create'), async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, invoiceId } = req.body;
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !invoiceId) {
@@ -61,14 +65,15 @@ router.post('/verify', authorize('payment:create'), async (req, res) => {
     }
 
     const settings = await SystemSettings.findOne({ key: 'company_config' }).select('+razorpayKeySecret +razorpayWebhookSecret');
-    if (!settings || !settings.razorpayKeySecret) {
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || settings?.razorpayKeySecret;
+    if (!keySecret) {
       return res.status(400).json({ error: 'Payment gateway not configured' });
     }
 
     const crypto = require('crypto');
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSignature = crypto
-      .createHmac('sha256', settings.razorpayKeySecret)
+      .createHmac('sha256', keySecret)
       .update(body)
       .digest('hex');
 
@@ -111,7 +116,8 @@ router.post('/verify', authorize('payment:create'), async (req, res) => {
 // POST /api/payments/gateway/webhook — Razorpay webhook handler
 router.post('/webhook', async (req, res) => {
   try {
-    const secret = (await SystemSettings.findOne({ key: 'company_config' }).select('+razorpayWebhookSecret'))?.razorpayWebhookSecret;
+    const settings = await SystemSettings.findOne({ key: 'company_config' }).select('+razorpayWebhookSecret');
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET || settings?.razorpayWebhookSecret;
     if (!secret) return res.status(200).json({ status: 'ignored', reason: 'Webhook not configured' });
 
     const crypto = require('crypto');
@@ -122,6 +128,13 @@ router.post('/webhook', async (req, res) => {
     }
 
     const event = req.body.event;
+    const eventId = req.headers['x-razorpay-event-id'] || req.body.id || crypto.createHash('sha256').update(bodyToSign).digest('hex');
+    try {
+      await WebhookEvent.create({ provider: 'razorpay', eventId: String(eventId), eventType: event, signatureValid: true, payload: req.body, status: 'received' });
+    } catch (e) {
+      if (e.code === 11000) return res.json({ status: 'ok', duplicate: true });
+      throw e;
+    }
     if (event === 'payment.captured' || event === 'order.paid') {
       const payload = req.body.payload;
       const paymentEntity = payload?.payment?.entity;
@@ -149,9 +162,11 @@ router.post('/webhook', async (req, res) => {
       }
     }
 
+    await WebhookEvent.updateOne({ provider: 'razorpay', eventId: String(eventId) }, { $set: { status: 'processed', processedAt: new Date() } });
     res.json({ status: 'ok' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (typeof eventId !== 'undefined') await WebhookEvent.updateOne({ provider: 'razorpay', eventId: String(eventId) }, { $set: { status: 'failed', lastError: err.message }, $inc: { attempts: 1 } }).catch(() => {});
+    res.status(500).json({ error: 'Webhook processing failed' });
   }
 });
 

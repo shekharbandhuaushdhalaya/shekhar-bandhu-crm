@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const bankStatementSchema = new mongoose.Schema({
   accountName: { type: String, default: '' },
@@ -18,4 +19,5 @@ const bankStatementSchema = new mongoose.Schema({
 bankStatementSchema.index({ transactionDate: -1 });
 bankStatementSchema.index({ status: 1 });
 
+bankStatementSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('BankStatement', bankStatementSchema);

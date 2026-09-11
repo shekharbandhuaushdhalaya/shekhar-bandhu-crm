@@ -181,7 +181,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                       <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{rm.name}</Text>
                       <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
                         <Text style={{ fontSize: 9, fontWeight: '700', color: colors.text.secondary }}>
-                          {rm.category === 'Packaging' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 ' + (rm.category || 'Herb')))}
+                          {(rm as any).materialType === 'packaging' || rm.category === 'Packaging' || rm.category === 'Packaging Material' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 ' + (rm.category || 'Herb')))}
                         </Text>
                       </View>
                       {rm.pharmacopoeialStandard ? (

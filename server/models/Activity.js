@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const activitySchema = new mongoose.Schema({
   type: {
@@ -16,4 +17,5 @@ const activitySchema = new mongoose.Schema({
 
 activitySchema.index({ createdAt: -1 });
 
+activitySchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Activity', activitySchema);

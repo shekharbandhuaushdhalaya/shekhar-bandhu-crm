@@ -42,6 +42,9 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockedUntil: { type: Date, default: null },
+  passwordChangedAt: { type: Date, default: null },
   mfaEnabled: {
     type: Boolean,
     default: false,

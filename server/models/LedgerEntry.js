@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const ledgerEntrySchema = new mongoose.Schema({
   partyId:    { type: mongoose.Schema.Types.ObjectId },
@@ -25,4 +26,5 @@ ledgerEntrySchema.index({ partyId: 1, date: -1 });
 ledgerEntrySchema.index({ refId: 1 });
 ledgerEntrySchema.index({ createdAt: -1 });
 
+ledgerEntrySchema.plugin(tenantPlugin);
 module.exports = mongoose.model('LedgerEntry', ledgerEntrySchema);

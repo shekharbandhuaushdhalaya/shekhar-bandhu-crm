@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const mrExpenseSchema = new mongoose.Schema({
   mrId:          { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative', required: true },
@@ -19,4 +20,5 @@ const mrExpenseSchema = new mongoose.Schema({
 mrExpenseSchema.index({ mrId: 1, date: -1 });
 mrExpenseSchema.index({ status: 1 });
 
+mrExpenseSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('MrExpense', mrExpenseSchema);

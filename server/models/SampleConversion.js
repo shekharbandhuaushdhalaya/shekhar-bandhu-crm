@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const sampleConversionSchema = new mongoose.Schema({
   mrId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalRepresentative', required: true },
@@ -21,4 +22,5 @@ const sampleConversionSchema = new mongoose.Schema({
 
 sampleConversionSchema.index({ mrId: 1, doctorId: 1, conversionStatus: 1 });
 
+sampleConversionSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('SampleConversion', sampleConversionSchema);

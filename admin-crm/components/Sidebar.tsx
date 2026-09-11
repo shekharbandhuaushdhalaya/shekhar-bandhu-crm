@@ -2,10 +2,13 @@ import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useEffect, useState, useRef } from 'react';
+import { Modal } from 'react-native';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { usePermission } from '../utils/permissions';
 import { LightColors, Spacing, Radius } from '../constants/theme';
 import { authStorage } from '../utils/storage';
+import { useAuth } from '../utils/auth';
+import { api } from '../utils/api';
 
 const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded';
 
@@ -167,6 +170,17 @@ function NavItemRow({
 
 const createSidebarStyles = (colors: typeof LightColors) =>
   StyleSheet.create({
+    firmSelector: { flexDirection: 'row', alignItems: 'center', margin: Spacing.xs, marginBottom: 4, padding: 9, borderRadius: Radius.md, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border },
+    firmIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight, marginRight: 8 },
+    firmCaption: { fontSize: 8, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.8 },
+    firmName: { fontSize: 12, fontWeight: '700', color: colors.text.primary, marginTop: 1 },
+    firmModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    firmModalCard: { width: '100%', maxWidth: 420, backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: colors.border },
+    firmModalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: 10 },
+    firmOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border },
+    firmOptionName: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+    firmOptionRole: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+
     sidebar: {
       width: '100%',
       backgroundColor: colors.bg.secondary,
@@ -349,6 +363,10 @@ const createSidebarStyles = (colors: typeof LightColors) =>
   });
 
 function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; isOnline?: boolean; logout?: () => void }) {
+  const { user, switchFirm } = useAuth();
+  const [firms, setFirms] = useState<any[]>([]);
+  const [firmPickerOpen, setFirmPickerOpen] = useState(false);
+  const [firmLoading, setFirmLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { colors, themeMode, toggleTheme } = useTheme();
@@ -408,8 +426,35 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
     if (onNavigate) onNavigate();
   };
 
+  useEffect(() => { api.getFirms().then(setFirms).catch(() => {}); }, [user?.id, user?.firmId]);
+  const activeFirm = firms.find(f => String(f._id) === String(user?.firmId)) || firms.find(f => f.isDefault) || firms[0];
+  const handleFirmSwitch = async (firmId: string) => {
+    if (String(firmId) === String(user?.firmId)) { setFirmPickerOpen(false); return; }
+    setFirmLoading(true);
+    try { await switchFirm(firmId); setFirmPickerOpen(false); } finally { setFirmLoading(false); }
+  };
+
   return (
     <View style={styles.sidebar}>
+      <TouchableOpacity style={styles.firmSelector} onPress={() => setFirmPickerOpen(true)} activeOpacity={0.75}>
+        <View style={styles.firmIcon}><Ionicons name="business-outline" size={16} color={colors.primary} /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.firmCaption}>ACTIVE FIRM</Text>
+          <Text style={styles.firmName} numberOfLines={1}>{activeFirm?.name || 'Select firm'}</Text>
+        </View>
+        <Ionicons name="chevron-down" size={14} color={colors.text.muted} />
+      </TouchableOpacity>
+      <Modal visible={firmPickerOpen} transparent animationType="fade" onRequestClose={() => setFirmPickerOpen(false)}>
+        <TouchableOpacity style={styles.firmModalBackdrop} activeOpacity={1} onPress={() => setFirmPickerOpen(false)}>
+          <View style={styles.firmModalCard}>
+            <Text style={styles.firmModalTitle}>Switch firm</Text>
+            {firms.map(f => <TouchableOpacity key={String(f._id)} style={styles.firmOption} disabled={firmLoading} onPress={() => handleFirmSwitch(String(f._id))}>
+              <Ionicons name={String(f._id) === String(user?.firmId) ? 'checkmark-circle' : 'business-outline'} size={18} color={String(f._id) === String(user?.firmId) ? colors.primary : colors.text.secondary} />
+              <View style={{ flex: 1 }}><Text style={styles.firmOptionName}>{f.name}</Text><Text style={styles.firmOptionRole}>{f.role || 'Member'}</Text></View>
+            </TouchableOpacity>)}
+          </View>
+        </TouchableOpacity>
+      </Modal>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}

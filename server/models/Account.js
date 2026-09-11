@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const accountSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true },
@@ -9,4 +10,5 @@ const accountSchema = new mongoose.Schema({
   description: { type: String, default: '' }
 }, { timestamps: true });
 
+accountSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Account', accountSchema);

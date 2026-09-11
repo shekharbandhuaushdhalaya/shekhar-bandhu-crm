@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const pharmacopoeiaEntrySchema = new mongoose.Schema({
   ayurvedicName: { type: String, required: true, trim: true, index: true },
@@ -42,4 +43,5 @@ pharmacopoeiaEntrySchema.index(
   }
 );
 
+pharmacopoeiaEntrySchema.plugin(tenantPlugin);
 module.exports = mongoose.model('PharmacopoeiaEntry', pharmacopoeiaEntrySchema);

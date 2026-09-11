@@ -54,10 +54,11 @@ import MRPPlanTab from './manufacturing/components/MRPPlanTab';
 import StockTraceModal from './manufacturing/modals/StockTraceModal';
 import ConfirmDeleteModal from './manufacturing/modals/ConfirmDeleteModal';
 
-const isIntegerQty = (unit?: string, category?: string) => {
+const isPackagingMaterial = (m: any) => m?.materialType === 'packaging' || ['Packaging', 'Packaging Material'].includes(m?.category);
+const isIntegerQty = (unit?: string, category?: string, materialType?: string) => {
   const u = (unit || '').toLowerCase().trim();
   const c = (category || '').toLowerCase().trim();
-  return u === 'pcs' && (c === 'packing' || c === 'packaging');
+  return u === 'pcs' && (materialType === 'packaging' || c === 'packing' || c === 'packaging');
 };
 
 export default function ManufacturingScreen() {
@@ -157,7 +158,28 @@ export default function ManufacturingScreen() {
 
   // Form States — Raw Material
   const [rmName, setRmName] = useState('');
+  const [rmMaterialType, setRmMaterialType] = useState<'raw_material' | 'packaging' | 'consumable' | 'excipient' | 'semi_finished' | 'other'>('raw_material');
+  const [rmPackagingType, setRmPackagingType] = useState('');
+  const [rmMaterialGrade, setRmMaterialGrade] = useState('');
+  const [rmSpecification, setRmSpecification] = useState('');
   const [rmBotanicalName, setRmBotanicalName] = useState('');
+  const [rmAcceptedScientificName, setRmAcceptedScientificName] = useState('');
+  const [rmFamily, setRmFamily] = useState('');
+  const [rmGenus, setRmGenus] = useState('');
+  const [rmSpecies, setRmSpecies] = useState('');
+  const [rmBotanicalAuthority, setRmBotanicalAuthority] = useState('');
+  const [rmTaxonomicRank, setRmTaxonomicRank] = useState('');
+  const [rmTaxonomicStatus, setRmTaxonomicStatus] = useState('');
+  const [rmBotanicalSynonyms, setRmBotanicalSynonyms] = useState<string[]>([]);
+  const [rmCommonNames, setRmCommonNames] = useState<string[]>([]);
+  const [rmTaxonomySource, setRmTaxonomySource] = useState('');
+  const [rmTherapeuticUses, setRmTherapeuticUses] = useState<string[]>([]);
+  const [rmRasa, setRmRasa] = useState<string[]>([]);
+  const [rmVirya, setRmVirya] = useState('');
+  const [rmVipaka, setRmVipaka] = useState('');
+  const [rmGuna, setRmGuna] = useState<string[]>([]);
+  const [rmDosage, setRmDosage] = useState('');
+  const [rmBotanicalDescription, setRmBotanicalDescription] = useState('');
   const [rmPartUsed, setRmPartUsed] = useState('');
   const [rmSku, setRmSku] = useState('');
   const [rmUnit, setRmUnit] = useState('kg');
@@ -179,8 +201,8 @@ export default function ManufacturingScreen() {
   // Form States — BOM Recipe
   const [selectedProdId, setSelectedProdId] = useState('');
   const [bomYield, setBomYield] = useState('100');
-  const [bomIngredients, setBomIngredients] = useState<{ rawMaterialId: string; qtyRequired: string; stageName?: string }[]>([
-    { rawMaterialId: '', qtyRequired: '' }
+  const [bomIngredients, setBomIngredients] = useState<{ rawMaterialId: string; qtyRequired: string; stageName?: string; itemType?: 'formulation' | 'packaging' }[]>([
+    { rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }
   ]);
   const [bomError, setBomError] = useState('');
   const [bomIsActive, setBomIsActive] = useState(true);
@@ -615,8 +637,10 @@ export default function ManufacturingScreen() {
           await api.adjustRawMaterialStock(editingMaterialId, targetStock, rmAdjustmentReason.trim());
         }
         await api.updateRawMaterial(editingMaterialId, {
-          name: rmName.trim(),
+          name: rmName
+          , materialType: rmMaterialType, packagingType: rmPackagingType, materialGrade: rmMaterialGrade, specification: rmSpecification.trim(),
           botanicalName: rmBotanicalName.trim(),
+          acceptedScientificName: rmAcceptedScientificName.trim(), family: rmFamily.trim(), genus: rmGenus.trim(), species: rmSpecies.trim(), botanicalAuthority: rmBotanicalAuthority.trim(), taxonomicRank: rmTaxonomicRank.trim(), taxonomicStatus: rmTaxonomicStatus.trim(), botanicalSynonyms: rmBotanicalSynonyms, commonNames: rmCommonNames, taxonomySource: rmTaxonomySource.trim(), therapeuticUses: rmTherapeuticUses, rasa: rmRasa, virya: rmVirya.trim(), vipaka: rmVipaka.trim(), guna: rmGuna, dosage: rmDosage.trim(), botanicalDescription: rmBotanicalDescription.trim(),
           partUsed: rmPartUsed.trim(),
           unit: rmUnit,
           category: rmCategory,
@@ -628,8 +652,10 @@ export default function ManufacturingScreen() {
         });
       } else {
         await api.createRawMaterial({
-          name: rmName.trim(),
+          name: rmName
+          , materialType: rmMaterialType, packagingType: rmPackagingType, materialGrade: rmMaterialGrade, specification: rmSpecification.trim(),
           botanicalName: rmBotanicalName.trim(),
+          acceptedScientificName: rmAcceptedScientificName.trim(), family: rmFamily.trim(), genus: rmGenus.trim(), species: rmSpecies.trim(), botanicalAuthority: rmBotanicalAuthority.trim(), taxonomicRank: rmTaxonomicRank.trim(), taxonomicStatus: rmTaxonomicStatus.trim(), botanicalSynonyms: rmBotanicalSynonyms, commonNames: rmCommonNames, taxonomySource: rmTaxonomySource.trim(), therapeuticUses: rmTherapeuticUses, rasa: rmRasa, virya: rmVirya.trim(), vipaka: rmVipaka.trim(), guna: rmGuna, dosage: rmDosage.trim(), botanicalDescription: rmBotanicalDescription.trim(),
           partUsed: rmPartUsed.trim(),
           sku: rmSku.trim() || undefined,
           unit: rmUnit,
@@ -651,7 +677,12 @@ export default function ManufacturingScreen() {
   const handleEditMaterial = (rm: RawMaterial) => {
     setEditingMaterialId(rm._id);
     setRmName(rm.name);
+    setRmMaterialType((rm as any).materialType || ((isPackagingMaterial(rm) || rm.category === 'Packaging Material') ? 'packaging' : (rm.category === 'Excipient' ? 'excipient' : 'raw_material')));
+    setRmPackagingType((rm as any).packagingType || '');
+    setRmMaterialGrade((rm as any).materialGrade || '');
+    setRmSpecification((rm as any).specification || '');
     setRmBotanicalName(rm.botanicalName || '');
+    setRmAcceptedScientificName(rm.acceptedScientificName || ''); setRmFamily(rm.family || ''); setRmGenus(rm.genus || ''); setRmSpecies(rm.species || ''); setRmBotanicalAuthority(rm.botanicalAuthority || ''); setRmTaxonomicRank(rm.taxonomicRank || ''); setRmTaxonomicStatus(rm.taxonomicStatus || ''); setRmBotanicalSynonyms(rm.botanicalSynonyms || []); setRmCommonNames(rm.commonNames || []); setRmTaxonomySource(rm.taxonomySource || ''); setRmTherapeuticUses(rm.therapeuticUses || []); setRmRasa(rm.rasa || []); setRmVirya(rm.virya || ''); setRmVipaka(rm.vipaka || ''); setRmGuna(rm.guna || []); setRmDosage(rm.dosage || ''); setRmBotanicalDescription(rm.botanicalDescription || '');
     setRmPartUsed(rm.partUsed || '');
     setRmSku(rm.sku || '');
     setRmUnit(rm.unit);
@@ -671,7 +702,12 @@ export default function ManufacturingScreen() {
 
   const handleCloseMaterialModal = () => {
     setRmName('');
+    setRmMaterialType('raw_material');
+    setRmPackagingType('');
+    setRmMaterialGrade('');
+    setRmSpecification('');
     setRmBotanicalName('');
+    setRmAcceptedScientificName(''); setRmFamily(''); setRmGenus(''); setRmSpecies(''); setRmBotanicalAuthority(''); setRmTaxonomicRank(''); setRmTaxonomicStatus(''); setRmBotanicalSynonyms([]); setRmCommonNames([]); setRmTaxonomySource(''); setRmTherapeuticUses([]); setRmRasa([]); setRmVirya(''); setRmVipaka(''); setRmGuna([]); setRmDosage(''); setRmBotanicalDescription('');
     setRmPartUsed('');
     setRmSku('');
     setRmUnit('kg');
@@ -712,14 +748,14 @@ export default function ManufacturingScreen() {
 
   // --- Handlers: BOM Formula ---
   const handleAddIngredientRow = () => {
-    setBomIngredients([...bomIngredients, { rawMaterialId: '', qtyRequired: '', stageName: '' }]);
+    setBomIngredients([...bomIngredients, { rawMaterialId: '', qtyRequired: '', stageName: '', itemType: 'formulation' }]);
   };
 
   const handleRemoveIngredientRow = (index: number) => {
     setBomIngredients(bomIngredients.filter((_, idx) => idx !== index));
   };
 
-  const handleIngredientChange = (index: number, key: 'rawMaterialId' | 'qtyRequired' | 'stageName', value: string) => {
+  const handleIngredientChange = (index: number, key: 'rawMaterialId' | 'qtyRequired' | 'stageName' | 'itemType', value: string) => {
     const updated = bomIngredients.map((item, idx) => {
       if (idx === index) {
         return { ...item, [key]: value };
@@ -776,6 +812,7 @@ export default function ManufacturingScreen() {
         ingredients: bomIngredients.map(ing => ({
           rawMaterialId: ing.rawMaterialId,
           qtyRequired: Number(ing.qtyRequired),
+          itemType: ing.itemType || 'formulation',
           stageName: ing.stageName || ''
         })),
         isActive: bomIsActive,
@@ -792,7 +829,7 @@ export default function ManufacturingScreen() {
 
       setSelectedProdId('');
       setBomYield('100');
-      setBomIngredients([{ rawMaterialId: '', qtyRequired: '', stageName: '' }]);
+      setBomIngredients([{ rawMaterialId: '', qtyRequired: '', stageName: '', itemType: 'formulation' }]);
       setBomIsActive(true);
       setBomIsDefault(true);
       setBomRecipeName('Standard Recipe');
@@ -1686,7 +1723,7 @@ export default function ManufacturingScreen() {
         for (const ing of matchingBom.ingredients) {
           const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
           const mat = materials.find(m => m._id === ingId);
-          const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+          const isPkg = ing.itemType === 'packaging' || (mat && isPackagingMaterial(mat));
           if (isPkg) continue;
           
           const qtyNeeded = ing.qtyRequired * overallScale;
@@ -1713,7 +1750,7 @@ export default function ManufacturingScreen() {
           for (const ing of childBom.ingredients) {
             const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
             const mat = materials.find(m => m._id === ingId);
-            const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+            const isPkg = ing.itemType === 'packaging' || (mat && isPackagingMaterial(mat));
             if (!isPkg) continue;
             const qtyNeeded = ing.qtyRequired * Number(yieldItem.plannedQty);
             const key = ingId || ing.rawMaterialId.toString();
@@ -1737,7 +1774,7 @@ export default function ManufacturingScreen() {
         .filter(ing => {
           const ingId = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId._id : ing.rawMaterialId;
           const mat = materials.find(m => m._id === ingId);
-          const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+          const isPkg = ing.itemType === 'packaging' || (mat && isPackagingMaterial(mat));
           if (isPkg) return showPackagingPreview;
           return showFormulationPreview;
         })
@@ -1746,7 +1783,7 @@ export default function ManufacturingScreen() {
           const ingName = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Unknown Raw Material';
           const ingUnit = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.unit : 'kg';
           const mat = materials.find(m => m._id === ingId);
-          const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+          const isPkg = ing.itemType === 'packaging' || (mat && isPackagingMaterial(mat));
           const qtyNeeded = isPkg ? ing.qtyRequired * plannedVal : ing.qtyRequired * scale;
           const ratioLabel = isPkg 
             ? `${ing.qtyRequired} ${ingUnit}/unit`
@@ -2035,7 +2072,28 @@ export default function ManufacturingScreen() {
         visible={materialModalVisible}
         editingMaterialId={editingMaterialId}
         rmName={rmName} setRmName={setRmName}
+        rmMaterialType={rmMaterialType} setRmMaterialType={setRmMaterialType}
+        rmPackagingType={rmPackagingType} setRmPackagingType={setRmPackagingType}
+        rmMaterialGrade={rmMaterialGrade} setRmMaterialGrade={setRmMaterialGrade}
+        rmSpecification={rmSpecification} setRmSpecification={setRmSpecification}
         rmBotanicalName={rmBotanicalName} setRmBotanicalName={setRmBotanicalName}
+        rmAcceptedScientificName={rmAcceptedScientificName} setRmAcceptedScientificName={setRmAcceptedScientificName}
+        rmFamily={rmFamily} setRmFamily={setRmFamily}
+        rmGenus={rmGenus} setRmGenus={setRmGenus}
+        rmSpecies={rmSpecies} setRmSpecies={setRmSpecies}
+        rmBotanicalAuthority={rmBotanicalAuthority} setRmBotanicalAuthority={setRmBotanicalAuthority}
+        rmTaxonomicRank={rmTaxonomicRank} setRmTaxonomicRank={setRmTaxonomicRank}
+        rmTaxonomicStatus={rmTaxonomicStatus} setRmTaxonomicStatus={setRmTaxonomicStatus}
+        rmBotanicalSynonyms={rmBotanicalSynonyms} setRmBotanicalSynonyms={setRmBotanicalSynonyms}
+        rmCommonNames={rmCommonNames} setRmCommonNames={setRmCommonNames}
+        rmTaxonomySource={rmTaxonomySource} setRmTaxonomySource={setRmTaxonomySource}
+        rmTherapeuticUses={rmTherapeuticUses} setRmTherapeuticUses={setRmTherapeuticUses}
+        rmRasa={rmRasa} setRmRasa={setRmRasa}
+        rmVirya={rmVirya} setRmVirya={setRmVirya}
+        rmVipaka={rmVipaka} setRmVipaka={setRmVipaka}
+        rmGuna={rmGuna} setRmGuna={setRmGuna}
+        rmDosage={rmDosage} setRmDosage={setRmDosage}
+        rmBotanicalDescription={rmBotanicalDescription} setRmBotanicalDescription={setRmBotanicalDescription}
         rmPartUsed={rmPartUsed} setRmPartUsed={setRmPartUsed}
         rmSku={rmSku}
         rmUnit={rmUnit} setRmUnit={setRmUnit}

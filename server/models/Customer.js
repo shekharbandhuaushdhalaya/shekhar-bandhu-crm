@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const customerSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
@@ -50,4 +51,5 @@ const customerSchema = new mongoose.Schema({
 customerSchema.index({ name: 'text', company: 'text', email: 'text' });
 customerSchema.index({ createdAt: -1 });
 
+customerSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Customer', customerSchema);

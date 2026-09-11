@@ -246,6 +246,8 @@ async function resolveHerbDetails(queryName) {
         matchedName: dbMatch.ayurvedicName,
         scientificName: dbMatch.botanicalName,
         botanicalName: dbMatch.botanicalName,
+        acceptedScientificName: dbMatch.botanicalName,
+        family: dbMatch.family || '',
         partUsed: dbMatch.partUsed,
         pharmacopoeialStandard: dbMatch.pharmacopoeialStandard || 'API',
         monographRef: dbMatch.monographRef || '',
@@ -255,7 +257,13 @@ async function resolveHerbDetails(queryName) {
         rasa: dbMatch.rasa || [],
         virya: dbMatch.virya || '',
         vipaka: dbMatch.vipaka || '',
-        dosage: dbMatch.dosage || ''
+        dosage: dbMatch.dosage || '',
+        guna: dbMatch.guna || [],
+        description: dbMatch.description || '',
+        botanicalSynonyms: dbMatch.synonyms || [],
+        commonNames: [dbMatch.ayurvedicName, ...(dbMatch.synonyms || [])].filter(Boolean),
+        taxonomySource: dbMatch.source || 'Ayurvedic Pharmacopoeia database',
+        taxonomyVerifiedAt: dbMatch.updatedAt || null
       };
       LOOKUP_CACHE.set(cleanKey, { data: res, timestamp: Date.now() });
       return res;
@@ -274,7 +282,17 @@ async function resolveHerbDetails(queryName) {
           matchedName: queryName.trim().toUpperCase(),
           scientificName: gbifResult.scientificName,
           botanicalName: gbifResult.scientificName,
+          acceptedScientificName: gbifResult.acceptedScientificName || gbifResult.scientificName,
           family: gbifResult.family || '',
+          genus: gbifResult.genus || '',
+          species: gbifResult.species || '',
+          botanicalAuthority: gbifResult.authorship || '',
+          taxonomicRank: gbifResult.rank || '',
+          taxonomicStatus: gbifResult.status || '',
+          botanicalSynonyms: gbifResult.synonyms || [],
+          commonNames: [queryName.trim()],
+          taxonomySource: 'GBIF Species Match API',
+          taxonomyVerifiedAt: new Date().toISOString(),
           partUsed: 'Herb/Plant Material',
           pharmacopoeialStandard: 'API',
           category: 'Herb',
@@ -292,7 +310,7 @@ async function resolveHerbDetails(queryName) {
   // 4. Gemini AI fallback if not in pre-loaded database or GBIF
   try {
     const sys = await SystemSettings.findOne({ key: 'company_config' }).select('+geminiApiKey').lean();
-    const apiKey = (sys && sys.geminiApiKey && sys.geminiApiKey.trim()) ? sys.geminiApiKey.trim() : process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || ((sys && sys.geminiApiKey && sys.geminiApiKey.trim()) ? sys.geminiApiKey.trim() : '');
 
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
@@ -307,6 +325,19 @@ Respond with ONLY a valid JSON object with the following fields:
 - "pharmacopoeialStandard": "API", "AFI", "IP", "BP", or "USP"
 - "category": "Dry Herb", "Fresh Herb", "Excipient", "Volatile Oil", or "Plant Concentrate"
 - "synonyms": Array of 2-4 alternative common/regional names or English names
+- "family": Botanical family
+- "genus": Botanical genus
+- "species": Specific epithet
+- "botanicalAuthority": Author citation if known
+- "taxonomicRank": taxonomic rank
+- "commonNames": Array of common/regional names
+- "therapeuticUses": Array of traditional Ayurvedic uses only when confidently known
+- "rasa": Array of Ayurvedic rasa values when confidently known
+- "virya": Ayurvedic virya when confidently known
+- "vipaka": Ayurvedic vipaka when confidently known
+- "guna": Array of Ayurvedic guna values when confidently known
+- "dosage": traditional dosage reference when confidently known
+- "description": concise identification description
 
 Do NOT include any extra text, markdown formatting or backticks outside the JSON.`;
 
@@ -323,7 +354,24 @@ Do NOT include any extra text, markdown formatting or backticks outside the JSON
           partUsed: parsed.partUsed || '',
           pharmacopoeialStandard: parsed.pharmacopoeialStandard || 'API',
           category: parsed.category || 'Herb',
-          synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : []
+          synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : [],
+          acceptedScientificName: parsed.scientificName || '',
+          family: parsed.family || '',
+          genus: parsed.genus || '',
+          species: parsed.species || '',
+          botanicalAuthority: parsed.botanicalAuthority || '',
+          taxonomicRank: parsed.taxonomicRank || '',
+          botanicalSynonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : [],
+          commonNames: Array.isArray(parsed.commonNames) ? parsed.commonNames : [],
+          therapeuticUses: Array.isArray(parsed.therapeuticUses) ? parsed.therapeuticUses : [],
+          rasa: Array.isArray(parsed.rasa) ? parsed.rasa : [],
+          virya: parsed.virya || '',
+          vipaka: parsed.vipaka || '',
+          guna: Array.isArray(parsed.guna) ? parsed.guna : [],
+          dosage: parsed.dosage || '',
+          description: parsed.description || '',
+          taxonomySource: 'Gemini pharmacognosy fallback',
+          taxonomyVerifiedAt: new Date().toISOString()
         };
         LOOKUP_CACHE.set(cleanKey, { data: res, timestamp: Date.now() });
         return res;

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const paymentAllocationSchema = new mongoose.Schema({
   invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice', required: true },
@@ -82,4 +83,5 @@ paymentSchema.pre('save', function (next) {
 paymentSchema.index({ partyName: 'text', paymentMethod: 'text', referenceNo: 'text' });
 paymentSchema.index({ date: -1, createdAt: -1 });
 
+paymentSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Payment', paymentSchema);

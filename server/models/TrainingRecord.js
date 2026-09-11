@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const trainingRecordSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -12,4 +13,5 @@ const trainingRecordSchema = new mongoose.Schema({
 
 trainingRecordSchema.index({ userId: 1, topic: 1 });
 
+trainingRecordSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('TrainingRecord', trainingRecordSchema);

@@ -31,7 +31,16 @@ describe('Critical Security Audits (Item 1 & Item 2)', () => {
 
   beforeEach(async () => {
     await SystemSettings.deleteMany({});
+    const Firm = require('../models/Firm');
+    const User = require('../models/User');
+    const UserFirm = require('../models/UserFirm');
+    await Firm.deleteMany({});
+    await User.deleteMany({});
+    await UserFirm.deleteMany({});
+
+    const firm = await Firm.create({ name: 'SHEKHAR BANDHU AUSHADHALAYA', active: true });
     await SystemSettings.create({
+      firmId: firm._id,
       key: 'company_config',
       firmName: 'SHEKHAR BANDHU AUSHADHALAYA',
       razorpayKeySecret: 'secret_rzp_live_12345',
@@ -57,8 +66,13 @@ describe('Critical Security Audits (Item 1 & Item 2)', () => {
     });
 
     it('authenticated GET /api/system/settings excludes razorpayKeySecret, razorpayWebhookSecret, and geminiApiKey', async () => {
-      const validUserId = new mongoose.Types.ObjectId().toString();
-      const token = jwt.sign({ id: validUserId, name: 'Admin', role: 'admin' }, TEST_JWT_SECRET);
+      const User = require('../models/User');
+      const Firm = require('../models/Firm');
+      const UserFirm = require('../models/UserFirm');
+      const firm = await Firm.findOne({ name: 'SHEKHAR BANDHU AUSHADHALAYA' });
+      const user = await User.create({ name: 'Admin', email: 'admin@test.com', password: 'hash', role: 'admin' });
+      await UserFirm.create({ userId: user._id, firmId: firm._id, role: 'admin', active: true });
+      const token = jwt.sign({ id: user._id.toString(), name: 'Admin', role: 'admin', firmId: firm._id.toString() }, TEST_JWT_SECRET);
       const res = await request(app)
         .get('/api/system/settings')
         .set('Authorization', `Bearer ${token}`);

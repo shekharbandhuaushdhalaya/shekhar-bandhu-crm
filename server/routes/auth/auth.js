@@ -1,12 +1,17 @@
 const express = require('express');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../../models/User');
+const Firm = require('../../models/Firm');
+const UserFirm = require('../../models/UserFirm');
+const RefreshSession = require('../../models/RefreshSession');
 const Otp = require('../../models/Otp');
 const { trackAgentActivity } = require('../../utils/agentTracker');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { authenticateJWT } = require('../../middleware/authenticateJWT');
 
 const router = express.Router();
 const config = require('../../src/config');
@@ -15,21 +20,18 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not set. Please set it in .env');
 }
 
-// Middleware to extract user from token (local check)
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) return res.status(401).json({ error: 'No token provided' });
+function hashRefreshToken(token) { return crypto.createHash('sha256').update(token).digest('hex'); }
+function issueRefreshToken({ userId, firmId, req }) {
+  const raw = crypto.randomBytes(48).toString('base64url');
+  const sessionId = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + config.refreshTokenTtlDays * 86400000);
+  return RefreshSession.create({ userId, firmId: firmId || null, tokenHash: hashRefreshToken(raw), sessionId, expiresAt, userAgent: req.headers['user-agent'] || '', ipAddress: req.ip || '' }).then(() => raw);
+}
+function issueAccessToken(user, firmId, firmRole) {
+  return jwt.sign({ id: user._id, name: user.name, email: user.email, role: firmRole || user.role, firmRole: firmRole || user.role, firmId: firmId || null, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword }, JWT_SECRET, { expiresIn: config.accessTokenTtl });
+}
 
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
-    req.user = decoded;
-    // Track agent activity asynchronously
-    trackAgentActivity(decoded.id, req);
-    next();
-  });
-};
+const authenticateToken = authenticateJWT;
 
 // POST /api/auth/register — Create a user (Admin/system route with bootstrap protection)
 router.post('/register', validate(schemas.userSchema), async (req, res) => {
@@ -78,13 +80,10 @@ router.post('/register', validate(schemas.userSchema), async (req, res) => {
     // Default canAccessCash to true for admins, otherwise false or request parameter
     const defaultCanAccessCash = role === 'admin' ? true : (canAccessCash || false);
 
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role: role || 'agent',
-      canAccessCash: defaultCanAccessCash,
-    });
+    const user = await User.create({ name, email, password: hashedPassword, role: role || 'agent', canAccessCash: defaultCanAccessCash });
+    if (req.user?.firmId) {
+      await UserFirm.create({ userId: user._id, firmId: req.user.firmId, role: role || 'agent', isDefault: true });
+    }
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -112,8 +111,14 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      return res.status(429).json({ error: 'Account temporarily locked after repeated failed logins. Please try again later.' });
+    }
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      const attempts = (user.failedLoginAttempts || 0) + 1;
+      const lockedUntil = attempts >= 5 ? new Date(Date.now() + Math.min(30, Math.pow(2, attempts - 5)) * 60 * 1000) : null;
+      await User.updateOne({ _id: user._id }, { $set: { failedLoginAttempts: attempts, lockedUntil } });
       const { logAction } = require('../../utils/auditLogger');
       await logAction({
         userId: user._id,
@@ -141,15 +146,21 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    await User.updateOne({ _id: user._id }, { $set: { failedLoginAttempts: 0, lockedUntil: null } });
 
-    res.json({
-      token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword, mfaEnabled: false }
+    const requestedFirmId = req.body.firmId || null;
+    let membership = requestedFirmId ? await UserFirm.findOne({ userId: user._id, firmId: requestedFirmId, active: true }).lean() : null;
+    if (!membership) membership = await UserFirm.findOne({ userId: user._id, isDefault: true, active: true }).lean();
+    if (!membership) membership = await UserFirm.findOne({ userId: user._id, active: true }).sort({ createdAt: 1 }).lean();
+    if (!membership) {
+      const firm = await Firm.create({ name: 'Default Firm' });
+      membership = await UserFirm.create({ userId: user._id, firmId: firm._id, role: user.role, isDefault: true });
+    }
+    const token = issueAccessToken(user, membership.firmId, membership.role);
+    const refreshToken = await issueRefreshToken({ userId: user._id, firmId: membership.firmId, req });
+
+    res.json({ token, refreshToken, expiresIn: config.accessTokenTtl, firmId: String(membership.firmId),
+      user: { id: user._id, name: user.name, email: user.email, role: membership.role, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword, mfaEnabled: false }
     });
 
     const { logAction } = require('../../utils/auditLogger');
@@ -166,6 +177,46 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
   }
 });
 
+
+// Rotate refresh token and issue a short-lived access token.
+router.post('/refresh', async (req, res) => {
+  try {
+    const raw = req.body.refreshToken;
+    if (!raw) return res.status(401).json({ error: 'Refresh token required' });
+    const session = await RefreshSession.findOne({ tokenHash: hashRefreshToken(raw), revokedAt: null }).lean();
+    if (!session || session.expiresAt <= new Date()) return res.status(401).json({ error: 'Refresh token expired or revoked' });
+    const user = await User.findById(session.userId).lean();
+    const membership = await UserFirm.findOne({ userId: user._id, firmId: session.firmId, active: true }).lean();
+    if (!user || !membership) return res.status(401).json({ error: 'Session is no longer valid' });
+    await RefreshSession.updateOne({ _id: session._id }, { $set: { revokedAt: new Date() } });
+    const nextRefresh = await issueRefreshToken({ userId: user._id, firmId: membership.firmId, req });
+    const token = issueAccessToken(user, membership.firmId, membership.role);
+    res.json({ token, refreshToken: nextRefresh, expiresIn: config.accessTokenTtl, firmId: String(membership.firmId) });
+  } catch (err) { res.status(500).json({ error: 'Unable to refresh session' }); }
+});
+
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    if (req.body.refreshToken) await RefreshSession.updateOne({ tokenHash: hashRefreshToken(req.body.refreshToken), userId: req.user.id }, { $set: { revokedAt: new Date() } });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: 'Unable to logout' }); }
+});
+
+router.get('/firms', authenticateToken, async (req, res) => {
+  const memberships = await UserFirm.find({ userId: req.user.id, active: true }).populate('firmId', 'name legalName gstin email phone address city state stateCode country pincode currency timezone active').lean();
+  res.json(memberships.map(m => ({ ...m.firmId, membershipId: m._id, role: m.role, isDefault: m.isDefault })));
+});
+
+router.post('/firms/switch', authenticateToken, async (req, res) => {
+  const { firmId } = req.body;
+  const membership = await UserFirm.findOne({ userId: req.user.id, firmId, active: true }).lean();
+  if (!membership) return res.status(403).json({ error: 'You do not have access to this firm' });
+  const user = await User.findById(req.user.id).lean();
+  const token = issueAccessToken(user, firmId, membership.role);
+  await UserFirm.updateOne({ _id: membership._id }, { $set: { lastSelectedAt: new Date() } });
+  res.json({ token, firmId: String(firmId), role: membership.role, expiresIn: config.accessTokenTtl });
+});
+
 // GET /api/auth/me — Verify token and get profile
 router.get('/me', authenticateToken, async (req, res) => {
   try {
@@ -180,8 +231,11 @@ router.get('/me', authenticateToken, async (req, res) => {
 // GET /api/auth/users — List all users (requires user:view)
 router.get('/users', authenticateToken, authorize('user:view'), async (req, res) => {
   try {
-    const users = await User.find({}).select('-password').lean();
-    res.json(users);
+    const memberships = await UserFirm.find({ firmId: req.user.firmId, active: true }).lean();
+    const ids = memberships.map(m => m.userId);
+    const users = await User.find({ _id: { $in: ids } }).select('-password').lean();
+    const roleByUser = new Map(memberships.map(m => [String(m.userId), m.role]));
+    res.json(users.map(u => ({ ...u, role: roleByUser.get(String(u._id)) || u.role, firmId: req.user.firmId })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -195,9 +249,13 @@ router.put('/users/:id', authenticateToken, authorize('user:edit'), validate(sch
     if (role !== undefined) updateFields.role = role;
     if (canAccessCash !== undefined) updateFields.canAccessCash = canAccessCash;
 
-    const user = await User.findByIdAndUpdate(req.params.id, updateFields, { new: true }).select('-password');
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+    const membership = await UserFirm.findOne({ userId: req.params.id, firmId: req.user.firmId, active: true });
+    if (!membership) return res.status(404).json({ error: 'User is not a member of the active firm' });
+    if (role !== undefined) membership.role = role;
+    await membership.save();
+    if (canAccessCash !== undefined) await User.updateOne({ _id: req.params.id }, { $set: { canAccessCash } });
+    const user = await User.findById(req.params.id).select('-password').lean();
+    res.json({ ...user, role: membership.role, firmId: req.user.firmId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -212,10 +270,9 @@ router.delete('/users/:id', authenticateToken, authorize('user:delete'), async (
       return res.status(400).json({ error: 'You cannot delete your own admin account.' });
     }
     
-    const user = await User.findByIdAndDelete(req.params.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    
-    res.json({ message: 'User deleted successfully', userId: req.params.id });
+    const membership = await UserFirm.findOneAndUpdate({ userId: req.params.id, firmId: req.user.firmId, active: true }, { $set: { active: false } }, { new: true });
+    if (!membership) return res.status(404).json({ error: 'User is not a member of the active firm' });
+    res.json({ message: 'User removed from the active firm', userId: req.params.id, firmId: req.user.firmId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -253,10 +310,7 @@ router.post('/whatsapp/send-otp', async (req, res) => {
     console.log('==================================================\n');
 
     // Return the code in response for testing/development simplicity
-    res.status(200).json({ 
-      message: 'Verification code sent to WhatsApp',
-      devOtp: code 
-    });
+    res.status(200).json({ message: 'Verification code sent to WhatsApp', ...(config.isProduction ? {} : { devOtp: code }) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -391,17 +445,12 @@ router.post('/forgot-password', async (req, res) => {
       { upsert: true, new: true }
     );
 
-    console.log('\n==================================================');
-    console.log('[PASSWORD RESET OTP SIMULATOR]');
-    console.log(`To: ${user.email}`);
-    console.log(`Message: Your password reset OTP is: ${code}`);
-    console.log('==================================================\n');
+    if (process.env.RESEND_API_KEY && process.env.EMAIL_FROM) {
+      const { enqueue } = require('../../services/jobQueue');
+      await enqueue('email.send', { to: user.email, subject: 'Password reset code', text: `Your password reset OTP is ${code}. It expires in 15 minutes.`, html: `<p>Your password reset OTP is <strong>${code}</strong>.</p><p>It expires in 15 minutes.</p>` });
+    } else if (!config.isProduction) { console.log(`[PASSWORD RESET OTP DEV] ${user.email}: ${code}`); }
 
-    res.json({
-      message: 'Password reset code issued',
-      resetToken: `email:${user.email}`,
-      devOtp: code
-    });
+    res.json({ message: 'If that email address is registered, a password reset code has been issued.', resetToken: `email:${user.email}`, ...(config.isProduction ? {} : { devOtp: code }) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -473,7 +522,7 @@ router.delete('/sessions/:sessionId', authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = {
-  router,
-  authenticateToken
-};
+const { registerJobHandler } = require('../../services/jobQueue');
+registerJobHandler('email.send', async payload => { const { sendEmail } = require('../../services/emailService'); return sendEmail(payload); });
+
+module.exports = { router, authenticateToken };

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const vendorSchema = new mongoose.Schema({
   name: { type: String, default: '', trim: true },
@@ -29,4 +30,5 @@ const vendorSchema = new mongoose.Schema({
 vendorSchema.index({ name: 'text', company: 'text', email: 'text', productCategory: 'text' });
 vendorSchema.index({ createdAt: -1 });
 
+vendorSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Vendor', vendorSchema);

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const leadSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
@@ -22,4 +23,5 @@ const leadSchema = new mongoose.Schema({
 
 leadSchema.index({ stage: 1, assignedAgentId: 1 });
 
+leadSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Lead', leadSchema);

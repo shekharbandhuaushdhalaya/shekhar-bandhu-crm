@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const debitNoteItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -32,4 +33,5 @@ const debitNoteSchema = new mongoose.Schema({
 debitNoteSchema.index({ debitNoteNo: 1 });
 debitNoteSchema.index({ partyId: 1, date: -1 });
 
+debitNoteSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('DebitNote', debitNoteSchema);

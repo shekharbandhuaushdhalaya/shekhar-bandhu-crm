@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const orderItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -44,4 +45,5 @@ const orderSchema = new mongoose.Schema({
 
 orderSchema.index({ createdAt: -1 });
 
+orderSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Order', orderSchema);

@@ -28,7 +28,7 @@ const getBaseUrl = () => {
   const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envApiUrl) return envApiUrl;
 
-  if (Platform.OS === 'web') return 'http://localhost:5000/api';
+  if (Platform.OS === 'web') { throw new Error('EXPO_PUBLIC_API_URL is required for the web build'); }
 
   // Try to use the Expo Host URI if running in Expo Go
   const hostUri = Constants?.expoConfig?.hostUri;
@@ -45,7 +45,7 @@ const getBaseUrl = () => {
   if (Platform.OS === 'android' && !Constants.isDevice) return 'http://10.0.2.2:5000/api';
 
   // Fallback — user can configure the correct URL from Profile > Server URL
-  return 'http://localhost:5000/api';
+  throw new Error('EXPO_PUBLIC_API_URL is required when the backend URL cannot be inferred');
 };
 
 export let API_BASE = getBaseUrl();
@@ -86,6 +86,25 @@ const STORAGE_KEY = 'vp_crm_database';
 class ApiClient {
   private authToken: string | null = null;
   currentUser: any = null;
+  private refreshInFlight: Promise<string | null> | null = null;
+
+  async refreshAccessToken(): Promise<string | null> {
+    if (this.refreshInFlight) return this.refreshInFlight;
+    this.refreshInFlight = (async () => {
+      try {
+        const refreshToken = await authStorage.getItem('vp_crm_refresh_token');
+        if (!refreshToken) return null;
+        const base = API_BASE;
+        const res = await fetch(`${base}/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken }) });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data.token) { this.authToken = data.token; await authStorage.setItem('vp_crm_token', data.token); }
+        if (data.refreshToken) await authStorage.setItem('vp_crm_refresh_token', data.refreshToken);
+        return data.token || null;
+      } catch { return null; } finally { this.refreshInFlight = null; }
+    })();
+    return this.refreshInFlight;
+  }
 
   setToken(token: string | null, user: any = null) {
     this.authToken = token;
@@ -93,7 +112,7 @@ class ApiClient {
   }
 
   async checkConnection(): Promise<boolean> {
-    return true; // Always true now since we require network
+    try { const base = API_BASE.replace(/\/api\/?$/, ''); const res = await fetch(`${base}/api/health`, { method: 'GET' }); return res.ok; } catch { return false; }
   }
 
   private activeRequests = 0;
@@ -179,6 +198,14 @@ class ApiClient {
         const res = await fetch(fetchUrl, { ...options, headers }).catch((netErr: any) => {
           throw new Error(`Connection Error: Unable to reach backend server (${netErr?.message || 'Network Failure'}). Please ensure the server is running.`);
         });
+        if (!res.ok && res.status === 401 && !url.includes('/auth/refresh') && this.authToken) {
+          const nextToken = await this.refreshAccessToken();
+          if (nextToken) {
+            headers['Authorization'] = `Bearer ${nextToken}`;
+            const retry = await fetch(fetchUrl, { ...options, headers });
+            if (retry.ok) return retry;
+          }
+        }
         if (!res.ok) {
           let errMsg = 'API Error';
           try {
@@ -297,6 +324,14 @@ class ApiClient {
     return res.json();
   }
 
+  async getFirms(): Promise<any[]> { const res = await this.request(`${API_BASE}/auth/firms`); return res.json(); }
+  async switchFirm(firmId: string): Promise<any> { const res = await this.request(`${API_BASE}/auth/firms/switch`, { method: 'POST', body: JSON.stringify({ firmId }) }); return res.json(); }
+
+  async logout(refreshToken?: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/auth/logout`, { method: 'POST', body: JSON.stringify({ refreshToken }) });
+    return res.json();
+  }
+
   // --- MFA (TOTP) ---
   async setupMfa(): Promise<{ secret: string; qrCode: string; otpauthUrl: string }> {
     const res = await this.request(`${API_BASE}/auth/mfa/setup`, { method: 'POST' });
@@ -311,7 +346,7 @@ class ApiClient {
     return res.json();
   }
 
-  async verifyMfaLogin(mfaToken: string, totpCode: string): Promise<{ token: string; user: any }> {
+  async verifyMfaLogin(mfaToken: string, totpCode: string): Promise<{ token: string; refreshToken?: string; user: any }> {
     const res = await this.request(`${API_BASE}/auth/mfa/verify`, {
       method: 'POST',
       body: JSON.stringify({ mfaToken, totpCode }),
@@ -1183,6 +1218,11 @@ class ApiClient {
     const res = await this.request(url);
     return res.json();
   }
+  async lookupHerbDetails(name: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/raw-materials/botanical-lookup?name=${encodeURIComponent(name.trim())}`);
+    return res.data || res;
+  }
+
   async searchPharmacopoeia(query: string): Promise<any[]> {
     if (!query || !query.trim()) return [];
     const res = await this.request(`${API_BASE}/pharmacopoeia/search?q=${encodeURIComponent(query.trim())}`);

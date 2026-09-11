@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const warehouseSchema = new mongoose.Schema({
   name:          { type: String, required: true, trim: true },
@@ -15,4 +16,5 @@ const warehouseSchema = new mongoose.Schema({
   dealerName:    { type: String, default: '', trim: true },
 }, { timestamps: true });
 
+warehouseSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Warehouse', warehouseSchema);

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const complaintSchema = new mongoose.Schema({
   complaintNo:  { type: String, required: true, unique: true, trim: true },
@@ -30,4 +31,5 @@ const complaintSchema = new mongoose.Schema({
 complaintSchema.index({ createdAt: -1 });
 complaintSchema.index({ status: 1 });
 
+complaintSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Complaint', complaintSchema);

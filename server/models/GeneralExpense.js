@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const generalExpenseSchema = new mongoose.Schema({
   expenseNo: { type: String, required: true, unique: true, trim: true },
@@ -19,4 +20,5 @@ const generalExpenseSchema = new mongoose.Schema({
 
 generalExpenseSchema.index({ expenseNo: 1, date: -1, category: 1 });
 
+generalExpenseSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('GeneralExpense', generalExpenseSchema);

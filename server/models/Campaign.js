@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const campaignSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
@@ -33,4 +34,5 @@ const campaignSchema = new mongoose.Schema({
 
 campaignSchema.index({ name: 'text' });
 
+campaignSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Campaign', campaignSchema);

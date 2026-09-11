@@ -5,7 +5,7 @@ import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
 import { RawMaterial, Vendor } from '../../../utils/api';
 
-interface Ingredient { rawMaterialId: string; qtyRequired: string; stageName?: string; }
+interface Ingredient { rawMaterialId: string; qtyRequired: string; stageName?: string; itemType?: 'formulation' | 'packaging'; }
 interface Stage { name: string; targetDurationDays: string; }
 
 interface Props {
@@ -35,7 +35,7 @@ interface Props {
   onSave: () => void;
   onAddIngredient: () => void;
   onRemoveIngredient: (i: number) => void;
-  onIngredientChange: (i: number, key: 'rawMaterialId' | 'qtyRequired' | 'stageName', val: string) => void;
+  onIngredientChange: (i: number, key: 'rawMaterialId' | 'qtyRequired' | 'stageName' | 'itemType', val: string) => void;
   onAddStage: () => void;
   onRemoveStage: (i: number) => void;
   onStageChange: (i: number, key: 'name' | 'targetDurationDays', val: string) => void;
@@ -209,6 +209,7 @@ export default function BOMModal({
             <View style={{ flexDirection: 'row', paddingHorizontal: 4, marginBottom: 4, gap: 8 }}>
               <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>INGREDIENT</Text>
               <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>QTY/100</Text>
+              <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>TYPE</Text>
               <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>USED IN STAGE</Text>
               <View style={{ width: 32 }} />
             </View>
@@ -236,6 +237,16 @@ export default function BOMModal({
                   onChangeText={(v) => onIngredientChange(idx, 'qtyRequired', v)}
                   keyboardType="numeric"
                 />
+                <View style={[styles.pickerWrapper, { flex: 1, marginBottom: 0 }]}>
+                  {Platform.OS === 'web' ? (
+                    <select value={ing.itemType || 'formulation'} onChange={(e: any) => onIngredientChange(idx, 'itemType', e.target.value)} style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
+                      <option value="formulation">🌿 Ingredient</option>
+                      <option value="packaging">📦 Packaging</option>
+                    </select>
+                  ) : (
+                    <TextInput style={styles.input} placeholder="ingredient/packaging" value={ing.itemType || 'formulation'} onChangeText={(v) => onIngredientChange(idx, 'itemType', v as any)} />
+                  )}
+                </View>
                 <View style={[styles.pickerWrapper, { flex: 1.5, marginBottom: 0 }]}>
                   {Platform.OS === 'web' ? (
                     <select

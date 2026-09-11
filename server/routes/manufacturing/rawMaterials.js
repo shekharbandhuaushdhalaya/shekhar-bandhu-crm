@@ -49,7 +49,7 @@ router.get('/', async (req, res) => {
     const limitNum = parseInt(limit) || 50;
     const isPaginated = !isNaN(pageNum) && pageNum > 0;
 
-    const rawMaterialFields = 'name sku unit category isScheduleE1 minReorder cleaningLossPercent botanicalName partUsed pharmacopoeialStandard monographRef createdAt updatedAt';
+    const rawMaterialFields = 'name sku unit materialType packagingType materialGrade specification category isScheduleE1 minReorder cleaningLossPercent botanicalName acceptedScientificName family genus species botanicalAuthority taxonomicRank taxonomicStatus botanicalSynonyms commonNames taxonomySource taxonomyVerifiedAt therapeuticUses rasa virya vipaka guna dosage botanicalDescription partUsed pharmacopoeialStandard monographRef createdAt updatedAt';
     let query = RawMaterial.find(filter).select(rawMaterialFields).sort({ name: 1 });
     if (isPaginated) {
       query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
@@ -127,22 +127,25 @@ router.get('/', async (req, res) => {
 // POST /api/raw-materials — Create raw material definition
 router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
   try {
-    const { name, unit, minReorder, category } = req.body;
+    const { name, unit, minReorder, category, materialType } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
     }
 
     const formattedName = name.trim().replace(/\s+/g, ' ').toUpperCase();
     const resolvedUnit = unit || 'kg';
-    const resolvedCategory = category || 'Herb';
+    const resolvedMaterialType = materialType || (category === 'Packaging' || category === 'Packaging Material' ? 'packaging' : (category === 'Excipient' ? 'excipient' : 'raw_material'));
+    const resolvedCategory = category || (resolvedMaterialType === 'packaging' ? 'Packaging' : resolvedMaterialType === 'excipient' ? 'Excipient' : 'Herb');
 
     // Auto-populate botanical/scientific details if missing
     let botanicalName = req.body.botanicalName;
+    let botanicalProfile = null;
     let partUsed = req.body.partUsed;
     let pharmacopoeialStandard = req.body.pharmacopoeialStandard;
 
     if (!botanicalName || !botanicalName.trim()) {
-      const autoBotanical = await getBotanicalInfo(formattedName);
+      const autoBotanical = await resolveHerbDetails(formattedName);
+      botanicalProfile = autoBotanical;
       if (autoBotanical.botanicalName) {
         botanicalName = autoBotanical.botanicalName;
         if (!partUsed) partUsed = autoBotanical.partUsed;
@@ -184,9 +187,31 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
       unit: resolvedUnit,
       minReorder: Number(minReorder) || 0,
       category: resolvedCategory,
+      materialType: resolvedMaterialType,
+      packagingType: req.body.packagingType || '',
+      materialGrade: req.body.materialGrade || '',
+      specification: req.body.specification || '',
       botanicalName: botanicalName || '',
       partUsed: partUsed || '',
-      pharmacopoeialStandard: pharmacopoeialStandard || 'API'
+      pharmacopoeialStandard: pharmacopoeialStandard || 'API',
+      acceptedScientificName: req.body.acceptedScientificName || (botanicalProfile && botanicalProfile.acceptedScientificName) || botanicalName || '',
+      family: req.body.family || (botanicalProfile && botanicalProfile.family) || '',
+      genus: req.body.genus || (botanicalProfile && botanicalProfile.genus) || '',
+      species: req.body.species || (botanicalProfile && botanicalProfile.species) || '',
+      botanicalAuthority: req.body.botanicalAuthority || (botanicalProfile && botanicalProfile.botanicalAuthority) || '',
+      taxonomicRank: req.body.taxonomicRank || (botanicalProfile && botanicalProfile.taxonomicRank) || '',
+      taxonomicStatus: req.body.taxonomicStatus || (botanicalProfile && botanicalProfile.taxonomicStatus) || '',
+      botanicalSynonyms: req.body.botanicalSynonyms || (botanicalProfile && botanicalProfile.botanicalSynonyms) || [],
+      commonNames: req.body.commonNames || (botanicalProfile && botanicalProfile.commonNames) || [],
+      taxonomySource: req.body.taxonomySource || (botanicalProfile && botanicalProfile.taxonomySource) || '',
+      taxonomyVerifiedAt: req.body.taxonomyVerifiedAt || (botanicalProfile && botanicalProfile.taxonomyVerifiedAt) || null,
+      therapeuticUses: req.body.therapeuticUses || (botanicalProfile && botanicalProfile.therapeuticUses) || [],
+      rasa: req.body.rasa || (botanicalProfile && botanicalProfile.rasa) || [],
+      virya: req.body.virya || (botanicalProfile && botanicalProfile.virya) || '',
+      vipaka: req.body.vipaka || (botanicalProfile && botanicalProfile.vipaka) || '',
+      guna: req.body.guna || (botanicalProfile && botanicalProfile.guna) || [],
+      dosage: req.body.dosage || (botanicalProfile && botanicalProfile.dosage) || '',
+      botanicalDescription: req.body.botanicalDescription || (botanicalProfile && botanicalProfile.description) || ''
     });
 
     res.status(201).json(newRM);
@@ -203,7 +228,7 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
 // PUT /api/raw-materials/:id — Update raw material definition
 router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, res) => {
   try {
-    const { name, unit, minReorder, category } = req.body;
+    const { name, unit, minReorder, category, materialType } = req.body;
 
     const existingRM = await RawMaterial.findById(req.params.id);
     if (!existingRM) return res.status(404).json({ error: 'Raw material not found' });
@@ -217,6 +242,7 @@ router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, re
       const effectiveName = formattedName;
       const effectiveUnit = unit !== undefined ? unit : existingRM.unit;
       const effectiveCategory = category !== undefined ? category : existingRM.category;
+      const effectiveMaterialType = materialType !== undefined ? materialType : existingRM.materialType;
 
       const duplicate = await RawMaterial.findDuplicateByName(effectiveName, {
         unit: effectiveUnit,
@@ -253,6 +279,8 @@ router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, re
     if (unit !== undefined) updateFields.unit = unit;
     if (minReorder !== undefined) updateFields.minReorder = Number(minReorder) || 0;
     if (category !== undefined) updateFields.category = category;
+    if (materialType !== undefined) updateFields.materialType = materialType;
+    if (updateFields.materialType === 'packaging') updateFields.category = 'Packaging';
 
     const updated = await RawMaterial.findByIdAndUpdate(
       req.params.id,

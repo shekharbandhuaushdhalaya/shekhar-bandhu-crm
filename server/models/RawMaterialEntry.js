@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const rawMaterialEntrySchema = new mongoose.Schema({
   rawMaterialId: {
@@ -37,4 +38,5 @@ const rawMaterialEntrySchema = new mongoose.Schema({
 rawMaterialEntrySchema.index({ rawMaterialId: 1, batchNo: 1 }, { unique: true });
 rawMaterialEntrySchema.index({ rawMaterialId: 1, warehouseId: 1, expiryDate: 1, createdAt: 1 });
 
+rawMaterialEntrySchema.plugin(tenantPlugin);
 module.exports = mongoose.model('RawMaterialEntry', rawMaterialEntrySchema);

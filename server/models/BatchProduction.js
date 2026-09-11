@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const MANUFACTURING_STAGES = [
   'Raw Material Verification & Weighing',
@@ -260,6 +261,7 @@ const batchProductionSchema = new mongoose.Schema({
 
 batchProductionSchema.index({ 'ingredientsConsumed.rawMaterialEntryId': 1 });
 
+batchProductionSchema.plugin(tenantPlugin);
 const BatchProduction = mongoose.model('BatchProduction', batchProductionSchema);
 module.exports = BatchProduction;
 module.exports.MANUFACTURING_STAGES = MANUFACTURING_STAGES;

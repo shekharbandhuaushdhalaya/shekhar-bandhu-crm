@@ -537,6 +537,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     showGstDropdown: boolean;
     selectedProduct: Product | null;
     rawMaterialId?: string;
+    itemType?: 'product' | 'raw_material' | 'packaging' | 'consumable' | 'excipient' | 'semi_finished' | 'other';
     unit?: string;
     boxes: string;
     packing: string;
@@ -655,6 +656,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                 showGstDropdown: false,
                 selectedProduct: matchedProd,
                 rawMaterialId: it.rawMaterialId,
+                itemType: it.itemType || matchedRawMat?.materialType || (it.productId ? 'product' : 'raw_material'),
                 unit: it.unit || matchedRawMat?.unit || '',
                 boxes: it.boxes !== undefined ? it.boxes.toString() : (it.qty || 0).toString(),
                 packing: (it.packing || 1).toString(),
@@ -809,6 +811,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     }));
   };
 
+  // Purchase invoices use the Manufacturing Material Master as their source of truth.
+  // This intentionally includes herbs/raw materials AND packaging/consumables/excipients/etc.
   const selectableItems = rawMaterials.map(rm => ({
     id: rm._id,
     name: rm.name,
@@ -816,10 +820,20 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     unit: rm.unit || '',
     price: 0,
     gstRate: 18,
+    materialType: rm.materialType || 'raw_material',
     isRawMaterial: true,
     rawMaterial: rm,
     product: null as Product | null
   }));
+
+  const materialTypeLabel = (type?: string) => ({
+    raw_material: '🌿 Raw Material',
+    packaging: '📦 Packaging',
+    consumable: '⚙️ Consumable',
+    excipient: '🧪 Excipient',
+    semi_finished: '🏭 Semi-Finished',
+    other: '📋 Other'
+  } as Record<string, string>)[type || 'raw_material'] || '📋 Material';
 
   const handleSelectRowItem = (id: string, item: typeof selectableItems[0]) => {
     setRows(prev => prev.map(r => {
@@ -829,6 +843,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         ...r,
         selectedProduct: item.product || null,
         rawMaterialId: item.rawMaterial ? item.rawMaterial._id : undefined,
+        itemType: item.materialType as any,
         productSearch: item.name,
         unit: item.unit || '',
         rate: item.price ? item.price.toString() : (r.rate || ''),
@@ -935,6 +950,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       return {
         productId: r.selectedProduct ? r.selectedProduct._id : undefined,
         rawMaterialId: r.rawMaterialId,
+        itemType: r.rawMaterialId
+          ? ((rawMaterials.find(rm => rm._id === r.rawMaterialId)?.materialType || r.itemType || 'raw_material') as any)
+          : 'product',
         name: r.selectedProduct ? getProductSelectorDisplayName(r.selectedProduct) : r.productSearch.trim(),
         qty: qty,
         boxes: qty,
@@ -979,6 +997,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         igst: computedIGST,
         roundOff: roundOff,
         type: 'purchase',
+        purchaseType: 'raw_materials',
         stateOfSupply: stateOfSupply.trim() || undefined,
         gstin: finalGstin,
         warehouseId,
@@ -1277,7 +1296,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   borderRadius: Radius.md,
                   marginBottom: 8
                 }}>
-                  <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Raw Material Name *</Text>
+                  <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Material / Packaging *</Text>
                   <Text style={{ width: 110, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Qty / Unit *</Text>
                   <Text style={{ width: 95, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Rate (₹)</Text>
                   <Text style={{ width: 100, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Batch No</Text>
@@ -1328,7 +1347,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                       <View style={{ flex: 1, position: 'relative', zIndex: row.showProductDropdown ? 5005 : 1 }}>
                         <TextInput
                           style={[styles.tableInput, { fontWeight: '600' }]}
-                          placeholder="Search raw material..."
+                          placeholder="Search material, packaging, SKU..."
                           placeholderTextColor={colors.text.muted}
                           value={row.productSearch}
                           onChangeText={(text) => updateRowProductSearch(row.id, text)}
@@ -1346,16 +1365,17 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                                   onPress={() => handleSelectRowItem(row.id, item)}
                                 >
                                   <Text style={styles.rowDropdownItemText}>
-                                    🧪 {item.name}
+                                    {materialTypeLabel(item.materialType)}  {item.name}
                                   </Text>
                                   <Text style={styles.rowDropdownItemSubtext}>
                                     SKU: {item.sku || 'N/A'} | Unit: {item.unit || 'units'}
+                                    {item.rawMaterial?.packagingType ? ` | ${String(item.rawMaterial.packagingType).replace(/_/g, ' ')}` : ''}
                                   </Text>
                                 </TouchableOpacity>
                               ))}
                               {rowFilteredItems.length === 0 && (
                                 <View style={{ padding: 10 }}>
-                                  <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'center' }}>No raw materials found</Text>
+                                  <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'center' }}>No materials or packaging found in Manufacturing Material Master</Text>
                                 </View>
                               )}
                               <TouchableOpacity

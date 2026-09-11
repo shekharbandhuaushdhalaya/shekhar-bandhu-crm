@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const loyaltySchemeSchema = new mongoose.Schema({
   schemeName: { type: String, required: true, trim: true },
@@ -14,4 +15,5 @@ const loyaltySchemeSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
+loyaltySchemeSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('LoyaltyScheme', loyaltySchemeSchema);

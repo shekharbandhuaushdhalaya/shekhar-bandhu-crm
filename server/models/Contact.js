@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const interactionSchema = new mongoose.Schema({
   type: { type: String, required: true },
@@ -33,4 +34,5 @@ const contactSchema = new mongoose.Schema({
 contactSchema.index({ name: 'text', company: 'text', email: 'text' });
 contactSchema.index({ createdAt: -1 });
 
+contactSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Contact', contactSchema);

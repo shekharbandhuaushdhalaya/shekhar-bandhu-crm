@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const taskSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
@@ -39,4 +40,5 @@ taskSchema.virtual('isOverdue').get(function () {
   return !this.completed && Boolean(this.dueDate) && new Date(this.dueDate) < new Date();
 });
 
+taskSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Task', taskSchema);

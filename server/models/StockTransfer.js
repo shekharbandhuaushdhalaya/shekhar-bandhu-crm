@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const stockTransferSchema = new mongoose.Schema({
   transferNo:        { type: String, unique: true },
@@ -22,4 +23,5 @@ const stockTransferSchema = new mongoose.Schema({
 stockTransferSchema.index({ transferNo: 1 });
 stockTransferSchema.index({ createdAt: -1 });
 
+stockTransferSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('StockTransfer', stockTransferSchema);

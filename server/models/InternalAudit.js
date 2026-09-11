@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const internalAuditSchema = new mongoose.Schema({
   manufacturingUnitId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: true },
@@ -17,4 +18,5 @@ const internalAuditSchema = new mongoose.Schema({
   status: { type: String, enum: ['scheduled', 'in_progress', 'completed'], default: 'scheduled' }
 }, { timestamps: true });
 
+internalAuditSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('InternalAudit', internalAuditSchema);

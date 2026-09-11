@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const mrSampleBagSchema = new mongoose.Schema({
   mrId: {
@@ -24,4 +25,5 @@ const mrSampleBagSchema = new mongoose.Schema({
 
 mrSampleBagSchema.index({ mrId: 1, productId: 1, batchNo: 1 }, { unique: true });
 
+mrSampleBagSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('MrSampleBag', mrSampleBagSchema);

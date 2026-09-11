@@ -4,6 +4,7 @@ const SystemSettings = require('../../models/SystemSettings');
 const AuditLog = require('../../models/AuditLog');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
+const { publicTenant } = require('../../middleware/publicTenant');
 const schemas = require('../../validation/schemas');
 
 const router = express.Router();
@@ -28,7 +29,7 @@ router.get('/settings', authenticateToken, async (req, res) => {
 });
 
 // GET /api/system/settings/public — Unauthenticated public-safe company details (strictly no secrets)
-router.get('/settings/public', async (req, res) => {
+router.get('/settings/public', publicTenant, async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=300');
     let settings = await SystemSettings.findOne({ key: 'company_config' })
@@ -53,6 +54,10 @@ router.put('/settings', authenticateToken, authorize('settings:edit'), validate(
     }
 
     // Update fields
+    if (process.env.NODE_ENV === 'production' && ['razorpayKeySecret','razorpayWebhookSecret','geminiApiKey'].some(k => Object.prototype.hasOwnProperty.call(req.body, k))) {
+      return res.status(400).json({ error: 'Integration secrets must be configured through the deployment secret manager/environment, not stored in the database.' });
+    }
+
     const fields = [
       'firmName', 'firmAddress', 'firmEmail', 'firmPhone', 'firmGstin',
       'bankName', 'bankAccountNo', 'bankIfsc', 'bankBranch', 'bankUpi',
@@ -136,6 +141,7 @@ router.get('/audit-logs', authenticateToken, authorize('audit:view'), async (req
 
 // POST /api/system/reset-db — Reset entire database (keeps User collection untouched)
 router.post('/reset-db', async (req, res) => {
+  if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DB_RESET !== 'true') return res.status(403).json({ error: 'Database reset is disabled. Set ALLOW_DB_RESET=true only in a controlled non-production environment.' });
   try {
     const models = [
       'Account', 'Activity', 'AuditLog', 'BankStatement', 'BatchProduction',
@@ -174,7 +180,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter: (req, file, cb) => { const allowed = ['image/jpeg','image/png','image/webp','application/pdf']; cb(allowed.includes(file.mimetype) ? null : new Error('Unsupported file type. Allowed: JPEG, PNG, WebP, PDF'), allowed.includes(file.mimetype)); } });
 
 function uploadFileToCloudinary(buffer, filename, folder = 'shekhar-bandhu/supporting-docs') {
   return new Promise((resolve, reject) => {

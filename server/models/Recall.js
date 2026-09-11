@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const affectedCustomerSchema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
@@ -27,4 +28,5 @@ const recallSchema = new mongoose.Schema({
 
 recallSchema.index({ recallNo: 1, batchNo: 1 });
 
+recallSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Recall', recallSchema);

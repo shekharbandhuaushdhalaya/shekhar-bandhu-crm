@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const retentionSampleSchema = new mongoose.Schema({
   batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', required: true },
@@ -21,4 +22,5 @@ const retentionSampleSchema = new mongoose.Schema({
 retentionSampleSchema.index({ batchId: 1 });
 retentionSampleSchema.index({ retentionUntil: 1, status: 1 });
 
+retentionSampleSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('RetentionSample', retentionSampleSchema);

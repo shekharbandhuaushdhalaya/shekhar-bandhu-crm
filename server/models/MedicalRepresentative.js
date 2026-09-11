@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const medicalRepresentativeSchema = new mongoose.Schema({
   name:          { type: String, required: true, trim: true },
@@ -17,4 +18,5 @@ const medicalRepresentativeSchema = new mongoose.Schema({
   notes:         { type: String, default: '' },
 }, { timestamps: true });
 
+medicalRepresentativeSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('MedicalRepresentative', medicalRepresentativeSchema);

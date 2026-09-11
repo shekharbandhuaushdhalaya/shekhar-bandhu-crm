@@ -175,7 +175,7 @@ async function deductPackagingMaterials(batch, outputQtyOrYields) {
     for (const ing of bom.ingredients) {
       if (ing.itemType !== 'packaging') {
         const rm = await RawMaterial.findById(ing.rawMaterialId);
-        if (rm && rm.category === 'Packaging' && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
+        if (rm && (rm.materialType === 'packaging' || (rm.materialType === 'packaging' || rm.category === 'Packaging' || rm.category === 'Packaging Material') || rm.category === 'Packaging Material') && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
           pkgIngs.push(ing);
         }
       }

@@ -1,4 +1,6 @@
 const express = require('express');
+const crypto = require('crypto');
+const WebhookEvent = require('../../models/WebhookEvent');
 const Dispatch = require('../../models/Dispatch');
 const { authorize } = require('../../middleware/authorize');
 
@@ -35,6 +37,14 @@ router.get('/track/:trackingId', async (req, res) => {
 // POST /api/logistics/webhook — Carrier status updates webhook handler
 router.post('/webhook', async (req, res) => {
   try {
+    const secret = process.env.COURIER_WEBHOOK_SECRET;
+    if (!secret) return res.status(503).json({ error: 'Courier webhook is not configured' });
+    const provided = req.headers['x-webhook-signature'] || '';
+    const raw = req.rawBody || Buffer.from(JSON.stringify(req.body));
+    const expected = crypto.createHmac('sha256', secret).update(raw).digest('hex');
+    if (!provided || !crypto.timingSafeEqual(Buffer.from(String(provided)), Buffer.from(expected))) return res.status(401).json({ error: 'Invalid webhook signature' });
+    const eventId = req.headers['x-event-id'] || crypto.createHash('sha256').update(raw).digest('hex');
+    try { await WebhookEvent.create({ provider: 'courier', eventId: String(eventId), eventType: req.body.status || '', signatureValid: true, payload: req.body }); } catch (e) { if (e.code === 11000) return res.json({ success: true, duplicate: true }); throw e; }
     const { trackingId, status, currentLocation } = req.body;
     if (!trackingId || !status) {
       return res.status(400).json({ error: 'trackingId and status are required' });

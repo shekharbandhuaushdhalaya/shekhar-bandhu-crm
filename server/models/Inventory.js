@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const inventorySchema = new mongoose.Schema({
   warehouse: { type: String, default: '', trim: true },
@@ -11,4 +12,5 @@ const inventorySchema = new mongoose.Schema({
 
 inventorySchema.index({ warehouse: 'text', itemSku: 'text', itemName: 'text' });
 
+inventorySchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Inventory', inventorySchema);

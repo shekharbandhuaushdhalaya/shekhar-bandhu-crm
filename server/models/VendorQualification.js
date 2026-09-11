@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const vendorQualificationSchema = new mongoose.Schema({
   vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
@@ -19,4 +20,5 @@ const vendorQualificationSchema = new mongoose.Schema({
 
 vendorQualificationSchema.index({ vendorId: 1, qualificationStatus: 1 });
 
+vendorQualificationSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('VendorQualification', vendorQualificationSchema);

@@ -1,8 +1,10 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const invoiceItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
   rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' },
+  itemType: { type: String, enum: ['product', 'raw_material', 'packaging', 'consumable', 'excipient', 'semi_finished', 'other'], default: 'product' },
   name: { type: String, required: true },
   unit: { type: String, default: '' },
   mrp: { type: Number, default: 0 },
@@ -139,4 +141,5 @@ invoiceSchema.index({ isFinalized: 1, status: 1 });
 invoiceSchema.index({ invoiceNo: 1 }, { unique: true, partialFilterExpression: { type: 'sale' } });
 invoiceSchema.index({ invoiceNo: 1, supplierName: 1 }, { unique: true, partialFilterExpression: { type: 'purchase' } });
 
+invoiceSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Invoice', invoiceSchema);

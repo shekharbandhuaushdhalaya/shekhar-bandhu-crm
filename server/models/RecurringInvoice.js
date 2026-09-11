@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const recurringItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -27,4 +28,5 @@ const recurringInvoiceSchema = new mongoose.Schema({
 
 recurringInvoiceSchema.index({ nextRunDate: 1, status: 1 });
 
+recurringInvoiceSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('RecurringInvoice', recurringInvoiceSchema);

@@ -1,6 +1,7 @@
 const express = require('express');
 const BillOfMaterials = require('../../models/BillOfMaterials');
 const Product = require('../../models/Product');
+const RawMaterial = require('../../models/RawMaterial');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
@@ -16,7 +17,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 
     let query = BillOfMaterials.find({})
       .populate('productId', 'name sku size')
-      .populate('ingredients.rawMaterialId', 'name sku unit');
+      .populate('ingredients.rawMaterialId', 'name sku unit materialType packagingType materialGrade specification category');
 
     if (isPaginated) {
       query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
@@ -48,19 +49,19 @@ router.get('/:productId', authorize('manufacturing:view'), async (req, res) => {
     if (all === 'true') {
       const boms = await BillOfMaterials.find({ productId: req.params.productId })
         .populate('productId', 'name sku size')
-        .populate('ingredients.rawMaterialId', 'name sku unit')
+        .populate('ingredients.rawMaterialId', 'name sku unit materialType packagingType materialGrade specification category')
         .lean();
       return res.json(boms);
     }
 
     let bom = await BillOfMaterials.findOne({ productId: req.params.productId, isDefault: true })
       .populate('productId', 'name sku size')
-      .populate('ingredients.rawMaterialId', 'name sku unit')
+      .populate('ingredients.rawMaterialId', 'name sku unit materialType packagingType materialGrade specification category')
       .lean();
     if (!bom) {
       bom = await BillOfMaterials.findOne({ productId: req.params.productId })
         .populate('productId', 'name sku size')
-        .populate('ingredients.rawMaterialId', 'name sku unit')
+        .populate('ingredients.rawMaterialId', 'name sku unit materialType packagingType materialGrade specification category')
         .lean();
     }
     if (!bom) return res.status(404).json({ error: 'Formulation not configured for this product' });
@@ -90,9 +91,27 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.bomSchema),
       return {
         rawMaterialId: ing.rawMaterialId,
         qtyRequired: qty,
-        itemType: ing.itemType === 'packaging' ? 'packaging' : 'formulation',
-        stageName: ing.stageName || ''
+        itemType: ing.itemType === 'packaging' || ing.itemType === 'formulation'
+          ? ing.itemType
+          : 'formulation',
+        stageName: ing.stageName || '',
+        isPrintedMaterial: !!ing.isPrintedMaterial
       };
+    });
+
+    // Packaging is a first-class BOM component. If an older client omits itemType,
+    // derive it from the material master so bottles, caps, labels, cartons, etc.
+    // are still deducted as packaging rather than formulation ingredients.
+    const materialIds = validatedIngredients.map(i => i.rawMaterialId);
+    const materialDocs = await RawMaterial.find({ _id: { $in: materialIds } })
+      .select('_id materialType category')
+      .lean();
+    const materialMap = new Map(materialDocs.map(m => [m._id.toString(), m]));
+    validatedIngredients.forEach(ing => {
+      const mat = materialMap.get(ing.rawMaterialId.toString());
+      if (mat && (mat.materialType === 'packaging' || mat.category === 'Packaging' || mat.category === 'Packaging Material')) {
+        ing.itemType = 'packaging';
+      }
     });
 
     // Validate stages list if provided
@@ -163,7 +182,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.bomSchema),
     if (populatedBom && populatedBom.ingredients && populatedBom.ingredients.length > 0) {
       const formulationIngredients = populatedBom.ingredients.filter(ing => {
         const mat = ing.rawMaterialId;
-        const isPkg = ing.itemType === 'packaging' || (mat && mat.category === 'Packaging');
+        const isPkg = ing.itemType === 'packaging' || (mat && (mat.materialType === 'packaging' || mat.category === 'Packaging' || mat.category === 'Packaging Material'));
         return !isPkg;
       });
       const totalQty = formulationIngredients.reduce((sum, ing) => sum + (ing.qtyRequired || 0), 0);

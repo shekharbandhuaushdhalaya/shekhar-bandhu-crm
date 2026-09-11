@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const rawMaterialQuarantineSchema = new mongoose.Schema({
   quarantineLotNo: { type: String, required: true, unique: true },
@@ -25,4 +26,5 @@ const rawMaterialQuarantineSchema = new mongoose.Schema({
   rawMaterialEntryId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterialEntry', default: null },
 }, { timestamps: true });
 
+rawMaterialQuarantineSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('RawMaterialQuarantine', rawMaterialQuarantineSchema);

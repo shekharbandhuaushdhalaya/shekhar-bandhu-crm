@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const mrSampleStockSchema = new mongoose.Schema({
   mrId: {
@@ -26,4 +27,5 @@ const mrSampleStockSchema = new mongoose.Schema({
 
 mrSampleStockSchema.index({ mrId: 1, productId: 1 }, { unique: true });
 
+mrSampleStockSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('MrSampleStock', mrSampleStockSchema);

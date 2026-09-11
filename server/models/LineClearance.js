@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const lineClearanceSchema = new mongoose.Schema({
   batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', required: true },
@@ -18,4 +19,5 @@ const lineClearanceSchema = new mongoose.Schema({
 
 lineClearanceSchema.index({ batchId: 1 }, { unique: true });
 
+lineClearanceSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('LineClearance', lineClearanceSchema);

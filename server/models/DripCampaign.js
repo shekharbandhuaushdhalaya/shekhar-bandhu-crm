@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const campaignStepSchema = new mongoose.Schema({
   stepNumber: { type: Number, required: true },
@@ -26,4 +27,5 @@ const dripCampaignSchema = new mongoose.Schema({
   convertedCount: { type: Number, default: 0 }
 }, { timestamps: true });
 
+dripCampaignSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('DripCampaign', dripCampaignSchema);

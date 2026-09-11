@@ -7,6 +7,10 @@ const paymentGatewayRouter = require('../routes/finance/paymentGateway');
 
 jest.mock('../models/SystemSettings');
 jest.mock('../models/Invoice');
+jest.mock('../models/WebhookEvent', () => ({
+  create: jest.fn().mockResolvedValue({ _id: 'mock_event_id' }),
+  updateOne: jest.fn().mockResolvedValue({ nModified: 1 }),
+}));
 jest.mock('../models/RolePermission', () => ({
   getEffectivePermissions: jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] }),
 }));

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const dispatchItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -43,4 +44,5 @@ dispatchSchema.index({ status: 1 });
 dispatchSchema.index({ invoiceId: 1 });
 dispatchSchema.index({ challanId: 1 });
 
+dispatchSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Dispatch', dispatchSchema);

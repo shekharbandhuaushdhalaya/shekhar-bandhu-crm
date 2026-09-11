@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const drugLicenseSchema = new mongoose.Schema({
   licenseNo: { type: String, required: true, unique: true, trim: true },
@@ -24,4 +25,5 @@ const drugLicenseSchema = new mongoose.Schema({
 
 drugLicenseSchema.index({ licenseNo: 1, expiryDate: 1, status: 1 });
 
+drugLicenseSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('DrugLicense', drugLicenseSchema);

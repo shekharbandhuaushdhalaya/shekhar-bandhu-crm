@@ -10,7 +10,28 @@ interface Props {
   visible: boolean;
   editingMaterialId: string | null;
   rmName: string; setRmName: (v: string) => void;
+  rmMaterialType: string; setRmMaterialType: (v: any) => void;
+  rmPackagingType: string; setRmPackagingType: (v: string) => void;
+  rmMaterialGrade: string; setRmMaterialGrade: (v: string) => void;
+  rmSpecification: string; setRmSpecification: (v: string) => void;
   rmBotanicalName: string; setRmBotanicalName: (v: string) => void;
+  rmAcceptedScientificName: string; setRmAcceptedScientificName: (v: string) => void;
+  rmFamily: string; setRmFamily: (v: string) => void;
+  rmGenus: string; setRmGenus: (v: string) => void;
+  rmSpecies: string; setRmSpecies: (v: string) => void;
+  rmBotanicalAuthority: string; setRmBotanicalAuthority: (v: string) => void;
+  rmTaxonomicRank: string; setRmTaxonomicRank: (v: string) => void;
+  rmTaxonomicStatus: string; setRmTaxonomicStatus: (v: string) => void;
+  rmBotanicalSynonyms: string[]; setRmBotanicalSynonyms: (v: string[]) => void;
+  rmCommonNames: string[]; setRmCommonNames: (v: string[]) => void;
+  rmTaxonomySource: string; setRmTaxonomySource: (v: string) => void;
+  rmTherapeuticUses: string[]; setRmTherapeuticUses: (v: string[]) => void;
+  rmRasa: string[]; setRmRasa: (v: string[]) => void;
+  rmVirya: string; setRmVirya: (v: string) => void;
+  rmVipaka: string; setRmVipaka: (v: string) => void;
+  rmGuna: string[]; setRmGuna: (v: string[]) => void;
+  rmDosage: string; setRmDosage: (v: string) => void;
+  rmBotanicalDescription: string; setRmBotanicalDescription: (v: string) => void;
   rmPartUsed: string; setRmPartUsed: (v: string) => void;
   rmSku: string;
   rmUnit: string; setRmUnit: (v: string) => void;
@@ -32,7 +53,12 @@ export default function RawMaterialModal({
   visible,
   editingMaterialId,
   rmName, setRmName,
+  rmMaterialType, setRmMaterialType,
+  rmPackagingType, setRmPackagingType,
+  rmMaterialGrade, setRmMaterialGrade,
+  rmSpecification, setRmSpecification,
   rmBotanicalName, setRmBotanicalName,
+  rmAcceptedScientificName, setRmAcceptedScientificName, rmFamily, setRmFamily, rmGenus, setRmGenus, rmSpecies, setRmSpecies, rmBotanicalAuthority, setRmBotanicalAuthority, rmTaxonomicRank, setRmTaxonomicRank, rmTaxonomicStatus, setRmTaxonomicStatus, rmBotanicalSynonyms, setRmBotanicalSynonyms, rmCommonNames, setRmCommonNames, rmTaxonomySource, setRmTaxonomySource, rmTherapeuticUses, setRmTherapeuticUses, rmRasa, setRmRasa, rmVirya, setRmVirya, rmVipaka, setRmVipaka, rmGuna, setRmGuna, rmDosage, setRmDosage, rmBotanicalDescription, setRmBotanicalDescription,
   rmPartUsed, setRmPartUsed,
   rmSku,
   rmUnit, setRmUnit,
@@ -53,6 +79,8 @@ export default function RawMaterialModal({
   const styles = useStyles(createStyles);
   const [autoFilledBadge, setAutoFilledBadge] = useState<string | null>(null);
   const [dbSuggestions, setDbSuggestions] = useState<any[]>([]);
+  const [botanicalLookupLoading, setBotanicalLookupLoading] = useState(false);
+  const [botanicalLookupMessage, setBotanicalLookupMessage] = useState('');
 
   const PLANT_PARTS = [
     { key: 'Root (Mool)', label: '🪵 Root' },
@@ -90,7 +118,7 @@ export default function RawMaterialModal({
 
   const UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'units', 'boxes', 'rolls'];
 
-  const isPackaging = rmCategory === 'Packaging';
+  const isPackaging = rmMaterialType === 'packaging' || rmCategory === 'Packaging' || rmCategory === 'Packaging Material';
   const isExcipient = rmCategory === 'Excipient';
   const isHerb = !isPackaging && rmCategory !== 'General';
 
@@ -123,6 +151,8 @@ export default function RawMaterialModal({
     const finalName = nameToSet || entry.ayurvedicName || (entry.commonNames ? entry.commonNames[0] : '');
     if (finalName) setRmName(finalName.toUpperCase());
     setRmBotanicalName(entry.botanicalName);
+    setRmAcceptedScientificName((entry as any).acceptedScientificName || entry.botanicalName || '');
+    setRmFamily((entry as any).family || ''); setRmGenus((entry as any).genus || ''); setRmSpecies((entry as any).species || ''); setRmBotanicalAuthority((entry as any).botanicalAuthority || ''); setRmTaxonomicRank((entry as any).taxonomicRank || ''); setRmTaxonomicStatus((entry as any).taxonomicStatus || ''); setRmBotanicalSynonyms((entry as any).botanicalSynonyms || entry.synonyms || []); setRmCommonNames((entry as any).commonNames || entry.commonNames || []); setRmTaxonomySource((entry as any).taxonomySource || ''); setRmTherapeuticUses((entry as any).therapeuticUses || []); setRmRasa((entry as any).rasa || []); setRmVirya((entry as any).virya || ''); setRmVipaka((entry as any).vipaka || ''); setRmGuna((entry as any).guna || []); setRmDosage((entry as any).dosage || ''); setRmBotanicalDescription((entry as any).description || '');
     if (entry.partUsed) setRmPartUsed(entry.partUsed);
     if (entry.category) setRmCategory(entry.category);
     if (entry.monographRef) setRmMonographRef(entry.monographRef);
@@ -133,6 +163,7 @@ export default function RawMaterialModal({
   const applyNonHerbPreset = (preset: { name: string; category: string; unit: string; std: string }) => {
     setRmName(preset.name);
     setRmCategory(preset.category);
+    if (preset.category === 'Packaging') setRmMaterialType('packaging');
     setRmUnit(preset.unit);
     setRmPharmacopoeialStandard(preset.std);
   };
@@ -209,6 +240,22 @@ export default function RawMaterialModal({
     return merged.slice(0, 6);
   }, [rmName, isPackaging, dbSuggestions]);
 
+  const lookupExternalBotanicalProfile = async () => {
+    if (!rmName.trim() || isPackaging) return;
+    setBotanicalLookupLoading(true); setBotanicalLookupMessage('');
+    try {
+      const info = await api.lookupHerbDetails(rmName.trim());
+      if (info && (info.scientificName || info.botanicalName)) {
+        applyHerbData(info, info.matchedName || rmName);
+        setBotanicalLookupMessage(`Verified via ${info.taxonomySource || 'botanical database'}`);
+      } else {
+        setBotanicalLookupMessage('No reliable botanical match found. You can enter the scientific name manually.');
+      }
+    } catch (e: any) {
+      setBotanicalLookupMessage(e?.message || 'Botanical lookup failed');
+    } finally { setBotanicalLookupLoading(false); }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
@@ -242,6 +289,23 @@ export default function RawMaterialModal({
                 {isPackaging ? '📦 1. PACKAGING SPECIFICATION & IDENTITY' : (isExcipient ? '🌾 1. EXCIPIENT & BASE MATERIAL IDENTITY' : '🌿 1. INGREDIENT & BOTANICAL IDENTITY')}
               </Text>
 
+              <Text style={styles.inputLabel}>Material Type *</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                {[
+                  ['raw_material', '🌿 Raw / Ingredient'],
+                  ['packaging', '📦 Packaging'],
+                  ['excipient', '🧪 Excipient'],
+                  ['consumable', '🛠 Consumable'],
+                  ['semi_finished', '⚙️ Semi-finished'],
+                  ['other', '📦 Other']
+                ].map(([key, label]) => (
+                  <TouchableOpacity key={key} onPress={() => { setRmMaterialType(key); if (key === 'packaging') setRmCategory('Packaging'); else if (rmCategory === 'Packaging' || rmCategory === 'Packaging Material') setRmCategory(key === 'excipient' ? 'Excipient' : 'General'); }}
+                    style={{ paddingHorizontal: 9, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: rmMaterialType === key ? colors.primary : colors.border, backgroundColor: rmMaterialType === key ? colors.primary + '15' : colors.bg.secondary }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: rmMaterialType === key ? colors.primary : colors.text.secondary }}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <Text style={styles.inputLabel}>
                 {isPackaging ? 'Packaging Item Name / Description *' : 'Material Item Name *'}
               </Text>
@@ -264,6 +328,22 @@ export default function RawMaterialModal({
                   ? 'Standard commercial name or dimension specification for boxes, bottles, caps, foils, or labels.'
                   : 'Commercial trade name or vernacular ingredient title.'}
               </Text>
+
+              {isPackaging && (
+                <View style={{ marginTop: 4, marginBottom: 10 }}>
+                  <Text style={styles.inputLabel}>Packaging Sub-type</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+                    {['bottle','cap','label','carton','corrugated_box','pouch','sachet','foil','shrink_wrap','insert','tape','other'].map(type => (
+                      <TouchableOpacity key={type} onPress={() => setRmPackagingType(type)} style={{ paddingHorizontal: 7, paddingVertical: 5, borderRadius: 5, borderWidth: 1, borderColor: rmPackagingType === type ? colors.primary : colors.border, backgroundColor: rmPackagingType === type ? colors.primary + '15' : colors.bg.secondary }}>
+                        <Text style={{ fontSize: 9.5, fontWeight: '700', color: rmPackagingType === type ? colors.primary : colors.text.secondary }}>{type.replace('_',' ')}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <Text style={styles.inputLabel}>Material Grade / Specification</Text>
+                  <TextInput style={styles.input} placeholder="e.g. Amber PET, 300 GSM Duplex Board, Food Grade HDPE" placeholderTextColor={colors.text.muted} value={rmMaterialGrade} onChangeText={setRmMaterialGrade} />
+                  <TextInput style={[styles.input, { marginTop: 6 }]} placeholder="Dimensions / print / pack details (optional)" placeholderTextColor={colors.text.muted} value={rmSpecification} onChangeText={setRmSpecification} />
+                </View>
+              )}
 
               {/* Quick Preset Chips for Packaging / Excipients */}
               {isPackaging && !rmName && (
@@ -419,7 +499,22 @@ export default function RawMaterialModal({
               />
             </View>
 
-            {/* SECTION 2: CATEGORY & AYUSH COMPLIANCE */}
+            {!isPackaging && (rmFamily || rmGenus || rmSpecies || rmBotanicalSynonyms.length || rmTherapeuticUses.length) && (
+              <View style={{ marginBottom: 16, backgroundColor: colors.bg.secondary + '40', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 10 }}>🔬 2. BOTANICAL / PHARMACOGNOSTIC PROFILE</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[['Accepted name', rmAcceptedScientificName], ['Family', rmFamily], ['Genus', rmGenus], ['Species', rmSpecies], ['Authority', rmBotanicalAuthority], ['Rank', rmTaxonomicRank], ['Taxonomic status', rmTaxonomicStatus]].map(([label,value]) => value ? <View key={label as string} style={{ minWidth: '45%', flex: 1, marginBottom: 4 }}><Text style={{ fontSize: 9, color: colors.text.muted }}>{label}</Text><Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary, fontStyle: label === 'Accepted name' ? 'italic' : 'normal' }}>{value}</Text></View> : null)}
+                </View>
+                {rmBotanicalSynonyms.length ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 5 }}><Text style={{ fontWeight: '800' }}>Synonyms: </Text>{rmBotanicalSynonyms.join(', ')}</Text> : null}
+                {rmCommonNames.length ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 4 }}><Text style={{ fontWeight: '800' }}>Common names: </Text>{rmCommonNames.join(', ')}</Text> : null}
+                {rmTherapeuticUses.length ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 4 }}><Text style={{ fontWeight: '800' }}>Traditional uses: </Text>{rmTherapeuticUses.join(', ')}</Text> : null}
+                {(rmRasa.length || rmVirya || rmVipaka || rmGuna.length || rmDosage) ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 4 }}><Text style={{ fontWeight: '800' }}>Ayurvedic profile: </Text>{[rmRasa.length ? `Rasa: ${rmRasa.join(', ')}` : '', rmVirya ? `Virya: ${rmVirya}` : '', rmVipaka ? `Vipaka: ${rmVipaka}` : '', rmGuna.length ? `Guna: ${rmGuna.join(', ')}` : '', rmDosage ? `Dosage: ${rmDosage}` : ''].filter(Boolean).join(' • ')}</Text> : null}
+                {rmBotanicalDescription ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 4 }}>{rmBotanicalDescription}</Text> : null}
+                {rmTaxonomySource ? <Text style={{ fontSize: 9, color: colors.text.muted, marginTop: 7 }}>Source: {rmTaxonomySource}</Text> : null}
+              </View>
+            )}
+
+            {/* SECTION 3: CATEGORY & AYUSH COMPLIANCE */}
             <View style={{ marginBottom: 16, backgroundColor: colors.bg.secondary + '40', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
               <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 10, letterSpacing: 0.5 }}>
                 🏷️ 2. AYUSH CLASSIFICATION & STANDARDS

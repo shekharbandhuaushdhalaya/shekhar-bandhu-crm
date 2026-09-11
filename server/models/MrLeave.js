@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const mrLeaveSchema = new mongoose.Schema({
   mrId: {
@@ -30,4 +31,5 @@ const mrLeaveSchema = new mongoose.Schema({
 
 mrLeaveSchema.index({ mrId: 1, startDate: -1 });
 
+mrLeaveSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('MrLeave', mrLeaveSchema);

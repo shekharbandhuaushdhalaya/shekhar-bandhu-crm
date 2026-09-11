@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const systemSettingsSchema = new mongoose.Schema({
   key: { type: String, default: 'company_config', unique: true },
@@ -42,4 +43,5 @@ const systemSettingsSchema = new mongoose.Schema({
   qrImageUrl: { type: String, default: '' }
 }, { timestamps: true });
 
+systemSettingsSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('SystemSettings', systemSettingsSchema);

@@ -6,7 +6,8 @@
     "dev": "nodemon server.js",
     "test": "jest --forceExit --detectOpenHandles",
     "lint": "eslint . --ext .js",
-    "lint:fix": "eslint . --ext .js --fix"
+    "lint:fix": "eslint . --ext .js --fix",
+    "migrate:production": "node scripts/migrate-production.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

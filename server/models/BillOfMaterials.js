@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const billOfMaterialsSchema = new mongoose.Schema({
   productId: {
@@ -42,4 +43,5 @@ const billOfMaterialsSchema = new mongoose.Schema({
 
 billOfMaterialsSchema.index({ productId: 1, recipeName: 1 }, { unique: true });
 
+billOfMaterialsSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('BillOfMaterials', billOfMaterialsSchema);

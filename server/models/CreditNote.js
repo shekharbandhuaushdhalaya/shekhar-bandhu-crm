@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const creditNoteItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -34,4 +35,5 @@ const creditNoteSchema = new mongoose.Schema({
 creditNoteSchema.index({ noteNo: 'text', partyName: 'text' });
 creditNoteSchema.index({ date: -1, createdAt: -1 });
 
+creditNoteSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('CreditNote', creditNoteSchema);

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const tourPlanEntrySchema = new mongoose.Schema({
   date: { type: Date, required: true },
@@ -34,4 +35,5 @@ const mrTourPlanSchema = new mongoose.Schema({
 
 mrTourPlanSchema.index({ mrId: 1, month: 1, year: 1 }, { unique: true });
 
+mrTourPlanSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('MrTourPlan', mrTourPlanSchema);

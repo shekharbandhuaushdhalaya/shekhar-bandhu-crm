@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const volumeTierSchema = new mongoose.Schema({
   minQty: { type: Number, required: true, min: 1 },
@@ -19,4 +20,5 @@ const customerPricingSchema = new mongoose.Schema({
 customerPricingSchema.index({ customerId: 1, productId: 1 }, { sparse: true });
 customerPricingSchema.index({ customerId: 1, rawMaterialId: 1 }, { sparse: true });
 
+customerPricingSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('CustomerPricing', customerPricingSchema);

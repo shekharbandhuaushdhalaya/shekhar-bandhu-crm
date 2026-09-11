@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const poItemSchema = new mongoose.Schema({
   rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' },
@@ -33,4 +34,5 @@ const purchaseOrderSchema = new mongoose.Schema({
 
 purchaseOrderSchema.index({ poNo: 'text', vendorName: 'text', status: 'text' });
 
+purchaseOrderSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('PurchaseOrder', purchaseOrderSchema);

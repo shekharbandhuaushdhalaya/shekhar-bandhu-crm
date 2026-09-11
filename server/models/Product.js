@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
@@ -45,4 +46,5 @@ productSchema.index({ productType: 1, size: 1, colour: 1, shape: 1, weight: 1 },
 productSchema.index({ createdAt: -1 });
 productSchema.index({ parentId: 1 });
 
+productSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Product', productSchema);

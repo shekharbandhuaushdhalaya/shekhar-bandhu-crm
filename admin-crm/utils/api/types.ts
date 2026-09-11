@@ -304,6 +304,7 @@ export type StockLedger = {
 export type InvoiceItem = {
   productId?: string;
   rawMaterialId?: string;
+  itemType?: 'product' | 'raw_material' | 'packaging' | 'consumable' | 'excipient' | 'semi_finished' | 'other';
   name: string;
   qty: number;
   boxes: number;
@@ -441,12 +442,34 @@ export type MockDataType = {
 export type RawMaterial = {
   _id: string;
   name: string;
+  materialType?: 'raw_material' | 'packaging' | 'consumable' | 'excipient' | 'semi_finished' | 'other';
+  packagingType?: string;
+  materialGrade?: string;
+  specification?: string;
   sku: string;
   unit: string;
   category?: string;
   minReorder: number;
   stockLevel?: number;
   botanicalName?: string;
+  acceptedScientificName?: string;
+  family?: string;
+  genus?: string;
+  species?: string;
+  botanicalAuthority?: string;
+  taxonomicRank?: string;
+  taxonomicStatus?: string;
+  botanicalSynonyms?: string[];
+  commonNames?: string[];
+  taxonomySource?: string;
+  taxonomyVerifiedAt?: string;
+  therapeuticUses?: string[];
+  rasa?: string[];
+  virya?: string;
+  vipaka?: string;
+  guna?: string[];
+  dosage?: string;
+  botanicalDescription?: string;
   partUsed?: string;
   pharmacopoeialStandard?: string;
   monographRef?: string;
@@ -472,6 +495,8 @@ export type BOMIngredient = {
   rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
   qtyRequired: number;
   itemType?: 'formulation' | 'packaging';
+  stageName?: string;
+  isPrintedMaterial?: boolean;
 };
 
 export type BillOfMaterials = {

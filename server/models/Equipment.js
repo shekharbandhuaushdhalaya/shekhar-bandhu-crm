@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const equipmentSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, trim: true },
@@ -36,4 +37,5 @@ const equipmentSchema = new mongoose.Schema({
 
 equipmentSchema.index({ code: 'text', name: 'text', category: 'text' });
 
+equipmentSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Equipment', equipmentSchema);

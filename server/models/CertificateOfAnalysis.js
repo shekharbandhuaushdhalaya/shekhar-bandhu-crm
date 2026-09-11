@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const certificateOfAnalysisSchema = new mongoose.Schema({
   coaNumber: { type: String, required: true, unique: true },
@@ -67,4 +68,5 @@ const certificateOfAnalysisSchema = new mongoose.Schema({
   remarks: { type: String, default: '' }
 }, { timestamps: true });
 
+certificateOfAnalysisSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('CertificateOfAnalysis', certificateOfAnalysisSchema);

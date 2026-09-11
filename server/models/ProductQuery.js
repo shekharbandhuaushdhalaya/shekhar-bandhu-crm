@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const productQuerySchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
@@ -15,4 +16,5 @@ const productQuerySchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+productQuerySchema.plugin(tenantPlugin);
 module.exports = mongoose.model('ProductQuery', productQuerySchema);

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const plannedBatchSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -34,4 +35,5 @@ const productionPlanSchema = new mongoose.Schema({
 
 productionPlanSchema.index({ planNo: 1, startDate: 1, manufacturingUnitId: 1 });
 
+productionPlanSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('ProductionPlan', productionPlanSchema);

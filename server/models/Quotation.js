@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const quotationItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -48,4 +49,5 @@ const quotationSchema = new mongoose.Schema({
 quotationSchema.index({ quotationNo: 'text', customerName: 'text', status: 'text' });
 quotationSchema.index({ createdAt: -1 });
 
+quotationSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Quotation', quotationSchema);

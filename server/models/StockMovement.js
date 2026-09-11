@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 
 const stockMovementItemSchema = new mongoose.Schema({
   productId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -90,4 +91,5 @@ const stockMovementSchema = new mongoose.Schema({
 stockMovementSchema.index({ docNo: 'text', partyName: 'text' });
 stockMovementSchema.index({ createdAt: -1 });
 
+stockMovementSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('StockMovement', stockMovementSchema);

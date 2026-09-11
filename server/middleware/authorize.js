@@ -28,11 +28,11 @@ function clearPermissionCache() {
 function authorize(...requiredPermissions) {
   return async (req, res, next) => {
     try {
-      if (!req.user || !req.user.role) {
+      if (!req.user || !(req.user.firmRole || req.user.role)) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const role = req.user.role;
+      const role = req.user.firmRole || req.user.role;
 
       if (requiredPermissions.length === 0) {
         return next();
@@ -64,7 +64,7 @@ function authorize(...requiredPermissions) {
 
 function roleAuthorize(...allowedRoles) {
   return (req, res, next) => {
-    if (!req.user || !req.user.role) {
+    if (!req.user || !(req.user.firmRole || req.user.role)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     if (allowedRoles.includes(req.user.role)) {
