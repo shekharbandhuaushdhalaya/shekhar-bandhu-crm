@@ -643,6 +643,7 @@ const interactionSchema = z.object({
 
 // ── MedicalRep ───────────────────────────────────────────────
 const medicalRepSchema = z.object({
+  code: z.string().optional().default(''),
   name: z.string().min(1),
   email,
   phone,
