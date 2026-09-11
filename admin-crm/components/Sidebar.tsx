@@ -2,13 +2,10 @@ import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useEffect, useState, useRef } from 'react';
-import { Modal } from 'react-native';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { usePermission } from '../utils/permissions';
 import { LightColors, Spacing, Radius } from '../constants/theme';
 import { authStorage } from '../utils/storage';
-import { useAuth } from '../utils/auth';
-import { api } from '../utils/api';
 
 const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded_v2';
 
@@ -97,6 +94,46 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+function DashboardItem({
+  isActive,
+  onPress,
+  colors,
+  styles,
+}: {
+  isActive: boolean;
+  onPress: () => void;
+  colors: typeof LightColors;
+  styles: ReturnType<typeof createSidebarStyles>;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.dashboardItem,
+        isActive && styles.dashboardItemActive,
+        !isActive && hovered && styles.itemHovered,
+      ]}
+      onPress={onPress}
+      activeOpacity={0.75}
+      // @ts-ignore
+      onMouseEnter={() => setHovered(true)}
+      // @ts-ignore
+      onMouseLeave={() => setHovered(false)}
+    >
+      <Ionicons
+        name={isActive ? 'grid' : 'grid-outline'}
+        size={18}
+        color={isActive || hovered ? colors.primary : colors.text.secondary}
+      />
+      <Text style={[styles.dashboardText, (isActive || hovered) && styles.dashboardTextActive]}>
+        Dashboard
+      </Text>
+      {isActive && <View style={styles.dashboardActiveBar} />}
+    </TouchableOpacity>
+  );
+}
+
 function GroupHeader({
   group,
   expanded,
@@ -110,28 +147,38 @@ function GroupHeader({
   colors: typeof LightColors;
   styles: ReturnType<typeof createSidebarStyles>;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <TouchableOpacity
-      style={[styles.groupHeader, expanded && styles.groupHeaderExpanded]}
+      style={[
+        styles.groupHeader,
+        expanded && styles.groupHeaderExpanded,
+        !expanded && hovered && styles.itemHovered,
+      ]}
       onPress={onToggle}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
+      // @ts-ignore
+      onMouseEnter={() => setHovered(true)}
+      // @ts-ignore
+      onMouseLeave={() => setHovered(false)}
     >
       <View style={styles.groupHeaderLeft}>
-        <View style={[styles.groupIconBox, expanded && styles.groupIconBoxExpanded]}>
+        <View style={[styles.groupIconBox, (expanded || hovered) && styles.groupIconBoxExpanded]}>
           <Ionicons
             name={(expanded ? group.icon.replace('-outline', '') : group.icon) as any}
             size={16}
-            color={expanded ? colors.primary : colors.text.secondary}
+            color={expanded || hovered ? colors.primary : colors.text.secondary}
           />
         </View>
-        <Text style={[styles.groupLabel, expanded && styles.groupLabelExpanded]}>
+        <Text style={[styles.groupLabel, (expanded || hovered) && styles.groupLabelExpanded]}>
           {group.label}
         </Text>
       </View>
       <Ionicons
         name={expanded ? 'chevron-down' : 'chevron-forward'}
         size={14}
-        color={colors.text.muted}
+        color={expanded || hovered ? colors.primary : colors.text.muted}
       />
     </TouchableOpacity>
   );
@@ -150,19 +197,33 @@ function NavItemRow({
   colors: typeof LightColors;
   styles: ReturnType<typeof createSidebarStyles>;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <TouchableOpacity
-      style={[styles.navItem, isActive && styles.navItemActive]}
+      style={[
+        styles.navItem,
+        isActive && styles.navItemActive,
+        !isActive && hovered && styles.itemHovered,
+      ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
+      // @ts-ignore
+      onMouseEnter={() => setHovered(true)}
+      // @ts-ignore
+      onMouseLeave={() => setHovered(false)}
     >
       {isActive && <View style={styles.activeBar} />}
       <Ionicons
         name={isActive ? item.activeIcon : item.icon}
         size={16}
-        color={isActive ? colors.primary : colors.text.secondary}
+        color={isActive || hovered ? colors.primary : colors.text.secondary}
       />
-      <Text style={[styles.navItemText, isActive && styles.navItemTextActive]}>
+      <Text
+        style={[styles.navItemText, (isActive || hovered) && styles.navItemTextActive]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
         {item.label}
       </Text>
     </TouchableOpacity>
@@ -171,17 +232,6 @@ function NavItemRow({
 
 const createSidebarStyles = (colors: typeof LightColors) =>
   StyleSheet.create({
-    firmSelector: { flexDirection: 'row', alignItems: 'center', margin: Spacing.xs, marginBottom: 4, padding: 9, borderRadius: Radius.md, backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary + '12' },
-    firmIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight, marginRight: 8 },
-    firmCaption: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8 },
-    firmName: { fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 1 },
-    firmModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-    firmModalCard: { width: '100%', maxWidth: 420, backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: colors.border },
-    firmModalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: 10 },
-    firmOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border },
-    firmOptionName: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-    firmOptionRole: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
-
     sidebar: {
       width: '100%',
       backgroundColor: colors.bg.secondary,
@@ -191,6 +241,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       flexDirection: 'column',
     },
     scrollContent: {
+      paddingTop: 12,
       paddingBottom: Spacing.sm,
       flexGrow: 1,
     },
@@ -269,13 +320,20 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       color: colors.primary,
     },
 
+    // Hover effect style
+    itemHovered: {
+      backgroundColor: colors.primaryLight,
+    },
+
     // ── Child Items ──
     childGroup: {
       paddingLeft: 2,
-      marginLeft: Spacing.md + 12,
+      marginLeft: 12,
+      marginRight: Spacing.xs,
       gap: 1,
       marginBottom: 4,
       marginTop: 2,
+      overflow: 'hidden',
     },
     navItem: {
       flexDirection: 'row',
@@ -284,15 +342,18 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       paddingHorizontal: 8,
       borderRadius: Radius.md,
       position: 'relative',
+      overflow: 'hidden',
     },
     navItemActive: {
       backgroundColor: colors.primaryLight,
     },
     navItemText: {
-      fontSize: 13,
+      fontSize: 12.5,
       fontWeight: '600',
       color: colors.text.secondary,
       marginLeft: 8,
+      flex: 1,
+      flexShrink: 1,
     },
     navItemTextActive: {
       color: colors.primary,
@@ -315,11 +376,6 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       paddingVertical: Spacing.sm,
       paddingHorizontal: Spacing.sm,
       gap: 6,
-    },
-    footerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
     },
     footerIconBtn: {
       flex: 1,
@@ -364,22 +420,13 @@ const createSidebarStyles = (colors: typeof LightColors) =>
   });
 
 function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; isOnline?: boolean; logout?: () => void }) {
-  const { user, switchFirm } = useAuth();
-  const [firms, setFirms] = useState<any[]>([]);
-  const [firmPickerOpen, setFirmPickerOpen] = useState(false);
-  const [firmLoading, setFirmLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { colors, themeMode, toggleTheme } = useTheme();
   const perm = usePermission();
   const styles = useStyles(createSidebarStyles);
 
-  const routeIncludes = (...segments: string[]) =>
-    segments.some((s) => pathname.includes(s));
-
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
-    // Keep the navigation compact. The active group is automatically expanded
-    // when its route is opened.
     return Object.fromEntries(NAV_GROUPS.map((g) => [g.key, false])) as Record<string, boolean>;
   });
   const loadedRef = useRef(false);
@@ -413,8 +460,6 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
   const toggleGroup = (key: string) =>
     setExpandedGroups((prev) => {
       const willOpen = !prev[key];
-      // Keep only one section open at a time. This prevents a long, cluttered
-      // navigation while still auto-expanding the section the user is in.
       const next = Object.fromEntries(
         NAV_GROUPS.map((g) => [g.key, willOpen && g.key === key])
       ) as Record<string, boolean>;
@@ -434,13 +479,6 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
 
   return (
     <View style={styles.sidebar}>
-      <View style={styles.firmSelector}>
-        <View style={styles.firmIcon}><Ionicons name="leaf-outline" size={16} color={colors.primary} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.firmCaption}>CRM DASHBOARD</Text>
-          <Text style={styles.firmName} numberOfLines={1}>Shekhar Bandhu</Text>
-        </View>
-      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -448,23 +486,12 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
         bounces={false}
       >
         {/* Dashboard */}
-        <TouchableOpacity
-          style={[styles.dashboardItem, isActive('index') && styles.dashboardItemActive]}
+        <DashboardItem
+          isActive={isActive('index')}
           onPress={() => navigate('index')}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={isActive('index') ? 'grid' : 'grid-outline'}
-            size={18}
-            color={isActive('index') ? colors.primary : colors.text.secondary}
-          />
-          <Text
-            style={[styles.dashboardText, isActive('index') && styles.dashboardTextActive]}
-          >
-            Dashboard
-          </Text>
-          {isActive('index') && <View style={styles.dashboardActiveBar} />}
-        </TouchableOpacity>
+          colors={colors}
+          styles={styles}
+        />
 
         {/* Nav Groups */}
         {NAV_GROUPS.map((group) => {
