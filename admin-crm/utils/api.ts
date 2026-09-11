@@ -116,20 +116,40 @@ class ApiClient {
   }
 
   private activeRequests = 0;
-  private cacheStore: Record<string, { data: any, timestamp: number }> = {};
-  private cacheTTL = 15000; // 15 seconds (stale data is patched via socket events)
-  private inFlightRequests: Record<string, Promise<Response> | undefined> = {};
+  // Small in-memory SWR cache. Keep it bounded so a long admin session cannot
+  // accumulate every URL ever visited. Socket events selectively invalidate it.
+  private cacheStore: Map<string, { data: any; timestamp: number }> = new Map();
+  private readonly cacheTTL = 15000;
+  private readonly maxCacheEntries = 80;
+  private inFlightRequests: Map<string, Promise<Response>> = new Map();
 
   clearCache(pattern?: string) {
-    if (pattern) {
-      const lowerPattern = pattern.toLowerCase();
-      Object.keys(this.cacheStore).forEach(key => {
-        if (key.toLowerCase().includes(lowerPattern)) {
-          delete this.cacheStore[key];
-        }
-      });
-    } else {
-      this.cacheStore = {};
+    if (!pattern) {
+      this.cacheStore.clear();
+      return;
+    }
+    const lowerPattern = pattern.toLowerCase();
+    for (const key of this.cacheStore.keys()) {
+      if (key.toLowerCase().includes(lowerPattern)) this.cacheStore.delete(key);
+    }
+  }
+
+  private invalidateMutation(url: string) {
+    const apiPath = url.replace(/^https?:\/\/[^/]+/i, '').replace(/^\/api\//, '');
+    const firstSegment = apiPath.split(/[/?#]/)[0].toLowerCase();
+    if (firstSegment) this.clearCache(firstSegment);
+    // Dashboard aggregates depend on most business mutations. Invalidate only
+    // those small, high-value aggregates rather than every cached endpoint.
+    this.clearCache('/dashboard');
+    this.clearCache('/activities');
+  }
+
+  private setCache(url: string, data: any) {
+    if (this.cacheStore.has(url)) this.cacheStore.delete(url);
+    this.cacheStore.set(url, { data, timestamp: Date.now() });
+    while (this.cacheStore.size > this.maxCacheEntries) {
+      const oldest = this.cacheStore.keys().next().value;
+      if (oldest) this.cacheStore.delete(oldest); else break;
     }
   }
 
@@ -141,8 +161,11 @@ class ApiClient {
 
     // SWR memory cache lookup (skip if cache-bust param present)
     if (isGet && !hasCacheBust) {
-      const cached = this.cacheStore[url];
+      const cached = this.cacheStore.get(url);
       if (cached && (Date.now() - cached.timestamp < this.cacheTTL)) {
+        // Touch the entry so the Map doubles as a tiny LRU cache.
+        this.cacheStore.delete(url);
+        this.cacheStore.set(url, cached);
         return {
           ok: true,
           status: 200,
@@ -155,21 +178,20 @@ class ApiClient {
       }
 
       // Request deduplication: if request is already in flight, reuse its promise
-      if (this.inFlightRequests[url]) {
-        const inFlightRes = await this.inFlightRequests[url];
+      if (this.inFlightRequests.has(url)) {
+        const inFlightRes = await this.inFlightRequests.get(url)!;
         return inFlightRes.clone();
       }
-    } else {
-      // Invalidate cache on mutations
-      this.cacheStore = {};
+    } else if (isMutating) {
+      // Do not flush the entire cache for every write. Invalidate the affected
+      // domain plus dashboard aggregates, preserving unrelated screen data.
+      this.invalidateMutation(url);
     }
 
     const promise = (async () => {
       const headers = {
         ...(options.headers || {}),
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
       } as Record<string, string>;
 
       if (!this.authToken) {
@@ -182,12 +204,9 @@ class ApiClient {
         headers['Authorization'] = `Bearer ${this.authToken}`;
       }
 
-      // Bust browser HTTP cache with timestamp on GET requests
-      let fetchUrl = url;
-      if (isGet && !hasCacheBust) {
-        const sep = url.includes('?') ? '&' : '?';
-        fetchUrl = `${url}${sep}_t=${Date.now()}`;
-      }
+      // Let the server/browser cache policy work normally. The client SWR cache
+      // above already handles freshness and socket-driven invalidation.
+      const fetchUrl = url;
 
       if (isMutating) {
         this.activeRequests++;
@@ -229,12 +248,12 @@ class ApiClient {
           try {
             const resClone = res.clone();
             const data = await resClone.json();
-            this.cacheStore[url] = { data, timestamp: Date.now() };
+            this.setCache(url, data);
           } catch (e) {
             // If clone fails, read directly and return custom response
             try {
               const data = await res.json();
-              this.cacheStore[url] = { data, timestamp: Date.now() };
+              this.setCache(url, data);
               return {
                 ok: true,
                 status: res.status,
@@ -258,11 +277,11 @@ class ApiClient {
     })();
 
     if (isGet && !hasCacheBust) {
-      this.inFlightRequests[url] = promise;
+      this.inFlightRequests.set(url, promise);
       try {
         return await promise;
       } finally {
-        delete this.inFlightRequests[url];
+        this.inFlightRequests.delete(url);
       }
     }
 

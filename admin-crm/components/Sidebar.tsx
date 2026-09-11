@@ -10,7 +10,7 @@ import { authStorage } from '../utils/storage';
 import { useAuth } from '../utils/auth';
 import { api } from '../utils/api';
 
-const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded';
+const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded_v2';
 
 export const SIDEBAR_WIDTH = 230;
 
@@ -378,11 +378,9 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
     segments.some((s) => pathname.includes(s));
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
-    const map: Record<string, boolean> = {};
-    for (const g of NAV_GROUPS) {
-      map[g.key] = true;
-    }
-    return map;
+    // Keep the navigation compact. The active group is automatically expanded
+    // when its route is opened.
+    return Object.fromEntries(NAV_GROUPS.map((g) => [g.key, g.key === 'sales'])) as Record<string, boolean>;
   });
   const loadedRef = useRef(false);
 

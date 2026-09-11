@@ -129,6 +129,12 @@ function DataTableInner<T>({
             }
             onEndReached={onLoadMore}
             onEndReachedThreshold={0.5}
+            initialNumToRender={12}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            windowSize={7}
+            removeClippedSubviews
+            keyboardShouldPersistTaps="handled"
             ListFooterComponent={renderFooter}
           />
         </View>

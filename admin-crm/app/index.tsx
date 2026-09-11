@@ -1104,6 +1104,7 @@ export default function DashboardScreen() {
   const [allChallans, setAllChallans] = useState<Challan[]>([]);
   const [expiryAlerts, setExpiryAlerts] = useState<ExpiryAlert[]>([]);
   const [expiryAlertsLoading, setExpiryAlertsLoading] = useState(true);
+  const [deferredLoaded, setDeferredLoaded] = useState({ mfg: false, marketing: false, expiry: false });
   
   const { user } = useAuth();
   const perm = usePermission();
@@ -1122,8 +1123,8 @@ export default function DashboardScreen() {
       api.getPurchaseInvoices('', 'all'),
       api.getSaleInvoices('', 'all'),
       api.getChallans('', 'all'),
-      api.getManufacturingAnalytics().catch(() => null),
-      api.getCampaigns().catch(() => [])
+      Promise.resolve(null),
+      Promise.resolve([])
     ]);
     if (mfgData) setMfgAnalytics(mfgData);
     if (camps) setCampaigns(camps);
@@ -1188,15 +1189,37 @@ export default function DashboardScreen() {
     setAllSales(sales);
     setAllChallans(challans);
 
-    api.getFinishedGoodsExpiryAlerts(60).then(r => {
-      setExpiryAlerts(r.alerts);
-      setExpiryAlertsLoading(false);
-    }).catch(() => setExpiryAlertsLoading(false));
-    
     setStats(s);
     setActivities(a);
     setContacts(c);
   }, []);
+
+  // Load expensive dashboard sections only when their tab is opened. This
+  // keeps the first paint focused on the operational overview.
+  useEffect(() => {
+    let cancelled = false;
+    const loadDeferred = async () => {
+      if (activeTab === 'manufacturing_analytics' && !deferredLoaded.mfg) {
+        const data = await api.getManufacturingAnalytics().catch(() => null);
+        if (!cancelled && data) setMfgAnalytics(data);
+        if (!cancelled) setDeferredLoaded((v) => ({ ...v, mfg: true }));
+      } else if (activeTab === 'marketing_analytics' && !deferredLoaded.marketing) {
+        const data = await api.getCampaigns().catch(() => []);
+        if (!cancelled) setCampaigns(data);
+        if (!cancelled) setDeferredLoaded((v) => ({ ...v, marketing: true }));
+      }
+      if (!cancelled && !deferredLoaded.expiry && activeTab === 'overview') {
+        const result = await api.getFinishedGoodsExpiryAlerts(60).catch(() => null);
+        if (result) setExpiryAlerts(result.alerts || []);
+        if (!cancelled) {
+          setExpiryAlertsLoading(false);
+          setDeferredLoaded((v) => ({ ...v, expiry: true }));
+        }
+      }
+    };
+    loadDeferred();
+    return () => { cancelled = true; };
+  }, [activeTab, deferredLoaded]);
 
   useEffect(() => { load(); }, [load]);
 
