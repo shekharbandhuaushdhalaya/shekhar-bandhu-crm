@@ -314,6 +314,8 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
             if (deductVal <= 0) continue;
 
             entry.qty = Math.max(0, Number((entry.qty - deductVal).toFixed(2)));
+            entry.usedQty = Number(((entry.usedQty || 0) + deductVal).toFixed(2));
+            entry.issuedQty = Number(((entry.issuedQty || 0) + deductVal).toFixed(2));
             await entry.save({ session });
 
             rawMaterialCost += deductVal * (entry.purchaseRate || 0);
@@ -358,6 +360,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
             if (blockVal <= 0) continue;
 
             entry.reservedQty = Number(((entry.reservedQty || 0) + blockVal).toFixed(2));
+            entry.issuedQty = Number(((entry.issuedQty || 0) + blockVal).toFixed(2));
             await entry.save({ session });
 
             ingredientsReserved.push({
@@ -461,7 +464,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
 // POST /api/batch-productions/:id/line-clearance — Record pre-batch line clearance
 router.post('/:id/line-clearance', authorize('manufacturing:edit'), async (req, res) => {
   try {
-    const { previousBatchNo, checklist, notes } = req.body;
+    const { previousBatchNo, checklist, notes, phase = 'manufacturing' } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
 
@@ -470,8 +473,11 @@ router.post('/:id/line-clearance', authorize('manufacturing:edit'), async (req, 
     }
 
     const LineClearance = require('../../models/LineClearance');
-    let record = await LineClearance.findOne({ batchId: batch._id });
+    if (!['manufacturing','filling','packing'].includes(phase)) return res.status(400).json({ error: 'phase must be manufacturing, filling or packing' });
+    let record = await LineClearance.findOne({ batchId: batch._id, phase });
     if (record) {
+      record.phase = phase;
+      record.cleared = true;
       record.checklist = checklist;
       record.notes = notes || '';
       record.clearedBy = req.user ? req.user.id : null;
@@ -481,6 +487,8 @@ router.post('/:id/line-clearance', authorize('manufacturing:edit'), async (req, 
     } else {
       record = await LineClearance.create({
         batchId: batch._id,
+        phase,
+        cleared: true,
         manufacturingUnitId: batch.manufacturingUnitId,
         previousBatchNo: previousBatchNo || '',
         checklist,
@@ -609,7 +617,7 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
     // Gate Stage 1 start on Line Clearance & BMR Approval
     if (stageIndex === 0 && (status === 'in_progress' || !status)) {
       const LineClearance = require('../../models/LineClearance');
-      const clearance = await LineClearance.findOne({ batchId: batch._id });
+      const clearance = await LineClearance.findOne({ batchId: batch._id, phase: 'manufacturing' });
       if (!clearance) {
         return res.status(400).json({ error: 'Line clearance required before starting production' });
       }
@@ -1180,6 +1188,23 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
     if (batch.status !== 'completed' || batch.qcStatus !== 'approved') {
       return res.status(400).json({ error: 'Batch must be completed and QC approved before market release' });
     }
+    if (!batch.bmrApprovedBy) return res.status(400).json({ error: 'BMR approval is required before market release' });
+    const criticalStages = (batch.stages || []).filter(s => s.name !== 'QC Testing');
+    if (criticalStages.some(s => s.status !== 'completed' && s.status !== 'skipped')) return res.status(400).json({ error: 'All critical manufacturing stages must be completed or formally skipped before market release' });
+    if (criticalStages.some(s => s.status === 'completed' && !s.isDualSigned)) return res.status(400).json({ error: 'Every completed critical manufacturing stage must have independent Chemist and QA signatures' });
+    const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
+    const LineClearance = require('../../models/LineClearance');
+    const spec = batch.qcSpecificationId ? await ProductQualitySpecification.findById(batch.qcSpecificationId).lean() : null;
+    if (!spec || spec.status !== 'approved') return res.status(400).json({ error: 'An approved product-specific AYUSH QC specification is required before market release' });
+    const mandatory = (spec.tests || []).filter(t => t.mandatory !== false);
+    const results = batch.qcTests || [];
+    const missing = mandatory.filter(t => { const r = results.find(x => x.code === t.code); return !r || r.status !== 'pass'; });
+    if (missing.length) return res.status(400).json({ error: 'Mandatory QC tests are incomplete or not passed', tests: missing.map(t => t.code) });
+    const clearances = await LineClearance.find({ batchId: batch._id }).lean();
+    for (const phase of ['manufacturing','filling','packing']) {
+      const c = clearances.find(x => x.phase === phase);
+      if (!c || !c.cleared || !c.checklist?.equipmentCleaned || !c.checklist?.previousMaterialsRemoved || !c.checklist?.previousLabelsDocumentsRemoved || !c.checklist?.areaVisuallyInspected) return res.status(400).json({ error: `Approved ${phase} line clearance is required before market release` });
+    }
 
     batch.releasedBy = req.user ? req.user.id : null;
     batch.releasedByName = req.user ? req.user.name : 'Authorized Quality Releaser';
@@ -1445,7 +1470,7 @@ router.get('/:id/bmr-report', async (req, res) => {
 
     const [settings, lineClearance, retentionSamples] = await Promise.all([
       SystemSettings.findOne().lean(),
-      LineClearance.findOne({ batchId: batch._id }).lean(),
+      LineClearance.find({ batchId: batch._id }).lean(),
       RetentionSample.find({ batchId: batch._id }).lean()
     ]);
 
@@ -1570,7 +1595,7 @@ router.get('/:id/bmr-report', async (req, res) => {
       stages: batch.stages || [],
       ingredients: enrichedIngredients,
       bomSnapshot: batch.bomSnapshot || null,
-      lineClearance: lineClearance || null,
+      lineClearance: lineClearance || [],
       labelReconciliation: batch.labelReconciliation || [],
       retentionSamples: retentionSamples || []
     });
@@ -1940,68 +1965,43 @@ router.post('/:id/job-work/receive', authorize('manufacturing:edit'), async (req
   }
 });
 
-// ─── FEATURE 13: Dual E-Signature & Audit Trail for Critical BMR Steps ───
-
-// POST /api/batch-productions/:id/stages/:stageIndex/dual-esign — Dual signature verification
+// ─── Controlled two-person electronic signature for critical BMR stages ───
 router.post('/:id/stages/:stageIndex/dual-esign', authorize('manufacturing:edit'), async (req, res) => {
   try {
     const crypto = require('crypto');
     const AuditLog = require('../../models/AuditLog');
-    const { chemistName, chemistComments, qaName, qaComments } = req.body;
-
+    const { role, comments } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
-
-    const idx = parseInt(req.params.stageIndex, 10);
-    if (isNaN(idx) || idx < 0 || idx >= batch.stages.length) {
-      return res.status(400).json({ error: 'Invalid BMR stage index' });
-    }
-
+    const idx = Number(req.params.stageIndex);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= batch.stages.length) return res.status(400).json({ error: 'Invalid BMR stage index' });
+    if (!req.user?.id) return res.status(401).json({ error: 'Authenticated user is required for electronic signature' });
+    if (!['chemist','qa'].includes(role)) return res.status(400).json({ error: 'role must be chemist or qa' });
     const stage = batch.stages[idx];
-    const timestamp = new Date();
-    const signPayload = `${batch.batchNo}:${stage.name}:${chemistName || 'Chemist'}:${qaName || 'QA Officer'}:${timestamp.toISOString()}`;
-    const hash = crypto.createHash('sha256').update(signPayload).digest('hex');
-
-    stage.isDualSigned = true;
-    stage.status = 'completed';
-    stage.completedAt = timestamp;
-    stage.chemistSignature = {
-      userId: req.user ? req.user.id : null,
-      userName: chemistName || (req.user ? req.user.name : 'Manufacturing Chemist'),
-      signedAt: timestamp,
-      signatureHash: hash,
-      comments: chemistComments || 'Verified & Performed by Manufacturing Chemist'
-    };
-    stage.qaSignature = {
-      userId: req.user ? req.user.id : null,
-      userName: qaName || 'Quality Assurance Manager',
-      signedAt: timestamp,
-      signatureHash: hash,
-      comments: qaComments || 'Verified & Released by QA Officer'
-    };
-
+    const now = new Date();
+    const userId = req.user.id;
+    const userName = req.user.name || req.user.email || 'Authenticated User';
+    const payload = `${batch._id}:${batch.batchNo}:${stage.name}:${role}:${userId}:${now.toISOString()}`;
+    const hash = crypto.createHash('sha256').update(payload).digest('hex');
+    const signature = { userId, userName, signedAt: now, signatureHash: hash, comments: comments || '' };
+    if (role === 'chemist') {
+      if (stage.qaSignature?.userId && String(stage.qaSignature.userId) === String(userId)) return res.status(400).json({ error: 'The same user cannot perform both BMR signatures' });
+      stage.chemistSignature = signature;
+    } else {
+      if (!stage.chemistSignature?.userId) return res.status(400).json({ error: 'Manufacturing Chemist signature is required before QA signature' });
+      if (String(stage.chemistSignature.userId) === String(userId)) return res.status(400).json({ error: 'The same user cannot perform both BMR signatures' });
+      stage.qaSignature = signature;
+      stage.isDualSigned = true;
+      stage.status = 'completed';
+      stage.completedAt = now;
+      stage.verifiedBy = userId;
+      stage.verifiedByName = userName;
+      stage.verifiedAt = now;
+    }
     await batch.save();
-
-    // Write to AuditLog for 21 CFR Part 11 electronic audit compliance
-    await AuditLog.create({
-      action: 'BMR_STAGE_DUAL_ESIGN',
-      module: 'manufacturing',
-      user: req.user ? req.user.id : null,
-      userName: chemistName || (req.user ? req.user.name : 'Manufacturing Chemist'),
-      details: `Dual E-Signature verified for Batch ${batch.batchNo}, Stage '${stage.name}'. Hash: ${hash}`,
-      entityId: batch._id,
-      entityType: 'BatchProduction'
-    }).catch(() => {});
-
-    res.json({
-      success: true,
-      message: `Dual E-Signature verified for stage '${stage.name}' on Batch ${batch.batchNo}`,
-      signatureHash: hash,
-      stage
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    await AuditLog.create({ action: `BMR_STAGE_${role.toUpperCase()}_ESIGN`, module:'manufacturing', user:userId, userName, details:`${role} electronic signature recorded for Batch ${batch.batchNo}, Stage '${stage.name}'. Hash: ${hash}`, entityId:batch._id, entityType:'BatchProduction' }).catch(()=>{});
+    res.json({success:true, stage, message: role === 'chemist' ? 'Manufacturing Chemist signature recorded. QA signature is still required.' : `QA signature recorded. Stage '${stage.name}' is now dual-signed.`});
+  } catch(e){ res.status(500).json({error:e.message}); }
 });
 
 module.exports = router;

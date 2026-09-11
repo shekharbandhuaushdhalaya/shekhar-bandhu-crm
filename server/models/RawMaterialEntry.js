@@ -20,6 +20,13 @@ const rawMaterialEntrySchema = new mongoose.Schema({
   vendorName: { type: String, default: '' },
   expiryDate: { type: Date, default: null },
   purchaseRef: { type: String, default: '' },
+  analyticalReportNo: { type: String, default: '', trim: true },
+  receivedDate: { type: Date, default: null },
+  approvedQty: { type: Number, default: 0 },
+  issuedQty: { type: Number, default: 0 },
+  usedQty: { type: Number, default: 0 },
+  returnedQty: { type: Number, default: 0 },
+  rejectedQty: { type: Number, default: 0 },
   warehouseId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Warehouse',

@@ -303,7 +303,7 @@ const warehouseSchema = z.object({
 const userSchema = z.object({
   name: z.string().min(1, 'Name required'),
   email: z.string().email('Valid email required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(12, 'Password must be at least 12 characters'),
   role: z.string().regex(/^[a-z0-9_]+$/, 'Invalid role format').default('agent'),
   canAccessCash: z.boolean().default(false),
 });
@@ -315,7 +315,7 @@ const loginSchema = z.object({
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
+  newPassword: z.string().min(12, 'New password must be at least 12 characters'),
 });
 
 const updateProfileSchema = z.object({

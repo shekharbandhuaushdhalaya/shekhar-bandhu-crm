@@ -7,7 +7,11 @@
     "test": "jest --forceExit --detectOpenHandles",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
-    "migrate:production": "node scripts/migrate-production.js"
+    "migrate:production": "node scripts/migrate-production.js",
+    "migrate:line-clearance-phases": "node scripts/migrate-line-clearance-phases.js",
+    "backup:database": "node scripts/backup-database.js",
+    "restore:database": "node scripts/restore-database.js",
+    "bootstrap:admin": "node scripts/seed-admin.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

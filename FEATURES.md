@@ -39,3 +39,13 @@
 
 ## Deferred
 - Public Storefront Website (`sba-website`) — descoped/deferred as an external separate project.
+
+
+## 2026-09 Manufacturing & AYUSH compliance upgrade
+- [x] Product-specific AYUSH QC specifications with version/source and approval workflow
+- [x] CoA is specification-driven; missing tests can no longer default to PASS
+- [x] BMR raw-material analytical report number and received/issued/used/returned/rejected tracking fields
+- [x] Two-person authenticated Chemist + QA electronic signatures; same-user dual signing blocked
+- [x] Market release gate requires approved QC specification, mandatory QC passes and manufacturing/filling/packing line clearances
+- [x] Equipment, deviations/CAPA, stability, recall and vendor-qualification modules surfaced in a GMP & AYUSH Compliance dashboard
+- [x] Production social integrations fail closed instead of reporting mocked success

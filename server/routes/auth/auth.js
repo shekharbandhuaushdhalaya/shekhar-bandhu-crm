@@ -153,6 +153,9 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
     if (!membership) membership = await UserFirm.findOne({ userId: user._id, isDefault: true, active: true }).lean();
     if (!membership) membership = await UserFirm.findOne({ userId: user._id, active: true }).sort({ createdAt: 1 }).lean();
     if (!membership) {
+      if (config.isProduction) {
+        return res.status(403).json({ error: 'No active firm membership. Complete controlled production setup before login.' });
+      }
       const firm = await Firm.create({ name: 'Default Firm' });
       membership = await UserFirm.create({ userId: user._id, firmId: firm._id, role: user.role, isDefault: true });
     }

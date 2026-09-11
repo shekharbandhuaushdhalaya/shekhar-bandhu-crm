@@ -63,6 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Products & Pricing', route: 'products', icon: 'cube-outline', activeIcon: 'cube' },
       { label: 'Inventories & Warehouses', route: 'inventories', icon: 'home-outline', activeIcon: 'home' },
       { label: 'Manufacturing & BMR', route: 'manufacturing', icon: 'hammer-outline', activeIcon: 'hammer' },
+      { label: 'GMP & AYUSH Compliance', route: 'compliance', icon: 'shield-checkmark-outline', activeIcon: 'shield-checkmark', permission: 'quality:view' },
     ],
   },
   {

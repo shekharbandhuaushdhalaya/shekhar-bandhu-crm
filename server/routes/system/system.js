@@ -10,7 +10,7 @@ const schemas = require('../../validation/schemas');
 const router = express.Router();
 
 // GET /api/system/settings — Authenticated endpoint for system settings (excludes raw base64 blobs by default)
-router.get('/settings', authenticateToken, async (req, res) => {
+router.get('/settings', authenticateToken, authorize('settings:view'), async (req, res) => {
   try {
     const { includeAssets } = req.query;
     let query = SystemSettings.findOne({ key: 'company_config' });
@@ -33,7 +33,7 @@ router.get('/settings/public', publicTenant, async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=300');
     let settings = await SystemSettings.findOne({ key: 'company_config' })
-      .select('firmName firmAddress firmEmail firmPhone firmGstin bankName bankAccountNo bankIfsc bankBranch bankUpi invoicePrefix quotationPrefix challanPrefix dispatchPrefix defaultTerms defaultGstRate signatureUrl dscSignatoryName dscCertificateName manufacturingLicenseNo gmpCertificateNo licenseValidTill gmpValidTill licenceValidityType stateUtCode licenceSerial qrImageUrl')
+      .select('firmName firmAddress firmEmail firmPhone firmGstin invoicePrefix quotationPrefix challanPrefix dispatchPrefix defaultTerms defaultGstRate signatureUrl dscSignatoryName dscCertificateName manufacturingLicenseNo gmpCertificateNo licenseValidTill gmpValidTill licenceValidityType stateUtCode licenceSerial qrImageUrl')
       .lean();
     if (!settings) {
       settings = await SystemSettings.create({ key: 'company_config' });
@@ -140,7 +140,7 @@ router.get('/audit-logs', authenticateToken, authorize('audit:view'), async (req
 
 
 // POST /api/system/reset-db — Reset entire database (keeps User collection untouched)
-router.post('/reset-db', async (req, res) => {
+router.post('/reset-db', authenticateToken, authorize('settings:edit'), async (req, res) => {
   if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DB_RESET !== 'true') return res.status(403).json({ error: 'Database reset is disabled. Set ALLOW_DB_RESET=true only in a controlled non-production environment.' });
   try {
     const models = [
@@ -212,50 +212,21 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
   }
 });
 
-// GET /api/system/backup — Export database snapshot backup JSON
+// Database backup/restore is deliberately kept out of the HTTP request path.
+// A JSON response containing counts is NOT a recoverable database backup and must
+// never be presented as one. Use the controlled mongodump/mongorestore scripts.
 router.get('/backup', authenticateToken, authorize('settings:edit'), async (req, res) => {
-  try {
-    const SystemSettings = require('../../models/SystemSettings');
-    const Product = require('../../models/Product');
-    const Customer = require('../../models/Customer');
-    const Vendor = require('../../models/Vendor');
-
-    const [settings, productsCount, customersCount, vendorsCount] = await Promise.all([
-      SystemSettings.findOne({ key: 'company_config' }).lean(),
-      Product.countDocuments(),
-      Customer.countDocuments(),
-      Vendor.countDocuments()
-    ]);
-
-    const backupSnapshot = {
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      companyConfig: settings || {},
-      counts: {
-        products: productsCount,
-        customers: customersCount,
-        vendors: vendorsCount
-      }
-    };
-
-    res.json(backupSnapshot);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  return res.status(410).json({
+    error: 'HTTP database snapshots are disabled',
+    message: 'Use the controlled backup:database script and store backups outside the application host.'
+  });
 });
 
-// POST /api/system/restore — Validate and process database restore payload
 router.post('/restore', authenticateToken, authorize('settings:edit'), async (req, res) => {
-  try {
-    const { backupSnapshot } = req.body;
-    if (!backupSnapshot || !backupSnapshot.version) {
-      return res.status(400).json({ error: 'Invalid backup snapshot format' });
-    }
-
-    res.json({ success: true, message: 'Database backup validated and ready for restore' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  return res.status(410).json({
+    error: 'HTTP database restore is disabled',
+    message: 'Database restores must be executed as a controlled operational release with an explicit restore confirmation.'
+  });
 });
 
 module.exports = router;

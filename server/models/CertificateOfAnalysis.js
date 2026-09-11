@@ -7,7 +7,10 @@ const certificateOfAnalysisSchema = new mongoose.Schema({
   productName: { type: String, required: true },
   manufacturingLicenseNo: { type: String, default: 'AYUSH-1983-UP' },
   gmpCertificateNo: { type: String, default: 'GMP-AYUSH-2026-VNS' },
-  pharmacopoeialStandard: { type: String, enum: ['API', 'AFI', 'IP', 'BP', 'USP', 'House Standard'], default: 'API' },
+  pharmacopoeialStandard: { type: String, default: '' },
+  specificationId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductQualitySpecification', default: null },
+  specificationVersion: { type: String, default: '' },
+  specificationSource: { type: String, default: '' },
   dosageForm: { type: String, default: 'Churna / Herbal Formulation' },
   manufacturingDate: { type: Date, required: true },
   expiryDate: { type: Date, required: true },
@@ -60,12 +63,21 @@ const certificateOfAnalysisSchema = new mongoose.Schema({
     pesticideResidues: { type: String, default: 'Complies with API Limits' },
     passed: { type: Boolean, default: true }
   },
-  overallResult: { type: String, enum: ['APPROVED', 'REJECTED', 'PENDING'], default: 'APPROVED' },
+  overallResult: { type: String, enum: ['APPROVED', 'REJECTED', 'PENDING'], default: 'PENDING' },
   status: { type: String, enum: ['draft', 'approved', 'rejected'], default: 'draft', index: true },
   testedBy: { type: String, required: true },
   approvedBy: { type: String, default: '' },
   approvedAt: { type: Date },
-  remarks: { type: String, default: '' }
+  remarks: { type: String, default: '' },
+  tests: [{
+    code: { type: String, required: true }, name: { type: String, required: true }, category: String,
+    specification: String, unit: String, methodReference: String, result: String, numericResult: Number,
+    status: { type: String, enum: ['not_tested','pending','pass','fail'], default: 'not_tested' },
+    testedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, testedByName: String, testedAt: Date, remarks: String
+  }],
+  qcCompleted: { type: Boolean, default: false },
+  qaReviewedByUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  qaReviewedByName: { type: String, default: '' }
 }, { timestamps: true });
 
 certificateOfAnalysisSchema.plugin(tenantPlugin);

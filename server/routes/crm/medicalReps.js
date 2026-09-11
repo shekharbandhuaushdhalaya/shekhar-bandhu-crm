@@ -15,6 +15,7 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { getHaversineDistanceInMeters, compileMRDailyCallReport, calculateMRLeaderboard, calculateTourPlanCompliance, calculateMRProfitability } = require('../../services/medicalRepService');
 const { safeEscapeRegex, sendWhatsAppNotification } = require('../../utils/whatsappService');
+const config = require('../../src/config');
 
 const router = express.Router();
 
@@ -960,14 +961,16 @@ router.post('/sample-otp/send', authorize('mr:visits'), async (req, res) => {
     }
 
     const otpKey = doctorId || doctorPhone || doctorName;
-    const otp = '1234'; // Standard mock OTP for field verification
+    const isMock = process.env.ALLOW_MOCK_OTP === 'true' || process.env.NODE_ENV === 'test';
+    if (config.isProduction && !isMock) return res.status(503).json({ error: 'OTP provider is not configured for production' });
+    const otp = isMock ? '1234' : String(Math.floor(100000 + Math.random() * 900000));
     sampleOtpStore.set(otpKey.toString().toLowerCase(), { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
 
     res.json({
       success: true,
-      message: `Sample verification OTP sent to doctor. (Mock OTP: ${otp})`,
+      message: isMock ? `Sample verification OTP sent to doctor (development mock).` : 'Sample verification OTP generated; deliver it through the configured provider.',
       otpKey,
-      otp
+      ...(isMock ? { otp } : {})
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

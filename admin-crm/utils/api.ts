@@ -1202,6 +1202,22 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/bmr-report`);
     return res.json();
   }
+  async getQualitySpecifications(productId?: string): Promise<any[]> {
+    const q = productId ? `?productId=${encodeURIComponent(productId)}` : '';
+    const res = await this.request(`${API_BASE}/manufacturing/quality-specifications${q}`); return res.json();
+  }
+  async createQualitySpecification(data: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/quality-specifications`, { method:'POST', body:JSON.stringify(data) }); return res.json();
+  }
+  async approveQualitySpecification(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/quality-specifications/${id}/approve`, { method:'PATCH' }); return res.json();
+  }
+  async getManufacturingEquipment(): Promise<any[]> { const res=await this.request(`${API_BASE}/manufacturing/equipment`); return res.json(); }
+  async getManufacturingDeviations(): Promise<any[]> { const res=await this.request(`${API_BASE}/manufacturing/deviations`); return res.json(); }
+  async getStabilityStudies(): Promise<any[]> { const res=await this.request(`${API_BASE}/stability-studies`); return res.json(); }
+  async getRecalls(): Promise<any[]> { const res=await this.request(`${API_BASE}/recalls`); return res.json(); }
+  async getVendorQualifications(): Promise<any[]> { const res=await this.request(`${API_BASE}/vendor-qualifications`); return res.json(); }
+
   async getBatchCoA(id: string): Promise<any> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/coa`);
     return res.json();

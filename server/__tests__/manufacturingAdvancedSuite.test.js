@@ -231,24 +231,30 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
       };
       BatchProduction.findById.mockResolvedValue(mockBatch);
 
-      const res = await request(app)
+      const resChemist = await request(app)
         .post('/api/batch-productions/batch_301/stages/0/dual-esign')
-        .send({
-          chemistName: 'R. K. Verma Chemist',
-          chemistComments: 'Weighing verified on calibrated balance',
-          qaName: 'Dr. S. K. Gupta QA Head',
-          qaComments: 'Verified and approved'
-        });
+        .send({ role: 'chemist', comments: 'Weighing verified on calibrated balance' });
 
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.signatureHash).toBeDefined();
+      expect(resChemist.status).toBe(200);
+      expect(mockBatch.stages[0].chemistSignature).toBeDefined();
+
+      const qaApp = express();
+      qaApp.use(express.json());
+      qaApp.use((req, res, next) => {
+        req.user = { id: '507f1f77bcf86cd799439099', name: 'Dr. S. K. Gupta QA Head', role: 'admin' };
+        next();
+      });
+      qaApp.use('/api/batch-productions', batchRouter);
+
+      const resQa = await request(qaApp)
+        .post('/api/batch-productions/batch_301/stages/0/dual-esign')
+        .send({ role: 'qa', comments: 'Verified and approved' });
+
+      expect(resQa.status).toBe(200);
+      expect(resQa.body.success).toBe(true);
       expect(mockBatch.stages[0].isDualSigned).toBe(true);
       expect(mockBatch.stages[0].status).toBe('completed');
-      expect(mockBatch.stages[0].chemistSignature.userName).toBe('R. K. Verma Chemist');
-      expect(mockBatch.stages[0].qaSignature.userName).toBe('Dr. S. K. Gupta QA Head');
       expect(mockSave).toHaveBeenCalled();
-      expect(AuditLog.create).toHaveBeenCalled();
     });
   });
 });

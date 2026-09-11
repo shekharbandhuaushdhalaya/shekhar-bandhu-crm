@@ -45,6 +45,11 @@ const stageSchema = new mongoose.Schema({
   // GMP Equipment & Environmental Logging
   equipmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Equipment', default: null },
   equipmentName: { type: String, default: '', trim: true },
+  equipmentCalibrationStatus: { type: String, enum: ['valid','due','expired','unknown'], default: 'unknown' },
+  equipmentCalibrationCertificateNo: { type: String, default: '' },
+  sopNo: { type: String, default: '' },
+  sopVersion: { type: String, default: '' },
+  processParameters: [{ key: String, value: String, unit: String }],
   temperatureCelsius: { type: Number, default: null },
   humidityPct: { type: Number, default: null },
   ambientVerified: { type: Boolean, default: false },
@@ -169,6 +174,14 @@ const batchProductionSchema = new mongoose.Schema({
   releasedByName: { type: String, default: '' },
   releasedAt: { type: Date, default: null },
   qcStatus: { type: String, enum: ['approved', 'rejected'], default: 'approved' },
+  qcSpecificationId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductQualitySpecification', default: null },
+  qcSpecificationVersion: { type: String, default: '' },
+  qcTests: [{
+    code: { type: String, required: true }, name: { type: String, required: true }, category: String,
+    specification: String, unit: String, methodReference: String, result: String, numericResult: Number,
+    status: { type: String, enum: ['not_tested','pending','pass','fail'], default: 'not_tested' },
+    testedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, testedByName: String, testedAt: Date, remarks: String
+  }],
   qcParameters: {
     organoleptic: { type: String, default: '' },
     moistureContent: { type: Number, default: null },
@@ -196,6 +209,12 @@ const batchProductionSchema = new mongoose.Schema({
   bmrApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   bmrApprovedByName: { type: String, default: '' },
   bmrApprovedAt: { type: Date, default: null },
+  lineClearanceRecords: [{
+    phase: { type: String, enum: ['manufacturing','filling','packing'], required: true },
+    cleared: { type: Boolean, default: false }, clearedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    clearedByName: { type: String, default: '' }, clearedAt: { type: Date, default: null },
+    checklist: { equipmentCleaned: Boolean, previousMaterialsRemoved: Boolean, previousLabelsDocumentsRemoved: Boolean, areaVisuallyInspected: Boolean }, notes: String
+  }],
   labelReconciliation: [{
     rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial', required: true },
     name: { type: String, required: true },

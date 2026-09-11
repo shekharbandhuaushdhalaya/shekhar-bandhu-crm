@@ -122,7 +122,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
 
   test('GET /api/batch-productions/:id/bmr-report returns hasUnverifiedReferences and unverifiedIngredients', async () => {
     SystemSettings.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({}) });
-    LineClearance.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
     RetentionSample.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
     Product.find.mockReturnValue({
       select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) })

@@ -4,6 +4,7 @@ const tenantPlugin = require('../utils/tenantPlugin');
 const lineClearanceSchema = new mongoose.Schema({
   batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', required: true },
   manufacturingUnitId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: true },
+  phase: { type: String, enum: ['manufacturing','filling','packing'], default: 'manufacturing', index: true },
   previousBatchNo: { type: String, default: '', trim: true },
   checklist: {
     equipmentCleaned: { type: Boolean, default: false },
@@ -17,7 +18,7 @@ const lineClearanceSchema = new mongoose.Schema({
   clearedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-lineClearanceSchema.index({ batchId: 1 }, { unique: true });
+lineClearanceSchema.index({ batchId: 1, phase: 1 }, { unique: true });
 
 lineClearanceSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('LineClearance', lineClearanceSchema);

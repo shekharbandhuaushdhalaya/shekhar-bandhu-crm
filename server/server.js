@@ -101,7 +101,7 @@ if (!JWT_SECRET) {
 
 // Socket.io Handshake JWT Authentication Middleware
 io.use((socket, next) => {
-  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  const token = socket.handshake.auth?.token;
   if (!token) {
     return next(new Error('Unauthorized: No authentication token provided'));
   }
@@ -252,8 +252,10 @@ app.use('/api/manufacturing/quality-audits', authenticateJWT, qualityAuditRoutes
 app.use('/api/pharmacopoeia', authenticateJWT, pharmacopoeiaRoutes);
 const batchTraceRoutes = require('./routes/manufacturing/batchTrace');
 app.use('/api/manufacturing/batch-trace', authenticateJWT, batchTraceRoutes);
+const qualitySpecificationRoutes = require('./routes/manufacturing/qualitySpecifications');
 const coaRoutes = require('./routes/manufacturing/coa');
 const quarantineRoutes = require('./routes/manufacturing/quarantine');
+app.use('/api/manufacturing/quality-specifications', authenticateJWT, qualitySpecificationRoutes);
 app.use('/api/manufacturing/coa', authenticateJWT, coaRoutes);
 app.use('/api/manufacturing/quarantine', authenticateJWT, quarantineRoutes);
 const debitNoteRoutes = require('./routes/finance/debitNotes');
@@ -322,14 +324,20 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: status >= 500 && config.isProduction ? 'Internal server error' : (err.message || 'Internal server error'), requestId: req.requestId });
 });
 
-// Start Express / Socket.IO server immediately
+// Start workers/server only after MongoDB is ready. This prevents accepting production
+// traffic while the database is unavailable and makes readiness meaningful.
 const { startWorker, stopWorker } = require('./services/jobQueue');
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Shekhar Bandhu CRM Server running on port ${PORT} with WebSockets enabled (bound to 0.0.0.0)`);
-  const { startOverdueTaskChecker } = require('./utils/taskOverdueChecker');
-  startOverdueTaskChecker(io);
-  startWorker();
-});
+let serverStarted = false;
+function startApplication() {
+  if (serverStarted) return;
+  serverStarted = true;
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Shekhar Bandhu CRM Server running on port ${PORT} with WebSockets enabled`);
+    const { startOverdueTaskChecker } = require('./utils/taskOverdueChecker');
+    startOverdueTaskChecker(io);
+    startWorker();
+  });
+}
 
 // Define startup migrations helper
 async function runStartupMigrations() {
@@ -389,11 +397,16 @@ mongoose
   .connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
   .then(async () => {
     console.log('🔌 Connected to MongoDB');
-    const { seedDatabase } = require('./utils/seed');
-    try {
-      await seedDatabase();
-    } catch (seedErr) {
-      console.error('❌ Database seed error:', seedErr.message);
+    // Never auto-seed production. Default/demo credentials and sample records must
+    // never be created merely because a collection is empty.
+    if (!config.isProduction || process.env.ALLOW_PRODUCTION_SEED === 'true') {
+      const { seedDatabase } = require('./utils/seed');
+      try {
+        await seedDatabase();
+      } catch (seedErr) {
+        console.error('❌ Database seed error:', seedErr.message);
+        if (config.isProduction) throw seedErr;
+      }
     }
     const { startOverdueTaskChecker } = require('./utils/taskOverdueChecker');
     startOverdueTaskChecker();
@@ -409,8 +422,12 @@ mongoose
       sendDoctorGreetings().catch(err => console.error('❌ Daily Doctor Greetings Cron Error:', err.message));
     });
     if (process.env.RUN_STARTUP_MIGRATIONS === 'true') {
+      if (config.isProduction) {
+        throw new Error('RUN_STARTUP_MIGRATIONS must not be enabled in production server startup; run migrations as a controlled release step.');
+      }
       runStartupMigrations().catch(err => console.error('❌ Startup migration failed:', err.message));
     }
+    startApplication();
   })
   .catch(err => {
     console.error('❌ Error: MongoDB connection failed!', err.message);

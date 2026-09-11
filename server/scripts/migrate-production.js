@@ -9,6 +9,9 @@ const tenantPlugin = require('../utils/tenantPlugin');
 
 const EXCLUDED = new Set(['User','Firm','UserFirm','RefreshSession','Job','WebhookEvent','RolePermission','Otp','IdempotencyKey']);
 async function main() {
+  if (config.isProduction && process.env.MIGRATION_CONFIRM !== 'YES') {
+    throw new Error('Production migration requires MIGRATION_CONFIRM=YES. Take and verify a backup first.');
+  }
   await mongoose.connect(config.mongoUri);
   let firm = await Firm.findOne().sort({ createdAt: 1 });
   if (!firm) {

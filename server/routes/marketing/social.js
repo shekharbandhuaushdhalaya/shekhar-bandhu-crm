@@ -222,7 +222,7 @@ router.post('/publish', async (req, res) => {
         }
       } else {
         // Fallback for mocked integrations
-        results.push({ platform, status: 'mocked_success', message: `Mocked publish success on ${platform}` });
+        results.push({ platform, status: 'not_connected', message: `No live ${platform} integration is configured; publish was not attempted.` });
       }
     }
 

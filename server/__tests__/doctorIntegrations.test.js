@@ -148,7 +148,7 @@ describe('5 CRM Enhancements Integration Suite', () => {
 
       PharmacopoeiaEntry.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({ verified: true, source: 'manual' }) });
       SystemSettings.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({}) });
-      LineClearance.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
       RetentionSample.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
       Product.find.mockReturnValue({
         select: jest.fn().mockReturnValue({

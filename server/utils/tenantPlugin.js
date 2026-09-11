@@ -24,7 +24,14 @@ module.exports = function tenantPlugin(schema) {
 
   const addTenantFilter = function () {
     const firmId = getFirmId();
-    if (firmId && !this.getQuery().firmId) this.setQuery({ ...this.getQuery(), firmId });
+    if (firmId) {
+      const query = this.getQuery();
+      if (query.firmId && String(query.firmId) !== String(firmId)) {
+        this.setQuery({ _id: { $exists: false }, firmId });
+      } else {
+        this.setQuery({ ...query, firmId });
+      }
+    }
   };
   ['find','findOne','findOneAndUpdate','findOneAndDelete','findOneAndReplace','countDocuments','exists','distinct','deleteMany','updateMany'].forEach(h => schema.pre(h, addTenantFilter));
   schema.pre('aggregate', function () {

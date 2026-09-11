@@ -3,11 +3,12 @@
 ## Before first production start
 1. Provision MongoDB with replica-set/Atlas transactions enabled.
 2. Set all required environment variables from `server/.env.example`.
-3. Deploy the API and verify `/api/health` and `/api/ready`.
-4. Run `node server/scripts/migrate-production.js` once against the production database.
-5. Confirm every business collection has `firmId` and every user has an active `UserFirm` membership.
-6. Verify unique indexes were converted to firm-scoped indexes and run a restore test.
-7. Configure HTTPS, restrictive `ALLOWED_ORIGINS`, backups and restore testing.
+3. Take a verified `mongodump` backup and keep a copy outside the application host.
+4. Run `MIGRATION_CONFIRM=YES node server/scripts/migrate-production.js` once against the production database; do not enable startup migrations.
+5. Deploy the API and verify `/api/health` and `/api/ready`.
+6. Confirm every business collection has `firmId` and every user has an active `UserFirm` membership.
+7. Verify unique indexes were converted to firm-scoped indexes and run a restore test.
+8. Configure HTTPS, restrictive `ALLOWED_ORIGINS`, backups and restore testing.
 
 ## Release gates
 - `npm ci`, lint, unit/integration tests and frontend TypeScript build pass.
@@ -29,3 +30,16 @@ Production secrets are environment/secret-manager first: `JWT_SECRET`, MongoDB U
 
 ## Tenant model
 Business models are tenant-scoped through `firmId`. The server derives the active firm from an authenticated `UserFirm` membership and rejects cross-firm access. Use `X-Firm-Id` only to select a firm the user already belongs to; never trust a client-supplied firm ID by itself.
+
+## Disaster recovery
+- Create backups with `BACKUP_CONFIRM=YES npm run backup:database` from a host with MongoDB Database Tools installed.
+- Store backups in independent storage; do not rely on the application container filesystem.
+- Test restores regularly using `RESTORE_CONFIRM=YES npm run restore:database -- /path/to/archive.gz` against a staging database first.
+- The HTTP `/api/system/backup` and `/api/system/restore` endpoints intentionally do not perform database backup/restore operations.
+
+## Production startup safety
+- Do not set `RUN_STARTUP_MIGRATIONS=true` in production.
+- Do not set `ALLOW_PRODUCTION_SEED=true` during normal deployment.
+- Production seeding, if ever required for an empty environment, requires explicit `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` (12+ chars), `ALLOW_PRODUCTION_SEED=true`, and a controlled release procedure.
+- `ALLOWED_ORIGINS` must contain exact frontend origins; wildcard Vercel/Render origins are not accepted in production.
+- WebSocket authentication accepts the token through the Socket.IO auth payload, not the query string, to avoid token leakage through URLs/logs.
