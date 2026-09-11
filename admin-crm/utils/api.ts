@@ -108,7 +108,7 @@ class ApiClient {
 
   setToken(token: string | null, user?: any) {
     this.authToken = token;
-    this.user = user || null;
+    this.currentUser = user || null;
   }
 
   getAuthToken(): string {
