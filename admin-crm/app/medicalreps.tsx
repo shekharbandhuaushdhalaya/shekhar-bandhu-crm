@@ -201,14 +201,16 @@ export default function MedicalRepsScreen() {
     setCheckInForm({ location: '', startKmReading: 0 });
     setCheckInModal(true);
     const coords = await fetchGpsLocation();
-    if (coords.latitude && coords.longitude) {
+    if (coords.latitude !== undefined && coords.longitude !== undefined) {
+      const lat = coords.latitude;
+      const lng = coords.longitude;
       setCheckInForm(prev => ({
         ...prev,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        location: prev.location ? prev.location : `GPS: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`
+        latitude: lat,
+        longitude: lng,
+        location: prev.location ? prev.location : `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`
       }));
-      showToast(`📍 Live GPS acquired: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`, 'success');
+      showToast(`📍 Live GPS acquired: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
     }
   };
 
@@ -216,21 +218,23 @@ export default function MedicalRepsScreen() {
     setCheckOutForm({ location: '', endKmReading: 0 });
     setCheckOutModal(true);
     const coords = await fetchGpsLocation();
-    if (coords.latitude && coords.longitude) {
+    if (coords.latitude !== undefined && coords.longitude !== undefined) {
+      const lat = coords.latitude;
+      const lng = coords.longitude;
       setCheckOutForm(prev => ({
         ...prev,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        location: prev.location ? prev.location : `GPS: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`
+        latitude: lat,
+        longitude: lng,
+        location: prev.location ? prev.location : `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`
       }));
-      showToast(`📍 Live GPS acquired: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`, 'success');
+      showToast(`📍 Live GPS acquired: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
     }
   };
 
   const handleCheckInSubmit = async () => {
     if (!selectedMrForAttendance) return;
     try {
-      let coords = { latitude: checkInForm.latitude, longitude: checkInForm.longitude };
+      let coords: { latitude?: number; longitude?: number } = { latitude: checkInForm.latitude, longitude: checkInForm.longitude };
       if (!coords.latitude || !coords.longitude) {
         showToast('Capturing GPS location...', 'info');
         coords = await fetchGpsLocation();
@@ -253,7 +257,7 @@ export default function MedicalRepsScreen() {
   const handleCheckOutSubmit = async () => {
     if (!selectedMrForAttendance) return;
     try {
-      let coords = { latitude: checkOutForm.latitude, longitude: checkOutForm.longitude };
+      let coords: { latitude?: number; longitude?: number } = { latitude: checkOutForm.latitude, longitude: checkOutForm.longitude };
       if (!coords.latitude || !coords.longitude) {
         showToast('Capturing GPS location...', 'info');
         coords = await fetchGpsLocation();

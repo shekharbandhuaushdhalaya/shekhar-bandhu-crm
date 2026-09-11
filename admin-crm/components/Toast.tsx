@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/themeContext';
 import { Radius, Spacing, Shadows } from '../constants/theme';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface ToastProps {
   message: string;
@@ -67,6 +67,8 @@ export function Toast({ message, type = 'info', visible, onDismiss }: ToastProps
         return { bg: colors.successLight, text: colors.success, icon: 'checkmark-circle' };
       case 'error':
         return { bg: colors.dangerLight, text: colors.danger, icon: 'alert-circle' };
+      case 'warning':
+        return { bg: colors.warningLight, text: colors.warning, icon: 'warning' };
       default:
         return { bg: colors.infoLight, text: colors.info, icon: 'information-circle' };
     }
@@ -118,7 +120,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Platform.OS === 'web' ? 40 : 60,
     zIndex: 9999,
-    ...Shadows.md,
+    ...Shadows.card,
   },
   nativeOverlay: {
     flex: 1,
