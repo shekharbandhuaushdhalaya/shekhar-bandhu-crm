@@ -1,6 +1,6 @@
 const express = require('express');
 const RolePermission = require('../../models/RolePermission');
-const User = require('../../models/User');
+const UserFirm = require('../../models/UserFirm');
 const { authorize, clearPermissionCache } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
@@ -103,7 +103,7 @@ router.put('/permissions/:role', authorize('rbac:manage'), validate(schemas.rbac
 router.delete('/permissions/:role', authorize('rbac:manage'), async (req, res) => {
   try {
     const { role } = req.params;
-    const BUILTIN_ROLES = ['admin', 'manager', 'agent'];
+    const BUILTIN_ROLES = ['admin', 'manager', 'agent', 'mr'];
     if (BUILTIN_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Cannot delete built-in roles' });
     }
@@ -111,8 +111,8 @@ router.delete('/permissions/:role', authorize('rbac:manage'), async (req, res) =
     if (!config) {
       return res.status(404).json({ error: 'Role not found' });
     }
-    // Reassign users with this role to 'agent'
-    await User.updateMany({ role }, { role: 'agent' });
+    // Reassign only memberships in the active firm. The global User role is a legacy fallback and must not change another firm's access.
+    await UserFirm.updateMany({ firmId: req.user.firmId, role, active: true }, { $set: { role: 'agent' } });
     clearPermissionCache();
     if (req.io) {
       req.io.emit('rbac_updated', { type: 'updated' });
@@ -129,7 +129,7 @@ router.post('/permissions/:role/reset', authorize('rbac:manage'), async (req, re
     const { role } = req.params;
     const defaults = getDefaultPermissionsForRole(role);
     if (!defaults || defaults.length === 0) {
-      return res.status(400).json({ error: `No default permissions defined for role "${role}". Built-in roles: admin, manager, agent` });
+      return res.status(400).json({ error: `No default permissions defined for role "${role}". Built-in roles: admin, manager, agent, mr` });
     }
     let config = await RolePermission.findOne({ role });
     if (!config) {
@@ -150,7 +150,7 @@ router.post('/permissions/:role/reset', authorize('rbac:manage'), async (req, re
 // GET /api/rbac/my-permissions — Get current user's effective permissions
 router.get('/my-permissions', async (req, res) => {
   try {
-    const role = req.user.role;
+    const role = req.user.firmRole || req.user.role;
     const config = await RolePermission.findOne({ role });
     const permissions = config
       ? config.permissions

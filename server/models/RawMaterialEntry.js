@@ -42,7 +42,7 @@ const rawMaterialEntrySchema = new mongoose.Schema({
   qcStatus: { type: String, enum: ['under_test', 'approved', 'rejected'], default: 'under_test' },
 }, { timestamps: true });
 
-rawMaterialEntrySchema.index({ rawMaterialId: 1, batchNo: 1 }, { unique: true });
+rawMaterialEntrySchema.index({ rawMaterialId: 1, warehouseId: 1, batchNo: 1 }, { unique: true });
 rawMaterialEntrySchema.index({ rawMaterialId: 1, warehouseId: 1, expiryDate: 1, createdAt: 1 });
 
 rawMaterialEntrySchema.plugin(tenantPlugin);

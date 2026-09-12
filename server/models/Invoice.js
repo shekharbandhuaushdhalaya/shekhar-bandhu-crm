@@ -10,6 +10,7 @@ const invoiceItemSchema = new mongoose.Schema({
   mrp: { type: Number, default: 0 },
   discountPercent: { type: Number, default: 0 },
   discountAmount: { type: Number, default: 0 },
+  freeQty: { type: Number, default: 0, min: 0 },
   qty: { 
     type: Number, 
     required: true, 
@@ -61,6 +62,7 @@ const invoiceSchema = new mongoose.Schema({
     bankBranch: { type: String }
   },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
   customerName: { type: String, default: '', trim: true },
   supplierName: { type: String, default: '', trim: true },
   partyAddress: { type: String, default: '', trim: true },
@@ -108,6 +110,9 @@ const invoiceSchema = new mongoose.Schema({
   doctorName: { type: String, default: '', trim: true },
   damageReason: { type: String, default: '', trim: true },
   reference: { type: String, default: '', trim: true },
+  paymentTransactionId: { type: String, default: '', trim: true },
+  gatewayOrderId: { type: String, default: '', trim: true },
+  paymentGatewayData: { type: mongoose.Schema.Types.Mixed, default: null },
   sourceDocType: { type: String, default: '', trim: true },
   sourceDocId: { type: mongoose.Schema.Types.ObjectId, refPath: 'sourceDocType' },
   supportingDocuments: [

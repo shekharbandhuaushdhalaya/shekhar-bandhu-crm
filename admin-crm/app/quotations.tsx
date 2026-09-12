@@ -668,23 +668,23 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
             </TouchableOpacity>
           )}
 
-          {/* Convert to Delivery Challan Button */}
+          {/* Convert through the authoritative Sales Order → Sale Challan flow */}
           {!(invoice as any).convertedToChallan && (
             <TouchableOpacity
               style={[styles.printBtn, { marginTop: 10, backgroundColor: colors.purple }]}
               onPress={async () => {
                 try {
                   const res = await api.convertQuotationToChallan(invoice._id);
-                  alert(`Draft Delivery Challan ${res.stockMovement?.docNo || ''} created successfully!`);
+                  alert(`Sales Order ${res.order?.orderNo || ''} and draft Sale Challan ${res.challan?.challanNo || ''} created successfully!`);
                   onDeleted();
                   onClose();
                 } catch (err: any) {
-                  alert(err.message || 'Failed to convert quotation to delivery challan');
+                  alert(err.message || 'Failed to convert quotation to a Sales Order and Sale Challan');
                 }
               }}
             >
               <Ionicons name="cart-outline" size={18} color="#fff" />
-              <Text style={styles.printBtnText}>Convert to Delivery Challan (Draft)</Text>
+              <Text style={styles.printBtnText}>Create Sales Order & Sale Challan</Text>
             </TouchableOpacity>
           )}
 

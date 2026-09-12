@@ -522,13 +522,14 @@ export default function CampaignsScreen() {
               </View>
 
               <View style={styles.feedCardPlatforms}>
-                {post.platforms.map(p => {
-                  const details = {
+                {post.platforms.map((p: string) => {
+                  const platformDetails: Record<string, { name: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }> = {
                     facebook: { name: 'Facebook', icon: 'logo-facebook' as const, color: '#1877f2' },
                     instagram: { name: 'Instagram', icon: 'logo-instagram' as const, color: '#e1306c' },
                     linkedin: { name: 'LinkedIn', icon: 'logo-linkedin' as const, color: '#0a66c2' },
                     whatsapp: { name: 'WhatsApp', icon: 'logo-whatsapp' as const, color: '#25d366' },
-                  }[p] || { name: p, icon: 'globe-outline' as const, color: colors.primary };
+                  };
+                  const details = platformDetails[p] || { name: p, icon: 'globe-outline' as const, color: colors.primary };
 
                   return (
                     <View key={p} style={[styles.feedPlatformBadge, { backgroundColor: details.color + '15' }]}>

@@ -7,6 +7,8 @@ const Product = require('../models/Product');
 const Warehouse = require('../models/Warehouse');
 const InventoryEntry = require('../models/InventoryEntry');
 const Challan = require('../models/Challan');
+const Customer = require('../models/Customer');
+const Order = require('../models/Order');
 const StockLedger = require('../models/StockLedger');
 const { postChallanInventory } = require('../services/challanInventoryService');
 const { runWithTenant } = require('../utils/tenantContext');
@@ -22,11 +24,11 @@ describe('Challan concurrent posting', () => {
   afterAll(async () => {
     await mongoose.disconnect();
     if (replSet) await replSet.stop();
-  }, 60000);
+  });
 
   beforeEach(async () => {
     await mongoose.connection.dropDatabase();
-  }, 60000);
+  });
 
   it('moves stock exactly once when the same Challan is posted concurrently', async () => {
     const firm = await Firm.create({ name: 'Concurrency Firm', active: true });
@@ -47,9 +49,23 @@ describe('Challan concurrent posting', () => {
         batchNo: 'B-001',
         qcStatus: 'approved'
       });
+      const customer = await Customer.create({ name: 'Concurrency Customer' });
+      const order = await Order.create({
+        orderNo: 'SO-CONC-001',
+        customerId: customer._id,
+        name: customer.name,
+        email: 'concurrency@example.test',
+        phone: '-',
+        shippingAddress: '-',
+        items: [{ productId: product._id, name: product.name, qty: 4, price: 10, freeQty: 0, backorderedQty: 4 }],
+        totalAmount: 40,
+        status: 'processing',
+      });
       const challan = await Challan.create({
         challanNo: 'CH-CONC-001',
         challanType: 'sale',
+        salesOrderId: order._id,
+        customerId: customer._id,
         warehouseId: warehouse._id,
         warehouseName: warehouse.name,
         items: [{ productId: product._id, name: product.name, qty: 4, packing: 1, batchNo: 'B-001' }],
@@ -75,5 +91,38 @@ describe('Challan concurrent posting', () => {
       expect(ledgers).toHaveLength(1);
       expect(ledgers[0].qtyBoxes).toBe(-4);
     });
-  }, 60000);
+  });
+
+  it('refuses to post a standalone Sale Challan without a Sales Order', async () => {
+    const firm = await Firm.create({ name: 'Order Invariant Firm', active: true });
+
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const product = await Product.create({ name: 'Invariant Product', sku: 'ORDER-REQ-001', stockLevel: 5 });
+      const warehouse = await Warehouse.create({ name: 'Invariant Warehouse', isDefault: true });
+      await InventoryEntry.create({
+        warehouseId: warehouse._id,
+        warehouseName: warehouse.name,
+        productId: product._id,
+        qtyBoxes: 5,
+        packing: 1,
+        batchNo: 'B-ORDER-REQ',
+        qcStatus: 'approved',
+      });
+      const challan = await Challan.create({
+        challanNo: 'CH-ORDER-REQ-001',
+        challanType: 'sale',
+        warehouseId: warehouse._id,
+        warehouseName: warehouse.name,
+        items: [{ productId: product._id, name: product.name, qty: 1, packing: 1, batchNo: 'B-ORDER-REQ' }],
+        status: 'draft',
+      });
+
+      await expect(postChallanInventory(challan, { createdBy: 'Invariant Test' }))
+        .rejects.toMatchObject({ code: 'SALES_ORDER_REQUIRED' });
+
+      const inventory = await InventoryEntry.findOne({ warehouseId: warehouse._id, productId: product._id }).lean();
+      expect(inventory.qtyBoxes).toBe(5);
+      expect(await StockLedger.countDocuments({ reference: challan.challanNo })).toBe(0);
+    });
+  });
 });

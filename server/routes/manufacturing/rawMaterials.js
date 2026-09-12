@@ -1,6 +1,7 @@
 const express = require('express');
 const RawMaterial = require('../../models/RawMaterial');
 const RawMaterialEntry = require('../../models/RawMaterialEntry');
+const Warehouse = require('../../models/Warehouse');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
@@ -8,8 +9,29 @@ const router = express.Router();
 
 const { getBotanicalInfo, resolveHerbDetails } = require('../../utils/botanicalLookup');
 
+async function resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId } = {}) {
+  if (warehouseId) {
+    const warehouse = await Warehouse.findById(warehouseId);
+    if (!warehouse) { const e = new Error('Warehouse not found'); e.code = 'WAREHOUSE_NOT_FOUND'; throw e; }
+    return warehouse;
+  }
+  if (manufacturingUnitId) {
+    const warehouse = await Warehouse.findOne({ manufacturingUnitId, type: 'manufacturing' });
+    if (!warehouse) { const e = new Error('No manufacturing warehouse is mapped to this manufacturing unit'); e.code = 'MANUFACTURING_WAREHOUSE_NOT_MAPPED'; throw e; }
+    return warehouse;
+  }
+  const manufacturing = await Warehouse.find({ type: 'manufacturing' }).sort({ isDefault: -1, createdAt: 1 }).limit(2);
+  if (manufacturing.length === 1) return manufacturing[0];
+  const defaults = await Warehouse.find({ isDefault: true }).limit(2);
+  if (defaults.length === 1) return defaults[0];
+  const e = new Error('warehouseId is required because the firm has more than one possible raw-material warehouse');
+  e.code = 'WAREHOUSE_REQUIRED';
+  throw e;
+}
+
+
 // GET /api/raw-materials/herb-service/lookup & GET /api/raw-materials/botanical-lookup
-router.get(['/botanical-lookup', '/herb-service/lookup'], async (req, res) => {
+router.get(['/botanical-lookup', '/herb-service/lookup'], authorize('manufacturing:view'), async (req, res) => {
   try {
     const name = req.query.name || req.query.q || req.query.query;
     if (!name) return res.status(400).json({ error: 'Herb name query parameter is required' });
@@ -21,7 +43,7 @@ router.get(['/botanical-lookup', '/herb-service/lookup'], async (req, res) => {
 });
 
 // POST /api/raw-materials/herb-service/resolve — API Service to resolve herb scientific name & metadata
-router.post('/herb-service/resolve', async (req, res) => {
+router.post('/herb-service/resolve', authorize('manufacturing:view'), async (req, res) => {
   try {
     const name = req.body.name || req.body.herbName || req.body.query;
     if (!name) return res.status(400).json({ error: 'Herb name is required in request body' });
@@ -33,7 +55,7 @@ router.post('/herb-service/resolve', async (req, res) => {
 });
 
 // GET /api/raw-materials — List raw materials with optional pagination & filtering
-router.get('/', async (req, res) => {
+router.get('/', authorize('manufacturing:view'), async (req, res) => {
   try {
     const { warehouseId, simple, search, page, limit } = req.query;
     const filter = search ? {
@@ -125,7 +147,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/raw-materials — Create raw material definition
-router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), validate(schemas.rawMaterialSchema), async (req, res) => {
   try {
     const { name, unit, minReorder, category, materialType } = req.body;
     if (!name || !name.trim()) {
@@ -226,7 +248,7 @@ router.post('/', validate(schemas.rawMaterialSchema), async (req, res) => {
 });
 
 // PUT /api/raw-materials/:id — Update raw material definition
-router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('manufacturing:edit'), validate(schemas.rawMaterialSchema.partial()), async (req, res) => {
   try {
     const { name, unit, minReorder, category, materialType } = req.body;
 
@@ -299,7 +321,7 @@ router.put('/:id', validate(schemas.rawMaterialSchema.partial()), async (req, re
 });
 
 // DELETE /api/raw-materials/:id — Delete raw material definition
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('manufacturing:delete'), async (req, res) => {
   try {
     const rawMaterial = await RawMaterial.findById(req.params.id);
     if (!rawMaterial) return res.status(404).json({ error: 'Raw material not found' });
@@ -334,7 +356,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // GET /api/raw-materials/entries — List all raw material stock entries (batches)
-router.get('/entries', async (req, res) => {
+router.get('/entries', authorize('manufacturing:view'), async (req, res) => {
   try {
     const entries = await RawMaterialEntry.find({})
       .populate('rawMaterialId', 'name sku unit category')
@@ -347,7 +369,7 @@ router.get('/entries', async (req, res) => {
 });
 
 // GET /api/raw-materials/expiry-alerts — Get near-expiry raw materials
-router.get('/expiry-alerts', async (req, res) => {
+router.get('/expiry-alerts', authorize('manufacturing:view'), async (req, res) => {
   try {
     const ninetyDays = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
     const alerts = await RawMaterialEntry.find({
@@ -364,9 +386,9 @@ router.get('/expiry-alerts', async (req, res) => {
 });
 
 // POST /api/raw-materials/entries — Inward a batch of raw material (Raw material stock entry)
-router.post('/entries', validate(schemas.rawMaterialEntrySchema), async (req, res) => {
+router.post('/entries', authorize('manufacturing:create'), validate(schemas.rawMaterialEntrySchema), async (req, res) => {
   try {
-    const { rawMaterialId, batchNo, qty, purchaseRate, vendorId, vendorName, expiryDate } = req.body;
+    const { rawMaterialId, batchNo, qty, purchaseRate, vendorId, vendorName, expiryDate, warehouseId, manufacturingUnitId } = req.body;
     if (!rawMaterialId || !batchNo || qty === undefined || purchaseRate === undefined) {
       return res.status(400).json({ error: 'Missing required stock inward fields' });
     }
@@ -382,9 +404,10 @@ router.post('/entries', validate(schemas.rawMaterialEntrySchema), async (req, re
 
     const rm = await RawMaterial.findById(rawMaterialId);
     if (!rm) return res.status(404).json({ error: 'Raw material definition not found' });
+    const warehouse = await resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId });
 
-    // Check if raw material batch already exists to avoid conflict, update if exists or error
-    let entry = await RawMaterialEntry.findOne({ rawMaterialId, batchNo });
+    // Batch identity is warehouse-specific. Never merge stock from different physical locations.
+    let entry = await RawMaterialEntry.findOne({ rawMaterialId, warehouseId: warehouse._id, batchNo: batchNo.trim().toUpperCase() });
     if (entry) {
       // Add to existing quantity
       entry.initialQty = (entry.initialQty || entry.qty || 0) + valQty;
@@ -401,6 +424,9 @@ router.post('/entries', validate(schemas.rawMaterialEntrySchema), async (req, re
         purchaseRate: valRate,
         vendorId: vendorId || null,
         vendorName: vendorName ? vendorName.trim() : '',
+        warehouseId: warehouse._id,
+        warehouseName: warehouse.name,
+        qcStatus: 'under_test',
         expiryDate: expiryDate ? new Date(expiryDate) : null
       });
     }
@@ -410,7 +436,8 @@ router.post('/entries', validate(schemas.rawMaterialEntrySchema), async (req, re
     }
     res.status(201).json(entry);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = ['WAREHOUSE_NOT_FOUND','WAREHOUSE_REQUIRED','MANUFACTURING_WAREHOUSE_NOT_MAPPED'].includes(err.code) ? 400 : 500;
+    res.status(status).json({ error: err.message, code: err.code });
   }
 });
 
@@ -439,7 +466,7 @@ router.patch('/entries/:id/qc-status', authorize('manufacturing:qcApprove'), asy
 });
 
 // POST /api/raw-materials/entries/:id/clean — Record cleaning/pre‑processing loss for a stock entry
-router.post('/entries/:id/clean', validate(schemas.cleaningAdjustmentSchema), async (req, res) => {
+router.post('/entries/:id/clean', authorize('manufacturing:edit'), validate(schemas.cleaningAdjustmentSchema), async (req, res) => {
   try {
     const entryId = req.params.id;
     const { cleanedQty, notes } = req.body;
@@ -476,7 +503,7 @@ router.post('/entries/:id/clean', validate(schemas.cleaningAdjustmentSchema), as
 });
 
 // DELETE /api/raw-materials/entries/:id — Void/Delete a stock entry
-router.delete('/entries/:id', async (req, res) => {
+router.delete('/entries/:id', authorize('manufacturing:delete'), async (req, res) => {
   try {
     const deleted = await RawMaterialEntry.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Stock entry not found' });
@@ -487,7 +514,7 @@ router.delete('/entries/:id', async (req, res) => {
 });
 
 // GET /api/raw-materials/:id/genealogy — Reverse trace: which finished batches used this raw material
-router.get('/:id/genealogy', async (req, res) => {
+router.get('/:id/genealogy', authorize('manufacturing:view'), async (req, res) => {
   try {
     const rawMaterial = await RawMaterial.findById(req.params.id);
     if (!rawMaterial) return res.status(404).json({ error: 'Raw material not found' });
@@ -539,7 +566,7 @@ router.get('/:id/genealogy', async (req, res) => {
 });
 
 // GET /api/raw-materials/purchases — List purchases grouped by purchaseRef
-router.get('/purchases/list', async (req, res) => {
+router.get('/purchases/list', authorize('manufacturing:view'), async (req, res) => {
   try {
     const entries = await RawMaterialEntry.find({ purchaseRef: { $ne: '' } })
       .populate('rawMaterialId', 'name sku unit category')
@@ -572,18 +599,20 @@ router.get('/purchases/list', async (req, res) => {
 });
 
 // POST /api/raw-materials/purchase — Create a bulk purchase (creates RawMaterialEntry records)
-router.post('/purchase', async (req, res) => {
+router.post('/purchase', authorize('manufacturing:create'), async (req, res) => {
   try {
-    const { vendorId, vendorName, date, items } = req.body;
+    const { vendorId, vendorName, date, items, warehouseId, manufacturingUnitId } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'At least one item is required' });
     }
 
-    // Generate purchase reference
+    const warehouse = await resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId });
+
+    // Generate purchase reference atomically for this tenant.
+    const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const count = await RawMaterialEntry.countDocuments({ purchaseRef: { $regex: `^PR-${dateStr}` } });
-    const purchaseRef = `PR-${dateStr}-${String(count + 1).padStart(3, '0')}`;
+    const purchaseRef = await generateAtomicDocumentNumber(`rawMaterialPurchase_${dateStr}`, `PR-${dateStr}-`, 3);
 
     const created = [];
     for (const item of items) {
@@ -600,6 +629,9 @@ router.post('/purchase', async (req, res) => {
         vendorName: vendorName || item.vendorName || '',
         expiryDate: item.expiryDate || undefined,
         purchaseRef,
+        warehouseId: warehouse._id,
+        warehouseName: warehouse.name,
+        qcStatus: 'under_test',
       });
       created.push(entry);
     }
@@ -611,9 +643,9 @@ router.post('/purchase', async (req, res) => {
 });
 
 // POST /api/raw-materials/:id/adjust-stock — Adjust raw material stock level with audit reason
-router.post('/:id/adjust-stock', async (req, res) => {
+router.post('/:id/adjust-stock', authorize('manufacturing:edit'), async (req, res) => {
   try {
-    const { newStockLevel, reason } = req.body;
+    const { newStockLevel, reason, warehouseId, manufacturingUnitId } = req.body;
     if (newStockLevel === undefined || newStockLevel === null) {
       return res.status(400).json({ error: 'New stock level is required' });
     }
@@ -627,9 +659,10 @@ router.post('/:id/adjust-stock', async (req, res) => {
 
     const rm = await RawMaterial.findById(req.params.id);
     if (!rm) return res.status(404).json({ error: 'Raw material not found' });
+    const warehouse = await resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId });
 
-    // Calculate current stock level
-    const entries = await RawMaterialEntry.find({ rawMaterialId: req.params.id });
+    // Adjust one physical warehouse only; never silently rebalance stock across locations.
+    const entries = await RawMaterialEntry.find({ rawMaterialId: req.params.id, warehouseId: warehouse._id });
     const currentStock = entries.reduce((s, e) => s + (e.qty || 0), 0);
     const diff = Number((targetStock - currentStock).toFixed(3));
 
@@ -672,6 +705,9 @@ router.post('/:id/adjust-stock', async (req, res) => {
           qty: diff,
           purchaseRate: 0,
           vendorName: 'Stock Adjustment',
+          warehouseId: warehouse._id,
+          warehouseName: warehouse.name,
+          qcStatus: 'approved',
           cleaningNotes: `Initial adjustment on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`
         });
       }

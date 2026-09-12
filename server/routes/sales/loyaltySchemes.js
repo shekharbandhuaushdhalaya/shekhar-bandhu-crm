@@ -6,17 +6,9 @@ const { authorize } = require('../../middleware/authorize');
 const router = express.Router();
 
 // GET /api/loyalty-schemes — List active loyalty volume pricing tiers
-router.get('/', async (req, res) => {
+router.get('/', authorize('pricing:view'), async (req, res) => {
   try {
     let schemes = await LoyaltyScheme.find({ isActive: true }).sort({ minAnnualPurchaseAmount: 1 }).lean();
-    if (schemes.length === 0) {
-      // Seed default AYUSH distributor loyalty tiers if empty
-      schemes = await LoyaltyScheme.insertMany([
-        { schemeName: 'Silver Distributor Tier', tier: 'silver', minAnnualPurchaseAmount: 100000, discountPercent: 3, bonusRewardPointsPerThousand: 10 },
-        { schemeName: 'Gold Distributor Tier', tier: 'gold', minAnnualPurchaseAmount: 500000, discountPercent: 6, bonusRewardPointsPerThousand: 25 },
-        { schemeName: 'Platinum Super Stockist Tier', tier: 'platinum', minAnnualPurchaseAmount: 1500000, discountPercent: 10, bonusRewardPointsPerThousand: 50 }
-      ]);
-    }
     res.json(schemes);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -24,7 +16,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/loyalty-schemes/evaluate/:customerId — Evaluate customer annual sales for loyalty tier qualification
-router.get('/evaluate/:customerId', async (req, res) => {
+router.get('/evaluate/:customerId', authorize('pricing:view'), async (req, res) => {
   try {
     const customer = await Customer.findById(req.params.customerId).lean();
     if (!customer) return res.status(404).json({ error: 'Customer not found' });

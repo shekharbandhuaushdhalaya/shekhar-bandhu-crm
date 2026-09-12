@@ -11,20 +11,21 @@ async function authenticatePortalCustomer(req, res, next) {
     }
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, config.jwtSecret);
-    const firmId = decoded.firmId || null;
-    if (!decoded || decoded.scope !== 'customer-portal' || !decoded.customerId) {
+    if (!decoded || decoded.scope !== 'customer-portal' || !decoded.customerId || !decoded.firmId) {
       return res.status(401).json({ error: 'Invalid customer portal token scope' });
     }
-    const customer = await Customer.findById(decoded.customerId);
-    if (!customer || customer.portalEnabled === false || (firmId && customer.firmId && String(customer.firmId) !== String(firmId))) {
-      return res.status(401).json({ error: 'Customer portal access disabled or account not found' });
-    }
-
-    const activeFirmId = customer.firmId ? String(customer.firmId) : firmId;
-    return runWithTenant({ firmId: activeFirmId, portal: true }, async () => {
-      req.customer = customer;
-      req.portalFirmId = activeFirmId;
-      return next();
+    return runWithTenant({ firmId: decoded.firmId, portal: true }, async () => {
+      try {
+        const customer = await Customer.findById(decoded.customerId);
+        if (!customer || customer.portalEnabled === false || String(customer.firmId) !== String(decoded.firmId)) {
+          return res.status(401).json({ error: 'Customer portal access disabled or account not found' });
+        }
+        req.customer = customer;
+        req.portalFirmId = decoded.firmId;
+        return next();
+      } catch (_) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid customer context' });
+      }
     });
   } catch (_) {
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });

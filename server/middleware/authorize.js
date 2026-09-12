@@ -5,18 +5,19 @@ const permissionCache = new Map();
 const CACHE_TTL = 60 * 1000;
 let lastCacheClear = Date.now();
 
-async function getRolePermissions(role) {
+async function getRolePermissions(role, firmId = null) {
   const now = Date.now();
   if (now - lastCacheClear > CACHE_TTL) {
     permissionCache.clear();
     lastCacheClear = now;
   }
-  if (permissionCache.has(role)) {
-    return permissionCache.get(role);
+  const key = `${firmId || 'no-firm'}:${role}`;
+  if (permissionCache.has(key)) {
+    return permissionCache.get(key);
   }
   const result = await RolePermission.getEffectivePermissions(role);
   const perms = result.permissions || [];
-  permissionCache.set(role, perms);
+  permissionCache.set(key, perms);
   return perms;
 }
 
@@ -38,7 +39,7 @@ function authorize(...requiredPermissions) {
         return next();
       }
 
-      const rolePermissions = await getRolePermissions(role);
+      const rolePermissions = await getRolePermissions(role, req.user.firmId);
 
       if (rolePermissions.includes('*')) {
         return next();
@@ -67,7 +68,8 @@ function roleAuthorize(...allowedRoles) {
     if (!req.user || !(req.user.firmRole || req.user.role)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    if (allowedRoles.includes(req.user.role)) {
+    const role = req.user.firmRole || req.user.role;
+    if (allowedRoles.includes(role)) {
       return next();
     }
     return res.status(403).json({

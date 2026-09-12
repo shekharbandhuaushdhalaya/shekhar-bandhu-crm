@@ -19,6 +19,7 @@ const quotationItemSchema = new mongoose.Schema({
 
 const quotationSchema = new mongoose.Schema({
   quotationNo: { type: String, required: true, unique: true, trim: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
   customerName: { type: String, default: '', trim: true },
   partyAddress: { type: String, default: '', trim: true },
   shippingAddress: { type: String, default: '', trim: true },
@@ -39,6 +40,12 @@ const quotationSchema = new mongoose.Schema({
   warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse' },
   warehouseName: { type: String, default: '', trim: true },
   isFinalized: { type: Boolean, default: false },
+  convertedToChallan: { type: Boolean, default: false },
+  convertedToOrder: { type: Boolean, default: false },
+  salesOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
+  orderNo: { type: String, default: '' },
+  challanId: { type: mongoose.Schema.Types.ObjectId, ref: 'Challan' },
+  challanNo: { type: String, default: '' },
   convertedToInvoice: { type: Boolean, default: false },
   invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
   invoiceNo: { type: String, default: '' },

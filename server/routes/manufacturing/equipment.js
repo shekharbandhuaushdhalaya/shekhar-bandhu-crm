@@ -3,6 +3,7 @@ const Equipment = require('../../models/Equipment');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
 
@@ -75,7 +76,7 @@ router.post('/:id/calibrate', authorize('manufacturing:edit'), async (req, res) 
       calibratedOn,
       calibratedBy: calibratedBy || req.user?.name || 'QC Inspector',
       nextDue,
-      certificateNo: certificateNo || 'CAL-' + Date.now().toString().slice(-6),
+      certificateNo: certificateNo || await generateAtomicDocumentNumber('calibrationCertificateNo', 'CAL-', 6),
       notes: notes || ''
     });
 

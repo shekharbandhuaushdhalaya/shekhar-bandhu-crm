@@ -4,6 +4,7 @@ const BatchProduction = require('../../models/BatchProduction');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
 
@@ -31,8 +32,7 @@ router.post('/', authorize('manufacturing:edit'), validate(schemas.deviationCapa
     const batch = await BatchProduction.findById(batchId);
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-    const count = await DeviationCapa.countDocuments();
-    const deviationNo = `DEV-${(count + 1).toString().padStart(4, '0')}`;
+    const deviationNo = await generateAtomicDocumentNumber('deviationNo_DEV', 'DEV-', 5);
 
     const dev = await DeviationCapa.create({
       deviationNo,

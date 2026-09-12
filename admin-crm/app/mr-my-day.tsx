@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getApiBaseUrl } from '../utils/api';
-import { authStorage } from '../utils/storage';
+import { api } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { LightColors, Radius, Spacing } from '../constants/theme';
-import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader } from '../components/WorkspacePrimitives';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 
-async function req(path: string) {
-  const token = await authStorage.getItem('vp_crm_token');
-  const r = await fetch(`${getApiBaseUrl()}${path}`, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
-  const b = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(b.error || 'Request failed');
-  return b;
-}
+const req = <T = any,>(path: string) => api.requestJson<T>(path);
 
 const money = (v: unknown) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
 
@@ -26,16 +19,24 @@ export default function MrMyDay() {
   const [coverage, setCoverage] = useState<any>(null);
   const [focus, setFocus] = useState<any[]>([]);
   const [attr, setAttr] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    req('/medical-reps?active=true').then((rows) => {
+  const loadRepresentatives = async () => {
+    setLoading(true); setError('');
+    try {
+      const rows = await req<any[]>('/medical-reps?active=true');
       setMrs(rows);
-      if (rows[0]) load(rows[0]._id);
-    }).catch(() => {});
-  }, []);
+      if (rows[0]) await load(rows[0]._id, true);
+      else setLoading(false);
+    } catch (e: any) { setError(e.message || 'Unable to load representatives'); setLoading(false); }
+  };
+  useEffect(() => { loadRepresentatives(); }, []);
 
-  const load = async (mrId: string) => {
+  const load = async (mrId: string, keepLoading = false) => {
     setId(mrId);
+    setError('');
+    if (!keepLoading) setLoading(true);
     try {
       const [d, c, f, a] = await Promise.all([
         req(`/mr-field/${mrId}/my-day`),
@@ -48,8 +49,8 @@ export default function MrMyDay() {
       setFocus(f);
       setAttr(a);
     } catch (e: any) {
-      Alert.alert('MR My Day', e.message);
-    }
+      setError(e.message || 'Unable to load MR workboard');
+    } finally { setLoading(false); }
   };
 
   const selectedMr = mrs.find((m) => m._id === id);
@@ -86,12 +87,14 @@ export default function MrMyDay() {
         ) : null}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      {loading ? <WorkspaceLoading title="Loading MR workboard…" message="Fetching today’s visits, coverage, focus products and attribution." /> : null}
+      {!loading && error ? <WorkspaceError message={error} onRetry={() => id ? load(id) : loadRepresentatives()} /> : null}
+      {!loading && !error ? <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.metrics}>
           <MetricTile label="Visits today" value={String(summary.visits || summary.calls || 0)} icon="medkit-outline" tone="info" />
           <MetricTile label="Follow-ups" value={String(summary.followups || summary.followUps || 0)} icon="repeat-outline" tone={Number(summary.followups || summary.followUps || 0) ? 'warning' : 'success'} />
           <MetricTile label="Collections" value={String(summary.collections || summary.paymentPromises || 0)} icon="wallet-outline" tone="success" />
-          <MetricTile label="Orders" value={String(summary.orders || 0)} icon="cart-outline" tone="primary" />
+          <MetricTile label="Orders" value={String(summary.pendingOrders || summary.orders || 0)} icon="cart-outline" tone="primary" />
         </View>
 
         {day?.nextVisit ? (
@@ -137,7 +140,7 @@ export default function MrMyDay() {
             <MetricTile label="Field cost" value={money(attr?.fieldCost)} icon="cash-outline" tone="warning" />
           </View>
         </Panel>
-      </ScrollView>
+      </ScrollView> : null}
     </View>
   );
 
@@ -156,7 +159,7 @@ const createStyles = (c: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: c.bg.primary },
   selectorRow: { marginHorizontal: Spacing.lg, marginBottom: Spacing.sm, padding: 10, paddingLeft: 13, borderRadius: Radius.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.bg.card, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   selectorLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  selectorLabel: { fontSize: 12, fontWeight: '750', color: c.text.secondary },
+  selectorLabel: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
   content: { padding: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.md, paddingBottom: 64, maxWidth: 1240, width: '100%', alignSelf: 'center' },
   metrics: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   twoColumn: { flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap', alignItems: 'flex-start' },
@@ -167,7 +170,7 @@ const createStyles = (c: typeof LightColors) => StyleSheet.create({
   muted: { fontSize: 11.5, lineHeight: 17, color: c.text.secondary, marginTop: 2 },
   line: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
   lineIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg.secondary },
-  lineA: { fontSize: 12.5, fontWeight: '750', color: c.text.primary },
+  lineA: { fontSize: 12.5, fontWeight: '700', color: c.text.primary },
   coverageHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   coverageValue: { fontSize: 27, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
   coverageLabel: { fontSize: 11.5, color: c.text.secondary },

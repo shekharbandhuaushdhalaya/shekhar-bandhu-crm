@@ -12,6 +12,7 @@ const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { authenticateJWT } = require('../../middleware/authenticateJWT');
+const { sendWhatsAppNotification } = require('../../utils/whatsappService');
 
 const router = express.Router();
 const config = require('../../src/config');
@@ -37,6 +38,12 @@ const authenticateToken = authenticateJWT;
 router.post('/register', validate(schemas.userSchema), async (req, res) => {
   try {
     const adminExists = await User.exists({ role: 'admin' });
+    if (!adminExists && config.isProduction) {
+      return res.status(403).json({
+        error: 'Public first-admin registration is disabled in production. Use npm run bootstrap:admin with BOOTSTRAP_ADMIN_CONFIRM=YES.',
+        code: 'PRODUCTION_BOOTSTRAP_REQUIRED'
+      });
+    }
     
     if (adminExists) {
       // Authenticate token manually
@@ -53,12 +60,22 @@ router.post('/register', validate(schemas.userSchema), async (req, res) => {
         return res.status(403).json({ error: 'Invalid or expired token' });
       }
       
-      req.user = decoded;
+      if (!decoded.id || !decoded.firmId) {
+        return res.status(403).json({ error: 'A current firm-scoped staff session is required to create users.' });
+      }
+      const [actor, membership] = await Promise.all([
+        User.findById(decoded.id).select('_id name email').lean(),
+        UserFirm.findOne({ userId: decoded.id, firmId: decoded.firmId, active: true }).lean(),
+      ]);
+      if (!actor || !membership) {
+        return res.status(403).json({ error: 'Your firm membership is no longer active.' });
+      }
+      req.user = { ...decoded, firmId: String(membership.firmId), firmRole: membership.role, role: membership.role };
       trackAgentActivity(decoded.id, req);
 
-      // Check role permissions: require 'user:create' or admin role
+      // Check permissions against the actor's current firm membership, never a stale JWT role.
       const { getRolePermissions } = require('../../middleware/authorize');
-      const rolePermissions = await getRolePermissions(req.user.role);
+      const rolePermissions = await getRolePermissions(membership.role, membership.firmId);
       const { hasPermission } = require('../../utils/permissions');
       if (!hasPermission(rolePermissions, 'user:create')) {
         return res.status(403).json({ error: 'Access denied. Required permission: user:create' });
@@ -290,38 +307,33 @@ router.delete('/users/:id', authenticateToken, authorize('user:delete'), async (
   }
 });
 
-// POST /api/auth/whatsapp/send-otp — Generate and send OTP via WhatsApp (Mocked)
+// POST /api/auth/whatsapp/send-otp — Generate and deliver an OTP via configured WhatsApp provider
 router.post('/whatsapp/send-otp', async (req, res) => {
   try {
     const { phone } = req.body;
-    if (!phone) {
-      return res.status(400).json({ error: 'Phone number is required' });
-    }
-
-    // Normalize phone number (keep only digits and + symbol)
+    if (!phone) return res.status(400).json({ error: 'Phone number is required' });
     const cleanPhone = phone.trim().replace(/[^0-9+]/g, '');
-    if (cleanPhone.length < 10) {
-      return res.status(400).json({ error: 'Please enter a valid phone number' });
+    if (cleanPhone.length < 10) return res.status(400).json({ error: 'Please enter a valid phone number' });
+
+    const allowMock = process.env.ALLOW_MOCK_OTP === 'true' || config.isProduction === false;
+    if (config.isProduction && (!config.twilio.accountSid || !config.twilio.authToken || !config.twilio.whatsappNumber)) {
+      return res.status(503).json({ error: 'WhatsApp OTP provider is not configured', code: 'OTP_PROVIDER_NOT_CONFIGURED' });
     }
 
-    // Generate random 6-digit OTP code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = allowMock && process.env.NODE_ENV === 'test'
+      ? '123456'
+      : Math.floor(100000 + Math.random() * 900000).toString();
+    const delivery = await sendWhatsAppNotification(cleanPhone, `Your Shekhar Bandhu Aushadhalaya verification code is ${code}. It expires in 5 minutes.`);
+    if (!delivery?.success || (config.isProduction && delivery.simulated)) {
+      return res.status(503).json({ error: 'Unable to deliver verification code', code: 'OTP_DELIVERY_FAILED' });
+    }
 
-    // Store in OTP database (expires in 5 minutes)
     await Otp.findOneAndUpdate(
       { phone: cleanPhone },
       { code, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
       { upsert: true, new: true }
     );
 
-    // Print OTP code prominently to the server logs
-    console.log('\n==================================================');
-    console.log('[WHATSAPP OTP SIMULATOR]');
-    console.log(`To: ${cleanPhone}`);
-    console.log(`Message: Your Shekhar Bandhu Aushadhalaya verification code is: ${code}`);
-    console.log('==================================================\n');
-
-    // Return the code in response for testing/development simplicity
     res.status(200).json({ message: 'Verification code sent to WhatsApp', ...(config.isProduction ? {} : { devOtp: code }) });
   } catch (err) {
     res.status(500).json({ error: err.message });

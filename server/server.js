@@ -13,6 +13,8 @@ const rateLimit = require('express-rate-limit');
 const requestId = require('./middleware/requestId');
 const { authenticateJWT } = require('./middleware/authenticateJWT');
 const { publicTenant } = require('./middleware/publicTenant');
+const { getFirmId } = require('./utils/tenantContext');
+const UserFirm = require('./models/UserFirm');
 
 // ─── Route imports (grouped by domain) ───
 const { router: authRoutes } = require('./routes/auth/auth');
@@ -21,6 +23,7 @@ const systemRoutes = require('./routes/system/system');
 const rbacRoutes = require('./routes/system/rbac');
 const traceRoutes = require('./routes/system/trace');
 const queryRoutes = require('./routes/system/queries');
+const publicQueryRoutes = require('./routes/public/queries');
 
 const contactRoutes = require('./routes/crm/contacts');
 const doctorRoutes = require('./routes/crm/doctors');
@@ -106,32 +109,49 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-// Socket.io Handshake JWT Authentication Middleware
-io.use((socket, next) => {
-  const token = socket.handshake.auth?.token;
-  if (!token) {
-    return next(new Error('Unauthorized: No authentication token provided'));
-  }
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return next(new Error('Unauthorized: Invalid or expired token'));
+// Socket.io staff authentication + firm isolation.
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error('Unauthorized: No authentication token provided'));
+    const user = jwt.verify(token, JWT_SECRET);
+    // Customer portal tokens use the same signing secret but must never enter staff realtime channels.
+    if (user.scope === 'customer-portal' || !user.id || !user.firmId) {
+      return next(new Error('Unauthorized: Staff token required'));
     }
-    socket.user = user;
-    next();
-  });
+    const membership = await UserFirm.findOne({ userId: user.id, firmId: user.firmId, active: true }).lean();
+    if (!membership) return next(new Error('Unauthorized: Firm membership not found'));
+    socket.user = { ...user, firmRole: membership.role };
+    socket.firmId = String(user.firmId);
+    return next();
+  } catch (_) {
+    return next(new Error('Unauthorized: Invalid or expired token'));
+  }
 });
 
-// Attach socket.io instance to req object
+// Expose a request-scoped emitter. Existing req.io.emit(...) calls are automatically
+// restricted to the active tenant instead of broadcasting to every connected firm.
 app.use((req, res, next) => {
-  req.io = io;
+  req.io = {
+    emit(event, payload) {
+      const firmId = getFirmId() || req.publicFirmId || req.portalFirmId;
+      if (!firmId) return false;
+      io.to(`firm:${String(firmId)}`).emit(event, payload);
+      return true;
+    },
+    toFirm(firmId, event, payload) {
+      if (!firmId) return false;
+      io.to(`firm:${String(firmId)}`).emit(event, payload);
+      return true;
+    },
+  };
   next();
 });
 
 io.on('connection', (socket) => {
-  console.log('⚡ Authenticated client connected via WebSocket:', socket.id, `(User: ${socket.user?.name || socket.user?.id})`);
-  socket.on('disconnect', () => {
-    console.log('🔌 Client disconnected:', socket.id);
-  });
+  socket.join(`firm:${socket.firmId}`);
+  console.log('⚡ Authenticated client connected via WebSocket:', socket.id, `(Firm: ${socket.firmId})`);
+  socket.on('disconnect', () => console.log('🔌 Client disconnected:', socket.id));
 });
 
 // Middleware
@@ -176,9 +196,9 @@ app.get('/api/ready', (req, res) => { const db = mongoose.connection.readyState 
 
 // ─── Public routes (no auth) ───
 app.use('/api/public/products', publicTenant, publicProductRoutes);
-app.use('/api/public/queries', publicTenant, queryRoutes);
+app.use('/api/public/queries', publicTenant, publicQueryRoutes);
 app.use('/api/public/orders', publicTenant, publicOrderRoutes);
-app.use('/api/orders', publicTenant, publicOrderRoutes); // also at /api/orders/public/* for website compat
+app.use('/api/orders/public', publicTenant, publicOrderRoutes); // compatibility alias; never intercepts internal /api/orders
 
 // Rate limiter for auth routes (stricter: 20 req/min)
 const authLimiter = rateLimit({
@@ -231,8 +251,10 @@ app.use('/api/sales-targets', authenticateJWT, salesTargetRoutes);
 app.use('/api/dispatches', authenticateJWT, dispatchRoutes);
 app.use('/api/parties', authenticateJWT, partiesRoutes);
 app.use('/api/trace', authenticateJWT, traceRoutes);
-app.use('/api/payments/gateway', authenticateJWT, paymentGatewayRoutes);
-app.use('/api/payments/gateway/webhook', paymentGatewayRoutes);
+app.use('/api/payments/gateway', (req, res, next) => {
+  if (req.path === '/webhook') return next();
+  return authenticateJWT(req, res, next);
+}, paymentGatewayRoutes);
 app.use('/api/rbac', authenticateJWT, rbacRoutes);
 app.use('/api/medical-reps', authenticateJWT, medicalRepRoutes);
 app.use('/api/mr-field', authenticateJWT, mrFieldIntelligenceRoutes);
@@ -240,7 +262,7 @@ app.use('/api/mr-sample-stock', authenticateJWT, medicalRepRoutes);
 app.use('/api/mr-tour-plans', authenticateJWT, medicalRepRoutes);
 app.use('/api/campaigns', authenticateJWT, campaignRoutes);
 app.use('/api/social', (req, res, next) => {
-  if (req.path === '/callback' || req.path === '/auth-url') {
+  if (req.path === '/callback') {
     return next();
   }
   return authenticateJWT(req, res, next);
@@ -422,8 +444,6 @@ mongoose
         if (config.isProduction) throw seedErr;
       }
     }
-    const { startOverdueTaskChecker } = require('./utils/taskOverdueChecker');
-    startOverdueTaskChecker();
     const { checkExpiriesAndReorders } = require('./utils/expiryAlertChecker');
     checkExpiriesAndReorders();
     setInterval(() => checkExpiriesAndReorders(), 6 * 60 * 60 * 1000);

@@ -1,4 +1,5 @@
 const express = require('express');
+const { authorize } = require('../../middleware/authorize');
 const router = express.Router();
 const SalesTarget = require('../../models/SalesTarget');
 const Invoice = require('../../models/Invoice');
@@ -7,7 +8,7 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
 // GET all targets (optionally filtered by month/year)
-router.get('/', async (req, res) => {
+router.get('/', authorize('report:view'), async (req, res) => {
   try {
     const { month, year } = req.query;
     const filter = {};
@@ -21,7 +22,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET commission report — aggregates sales by agentName from invoices
-router.get('/commission', async (req, res) => {
+router.get('/commission', authorize('report:view'), async (req, res) => {
   try {
     const { month, year, commissionRate } = req.query;
     const rate = parseFloat(commissionRate) || 5; // default 5%
@@ -59,7 +60,7 @@ router.get('/commission', async (req, res) => {
 });
 
 // POST set/update target (upsert)
-router.post('/', validate(schemas.salesTargetSchema), async (req, res) => {
+router.post('/', authorize('settings:edit'), validate(schemas.salesTargetSchema), async (req, res) => {
   try {
     const { agentId, agentName, month, year, targetAmount, notes } = req.body;
     const target = await SalesTarget.findOneAndUpdate(
@@ -77,7 +78,7 @@ router.post('/', validate(schemas.salesTargetSchema), async (req, res) => {
 });
 
 // DELETE
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('settings:edit'), async (req, res) => {
   try {
     await SalesTarget.findByIdAndDelete(req.params.id);
     if (req.io) {

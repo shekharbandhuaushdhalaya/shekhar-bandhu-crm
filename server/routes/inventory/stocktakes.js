@@ -4,6 +4,8 @@ const InventoryEntry = require('../../models/InventoryEntry');
 const Product = require('../../models/Product');
 const StockLedger = require('../../models/StockLedger');
 const { authorize } = require('../../middleware/authorize');
+const { withTransaction } = require('../../utils/withTransaction');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
 
@@ -30,7 +32,7 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
     }
 
     const fy = new Date().getFullYear() % 100 + '-' + (new Date().getFullYear() + 1) % 100;
-    const stocktakeNo = `STK/${fy}/${Math.floor(1000 + Math.random() * 9000)}`;
+    const stocktakeNo = await generateAtomicDocumentNumber(`stocktakeNo_${fy}`, `STK/${fy}/`, 5);
 
     let totalVarianceBoxes = 0;
     const processedItems = items.map(it => {
@@ -67,59 +69,69 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
   }
 });
 
-// PATCH /api/stocktakes/:id/complete — Complete stocktake & adjust physical inventory
+// PATCH /api/stocktakes/:id/complete — Complete stocktake atomically.
+// The count can only post if stock has not moved since the expected quantity snapshot;
+// otherwise the operator must refresh/recount instead of overwriting newer movements.
 router.patch('/:id/complete', authorize('inventory:edit'), async (req, res) => {
   try {
-    const stocktake = await Stocktake.findById(req.params.id);
-    if (!stocktake) return res.status(404).json({ error: 'Stocktake run not found' });
+    const completed = await withTransaction(async session => {
+      const stocktake = await Stocktake.findById(req.params.id).session(session);
+      if (!stocktake) throw Object.assign(new Error('Stocktake run not found'), { status: 404, code: 'STOCKTAKE_NOT_FOUND' });
+      if (stocktake.status === 'completed') throw Object.assign(new Error('Stocktake is already completed'), { status: 409, code: 'STOCKTAKE_ALREADY_COMPLETED' });
 
-    if (stocktake.status === 'completed') {
-      return res.status(400).json({ error: 'Stocktake is already completed' });
-    }
+      for (let idx = 0; idx < (stocktake.items || []).length; idx += 1) {
+        const item = stocktake.items[idx];
+        const expectedQty = Number(item.expectedQty || 0);
+        const countedQty = Number(item.countedQty || 0);
+        const varianceQty = countedQty - expectedQty;
+        if (countedQty < 0) throw Object.assign(new Error(`Counted quantity cannot be negative for ${item.productName || 'item'}`), { status: 400, code: 'INVALID_COUNT' });
+        if (Math.abs(varianceQty) < 0.0001) continue;
 
-    for (const item of stocktake.items) {
-      if (item.varianceQty !== 0) {
-        // Adjust product stockLevel
-        const product = await Product.findById(item.productId);
-        if (product) {
-          product.stockLevel = Math.max(0, product.stockLevel + item.varianceQty);
-          await product.save();
-        }
-
-        // Adjust InventoryEntry if present
         const entryQuery = { warehouseId: stocktake.warehouseId, productId: item.productId };
         if (item.batchNo) entryQuery.batchNo = item.batchNo;
-        let entry = await InventoryEntry.findOne(entryQuery);
-        if (entry) {
-          entry.qtyBoxes = Math.max(0, entry.qtyBoxes + item.varianceQty);
-          await entry.save();
+        const matches = await InventoryEntry.find(entryQuery).session(session);
+        if (matches.length > 1) throw Object.assign(new Error(`Multiple inventory slots match ${item.productName || 'item'}${item.batchNo ? ` batch ${item.batchNo}` : ''}; stocktake requires an exact slot.`), { status: 409, code: 'STOCKTAKE_SLOT_AMBIGUOUS' });
+        let entry = matches[0] || null;
+        const currentQty = Number(entry?.qtyBoxes || 0);
+        if (Math.abs(currentQty - expectedQty) > 0.0001) throw Object.assign(new Error(`Stock changed after the count started for ${item.productName || 'item'}. Expected ${expectedQty}, current ${currentQty}; refresh and recount.`), { status: 409, code: 'STOCKTAKE_CONCURRENT_MOVEMENT' });
+
+        const product = await Product.findById(item.productId).session(session);
+        if (!product) throw Object.assign(new Error(`Product not found: ${item.productName || item.productId}`), { status: 404, code: 'PRODUCT_NOT_FOUND' });
+        const nextAggregate = Number(product.stockLevel || 0) + varianceQty;
+        if (nextAggregate < -0.0001) throw Object.assign(new Error(`Aggregate stock would become negative for ${item.productName || product.name}`), { status: 409, code: 'AGGREGATE_STOCK_MISMATCH' });
+
+        if (!entry) {
+          entry = new InventoryEntry({
+            warehouseId: stocktake.warehouseId, warehouseName: stocktake.warehouseName,
+            productId: product._id, productType: product.productType || '', size: product.size || '',
+            colour: product.colour || '', shape: product.shape || '', weight: product.weight || '',
+            hsnCode: product.hsnCode || '', vendorId: '', vendorName: '', packing: 1,
+            batchNo: item.batchNo || '', qcStatus: 'approved', qtyBoxes: 0,
+          });
         }
+        entry.qtyBoxes = countedQty;
+        await entry.save({ session });
+        product.stockLevel = Math.max(0, nextAggregate);
+        await product.save({ session });
 
-        // Write StockLedger adjustment entry
-        await StockLedger.create({
-          productId: item.productId,
-          warehouseId: stocktake.warehouseId,
-          warehouseName: stocktake.warehouseName,
-          type: item.varianceQty > 0 ? 'IN' : 'OUT',
-          qtyBoxes: item.varianceQty,
-          balanceBoxes: entry ? entry.qtyBoxes : Math.max(0, item.countedQty),
-          reference: stocktake.stocktakeNo,
-          note: `Cycle count variance adjustment (${item.varianceQty > 0 ? '+' : ''}${item.varianceQty} boxes)`,
-          createdBy: req.user ? req.user.name : 'Stock Counter',
-          batchNo: item.batchNo || ''
-        });
+        await StockLedger.create([{
+          productId: item.productId, warehouseId: stocktake.warehouseId, warehouseName: stocktake.warehouseName,
+          type: varianceQty > 0 ? 'IN' : 'OUT', qtyBoxes: varianceQty, balanceBoxes: countedQty,
+          reference: stocktake.stocktakeNo, movementKey: `stocktake:${stocktake._id}:${idx}`,
+          note: `Cycle count variance adjustment (${varianceQty > 0 ? '+' : ''}${varianceQty} boxes)`,
+          createdBy: req.user ? req.user.name : 'Stock Counter', batchNo: item.batchNo || '',
+        }], { session });
       }
-    }
 
-    stocktake.status = 'completed';
-    await stocktake.save();
-
-    res.json({
-      message: `Stocktake ${stocktake.stocktakeNo} completed and inventory levels adjusted successfully`,
-      stocktake
+      stocktake.status = 'completed';
+      stocktake.completedAt = new Date();
+      await stocktake.save({ session });
+      return stocktake;
     });
+    if (req.io) req.io.emit('inventory_updated', { type: 'stocktake_completed', stocktakeId: completed._id });
+    res.json({ message: `Stocktake ${completed.stocktakeNo} completed and inventory levels adjusted successfully`, stocktake: completed });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'STOCKTAKE_COMPLETE_FAILED' });
   }
 });
 

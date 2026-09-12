@@ -7,9 +7,10 @@ const StockLedger = require('../../models/StockLedger');
 const Customer = require('../../models/Customer');
 const Vendor = require('../../models/Vendor');
 const { authorize } = require('../../middleware/authorize');
+const { withTransaction } = require('../../utils/withTransaction');
 
 // GET /api/inventory/compliance/near-expiry — Get batches expiring soon (default 90 days)
-router.get('/near-expiry', async (req, res) => {
+router.get('/near-expiry', authorize('inventory:view'), async (req, res) => {
   try {
     const days = parseInt(req.query.days, 10) || 90;
     const thresholdDate = new Date();
@@ -27,7 +28,7 @@ router.get('/near-expiry', async (req, res) => {
 });
 
 // GET /api/inventory/compliance/license-alerts — Get customers/vendors with expiring licenses (default 60 days)
-router.get('/license-alerts', async (req, res) => {
+router.get('/license-alerts', authorize('inventory:view'), async (req, res) => {
   try {
     const days = parseInt(req.query.days, 10) || 60;
     const thresholdDate = new Date();
@@ -67,75 +68,39 @@ router.get('/license-alerts', async (req, res) => {
 });
 
 // POST /api/inventory/compliance/write-off — Write off expired or damaged stock
-router.post('/write-off', async (req, res) => {
+router.post('/write-off', authorize('inventory:edit'), async (req, res) => {
   try {
-    const { productId, warehouseId, qtyBoxes, packing, batchNo, reason } = req.body;
-    const qty = parseFloat(qtyBoxes);
+    const { productId, warehouseId, packing, batchNo, reason } = req.body;
+    const qty = Number(req.body.qtyBoxes);
+    if (!productId || !warehouseId || !(qty > 0)) return res.status(400).json({ error: 'productId, warehouseId, and positive qtyBoxes are required' });
 
-    if (!productId || !warehouseId || isNaN(qty) || qty <= 0) {
-      return res.status(400).json({ error: 'productId, warehouseId, and positive qtyBoxes are required' });
-    }
-
-    const [product, warehouse] = await Promise.all([
-      Product.findById(productId),
-      Warehouse.findById(warehouseId)
-    ]);
-
-    if (!product) return res.status(404).json({ error: 'Product not found' });
-    if (!warehouse) return res.status(404).json({ error: 'Warehouse not found' });
-
-    // Find exact inventory slot
-    const entry = await InventoryEntry.findOne({
-      productId,
-      warehouseId,
-      packing: parseInt(packing, 10) || 1,
-      batchNo: (batchNo || '').trim()
+    const posted = await withTransaction(async (session) => {
+      const [product, warehouse] = await Promise.all([Product.findById(productId).session(session), Warehouse.findById(warehouseId).session(session)]);
+      if (!product) throw Object.assign(new Error('Product not found'), { code: 'PRODUCT_NOT_FOUND' });
+      if (!warehouse) throw Object.assign(new Error('Warehouse not found'), { code: 'WAREHOUSE_NOT_FOUND' });
+      const query = { productId, warehouseId, packing: Number(packing) || 1, batchNo: String(batchNo || '').trim() };
+      const entry = await InventoryEntry.findOne({ ...query, qtyBoxes: { $gte: qty } }).session(session);
+      if (!entry) throw Object.assign(new Error('Insufficient stock in the specified batch/QC slot'), { code: 'INSUFFICIENT_STOCK' });
+      entry.qtyBoxes -= qty;
+      await entry.save({ session });
+      const aggregate = await Product.updateOne({ _id: productId, stockLevel: { $gte: qty } }, { $inc: { stockLevel: -qty } }, { session });
+      if (!aggregate.modifiedCount) throw Object.assign(new Error('Aggregate stock does not match warehouse stock. Run reconciliation before write-off.'), { code: 'AGGREGATE_STOCK_MISMATCH' });
+      const [ledger] = await StockLedger.create([{
+        productId, warehouseId, warehouseName: warehouse.name, type: 'OUT', qtyBoxes: -qty, balanceBoxes: entry.qtyBoxes,
+        reference: 'WRITE-OFF', movementKey: `writeoff:${entry._id}:${Date.now()}`, note: `Damaged Goods Write-off: ${reason || 'Expired/Damaged stock discard'}`,
+        createdBy: req.user?.name || 'System', packing: entry.packing, batchNo: entry.batchNo || '',
+      }], { session });
+      return { entry, ledger };
     });
-
-    if (!entry || entry.qtyBoxes < qty) {
-      return res.status(400).json({ error: 'Insufficient stock in the specified batch slot' });
-    }
-
-    // Deduct stock
-    entry.qtyBoxes = Math.max(0, entry.qtyBoxes - qty);
-    await entry.save();
-
-    // Deduct overall Product stock level
-    product.stockLevel = Math.max(0, product.stockLevel - qty);
-    await product.save();
-
-    // Log to Stock Ledger
-    const note = `Damaged Goods Write-off: ${reason || 'Expired/Damaged stock discard'}`;
-    const ledger = await StockLedger.create({
-      productId,
-      warehouseId,
-      warehouseName: warehouse.name,
-      type: 'OUT',
-      qtyBoxes: -qty,
-      balanceBoxes: entry.qtyBoxes,
-      reference: 'WRITE-OFF',
-      note,
-      createdBy: req.user ? req.user.name : 'System',
-      packing: entry.packing,
-      batchNo: entry.batchNo || '',
-    });
-
-    if (req.io) {
-      req.io.emit('inventory_updated', { type: 'write_off', productId, warehouseId });
-      req.io.emit('compliance_updated', { type: 'write_off', productId });
-    }
-    res.status(200).json({
-      message: 'Stock successfully written off',
-      inventoryEntry: entry,
-      ledgerEntry: ledger
-    });
+    if (req.io) { req.io.emit('inventory_updated', { type: 'write_off', productId, warehouseId }); req.io.emit('compliance_updated', { type: 'write_off', productId }); }
+    res.status(200).json({ message: 'Stock successfully written off', inventoryEntry: posted.entry, ledgerEntry: posted.ledger });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(['PRODUCT_NOT_FOUND','WAREHOUSE_NOT_FOUND'].includes(err.code) ? 404 : 409).json({ error: err.message, code: err.code || 'WRITE_OFF_FAILED' });
   }
 });
 
 // GET /api/inventory/compliance/low-stock — Get products running below minimum reorder levels
-router.get('/low-stock', async (req, res) => {
+router.get('/low-stock', authorize('inventory:view'), async (req, res) => {
   try {
     const products = await Product.find({
       $expr: { $lte: ['$stockLevel', '$minReorder'] }

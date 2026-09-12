@@ -1,16 +1,18 @@
 const express = require('express');
+const { authorize } = require('../../middleware/authorize');
 const InventoryEntry = require('../../models/InventoryEntry');
 const StockLedger = require('../../models/StockLedger');
 const Product = require('../../models/Product');
 const Warehouse = require('../../models/Warehouse');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { withTransaction } = require('../../utils/withTransaction');
 
 const router = express.Router();
 
 // GET /api/inventory-entries?warehouseId=&search=
 // Returns all entries, optionally filtered by warehouse
-router.get('/', async (req, res) => {
+router.get('/', authorize('inventory:view'), async (req, res) => {
   try {
     const { warehouseId, search, showZero } = req.query;
     const filter = {};
@@ -37,7 +39,7 @@ router.get('/', async (req, res) => {
 
 // GET /api/inventory-entries/consolidated?search=
 // Returns one row per (product + vendor + packing) configuration summed across all warehouses
-router.get('/consolidated', async (req, res) => {
+router.get('/consolidated', authorize('inventory:view'), async (req, res) => {
   try {
     const { search, showZero } = req.query;
     const matchStage = {}; // By default include everything, frontend handles the zero filter or we can apply it conditionally
@@ -95,158 +97,89 @@ router.get('/consolidated', async (req, res) => {
   }
 });
 
-// POST /api/inventory-entries — Add/update stock entry (IN movement)
-// A unique stock slot is defined by (warehouseId + productId + vendorId + packing).
-// Same product from a different vendor always creates a separate row.
-router.post('/', validate(schemas.inventoryEntrySchema), async (req, res) => {
+// POST /api/inventory-entries — Manual stock receipt. Inventory slot, aggregate stock and ledger post atomically.
+router.post('/', authorize('inventory:create'), validate(schemas.inventoryEntrySchema), async (req, res) => {
   try {
-    const { warehouseId, productId, note, reference, createdBy, vendorId, vendorName, batchNo, mfgDate, expiryDate } = req.body;
-    const qtyBoxes = parseFloat(req.body.qtyBoxes);
-    const packing  = parseInt(req.body.packing) || 0;
+    const result = await withTransaction(async (session) => {
+      const { warehouseId, productId, note, reference, createdBy, vendorId, vendorName, batchNo, mfgDate, expiryDate } = req.body;
+      const qtyBoxes = Number(req.body.qtyBoxes);
+      const packing = Number(req.body.packing) || 1;
+      const qcStatus = req.body.qcStatus || 'under_test';
+      if (!warehouseId || !productId || !(qtyBoxes > 0)) throw Object.assign(new Error('warehouseId, productId and positive qtyBoxes are required'), { code: 'INVALID_STOCK_RECEIPT' });
 
-    if (!warehouseId || !productId) {
-      return res.status(400).json({ error: 'warehouseId and productId are required' });
-    }
-    if (isNaN(qtyBoxes) || qtyBoxes <= 0) {
-      return res.status(400).json({ error: 'qtyBoxes must be a positive number' });
-    }
+      const [warehouse, product] = await Promise.all([
+        Warehouse.findById(warehouseId).session(session), Product.findById(productId).session(session),
+      ]);
+      if (!warehouse) throw Object.assign(new Error('Warehouse not found'), { code: 'WAREHOUSE_NOT_FOUND' });
+      if (!product) throw Object.assign(new Error('Product not found'), { code: 'PRODUCT_NOT_FOUND' });
 
-    const [warehouse, product] = await Promise.all([
-      Warehouse.findById(warehouseId),
-      Product.findById(productId),
-    ]);
-
-    if (!warehouse) return res.status(404).json({ error: 'Warehouse not found' });
-    if (!product)   return res.status(404).json({ error: 'Product not found' });
-
-    // Resolve the vendor for this batch
-    const resolvedVendorId   = vendorId   || product.vendorId   || '';
-    const resolvedVendorName = vendorName || product.vendorName || '';
-    const resolvedBatchNo    = (batchNo || '').trim();
-
-    // Find the slot that matches all five dimensions:
-    // warehouseId + productId + vendorId + packing + batchNo
-    let entry = await InventoryEntry.findOne({
-      warehouseId,
-      productId,
-      vendorId: resolvedVendorId,
-      packing,
-      batchNo: resolvedBatchNo,
-    });
-
-    if (entry) {
-      // Increment
-      entry.qtyBoxes += qtyBoxes;
+      const resolvedVendorId = vendorId || product.vendorId || '';
+      const resolvedVendorName = vendorName || product.vendorName || '';
+      const resolvedBatchNo = String(batchNo || '').trim();
+      let entry = await InventoryEntry.findOne({ warehouseId, productId, vendorId: resolvedVendorId, packing, batchNo: resolvedBatchNo, qcStatus }).session(session);
+      if (!entry) entry = new InventoryEntry({
+        warehouseId, warehouseName: warehouse.name, productId,
+        productType: product.productType || '', size: product.size || '', colour: product.colour || '', shape: product.shape || '', weight: product.weight || '', hsnCode: product.hsnCode || '',
+        vendorId: resolvedVendorId, vendorName: resolvedVendorName, qtyBoxes: 0, packing, batchNo: resolvedBatchNo,
+        mfgDate: mfgDate ? new Date(mfgDate) : undefined, expiryDate: expiryDate ? new Date(expiryDate) : undefined, qcStatus,
+      });
+      entry.qtyBoxes = Number(entry.qtyBoxes || 0) + qtyBoxes;
       if (mfgDate) entry.mfgDate = new Date(mfgDate);
       if (expiryDate) entry.expiryDate = new Date(expiryDate);
-    } else {
-      entry = new InventoryEntry({
-        warehouseId,
-        warehouseName: warehouse.name,
-        productId,
-        productType: product.productType || '',
-        size:        product.size        || '',
-        colour:      product.colour      || '',
-        shape:       product.shape       || '',
-        weight:      product.weight      || '',
-        hsnCode:     product.hsnCode     || '',
-        vendorId:    resolvedVendorId,
-        vendorName:  resolvedVendorName,
-        qtyBoxes,
-        packing,
-        batchNo:     resolvedBatchNo,
-        mfgDate:     mfgDate ? new Date(mfgDate) : undefined,
-        expiryDate:  expiryDate ? new Date(expiryDate) : undefined,
-      });
-    }
-    await entry.save();
-
-    // Record stock ledger entry
-    await StockLedger.create({
-      productId,
-      warehouseId,
-      warehouseName: warehouse.name,
-      type: 'IN',
-      qtyBoxes,
-      balanceBoxes: entry.qtyBoxes,
-      reference: reference || '',
-      note:      note      || '',
-      createdBy: createdBy || '',
-      packing,
-      vendorId:   resolvedVendorId,
-      vendorName: resolvedVendorName,
-      batchNo:    resolvedBatchNo,
-      mfgDate:    entry.mfgDate,
-      expiryDate: entry.expiryDate,
-      createdAt: req.body.createdAt ? new Date(req.body.createdAt) : undefined,
+      await entry.save({ session });
+      await Product.updateOne({ _id: productId }, { $inc: { stockLevel: qtyBoxes } }, { session });
+      await StockLedger.create([{
+        productId, warehouseId, warehouseName: warehouse.name, type: 'IN', qtyBoxes, balanceBoxes: entry.qtyBoxes,
+        reference: reference || '', note: note || 'Manual stock receipt', createdBy: createdBy || req.user?.name || '', packing,
+        vendorId: resolvedVendorId, vendorName: resolvedVendorName, batchNo: resolvedBatchNo, mfgDate: entry.mfgDate, expiryDate: entry.expiryDate,
+        createdAt: req.body.createdAt ? new Date(req.body.createdAt) : undefined,
+      }], { session });
+      return entry;
     });
-
-    if (req.io) {
-      req.io.emit('inventory_updated', { type: 'entry_created', id: entry._id, productId });
-    }
-    res.status(201).json(entry);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+    if (req.io) req.io.emit('inventory_updated', { type: 'entry_created', id: result._id, productId: result.productId });
+    res.status(201).json(result);
+  } catch (err) { res.status(['WAREHOUSE_NOT_FOUND','PRODUCT_NOT_FOUND'].includes(err.code) ? 404 : 400).json({ error: err.message, code: err.code }); }
 });
 
-// PUT /api/inventory-entries/:id — Adjust stock (IN / OUT / ADJUSTMENT)
-router.put('/:id', validate(schemas.inventoryEntrySchema.partial()), async (req, res) => {
+// PUT /api/inventory-entries/:id — Manual adjustment. Slot, aggregate stock and ledger post atomically.
+router.put('/:id', authorize('inventory:edit'), validate(schemas.inventoryEntrySchema.partial()), async (req, res) => {
   try {
-    const { type, note, reference, createdBy, createdAt } = req.body;
-    const entry = await InventoryEntry.findById(req.params.id);
-    if (!entry) return res.status(404).json({ error: 'Inventory entry not found' });
-
-    const oldBalance = entry.qtyBoxes;
-    const movementType = type || 'ADJUSTMENT';
-    const movement = parseFloat(req.body.qtyBoxes);
-    if (isNaN(movement)) return res.status(400).json({ error: 'Invalid qtyBoxes' });
-
-    let qtyChangeForLedger = 0;
-
-    if (movementType === 'OUT') {
-      if (entry.qtyBoxes < movement) return res.status(400).json({ error: 'Insufficient stock' });
-      entry.qtyBoxes -= movement;
-      qtyChangeForLedger = -movement;
-    } else if (movementType === 'IN') {
-      entry.qtyBoxes += movement;
-      qtyChangeForLedger = movement;
-    } else {
-      // ADJUSTMENT: set absolute value
-      entry.qtyBoxes = movement;
-      qtyChangeForLedger = movement - oldBalance;
-    }
-
-    await entry.save();
-
-    // Record ledger
-    await StockLedger.create({
-      productId:     entry.productId,
-      warehouseId:   entry.warehouseId,
-      warehouseName: entry.warehouseName,
-      type:          movementType,
-      qtyBoxes:      qtyChangeForLedger,
-      balanceBoxes:  entry.qtyBoxes,
-      reference:     reference || '',
-      note:          note      || '',
-      createdBy:     createdBy || '',
-      packing:       entry.packing,
-      vendorId:      entry.vendorId   || '',
-      vendorName:    entry.vendorName || '',
-      createdAt:     createdAt ? new Date(createdAt) : undefined,
+    const result = await withTransaction(async (session) => {
+      const { type, note, reference, createdBy, createdAt } = req.body;
+      const entry = await InventoryEntry.findById(req.params.id).session(session);
+      if (!entry) throw Object.assign(new Error('Inventory entry not found'), { code: 'INVENTORY_ENTRY_NOT_FOUND' });
+      const oldBalance = Number(entry.qtyBoxes || 0);
+      const movementType = type || 'ADJUSTMENT';
+      const movement = Number(req.body.qtyBoxes);
+      if (!Number.isFinite(movement) || movement < 0) throw Object.assign(new Error('qtyBoxes must be a non-negative number'), { code: 'INVALID_QUANTITY' });
+      let newBalance;
+      if (movementType === 'OUT') {
+        if (oldBalance < movement) throw Object.assign(new Error('Insufficient stock'), { code: 'INSUFFICIENT_STOCK' });
+        newBalance = oldBalance - movement;
+      } else if (movementType === 'IN') newBalance = oldBalance + movement;
+      else newBalance = movement;
+      const delta = newBalance - oldBalance;
+      entry.qtyBoxes = newBalance;
+      await entry.save({ session });
+      if (delta < 0) {
+        const update = await Product.updateOne({ _id: entry.productId, stockLevel: { $gte: -delta } }, { $inc: { stockLevel: delta } }, { session });
+        if (!update.modifiedCount) throw Object.assign(new Error('Aggregate product stock is lower than this adjustment. Run inventory reconciliation before retrying.'), { code: 'AGGREGATE_STOCK_MISMATCH' });
+      } else if (delta > 0) await Product.updateOne({ _id: entry.productId }, { $inc: { stockLevel: delta } }, { session });
+      await StockLedger.create([{
+        productId: entry.productId, warehouseId: entry.warehouseId, warehouseName: entry.warehouseName, type: movementType,
+        qtyBoxes: delta, balanceBoxes: newBalance, reference: reference || '', note: note || 'Manual stock adjustment',
+        createdBy: createdBy || req.user?.name || '', packing: entry.packing, vendorId: entry.vendorId || '', vendorName: entry.vendorName || '', batchNo: entry.batchNo || '',
+        createdAt: createdAt ? new Date(createdAt) : undefined,
+      }], { session });
+      return entry;
     });
-
-    if (req.io) {
-      req.io.emit('inventory_updated', { type: 'entry_adjusted', id: entry._id, movementType });
-    }
-    res.json(entry);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+    if (req.io) req.io.emit('inventory_updated', { type: 'entry_adjusted', id: result._id });
+    res.json(result);
+  } catch (err) { res.status(err.code === 'INVENTORY_ENTRY_NOT_FOUND' ? 404 : 400).json({ error: err.message, code: err.code }); }
 });
 
 // PATCH /api/inventory-entries/:id — Update metadata fields (e.g. purchaseRate)
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', authorize('inventory:edit'), async (req, res) => {
   try {
     const allowed = ['purchaseRate', 'batchNo', 'mfgDate', 'expiryDate', 'vendorName', 'hsnCode'];
     const updates = {};
@@ -265,7 +198,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 // GET /api/inventory-entries/ledger/:productId — Stock ledger for a product
-router.get('/ledger/:productId', async (req, res) => {
+router.get('/ledger/:productId', authorize('inventory:view'), async (req, res) => {
   try {
     const { warehouseId, packing, vendorId, batchNo, startDate, endDate } = req.query;
     const filter = { productId: req.params.productId };
@@ -305,7 +238,7 @@ router.get('/ledger/:productId', async (req, res) => {
 
 // GET /api/inventory-entries/expiry-alerts?days=30
 // Returns finished-goods entries nearing expiry
-router.get('/expiry-alerts', async (req, res) => {
+router.get('/expiry-alerts', authorize('inventory:view'), async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
     const now = new Date();

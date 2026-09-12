@@ -256,7 +256,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
               </View>
             ) : null}
 
-            {(invoice.freightAmount > 0 || invoice.cartageAmount > 0) && (
+            {((invoice.freightAmount || 0) > 0 || (invoice.cartageAmount || 0) > 0) && (
               <View style={styles.infoItem}>
                 <View style={[styles.infoIcon, { backgroundColor: colors.infoLight }]}>
                   <Ionicons name="car-outline" size={16} color={colors.info} />
@@ -264,15 +264,15 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
                 <View>
                   <Text style={styles.infoLabel}>Bill Freight & Cartage</Text>
                   <Text style={styles.infoValue}>
-                    {invoice.freightAmount > 0 ? `Freight: ₹${invoice.freightAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
-                    {invoice.freightAmount > 0 && invoice.cartageAmount > 0 ? ' | ' : ''}
-                    {invoice.cartageAmount > 0 ? `Cartage: ₹${invoice.cartageAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                    {(invoice.freightAmount || 0) > 0 ? `Freight: ₹${(invoice.freightAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                    {(invoice.freightAmount || 0) > 0 && (invoice.cartageAmount || 0) > 0 ? ' | ' : ''}
+                    {(invoice.cartageAmount || 0) > 0 ? `Cartage: ₹${(invoice.cartageAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
                   </Text>
                 </View>
               </View>
             )}
 
-            {invoice.internalFreightExpense > 0 && (
+            {(invoice.internalFreightExpense || 0) > 0 && (
               <View style={styles.infoItem}>
                 <View style={[styles.infoIcon, { backgroundColor: colors.warningLight }]}>
                   <Ionicons name="bus-outline" size={16} color={colors.warning} />
@@ -280,7 +280,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
                 <View>
                   <Text style={styles.infoLabel}>Internal Freight Expense (Paid by Us)</Text>
                   <Text style={styles.infoValue}>
-                    ₹{invoice.internalFreightExpense.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹{(invoice.internalFreightExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
                 </View>
               </View>
@@ -543,6 +543,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
     packing: string;
     rate: string;
     gstRate: number;
+    batchNo: string;
+    mfgDate: string;
+    expiryDate: string;
   }>>([]);
 
   const [manufacturingUnits, setManufacturingUnits] = useState<ManufacturingUnit[]>([]);
@@ -647,8 +650,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           }
           if (invoiceToEdit) {
             setRows((invoiceToEdit.items || []).map((it, idx) => {
-              const matchedProd = p.find(prod => prod._id === it.productId) || null;
-              const matchedRawMat = rm.find(r => r.name.toLowerCase() === (it.name || '').toLowerCase() || r._id === it.rawMaterialId);
+              const matchedProd = p.find((prod: Product) => prod._id === it.productId) || null;
+              const matchedRawMat = rm.find((r: RawMaterial) => r.name.toLowerCase() === (it.name || '').toLowerCase() || r._id === it.rawMaterialId);
               return {
                 id: idx.toString(),
                 productSearch: it.name || '',

@@ -6,6 +6,7 @@ const Vendor = require('../../models/Vendor');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const { createPaymentAndAllocate, allocateExistingPayment, reversePayment } = require('../../services/paymentPostingService');
 
 const router = express.Router();
 
@@ -46,183 +47,50 @@ router.get('/', authorize('payment:view'), async (req, res) => {
   }
 });
 
-// POST /api/payments — Create a new payment and update balances
+// POST /api/payments — Create a new payment and update balances atomically
 router.post('/', authorize('payment:create'), validate(schemas.paymentSchema), async (req, res) => {
   try {
-    const { type, partyType, partyId, amount, mode, allocations } = req.body;
-
-    if (!type || !partyType || !partyId || !amount) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    const { type, partyType, partyId, amount, mode, allocations = [] } = req.body;
+    if (!type || !partyType || !partyId || !(Number(amount) > 0)) {
+      return res.status(400).json({ error: 'Missing or invalid required fields' });
     }
-
-    // Cash access gating
     if (mode === 'cash' && (!req.user || !req.user.canAccessCash)) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to perform cash transactions.' });
     }
-
-    const Invoice = require('../../models/Invoice');
-    let totalAllocated = 0;
-    const processedAllocations = [];
-
-    if (allocations && Array.isArray(allocations) && allocations.length > 0) {
-      for (const alloc of allocations) {
-        const allocAmt = Number(alloc.amountApplied !== undefined ? alloc.amountApplied : (alloc.amountAllocated !== undefined ? alloc.amountAllocated : alloc.amount)) || 0;
-        if (allocAmt <= 0) continue;
-        totalAllocated += allocAmt;
-      }
-
-      if (totalAllocated > amount) {
-        return res.status(400).json({ error: `Allocated total (₹${totalAllocated}) cannot exceed total payment amount (₹${amount})` });
-      }
-    }
-
-    const unallocatedAmount = Math.max(0, amount - totalAllocated);
-    const paymentData = {
-      ...req.body,
-      unallocatedAmount,
-      allocations: []
-    };
-
-    const payment = await Payment.create(paymentData);
-
-    if (allocations && Array.isArray(allocations) && allocations.length > 0) {
-      for (const alloc of allocations) {
-        const allocAmt = Number(alloc.amountApplied !== undefined ? alloc.amountApplied : (alloc.amountAllocated !== undefined ? alloc.amountAllocated : alloc.amount)) || 0;
-        if (allocAmt <= 0) continue;
-
-        const inv = await Invoice.findById(alloc.invoiceId);
-        if (inv) {
-          inv.payments = inv.payments || [];
-          inv.payments.push({
-            paymentId: payment._id,
-            amountAllocated: allocAmt,
-            amountApplied: allocAmt,
-            allocatedAt: new Date()
-          });
-          inv.amountPaid = (inv.amountPaid || 0) + allocAmt;
-          inv.status = inv.amountPaid >= inv.amount ? 'paid' : (inv.amountPaid > 0 ? 'partial' : 'unpaid');
-          await inv.save();
-
-          processedAllocations.push({
-            invoiceId: inv._id,
-            invoiceNo: inv.invoiceNo,
-            amountAllocated: allocAmt,
-            amountApplied: allocAmt,
-            allocatedAt: new Date()
-          });
-        }
-      }
-      payment.allocations = processedAllocations;
-      await payment.save();
-    }
-
-    // Update balances — branch on mode
-    if (partyType === 'Customer') {
-      const cust = await Customer.findById(partyId);
-      if (cust) {
-        if (mode === 'cash') {
-          cust.cashBalance += (type === 'receive' ? -amount : amount);
-        } else {
-          cust.regularBalance += (type === 'receive' ? -amount : amount);
-        }
-        await cust.save();
-      }
-    } else if (partyType === 'Vendor') {
-      const vend = await Vendor.findById(partyId);
-      if (vend) {
-        if (mode === 'cash') {
-          vend.cashBalance += (type === 'make' ? -amount : amount);
-        } else {
-          vend.regularBalance += (type === 'make' ? -amount : amount);
-        }
-        await vend.save();
-      }
-    }
-
+    const { payment } = await createPaymentAndAllocate({ paymentData: req.body, allocations });
     if (req.io) {
-      req.io.emit('payment_updated', payment);
+      req.io.emit('payment_updated', { type: 'created', id: payment._id });
+      if (payment.allocations?.length) req.io.emit('invoice_updated', { type: 'payment_allocated', paymentId: payment._id });
     }
-
     res.status(201).json(payment);
-
     const { logAction } = require('../../utils/auditLogger');
     await logAction({
       action: 'CREATE_PAYMENT',
       description: `${type === 'receive' ? 'Received' : 'Made'} payment of ₹${amount} for ${partyType} (Mode: ${(mode || 'regular').toUpperCase()})`,
-      details: { id: payment._id },
-      req
+      details: { id: payment._id }, req
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const status = ['PAYMENT_NOT_FOUND','CUSTOMER_NOT_FOUND','VENDOR_NOT_FOUND','INVOICE_NOT_FOUND'].includes(err.code) ? 404 : 400;
+    res.status(status).json({ error: err.message, code: err.code || 'PAYMENT_CREATE_FAILED' });
   }
 });
 
-// DELETE /api/payments/:id — Delete payment and revert balances
+// DELETE /api/payments/:id — controlled payment reversal
 router.delete('/:id', authorize('payment:create'), async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
     if (!payment) return res.status(404).json({ error: 'Payment not found' });
-
-    // Cash access gating
     if (payment.mode === 'cash' && (!req.user || !req.user.canAccessCash)) {
-      return res.status(403).json({ error: 'Access denied: You do not have permission to delete cash transactions.' });
+      return res.status(403).json({ error: 'Access denied: You do not have permission to reverse cash transactions.' });
     }
-
-    const { type, partyType, partyId, amount, mode } = payment;
-
-    // Revert allocations from invoices if any
-    const Invoice = require('../../models/Invoice');
-    if (payment.allocations && payment.allocations.length > 0) {
-      for (const alloc of payment.allocations) {
-        const inv = await Invoice.findById(alloc.invoiceId);
-        if (inv) {
-          const allocAmt = alloc.amountApplied || alloc.amountAllocated || 0;
-          inv.amountPaid = Math.max(0, (inv.amountPaid || 0) - allocAmt);
-          inv.status = inv.amountPaid >= inv.amount ? 'paid' : (inv.amountPaid > 0 ? 'partial' : 'unpaid');
-          inv.payments = (inv.payments || []).filter(p => p.paymentId && p.paymentId.toString() !== payment._id.toString());
-          await inv.save();
-        }
-      }
-    }
-
-    // Revert balances — branch on mode
-    if (partyType === 'Customer') {
-      const cust = await Customer.findById(partyId);
-      if (cust) {
-        if (mode === 'cash') {
-          cust.cashBalance += (type === 'receive' ? amount : -amount);
-        } else {
-          cust.regularBalance += (type === 'receive' ? amount : -amount);
-        }
-        await cust.save();
-      }
-    } else if (partyType === 'Vendor') {
-      const vend = await Vendor.findById(partyId);
-      if (vend) {
-        if (mode === 'cash') {
-          vend.cashBalance += (type === 'make' ? amount : -amount);
-        } else {
-          vend.regularBalance += (type === 'make' ? amount : -amount);
-        }
-        await vend.save();
-      }
-    }
-
-    await Payment.findByIdAndDelete(req.params.id);
+    const reversed = await reversePayment(req.params.id);
     if (req.io) {
       req.io.emit('payment_updated', { id: req.params.id, deleted: true });
+      if (reversed.allocations?.length) req.io.emit('invoice_updated', { type: 'payment_reversed', paymentId: req.params.id });
     }
-    res.json({ message: 'Payment deleted and balance reverted' });
-
-    const { logAction } = require('../../utils/auditLogger');
-    await logAction({
-      action: 'DELETE_PAYMENT',
-      description: `Deleted ${type === 'receive' ? 'received' : 'made'} payment of ₹${amount} (Mode: ${(mode || 'regular').toUpperCase()})`,
-      details: { id: payment._id },
-      req
-    });
+    res.json({ message: 'Payment reversed and balances restored' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'PAYMENT_NOT_FOUND' ? 404 : 400).json({ error: err.message, code: err.code || 'PAYMENT_REVERSAL_FAILED' });
   }
 });
 
@@ -392,68 +260,18 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
   }
 });
 
-// POST /api/payments/allocate — Match payment receipt against outstanding invoices (bill-wise)
+// POST /api/payments/allocate — Match an existing unallocated payment against owned finalized invoices
 router.post('/allocate', authorize('payment:create'), validate(schemas.paymentAllocateSchema), async (req, res) => {
   try {
-    const { paymentId, allocations } = req.body;
-
-    const payment = await Payment.findById(paymentId);
-    if (!payment) return res.status(404).json({ error: 'Payment receipt record not found' });
-
-    let currentUnallocated = payment.unallocatedAmount !== undefined ? payment.unallocatedAmount : payment.amount;
-
-    let requestedAllocSum = 0;
-    for (const alloc of allocations) {
-      const allocAmt = Number(alloc.amountApplied !== undefined ? alloc.amountApplied : (alloc.amountAllocated !== undefined ? alloc.amountAllocated : alloc.amount)) || 0;
-      if (allocAmt > 0) requestedAllocSum += allocAmt;
-    }
-
-    if (requestedAllocSum > currentUnallocated) {
-      return res.status(400).json({ error: `Allocations sum (₹${requestedAllocSum}) exceeds unallocated payment amount (₹${currentUnallocated})` });
-    }
-
-    const Invoice = require('../../models/Invoice');
-    for (const alloc of allocations) {
-      const allocAmt = Number(alloc.amountApplied !== undefined ? alloc.amountApplied : (alloc.amountAllocated !== undefined ? alloc.amountAllocated : alloc.amount)) || 0;
-      if (allocAmt <= 0) continue;
-
-      const inv = await Invoice.findById(alloc.invoiceId);
-      if (inv) {
-        inv.payments = inv.payments || [];
-        inv.payments.push({
-          paymentId: payment._id,
-          amountAllocated: allocAmt,
-          amountApplied: allocAmt,
-          allocatedAt: new Date()
-        });
-        inv.amountPaid = (inv.amountPaid || 0) + allocAmt;
-        inv.status = inv.amountPaid >= inv.amount ? 'paid' : (inv.amountPaid > 0 ? 'partial' : 'unpaid');
-        await inv.save();
-
-        payment.allocations = payment.allocations || [];
-        payment.allocations.push({
-          invoiceId: inv._id,
-          invoiceNo: inv.invoiceNo,
-          amountAllocated: allocAmt,
-          amountApplied: allocAmt,
-          allocatedAt: new Date()
-        });
-
-        currentUnallocated = Math.max(0, currentUnallocated - allocAmt);
-      }
-    }
-
-    payment.unallocatedAmount = currentUnallocated;
-    await payment.save();
-
+    const payment = await allocateExistingPayment({ paymentId: req.body.paymentId, allocations: req.body.allocations || [] });
     if (req.io) {
-      req.io.emit('payment_updated', payment);
-      req.io.emit('invoice_updated', { type: 'allocate', paymentId });
+      req.io.emit('payment_updated', { type: 'allocated', id: payment._id });
+      req.io.emit('invoice_updated', { type: 'allocate', paymentId: payment._id });
     }
-
     res.json({ message: 'Payment successfully allocated bill-wise', payment });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = ['PAYMENT_NOT_FOUND','INVOICE_NOT_FOUND'].includes(err.code) ? 404 : 400;
+    res.status(status).json({ error: err.message, code: err.code || 'PAYMENT_ALLOCATION_FAILED' });
   }
 });
 

@@ -1131,16 +1131,16 @@ export default function DashboardScreen() {
     if (mfgData) setMfgAnalytics(mfgData);
     if (camps) setCampaigns(camps);
 
-    const recInvoiceSum = custs.reduce((sum, cust) => sum + (cust.pakkaBalance || 0), 0);
-    const payInvoiceSum = vends.reduce((sum, vend) => sum + (vend.pakkaBalance || 0), 0);
+    const recInvoiceSum = custs.reduce((sum: number, cust: any) => sum + (cust.pakkaBalance || 0), 0);
+    const payInvoiceSum = vends.reduce((sum: number, vend: any) => sum + (vend.pakkaBalance || 0), 0);
     
     // Calculate the asset value: purchases minus sales at purchase price
     let purchaseInvoiceSum = 0;
     const purchaseRatesMap: Record<string, number> = {};
     
-    purchs.forEach(p => {
+    purchs.forEach((p: any) => {
       if (p.isFinalized) {
-        (p.items || []).forEach(item => {
+        (p.items || []).forEach((item: any) => {
           const pcs = getItemTotalPieces(item);
           const rate = item.rate || 0;
           const val = pcs * rate;
@@ -1154,16 +1154,16 @@ export default function DashboardScreen() {
     });
 
     let saleInvoiceSub = 0;
-    sales.forEach(s => {
+    sales.forEach((s: any) => {
       if (s.isFinalized) {
-        (s.items || []).forEach(item => {
+        (s.items || []).forEach((item: any) => {
           const pcs = getItemTotalPieces(item);
           
           let purchasePrice = 0;
           if (item.productId && purchaseRatesMap[item.productId] !== undefined) {
             purchasePrice = purchaseRatesMap[item.productId];
           } else {
-            const product = prods.find(p => p._id === item.productId);
+            const product = prods.find((p: any) => p._id === item.productId);
             purchasePrice = product ? (product.price || 0) : 0;
           }
           
@@ -1174,10 +1174,10 @@ export default function DashboardScreen() {
     });
 
     const assetInvoiceSum = Math.max(0, purchaseInvoiceSum - saleInvoiceSub);
-    const volSum = custs.reduce((sum, cust) => sum + (cust.salesVolume || 0), 0);
-    const revenueSum = sales.reduce((sum, s) => sum + (s.isFinalized ? s.amount || 0 : 0), 0);
+    const volSum = custs.reduce((sum: number, cust: any) => sum + (cust.salesVolume || 0), 0);
+    const revenueSum = sales.reduce((sum: number, s: any) => sum + (s.isFinalized ? s.amount || 0 : 0), 0);
     const cogsSum = saleInvoiceSub;
-    const lowStock = prods.filter(p => typeof p.minReorder === 'number' && p.stockLevel <= p.minReorder);
+    const lowStock = prods.filter((p: any) => typeof p.minReorder === 'number' && p.stockLevel <= p.minReorder);
 
     setRecInvoice(recInvoiceSum);
     setPayInvoice(payInvoiceSum);
@@ -1300,7 +1300,7 @@ export default function DashboardScreen() {
             <View style={styles.quickActionsRow}>
               {[
                 { label: 'Sales workspace', sub: 'Orders and fulfillment', icon: 'cart-outline', route: '/sales-workspace' },
-                { label: 'Challans', sub: 'Dispatch and stock movement', icon: 'document-text-outline', route: '/stockmovements' },
+                { label: 'Challans', sub: 'Finalize physical movement', icon: 'document-text-outline', route: '/sales-workspace?tab=challans' },
                 { label: 'MR My Day', sub: 'Field priorities', icon: 'today-outline', route: '/mr-my-day' },
                 { label: 'Sales intelligence', sub: 'Collections and customer health', icon: 'flash-outline', route: '/sales-intelligence' },
               ].map((item) => (

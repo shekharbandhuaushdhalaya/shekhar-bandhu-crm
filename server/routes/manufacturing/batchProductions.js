@@ -12,6 +12,7 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { getSizeInMl, consumeFromReservation, releaseAllReservations, deductPackagingMaterials, calculateAggregateMaterialSufficiency } = require('../../services/batchProductionService');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+const { resolveManufacturingWarehouse } = require('../../services/manufacturingWarehouseService');
 
 const router = express.Router();
 
@@ -90,10 +91,12 @@ router.get('/preview', authorize('manufacturing:view'), async (req, res) => {
       let totalAvailable = 0;
 
       if (manufacturingUnitId) {
-        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, warehouseId: manufacturingUnitId, qcStatus: 'approved' });
+        const manufacturingWarehouse = await resolveManufacturingWarehouse(manufacturingUnitId);
+        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, warehouseId: manufacturingWarehouse._id, qcStatus: 'approved' });
         totalAvailable = entries.reduce((s, e) => s + (e.qty || 0), 0);
       } else {
-        totalAvailable = rm.stockLevel || 0;
+        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, qcStatus: 'approved' });
+        totalAvailable = entries.reduce((sum, entry) => sum + Number(entry.qty || 0), 0);
       }
 
       const isSufficient = totalAvailable >= qtyNeeded;
@@ -162,6 +165,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
       const ManufacturingUnit = require('../../models/ManufacturingUnit');
       const mfgUnit = await ManufacturingUnit.findById(manufacturingUnitId).session(session);
       if (!mfgUnit) throw new Error('Manufacturing unit not found');
+      const manufacturingWarehouse = await resolveManufacturingWarehouse(manufacturingUnitId, session);
 
       const existingBatch = await BatchProduction.findOne({ batchNo: batchNo.trim().toUpperCase() }).session(session);
       if (existingBatch) {
@@ -288,7 +292,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
         for (const item of immediateDeductGroup) {
           const entries = await RawMaterialEntry.find({
             rawMaterialId: item.rawMaterialId,
-            warehouseId: manufacturingUnitId,
+            warehouseId: manufacturingWarehouse._id,
             qcStatus: 'approved'
           }).session(session);
 
@@ -334,7 +338,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
         for (const item of blockGroup) {
           const entries = await RawMaterialEntry.find({
             rawMaterialId: item.rawMaterialId,
-            warehouseId: manufacturingUnitId,
+            warehouseId: manufacturingWarehouse._id,
             qcStatus: 'approved'
           }).session(session);
 
@@ -838,7 +842,7 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       return res.status(400).json({ error: 'Actual yield must be a positive number' });
     }
 
-    const batch = await BatchProduction.findById(req.params.id);
+    let batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
 
     if (batch.status === 'completed' || batch.status === 'rejected') {
@@ -1055,7 +1059,6 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     // authoritative document for the subsequent physical transfer.
     const now = new Date();
     const ManufacturingUnit = require('../../models/ManufacturingUnit');
-    const Challan = require('../../models/Challan');
     const { completeProductionReceiptAndCreateTransfer } = require('../../services/challanInventoryService');
     let productionWarehouse = await Warehouse.findOne({ manufacturingUnitId: batch.manufacturingUnitId, type: 'manufacturing' });
     if (!productionWarehouse) {
@@ -1143,7 +1146,6 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
 
     // Backfill: deduct any stage-tied ingredients missed during stage advancement
     // (covers both formulation and packaging that fell through due to the stageName filter bug)
-    const RawMaterialEntry = require('../../models/RawMaterialEntry');
     const backfillIngs = (batch.bomSnapshot?.ingredients || []).filter(i => {
       const hasStage = i.stageName && i.stageName.trim().length > 0;
       const alreadyConsumed = batch.ingredientsConsumed.some(
@@ -1151,33 +1153,10 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       );
       return hasStage && !alreadyConsumed;
     });
+    let backfillWarehouseId = null;
     if (backfillIngs.length > 0) {
-      const totalYield = batch.actualYieldQty || 0;
-      const totalPlanned = batch.plannedQty || 0;
-      for (const ing of backfillIngs) {
-        const isPackaging = ing.itemType === 'packaging';
-        const qtyNeeded = isPackaging
-          ? Number(((ing.qtyRequired || 0) * totalYield).toFixed(2))
-          : Number(((ing.qtyRequired || 0) * (totalPlanned / 100)).toFixed(2));
-        if (qtyNeeded <= 0) continue;
-        const entries = await RawMaterialEntry.find({ rawMaterialId: ing.rawMaterialId, warehouseId: batch.manufacturingUnitId, qcStatus: 'approved' }).sort({ createdAt: 1 }).lean();
-        let needed = qtyNeeded;
-        for (const entry of entries) {
-          if (needed <= 0.0001) break;
-          if ((entry.qty || 0) <= 0) continue;
-          const deduct = Math.min(needed, Math.round(entry.qty * 100) / 100);
-          if (deduct <= 0) continue;
-          await RawMaterialEntry.updateOne({ _id: entry._id }, { $inc: { qty: -deduct } });
-          batch.rawMaterialCost += deduct * (entry.purchaseRate || 0);
-          batch.ingredientsConsumed.push({
-            rawMaterialId: ing.rawMaterialId,
-            rawMaterialEntryId: entry._id,
-            qtyConsumed: deduct,
-            batchNo: entry.batchNo
-          });
-          needed -= deduct;
-        }
-      }
+      const manufacturingWarehouseForMaterials = await resolveManufacturingWarehouse(batch.manufacturingUnitId);
+      backfillWarehouseId = manufacturingWarehouseForMaterials._id;
     }
 
     const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
@@ -1190,7 +1169,9 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       challanNo,
       now,
       userId: req.user ? req.user.id : null,
-      createdBy: qcPassedBy || (req.user ? req.user.name : 'System')
+      createdBy: qcPassedBy || (req.user ? req.user.name : 'System'),
+      backfillIngredients: backfillIngs,
+      backfillWarehouseId
     });
     batch = completed.batch;
     challan = completed.challan;
@@ -1289,7 +1270,7 @@ router.patch('/:id/correct', authorize('manufacturing:correctReleased'), async (
 });
 
 // PATCH /api/batch-productions/:id/cancel — Cancel active production run, revert raw materials stock
-router.patch('/:id/cancel', validate(schemas.batchCancelSchema), async (req, res) => {
+router.patch('/:id/cancel', authorize('manufacturing:edit'), validate(schemas.batchCancelSchema), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
@@ -1337,7 +1318,7 @@ router.patch('/:id/cancel', validate(schemas.batchCancelSchema), async (req, res
 });
 
 // GET /api/batch-productions/genealogy/search — Search genealogy by Finished Goods Batch No or Raw Material Batch No
-router.get('/genealogy/search', async (req, res) => {
+router.get('/genealogy/search', authorize('manufacturing:view'), async (req, res) => {
   try {
     const q = (req.query.q || '').trim();
     if (!q) return res.status(400).json({ error: 'Search query is required' });
@@ -1431,7 +1412,7 @@ router.get('/genealogy/search', async (req, res) => {
 });
 
 // GET /api/batch-productions/:id/genealogy — Full genealogy with raw material entry details
-router.get('/:id/genealogy', async (req, res) => {
+router.get('/:id/genealogy', authorize('manufacturing:view'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id)
       .populate('productId', 'name sku')
@@ -1479,7 +1460,7 @@ router.get('/:id/genealogy', async (req, res) => {
 });
 
 // GET /api/batch-productions/:id/bmr-report — Generate a compliance-friendly BMR
-router.get('/:id/bmr-report', async (req, res) => {
+router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id)
       .populate('productId')
@@ -1630,7 +1611,7 @@ router.get('/:id/bmr-report', async (req, res) => {
 });
 
 // GET /api/batch-productions/:id/coa — Auto-generate Certificate of Analysis (CoA) document JSON
-router.get('/:id/coa', async (req, res) => {
+router.get('/:id/coa', authorize('manufacturing:view'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id)
       .populate('productId')
@@ -1692,7 +1673,7 @@ router.get('/:id/coa', async (req, res) => {
 });
 
 // PATCH /api/batch-productions/:id/documents — Add a supporting document
-router.patch('/:id/documents', validate(schemas.batchDocumentAddSchema), async (req, res) => {
+router.patch('/:id/documents', authorize('manufacturing:edit'), validate(schemas.batchDocumentAddSchema), async (req, res) => {
   try {
     const { name, url } = req.body;
     if (!name || !url) return res.status(400).json({ error: 'Document name and url are required' });
@@ -1711,7 +1692,7 @@ router.patch('/:id/documents', validate(schemas.batchDocumentAddSchema), async (
 });
 
 // DELETE /api/batch-productions/:id/documents — Remove a supporting document
-router.delete('/:id/documents', validate(schemas.batchDocumentRemoveSchema), async (req, res) => {
+router.delete('/:id/documents', authorize('manufacturing:edit'), validate(schemas.batchDocumentRemoveSchema), async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Document URL is required' });
@@ -1935,7 +1916,7 @@ router.post('/:id/job-work/dispatch', authorize('manufacturing:edit'), async (re
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
 
-    const challanNo = `JW-CHALLAN-${Date.now().toString().slice(-6)}`;
+    const challanNo = await generateAtomicDocumentNumber('jobWorkChallanNo', 'JW-CHALLAN-', 6);
     batch.productionType = 'job_work';
     batch.jobWorkStatus = 'dispatched_to_vendor';
     if (jobWorkerId) batch.jobWorkerId = jobWorkerId;

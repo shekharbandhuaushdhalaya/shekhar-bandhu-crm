@@ -147,7 +147,7 @@ export default function RawMaterialModal({
     };
   }, [rmName, isPackaging]);
 
-  const applyHerbData = (entry: { commonNames?: string[]; ayurvedicName?: string; botanicalName: string; partUsed?: string; category?: string; monographRef?: string; isScheduleE1?: boolean }, nameToSet?: string) => {
+  const applyHerbData = (entry: { commonNames?: string[]; synonyms?: string[]; ayurvedicName?: string; botanicalName: string; partUsed?: string; category?: string; monographRef?: string; isScheduleE1?: boolean }, nameToSet?: string) => {
     const finalName = nameToSet || entry.ayurvedicName || (entry.commonNames ? entry.commonNames[0] : '');
     if (finalName) setRmName(finalName.toUpperCase());
     setRmBotanicalName(entry.botanicalName);

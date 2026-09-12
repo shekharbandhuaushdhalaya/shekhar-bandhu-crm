@@ -10,6 +10,7 @@ const InventoryEntry = require('../../models/InventoryEntry');
 const PaymentPromise = require('../../models/PaymentPromise');
 const LostSale = require('../../models/LostSale');
 const { authorize } = require('../../middleware/authorize');
+const { createSalesOrder } = require('../../services/salesOrderService');
 
 const router = express.Router();
 const money = n => Number(Number(n || 0).toFixed(2));
@@ -61,20 +62,28 @@ router.get('/customers/:id/360', authorize('customer:view'), async (req,res) => 
   } catch(e){res.status(500).json({error:e.message});}
 });
 
-router.post('/orders/:id/repeat', authorize('customer:create'), async (req,res) => {
+router.post('/orders/:id/repeat', authorize('order:create'), async (req,res) => {
   try {
     const prior = await Order.findById(req.params.id).lean();
     if (!prior) return res.status(404).json({code:'ORDER_NOT_FOUND',error:'Order not found'});
-    const suffix = String(Date.now()).slice(-6);
-    const order = await Order.create({
-      orderNo:`SO-R${suffix}`, customerId:prior.customerId, name:prior.name, email:prior.email, phone:prior.phone,
-      shippingAddress:req.body.shippingAddress || prior.shippingAddress, billingAddress:prior.billingAddress,
-      warehouseId:req.body.warehouseId || prior.warehouseId, warehouseName:prior.warehouseName,
-      items:(prior.items||[]).map(i=>({productId:i.productId,name:i.name,qty:Number(i.qty||0),price:Number(i.price||0),size:i.size||'',fulfilledQty:0,backorderedQty:Number(i.qty||0),freeQty:Number(i.freeQty||0),discountPercent:Number(i.discountPercent||0),pricingSource:i.pricingSource||'repeat_order',schemeCode:i.schemeCode||''})),
-      totalAmount:prior.totalAmount,status:'pending',sourceType:req.body.sourceType||'existing_customer',sourcePersonId:req.body.sourcePersonId||null,sourcePersonName:req.body.sourcePersonName||'',approvalStatus:'none',approvalRequired:false,adminNotes:`Repeated from ${prior.orderNo||prior._id}`
+    if (!prior.customerId) return res.status(409).json({code:'CUSTOMER_LINK_REQUIRED',error:'The source order is not linked to a CRM customer and cannot be repeated safely.'});
+    const result = await createSalesOrder({
+      customerId: prior.customerId,
+      warehouseId: req.body.warehouseId || prior.warehouseId || null,
+      shippingAddress: req.body.shippingAddress || prior.shippingAddress,
+      billingAddress: prior.billingAddress,
+      customerPoNo: req.body.customerPoNo || '',
+      expectedDeliveryDate: req.body.expectedDeliveryDate || null,
+      priority: req.body.priority || prior.priority || 'normal',
+      items: (prior.items || []).map(item => ({ productId: item.productId, qty: Number(item.qty || 0) })),
+      sourceType: req.body.sourceType || 'existing_customer',
+      sourcePersonId: req.body.sourcePersonId || null,
+      sourcePersonName: req.body.sourcePersonName || '',
+      notes: `Repeated from ${prior.orderNo || prior._id}. ${req.body.notes || ''}`.trim(),
+      orderChannel: 'crm',
     });
-    res.status(201).json(order);
-  } catch(e){res.status(400).json({error:e.message,code:'REPEAT_ORDER_FAILED'});}
+    res.status(result.approvalRequired ? 202 : 201).json(result);
+  } catch(e){res.status(e.status || 400).json({error:e.message,code:e.code || 'REPEAT_ORDER_FAILED'});}
 });
 
 router.get('/collections', authorize('payment:view'), async(req,res)=>{

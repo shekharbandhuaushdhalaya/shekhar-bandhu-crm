@@ -5,8 +5,13 @@ const itemSchema = new mongoose.Schema({
   name: { type: String, required: true },
   batchNo: { type: String, default: '' },
   qty: { type: Number, required: true, min: 0.0001 },
+  billableQty: { type: Number, default: 0, min: 0 },
+  freeQty: { type: Number, default: 0, min: 0 },
   packing: { type: Number, default: 1 },
   rate: { type: Number, default: 0 },
+  gstRate: { type: Number, default: 0 },
+  vendorId: { type: String, default: '', trim: true },
+  vendorName: { type: String, default: '', trim: true },
   condition: { type: String, enum: ['saleable','damaged','expired','other'], default: 'saleable' },
   reason: { type: String, default: '' }
 }, { _id: false });
@@ -19,12 +24,16 @@ const schema = new mongoose.Schema({
   challanId: { type: mongoose.Schema.Types.ObjectId, ref: 'Challan', default: null },
   challanNo: { type: String, default: '' },
   warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: true },
-  status: { type: String, enum: ['draft','posted','cancelled'], default: 'draft' },
+  status: { type: String, enum: ['draft','posted','reversed','cancelled'], default: 'draft' },
   resolution: { type: String, enum: ['credit_note','refund','replacement','none'], default: 'credit_note' },
   items: [itemSchema],
   totalAmount: { type: Number, default: 0 },
   postedAt: { type: Date, default: null },
-  postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
+  postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  creditNoteId: { type: mongoose.Schema.Types.ObjectId, ref: 'CreditNote', default: null },
+  reversedAt: { type: Date, default: null },
+  reversedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  reversalReason: { type: String, default: '' }
 }, { timestamps: true });
 schema.index({ firmId: 1, returnNo: 1 }, { unique: true });
 schema.index({ firmId: 1, customerId: 1, createdAt: -1 });

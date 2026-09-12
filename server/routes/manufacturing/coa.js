@@ -3,6 +3,7 @@ const router = express.Router();
 const CertificateOfAnalysis = require('../../models/CertificateOfAnalysis');
 const SystemSettings = require('../../models/SystemSettings');
 const { authorize } = require('../../middleware/authorize');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 // GET /api/manufacturing/coa — List / search Certificate of Analysis documents
 router.get('/', authorize('quality:view'), async (req, res) => {
@@ -40,7 +41,7 @@ router.post('/', authorize('quality:create'), async (req, res) => {
     
     if (!specificationId) {
       const coa = await CertificateOfAnalysis.create({
-        coaNumber: req.body.coaNumber || `COA-${Date.now().toString().slice(-8)}`,
+        coaNumber: req.body.coaNumber || await generateAtomicDocumentNumber('coaNumber', 'COA-', 6),
         batchNo: (batchNo || '').trim(),
         productName: (productName || '').trim(),
         manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : new Date(),
@@ -69,7 +70,7 @@ router.post('/', authorize('quality:create'), async (req, res) => {
     const failed=resultTests.filter(r=>r.status==='fail');
     const allPassed=resultTests.length>0 && resultTests.every(r=>r.status==='pass' || (!spec.tests.find(t=>t.code===r.code)?.mandatory));
     const overall=failed.length?'REJECTED':(allPassed?'APPROVED':'PENDING');
-    const coa=await CertificateOfAnalysis.create({coaNumber:`COA-${Date.now().toString().slice(-8)}`,batchNo:batchNo.trim(),productName:productName.trim(),manufacturingLicenseNo:req.body.manufacturingLicenseNo||'',gmpCertificateNo:req.body.gmpCertificateNo||'',pharmacopoeialStandard:spec.pharmacopoeialStandard,dosageForm:spec.dosageForm,specificationId,specificationVersion:spec.specificationVersion,specificationSource:spec.sourceNote||spec.monographReference||'',manufacturingDate:new Date(manufacturingDate),expiryDate:new Date(expiryDate),testingDate:testingDate?new Date(testingDate):new Date(),tests:resultTests,qcCompleted:allPassed||failed.length>0,overallResult:overall,status:overall==='APPROVED'?'draft':(overall==='REJECTED'?'rejected':'draft'),testedBy:req.user?.name||'QC Analyst',remarks:remarks||''});
+    const coa=await CertificateOfAnalysis.create({coaNumber:await generateAtomicDocumentNumber('coaNumber', 'COA-', 6),batchNo:batchNo.trim(),productName:productName.trim(),manufacturingLicenseNo:req.body.manufacturingLicenseNo||'',gmpCertificateNo:req.body.gmpCertificateNo||'',pharmacopoeialStandard:spec.pharmacopoeialStandard,dosageForm:spec.dosageForm,specificationId,specificationVersion:spec.specificationVersion,specificationSource:spec.sourceNote||spec.monographReference||'',manufacturingDate:new Date(manufacturingDate),expiryDate:new Date(expiryDate),testingDate:testingDate?new Date(testingDate):new Date(),tests:resultTests,qcCompleted:allPassed||failed.length>0,overallResult:overall,status:overall==='APPROVED'?'draft':(overall==='REJECTED'?'rejected':'draft'),testedBy:req.user?.name||'QC Analyst',remarks:remarks||''});
     if(missing.length) return res.status(400).json({error:'Mandatory QC tests are missing or not passed',tests:missing.map(x=>x.code),coa});
     res.status(201).json(coa);
   } catch(e){res.status(400).json({error:e.message});}

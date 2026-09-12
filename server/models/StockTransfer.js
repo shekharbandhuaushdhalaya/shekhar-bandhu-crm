@@ -18,11 +18,17 @@ const stockTransferSchema = new mongoose.Schema({
   notes:             { type: String, default: '' },
   createdBy:         { type: String, default: '' },
   approvedBy:         { type: String, default: '' },
+  approvedAt:         { type: Date, default: null },
+  challanId:          { type: mongoose.Schema.Types.ObjectId, ref: 'Challan', default: null },
+  challanNo:          { type: String, default: '' },
+  shippedAt:          { type: Date, default: null },
+  receivedAt:         { type: Date, default: null },
+  cancelledAt:        { type: Date, default: null },
 }, { timestamps: true });
 
 stockTransferSchema.index({ transferNo: 1 });
 stockTransferSchema.index({ createdAt: -1 });
-stockTransferSchema.index({ challanId: 1 }, { sparse: true });
+stockTransferSchema.index({ firmId: 1, challanId: 1 }, { sparse: true });
 
 stockTransferSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('StockTransfer', stockTransferSchema);

@@ -1,14 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const StockTransfer = require('../../models/StockTransfer');
-const InventoryEntry = require('../../models/InventoryEntry');
 const Warehouse = require('../../models/Warehouse');
 const Product = require('../../models/Product');
-const StockLedger = require('../../models/StockLedger');
 const Challan = require('../../models/Challan');
 const { postChallanInventory, reverseChallanInventory } = require('../../services/challanInventoryService');
 const idempotency = require('../../middleware/idempotency');
 const { authorize } = require('../../middleware/authorize');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 // GET /api/inventory/transfers — List all stock transfers
 router.get('/', authorize('inventory:view'), async (req, res) => {
@@ -25,8 +24,11 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
   try {
     const { fromWarehouseId, toWarehouseId, items, notes } = req.body;
 
-    if (!fromWarehouseId || !toWarehouseId || !items || items.length === 0) {
+    if (!fromWarehouseId || !toWarehouseId || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'fromWarehouseId, toWarehouseId, and items are required' });
+    }
+    if (String(fromWarehouseId) === String(toWarehouseId)) {
+      return res.status(400).json({ error: 'Source and target warehouses must be different', code: 'SAME_WAREHOUSE_TRANSFER' });
     }
 
     const [fromW, toW] = await Promise.all([
@@ -38,17 +40,22 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
       return res.status(404).json({ error: 'Source or target warehouse not found' });
     }
 
-    const count = await StockTransfer.countDocuments();
-    const transferNo = `TRSF-${(count + 1).toString().padStart(4, '0')}`;
+    const transferNo = await generateAtomicDocumentNumber('stockTransferNo', 'TRSF-', 5);
 
     const enrichedItems = [];
     for (const item of items) {
+      const qtyBoxes = Number(item.qtyBoxes);
+      const packing = Number(item.packing || 1);
+      if (!item.productId || !Number.isFinite(qtyBoxes) || qtyBoxes <= 0 || !Number.isFinite(packing) || packing <= 0) {
+        return res.status(400).json({ error: 'Every transfer item requires a product and positive quantity/packing', code: 'INVALID_TRANSFER_ITEM' });
+      }
       const prod = await Product.findById(item.productId);
+      if (!prod) return res.status(404).json({ error: `Product not found: ${item.productId}`, code: 'PRODUCT_NOT_FOUND' });
       enrichedItems.push({
         productId: item.productId,
-        productName: prod ? prod.name : 'Unknown Product',
-        qtyBoxes: parseFloat(item.qtyBoxes),
-        packing: parseInt(item.packing, 10) || 1,
+        productName: prod.name,
+        qtyBoxes,
+        packing,
         batchNo: (item.batchNo || '').trim()
       });
     }
@@ -116,33 +123,38 @@ router.patch('/:id/ship', idempotency, authorize('inventory:edit'), async (req, 
     if (!transfer) return res.status(404).json({ error: 'Transfer not found', code: 'TRANSFER_NOT_FOUND' });
     if (transfer.status !== 'pending') return res.status(400).json({ error: `Cannot ship transfer in status: ${transfer.status}`, code: 'TRANSFER_NOT_SHIPPABLE' });
 
-    if (String(transfer.fromWarehouseId) === String(transfer.toWarehouseId)) return res.status(400).json({ error: 'Source and target warehouses must be different', code: 'SAME_WAREHOUSE_TRANSFER' });
+    if (transfer.fromWarehouseId.equals(transfer.toWarehouseId)) return res.status(400).json({ error: 'Source and target warehouses must be different', code: 'SAME_WAREHOUSE_TRANSFER' });
     const fromW = await Warehouse.findById(transfer.fromWarehouseId);
     const toW = await Warehouse.findById(transfer.toWarehouseId);
     if (!fromW || !toW) return res.status(404).json({ error: 'Source or target warehouse not found', code: 'WAREHOUSE_NOT_FOUND' });
 
-    const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
-    const challanNo = await generateAtomicDocumentNumber('transferChallanNo', 'CH', 5);
-    const challan = await Challan.create({
-      challanNo,
-      date: new Date(),
-      challanType: 'transfer',
-      warehouseId: fromW._id,
-      warehouseName: fromW.name,
-      destinationWarehouseId: toW._id,
-      destinationWarehouseName: toW.name,
-      partyName: toW.name,
-      partyAddress: toW.addressLine1 || '',
-      partyCity: toW.city || '',
-      shippingAddress: [toW.addressLine1, toW.city, toW.state, toW.pincode].filter(Boolean).join(', '),
-      items: transfer.items.map(i => ({ productId: i.productId, name: i.productName || 'Product', qty: Number(i.qtyBoxes), packing: Number(i.packing) || 1, batchNo: i.batchNo || '' })),
-      status: 'draft', mode: 'regular', deductInventory: true
-    });
+    let challan = transfer.challanId ? await Challan.findById(transfer.challanId) : null;
+    if (!challan) challan = await Challan.findOne({ stockTransferId: transfer._id });
+    if (!challan) {
+      const challanNo = await generateAtomicDocumentNumber('transferChallanNo', 'TR-CH-', 5);
+      challan = await Challan.create({
+        challanNo,
+        date: new Date(),
+        challanType: 'transfer',
+        stockTransferId: transfer._id,
+        warehouseId: fromW._id,
+        warehouseName: fromW.name,
+        destinationWarehouseId: toW._id,
+        destinationWarehouseName: toW.name,
+        partyName: toW.name,
+        partyAddress: toW.addressLine1 || '',
+        partyCity: toW.city || '',
+        shippingAddress: [toW.addressLine1, toW.city, toW.state, toW.pincode].filter(Boolean).join(', '),
+        items: transfer.items.map(i => ({ productId: i.productId, name: i.productName || 'Product', qty: Number(i.qtyBoxes), packing: Number(i.packing) || 1, batchNo: i.batchNo || '' })),
+        status: 'draft', mode: 'regular', deductInventory: true
+      });
+    }
     const posted = await postChallanInventory(challan, { userId: req.user?.id || null, createdBy: req.user?.name || 'System' });
     transfer.challanId = posted._id;
     transfer.challanNo = posted.challanNo;
     transfer.status = 'in_transit';
     transfer.approvedBy = req.user?.name || 'System';
+    transfer.shippedAt = transfer.shippedAt || new Date();
     await transfer.save();
 
     if (req.io) {
@@ -164,6 +176,7 @@ router.patch('/:id/receive', idempotency, authorize('inventory:edit'), async (re
     if (transfer.status !== 'in_transit') return res.status(400).json({ error: `Cannot receive transfer in status: ${transfer.status}`, code: 'TRANSFER_NOT_IN_TRANSIT' });
     transfer.status = 'completed';
     transfer.approvedBy = req.user?.name || 'System';
+    transfer.receivedAt = new Date();
     await transfer.save();
     if (req.io) req.io.emit('transfer_updated', { type: 'received', id: transfer._id, challanId: transfer.challanId });
     res.json(transfer);
@@ -182,9 +195,12 @@ router.patch('/:id/cancel', idempotency, authorize('inventory:edit'), async (req
       if (!transfer.challanId) return res.status(409).json({ error: 'Transfer has no authoritative Challan', code: 'TRANSFER_CHALLAN_REQUIRED' });
       const challan = await Challan.findById(transfer.challanId);
       if (!challan) return res.status(404).json({ error: 'Authoritative Transfer Challan not found', code: 'CHALLAN_NOT_FOUND' });
-      await reverseChallanInventory(challan, { userId: req.user?.id || null, createdBy: req.user?.name || 'System' });
+      if (challan.inventoryPostingStatus !== 'reversed') {
+        await reverseChallanInventory(challan, { userId: req.user?.id || null, createdBy: req.user?.name || 'System' });
+      }
     }
     transfer.status = 'cancelled';
+    transfer.cancelledAt = new Date();
     await transfer.save();
     if (req.io) req.io.emit('transfer_updated', { type: 'cancelled', id: transfer._id, challanId: transfer.challanId });
     res.json(transfer);

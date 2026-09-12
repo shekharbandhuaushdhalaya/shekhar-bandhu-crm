@@ -102,7 +102,7 @@ export default function ConfirmDeleteModal({
             {isBlocked ? (
               <View style={[styles.alertCard, { backgroundColor: colors.danger + '08', borderColor: colors.danger + '40' }]}>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-                  <Ionicons name="shield-alert-outline" size={20} color={colors.danger} style={{ marginTop: 2 }} />
+                  <Ionicons name="shield-half-outline" size={20} color={colors.danger} style={{ marginTop: 2 }} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.danger }}>
                       Stock Quantity &gt; 0 Blocked

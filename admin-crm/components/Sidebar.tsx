@@ -38,7 +38,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Sales Workspace', route: 'sales-workspace', icon: 'options-outline', activeIcon: 'options' },
       { label: 'Sales Intelligence', route: 'sales-intelligence', icon: 'flash-outline', activeIcon: 'flash' },
       { label: 'Quotations', route: 'quotations', icon: 'document-text-outline', activeIcon: 'document-text' },
-      { label: 'Delivery Challan & Dispatch', route: 'stockmovements', icon: 'bus-outline', activeIcon: 'bus', permission: 'stockmovement:view' },
+      { label: 'Operational Stock Movements', route: 'stockmovements', icon: 'swap-horizontal-outline', activeIcon: 'swap-horizontal', permission: 'stockmovement:view' },
       { label: 'Sales Invoices', route: 'invoices/sale', icon: 'receipt-outline', activeIcon: 'receipt' },
       { label: 'Medical Reps & Targets', route: 'medicalreps', icon: 'briefcase-outline', activeIcon: 'briefcase', permission: 'mr:view' },
       { label: 'MR My Day', route: 'mr-my-day', icon: 'today-outline', activeIcon: 'today', permission: 'mr:view' },

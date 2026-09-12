@@ -1,7 +1,4 @@
 const Warehouse = require('../models/Warehouse');
-const Product = require('../models/Product');
-const InventoryEntry = require('../models/InventoryEntry');
-const StockLedger = require('../models/StockLedger');
 
 /**
  * Calculates item totals, base total, GST tax (CGST/SGST vs IGST), and rounded nett amount for an invoice.
@@ -71,83 +68,28 @@ function calculateTdsTcs(type = 'sale', baseAmount = 0, partyCumulativeAnnualTur
 }
 
 /**
- * Resolves a warehouse by ID, fallback to default or first warehouse.
+ * Resolves a physical Warehouse. Historical callers sometimes passed a
+ * ManufacturingUnit id in the warehouse field; support that only by mapping it
+ * to the warehouse linked through `manufacturingUnitId`—never by returning a
+ * ManufacturingUnit document as if it were inventory storage.
  */
 async function resolveWarehouse(warehouseId) {
   if (warehouseId) {
-    const wh = await Warehouse.findById(warehouseId);
-    if (wh) return wh;
-    const ManufacturingUnit = require('../models/ManufacturingUnit');
-    const mfgUnit = await ManufacturingUnit.findById(warehouseId);
-    if (mfgUnit) return mfgUnit;
+    let warehouse = await Warehouse.findById(warehouseId);
+    if (warehouse) return warehouse;
+    warehouse = await Warehouse.findOne({ manufacturingUnitId: warehouseId });
+    if (warehouse) return warehouse;
+    return null;
   }
-  let defaultWh = await Warehouse.findOne({ isDefault: true });
-  if (!defaultWh) {
-    defaultWh = await Warehouse.findOne();
-  }
-  return defaultWh;
-}
 
-/**
- * Deducts inventory for a sale invoice (direct sale/sampling/damage).
- */
-async function deductInventoryForInvoice(invoice) {
-  if (!invoice.items || invoice.items.length === 0) return;
-
-  const warehouse = await resolveWarehouse(invoice.warehouseId);
-  if (!warehouse) return;
-
-  for (const item of invoice.items) {
-    let product;
-    if (item.productId) {
-      product = await Product.findById(item.productId);
-    }
-    if (!product && item.name) {
-      product = await Product.findOne({ name: item.name });
-    }
-    if (!product) continue;
-
-    const boxesToDeduct = item.qty || item.boxes || 0;
-    const packing = item.packing || 1;
-
-    // 1. Decrement product stock level
-    product.stockLevel = Math.max(0, product.stockLevel - boxesToDeduct);
-    await product.save();
-
-    // 2. Decrement specific InventoryEntry
-    const entryQuery = {
-      warehouseId: warehouse._id,
-      productId: product._id,
-      packing
-    };
-    if (item.batchNo) entryQuery.batchNo = item.batchNo;
-
-    let entry = await InventoryEntry.findOne(entryQuery);
-    if (entry) {
-      entry.qtyBoxes = Math.max(0, entry.qtyBoxes - boxesToDeduct);
-      await entry.save();
-    }
-
-    // 3. Record Stock Ledger movement (OUT)
-    await StockLedger.create({
-      productId: product._id,
-      warehouseId: warehouse._id,
-      warehouseName: warehouse.name,
-      type: 'OUT',
-      qtyBoxes: -boxesToDeduct,
-      balanceBoxes: entry ? entry.qtyBoxes : 0,
-      reference: invoice.invoiceNo,
-      note: `Sales Invoice ${invoice.invoiceNo} (Finalized)`,
-      createdBy: 'System',
-      packing,
-      batchNo: item.batchNo || ''
-    });
-  }
+  const defaults = await Warehouse.find({ isDefault: true }).limit(2);
+  if (defaults.length === 1) return defaults[0];
+  const warehouses = await Warehouse.find({}).sort({ createdAt: 1 }).limit(2);
+  return warehouses.length === 1 ? warehouses[0] : null;
 }
 
 module.exports = {
   calculateInvoiceTotals,
   calculateTdsTcs,
-  resolveWarehouse,
-  deductInventoryForInvoice
+  resolveWarehouse
 };

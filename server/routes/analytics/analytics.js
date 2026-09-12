@@ -154,7 +154,7 @@ async function checkUserPermission(user, permName) {
 }
 
 // POST /api/analytics/ask — Query Business AI with strict RBAC permission enforcement
-router.post('/ask', authenticateToken, async (req, res) => {
+router.post('/ask', authenticateToken, authorize('analytics:query'), async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
@@ -239,7 +239,7 @@ Strict Security Rule: Answer the user's question accurately based ONLY on the pr
 });
 
 // GET /api/analytics/manufacturing — Retrieve manufacturing analytics, stats, and visual timeline runs
-router.get('/manufacturing', async (req, res) => {
+router.get('/manufacturing', authorize('manufacturing:view'), async (req, res) => {
   try {
     const BatchProduction = require('../../models/BatchProduction');
     const BillOfMaterials = require('../../models/BillOfMaterials');

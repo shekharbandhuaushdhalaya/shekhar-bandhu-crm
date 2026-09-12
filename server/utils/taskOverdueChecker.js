@@ -1,11 +1,13 @@
 const Task = require('../models/Task');
 const Notification = require('../models/Notification');
+const Firm = require('../models/Firm');
+const { runWithTenant } = require('./tenantContext');
 
 /**
  * Checks for overdue uncompleted tasks that have an assignee and haven't been notified yet.
  * Creates an alert Notification for assignedTo user and sets overdueNotifiedAt.
  */
-async function checkOverdueTasks(io) {
+async function checkOverdueTasksForCurrentFirm(io, firmId) {
   try {
     const now = new Date();
     const overdueTasks = await Task.find({
@@ -29,12 +31,22 @@ async function checkOverdueTasks(io) {
       await task.save();
 
       if (io) {
-        io.emit('notification_updated', notif);
-        io.emit('task_updated', { type: 'overdue_alert', id: task._id });
+        const room = firmId ? io.to(`firm:${firmId}`) : null;
+        if (room) {
+          room.emit('notification_updated', notif);
+          room.emit('task_updated', { type: 'overdue_alert', id: task._id });
+        }
       }
     }
   } catch (err) {
     console.error('❌ Error checking overdue tasks:', err.message);
+  }
+}
+
+async function checkOverdueTasks(io) {
+  const firms = await Firm.find({ active: { $ne: false } }).select('_id').lean();
+  for (const firm of firms) {
+    await runWithTenant({ firmId: firm._id }, () => checkOverdueTasksForCurrentFirm(io, String(firm._id)));
   }
 }
 

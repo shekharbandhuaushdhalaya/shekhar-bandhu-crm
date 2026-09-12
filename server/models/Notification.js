@@ -7,6 +7,7 @@ const notificationSchema = new mongoose.Schema({
   type:      { type: String, enum: ['info', 'alert', 'compliance', 'system'], default: 'info' },
   isRead:    { type: Boolean, default: false },
   userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Null represents a global broadcast
+  readBy:    [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // per-user read state for global broadcasts
   link:      { type: String, default: '' },
 }, { timestamps: true });
 

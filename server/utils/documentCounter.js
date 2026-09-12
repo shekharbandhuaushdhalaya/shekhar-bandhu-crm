@@ -1,33 +1,29 @@
 const Counter = require('../models/Counter');
 
 /**
- * Atomically gets the next sequence number for a given counter ID.
- * @param {string} counterId - Unique key for the counter (e.g. 'invoiceNo', 'complaintNo', 'sampleNo', 'dispatchNo')
- * @returns {Promise<number>} - Next sequence number
+ * Atomically gets the next tenant-scoped sequence number for a business counter.
+ * Tenant ownership is enforced by Counter's tenant plugin and active tenant context.
+ *
+ * @param {string} counterId unique business counter key (e.g. `invoiceNo_SALE`)
+ * @param {object|null} session optional mongoose session so number allocation can be
+ * rolled back with the surrounding transaction.
  */
-async function getNextSequenceValue(counterId) {
+async function getNextSequenceValue(counterId, session = null) {
+  if (!counterId || typeof counterId !== 'string') throw new Error('counterId is required');
+  const options = { new: true, upsert: true, setDefaultsOnInsert: true };
+  if (session) options.session = session;
   const counter = await Counter.findOneAndUpdate(
-    { _id: counterId },
-    { $inc: { seq: 1 } },
-    { new: true, upsert: true }
+    { counterKey: counterId },
+    { $inc: { seq: 1 }, $setOnInsert: { counterKey: counterId } },
+    options
   );
   return counter.seq;
 }
 
-/**
- * Atomically generates a formatted document number code.
- * @param {string} counterId - Unique counter identifier
- * @param {string} prefix - Optional prefix (e.g. 'VP', 'DISP', 'CMP')
- * @param {number} padLength - Number of digits to zero-pad (default: 4)
- * @returns {Promise<string>} - Formatted document code (e.g. 'VP-0042' or '0042')
- */
-async function generateAtomicDocumentNumber(counterId, prefix = '', padLength = 4) {
-  const seq = await getNextSequenceValue(counterId);
+async function generateAtomicDocumentNumber(counterId, prefix = '', padLength = 4, session = null) {
+  const seq = await getNextSequenceValue(counterId, session);
   const padded = String(seq).padStart(padLength, '0');
-  return prefix ? `${prefix}-${padded}` : padded;
+  return prefix ? `${prefix}${prefix.endsWith('-') || prefix.endsWith('/') ? '' : '-'}${padded}` : padded;
 }
 
-module.exports = {
-  getNextSequenceValue,
-  generateAtomicDocumentNumber
-};
+module.exports = { getNextSequenceValue, generateAtomicDocumentNumber };

@@ -1,608 +1,176 @@
 const express = require('express');
 const Order = require('../../models/Order');
-const Product = require('../../models/Product');
-
+const Challan = require('../../models/Challan');
 const Invoice = require('../../models/Invoice');
-const Customer = require('../../models/Customer');
-const Warehouse = require('../../models/Warehouse');
-const InventoryEntry = require('../../models/InventoryEntry');
-const StockLedger = require('../../models/StockLedger');
+const Dispatch = require('../../models/Dispatch');
+const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
 
-function checkAndAddAlerts(order, newStatus, newTrackingId, newCourierName) {
-  const oldStatus = order.status;
-  if (oldStatus !== newStatus) {
-    let alertMsg = '';
-    const tracker = newTrackingId || order.trackingId || 'N/A';
-    const courier = newCourierName || order.courierName || 'Courier Service';
-
-    if (newStatus === 'processing') {
-      alertMsg = `[SMS/WhatsApp Alert sent to ${order.phone}]: Hello ${order.name}, your order of ₹${order.totalAmount} has been approved and is now being processed at our Varanasi factory.`;
-    } else if (newStatus === 'shipped') {
-      alertMsg = `[SMS/WhatsApp/Email Alert sent to ${order.phone} / ${order.email}]: Hello ${order.name}, your order has been dispatched via ${courier}. Tracking ID: ${tracker}. Monitor your delivery live!`;
-    } else if (newStatus === 'delivered') {
-      alertMsg = `[SMS/WhatsApp Alert sent to ${order.phone}]: Hello ${order.name}, your order has been successfully delivered. Thank you for choosing Shekhar Bandhu Aushadhalaya!`;
-    } else if (newStatus === 'cancelled') {
-      alertMsg = `[SMS/WhatsApp Alert sent to ${order.phone}]: Hello ${order.name}, your order has been cancelled. Please contact B2B support for details.`;
-    }
-
-    if (alertMsg) {
-      if (!order.notifications) order.notifications = [];
-      order.notifications.push(`${new Date().toISOString()}:: ${alertMsg}`);
-    }
+function addStatusAlert(order, newStatus) {
+  if (order.status === newStatus) return;
+  let message = '';
+  if (newStatus === 'processing') message = `[Order update]: ${order.orderNo || order._id} is being processed.`;
+  else if (newStatus === 'cancelled') message = `[Order update]: ${order.orderNo || order._id} was cancelled.`;
+  if (message) {
+    order.notifications = order.notifications || [];
+    order.notifications.push(`${new Date().toISOString()}:: ${message}`);
   }
 }
 
-// GET /api/orders — List all orders (Authenticated)
-router.get('/', async (req, res) => {
-  try {
-    const { page, limit } = req.query;
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit) || 50;
-    const isPaginated = !isNaN(pageNum) && pageNum > 0;
-
-    let query = Order.find({}).sort({ createdAt: -1 });
-    if (isPaginated) {
-      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
-    }
-    
-    const orders = await query.lean();
-    const Invoice = require('../../models/Invoice');
-    const StockMovement = require('../../models/StockMovement');
-    const Dispatch = require('../../models/Dispatch');
-
-    const orderIds = orders.map(o => o._id);
-
-    const [invoices, challans] = await Promise.all([
-      Invoice.find({ reference: { $in: orderIds } }).select('_id reference invoiceNo').lean(),
-      StockMovement.find({ sourceDocId: { $in: orderIds } }).select('_id sourceDocId docNo').lean()
-    ]);
-
-    const invoiceMap = new Map();
-    invoices.forEach(inv => {
-      if (inv.reference) invoiceMap.set(inv.reference.toString(), inv);
-    });
-
-    const challanMap = new Map();
-    challans.forEach(ch => {
-      if (ch.sourceDocId) challanMap.set(ch.sourceDocId.toString(), ch);
-    });
-
-    const invoiceIds = invoices.map(i => i._id);
-    const challanIds = challans.map(c => c._id);
-
-    let dispatches = [];
-    if (invoiceIds.length > 0 || challanIds.length > 0) {
-      const dOr = [];
-      if (invoiceIds.length > 0) dOr.push({ invoiceId: { $in: invoiceIds } });
-      if (challanIds.length > 0) dOr.push({ challanId: { $in: challanIds } });
-      dispatches = await Dispatch.find({ $or: dOr }).select('_id invoiceId challanId dispatchNo').lean();
-    }
-
-    const dispatchByInvoiceMap = new Map();
-    const dispatchByChallanMap = new Map();
-    dispatches.forEach(d => {
-      if (d.invoiceId) dispatchByInvoiceMap.set(d.invoiceId.toString(), d);
-      if (d.challanId) dispatchByChallanMap.set(d.challanId.toString(), d);
-    });
-
-    const enrichedOrders = orders.map((order) => {
-      const orderIdStr = order._id.toString();
-      const invoice = invoiceMap.get(orderIdStr);
-      const challan = challanMap.get(orderIdStr);
-
-      let dispatch = null;
-      if (invoice) dispatch = dispatchByInvoiceMap.get(invoice._id.toString());
-      if (!dispatch && challan) dispatch = dispatchByChallanMap.get(challan._id.toString());
-
-      return {
-        ...order,
-        hasInvoice: !!invoice,
-        invoiceNo: invoice ? invoice.invoiceNo : null,
-        hasChallan: !!challan,
-        challanNo: challan ? challan.docNo : null,
-        hasDispatch: !!dispatch,
-        dispatchNo: dispatch ? dispatch.dispatchNo : null,
-      };
-    });
-
-    if (isPaginated) {
-      const total = await Order.countDocuments({});
-      return res.json({
-        data: enrichedOrders,
-        total,
-        page: pageNum,
-        limit: limitNum,
-        totalPages: Math.ceil(total / limitNum)
-      });
-    }
-
-    res.json(enrichedOrders);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+async function enrichOrders(orders) {
+  if (!orders.length) return [];
+  const orderIds = orders.map(o => o._id);
+  const challans = await Challan.find({ salesOrderId: { $in: orderIds } }).select('_id salesOrderId challanNo status inventoryPostingStatus invoiceId invoiceNo').lean();
+  const challanIds = challans.map(c => c._id);
+  const invoiceIds = [...new Set(orders.flatMap(o => (o.invoiceIds || []).map(String)).concat(challans.map(c => c.invoiceId).filter(Boolean).map(String)))];
+  const [invoices, dispatches] = await Promise.all([
+    invoiceIds.length ? Invoice.find({ _id: { $in: invoiceIds } }).select('_id invoiceNo status isFinalized sourceDocId').lean() : [],
+    challanIds.length ? Dispatch.find({ challanId: { $in: challanIds } }).select('_id challanId dispatchNo status trackingId courierName deliveredAt').lean() : [],
+  ]);
+  const challansByOrder = new Map();
+  for (const c of challans) {
+    const key = String(c.salesOrderId);
+    if (!challansByOrder.has(key)) challansByOrder.set(key, []);
+    challansByOrder.get(key).push(c);
   }
+  const invoicesById = new Map(invoices.map(i => [String(i._id), i]));
+  const dispatchesByChallan = new Map();
+  for (const d of dispatches) {
+    const key = String(d.challanId);
+    if (!dispatchesByChallan.has(key)) dispatchesByChallan.set(key, []);
+    dispatchesByChallan.get(key).push(d);
+  }
+  return orders.map(order => {
+    const cs = challansByOrder.get(String(order._id)) || [];
+    const invoiceSet = new Map();
+    for (const id of order.invoiceIds || []) { const inv = invoicesById.get(String(id)); if (inv) invoiceSet.set(String(inv._id), inv); }
+    for (const c of cs) { const inv = c.invoiceId ? invoicesById.get(String(c.invoiceId)) : null; if (inv) invoiceSet.set(String(inv._id), inv); }
+    const ds = cs.flatMap(c => dispatchesByChallan.get(String(c._id)) || []);
+    const invoiceList = [...invoiceSet.values()];
+    return {
+      ...order,
+      challans: cs,
+      invoices: invoiceList,
+      dispatches: ds,
+      hasChallan: cs.length > 0,
+      challanNo: cs[0]?.challanNo || null,
+      hasInvoice: invoiceList.length > 0,
+      invoiceNo: invoiceList[0]?.invoiceNo || null,
+      hasDispatch: ds.length > 0,
+      dispatchNo: ds[0]?.dispatchNo || null,
+    };
+  });
+}
+
+router.get('/', authorize('order:view'), async (req, res) => {
+  try {
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
+    const paginate = req.query.page != null;
+    const filter = {};
+    if (req.query.customerId) filter.customerId = req.query.customerId;
+    if (req.query.status) filter.status = req.query.status;
+    let query = Order.find(filter).sort({ createdAt: -1 });
+    if (paginate) query = query.skip((page - 1) * limit).limit(limit);
+    const orders = await query.lean();
+    const data = await enrichOrders(orders);
+    if (!paginate) return res.json(data);
+    const total = await Order.countDocuments(filter);
+    res.json({ data, total, page, limit, totalPages: Math.ceil(total / limit) });
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// PATCH /api/orders/:id/status — Update order status (Authenticated)
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', authorize('order:edit'), async (req, res) => {
   try {
     const { status } = req.body;
-    if (!['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status value' });
-    }
+    if (['shipped','delivered'].includes(status)) return res.status(409).json({ error: 'Shipping and delivery status are controlled by Dispatch records.', code: 'DISPATCH_STATUS_AUTHORITY' });
+    if (status === 'cancelled') return res.status(409).json({ error: 'Use the dedicated cancel action so Challan dependencies can be checked.', code: 'USE_CANCEL_ENDPOINT' });
+    if (!['pending','processing','draft'].includes(status)) return res.status(400).json({ error: 'Invalid manually assignable status' });
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-
-    checkAndAddAlerts(order, status);
+    addStatusAlert(order, status);
     order.status = status;
     await order.save();
-
-    if (req.io) {
-      req.io.emit('order_updated', { type: 'status_changed', id: order._id });
-    }
+    if (req.io) req.io.emit('order_updated', { type: 'status_changed', id: order._id });
     res.json(order);
-
-    await logAction({
-      action: 'ORDER_STATUS_CHANGE',
-      description: `Order #${order._id} status changed to "${status}" for customer ${order.name}`,
-      details: { orderId: order._id, customer: order.name, newStatus: status, amount: order.totalAmount },
-      req
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// PUT /api/orders/:id — Update full order details (Authenticated)
-router.put('/:id', validate(schemas.orderSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('order:edit'), validate(schemas.orderSchema.partial()), async (req, res) => {
   try {
-    const { name, email, phone, shippingAddress, status, totalAmount, courierName, trackingId, courierLink, adminNotes } = req.body;
-
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-
-    if (status !== undefined) {
-      if (!['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status value' });
-      }
-      checkAndAddAlerts(order, status, trackingId, courierName);
-      order.status = status;
+    const posted = await Challan.exists({ salesOrderId: order._id, status: 'finalized', inventoryPostingStatus: 'posted' });
+    const protectedFields = ['items','customerId','warehouseId','totalAmount','name'];
+    if (posted && protectedFields.some(field => Object.prototype.hasOwnProperty.call(req.body, field))) {
+      return res.status(409).json({ error: 'Commercial/order lines cannot be changed after physical fulfillment has started.', code: 'ORDER_ALREADY_FULFILLED' });
     }
-
-    if (name !== undefined) order.name = name.trim();
-    if (email !== undefined) order.email = email.trim().toLowerCase();
-    if (phone !== undefined) order.phone = phone.trim();
-    if (shippingAddress !== undefined) order.shippingAddress = shippingAddress.trim();
-    if (totalAmount !== undefined) order.totalAmount = Number(totalAmount);
-    if (courierName !== undefined) order.courierName = courierName.trim();
-    if (trackingId !== undefined) order.trackingId = trackingId.trim();
-    if (courierLink !== undefined) order.courierLink = courierLink.trim();
-    if (adminNotes !== undefined) order.adminNotes = adminNotes.trim();
-
+    if (req.body.status && ['shipped','delivered','cancelled'].includes(req.body.status)) {
+      return res.status(409).json({ error: 'Shipment/delivery is controlled by Dispatch; cancellation uses the cancel endpoint.', code: 'ORDER_STATUS_PROTECTED' });
+    }
+    const allowed = ['email','phone','shippingAddress','billingAddress','customerPoNo','expectedDeliveryDate','priority','adminNotes','courierName','trackingId','courierLink','status'];
+    for (const field of allowed) if (Object.prototype.hasOwnProperty.call(req.body, field)) order[field] = req.body[field];
     await order.save();
-    if (req.io) {
-      req.io.emit('order_updated', { type: 'updated', id: order._id });
-    }
+    if (req.io) req.io.emit('order_updated', { type: 'updated', id: order._id });
     res.json(order);
-
-    await logAction({
-      action: 'UPDATE_ORDER',
-      description: `Updated order #${order._id} for ${order.name} — Status: ${order.status}`,
-      details: { orderId: order._id, customer: order.name, status: order.status, changes: Object.keys(req.body) },
-      req
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-
-// POST /api/orders/public/create — compatibility order creation. No physical inventory movement.
-router.post('/public/create', validate(schemas.orderSchema), async (req, res) => {
-  try {
-    const { name, email, phone, shippingAddress, items, mrId, mrName, visitId } = req.body;
-    if (!name || !email || !phone || !shippingAddress || !Array.isArray(items) || !items.length) {
-      return res.status(400).json({ error: 'Missing required order fields or items list' });
-    }
-    let totalAmount = 0;
-    const validatedItems = [];
-    for (const item of items) {
-      const dbProd = await Product.findById(item.productId);
-      if (!dbProd) return res.status(404).json({ error: `Product not found: ${item.name || item.productId}` });
-      const qty = Number(item.qty || 0);
-      if (!Number.isFinite(qty) || qty <= 0) return res.status(400).json({ error: `Invalid quantity for item: ${dbProd.name}` });
-      const price = dbProd.discount > 0 ? Number(dbProd.price || 0) * (1 - dbProd.discount / 100) : Number(dbProd.price || 0);
-      totalAmount += price * qty;
-      validatedItems.push({ productId: dbProd._id, name: dbProd.name, qty, price: Number(price.toFixed(2)), size: dbProd.size || 'Standard', deductedBoxes: 0, fulfilledQty: 0, backorderedQty: qty });
-    }
-    const approvalRequired = totalAmount >= 50000;
-    const count = await Order.countDocuments({});
-    const commissionAmount = mrId ? Number((totalAmount * 0.02).toFixed(2)) : 0;
-    const incentiveCredited = mrId ? true : false;
-    const newOrder = await Order.create({
-      orderNo: `SO-${String(count+1).padStart(5,'0')}`,
-      name, email, phone, shippingAddress, items: validatedItems,
-      totalAmount: Number(totalAmount.toFixed(2)), status: 'pending', sourceType: mrId ? 'mr' : 'online',
-      sourcePersonId: mrId || null, sourcePersonName: mrName || '',
-      approvalRequired, approvalStatus: approvalRequired ? 'pending_approval' : 'none',
-      mrId: mrId || null, mrName: mrName || '', visitId: visitId || null,
-      commissionAmount, incentiveCredited
-    });
-    if (mrId) {
-      const SalesTarget = require('../../models/SalesTarget');
-      await SalesTarget.findOneAndUpdate({ agentId: mrId }, { $inc: { achievedAmount: totalAmount } });
-    }
-    if (req.io) req.io.emit('order_updated', { type: 'created', id: newOrder._id });
-    const orderData = newOrder.toObject ? newOrder.toObject() : newOrder;
-    res.status(201).json({ ...orderData, message: 'Order created. Inventory moves only through a finalized Challan.' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-router.patch('/:id/approve', async (req, res) => {
+router.patch('/:id/approve', authorize('order:approve'), async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-
+    if (order.status === 'cancelled') return res.status(409).json({ error: 'Cancelled orders cannot be approved' });
     order.approvalStatus = 'approved';
-    order.approvedBy = req.user ? req.user.name : 'Manager';
+    order.approvedBy = req.user?.name || req.user?.email || 'User';
     order.approvedAt = new Date();
+    order.rejectionReason = '';
+    if (order.status === 'pending') order.status = 'processing';
     await order.save();
-
     if (req.io) req.io.emit('order_updated', { type: 'approved', id: order._id });
-    res.json({ message: 'Order approved successfully', order });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json(order);
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// PATCH /api/orders/:id/reject — Manager reject a large-value order
-router.patch('/:id/reject', async (req, res) => {
+router.patch('/:id/reject', authorize('order:approve'), async (req, res) => {
   try {
-    const { rejectionReason } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-
+    if (await Challan.exists({ salesOrderId: order._id, status: 'finalized', inventoryPostingStatus: 'posted' })) {
+      return res.status(409).json({ error: 'An order with posted Challans cannot be rejected. Reverse the dependent Challans first.', code: 'POSTED_CHALLAN_EXISTS' });
+    }
     order.approvalStatus = 'rejected';
-    order.rejectionReason = rejectionReason || 'Large value order rejected by manager';
+    order.rejectionReason = String(req.body.reason || '').slice(0, 500);
     order.status = 'cancelled';
     await order.save();
-
     if (req.io) req.io.emit('order_updated', { type: 'rejected', id: order._id });
-    res.json({ message: 'Order rejected', order });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json(order);
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// PATCH /api/orders/:id/cancel — Cancel order & revert stock (Authenticated)
-router.patch('/:id/cancel', async (req, res) => {
+router.patch('/:id/cancel', authorize('order:cancel'), async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-
-    if (order.status === 'cancelled') {
-      return res.status(400).json({ error: 'Order is already cancelled' });
+    if (await Challan.exists({ salesOrderId: order._id, status: 'finalized', inventoryPostingStatus: 'posted' })) {
+      return res.status(409).json({ error: 'This order has posted Challans. Reverse those physical movements before cancelling the order.', code: 'POSTED_CHALLAN_EXISTS' });
     }
-    if (order.status === 'delivered') {
-      return res.status(400).json({ error: 'Cannot cancel a delivered order' });
-    }
-
-    let warehouse = await Warehouse.findOne({ isDefault: true });
-    if (!warehouse) {
-      warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
-    }
-
-    // Revert stock for each item
-    for (const item of order.items) {
-      const dbProd = await Product.findById(item.productId);
-      if (!dbProd) continue;
-
-      // Use stored deductedBoxes if available, else estimate
-      const boxesToRestore = item.deductedBoxes || Math.ceil(item.qty / ((await InventoryEntry.findOne({ productId: dbProd._id }))?.packing || 1));
-
-      // Revert product stockLevel (in boxes)
-      dbProd.stockLevel += boxesToRestore;
-      await dbProd.save();
-
-      // Revert InventoryEntry — add back to unbatched/first slot for this product
-      if (warehouse) {
-        // Find the most recent OUT ledger entries for this product from this order to know which batches to restore
-        const outLedgers = await StockLedger.find({
-          productId: dbProd._id,
-          warehouseId: warehouse._id,
-          type: 'OUT',
-          reference: 'Web Order',
-        }).sort({ createdAt: -1 }).limit(10);
-
-        if (outLedgers.length > 0) {
-          // Restore using the same batch slots recorded in the ledger
-          for (const ledger of outLedgers) {
-            const entryToRestore = await InventoryEntry.findOne({
-              warehouseId: warehouse._id,
-              productId: dbProd._id,
-              vendorId: ledger.vendorId || '',
-              packing: ledger.packing || 1,
-              batchNo: ledger.batchNo || '',
-            });
-            if (entryToRestore) {
-              entryToRestore.qtyBoxes += Math.abs(ledger.qtyBoxes);
-              await entryToRestore.save();
-            }
-          }
-        } else {
-          // Fallback: add to first available slot
-          const fallbackEntry = await InventoryEntry.findOne({
-            warehouseId: warehouse._id,
-            productId: dbProd._id,
-          });
-          if (fallbackEntry) {
-            fallbackEntry.qtyBoxes += boxesToRestore;
-            await fallbackEntry.save();
-          }
-        }
-
-        await StockLedger.create({
-          productId: dbProd._id,
-          warehouseId: warehouse._id,
-          warehouseName: warehouse.name,
-          type: 'IN',
-          qtyBoxes: boxesToRestore,
-          balanceBoxes: 0,
-          reference: 'Order Cancel',
-          note: `Stock reverted due to cancellation of Web Order by ${order.name}`,
-          createdBy: 'System',
-          packing: outLedgers[0]?.packing || 1,
-          vendorId: outLedgers[0]?.vendorId || '',
-          vendorName: outLedgers[0]?.vendorName || '',
-        });
-      }
-    }
-
+    addStatusAlert(order, 'cancelled');
     order.status = 'cancelled';
     await order.save();
-    if (req.io) {
-      req.io.emit('order_updated', { type: 'cancelled', id: order._id });
-    }
-    res.json({ message: 'Order cancelled and stock reverted', order });
-
-    await logAction({
-      action: 'CANCEL_ORDER',
-      description: `Cancelled order #${order._id} for ${order.name} — Stock reverted for ${order.items.length} product(s)`,
-      details: { orderId: order._id, customer: order.name, phone: order.phone, amount: order.totalAmount, items: order.items.length },
-      req
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    if (req.io) req.io.emit('order_updated', { type: 'cancelled', id: order._id });
+    await logAction({ action: 'CANCEL_ORDER', description: `Cancelled order ${order.orderNo || order._id} for ${order.name}`, details: { orderId: order._id }, req });
+    res.json({ message: 'Order cancelled. No inventory was changed because Sales Orders never move stock.', order });
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// GET /api/orders/public/track/:query — Public tracking search by Order ID or Phone (Unauthenticated)
-router.get('/public/track/:query', async (req, res) => {
-  try {
-    const { query } = req.params;
-    if (!query) {
-      return res.status(400).json({ error: 'Tracking query is required' });
-    }
-
-    const filter = {};
-    const cleanQuery = query.trim();
-
-    // Check if the query is a valid 24-character hexadecimal MongoDB ObjectId
-    if (/^[0-9a-fA-F]{24}$/.test(cleanQuery)) {
-      filter._id = cleanQuery;
-    } else {
-      // Otherwise, query by exact phone number match
-      filter.phone = cleanQuery;
-    }
-
-    const matchedOrders = await Order.find(filter)
-      .select('name status totalAmount courierName trackingId courierLink createdAt items')
-      .sort({ createdAt: -1 })
-      .lean();
-
-    const Invoice = require('../../models/Invoice');
-    const StockMovement = require('../../models/StockMovement');
-    const Dispatch = require('../../models/Dispatch');
-
-    const enrichedOrders = await Promise.all(matchedOrders.map(async (order) => {
-      let courierName = order.courierName || '';
-      let trackingId = order.trackingId || '';
-      let courierLink = order.courierLink || '';
-      let transporter = '';
-      let lrNo = '';
-      let vehicleNo = '';
-
-      const invoice = await Invoice.findOne({ reference: order._id }).select('_id').lean();
-      const challan = await StockMovement.findOne({ sourceDocId: order._id }).select('_id transporter lrNo vehicleNo').lean();
-      
-      let dispatch = null;
-      if (invoice || challan) {
-        const query = {};
-        if (invoice && challan) {
-          query.$or = [{ invoiceId: invoice._id }, { challanId: challan._id }];
-        } else if (invoice) {
-          query.invoiceId = invoice._id;
-        } else {
-          query.challanId = challan._id;
-        }
-        dispatch = await Dispatch.findOne(query).lean();
-      }
-
-      if (dispatch) {
-        if (!courierName) courierName = dispatch.courierName || '';
-        if (!trackingId) trackingId = dispatch.trackingId || '';
-        if (!courierLink) courierLink = dispatch.trackingUrl || '';
-        transporter = dispatch.transporter || '';
-        lrNo = dispatch.lrNo || '';
-        vehicleNo = dispatch.vehicleNo || '';
-      }
-
-      if (challan) {
-        if (!transporter) transporter = challan.transporter || '';
-        if (!lrNo) lrNo = challan.lrNo || '';
-        if (!vehicleNo) vehicleNo = challan.vehicleNo || '';
-      }
-
-      return {
-        ...order,
-        courierName,
-        trackingId,
-        courierLink,
-        transporter,
-        lrNo,
-        vehicleNo
-      };
-    }));
-
-    res.json(enrichedOrders);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Helper for financial year string
-function getFinancialYearString(date = new Date()) {
-  const year = date.getFullYear();
-  const month = date.getMonth(); // 0-indexed, 3 = Apr
-  if (month >= 3) {
-    return `${year}-${(year + 1).toString().slice(-2)}`;
-  } else {
-    return `${year - 1}-${year.toString().slice(-2)}`;
-  }
-}
-
-// POST /api/orders/:id/invoice — Generate Draft Sale Invoice from Order (Authenticated)
-router.post('/:id/invoice', validate(schemas.invoiceSchema), async (req, res) => {
-  try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-
-    // 1. Check if an invoice was already generated for this order to prevent duplicates
-    const existingInvoice = await Invoice.findOne({ reference: order._id });
-    if (existingInvoice) {
-      return res.status(400).json({ error: `An invoice has already been generated for this order (Invoice No: ${existingInvoice.invoiceNo})` });
-    }
-
-    // 2. Resolve Customer (try to find matching customer in B2B database, or fallback/create)
-    let customer = await Customer.findOne({
-      $or: [
-        { name: order.name },
-        { company: order.name }
-      ]
-    });
-
-    if (!customer) {
-      // Create a default customer record for this web order
-      customer = await Customer.create({
-        name: order.name,
-        company: order.name,
-        email: order.email,
-        phone: order.phone,
-        billingAddress: { street: order.shippingAddress, city: 'Varanasi', state: 'Uttar Pradesh', pin: '221001' },
-        shippingAddress: { street: order.shippingAddress, city: 'Varanasi', state: 'Uttar Pradesh', pin: '221001' },
-        customerType: 'cash',
-        recordTracking: 'cash_ledger'
-      });
-    }
-
-    // 3. Format Invoice items with GST back-calculation (MRP is tax-inclusive)
-    let totalBase = 0;
-    let totalTax = 0;
-    const invoiceItems = [];
-
-    for (const item of order.items) {
-      const dbProd = await Product.findById(item.productId);
-      const gstRate = dbProd ? (dbProd.gstRate || 18) : 18;
-
-      const totalInclusive = item.qty * item.price;
-      const itemBase = totalInclusive / (1 + gstRate / 100);
-      const itemTax = totalInclusive - itemBase;
-      const rateExclGst = item.price / (1 + gstRate / 100);
-
-      totalBase += itemBase;
-      totalTax += itemTax;
-
-      invoiceItems.push({
-        productId: item.productId,
-        name: item.name,
-        qty: item.qty,
-        boxes: item.qty,
-        packing: 1,
-        rate: Number(rateExclGst.toFixed(2)),
-        gstRate,
-        amount: Number(itemBase.toFixed(2)),
-        size: item.size,
-        mrp: item.price
-      });
-    }
-
-    const cgst = totalTax / 2;
-    const sgst = totalTax / 2;
-    const igst = 0; // website orders default to Uttar Pradesh (intra-state)
-    const rawTotal = totalBase + cgst + sgst + igst;
-    const nettTotal = Math.round(rawTotal);
-    const roundOff = nettTotal - rawTotal;
-
-    // 4. Generate unique invoice number
-    const fy = getFinancialYearString(new Date());
-    const SystemSettings = require('../../models/SystemSettings');
-    const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
-    const pfx = settings.invoicePrefix || 'VP';
-    const prefix = `${pfx}/${fy}/`;
-    const invoices = await Invoice.find({
-      type: 'sale',
-      invoiceNo: { $regex: `^${prefix.replace(/\//g, '\\/')}\\d+$` }
-    }).select('invoiceNo').lean();
-
-    let nextNum = 1;
-    if (invoices.length > 0) {
-      const nums = invoices.map(inv => {
-        const parts = inv.invoiceNo.split('/');
-        return parts.length === 3 ? parseInt(parts[2], 10) : 0;
-      }).filter(n => !isNaN(n));
-      if (nums.length > 0) {
-        nextNum = Math.max(...nums) + 1;
-      }
-    }
-    const invoiceNo = `${prefix}${nextNum.toString().padStart(3, '0')}`;
-
-    // 5. Create Draft Sale Invoice
-    const newInvoice = await Invoice.create({
-      type: 'sale',
-      invoiceNo,
-      date: new Date(),
-      customerName: customer.company || customer.name,
-      items: invoiceItems,
-      amount: order.totalAmount, // keep the exact order amount
-      mode: 'pakka', // default website orders to pakka ledger
-      baseAmount: Number(totalBase.toFixed(2)),
-      cgst: Number(cgst.toFixed(2)),
-      sgst: Number(sgst.toFixed(2)),
-      igst: Number(igst.toFixed(2)),
-      roundOff: Number(roundOff.toFixed(2)),
-      isFinalized: false,
-      reference: order._id, // link back to this order
-      status: 'unpaid'
-    });
-
-    if (req.io) {
-      req.io.emit('invoice_updated', { type: 'created_from_order', id: newInvoice._id });
-    }
-    res.status(201).json({ message: 'Draft invoice generated successfully', invoice: newInvoice });
-
-    await logAction({
-      action: 'ORDER_GENERATE_INVOICE',
-      description: `Generated invoice ${newInvoice.invoiceNo} from order #${order._id} for ${order.name} — ₹${order.totalAmount}`,
-      details: { orderId: order._id, invoiceId: newInvoice._id, invoiceNo: newInvoice.invoiceNo, customer: order.name, amount: order.totalAmount },
-      req
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// Legacy public and direct-invoice endpoints are deliberately retired. Public ordering lives under /api/public/orders and /api/portal/orders.
+router.post('/public/create', (_req, res) => res.status(410).json({ error: 'This endpoint is retired. Use the authenticated customer portal.', code: 'LEGACY_ORDER_ENDPOINT_RETIRED' }));
+router.get('/public/track/:query', (_req, res) => res.status(410).json({ error: 'Phone-based public tracking is retired. Use customer portal tracking.', code: 'LEGACY_TRACKING_RETIRED' }));
+router.post('/:id/invoice', authorize('invoice:create'), (_req, res) => res.status(410).json({ error: 'Direct Order → Invoice conversion is retired. Fulfill the order through a posted Sale Challan, then create the invoice from that Challan.', code: 'CHALLAN_REQUIRED' }));
 
 module.exports = router;

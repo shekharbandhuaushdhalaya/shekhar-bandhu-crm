@@ -8,7 +8,7 @@ const { logAction } = require('../../utils/auditLogger');
 const router = express.Router();
 
 // GET /api/customers — List customers with optional search filter
-router.get('/', async (req, res) => {
+router.get('/', authorize('customer:view'), async (req, res) => {
   try {
     const { search, page, limit, mode } = req.query;
     const filter = {};
@@ -64,7 +64,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/customers — Create new customer
-router.post('/', validate(schemas.customerSchema), async (req, res) => {
+router.post('/', authorize('customer:create'), validate(schemas.customerSchema), async (req, res) => {
   try {
     const data = { ...req.body };
     if (!req.user || !req.user.canAccessCash) {
@@ -92,7 +92,7 @@ router.post('/', validate(schemas.customerSchema), async (req, res) => {
 });
 
 // PUT /api/customers/:id — Update customer details
-router.put('/:id', validate(schemas.customerSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('customer:edit'), validate(schemas.customerSchema.partial()), async (req, res) => {
   try {
     const data = { ...req.body };
     if (!req.user || !req.user.canAccessCash) {
@@ -146,7 +146,7 @@ router.delete('/:id', authorize('customer:delete'), async (req, res) => {
 });
 
 // GET /api/customers/export-csv — Export customers list as CSV format
-router.get('/export-csv', async (req, res) => {
+router.get('/export-csv', authorize('customer:view'), async (req, res) => {
   try {
     const customers = await Customer.find({}).lean();
     let csv = 'Name,Company,Email,Phone,GSTIN,State,VolumeTier,CreditLimit,OutstandingBalance\n';

@@ -185,12 +185,13 @@ const quotationItem = z.object({
 
 const quotationSchema = z.object({
   quotationNo: z.string().optional(),
+  customerId: objectId.optional().nullable(),
   customerName: z.string().default(''),
   partyAddress: z.string().default(''),
   shippingAddress: z.string().default(''),
   date: z.string().or(z.date()).optional(),
   amount: z.number().default(0),
-  status: z.enum(['draft', 'sent', 'approved', 'rejected']).default('draft'),
+  status: z.enum(['draft', 'sent', 'approved', 'rejected', 'converted', 'lost']).default('draft'),
   mode: z.enum(['regular', 'pakka', 'cash']).default('pakka'),
   baseAmount: z.number().optional(),
   gstRate: z.number().optional(),
@@ -371,6 +372,7 @@ const inventoryEntrySchema = z.object({
   mfgDate: z.string().or(z.date()).optional(),
   expiryDate: z.string().or(z.date()).optional(),
   purchaseRate: z.number().default(0),
+  qcStatus: z.enum(['under_test', 'approved', 'rejected']).optional().default('under_test'),
 });
 
 // ── Payment & Allocation ──────────────────────────────────────
@@ -430,6 +432,7 @@ const sampleItem = z.object({
   productId: objectId.optional(),
   productName: z.string().min(1),
   qty: z.number().int().min(1),
+  batchNo: z.string().optional().default(''),
   size: z.string().default(''),
   mrp: z.number().default(0),
 });
@@ -442,6 +445,7 @@ const sampleSchema = z.object({
   location: z.string().default(''),
   purpose: z.string().default(''),
   items: z.array(sampleItem).min(1),
+  warehouseId: objectId.optional().nullable(),
   totalMrpValue: z.number().default(0),
   givenBy: z.string().default(''),
   date: z.string().or(z.date()).optional(),
@@ -514,6 +518,8 @@ const challanItem = z.object({
   productId: objectId.optional(),
   name: z.string().min(1),
   qty: z.number().default(0),
+  billableQty: z.number().min(0).nullable().optional(),
+  freeQty: z.number().min(0).default(0),
   rate: z.number().default(0),
   packing: z.number().default(1),
   hsnCode: z.string().default(''),
@@ -534,6 +540,9 @@ const challanSchema = z.object({
   shippingAddress: z.string().default(''),
   warehouseId: objectId.optional(),
   warehouseName: z.string().default(''),
+  customerId: objectId.nullable().optional(),
+  salesOrderId: objectId.nullable().optional(),
+  fulfillmentSequence: z.number().int().positive().optional(),
   challanType: z.enum(['sale', 'transfer', 'production_transfer']).default('sale'),
   destinationWarehouseId: objectId.nullable().optional(),
   destinationWarehouseName: z.string().default(''),
@@ -592,7 +601,10 @@ const rawMaterialEntrySchema = z.object({
   batchNo: z.string().min(1),
   qty: z.number().positive(),
   purchaseRate: z.number().min(0),
+  vendorId: objectId.optional().nullable(),
   vendorName: z.string().default(''),
+  warehouseId: objectId.optional().nullable(),
+  manufacturingUnitId: objectId.optional().nullable(),
   expiryDate: z.string().or(z.date()).optional(),
 });
 
@@ -738,6 +750,7 @@ const mrTourPlanSchema = z.object({
 
 const mrSampleIssueSchema = z.object({
   productId: objectId,
+  warehouseId: objectId.optional().nullable(),
   batchNo: z.string().optional().default(''),
   expiryDate: z.string().or(z.date()).optional().nullable(),
   qty: z.number().int().positive(),
@@ -936,18 +949,22 @@ const dispatchSchema = z.object({
   invoiceNo: z.string().default(''),
   challanId: objectId.optional(),
   challanNo: z.string().default(''),
-  customerName: z.string().min(1, 'Customer name required'),
+  customerName: z.string().default(''),
   customerPhone: z.string().default(''),
   shippingAddress: z.string().default(''),
   items: z.array(z.object({
     productId: objectId.optional(),
     name: z.string().min(1, 'Item name required'),
-    qty: z.number().int().nonnegative(),
+    qty: z.number().nonnegative(),
     packing: z.number().int().min(1).default(1),
     batchNo: z.string().default(''),
-  })).min(1),
+  })).default([]),
   transporter: z.string().default(''),
+  lrNo: z.string().default(''),
   vehicleNo: z.string().default(''),
+  courierName: z.string().default(''),
+  trackingId: z.string().default(''),
+  trackingUrl: z.string().default(''),
   date: z.string().or(z.date()).optional(),
   notes: z.string().default(''),
   totalBoxes: z.number().default(0),

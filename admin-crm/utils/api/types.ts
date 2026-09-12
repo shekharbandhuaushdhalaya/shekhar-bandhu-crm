@@ -132,6 +132,8 @@ export type ChallanItem = {
   productId?: string;
   name: string;
   qty: number;
+  billableQty?: number;
+  freeQty?: number;
   rate?: number;
   packing?: number;
   vendorId?: string;
@@ -154,6 +156,10 @@ export type Challan = {
   warehouseName?: string;
   items: ChallanItem[];
   status: string;
+  challanType?: 'sale' | 'transfer' | 'production_transfer';
+  inventoryPostingStatus?: 'not_posted' | 'posting' | 'posted' | 'reversed';
+  customerId?: string;
+  salesOrderId?: string;
   mode: 'regular';
   baseAmount?: number;
   cgst?: number;
@@ -479,7 +485,7 @@ export type RawMaterial = {
 
 export type RawMaterialEntry = {
   _id: string;
-  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string };
+  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string; category?: string };
   batchNo: string;
   qty: number;
   purchaseRate: number;

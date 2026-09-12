@@ -43,6 +43,7 @@ dispatchSchema.index({ createdAt: -1 });
 dispatchSchema.index({ status: 1 });
 dispatchSchema.index({ invoiceId: 1 });
 dispatchSchema.index({ challanId: 1 });
+dispatchSchema.index({ firmId: 1, challanId: 1 }, { unique: true, sparse: true });
 
 dispatchSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Dispatch', dispatchSchema);

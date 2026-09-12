@@ -25,8 +25,9 @@ const inventoryEntrySchema = new mongoose.Schema({
   qcStatus: { type: String, enum: ['under_test', 'approved', 'rejected'], default: 'under_test' }
 }, { timestamps: true });
 
-// Unique stock slot = product + vendor + warehouse + packing size + batch number
-inventoryEntrySchema.index({ warehouseId: 1, productId: 1, vendorId: 1, packing: 1, batchNo: 1 }, { unique: true });
+// Unique stock slot = product + vendor + warehouse + packing size + batch + QC disposition.
+// Approved and rejected stock must never collide in the same logical slot.
+inventoryEntrySchema.index({ warehouseId: 1, productId: 1, vendorId: 1, packing: 1, batchNo: 1, qcStatus: 1 }, { unique: true });
 inventoryEntrySchema.index({ warehouseId: 1, productId: 1, vendorId: 1, packing: 1, createdAt: 1 });
 inventoryEntrySchema.index({ expiryDate: 1, qtyBoxes: 1 });
 

@@ -67,7 +67,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   actionText: {
     fontSize: 12.5,
-    fontWeight: '750',
+    fontWeight: '700',
     color: colors.primary,
   },
 });

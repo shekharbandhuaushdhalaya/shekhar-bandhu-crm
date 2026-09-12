@@ -1,4 +1,5 @@
 const express = require('express');
+const { authorize } = require('../../middleware/authorize');
 const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
 const { PHARMACOPOEIA_SEED_DATA } = require('../../utils/pharmacopoeiaSeedData');
 const router = express.Router();
@@ -101,7 +102,7 @@ async function checkDuplicatePharmacopoeiaEntries() {
 }
 
 // GET /api/pharmacopoeia — List / Search pharmacopoeia monographs
-router.get('/', async (req, res) => {
+router.get('/', authorize('manufacturing:view'), async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=300');
 
@@ -137,7 +138,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/pharmacopoeia/unverified — List all unverified pharmacopoeia monographs
-router.get('/unverified', async (req, res) => {
+router.get('/unverified', authorize('manufacturing:view'), async (req, res) => {
   try {
     const unverifiedEntries = await PharmacopoeiaEntry.find({ verified: false }).sort({ createdAt: -1 }).lean();
     res.json(unverifiedEntries);
@@ -147,7 +148,7 @@ router.get('/unverified', async (req, res) => {
 });
 
 // GET /api/pharmacopoeia/search — Instant search by herb name or alias
-router.get('/search', async (req, res) => {
+router.get('/search', authorize('manufacturing:view'), async (req, res) => {
   try {
     const queryTerm = (req.query.q || req.query.query || '').trim();
     if (!queryTerm) return res.status(400).json({ error: 'Search query parameter q is required' });
@@ -204,7 +205,7 @@ router.get('/search', async (req, res) => {
 });
 
 // POST /api/pharmacopoeia/seed — Trigger manual re-seeding / reset
-router.post('/seed', async (req, res) => {
+router.post('/seed', authorize('manufacturing:edit'), async (req, res) => {
   try {
     await PharmacopoeiaEntry.deleteMany({});
     const inserted = await PharmacopoeiaEntry.insertMany(PHARMACOPOEIA_SEED_DATA);
@@ -215,7 +216,7 @@ router.post('/seed', async (req, res) => {
 });
 
 // POST /api/pharmacopoeia/import-to-raw-materials — Bulk/single import monographs into Raw Materials Master
-router.post('/import-to-raw-materials', async (req, res) => {
+router.post('/import-to-raw-materials', authorize('manufacturing:create'), async (req, res) => {
   try {
     const RawMaterial = require('../../models/RawMaterial');
     const { generateRawMaterialSku } = require('../../utils/skuGenerator');
@@ -282,7 +283,7 @@ router.post('/import-to-raw-materials', async (req, res) => {
 });
 
 // GET /api/pharmacopoeia/:id — Get monograph details by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', authorize('manufacturing:view'), async (req, res) => {
   try {
     const entry = await PharmacopoeiaEntry.findById(req.params.id).lean();
     if (!entry) return res.status(404).json({ error: 'Monograph not found' });
@@ -293,7 +294,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/pharmacopoeia — Create custom pharmacopoeia entry
-router.post('/', async (req, res) => {
+router.post('/', authorize('manufacturing:create'), async (req, res) => {
   try {
     const { ayurvedicName, botanicalName } = req.body;
     if (!ayurvedicName || !botanicalName) {
@@ -307,7 +308,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/pharmacopoeia/:id/verify — Approve and optionally update monograph fields
-router.put('/:id/verify', async (req, res) => {
+router.put('/:id/verify', authorize('quality:approve'), async (req, res) => {
   try {
     const updateData = { ...req.body, verified: true };
     const updated = await PharmacopoeiaEntry.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
@@ -319,7 +320,7 @@ router.put('/:id/verify', async (req, res) => {
 });
 
 // PUT /api/pharmacopoeia/:id — Update pharmacopoeia entry
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorize('manufacturing:edit'), async (req, res) => {
   try {
     const updated = await PharmacopoeiaEntry.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!updated) return res.status(404).json({ error: 'Monograph not found' });

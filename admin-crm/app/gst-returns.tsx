@@ -262,7 +262,7 @@ function GstReturnsPage() {
                   } else {
                     Alert.prompt('File URL', 'Enter PDF Receipt URL:', [
                       { text: 'Cancel' },
-                      { text: 'Save', onPress: (url) => url && setAcknowledgementUrl(url) }
+                      { text: 'Save', onPress: (url?: string) => url && setAcknowledgementUrl(url) }
                     ]);
                   }
                 }}
@@ -457,6 +457,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   label: { fontSize: 10, color: colors.text.muted, fontWeight: '700', letterSpacing: 0.5 },
   value: { fontSize: 18, fontWeight: '800', color: colors.text.primary, marginTop: 4 },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.text.primary, marginBottom: 12 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   statCard: { flex: 1, minWidth: 200, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1 },
   statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   statValue: { fontSize: 18, fontWeight: '800', marginTop: 4 },

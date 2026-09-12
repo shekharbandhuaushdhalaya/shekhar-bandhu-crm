@@ -2,6 +2,7 @@ const express = require('express');
 const Recall = require('../../models/Recall');
 const Invoice = require('../../models/Invoice');
 const { authorize } = require('../../middleware/authorize');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/recalls — Initiate a batch recall & auto-trace affected customers
-router.post('/', authorize('manufacturing:batchManage'), async (req, res) => {
+router.post('/', authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { batchNo, productId, productName, reason, severity = 'class_II' } = req.body;
 
@@ -29,7 +30,7 @@ router.post('/', authorize('manufacturing:batchManage'), async (req, res) => {
     }
 
     const fy = new Date().getFullYear() % 100 + '-' + (new Date().getFullYear() + 1) % 100;
-    const recallNo = `RCL/${fy}/${Math.floor(1000 + Math.random() * 9000)}`;
+    const recallNo = await generateAtomicDocumentNumber(`recallNo_${fy}`, `RCL/${fy}/`, 4);
 
     // Auto-trace sale invoices containing this batchNo
     const saleInvoices = await Invoice.find({
@@ -78,7 +79,7 @@ router.post('/', authorize('manufacturing:batchManage'), async (req, res) => {
 });
 
 // PATCH /api/recalls/:id/notify-customer — Mark affected customer as notified
-router.patch('/:id/notify-customer', authorize('manufacturing:batchManage'), async (req, res) => {
+router.patch('/:id/notify-customer', authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { invoiceNo } = req.body;
     const recall = await Recall.findById(req.params.id);
@@ -98,7 +99,7 @@ router.patch('/:id/notify-customer', authorize('manufacturing:batchManage'), asy
 });
 
 // PATCH /api/recalls/:id/status — Update recall status
-router.patch('/:id/status', authorize('manufacturing:batchManage'), async (req, res) => {
+router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { status, recalledQty, closureNotes } = req.body;
     const recall = await Recall.findById(req.params.id);

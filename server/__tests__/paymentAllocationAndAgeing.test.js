@@ -26,7 +26,7 @@ describe('Bill-Wise Payment Allocation & Receivables Ageing Test Suite', () => {
   });
 
   describe('Bill-Wise Payment Allocation', () => {
-    it('allocates payment across multiple invoices updating status to partial and paid', async () => {
+    it('allocates payment across multiple invoices updating status to partially_paid and paid', async () => {
       const cust = await Customer.create({
         name: 'Dabur Pharma Distributors',
         regularBalance: 15000
@@ -82,7 +82,7 @@ describe('Bill-Wise Payment Allocation & Receivables Ageing Test Suite', () => {
         inv.payments = inv.payments || [];
         inv.payments.push({ paymentId: payment._id, amountAllocated: alloc.amountApplied, amountApplied: alloc.amountApplied });
         inv.amountPaid += alloc.amountApplied;
-        inv.status = inv.amountPaid >= inv.amount ? 'paid' : (inv.amountPaid > 0 ? 'partial' : 'unpaid');
+        inv.status = inv.amountPaid >= inv.amount ? 'paid' : (inv.amountPaid > 0 ? 'partially_paid' : 'unpaid');
         await inv.save();
       }
 
@@ -93,7 +93,7 @@ describe('Bill-Wise Payment Allocation & Receivables Ageing Test Suite', () => {
 
       const updatedInv2 = await Invoice.findById(inv2._id);
       expect(updatedInv2.amountPaid).toBe(3000);
-      expect(updatedInv2.status).toBe('partial');
+      expect(updatedInv2.status).toBe('partially_paid');
       expect(updatedInv2.balanceDue).toBe(7000);
     });
 

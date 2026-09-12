@@ -1,22 +1,9 @@
 const express = require('express');
 const ProductQuery = require('../../models/ProductQuery');
 const Contact = require('../../models/Contact');
-const multer = require('multer');
-const path = require('path');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
-
-// Multer storage config for query reference photos
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../../public/uploads/'));
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'query-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const upload = multer({ storage: storage });
+const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
 
@@ -28,7 +15,7 @@ const router = express.Router();
 // authenticateJWT will be applied in server.js when mounting.
 
 // GET /api/queries — List all queries (Authenticated)
-router.get('/', async (req, res) => {
+router.get('/', authorize('contact:view'), async (req, res) => {
   try {
     const queries = await ProductQuery.find({}).sort({ createdAt: -1 }).lean();
     res.json(queries);
@@ -38,7 +25,7 @@ router.get('/', async (req, res) => {
 });
 
 // PATCH /api/queries/:id/status — Update query status (Authenticated)
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', authorize('contact:edit'), async (req, res) => {
   try {
     const { status } = req.body;
     if (!['pending', 'contacted', 'converted', 'closed'].includes(status)) {
@@ -57,7 +44,7 @@ router.patch('/:id/status', async (req, res) => {
 });
 
 // POST /api/queries/:id/convert — Convert query to CRM Lead Contact (Authenticated)
-router.post('/:id/convert', validate(schemas.queryConvertSchema), async (req, res) => {
+router.post('/:id/convert', authorize('contact:create'), validate(schemas.queryConvertSchema), async (req, res) => {
   try {
     const queryDoc = await ProductQuery.findById(req.params.id);
     if (!queryDoc) return res.status(404).json({ error: 'Query not found' });
@@ -106,34 +93,5 @@ router.post('/:id/convert', validate(schemas.queryConvertSchema), async (req, re
   }
 });
 
-// POST /api/public/queries — Public submission of product queries (Unauthenticated)
-// Route matches `/api/public/queries`
-router.post('/submit', upload.single('image'), validate(schemas.querySubmitSchema), async (req, res) => {
-  try {
-    const { name, email, phone, productName, query, productId } = req.body;
-    if (!name || !email || !phone || !productName || !query) {
-      return res.status(400).json({ error: 'Missing required inquiry fields' });
-    }
-
-    const imagePath = req.file ? '/uploads/' + req.file.filename : '';
-
-    const newQuery = await ProductQuery.create({
-      name,
-      email,
-      phone,
-      productName,
-      productId: productId || null,
-      query,
-      image: imagePath
-    });
-
-    if (req.io) {
-      req.io.emit('query_updated', { type: 'created' });
-    }
-    res.status(201).json({ message: 'Query submitted successfully', query: newQuery });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 module.exports = router;

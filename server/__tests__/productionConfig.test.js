@@ -52,11 +52,12 @@ describe('Production configuration hardening', () => {
     expect(result.stderr).toContain('ALLOWED_ORIGINS must contain at least one exact origin in production');
   });
 
-  it('allows startup when PUBLIC_FIRM_ID is omitted in production', () => {
+  it('fails startup when PUBLIC_FIRM_ID is missing in production', () => {
     const env = { ...validEnv };
     delete env.PUBLIC_FIRM_ID;
     const result = runConfig(env);
-    expect(result.status).toBe(0);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('PUBLIC_FIRM_ID is required in production');
   });
 
   it('fails startup when PUBLIC_FIRM_ID is not a MongoDB ObjectId', () => {

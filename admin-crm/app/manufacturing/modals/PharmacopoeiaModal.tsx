@@ -79,7 +79,7 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
         } else {
           const data = await api.getPharmacopoeia(debouncedSearch, selectedStandard, { page: 1, limit: 50 });
           if (active) {
-            const list = Array.isArray(data) ? data : (data?.data || []);
+            const list = Array.isArray(data) ? data : [];
             setMonographs(list);
             setPage(1);
             setHasMore(list.length === 50);
@@ -110,7 +110,7 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
     try {
       const nextPage = page + 1;
       const data = await api.getPharmacopoeia(debouncedSearch, selectedStandard, { page: nextPage, limit: 50 });
-      const list = Array.isArray(data) ? data : (data?.data || []);
+      const list = Array.isArray(data) ? data : [];
       setMonographs(prev => [...prev, ...list]);
       setPage(nextPage);
       setHasMore(list.length === 50);

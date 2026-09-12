@@ -4,14 +4,17 @@ const tenantPlugin = require('../utils/tenantPlugin');
 const challanItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
   name: { type: String, required: true },
-  qty: { type: Number, required: true, default: 0 },
+  qty: { type: Number, required: true, default: 0 }, // physical quantity
+  billableQty: { type: Number, default: null }, // null => legacy: all physical qty billable
+  freeQty: { type: Number, default: 0 },
   rate: { type: Number, default: 0 },
   packing: { type: Number, default: 1 },
   hsnCode: { type: String, default: '' },
   gstRate: { type: Number, default: 0 },
   vendorId: { type: String, default: '', trim: true },
   vendorName: { type: String, default: '', trim: true },
-  batchNo: { type: String, default: '', trim: true }
+  batchNo: { type: String, default: '', trim: true },
+  qcStatus: { type: String, enum: ['under_test', 'approved', 'rejected'], default: 'approved' }
 }, { _id: false });
 
 const challanSchema = new mongoose.Schema({
@@ -32,6 +35,8 @@ const challanSchema = new mongoose.Schema({
   sourceManufacturingUnitId: { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit', default: null },
   sourceManufacturingUnitName: { type: String, default: '', trim: true },
   salesOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
+  stockTransferId: { type: mongoose.Schema.Types.ObjectId, ref: 'StockTransfer', default: null },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
   fulfillmentSequence: { type: Number, default: 1 },
   items: [challanItemSchema],
   status: { type: String, default: 'draft' },
@@ -68,6 +73,10 @@ challanSchema.index({ challanType: 1, destinationWarehouseId: 1, createdAt: -1 }
 challanSchema.index({ inventoryTransactionId: 1 }, { unique: true, sparse: true });
 challanSchema.index({ firmId: 1, challanType: 1, status: 1, date: -1 });
 challanSchema.index({ firmId: 1, salesOrderId: 1, fulfillmentSequence: 1 });
+challanSchema.index(
+  { firmId: 1, stockTransferId: 1 },
+  { unique: true, partialFilterExpression: { stockTransferId: { $type: 'objectId' } } }
+);
 
 challanSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Challan', challanSchema);

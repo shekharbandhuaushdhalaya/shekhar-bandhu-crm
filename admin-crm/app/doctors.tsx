@@ -95,7 +95,7 @@ export default function DoctorsScreen() {
         if (isAppend) {
           setDoctors(prev => {
             const existingIds = new Set(prev.map(d => (d && d._id) ? String(d._id) : '').filter(Boolean));
-            const newItems = rawData.filter(d => d && d._id && !existingIds.has(String(d._id)));
+            const newItems = rawData.filter((d: any) => d && d._id && !existingIds.has(String(d._id)));
             return [...prev, ...newItems];
           });
         } else {

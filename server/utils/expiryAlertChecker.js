@@ -2,8 +2,10 @@ const RawMaterialEntry = require('../models/RawMaterialEntry');
 const Product = require('../models/Product');
 const RawMaterial = require('../models/RawMaterial');
 const Notification = require('../models/Notification');
+const Firm = require('../models/Firm');
+const { runWithTenant } = require('./tenantContext');
 
-async function checkExpiriesAndReorders() {
+async function checkExpiriesAndReordersForCurrentFirm() {
   try {
     const now = new Date();
     const d90 = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
@@ -191,6 +193,14 @@ async function checkExpiriesAndReorders() {
   }
 }
 
+async function checkExpiriesAndReorders() {
+  const firms = await Firm.find({ active: { $ne: false } }).select('_id').lean();
+  for (const firm of firms) {
+    await runWithTenant({ firmId: firm._id }, () => checkExpiriesAndReordersForCurrentFirm());
+  }
+}
+
 module.exports = {
-  checkExpiriesAndReorders
+  checkExpiriesAndReorders,
+  checkExpiriesAndReordersForCurrentFirm
 };

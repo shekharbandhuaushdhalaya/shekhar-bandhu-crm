@@ -21,9 +21,6 @@ jest.mock('../models/StockMovement');
 jest.mock('../models/MrDailyLog');
 jest.mock('../models/MrExpense');
 jest.mock('../models/RolePermission');
-jest.mock('../models/Counter');
-jest.mock('../models/Challan');
-jest.mock('../services/challanInventoryService');
 
 const Customer = require('../models/Customer');
 const Vendor = require('../models/Vendor');
@@ -229,21 +226,7 @@ describe('Compliance and Operations Features', () => {
         save: jest.fn().mockResolvedValue(true)
       };
 
-      const Counter = require('../models/Counter');
-      const Challan = require('../models/Challan');
-      const { postChallanInventory } = require('../services/challanInventoryService');
-
-      Counter.findOneAndUpdate.mockResolvedValue({ seq: 1 });
-      Challan.create.mockImplementation(data => Promise.resolve({ _id: 'challan_01', challanNo: 'CH-00001', ...data }));
-      postChallanInventory.mockImplementation(c => Promise.resolve({ _id: 'challan_01', challanNo: 'CH-00001', ...c }));
-
       StockTransfer.findById.mockResolvedValue(mockTransfer);
-      Warehouse.findById.mockImplementation(id => Promise.resolve({
-        _id: id || '507f1f77bcf86cd799439011',
-        name: 'Warehouse ' + id,
-        addressLine1: 'Varanasi',
-        city: 'Varanasi'
-      }));
       InventoryEntry.findOne.mockResolvedValue({
         qtyBoxes: 10,
         save: jest.fn().mockResolvedValue(true)
@@ -252,7 +235,7 @@ describe('Compliance and Operations Features', () => {
 
       const response = await request(app).patch('/api/inventory/transfers/transfer_01/ship');
       expect(response.status).toBe(200);
-      expect(response.body.transfer ? response.body.transfer.status : response.body.status).toBe('in_transit');
+      expect(response.body.status).toBe('in_transit');
       expect(mockTransfer.save).toHaveBeenCalled();
     });
   });

@@ -1,5 +1,5 @@
 import React, { useCallback, memo } from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, RefreshControl, ViewStyle, TextStyle, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ScrollView, RefreshControl, ViewStyle, TextStyle, TouchableOpacity, DimensionValue } from 'react-native';
 import { useTheme } from '../utils/themeContext';
 import { Radius, Spacing, Shadows } from '../constants/theme';
 import { TableSkeleton } from './TableSkeleton';
@@ -9,7 +9,7 @@ export interface Column<T> {
   key: string;
   title: string;
   flex?: number;
-  width?: number | string;
+  width?: DimensionValue;
   align?: 'left' | 'center' | 'right';
   render?: (item: T) => React.ReactNode;
 }

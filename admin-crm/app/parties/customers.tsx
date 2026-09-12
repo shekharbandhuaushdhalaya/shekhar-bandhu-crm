@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Pressable, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
-import { api, Customer, Invoice, getApiBaseUrl } from '../../utils/api';
+import { api, Customer, Invoice } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
@@ -85,14 +85,8 @@ function CustomerDetailModal({
       const fetchOrders = async () => {
         setLoadingOrders(true);
         try {
-          const query = customer.phone || customer.email || '';
-          if (query) {
-            const res = await fetch(`${getApiBaseUrl()}/orders/public/track/${encodeURIComponent(query)}`);
-            if (res.ok) {
-              const data = await res.json();
-              setCustomerOrders(data);
-            }
-          }
+          const result = await api.getOrders(1, 100, customer._id);
+          setCustomerOrders(Array.isArray(result) ? result : (result?.data || []));
         } catch (err) {
           console.error('Failed to load customer orders:', err);
         } finally {
@@ -294,14 +288,14 @@ function CustomerDetailModal({
           {/* Storefront E-Commerce Order History */}
           <View style={{ marginTop: 20 }}>
             <View style={styles.infoSectionHeader}>
-              <Text style={styles.infoSectionTitle}>Storefront Order History</Text>
+              <Text style={styles.infoSectionTitle}>Sales Order History</Text>
             </View>
 
             {loadingOrders ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
             ) : customerOrders.length === 0 ? (
               <Text style={{ fontSize: 13, color: colors.text.muted, marginVertical: 8, fontStyle: 'italic' }}>
-                No storefront orders found matching this customer's details.
+                No Sales Orders found for this customer.
               </Text>
             ) : (
               <View style={{ gap: 8, marginTop: 8 }}>
@@ -1058,7 +1052,7 @@ function CustomerLedgerModal({
       ]);
 
       const filteredInvoices = activeLedgerMode === 'regular'
-        ? allInvoices.filter(i => {
+        ? allInvoices.filter((i: any) => {
           if (!i.isFinalized) return false;
           const matchesName = (i.customerName || '').toLowerCase().includes(name.toLowerCase());
           return i.mode === 'regular' && matchesName;
@@ -1086,7 +1080,7 @@ function CustomerLedgerModal({
       type Row = { _id: string; date: string; no: string; mode: string; status: string; amount: number; isInvoice: boolean; isMovement?: boolean; dueDate?: string };
       let items: Row[] = [];
 
-      filteredInvoices.forEach(inv => {
+      filteredInvoices.forEach((inv: any) => {
         items.push({
           _id: inv._id,
           date: inv.date,

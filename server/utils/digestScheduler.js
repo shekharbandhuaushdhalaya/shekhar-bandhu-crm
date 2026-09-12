@@ -1,16 +1,17 @@
 const User = require('../models/User');
+const UserFirm = require('../models/UserFirm');
+const Firm = require('../models/Firm');
+const { runWithTenant } = require('./tenantContext');
 const { generateDailyDigestData } = require('../services/digestService');
 const { sendWhatsAppNotification } = require('./whatsappService');
 
 /**
  * Sends the Daily Executive Digest via WhatsApp to all Admin and Owner users with a phone number.
  */
-async function sendDailyDigest() {
+async function sendDailyDigestForCurrentFirm(firmId) {
   try {
-    const recipients = await User.find({
-      role: { $in: ['admin', 'owner'] },
-      phone: { $exists: true, $ne: '' }
-    }).lean();
+    const memberships = await UserFirm.find({ firmId, active: true, role: { $in: ['admin', 'owner'] } }).select('userId').lean();
+    const recipients = await User.find({ _id: { $in: memberships.map(m => m.userId) }, phone: { $exists: true, $ne: '' } }).lean();
 
     const digest = await generateDailyDigestData();
     const sentResults = [];
@@ -36,7 +37,7 @@ async function sendDailyDigest() {
 /**
  * Scans Doctor collection daily for birthdays & anniversaries and dispatches automated greetings.
  */
-async function sendDoctorGreetings() {
+async function sendDoctorGreetingsForCurrentFirm() {
   try {
     const Doctor = require('../models/Doctor');
     const Notification = require('../models/Notification');
@@ -103,7 +104,18 @@ async function sendDoctorGreetings() {
   }
 }
 
-module.exports = {
-  sendDailyDigest,
-  sendDoctorGreetings
-};
+async function sendDailyDigest() {
+  const firms = await Firm.find({ active: { $ne: false } }).select('_id').lean();
+  const results = [];
+  for (const firm of firms) results.push(await runWithTenant({ firmId: firm._id }, () => sendDailyDigestForCurrentFirm(firm._id)));
+  return results;
+}
+
+async function sendDoctorGreetings() {
+  const firms = await Firm.find({ active: { $ne: false } }).select('_id').lean();
+  const results = [];
+  for (const firm of firms) results.push(await runWithTenant({ firmId: firm._id }, () => sendDoctorGreetingsForCurrentFirm()));
+  return results;
+}
+
+module.exports = { sendDailyDigest, sendDoctorGreetings };

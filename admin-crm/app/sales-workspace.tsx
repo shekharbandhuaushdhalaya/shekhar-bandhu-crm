@@ -1,44 +1,36 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, RefreshControl, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { getApiBaseUrl } from '../utils/api';
-import { authStorage } from '../utils/storage';
+import { api } from '../utils/api';
 import { LightColors, Radius, Shadows, Spacing } from '../constants/theme';
-import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTabs } from '../components/WorkspacePrimitives';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 
-type Tab = 'dashboard' | 'orders' | 'schemes' | 'returns' | 'commissions';
+type Tab = 'dashboard' | 'orders' | 'challans' | 'schemes' | 'returns' | 'commissions';
 
-async function request(path: string, init: RequestInit = {}) {
-  const token = await authStorage.getItem('vp_crm_token');
-  const res = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers || {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || 'Request failed');
-  return body;
-}
+const request = <T = any,>(path: string, init: RequestInit = {}) => api.requestJson<T>(path, init);
 
 const formatMoney = (value: unknown) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
 
 export default function SalesWorkspace() {
   const { colors } = useTheme();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const styles = useStyles(createStyles);
   const [tab, setTab] = useState<Tab>('dashboard');
   const [refreshing, setRefreshing] = useState(false);
   const [dashboard, setDashboard] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
+  const [challans, setChallans] = useState<any[]>([]);
   const [schemes, setSchemes] = useState<any[]>([]);
   const [returns, setReturns] = useState<any[]>([]);
   const [commissions, setCommissions] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any>(null);
   const [showQuickSale, setShowQuickSale] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [busyAction, setBusyAction] = useState('');
 
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -57,32 +49,42 @@ export default function SalesWorkspace() {
   const [schemeDiscount, setSchemeDiscount] = useState('0');
 
   const load = useCallback(async () => {
-    const [d, o, s, r, c, cu, pr, wh] = await Promise.all([
-      request('/sales-workflow/dashboard').catch(() => null),
-      request('/orders?page=1&limit=100').catch(() => ({ data: [] })),
-      request('/sales-workflow/schemes').catch(() => []),
-      request('/sales-workflow/returns').catch(() => []),
-      request('/sales-workflow/commissions').catch(() => null),
-      request('/customers?page=1&limit=300').catch(() => []),
-      request('/products?page=1&limit=500').catch(() => []),
-      request('/warehouses').catch(() => []),
-    ]);
-    setDashboard(d);
-    setOrders(Array.isArray(o) ? o : o.data || []);
-    setSchemes(s);
-    setReturns(r);
-    setCommissions(c);
-    setCustomers(Array.isArray(cu) ? cu : cu.data || cu.customers || []);
-    setProducts(Array.isArray(pr) ? pr : pr.data || pr.products || []);
-    setWarehouses(Array.isArray(wh) ? wh : wh.data || wh.warehouses || []);
+    setLoadError('');
+    try {
+      const [d, o, ch, s, r, c, cu, pr, wh] = await Promise.all([
+        request('/sales-workflow/dashboard'),
+        request('/orders?page=1&limit=100'),
+        request('/challans?page=1&limit=100'),
+        request('/sales-workflow/schemes'),
+        request('/sales-workflow/returns'),
+        request('/sales-workflow/commissions'),
+        request('/customers?page=1&limit=300'),
+        request('/products?page=1&limit=500'),
+        request('/warehouses'),
+      ]);
+      setDashboard(d);
+      setOrders(Array.isArray(o) ? o : o.data || []);
+      setChallans(Array.isArray(ch) ? ch : ch.data || []);
+      setSchemes(Array.isArray(s) ? s : []);
+      setReturns(Array.isArray(r) ? r : []);
+      setCommissions(c);
+      setCustomers(Array.isArray(cu) ? cu : cu.data || cu.customers || []);
+      setProducts(Array.isArray(pr) ? pr : pr.data || pr.products || []);
+      setWarehouses(Array.isArray(wh) ? wh : wh.data || wh.warehouses || []);
+    } catch (e: any) {
+      setLoadError(e.message || 'Unable to load Sales Workspace');
+    } finally { setInitialLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const requested = String(params.tab || '');
+    if (['dashboard','orders','challans','schemes','returns','commissions'].includes(requested)) setTab(requested as Tab);
+  }, [params.tab]);
 
   const refresh = async () => {
     setRefreshing(true);
-    await load();
-    setRefreshing(false);
+    try { await load(); } finally { setRefreshing(false); }
   };
 
   const doSearch = async () => {
@@ -98,15 +100,19 @@ export default function SalesWorkspace() {
   };
 
   const approve = async (id: string) => {
+    if (busyAction) return;
+    setBusyAction(`approve:${id}`);
     try {
       await request(`/orders/${id}/approve`, { method: 'PATCH' });
       await load();
     } catch (e: any) {
       Alert.alert('Approval', e.message);
-    }
+    } finally { setBusyAction(''); }
   };
 
   const createScheme = async () => {
+    if (busyAction) return;
+    setBusyAction('scheme');
     try {
       await request('/sales-workflow/schemes', {
         method: 'POST',
@@ -126,7 +132,7 @@ export default function SalesWorkspace() {
       await load();
     } catch (e: any) {
       Alert.alert('Scheme', e.message);
-    }
+    } finally { setBusyAction(''); }
   };
 
   const createQuickSale = async () => {
@@ -150,7 +156,7 @@ export default function SalesWorkspace() {
       Alert.alert('Quick Sale', `Draft Challan ${out.challan?.challanNo || ''} created. Finalize the Challan to move stock.`);
     } catch (e: any) {
       Alert.alert('Quick Sale', e.message);
-    }
+    } finally { setBusyAction(''); }
   };
 
   const prepareRemainingChallan = async (order: any) => {
@@ -171,17 +177,37 @@ export default function SalesWorkspace() {
       Alert.alert('Challan prepared', `${out.challan.challanNo} is a draft. Review and finalize it to move stock.`);
     } catch (e: any) {
       Alert.alert('Fulfillment', e.message);
-    }
+    } finally { setBusyAction(''); }
+  };
+
+  const actOnChallan = async (challan: any, action: 'finalize' | 'convert' | 'reverse') => {
+    if (busyAction) return;
+    const key = `${action}:${challan._id}`;
+    setBusyAction(key);
+    try {
+      if (action === 'finalize') await request(`/challans/${challan._id}/finalize`, { method: 'PATCH', headers: { 'Idempotency-Key': `ui-finalize-${challan._id}` } });
+      if (action === 'convert') await request(`/challans/${challan._id}/convert`, { method: 'POST' });
+      if (action === 'reverse') {
+        const run = async () => { await request(`/challans/${challan._id}/reverse`, { method: 'POST', headers: { 'Idempotency-Key': `ui-reverse-${challan._id}-${Date.now()}` } }); await load(); };
+        if (Platform.OS === 'web') { if (typeof window !== 'undefined' && window.confirm(`Reverse ${challan.challanNo}? This creates compensating inventory entries.`)) await run(); }
+        else Alert.alert('Reverse Challan', `Reverse ${challan.challanNo}?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Reverse', style: 'destructive', onPress: run }]);
+        return;
+      }
+      await load();
+      Alert.alert('Challan', action === 'finalize' ? 'Challan finalized.' : 'Sale Invoice created from Challan.');
+    } catch (e: any) { Alert.alert('Challan', e.message || `Unable to ${action} Challan`); }
+    finally { setBusyAction(''); }
   };
 
   const k = dashboard?.kpis || {};
   const tabs = useMemo(() => [
     { id: 'dashboard' as Tab, label: 'Overview', icon: 'grid-outline' as const },
     { id: 'orders' as Tab, label: 'Orders', icon: 'cart-outline' as const, badge: Number(k.pendingApprovals || 0) },
+    { id: 'challans' as Tab, label: 'Challans', icon: 'document-text-outline' as const, badge: challans.filter((x) => x.status === 'draft').length },
     { id: 'schemes' as Tab, label: 'Schemes', icon: 'pricetags-outline' as const },
     { id: 'returns' as Tab, label: 'Returns', icon: 'return-down-back-outline' as const },
     { id: 'commissions' as Tab, label: 'Commissions', icon: 'cash-outline' as const },
-  ], [k.pendingApprovals]);
+  ], [k.pendingApprovals, challans]);
 
   const resultGroups = searchResults
     ? Object.entries(searchResults).flatMap(([type, rows]: any) => (rows || []).map((x: any) => ({ type, ...x })))
@@ -277,7 +303,9 @@ export default function SalesWorkspace() {
 
       <WorkspaceTabs tabs={tabs} value={tab} onChange={setTab} />
 
-      <ScrollView
+      {initialLoading ? <WorkspaceLoading title="Loading Sales Workspace…" message="Fetching orders, schemes, returns, commissions and stock choices." /> : null}
+      {!initialLoading && loadError ? <WorkspaceError message={loadError} onRetry={load} /> : null}
+      {!initialLoading && !loadError ? <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
@@ -349,6 +377,39 @@ export default function SalesWorkspace() {
           </Panel>
         ) : null}
 
+        {tab === 'challans' ? (
+          <Panel title="Authoritative Sale Challans" subtitle="Finalize physical movement here, then create the financial invoice. Posted Challans remain immutable except through controlled reversal.">
+            {!challans.length ? <EmptyState icon="document-text-outline" title="No Challans" message="Draft Challans prepared from Sales Orders will appear here." /> : challans.map((ch) => {
+              const posted = ch.status === 'finalized' && ch.inventoryPostingStatus === 'posted';
+              const sale = (ch.challanType || 'sale') === 'sale';
+              return (
+                <View style={styles.orderCard} key={ch._id}>
+                  <View style={styles.orderTop}>
+                    <View style={{ flex: 1, minWidth: 220 }}>
+                      <View style={styles.orderTitleRow}>
+                        <Text style={styles.rowMain}>{ch.challanNo}</Text>
+                        <StatusPill label={posted ? 'Posted' : (ch.status || 'draft')} tone={posted ? 'success' : ch.status === 'cancelled' ? 'danger' : 'warning'} />
+                        <StatusPill label={(ch.challanType || 'sale').replaceAll('_', ' ')} tone="neutral" />
+                      </View>
+                      <Text style={styles.customerName}>{ch.partyName || 'Internal transfer'}</Text>
+                      <Text style={styles.rowSub}>{ch.items?.length || 0} items • {ch.warehouseName || 'Source warehouse'}{ch.destinationWarehouseName ? ` → ${ch.destinationWarehouseName}` : ''}</Text>
+                    </View>
+                    <Text style={styles.orderAmount}>{formatMoney(ch.nettTotal || ch.amount)}</Text>
+                  </View>
+                  <View style={styles.orderFooter}>
+                    <Text style={styles.fulfillmentText}>{ch.invoiceNo ? `Invoice ${ch.invoiceNo}` : posted && sale ? 'Ready for invoice' : posted ? 'Inventory posted' : 'No stock moved yet'}</Text>
+                    <View style={styles.rowActions}>
+                      {ch.status === 'draft' ? <TouchableOpacity disabled={!!busyAction} style={styles.primarySmallButton} onPress={() => actOnChallan(ch, 'finalize')}><Text style={styles.primarySmallButtonText}>{busyAction === `finalize:${ch._id}` ? 'Finalizing…' : 'Finalize'}</Text></TouchableOpacity> : null}
+                      {posted && sale && !ch.invoiceId && !ch.convertedToInvoice ? <TouchableOpacity disabled={!!busyAction} style={styles.primarySmallButton} onPress={() => actOnChallan(ch, 'convert')}><Text style={styles.primarySmallButtonText}>{busyAction === `convert:${ch._id}` ? 'Creating…' : 'Create Invoice'}</Text></TouchableOpacity> : null}
+                      {posted && !ch.invoiceId ? <TouchableOpacity disabled={!!busyAction} style={styles.secondaryButton} onPress={() => actOnChallan(ch, 'reverse')}><Text style={styles.secondaryButtonText}>Reverse</Text></TouchableOpacity> : null}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </Panel>
+        ) : null}
+
         {tab === 'schemes' ? (
           <View style={styles.twoColumn}>
             <Panel title="Create sales scheme" subtitle="Configure Buy X Get Y or percentage discount rules." style={styles.columnPanel}>
@@ -406,7 +467,7 @@ export default function SalesWorkspace() {
             <View style={styles.totalRow}><Text style={styles.totalLabel}>Total commission</Text><Text style={styles.totalValue}>{formatMoney(commissions?.total)}</Text></View>
           </Panel>
         ) : null}
-      </ScrollView>
+      </ScrollView> : null}
     </View>
   );
 }
@@ -431,9 +492,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   dataRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
-  rowMain: { fontSize: 13, fontWeight: '750', color: colors.text.primary },
+  rowMain: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   rowSub: { fontSize: 11.5, lineHeight: 17, color: colors.text.muted, marginTop: 3 },
-  customerName: { fontSize: 12.5, fontWeight: '650', color: colors.text.secondary, marginTop: 3 },
+  customerName: { fontSize: 12.5, fontWeight: '600', color: colors.text.secondary, marginTop: 3 },
   money: { fontSize: 13, fontWeight: '800', color: colors.text.primary },
   healthRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   healthLabel: { fontSize: 12, color: colors.text.secondary },
@@ -447,7 +508,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   fulfillmentTrack: { height: 5, borderRadius: 999, backgroundColor: colors.bg.secondary, overflow: 'hidden', marginTop: 12 },
   fulfillmentFill: { height: '100%', backgroundColor: colors.success, borderRadius: 999 },
   orderFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 9, flexWrap: 'wrap' },
-  fulfillmentText: { fontSize: 10.5, fontWeight: '650', color: colors.text.muted },
+  fulfillmentText: { fontSize: 10.5, fontWeight: '600', color: colors.text.muted },
   rowActions: { flexDirection: 'row', gap: 7, flexWrap: 'wrap' },
   primarySmallButton: { minHeight: 32, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 5 },
   primarySmallButtonText: { color: '#fff', fontSize: 10.5, fontWeight: '800' },
@@ -459,6 +520,6 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   input: { minWidth: 145, flexGrow: 1, flexShrink: 1, minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 11, color: colors.text.primary, backgroundColor: colors.bg.card, fontSize: 12.5 },
   inputWide: { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 11, color: colors.text.primary, backgroundColor: colors.bg.card, marginBottom: 9, fontSize: 12.5 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, marginTop: 6, borderTopWidth: 1, borderTopColor: colors.border },
-  totalLabel: { fontSize: 13, fontWeight: '750', color: colors.text.secondary },
+  totalLabel: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
   totalValue: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
 });

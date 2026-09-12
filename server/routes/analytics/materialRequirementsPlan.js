@@ -7,6 +7,7 @@ const ProductionPlan = require('../../models/ProductionPlan');
 const Warehouse = require('../../models/Warehouse');
 const { authorize } = require('../../middleware/authorize');
 const { computeDemandForecast } = require('./demandForecasting');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
 
@@ -173,7 +174,7 @@ router.post('/create-production-plans', authorize('manufacturing:create'), async
     const fy = `${currentYear % 100}-${(currentYear + 1) % 100}`;
 
     for (const tp of targetProducts) {
-      const planNo = `PLN/${fy}/${Math.floor(1000 + Math.random() * 9000)}`;
+      const planNo = await generateAtomicDocumentNumber(`productionPlanNo_${fy}`, `PLN/${fy}/`, 5);
       const plannedQty = tp.recommendedReorderQty > 0 ? tp.recommendedReorderQty : 100;
 
       const plan = await ProductionPlan.create({

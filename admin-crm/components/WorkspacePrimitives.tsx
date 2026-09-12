@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ViewStyle, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { LightColors, Radius, Shadows, Spacing } from '../constants/theme';
@@ -111,6 +111,31 @@ export function EmptyState({ icon = 'file-tray-outline', title, message }: { ico
   );
 }
 
+export function WorkspaceLoading({ title = 'Loading workspace…', message = 'Fetching the latest business data.' }: { title?: string; message?: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  return (
+    <View style={styles.stateCard}>
+      <ActivityIndicator size="small" color={colors.primary} />
+      <Text style={styles.stateTitle}>{title}</Text>
+      <Text style={styles.stateMessage}>{message}</Text>
+    </View>
+  );
+}
+
+export function WorkspaceError({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  return (
+    <View style={styles.stateCard}>
+      <View style={styles.emptyIcon}><Ionicons name="alert-circle-outline" size={22} color={colors.danger} /></View>
+      <Text style={styles.stateTitle}>Unable to load this workspace</Text>
+      <Text style={styles.stateMessage}>{message}</Text>
+      {onRetry ? <TouchableOpacity style={styles.retryButton} onPress={onRetry}><Text style={styles.retryText}>Try again</Text></TouchableOpacity> : null}
+    </View>
+  );
+}
+
 export function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: 'neutral'|'success'|'warning'|'danger'|'info' }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
@@ -129,13 +154,13 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   action: { minHeight: 38, paddingHorizontal: 14, borderRadius: Radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1 },
   actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
   actionSecondary: { backgroundColor: colors.bg.card, borderColor: colors.border },
-  actionText: { fontSize: 12.5, fontWeight: '750' },
+  actionText: { fontSize: 12.5, fontWeight: '700' },
   actionTextPrimary: { color: '#fff' },
   actionTextSecondary: { color: colors.primary },
   tabs: { paddingHorizontal: Spacing.lg, paddingBottom: 1, gap: 4, minHeight: 42, alignItems: 'flex-end' },
   tab: { minHeight: 38, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: colors.primary },
-  tabText: { fontSize: 12.5, fontWeight: '650', color: colors.text.secondary },
+  tabText: { fontSize: 12.5, fontWeight: '600', color: colors.text.secondary },
   tabTextActive: { color: colors.text.primary, fontWeight: '800' },
   tabBadge: { minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg.secondary },
   tabBadgeActive: { backgroundColor: colors.primaryLight },
@@ -143,7 +168,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   tabBadgeTextActive: { color: colors.primary },
   metric: { flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 155, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: 15, ...Shadows.card },
   metricTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  metricLabel: { fontSize: 10.5, fontWeight: '750', letterSpacing: 0.3, color: colors.text.muted, textTransform: 'uppercase' },
+  metricLabel: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.3, color: colors.text.muted, textTransform: 'uppercase' },
   metricIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   metricValue: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3, marginTop: 8 },
   metricHelper: { fontSize: 11, lineHeight: 16, color: colors.text.secondary, marginTop: 3 },
@@ -155,6 +180,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   emptyIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
   emptyTitle: { fontSize: 13, fontWeight: '800', color: colors.text.primary, textAlign: 'center' },
   emptyMessage: { fontSize: 11.5, lineHeight: 17, color: colors.text.muted, textAlign: 'center', maxWidth: 360, marginTop: 4 },
+  stateCard: { margin: Spacing.lg, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.lg, padding: 28, alignItems: 'center', justifyContent: 'center', minHeight: 180, ...Shadows.card },
+  stateTitle: { fontSize: 14, fontWeight: '800', color: colors.text.primary, marginTop: 10, textAlign: 'center' },
+  stateMessage: { fontSize: 11.5, lineHeight: 17, color: colors.text.muted, marginTop: 4, textAlign: 'center', maxWidth: 420 },
+  retryButton: { marginTop: 14, minHeight: 36, paddingHorizontal: 14, borderRadius: Radius.md, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  retryText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, alignSelf: 'flex-start' },
   statusText: { fontSize: 9.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.35 },
 });

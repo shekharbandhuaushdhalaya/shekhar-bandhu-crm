@@ -1,22 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getApiBaseUrl } from '../utils/api';
-import { authStorage } from '../utils/storage';
+import { api } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { LightColors, Radius, Spacing } from '../constants/theme';
-import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTabs } from '../components/WorkspacePrimitives';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 
-async function req(path: string, init: RequestInit = {}) {
-  const token = await authStorage.getItem('vp_crm_token');
-  const r = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init.headers || {}) },
-  });
-  const b = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(b.error || 'Request failed');
-  return b;
-}
+const req = <T = any,>(path: string, init: RequestInit = {}) => api.requestJson<T>(path, init);
 
 type Tab = 'actions' | 'customer' | 'collections' | 'lost' | 'margin';
 const money = (v: unknown) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
@@ -32,10 +22,12 @@ export default function SalesIntelligence() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [customerId, setCustomerId] = useState('');
   const [c360, setC360] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [customerLoading, setCustomerLoading] = useState(false);
 
   const load = async () => {
-    setLoading(true);
+    setLoading(true); setError('');
     try {
       const [a, c, l, m, cu] = await Promise.all([
         req('/sales-intelligence/action-center'),
@@ -50,7 +42,7 @@ export default function SalesIntelligence() {
       setMargin(m);
       setCustomers(Array.isArray(cu) ? cu : cu.data || []);
     } catch (e: any) {
-      Alert.alert('Sales intelligence', e.message);
+      setError(e.message || 'Unable to load sales intelligence');
     } finally {
       setLoading(false);
     }
@@ -60,12 +52,14 @@ export default function SalesIntelligence() {
 
   const loadCustomer = async (id: string) => {
     setCustomerId(id);
-    if (!id) return setC360(null);
+    setC360(null);
+    if (!id) return;
+    setCustomerLoading(true);
     try {
       setC360(await req(`/sales-intelligence/customers/${id}/360`));
     } catch (e: any) {
       Alert.alert('Customer 360', e.message);
-    }
+    } finally { setCustomerLoading(false); }
   };
 
   const tabs = useMemo(() => [
@@ -100,7 +94,9 @@ export default function SalesIntelligence() {
       />
       <WorkspaceTabs tabs={tabs} value={tab} onChange={setTab} />
 
-      <ScrollView contentContainerStyle={styles.content}>
+      {loading ? <WorkspaceLoading title="Loading Sales Intelligence…" message="Fetching action items, collections, customer health and profitability." /> : null}
+      {!loading && error ? <WorkspaceError message={error} onRetry={load} /> : null}
+      {!loading && !error ? <ScrollView contentContainerStyle={styles.content}>
         {tab === 'actions' ? (
           <>
             <View style={styles.metrics}>
@@ -129,7 +125,7 @@ export default function SalesIntelligence() {
                 <TextInput style={styles.input} value={customerId} onChangeText={loadCustomer} placeholder="Customer ID" placeholderTextColor={colors.text.muted} />
               )}
             </Panel>
-            {c360 ? (
+            {customerLoading ? <WorkspaceLoading title="Loading Customer 360…" message="Fetching this customer’s current sales and credit context." /> : c360 ? (
               <>
                 <View style={styles.metrics}>
                   <MetricTile label="This month" value={money(c360.summary?.monthSales)} icon="trending-up-outline" tone="success" />
@@ -167,7 +163,7 @@ export default function SalesIntelligence() {
         {tab === 'margin' ? (
           <ListPanel title="Estimated order margins" icon="analytics-outline" empty="No margin data" rows={margin.map((x: any) => ({ a: `${x.orderNo} • ${x.customer}`, b: `Revenue ${money(x.revenue)} • Margin ${x.marginPercent}%`, tone: Number(x.marginPercent) < 10 ? 'danger' : Number(x.marginPercent) < 20 ? 'warning' : 'success' }))} />
         ) : null}
-      </ScrollView>
+      </ScrollView> : null}
     </View>
   );
 
@@ -195,7 +191,7 @@ const makeStyles = (c: typeof LightColors) => StyleSheet.create({
   twoColumn: { flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap', alignItems: 'flex-start' },
   listPanel: { flexGrow: 1, flexShrink: 1, flexBasis: 430, minWidth: 290 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
-  rowA: { fontSize: 13, fontWeight: '750', color: c.text.primary },
+  rowA: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   rowB: { fontSize: 11.5, lineHeight: 17, color: c.text.secondary, marginTop: 3 },
   input: { minHeight: 42, paddingHorizontal: 12, borderWidth: 1, borderColor: c.border, borderRadius: Radius.md, color: c.text.primary, backgroundColor: c.bg.card, maxWidth: 440 },
 });

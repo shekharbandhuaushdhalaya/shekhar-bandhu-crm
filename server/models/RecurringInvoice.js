@@ -21,8 +21,10 @@ const recurringInvoiceSchema = new mongoose.Schema({
   items: [recurringItemSchema],
   totalAmount: { type: Number, required: true, min: 0 },
   status: { type: String, enum: ['active', 'paused', 'cancelled'], default: 'active' },
-  generatedInvoicesCount: { type: Number, default: 0 },
-  lastGeneratedInvoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice', default: null },
+  generatedInvoicesCount: { type: Number, default: 0 }, // legacy counter retained for historical templates
+  lastGeneratedInvoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice', default: null }, // legacy reference
+  generatedOrdersCount: { type: Number, default: 0 },
+  lastGeneratedOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
   createdBy: { type: String, default: 'System' }
 }, { timestamps: true });
 

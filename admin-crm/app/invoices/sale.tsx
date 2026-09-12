@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Linking, Pressable, DeviceEventEmitter, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Spacing, Radius, LightColors } from '../../constants/theme';
 import { api, Invoice, Product, Customer, Warehouse, InventoryEntry, InvoiceItem } from '../../utils/api';
 import { shortenPartyName } from '../../utils/string';
@@ -14,6 +14,11 @@ import { FIRM_DETAILS } from '../../constants/firm';
 import { printInvoice } from '../../utils/printInvoiceTemplate';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
+
+const getFinancialYearString = (date: Date): string => {
+  const startYear = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+  return `${startYear}-${String(startYear + 1).slice(-2)}`;
+};
 
 // ── Share on WhatsApp ──────────────────────────────────────────────────────────
 const shareInvoiceOnWhatsApp = (invoice: Invoice, customers: Customer[]) => {
@@ -131,7 +136,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Attach',
-            onPress: async (url) => {
+            onPress: async (url?: string) => {
               if (!url) return;
               try {
                 await api.addDocument('invoice', invoice._id, { name: 'Attached Receiving Copy', url });
@@ -512,23 +517,15 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
               </TouchableOpacity>
             )}
 
-            {/* Toggle Payment Status */}
+            {/* Payments must be recorded through the Payments workflow so invoice and customer ledgers remain consistent. */}
             {invoice.isFinalized && invoice.status?.toLowerCase() !== 'paid' && (
               <>
                 <TouchableOpacity
                   style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.success }]}
-                  onPress={async () => {
-                    try {
-                      await api.updateSaleInvoice(invoice._id, { status: 'paid' });
-                      onDeleted();
-                      onClose();
-                    } catch (err: any) {
-                      alert(err.message || 'Failed to update payment status');
-                    }
-                  }}
+                  onPress={() => { onClose(); router.push('/payments'); }}
                 >
                   <Ionicons name="cash-outline" size={18} color="#fff" />
-                  <Text style={styles.printBtnText}>Mark Paid</Text>
+                  <Text style={styles.printBtnText}>Record Payment</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.primary }]}
@@ -540,25 +537,15 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                         script.src = 'https://checkout.razorpay.com/v1/checkout.js';
                         script.onload = () => {
                           const options = {
-                            key: orderData.keyId,
-                            amount: orderData.amount,
-                            currency: orderData.currency,
-                            name: 'Shekhar Bandhu Aushadhalaya',
-                            description: `Invoice ${orderData.invoiceNo}`,
-                            order_id: orderData.orderId,
+                            key: orderData.keyId, amount: orderData.amount, currency: orderData.currency,
+                            name: 'Shekhar Bandhu Aushadhalaya', description: `Invoice ${orderData.invoiceNo}`, order_id: orderData.orderId,
                             prefill: { name: orderData.customerName, email: orderData.customerEmail, contact: orderData.customerPhone },
                             handler: async (response: any) => {
                               const verify = await api.verifyPayment({
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                                invoiceId: invoice._id,
+                                razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature, invoiceId: invoice._id,
                               });
-                              if (verify.success) {
-                                alert('Payment successful! Invoice marked as paid.');
-                                onDeleted();
-                                onClose();
-                              }
+                              if (verify.success) { alert('Payment recorded successfully.'); onDeleted(); onClose(); }
                             },
                             modal: { ondismiss: () => { } },
                           };
@@ -567,35 +554,15 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
                         };
                         document.body.appendChild(script);
                       } else {
-                        alert('Online payment is available on web. Use Mark as Paid for manual recording.');
+                        alert('Online payment is available on web. Use Record Payment for manual receipts.');
                       }
-                    } catch (err: any) {
-                      alert(err.message || 'Failed to initiate payment');
-                    }
+                    } catch (err: any) { alert(err.message || 'Failed to initiate payment'); }
                   }}
                 >
                   <Ionicons name="globe-outline" size={18} color="#fff" />
                   <Text style={styles.printBtnText}>Pay Online</Text>
                 </TouchableOpacity>
               </>
-            )}
-
-            {invoice.isFinalized && invoice.status?.toLowerCase() === 'paid' && (
-              <TouchableOpacity
-                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.warning }]}
-                onPress={async () => {
-                  try {
-                    await api.updateSaleInvoice(invoice._id, { status: 'pending' });
-                    onDeleted(); // Reload parent
-                    onClose();
-                  } catch (err: any) {
-                    alert(err.message || 'Failed to update payment status');
-                  }
-                }}
-              >
-                <Ionicons name="alert-circle-outline" size={18} color="#fff" />
-                <Text style={styles.printBtnText}>Mark Unpaid</Text>
-              </TouchableOpacity>
             )}
 
             <TouchableOpacity
@@ -925,7 +892,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       c => (c.company || c.name || '').trim().toLowerCase() === customerName.trim().toLowerCase()
     );
     if (!selectedCustomer || !selectedCustomer.gstin || !selectedCustomer.gstin.trim()) {
-      alert('Sale invoices can only be created for customers with a valid GSTIN. For kaccha/sampling/damage movements, use the Delivery Challan module.');
+      alert('Sale invoices can only be created for customers with a valid GSTIN. Create the sale from Sales Workspace and generate the invoice from a posted Sale Challan.');
       return;
     }
 
@@ -971,7 +938,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
       if (invoiceToEdit) {
         await api.updateSaleInvoice(invoiceToEdit._id, invoiceData);
       } else {
-        await api.createSaleInvoice(invoiceData);
+        alert('Direct Sale Invoice creation is retired. Create the sale from Sales Workspace and invoice the posted Sale Challan.');
+        return;
       }
       onSaved();
       onClose();
@@ -1940,8 +1908,9 @@ export default function SaleInvoicesScreen() {
               )}
             </View>
 
-            <TouchableOpacity style={styles.addBtn} onPress={() => { setInvoiceToEdit(null); setAddVisible(true); }}>
-              <Ionicons name="add" size={22} color="#fff" />
+            <TouchableOpacity style={[styles.addBtn, { width: 'auto', paddingHorizontal: 12, flexDirection: 'row', gap: 6 }]} onPress={() => router.push('/sales-workspace?tab=challans')}>
+              <Ionicons name="document-text-outline" size={17} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>From Challan</Text>
             </TouchableOpacity>
           </View>
         </View>

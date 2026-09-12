@@ -1,6 +1,7 @@
 const RawMaterial = require('../models/RawMaterial');
 const RawMaterialEntry = require('../models/RawMaterialEntry');
 const BillOfMaterials = require('../models/BillOfMaterials');
+const { resolveManufacturingWarehouse } = require('./manufacturingWarehouseService');
 
 /**
  * Parses size strings like "200ml", "450 ml", "1 L", "500g" to numeric value in ml/grams.
@@ -75,9 +76,10 @@ async function consumeFromReservation(batch, rawMaterialId, qtyNeeded, session) 
   }
 
   if (needed > 0.0001) {
+    const manufacturingWarehouse = await resolveManufacturingWarehouse(batch.manufacturingUnitId, session);
     let query = RawMaterialEntry.find({
       rawMaterialId,
-      warehouseId: batch.manufacturingUnitId,
+      warehouseId: manufacturingWarehouse._id,
       qcStatus: 'approved'
     });
     if (session) query = query.session(session);

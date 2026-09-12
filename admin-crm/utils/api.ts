@@ -76,6 +76,10 @@ export interface CreditNote {
   invoiceNo?: string;
   baseAmount?: number;
   taxAmount?: number;
+  gstRate?: number;
+  cgst?: number;
+  sgst?: number;
+  igst?: number;
   totalAmount: number;
   reason?: string;
   status: 'draft' | 'finalized' | 'cancelled';
@@ -212,10 +216,16 @@ class ApiClient {
       // above already handles freshness and socket-driven invalidation.
       const fetchUrl = url;
 
-      if (isMutating) {
+      let loaderStarted = false;
+      let getLoaderTimer: ReturnType<typeof setTimeout> | null = null;
+      const startLoader = () => {
+        if (loaderStarted) return;
+        loaderStarted = true;
         this.activeRequests++;
         DeviceEventEmitter.emit('global_loader', { isLoading: this.activeRequests > 0 });
-      }
+      };
+      if (isMutating) startLoader();
+      else if (isGet) getLoaderTimer = setTimeout(startLoader, 300);
 
       try {
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -284,7 +294,8 @@ class ApiClient {
 
         return res;
       } finally {
-        if (isMutating) {
+        if (getLoaderTimer) clearTimeout(getLoaderTimer);
+        if (loaderStarted) {
           this.activeRequests = Math.max(0, this.activeRequests - 1);
           DeviceEventEmitter.emit('global_loader', { isLoading: this.activeRequests > 0 });
         }
@@ -301,6 +312,12 @@ class ApiClient {
     }
 
     return promise;
+  }
+
+  async requestJson<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+    const url = path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
+    const res = await this.request(url, options);
+    return res.json();
   }
 
   // --- Auth ---
@@ -866,7 +883,7 @@ class ApiClient {
     return res.json();
   }
   async updateQuotation(id: string, data?: Partial<Quotation>): Promise<Quotation> {
-    if (!data) return this.request(`${API_BASE}/quotations/${id}/status`, { method: "PUT", body: JSON.stringify({ status: "Finalized" }) }).then(r => r.json());
+    if (!data) return this.request(`${API_BASE}/quotations/${id}/finalize`, { method: 'PATCH' }).then(r => r.json());
     const res = await this.request(`${API_BASE}/quotations/${id}`, { method: 'PUT', body: JSON.stringify(data) });
     return res.json();
   }
@@ -1031,10 +1048,12 @@ class ApiClient {
   }
 
   // --- E-commerce Orders ---
-  async getOrders(page?: number, limit?: number): Promise<any> {
+  async getOrders(page?: number, limit?: number, customerId?: string, status?: string): Promise<any> {
     const params = new URLSearchParams();
     if (page !== undefined) params.append('page', page.toString());
     if (limit !== undefined) params.append('limit', limit.toString());
+    if (customerId) params.append('customerId', customerId);
+    if (status) params.append('status', status);
     const query = params.toString() ? `?${params.toString()}` : '';
     const res = await this.request(`${API_BASE}/orders${query}`);
     return res.json();
@@ -1906,15 +1925,15 @@ class ApiClient {
     return res.json();
   }
   async shipStockTransfer(id: string): Promise<StockTransfer> {
-    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/ship`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/ship`, { method: 'PATCH', headers: { 'Idempotency-Key': `stock-transfer-ship-${id}` } });
     return res.json();
   }
   async receiveStockTransfer(id: string): Promise<StockTransfer> {
-    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/receive`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/receive`, { method: 'PATCH', headers: { 'Idempotency-Key': `stock-transfer-receive-${id}` } });
     return res.json();
   }
   async cancelStockTransfer(id: string): Promise<StockTransfer> {
-    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/cancel`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/cancel`, { method: 'PATCH', headers: { 'Idempotency-Key': `stock-transfer-cancel-${id}` } });
     return res.json();
   }
 }
@@ -1937,6 +1956,12 @@ export interface StockTransfer {
   notes?: string;
   createdBy?: string;
   approvedBy?: string;
+  approvedAt?: string;
+  challanId?: string;
+  challanNo?: string;
+  shippedAt?: string;
+  receivedAt?: string;
+  cancelledAt?: string;
   createdAt?: string;
 }
 

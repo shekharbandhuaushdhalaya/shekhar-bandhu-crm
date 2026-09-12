@@ -5,9 +5,12 @@ const creditNoteItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
   name: { type: String, required: true },
   qty: { type: Number, default: 0 },
+  billableQty: { type: Number, default: 0 },
+  freeQty: { type: Number, default: 0 },
   boxes: { type: Number, default: 0 },
   packing: { type: Number, default: 1 },
   rate: { type: Number, default: 0 },
+  gstRate: { type: Number, default: 0 },
   amount: { type: Number, default: 0 },
   batchNo: { type: String, default: '', trim: true }
 }, { _id: false });

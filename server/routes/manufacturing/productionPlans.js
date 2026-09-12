@@ -1,7 +1,9 @@
 const express = require('express');
 const ProductionPlan = require('../../models/ProductionPlan');
 const BillOfMaterials = require('../../models/BillOfMaterials');
-const InventoryEntry = require('../../models/InventoryEntry');
+const RawMaterialEntry = require('../../models/RawMaterialEntry');
+const { resolveManufacturingWarehouse } = require('../../services/manufacturingWarehouseService');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const RawMaterial = require('../../models/RawMaterial');
 const { authorize } = require('../../middleware/authorize');
 
@@ -29,8 +31,9 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       return res.status(400).json({ error: 'title, manufacturingUnitId, manufacturingUnitName, and plannedBatches array are required' });
     }
 
-    const fy = new Date().getFullYear() % 100 + '-' + (new Date().getFullYear() + 1) % 100;
-    const planNo = `PLN/${fy}/${Math.floor(1000 + Math.random() * 9000)}`;
+    const fy = `${new Date().getFullYear() % 100}-${(new Date().getFullYear() + 1) % 100}`;
+    const planNo = await generateAtomicDocumentNumber(`productionPlan_${fy}`, `PLN/${fy}/`, 5);
+    const manufacturingWarehouse = await resolveManufacturingWarehouse(manufacturingUnitId);
 
     // Aggregate total raw material requirements across all planned batches
     const rawMaterialNeeds = new Map(); // rawMaterialId -> totalNeeded
@@ -57,13 +60,13 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       const rm = await RawMaterial.findById(rmId).lean();
       const rmName = rm ? rm.name : 'Raw Material';
 
-      const entries = await InventoryEntry.find({
-        warehouseId: manufacturingUnitId,
+      const entries = await RawMaterialEntry.find({
+        warehouseId: manufacturingWarehouse._id,
         rawMaterialId: rmId,
         qcStatus: 'approved'
       }).lean();
 
-      const availableQty = entries.reduce((acc, e) => acc + (e.qtyBoxes || 0), 0);
+      const availableQty = entries.reduce((acc, e) => acc + Math.max(0, Number(e.qty || 0) - Number(e.reservedQty || 0)), 0);
       if (availableQty < requiredQty) {
         shortageDetected = true;
         shortageDetails.push({

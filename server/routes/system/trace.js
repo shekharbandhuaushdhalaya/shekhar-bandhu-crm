@@ -4,11 +4,12 @@ const RawMaterialEntry = require('../../models/RawMaterialEntry');
 const InventoryEntry = require('../../models/InventoryEntry');
 const Invoice = require('../../models/Invoice');
 const Dispatch = require('../../models/Dispatch');
+const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
 
 // GET /api/trace/:batchNo — End-to-end batch traceability
-router.get('/:batchNo', async (req, res) => {
+router.get('/:batchNo', authorize('manufacturing:view'), async (req, res) => {
   try {
     const searchKey = req.params.batchNo.trim();
     if (!searchKey) return res.status(400).json({ error: 'Batch number or material parameter is required' });

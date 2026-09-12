@@ -1,6 +1,7 @@
 const express = require('express');
 const GeneralExpense = require('../../models/GeneralExpense');
 const { authorize } = require('../../middleware/authorize');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
 
@@ -47,7 +48,7 @@ router.post('/', authorize('payment:create'), async (req, res) => {
     }
 
     const fy = new Date().getFullYear() % 100 + '-' + (new Date().getFullYear() + 1) % 100;
-    const expenseNo = `EXP/${fy}/${Math.floor(1000 + Math.random() * 9000)}`;
+    const expenseNo = await generateAtomicDocumentNumber(`expenseNo_${fy}`, `EXP/${fy}/`, 5);
 
     const exp = await GeneralExpense.create({
       expenseNo,

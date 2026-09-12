@@ -472,7 +472,7 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
       try {
         setLoadingInvoices(true);
         const invs = await api.getSaleInvoices(selectedName);
-        const matched = (invs || []).filter(inv =>
+        const matched = (invs || []).filter((inv: any) =>
           (inv.customerName || '').toLowerCase().includes(selectedName.toLowerCase()) ||
           (p.company && (inv.customerName || '').toLowerCase().includes(p.company.toLowerCase())) ||
           (p.name && (inv.customerName || '').toLowerCase().includes(p.name.toLowerCase()))

@@ -18,7 +18,10 @@ router.get('/', async (req, res) => {
       ]
     };
     const notifications = await Notification.find(filter).sort({ createdAt: -1 }).limit(100).lean();
-    res.json(notifications);
+    res.json(notifications.map(n => ({
+      ...n,
+      isRead: n.userId ? Boolean(n.isRead) : (n.readBy || []).some(id => String(id) === String(userId)),
+    })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -27,8 +30,12 @@ router.get('/', async (req, res) => {
 // PATCH /api/notifications/:id/read — Mark a notification as read
 router.patch('/:id/read', async (req, res) => {
   try {
-    const notification = await Notification.findByIdAndUpdate(req.params.id, { isRead: true }, { new: true });
+    const userId = req.user ? req.user.id : null;
+    const notification = await Notification.findOne({ _id: req.params.id, $or: [{ userId }, { userId: null }] });
     if (!notification) return res.status(404).json({ error: 'Notification not found' });
+    if (notification.userId) notification.isRead = true;
+    else if (userId && !(notification.readBy || []).some(id => String(id) === String(userId))) notification.readBy.push(userId);
+    await notification.save();
     if (req.io) {
       req.io.emit('notification_updated', { type: 'read', id: notification._id });
     }
@@ -42,18 +49,16 @@ router.patch('/:id/read', async (req, res) => {
 router.post('/read-all', async (req, res) => {
   try {
     const userId = req.user ? req.user.id : null;
-    await Notification.updateMany({
-      $or: [{ userId }, { userId: null }],
-      isRead: false
-    }, { isRead: true });
-    res.json({ success: true, message: 'All notifications marked as read' });
+    await Notification.updateMany({ userId, isRead: false }, { $set: { isRead: true } });
+    if (userId) await Notification.updateMany({ userId: null, readBy: { $ne: userId } }, { $addToSet: { readBy: userId } });
+    res.json({ success: true, message: 'All notifications marked as read for this user' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/notifications/alerts/check — Check and trigger alerts for low stock, expiring licenses, and expiring batches
-router.get('/alerts/check', async (req, res) => {
+router.get('/alerts/check', authorize('report:view'), async (req, res) => {
   try {
     const alertsCreated = [];
 

@@ -241,7 +241,7 @@ router.put('/admin-disable/:userId', authenticateToken, async (req, res) => {
     const { authorize } = require('../../middleware/authorize');
     const { getRolePermissions } = require('../../middleware/authorize');
     const { hasPermission } = require('../../utils/permissions');
-    const rolePerms = await getRolePermissions(req.user.role);
+    const rolePerms = await getRolePermissions(req.user.firmRole || req.user.role, req.user.firmId || null);
     if (!hasPermission(rolePerms, 'user:edit') && !rolePerms.includes('*')) {
       return res.status(403).json({ error: 'Access denied. Requires user:edit permission.' });
     }

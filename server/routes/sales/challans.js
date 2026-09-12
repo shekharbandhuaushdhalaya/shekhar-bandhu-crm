@@ -6,13 +6,19 @@ const idempotency = require('../../middleware/idempotency');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const Customer = require('../../models/Customer');
+const Order = require('../../models/Order');
+const Invoice = require('../../models/Invoice');
+const SystemSettings = require('../../models/SystemSettings');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+const { withTransaction } = require('../../utils/withTransaction');
 
 const router = express.Router();
 
 // GET /api/challans — List challans with search and mode filters
-router.get('/', async (req, res) => {
+router.get('/', authorize('challan:view'), async (req, res) => {
   try {
-    const { search, mode, page = 1, limit = 50 } = req.query;
+    const { search, page = 1, limit = 50 } = req.query;
     const filter = {};
 
     if (search) {
@@ -37,25 +43,15 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/challans — Create new challan in DRAFT status (no inventory deduction yet)
-router.post('/', validate(schemas.challanSchema), async (req, res) => {
+router.post('/', authorize('challan:create'), validate(schemas.challanSchema), async (req, res) => {
   try {
-    const { mode } = req.body;
-
-
     let challanNo = req.body.challanNo;
     if (!challanNo) {
-      const SystemSettings = require('../../models/SystemSettings');
       const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
       const pfx = settings.challanPrefix || 'CH';
-      const lastChallan = await Challan.findOne({ challanNo: new RegExp(`^${pfx}-\\d+$`) }).sort({ createdAt: -1 }).lean();
-      let nextNum = 1;
-      if (lastChallan) {
-        const parts = lastChallan.challanNo.split('-');
-        if (parts.length === 3) {
-          nextNum = parseInt(parts[2], 10) + 1;
-        }
-      }
-      challanNo = `${pfx}-${nextNum.toString().padStart(3, '0')}`;
+      challanNo = await generateAtomicDocumentNumber(`challanNo_${pfx}`, `${pfx}-`, 5);
+    } else if (await Challan.exists({ challanNo })) {
+      return res.status(409).json({ error: `Challan number ${challanNo} already exists`, code: 'DUPLICATE_CHALLAN_NO' });
     }
 
     const data = {
@@ -70,6 +66,30 @@ router.post('/', validate(schemas.challanSchema), async (req, res) => {
     }
     if (data.challanType !== 'sale' && data.destinationWarehouseId && String(data.destinationWarehouseId) === String(data.warehouseId)) {
       return res.status(400).json({ error: 'Source and destination warehouses must be different', code: 'SAME_WAREHOUSE_TRANSFER' });
+    }
+
+    if (data.challanType === 'sale') {
+      if (!data.salesOrderId) {
+        return res.status(400).json({
+          error: 'A linked Sales Order is required for every Sale Challan',
+          code: 'SALES_ORDER_REQUIRED',
+        });
+      }
+      const order = await Order.findById(data.salesOrderId);
+      if (!order) return res.status(404).json({ error: 'Linked Sales Order not found', code: 'ORDER_NOT_FOUND' });
+      if (['draft', 'cancelled', 'fulfilled', 'shipped', 'delivered'].includes(order.status)) {
+        return res.status(409).json({ error: `Sales Order is ${order.status} and cannot accept another Challan`, code: 'ORDER_NOT_FULFILLABLE' });
+      }
+      data.customerId = order.customerId;
+      data.partyName = order.name || data.partyName;
+      if (!data.customerId) {
+        return res.status(409).json({ error: 'The linked Sales Order has no customer', code: 'ORDER_CUSTOMER_REQUIRED' });
+      }
+      const customer = await Customer.findById(data.customerId);
+      if (!customer) return res.status(404).json({ error: 'Selected customer not found', code: 'CUSTOMER_NOT_FOUND' });
+      data.partyName = customer.company || customer.name || data.partyName;
+      data.gstin = data.gstin || customer.gstin || '';
+      data.stateOfSupply = data.stateOfSupply || customer.state || '';
     }
 
     if (!data.warehouseId) {
@@ -89,6 +109,9 @@ router.post('/', validate(schemas.challanSchema), async (req, res) => {
     }
 
     const challan = await Challan.create(data);
+    if (challan.challanType === 'sale') {
+      await Order.updateOne({ _id: challan.salesOrderId }, { $addToSet: { challanIds: challan._id } });
+    }
     if (req.io) {
       req.io.emit('challan_updated', { type: 'created', id: challan._id });
     }
@@ -107,18 +130,70 @@ router.post('/', validate(schemas.challanSchema), async (req, res) => {
 });
 
 // PUT /api/challans/:id — Update an existing draft challan
-router.put('/:id', validate(schemas.challanSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('challan:edit'), validate(schemas.challanSchema.partial()), async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found' });
-    if (challan.status === 'finalized') {
-      return res.status(400).json({ error: 'Cannot edit a finalized challan' });
+    if (challan.status !== 'draft' || challan.inventoryPostingStatus !== 'not_posted') {
+      return res.status(409).json({ error: 'Only an unposted draft Challan can be edited', code: 'CHALLAN_NOT_EDITABLE' });
     }
-    
 
-    
-    Object.assign(challan, req.body);
+    const update = { ...req.body, status: 'draft' };
+    const nextType = update.challanType || challan.challanType;
+    const nextOrderId = update.salesOrderId === undefined ? challan.salesOrderId : update.salesOrderId;
+    const nextWarehouseId = update.warehouseId || challan.warehouseId;
+    const nextDestinationId = update.destinationWarehouseId === undefined
+      ? challan.destinationWarehouseId
+      : update.destinationWarehouseId;
+
+    if (nextType === 'sale') {
+      if (!nextOrderId) {
+        return res.status(400).json({ error: 'A linked Sales Order is required for every Sale Challan', code: 'SALES_ORDER_REQUIRED' });
+      }
+      const order = await Order.findById(nextOrderId);
+      if (!order) return res.status(404).json({ error: 'Linked Sales Order not found', code: 'ORDER_NOT_FOUND' });
+      if (['draft', 'cancelled', 'fulfilled', 'shipped', 'delivered'].includes(order.status)) {
+        return res.status(409).json({ error: `Sales Order is ${order.status} and cannot accept another Challan`, code: 'ORDER_NOT_FULFILLABLE' });
+      }
+      if (!order.customerId) {
+        return res.status(409).json({ error: 'The linked Sales Order has no customer', code: 'ORDER_CUSTOMER_REQUIRED' });
+      }
+      update.salesOrderId = order._id;
+      update.customerId = order.customerId;
+      update.partyName = order.name || update.partyName || challan.partyName;
+    } else {
+      update.salesOrderId = null;
+      if (!nextDestinationId) {
+        return res.status(400).json({ error: 'Destination warehouse is required for transfer Challans', code: 'DESTINATION_WAREHOUSE_REQUIRED' });
+      }
+      if (String(nextDestinationId) === String(nextWarehouseId)) {
+        return res.status(400).json({ error: 'Source and destination warehouses must be different', code: 'SAME_WAREHOUSE_TRANSFER' });
+      }
+    }
+
+    if (!nextWarehouseId) return res.status(400).json({ error: 'Source warehouse is required', code: 'SOURCE_WAREHOUSE_REQUIRED' });
+    const warehouse = await Warehouse.findById(nextWarehouseId);
+    if (!warehouse) return res.status(404).json({ error: 'Selected warehouse not found', code: 'SOURCE_WAREHOUSE_NOT_FOUND' });
+    update.warehouseId = warehouse._id;
+    update.warehouseName = warehouse.name;
+
+    if (nextType !== 'sale') {
+      const destination = await Warehouse.findById(nextDestinationId);
+      if (!destination) return res.status(404).json({ error: 'Destination warehouse not found', code: 'DESTINATION_WAREHOUSE_NOT_FOUND' });
+      update.destinationWarehouseId = destination._id;
+      update.destinationWarehouseName = destination.name;
+    }
+
+    const previousOrderId = challan.salesOrderId ? String(challan.salesOrderId) : null;
+    Object.assign(challan, update);
     const updated = await challan.save();
+    const nextSavedOrderId = updated.salesOrderId ? String(updated.salesOrderId) : null;
+    if (previousOrderId && previousOrderId !== nextSavedOrderId) {
+      await Order.updateOne({ _id: previousOrderId }, { $pull: { challanIds: updated._id } });
+    }
+    if (nextSavedOrderId) {
+      await Order.updateOne({ _id: nextSavedOrderId }, { $addToSet: { challanIds: updated._id } });
+    }
     if (req.io) {
       req.io.emit('challan_updated', { type: 'updated', id: updated._id });
     }
@@ -137,7 +212,7 @@ router.put('/:id', validate(schemas.challanSchema.partial()), async (req, res) =
 });
 
 // PATCH /api/challans/:id/finalize — post the authoritative physical-goods transaction
-router.patch('/:id/finalize', idempotency, async (req, res) => {
+router.patch('/:id/finalize', idempotency, authorize('challan:finalize'), async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found' });
@@ -152,32 +227,7 @@ router.patch('/:id/finalize', idempotency, async (req, res) => {
       createdBy: req.user ? req.user.name : 'System'
     });
 
-    // Sale-only financial side effect. Internal/production transfers never affect customer balances.
-    if (posted.challanType === 'sale' && posted.partyName && posted.nettTotal > 0) {
-      const Customer = require('../../models/Customer');
-      const cust = await Customer.findOne({ $or: [{ name: posted.partyName }, { company: posted.partyName }] });
-      if (cust) {
-        if (posted.mode === 'cash') cust.cashBalance = (cust.cashBalance || 0) + posted.nettTotal;
-        else cust.regularBalance = (cust.regularBalance || 0) + posted.nettTotal;
-        await cust.save();
-      }
-    }
-
-    if (posted.salesOrderId) {
-      const Order = require('../../models/Order');
-      const order = await Order.findById(posted.salesOrderId);
-      if (order) {
-        const postedChallans = await Challan.find({ salesOrderId: order._id, status: 'finalized', inventoryPostingStatus: 'posted' }).lean();
-        for (const oi of order.items) {
-          oi.fulfilledQty = postedChallans.flatMap(c => c.items).filter(i => String(i.productId) === String(oi.productId)).reduce((sum, i) => sum + Number(i.qty || 0), 0);
-          oi.backorderedQty = Math.max(0, Number(oi.qty || 0) + Number(oi.freeQty || 0) - Number(oi.fulfilledQty || 0));
-        }
-        const done = order.items.every(i => Number(i.backorderedQty || 0) <= 0);
-        const any = order.items.some(i => Number(i.fulfilledQty || 0) > 0);
-        order.status = done ? 'fulfilled' : (any ? 'partially_fulfilled' : 'processing');
-        await order.save();
-      }
-    }
+    // Financial receivables are created only when the derived Sale Invoice is finalized.
 
     if (req.io) {
       req.io.emit('challan_updated', { type: 'finalized', id: posted._id });
@@ -195,7 +245,7 @@ router.patch('/:id/finalize', idempotency, async (req, res) => {
     res.json(posted);
   } catch (err) {
     console.error('Challan finalization failed:', err);
-    const status = ['INSUFFICIENT_STOCK','CHALLAN_NOT_POSTABLE','SAME_WAREHOUSE_TRANSFER','DESTINATION_WAREHOUSE_REQUIRED','SOURCE_WAREHOUSE_REQUIRED','PRODUCT_NOT_FOUND','INVALID_QUANTITY'].includes(err.code) ? 400 : 500;
+    const status = ['INSUFFICIENT_STOCK','CHALLAN_NOT_POSTABLE','SAME_WAREHOUSE_TRANSFER','DESTINATION_WAREHOUSE_REQUIRED','SOURCE_WAREHOUSE_REQUIRED','PRODUCT_NOT_FOUND','INVALID_QUANTITY','SALES_ORDER_REQUIRED','ORDER_NOT_FOUND','ORDER_NOT_FULFILLABLE','ORDER_APPROVAL_REQUIRED','ORDER_CUSTOMER_REQUIRED','ORDER_CUSTOMER_MISMATCH','FULFILLMENT_EXCEEDS_REMAINING','ORDER_ITEM_NOT_FOUND'].includes(err.code) ? 409 : 500;
     res.status(status).json({ error: err.message, code: err.code || 'INVENTORY_TRANSACTION_FAILED', details: err.details || undefined });
   }
 });
@@ -244,162 +294,134 @@ router.delete('/:id', authorize('challan:delete'), async (req, res) => {
 // Helper to get financial year string
 function getFinancialYearString(date = new Date()) {
   const year = date.getFullYear();
-  const month = date.getMonth(); // 0-indexed, 0 = Jan, 3 = Apr
-  if (month >= 3) {
-    return `${year}-${(year + 1).toString().slice(-2)}`;
-  } else {
-    return `${year - 1}-${year.toString().slice(-2)}`;
-  }
+  const month = date.getMonth();
+  return month >= 3 ? `${year}-${(year + 1).toString().slice(-2)}` : `${year - 1}-${year.toString().slice(-2)}`;
 }
 
-// POST /api/challans/:id/convert — Convert a Challan to a Sale Invoice
-router.post('/:id/convert', async (req, res) => {
+// POST /api/challans/:id/convert — Create the financial invoice derived from a posted Sale Challan.
+router.post('/:id/convert', authorize('invoice:create'), async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
-    if (!challan) return res.status(404).json({ error: 'Challan not found' });
-
-    if (challan.convertedToInvoice) {
-      return res.status(400).json({ error: `Challan is already converted to Sale Invoice ${challan.invoiceNo}` });
-    }
+    if (!challan) return res.status(404).json({ error: 'Challan not found', code: 'CHALLAN_NOT_FOUND' });
+    if (challan.challanType !== 'sale') return res.status(409).json({ error: 'Only Sale Challans can be converted to Sale Invoices', code: 'NOT_SALE_CHALLAN' });
     if (challan.status !== 'finalized' || challan.inventoryPostingStatus !== 'posted') {
       return res.status(409).json({ error: 'Finalize the Challan before creating its invoice.', code: 'CHALLAN_NOT_POSTED' });
     }
-
-
-
-    // Check if customer is GSTIN registered
-    const Customer = require('../../models/Customer');
-    const customer = await Customer.findOne({
-      $or: [
-        { name: challan.partyName },
-        { company: challan.partyName }
-      ]
-    });
-
-    const finalGstin = (challan.gstin || (customer ? customer.gstin : '') || '').trim();
-    if (!finalGstin) {
-      return res.status(400).json({ error: 'Customer is not GSTIN registered. Sale invoices can only be created for customers with a valid GSTIN.' });
+    if (challan.convertedToInvoice || challan.invoiceId) {
+      const existing = challan.invoiceId ? await Invoice.findById(challan.invoiceId) : null;
+      if (existing && existing.status !== 'cancelled') {
+        return res.status(409).json({ error: `Challan is already converted to Sale Invoice ${existing.invoiceNo || challan.invoiceNo}`, code: 'CHALLAN_ALREADY_INVOICED' });
+      }
     }
+    if (!challan.customerId) return res.status(409).json({ error: 'Sale Challan has no linked customer', code: 'CUSTOMER_REQUIRED' });
+    const customer = await Customer.findById(challan.customerId);
+    if (!customer) return res.status(404).json({ error: 'Linked customer not found', code: 'CUSTOMER_NOT_FOUND' });
 
-    // Generate Invoice Number
-    const Invoice = require('../../models/Invoice');
+    const finalGstin = String(challan.gstin || customer.gstin || '').trim();
+    if (!finalGstin) return res.status(400).json({ error: 'Customer is not GSTIN registered. Sale invoices can only be created for customers with a valid GSTIN.', code: 'GSTIN_REQUIRED' });
+
     const fy = getFinancialYearString();
-    const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
     const pfx = settings.invoicePrefix || 'VP';
     const prefix = `${pfx}/${fy}/`;
-    
-    const lastInvoice = await Invoice.findOne({ 
-      type: 'sale',
-      invoiceNo: { $regex: `^${prefix.replace(/\//g, '\\/')}\\d+$` }
-    }).sort({ createdAt: -1 }).lean();
+    const invoiceNo = await generateAtomicDocumentNumber(`invoiceNo_${prefix}`, prefix, 5);
+    const state = String(challan.stateOfSupply || customer.state || 'Uttar Pradesh').trim();
+    const isIntraState = finalGstin.startsWith('09') || ['uttar pradesh', 'up'].includes(state.toLowerCase());
 
-    let nextNum = 1;
-    if (lastInvoice) {
-      const parts = lastInvoice.invoiceNo.split('/');
-      if (parts.length === 3) {
-        nextNum = parseInt(parts[2], 10) + 1;
-      }
-    }
-    const invoiceNo = `${prefix}${nextNum.toString().padStart(3, '0')}`;
-
-    const isIntraState = finalGstin.startsWith('09') || 
-      ['uttar pradesh', 'up'].includes((challan.stateOfSupply || (customer ? customer.state : '') || 'Uttar Pradesh').trim().toLowerCase());
-
-    // Recalculate base amount and tax amounts based on items and state of supply
     let totalBase = 0;
     let totalTax = 0;
-    const invoiceItems = challan.items.map(it => {
-      const itemBase = (it.qty || 0) * (it.rate || 0) * (it.packing || 1);
+    const invoiceItems = (challan.items || []).map((it) => {
+      const physical = Number(it.qty || 0);
+      const billable = it.billableQty == null ? Math.max(0, physical - Number(it.freeQty || 0)) : Number(it.billableQty || 0);
+      const freeQty = Math.max(0, physical - billable);
+      const rate = Number(it.rate || 0);
+      const itemBase = billable * rate;
+      const gst = Number(it.gstRate || 0);
       totalBase += itemBase;
-      const gst = it.gstRate || 0;
-      totalTax += (itemBase * gst) / 100;
-
+      totalTax += itemBase * gst / 100;
       return {
         productId: it.productId,
         name: it.name,
-        qty: it.qty, // boxes (in sale.tsx, qty is boxes)
-        boxes: it.qty, // quantity in boxes
-        packing: it.packing || 1,
-        rate: it.rate || 0,
+        qty: billable,
+        boxes: billable,
+        freeQty,
+        packing: Number(it.packing || 1),
+        rate,
         hsnCode: it.hsnCode || '',
-        gstRate: it.gstRate || 0
+        gstRate: gst,
+        batchNo: it.batchNo || '',
       };
     });
 
     const cgst = isIntraState ? totalTax / 2 : 0;
     const sgst = isIntraState ? totalTax / 2 : 0;
-    const igst = !isIntraState ? totalTax : 0;
-    const rawTotal = totalBase + cgst + sgst + igst;
-    const nettTotal = Math.round(rawTotal);
-    const roundOff = nettTotal - rawTotal;
+    const igst = isIntraState ? 0 : totalTax;
+    const rawTotal = totalBase + totalTax;
+    const amount = Math.round(rawTotal);
+    const roundOff = amount - rawTotal;
 
-    // Create invoice data
-    const invoiceData = {
-      invoiceNo,
-      customerId: customer ? customer._id : null,
-      customerName: challan.partyName,
-      partyAddress: challan.partyAddress,
-      shippingAddress: challan.shippingAddress,
-      date: new Date(),
-      amount: nettTotal,
-      status: 'draft',
-      mode: 'pakka', // converted invoice is pakka
-      baseAmount: totalBase,
-      cgst,
-      sgst,
-      igst,
-      roundOff,
-      stateOfSupply: challan.stateOfSupply || (customer ? customer.state : '') || 'Uttar Pradesh',
-      gstin: finalGstin,
-      warehouseId: challan.warehouseId,
-      warehouseName: challan.warehouseName,
-      deductInventory: false, // Challan has already posted the authoritative physical stock movement.
-      isFinalized: false, // create as draft
-      type: 'sale',
-      sourceDocType: 'Challan',
-      sourceDocId: challan._id,
-      reference: challan._id.toString(),
-      items: invoiceItems
-    };
+    const invoice = await withTransaction(async (session) => {
+      const locked = await Challan.findById(challan._id).session(session);
+      if (!locked || locked.status !== 'finalized' || locked.inventoryPostingStatus !== 'posted') {
+        throw Object.assign(new Error('Challan is no longer postable to invoice'), { code: 'CHALLAN_NOT_POSTED' });
+      }
+      if (locked.convertedToInvoice || locked.invoiceId) {
+        const prior = locked.invoiceId ? await Invoice.findById(locked.invoiceId).session(session) : null;
+        if (prior && prior.status !== 'cancelled') throw Object.assign(new Error('Challan has already been invoiced'), { code: 'CHALLAN_ALREADY_INVOICED' });
+      }
+      const [created] = await Invoice.create([{
+        invoiceNo,
+        customerId: customer._id,
+        customerName: customer.company || customer.name || locked.partyName,
+        partyAddress: locked.partyAddress,
+        shippingAddress: locked.shippingAddress,
+        date: new Date(),
+        amount,
+        status: 'draft',
+        mode: 'pakka',
+        baseAmount: totalBase,
+        cgst,
+        sgst,
+        igst,
+        roundOff,
+        stateOfSupply: state,
+        gstin: finalGstin,
+        warehouseId: locked.warehouseId,
+        warehouseName: locked.warehouseName,
+        deductInventory: false,
+        isFinalized: false,
+        type: 'sale',
+        sourceDocType: 'Challan',
+        sourceDocId: locked._id,
+        reference: String(locked._id),
+        items: invoiceItems,
+      }], { session });
 
-    const invoice = await Invoice.create(invoiceData);
-
-    // Update Challan to link to the invoice
-    challan.convertedToInvoice = true;
-    challan.invoiceId = invoice._id;
-    challan.invoiceNo = invoice.invoiceNo;
-    await challan.save();
-
-    if (challan.salesOrderId) {
-      const Order = require('../../models/Order');
-      await Order.findByIdAndUpdate(challan.salesOrderId, { $addToSet: { invoiceIds: invoice._id } });
-    }
+      locked.convertedToInvoice = true;
+      locked.invoiceId = created._id;
+      locked.invoiceNo = created.invoiceNo;
+      await locked.save({ session });
+      if (locked.salesOrderId) {
+        await Order.updateOne({ _id: locked.salesOrderId }, { $addToSet: { invoiceIds: created._id } }, { session });
+      }
+      return created;
+    });
 
     if (req.io) {
       req.io.emit('challan_updated', { type: 'converted', id: challan._id });
       req.io.emit('invoice_updated', { type: 'created_from_challan', id: invoice._id });
     }
-    res.status(201).json({
-      message: 'Challan successfully converted to Sale Invoice',
-      invoice,
-      challan
-    });
-
     const { logAction } = require('../../utils/auditLogger');
-    await logAction({
-      action: 'CONVERT_CHALLAN_TO_INVOICE',
-      description: `Converted challan ${challan.challanNo} to invoice: ${invoice.invoiceNo}`,
-      details: { challanId: challan._id, invoiceId: invoice._id },
-      req
-    });
+    await logAction({ action: 'CONVERT_CHALLAN_TO_INVOICE', description: `Converted challan ${challan.challanNo} to invoice: ${invoice.invoiceNo}`, details: { challanId: challan._id, invoiceId: invoice._id }, req });
+    res.status(201).json({ message: 'Challan successfully converted to Sale Invoice', invoice });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = ['CHALLAN_NOT_POSTED','CHALLAN_ALREADY_INVOICED','CUSTOMER_REQUIRED','NOT_SALE_CHALLAN'].includes(err.code) ? 409 : (['CHALLAN_NOT_FOUND','CUSTOMER_NOT_FOUND'].includes(err.code) ? 404 : 500);
+    res.status(status).json({ error: err.message, code: err.code || 'CHALLAN_INVOICE_CONVERSION_FAILED' });
   }
 });
 
 // PATCH /api/challans/:id/documents — Add a supporting document
-router.patch('/:id/documents', async (req, res) => {
+router.patch('/:id/documents', authorize('challan:edit'), async (req, res) => {
   try {
     const { name, url } = req.body;
     if (!name || !url) return res.status(400).json({ error: 'Document name and url are required' });
@@ -418,7 +440,7 @@ router.patch('/:id/documents', async (req, res) => {
 });
 
 // DELETE /api/challans/:id/documents — Remove a supporting document
-router.delete('/:id/documents', async (req, res) => {
+router.delete('/:id/documents', authorize('challan:edit'), async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Document URL is required' });

@@ -235,7 +235,7 @@ function uploadFileToCloudinary(buffer, filename, folder = 'shekhar-bandhu/suppo
 }
 
 // POST /api/system/upload — Upload a supporting document/image/pdf to Cloudinary
-router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
+router.post('/upload', authenticateToken, authorize('settings:edit'), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file provided' });

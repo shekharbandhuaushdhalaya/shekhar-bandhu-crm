@@ -1,4 +1,5 @@
 const express = require('express');
+const { authorize } = require('../../middleware/authorize');
 const ManufacturingUnit = require('../../models/ManufacturingUnit');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
@@ -6,7 +7,7 @@ const schemas = require('../../validation/schemas');
 const router = express.Router();
 
 // GET /api/manufacturing-units — List all manufacturing units
-router.get('/', async (req, res) => {
+router.get('/', authorize('manufacturing:view'), async (req, res) => {
   try {
     const units = await ManufacturingUnit.find({}).sort({ name: 1 }).lean();
     res.json(units);
@@ -16,7 +17,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/manufacturing-units — Create a manufacturing unit
-router.post('/', validate(schemas.manufacturingUnitSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), validate(schemas.manufacturingUnitSchema), async (req, res) => {
   try {
     const { name, code, addressLine1, city, state, pincode, contactPerson, phone } = req.body;
     
@@ -51,7 +52,7 @@ router.post('/', validate(schemas.manufacturingUnitSchema), async (req, res) => 
 });
 
 // PUT /api/manufacturing-units/:id — Update a manufacturing unit
-router.put('/:id', validate(schemas.manufacturingUnitSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('manufacturing:edit'), validate(schemas.manufacturingUnitSchema.partial()), async (req, res) => {
   try {
     const { name, code, addressLine1, city, state, pincode, contactPerson, phone, isActive } = req.body;
     const updateFields = {};
@@ -79,7 +80,7 @@ router.put('/:id', validate(schemas.manufacturingUnitSchema.partial()), async (r
 });
 
 // DELETE /api/manufacturing-units/:id — Delete a manufacturing unit
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('manufacturing:delete'), async (req, res) => {
   try {
     // Check if any batches exist under this unit
     const BatchProduction = require('../../models/BatchProduction');

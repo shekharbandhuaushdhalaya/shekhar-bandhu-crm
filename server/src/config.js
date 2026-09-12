@@ -26,11 +26,9 @@ function positiveInt(name, fallback) {
 
 if (isProduction) {
   const jwtSecret = required('JWT_SECRET');
-  const publicFirmId = process.env.PUBLIC_FIRM_ID;
+  const publicFirmId = required('PUBLIC_FIRM_ID');
   if (jwtSecret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters in production');
-  if (publicFirmId && !/^[a-f0-9]{24}$/i.test(publicFirmId)) {
-    throw new Error('PUBLIC_FIRM_ID must be a valid 24-character MongoDB ObjectId in production');
-  }
+  if (!/^[a-f0-9]{24}$/i.test(publicFirmId)) throw new Error('PUBLIC_FIRM_ID must be a valid 24-character MongoDB ObjectId in production');
   if (origins.length === 0) throw new Error('ALLOWED_ORIGINS must contain at least one exact origin in production');
   if (origins.includes('*') || origins.some(origin => origin.includes('*'))) {
     throw new Error('Wildcard origins are not allowed in production');
@@ -57,6 +55,7 @@ module.exports = {
   refreshTokenTtlDays: positiveInt('REFRESH_TOKEN_TTL_DAYS', 30),
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   cloudinary: { cloudName: process.env.CLOUDINARY_CLOUD_NAME || '', apiKey: process.env.CLOUDINARY_API_KEY || '', apiSecret: process.env.CLOUDINARY_API_SECRET || '' },
+  twilio: { accountSid: process.env.TWILIO_ACCOUNT_SID || '', authToken: process.env.TWILIO_AUTH_TOKEN || '', whatsappNumber: process.env.TWILIO_WHATSAPP_NUMBER || '' },
   allowedOrigins,
   trustProxy: process.env.TRUST_PROXY === 'true',
   enforceTenancy: process.env.ENFORCE_TENANCY !== 'false',

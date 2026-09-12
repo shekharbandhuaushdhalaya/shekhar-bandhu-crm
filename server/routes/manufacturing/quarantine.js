@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const RawMaterialQuarantine = require('../../models/RawMaterialQuarantine');
 const { authorize } = require('../../middleware/authorize');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 // GET /api/manufacturing/quarantine — List raw material quarantine lots
 router.get('/', authorize('inventory:view'), async (req, res) => {
@@ -89,7 +90,7 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
       linkedEntry = null;
     }
 
-    const quarantineLotNo = `QRM-${Date.now().toString().slice(-8)}`;
+    const quarantineLotNo = await generateAtomicDocumentNumber('quarantineLotNo_QRM', 'QRM-', 6);
 
     const lot = await RawMaterialQuarantine.create({
       quarantineLotNo,
@@ -127,7 +128,7 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
     if (!lot) return res.status(404).json({ error: 'Quarantine lot not found' });
 
     lot.quarantineStatus = quarantineStatus;
-    lot.testReportNo = testReportNo || `QC-${Date.now().toString().slice(-6)}`;
+    lot.testReportNo = testReportNo || await generateAtomicDocumentNumber('rawMaterialQcReportNo', 'QC-', 6);
     lot.testingDate = new Date();
     lot.testedBy = req.user ? req.user.name : 'QC Chemist';
     lot.releasedBy = req.user ? req.user.name : 'QC Head';

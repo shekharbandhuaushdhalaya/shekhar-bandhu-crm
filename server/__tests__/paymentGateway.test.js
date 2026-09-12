@@ -3,10 +3,12 @@ const request = require('supertest');
 const crypto = require('crypto');
 const SystemSettings = require('../models/SystemSettings');
 const Invoice = require('../models/Invoice');
+const { postGatewayPayment } = require('../services/paymentPostingService');
 const paymentGatewayRouter = require('../routes/finance/paymentGateway');
 
 jest.mock('../models/SystemSettings');
 jest.mock('../models/Invoice');
+jest.mock('../services/paymentPostingService', () => ({ postGatewayPayment: jest.fn() }));
 jest.mock('../models/WebhookEvent', () => ({
   create: jest.fn().mockResolvedValue({ _id: 'mock_event_id' }),
   updateOne: jest.fn().mockResolvedValue({ nModified: 1 }),
@@ -46,7 +48,11 @@ describe('Payment Gateway - Money Critical Paths', () => {
       const mockInvoice = {
         _id: '507f1f77bcf86cd799439011',
         invoiceNo: 'INV-1001',
+        customerId: '507f1f77bcf86cd799439012',
+        type: 'sale',
+        isFinalized: true,
         status: 'unpaid',
+        gatewayOrderId: 'order_abc123',
         save: jest.fn().mockResolvedValue(true),
       };
 
@@ -55,7 +61,8 @@ describe('Payment Gateway - Money Critical Paths', () => {
       };
 
       SystemSettings.findOne.mockReturnValue(mockFindOne(mockSettings));
-      Invoice.findById.mockResolvedValue(mockInvoice);
+      Invoice.findOne.mockResolvedValue(mockInvoice);
+      postGatewayPayment.mockResolvedValue({ invoice: { ...mockInvoice, status: 'paid' }, payment: { _id: 'payment-1' } });
 
       const razorpay_order_id = 'order_abc123';
       const razorpay_payment_id = 'pay_xyz789';
@@ -76,9 +83,11 @@ describe('Payment Gateway - Money Critical Paths', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(mockInvoice.status).toBe('paid');
-      expect(mockInvoice.paymentTransactionId).toBe(razorpay_payment_id);
-      expect(mockInvoice.save).toHaveBeenCalled();
+      expect(postGatewayPayment).toHaveBeenCalledWith(expect.objectContaining({
+        invoice: mockInvoice,
+        transactionId: razorpay_payment_id,
+        gatewayOrderId: razorpay_order_id,
+      }));
     });
 
     test('fails verification on invalid payment signature', async () => {
@@ -106,7 +115,13 @@ describe('Payment Gateway - Money Critical Paths', () => {
     test('successfully processes valid webhook with matching rawBody signature', async () => {
       const mockInvoice = {
         _id: '507f1f77bcf86cd799439011',
+        customerId: '507f1f77bcf86cd799439012',
+        type: 'sale',
+        isFinalized: true,
         status: 'unpaid',
+        amount: 100,
+        amountPaid: 0,
+        gatewayOrderId: 'order_webhook456',
         save: jest.fn().mockResolvedValue(true),
       };
 
@@ -115,7 +130,8 @@ describe('Payment Gateway - Money Critical Paths', () => {
       };
 
       SystemSettings.findOne.mockReturnValue(mockFindOne(mockSettings));
-      Invoice.findById.mockResolvedValue(mockInvoice);
+      Invoice.findOne.mockResolvedValue(mockInvoice);
+      postGatewayPayment.mockResolvedValue({ invoice: { ...mockInvoice, status: 'paid' }, payment: { _id: 'payment-2' } });
 
       const payloadBody = {
         event: 'payment.captured',
@@ -125,8 +141,10 @@ describe('Payment Gateway - Money Critical Paths', () => {
               id: 'pay_webhook123',
               order_id: 'order_webhook456',
               notes: {
+                firmId: '507f1f77bcf86cd799439099',
                 invoiceId: '507f1f77bcf86cd799439011',
               },
+              amount: 10000,
             },
           },
         },
@@ -146,9 +164,11 @@ describe('Payment Gateway - Money Critical Paths', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.status).toBe('ok');
-      expect(mockInvoice.status).toBe('paid');
-      expect(mockInvoice.paymentTransactionId).toBe('pay_webhook123');
-      expect(mockInvoice.save).toHaveBeenCalled();
+      expect(postGatewayPayment).toHaveBeenCalledWith(expect.objectContaining({
+        invoice: mockInvoice,
+        transactionId: 'pay_webhook123',
+        gatewayOrderId: 'order_webhook456',
+      }));
     });
 
     test('rejects webhook on invalid signature', async () => {
@@ -161,7 +181,10 @@ describe('Payment Gateway - Money Critical Paths', () => {
       const response = await request(app)
         .post('/api/payments/gateway/webhook')
         .set('x-razorpay-signature', 'bad_signature')
-        .send({ event: 'payment.captured' });
+        .send({
+          event: 'payment.captured',
+          payload: { payment: { entity: { notes: { firmId: '507f1f77bcf86cd799439099' } } } }
+        });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toContain('Invalid webhook signature');

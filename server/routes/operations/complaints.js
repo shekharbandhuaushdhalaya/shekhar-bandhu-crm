@@ -1,4 +1,5 @@
 const express = require('express');
+const { authorize } = require('../../middleware/authorize');
 const router = express.Router();
 const Complaint = require('../../models/Complaint');
 const { validate } = require('../../middleware/validate');
@@ -12,7 +13,7 @@ async function nextComplaintNo() {
 }
 
 // GET all complaints
-router.get('/', async (req, res) => {
+router.get('/', authorize('quality:view'), async (req, res) => {
   try {
     const { status, type, search } = req.query;
     const filter = {};
@@ -31,7 +32,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/complaints/batch-clusters — List batch complaint clusters (batches with 2+ complaints)
-router.get('/batch-clusters', async (req, res) => {
+router.get('/batch-clusters', authorize('quality:view'), async (req, res) => {
   try {
     const clusters = await Complaint.aggregate([
       { $match: { batchNo: { $exists: true, $ne: '' } } },
@@ -55,7 +56,7 @@ router.get('/batch-clusters', async (req, res) => {
 });
 
 // POST create complaint
-router.post('/', validate(schemas.complaintSchema), async (req, res) => {
+router.post('/', authorize('quality:create'), validate(schemas.complaintSchema), async (req, res) => {
   try {
     const complaintNo = await nextComplaintNo();
     const complaintData = { ...req.body, complaintNo };
@@ -71,7 +72,7 @@ router.post('/', validate(schemas.complaintSchema), async (req, res) => {
         let capa = await DeviationCapa.findOne({ batchNo: batchNoClean, deviationType: 'customer_complaint_cluster' });
         
         if (!capa) {
-          const capaNo = `CAPA-CMP-${Date.now().toString().slice(-6)}`;
+          const capaNo = await generateAtomicDocumentNumber('deviationNo_CAPA_CMP', 'CAPA-CMP-', 5);
           capa = await DeviationCapa.create({
             deviationNo: capaNo,
             batchNo: batchNoClean,
@@ -108,7 +109,7 @@ router.post('/', validate(schemas.complaintSchema), async (req, res) => {
 });
 
 // PATCH update status / resolve
-router.patch('/:id', validate(schemas.complaintSchema.partial()), async (req, res) => {
+router.patch('/:id', authorize('quality:approve'), validate(schemas.complaintSchema.partial()), async (req, res) => {
   try {
     const data = { ...req.body };
     if (data.status === 'resolved' && !data.resolvedAt) data.resolvedAt = new Date();
@@ -124,7 +125,7 @@ router.patch('/:id', validate(schemas.complaintSchema.partial()), async (req, re
 });
 
 // DELETE
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('quality:approve'), async (req, res) => {
   try {
     await Complaint.findByIdAndDelete(req.params.id);
     res.json({ success: true });

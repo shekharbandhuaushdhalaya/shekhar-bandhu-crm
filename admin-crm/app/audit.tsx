@@ -158,17 +158,17 @@ export default function AuditLogsScreen() {
           activeOpacity={0.7}
         >
           <Text style={[styles.cell, { flex: 1.5, color: colors.text.secondary }]}>{dateStr} {timeStr}</Text>
-          <View style={[styles.cell, { flex: 2 }]}>
+          <View style={{ flex: 2 }}>
             <Text style={styles.logUser}>{item.userName}</Text>
             <Text style={styles.logEmail}>{item.userEmail || 'anonymous'}</Text>
           </View>
-          <View style={[styles.cell, { flex: 2, alignItems: 'flex-start' }]}>
+          <View style={{ flex: 2, alignItems: 'flex-start' }}>
             <View style={[styles.actionBadge, { backgroundColor: actionBg }]}>
               <Text style={[styles.actionBadgeText, { color: actionColor }]}>{item.action}</Text>
             </View>
           </View>
           <Text style={[styles.cell, { flex: 4 }]}>{item.description}</Text>
-          <View style={[styles.cell, { flex: 1.5, alignItems: 'flex-end' }]}>
+          <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
             <Text style={styles.logIp}>{item.ipAddress || '—'}</Text>
             {item.details && (
               <Text style={{ fontSize: 10, color: colors.primary, fontWeight: '700', marginTop: 2 }}>

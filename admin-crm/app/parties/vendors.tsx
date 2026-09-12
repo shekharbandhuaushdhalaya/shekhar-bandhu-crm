@@ -806,7 +806,7 @@ function VendorLedgerModal({
         api.getPayments(vendor._id, 'all', 'Vendor')
       ]);
 
-      const filteredInvoices = allInvoices.filter(i =>
+      const filteredInvoices = allInvoices.filter((i: any) =>
         i.isFinalized && (i.supplierName || '').toLowerCase().includes(name.toLowerCase()) && i.mode === activeLedgerMode
       );
       const filteredPayments = allPayments.filter(p =>
@@ -816,7 +816,7 @@ function VendorLedgerModal({
       type Row = { _id: string; date: string; no: string; mode: string; status: string; amount: number; isInvoice: boolean; dueDate?: string };
       let items: Row[] = [];
 
-      filteredInvoices.forEach(inv => {
+      filteredInvoices.forEach((inv: any) => {
         items.push({
           _id: inv._id,
           date: inv.date,
@@ -1622,4 +1622,3 @@ export default function VendorsScreen() {
       color: colors.text.primary
     },
   });
-

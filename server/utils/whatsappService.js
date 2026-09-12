@@ -14,6 +14,7 @@ function safeEscapeRegex(str) {
 async function sendWhatsAppNotification(toPhone, messageText) {
   try {
     if (!config.twilio.accountSid || !config.twilio.authToken || !config.twilio.whatsappNumber) {
+      if (config.isProduction) return { success: false, simulated: false, error: 'WhatsApp provider is not configured' };
       console.log(`[WhatsApp Simulated Push to ${toPhone}]: ${messageText}`);
       return { success: true, simulated: true };
     }

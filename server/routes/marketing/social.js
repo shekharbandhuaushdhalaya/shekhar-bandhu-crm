@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const SocialIntegration = require('../../models/SocialIntegration');
+const jwt = require('jsonwebtoken');
+const config = require('../../src/config');
+const { authorize } = require('../../middleware/authorize');
+const { runWithTenant } = require('../../utils/tenantContext');
 // Native global fetch will be used (Node 18+)
 
 // Helper: check if meta configuration is present
@@ -13,7 +17,7 @@ const getMetaConfig = () => {
 };
 
 // 1. GET /api/social/auth-url -> Get OAuth URL
-router.get('/auth-url', (req, res) => {
+router.get('/auth-url', authorize('campaign:edit'), (req, res) => {
   const { appId, redirectUri } = getMetaConfig();
   if (!appId) {
     return res.status(400).json({ 
@@ -22,21 +26,25 @@ router.get('/auth-url', (req, res) => {
   }
 
   const scope = 'pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,pages_show_list';
-  const fbAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+  const state = jwt.sign({ purpose: 'meta_oauth', firmId: req.user.firmId, userId: req.user.id }, config.jwtSecret, { expiresIn: '10m' });
+  const fbAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${encodeURIComponent(state)}`;
   
   res.json({ url: fbAuthUrl });
 });
 
 // 2. GET /api/social/callback -> Handles callback and token exchange
 router.get('/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
   const { appId, appSecret, redirectUri } = getMetaConfig();
 
-  if (!code) {
-    return res.status(400).send('Authorization code is missing');
-  }
+  if (!code || !state) return res.status(400).send('Authorization code or OAuth state is missing');
 
   try {
+    let oauthState;
+    try { oauthState = jwt.verify(String(state), config.jwtSecret); } catch (_) { return res.status(400).send('Invalid or expired OAuth state'); }
+    if (oauthState.purpose !== 'meta_oauth' || !oauthState.firmId) return res.status(400).send('Invalid OAuth state');
+
+    return await runWithTenant({ firmId: String(oauthState.firmId), oauthUserId: String(oauthState.userId || '') }, async () => {
     // A. Exchange code for User Access Token
     const tokenUrl = `https://graph.facebook.com/v18.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${appSecret}&code=${code}`;
     const tokenRes = await fetch(tokenUrl);
@@ -109,6 +117,7 @@ router.get('/callback', async (req, res) => {
         </body>
       </html>
     `);
+    });
   } catch (error) {
     console.error('Meta OAuth Error:', error.message);
     res.status(500).send(`Authentication failed: ${error.message}`);
@@ -116,7 +125,7 @@ router.get('/callback', async (req, res) => {
 });
 
 // 3. GET /api/social/accounts -> List active integrated social profiles
-router.get('/accounts', async (req, res) => {
+router.get('/accounts', authorize('campaign:view'), async (req, res) => {
   try {
     const integrations = await SocialIntegration.find({ isActive: true }).select('-accessToken');
     res.json(integrations);
@@ -126,7 +135,7 @@ router.get('/accounts', async (req, res) => {
 });
 
 // 4. DELETE /api/social/accounts/:id -> Disconnect an integration
-router.delete('/accounts/:id', async (req, res) => {
+router.delete('/accounts/:id', authorize('campaign:edit'), async (req, res) => {
   try {
     await SocialIntegration.findByIdAndDelete(req.params.id);
     res.json({ message: 'Account disconnected successfully' });
@@ -136,7 +145,7 @@ router.delete('/accounts/:id', async (req, res) => {
 });
 
 // 5. POST /api/social/publish -> Publish post to Facebook / Instagram
-router.post('/publish', async (req, res) => {
+router.post('/publish', authorize('campaign:publish'), async (req, res) => {
   const { platforms, text, imageUrl } = req.body;
 
   if (!text) {

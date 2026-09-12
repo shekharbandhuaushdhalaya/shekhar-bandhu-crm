@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Contact = require('../../models/Contact');
 const Activity = require('../../models/Activity');
 const { authorize } = require('../../middleware/authorize');
@@ -8,7 +9,7 @@ const schemas = require('../../validation/schemas');
 const router = express.Router();
 
 // GET /api/contacts — list contacts with optional search and stage filter
-router.get('/', async (req, res) => {
+router.get('/', authorize('contact:view'), async (req, res) => {
   try {
     const { search, stage, page, limit } = req.query;
     const filter = {};
@@ -57,7 +58,8 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/contacts/:id — get single contact
-router.get('/:id', async (req, res) => {
+router.get('/:id', authorize('contact:view'), async (req, res, next) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) return next();
   try {
     const contact = await Contact.findById(req.params.id).lean();
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
@@ -71,7 +73,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/contacts — create contact
-router.post('/', validate(schemas.contactSchema), async (req, res) => {
+router.post('/', authorize('contact:create'), validate(schemas.contactSchema), async (req, res) => {
   try {
     const data = {
       ...req.body,
@@ -95,7 +97,7 @@ router.post('/', validate(schemas.contactSchema), async (req, res) => {
 });
 
 // PUT /api/contacts/:id — update contact (stage changes, full edits)
-router.put('/:id', validate(schemas.contactSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('contact:edit'), validate(schemas.contactSchema.partial()), async (req, res) => {
   try {
     const contact = await Contact.findById(req.params.id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
@@ -125,7 +127,7 @@ router.put('/:id', validate(schemas.contactSchema.partial()), async (req, res) =
 });
 
 // POST /api/contacts/:id/interactions — log interaction
-router.post('/:id/interactions', validate(schemas.interactionSchema), async (req, res) => {
+router.post('/:id/interactions', authorize('contact:edit'), validate(schemas.interactionSchema), async (req, res) => {
   try {
     const contact = await Contact.findById(req.params.id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });

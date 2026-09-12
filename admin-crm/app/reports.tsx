@@ -1230,7 +1230,7 @@ export default function ReportsScreen() {
                       onChangeText={setRmSearchText}
                       placeholder="Search materials..."
                       placeholderTextColor={colors.text.muted}
-                      style={{ fontSize: 13, color: colors.text.primary, flex: 1, paddingVertical: 2, outlineStyle: 'none' }}
+                      style={{ fontSize: 13, color: colors.text.primary, flex: 1, paddingVertical: 2 }}
                     />
                   </View>
                 </View>
@@ -1410,7 +1410,26 @@ export default function ReportsScreen() {
           );
         })()}
 
-
+        {/* ---- Audit Logs ---- */}
+        <View style={styles.sectionCard}>
+          <TouchableOpacity onPress={() => router.push('/audit')} activeOpacity={0.7}>
+            <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
+                <View style={[styles.iconBadge, { backgroundColor: colors.warning + '15' }]}>
+                  <Ionicons name="shield-checkmark" size={20} color={colors.warning} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sectionCardTitle}>System Audit Logs</Text>
+                  <Text style={styles.sectionCardSubtitle}>Security events, user actions & system audit trail</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>View Logs</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 40 }} />
 
@@ -1958,4 +1977,3 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: 8,
   },
 });
-

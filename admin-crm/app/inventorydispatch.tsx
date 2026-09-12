@@ -6,8 +6,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors } from '../constants/theme';
-import { api, Dispatch, DeadStockItem, Invoice, StockMovement } from '../utils/api';
+import { api, Dispatch, DeadStockItem, Challan } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 
 export default function InventoryDispatchScreen() {
   const { colors } = useTheme();
@@ -19,14 +20,14 @@ export default function InventoryDispatchScreen() {
 
   // ── Dispatches ──
   const [dispatches, setDispatches] = useState<Dispatch[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [challans, setChallans] = useState<StockMovement[]>([]);
-  const [sourceType, setSourceType] = useState<'invoice' | 'challan'>('invoice');
+  const [challans, setChallans] = useState<Challan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [dispStatusFilter, setDispStatusFilter] = useState('all');
   const [dispSearch, setDispSearch] = useState('');
   const [showDispModal, setShowDispModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [selectedChallan, setSelectedChallan] = useState<StockMovement | null>(null);
+  const [selectedChallan, setSelectedChallan] = useState<Challan | null>(null);
   const [transporter, setTransporter] = useState('');
   const [lrNo, setLrNo] = useState('');
   const [vehicleNo, setVehicleNo] = useState('');
@@ -48,22 +49,20 @@ export default function InventoryDispatchScreen() {
   const [deadStock, setDeadStock] = useState<DeadStockItem[]>([]);
 
   const load = useCallback(async () => {
-    const [disps, dead, sales, movements] = await Promise.all([
-      api.getDispatches(dispStatusFilter, dispSearch).catch(() => []),
-      api.getDeadStock().catch(() => []),
-      api.getSaleInvoices().catch(() => []),
-      api.getStockMovements({ direction: 'out' }).catch(() => []),
-    ]);
-    setDispatches(disps);
-    setDeadStock(dead);
-
-    // Only show finalized invoices that don't have a dispatch yet
-    const dispatchedInvoiceIds = new Set(disps.map(d => d.invoiceId).filter(Boolean));
-    setInvoices(sales.filter(inv => inv.isFinalized && !dispatchedInvoiceIds.has(inv._id)));
-
-    // Only show finalized (dispatched) StockMovements/Challans that don't have a dispatch yet
-    const dispatchedChallanIds = new Set(disps.map(d => d.challanId).filter(Boolean));
-    setChallans(movements.filter(m => m.status === 'dispatched' && !dispatchedChallanIds.has(m._id)));
+    setLoadError('');
+    try {
+      const [disps, dead, allChallans] = await Promise.all([
+        api.getDispatches(dispStatusFilter, dispSearch),
+        api.getDeadStock(),
+        api.getChallans('', 'all'),
+      ]);
+      setDispatches(disps);
+      setDeadStock(dead);
+      const dispatchedChallanIds = new Set(disps.map(d => d.challanId).filter(Boolean));
+      setChallans(allChallans.filter(c => c.challanType === 'sale' && c.status === 'finalized' && c.inventoryPostingStatus === 'posted' && !dispatchedChallanIds.has(c._id)));
+    } catch (e: any) {
+      setLoadError(e.message || 'Unable to load dispatch workspace');
+    } finally { setLoading(false); }
   }, [dispStatusFilter, dispSearch]);
 
   useEffect(() => { load(); }, [load]);
@@ -71,51 +70,23 @@ export default function InventoryDispatchScreen() {
 
   // Dispatch creation
   const handleCreateDispatch = async () => {
-    if (sourceType === 'invoice' && !selectedInvoice) { setDispError('Please select a finalized Sale Invoice.'); return; }
-    if (sourceType === 'challan' && !selectedChallan) { setDispError('Please select a Delivery Challan.'); return; }
+    if (!selectedChallan) { setDispError('Please select a posted Sale Challan.'); return; }
+    if (submitting) return;
+    setSubmitting(true); setDispError('');
     try {
-      const payload: Partial<Dispatch> = {
+      await api.createDispatch({
+        challanId: selectedChallan._id,
         transporter, lrNo, vehicleNo, courierName, trackingId, trackingUrl,
-        totalBoxes: parseInt(totalBoxes) || 1, totalWeight, freightCharge: parseFloat(freightCharge) || 0,
+        totalBoxes: parseInt(totalBoxes) || 0, totalWeight, freightCharge: parseFloat(freightCharge) || 0,
         notes: dispNotes, status: 'dispatched'
-      };
-
-      if (sourceType === 'invoice' && selectedInvoice) {
-        payload.invoiceId = selectedInvoice._id;
-        payload.invoiceNo = selectedInvoice.invoiceNo;
-        payload.customerName = selectedInvoice.customerName;
-        payload.customerPhone = selectedInvoice.gstin || '';
-        payload.shippingAddress = selectedInvoice.shippingAddress || selectedInvoice.partyAddress;
-        payload.items = (selectedInvoice.items || []).map((it: any) => ({
-          productId: it.productId,
-          name: it.name,
-          qty: it.qty || it.boxes || 1,
-          packing: it.packing || 1,
-          batchNo: it.batchNo || '',
-        }));
-      } else if (sourceType === 'challan' && selectedChallan) {
-        payload.challanId = selectedChallan._id;
-        payload.challanNo = selectedChallan.docNo;
-        payload.customerName = selectedChallan.partyName || '';
-        payload.customerPhone = selectedChallan.partyGstin || '';
-        payload.shippingAddress = selectedChallan.shippingAddress || selectedChallan.partyAddress || '';
-        payload.items = (selectedChallan.items || []).map((it: any) => ({
-          productId: it.productId,
-          name: it.productName,
-          qty: it.qty || 1,
-          packing: it.packing || 1,
-          batchNo: it.batchNo || '',
-        }));
-      }
-
-      await api.createDispatch(payload);
+      });
       setShowDispModal(false);
-      // Reset form
-      setSelectedInvoice(null); setSelectedChallan(null); setTransporter(''); setLrNo(''); setVehicleNo('');
+      setSelectedChallan(null); setTransporter(''); setLrNo(''); setVehicleNo('');
       setCourierName(''); setTrackingId(''); setTrackingUrl(''); setTotalBoxes('1');
-      setTotalWeight(''); setFreightCharge('0'); setDispNotes(''); setDispError('');
-      load();
+      setTotalWeight(''); setFreightCharge('0'); setDispNotes('');
+      await load();
     } catch (e: any) { setDispError(e.message); }
+    finally { setSubmitting(false); }
   };
 
   const handleUpdateStatus = async () => {
@@ -143,7 +114,9 @@ export default function InventoryDispatchScreen() {
   return (
     <View style={styles.screen}>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}
+      {loading ? <WorkspaceLoading title="Loading Dispatch…" message="Fetching posted Challans, logistics records and dead stock." /> : null}
+      {!loading && loadError ? <WorkspaceError message={loadError} onRetry={load} /> : null}
+      {!loading && !loadError ? <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
 
           <View>
@@ -172,7 +145,7 @@ export default function InventoryDispatchScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
-                <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedInvoice(null); setSelectedChallan(null); setSourceType('invoice'); setShowDispModal(true); }}>
+                <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedChallan(null); setShowDispModal(true); }}>
                   <Ionicons name="add" size={16} color="#fff" />
                   <Text style={styles.addBtnText}>Create Dispatch</Text>
                 </TouchableOpacity>
@@ -229,7 +202,7 @@ export default function InventoryDispatchScreen() {
           </View>
 
         <View style={{ height: 40 }} />
-      </ScrollView>
+      </ScrollView> : null}
 
       {/* ===== MODAL: CREATE DISPATCH ===== */}
       <Modal visible={showDispModal} transparent animationType="fade">
@@ -242,46 +215,15 @@ export default function InventoryDispatchScreen() {
             </View>
             {dispError ? <Text style={styles.modalError}>{dispError}</Text> : null}
             <ScrollView style={styles.modalForm}>
-              <Text style={styles.inputLabel}>Dispatch Source Type *</Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-                <TouchableOpacity 
-                  style={[{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.bg.secondary }, sourceType === 'invoice' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                  onPress={() => { setSourceType('invoice'); setSelectedChallan(null); }}
-                >
-                  <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, sourceType === 'invoice' && { color: '#fff' }]}>Sale Invoice</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.bg.secondary }, sourceType === 'challan' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                  onPress={() => { setSourceType('challan'); setSelectedInvoice(null); }}
-                >
-                  <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }, sourceType === 'challan' && { color: '#fff' }]}>Delivery Challan</Text>
-                </TouchableOpacity>
-              </View>
-
-              {sourceType === 'invoice' ? (
-                <>
-                  <Text style={styles.inputLabel}>Select Finalized Sale Invoice *</Text>
-                  {Platform.OS === 'web' ? (
-                    <select value={selectedInvoice?._id || ''} onChange={(e: any) => setSelectedInvoice(invoices.find(inv => inv._id === e.target.value) || null)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13, marginBottom: 12, width: '100%' }}>
-                      <option value="">-- Select Invoice --</option>
-                      {invoices.map(inv => <option key={inv._id} value={inv._id}>{inv.invoiceNo} - {inv.customerName} (₹{inv.amount.toLocaleString()})</option>)}
-                    </select>
-                  ) : (
-                    <TextInput style={styles.input} value={selectedInvoice?.invoiceNo || ''} placeholder="Invoice No" placeholderTextColor={colors.text.muted} />
-                  )}
-                </>
+              <Text style={styles.inputLabel}>Posted Sale Challan *</Text>
+              <Text style={[styles.metaText, { marginBottom: 8 }]}>Dispatch can only be created from an authoritative posted Sale Challan.</Text>
+              {Platform.OS === 'web' ? (
+                <select value={selectedChallan?._id || ''} onChange={(e: any) => setSelectedChallan(challans.find(c => c._id === e.target.value) || null)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13, marginBottom: 12, width: '100%' }}>
+                  <option value="">-- Select posted Sale Challan --</option>
+                  {challans.map(c => <option key={c._id} value={c._id}>{c.challanNo} - {c.partyName} ({c.items?.reduce((n, x) => n + Number(x.qty || 0), 0) || 0} boxes)</option>)}
+                </select>
               ) : (
-                <>
-                  <Text style={styles.inputLabel}>Select Delivery Challan *</Text>
-                  {Platform.OS === 'web' ? (
-                    <select value={selectedChallan?._id || ''} onChange={(e: any) => setSelectedChallan(challans.find(c => c._id === e.target.value) || null)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13, marginBottom: 12, width: '100%' }}>
-                      <option value="">-- Select Challan --</option>
-                      {challans.map(c => <option key={c._id} value={c._id}>{c.docNo} - {c.partyName} (₹{c.totalAmount.toLocaleString()})</option>)}
-                    </select>
-                  ) : (
-                    <TextInput style={styles.input} value={selectedChallan?.docNo || ''} placeholder="Challan No" placeholderTextColor={colors.text.muted} />
-                  )}
-                </>
+                <TextInput style={styles.input} value={selectedChallan?.challanNo || ''} placeholder="Select posted Sale Challan" placeholderTextColor={colors.text.muted} />
               )}
 
               <Text style={styles.inputLabel}>Transporter Name</Text>
@@ -321,7 +263,7 @@ export default function InventoryDispatchScreen() {
             </ScrollView>
             <View style={styles.modalFooter}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowDispModal(false)}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.submitBtn} onPress={handleCreateDispatch}><Text style={styles.submitBtnText}>Dispatch Out</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.55 }]} disabled={submitting} onPress={handleCreateDispatch}><Text style={styles.submitBtnText}>{submitting ? 'Creating…' : 'Dispatch Out'}</Text></TouchableOpacity>
             </View>
           </View>
         </View>

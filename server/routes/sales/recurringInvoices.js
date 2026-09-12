@@ -1,6 +1,6 @@
 const express = require('express');
 const RecurringInvoice = require('../../models/RecurringInvoice');
-const Invoice = require('../../models/Invoice');
+const { createSalesOrder } = require('../../services/salesOrderService');
 const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
@@ -29,8 +29,8 @@ router.post('/', authorize('invoice:create'), async (req, res) => {
   try {
     const { templateName, customerId, customerName, frequency = 'monthly', startDate, items, status } = req.body;
 
-    if (!templateName || !customerName || !items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'templateName, customerName, and items array are required' });
+    if (!templateName || !customerId || !customerName || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'templateName, customerId, customerName, and items array are required' });
     }
 
     let totalAmount = 0;
@@ -74,67 +74,44 @@ router.post('/', authorize('invoice:create'), async (req, res) => {
   }
 });
 
-// POST /api/recurring-invoices/:id/generate-now — Manually trigger invoice generation
-router.post('/:id/generate-now', authorize('invoice:create'), async (req, res) => {
+// POST /api/recurring-invoices/:id/generate-now — Generate a Sales Order, never a physical-goods invoice directly.
+router.post('/:id/generate-now', authorize('order:create'), async (req, res) => {
   try {
     const template = await RecurringInvoice.findById(req.params.id);
-    if (!template) return res.status(404).json({ error: 'Recurring invoice template not found' });
+    if (!template) return res.status(404).json({ error: 'Recurring order template not found' });
+    if (template.status !== 'active') return res.status(409).json({ error: `Template is ${template.status}`, code: 'RECURRING_TEMPLATE_INACTIVE' });
+    if (!template.customerId) return res.status(409).json({ error: 'Template is not linked to a CRM customer', code: 'CUSTOMER_LINK_REQUIRED' });
 
-    const fy = new Date().getFullYear() % 100 + '-' + (new Date().getFullYear() + 1) % 100;
-    const prefix = `SB/${fy}/`;
-    const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
-    const invoiceNo = await generateAtomicDocumentNumber(`invoiceNo_${prefix}`, prefix, 4);
-
-    const invoiceItems = template.items.map(it => ({
-      productId: it.productId,
-      name: it.name,
-      packing: it.packing,
-      qty: it.qty,
-      boxes: it.qty,
-      rate: it.rate,
-      gstRate: it.gstRate,
-      amount: it.amount
-    }));
-
-    const invoice = await Invoice.create({
-      invoiceNo,
-      type: 'sale',
-      mode: 'regular',
-      date: new Date(),
-      partyName: template.customerName,
+    const result = await createSalesOrder({
       customerId: template.customerId,
-      items: invoiceItems,
-      baseAmount: template.totalAmount,
-      totalAmount: template.totalAmount,
-      nettTotal: template.totalAmount,
-      status: 'unpaid',
-      isFinalized: false,
-      createdBy: req.user ? req.user.name : 'System Scheduler'
+      warehouseId: req.body.warehouseId || null,
+      items: (template.items || []).map(it => ({ productId: it.productId, qty: Number(it.qty || 0) })),
+      shippingAddress: req.body.shippingAddress || '',
+      sourceType: 'recurring',
+      orderChannel: 'crm',
+      notes: `Generated from recurring template ${template.templateName}`,
     });
 
-    // Advance nextRunDate based on frequency
     const currentRun = new Date(template.nextRunDate);
-    if (template.frequency === 'weekly') {
-      currentRun.setDate(currentRun.getDate() + 7);
-    } else if (template.frequency === 'quarterly') {
-      currentRun.setMonth(currentRun.getMonth() + 3);
-    } else {
-      currentRun.setMonth(currentRun.getMonth() + 1);
-    }
+    if (template.frequency === 'weekly') currentRun.setDate(currentRun.getDate() + 7);
+    else if (template.frequency === 'quarterly') currentRun.setMonth(currentRun.getMonth() + 3);
+    else currentRun.setMonth(currentRun.getMonth() + 1);
 
     template.lastRunDate = new Date();
     template.nextRunDate = currentRun;
-    template.generatedInvoicesCount = (template.generatedInvoicesCount || 0) + 1;
-    template.lastGeneratedInvoiceId = invoice._id;
+    template.generatedOrdersCount = Number(template.generatedOrdersCount || 0) + 1;
+    template.lastGeneratedOrderId = result.order._id;
     await template.save();
 
-    res.status(201).json({
-      message: `Invoice ${invoiceNo} generated successfully from recurring template`,
-      invoice,
-      recurringTemplate: template
+    res.status(result.approvalRequired ? 202 : 201).json({
+      message: `Sales Order ${result.order.orderNo} generated from recurring template. Finalize a Sale Challan to move goods.`,
+      order: result.order,
+      approvalRequired: result.approvalRequired,
+      credit: result.credit,
+      recurringTemplate: template,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 400).json({ error: err.message, code: err.code || 'RECURRING_ORDER_FAILED' });
   }
 });
 

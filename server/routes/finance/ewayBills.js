@@ -4,7 +4,7 @@ const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
 
-// POST /api/eway-bills/generate — Generate NIC E-Way Bill JSON payload for B2B invoices
+// POST /api/eway-bills/generate — Prepare NIC E-Way Bill payload. This endpoint never fabricates an official E-Way Bill number.
 router.post('/generate', authorize('invoice:create'), async (req, res) => {
   try {
     const { invoiceId, vehicleNo, transporterId, transporterName } = req.body;
@@ -39,10 +39,11 @@ router.post('/generate', authorize('invoice:create'), async (req, res) => {
       vehicleNo: vehicleNo || invoice.vehicleNo || 'UP65AB1234'
     };
 
-    res.json({
-      status: 'generated',
-      ewayBillNo: 'EWB-' + Math.floor(100000000000 + Math.random() * 900000000000),
-      validTill: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    res.status(501).json({
+      status: 'payload_ready',
+      code: 'EWAY_PROVIDER_NOT_CONFIGURED',
+      error: 'Official NIC E-Way Bill submission is not configured. The payload is ready for submission through an authorized provider; no fake E-Way Bill number has been generated.',
+      ewayBillNo: null,
       ewayBillPayload
     });
   } catch (err) {

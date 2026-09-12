@@ -1,5 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const MedicalRepresentative = require('../../models/MedicalRepresentative');
 const MrDailyLog = require('../../models/MrDailyLog');
 const MrVisit = require('../../models/MrVisit');
@@ -17,6 +18,10 @@ const schemas = require('../../validation/schemas');
 const { getHaversineDistanceInMeters, compileMRDailyCallReport, calculateMRLeaderboard, calculateTourPlanCompliance, calculateMRProfitability } = require('../../services/medicalRepService');
 const { safeEscapeRegex, sendWhatsAppNotification } = require('../../utils/whatsappService');
 const config = require('../../src/config');
+const { withTransaction } = require('../../utils/withTransaction');
+const { issueSamplesToMr, consumeSamplesFromMr } = require('../../services/mrSampleInventoryService');
+const MrSampleOtp = require('../../models/MrSampleOtp');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
 
@@ -74,13 +79,7 @@ router.post('/', authorize('mr:create'), validate(schemas.medicalRepSchema), asy
   try {
     const data = { ...req.body };
     if (!data.code || !data.code.trim()) {
-      let num = (await MedicalRepresentative.countDocuments()) + 1;
-      let nextCode = `MR-${num.toString().padStart(3, '0')}`;
-      while (await MedicalRepresentative.exists({ code: nextCode })) {
-        num++;
-        nextCode = `MR-${num.toString().padStart(3, '0')}`;
-      }
-      data.code = nextCode;
+      data.code = await generateAtomicDocumentNumber('medicalRepresentativeCode', 'MR-', 4);
     }
     const mr = await MedicalRepresentative.create(data);
     if (req.io) {
@@ -99,9 +98,7 @@ router.post('/', authorize('mr:create'), validate(schemas.medicalRepSchema), asy
 });
 
 router.get('/:id', authorize('mr:view'), async (req, res, next) => {
-  if (['suggest', 'tour-plans', 'sample-stock', 'matrix', 'events'].includes(req.params.id)) {
-    return next();
-  }
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) return next();
   try {
     const mr = await MedicalRepresentative.findById(req.params.id)
       .populate('reportingTo', 'name email')
@@ -418,21 +415,16 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
       }
     }
 
-    const visit = await MrVisit.create(data);
-
-    // Deduct sample quantities from MR Field Bag Stock (MrSampleStock)
-    if (data.sampleDetails && data.sampleDetails.length > 0) {
-      const MrSampleStock = require('../../models/MrSampleStock');
-      for (const s of data.sampleDetails) {
-        if (s.productId && (Number(s.qty) > 0)) {
-          await MrSampleStock.findOneAndUpdate(
-            { mrId: req.params.mrId, productId: s.productId },
-            { $inc: { qty: -Number(s.qty) } },
-            { upsert: false }
-          );
-        }
+    // Visit creation and sample consumption are one transaction. Samples have already
+    // left warehouse inventory when they were allocated to the MR field bag; a doctor
+    // visit consumes only that field bag and must never touch Product/warehouse stock again.
+    const visit = await withTransaction(async session => {
+      if (data.sampleDetails && data.sampleDetails.length > 0) {
+        await consumeSamplesFromMr({ mrId: req.params.mrId, sampleDetails: data.sampleDetails, session });
       }
-    }
+      const [created] = await MrVisit.create([data], { session });
+      return created;
+    });
 
     // Check & update Permanent Journey Plan (PJP) adherence if plan exists for MR + date
     try {
@@ -476,78 +468,6 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
       }
     } catch (_) {
       // Non-blocking PJP update catch
-    }
-
-    if (data.sampleDetails && data.sampleDetails.length > 0) {
-      const StockMovement = require('../../models/StockMovement');
-      const Product = require('../../models/Product');
-      const InventoryEntry = require('../../models/InventoryEntry');
-
-      const mr = await MedicalRepresentative.findById(req.params.mrId);
-      const count = await StockMovement.countDocuments({ type: 'sample' });
-      const docNo = `DC-SMP-${(count + 1).toString().padStart(4, '0')}`;
-
-      const items = [];
-      for (const s of data.sampleDetails) {
-        let prodName = s.name;
-        let pId = s.productId;
-        let batchNo = s.batchNo || '';
-
-        if (pId) {
-          const p = await Product.findById(pId);
-          if (p) {
-            prodName = p.name;
-            const qtyBoxes = Number(s.qty) || 1;
-            p.stockLevel = Math.max(0, (p.stockLevel || 0) - qtyBoxes);
-            await p.save();
-
-            // Deduct sample balance from MR's personal bag
-            const sampleBagItem = await MrSampleBag.findOne({ mrId: req.params.mrId, productId: pId });
-            if (sampleBagItem) {
-              sampleBagItem.qty = Math.max(0, sampleBagItem.qty - qtyBoxes);
-              await sampleBagItem.save();
-            }
-
-            if (!batchNo) {
-              const invEntry = await InventoryEntry.findOne({
-                productId: pId,
-                qtyBoxes: { $gt: 0 },
-                batchNo: { $ne: '' }
-              }).sort({ mfgDate: 1, createdAt: 1 }).lean();
-              if (invEntry && invEntry.batchNo) {
-                batchNo = invEntry.batchNo;
-              }
-            }
-          }
-        }
-        items.push({
-          productId: pId || null,
-          productName: prodName || 'Doctor Sample',
-          qty: Number(s.qty) || 1,
-          packing: 1,
-          rate: 0,
-          mrp: 0,
-          batchNo: batchNo
-        });
-      }
-
-      await StockMovement.create({
-        docNo,
-        direction: 'out',
-        type: 'sample',
-        date: data.date,
-        partyType: 'mr',
-        partyId: req.params.mrId,
-        partyName: data.doctorName ? `Dr. ${data.doctorName} (via ${mr ? mr.name : 'MR'})` : (mr ? mr.name : 'MR'),
-        medicalRepName: mr ? mr.name : '',
-        doctorName: data.doctorName || '',
-        items,
-        isFree: true,
-        status: 'dispatched',
-        sourceDocType: 'MrVisit',
-        sourceDocId: visit._id,
-        notes: `Free doctor samples given during clinic visit to Dr. ${data.doctorName || ''}`
-      });
     }
 
     if (req.io) {
@@ -922,8 +842,6 @@ router.get('/doctors/events', authorize('mr:view'), async (req, res) => {
 
 // ─── MR Sample Bag Inventory ───
 
-const sampleOtpStore = new Map();
-
 router.get('/:mrId/sample-bag', authorize('mr:view'), async (req, res) => {
   try {
     if (!(await verifyMrAccess(req, req.params.mrId))) {
@@ -966,50 +884,19 @@ router.get('/:mrId/sample-bag', authorize('mr:view'), async (req, res) => {
 
 router.post('/:mrId/sample-bag/issue', authorize('mr:edit'), validate(schemas.mrSampleIssueSchema), async (req, res) => {
   try {
-    const { productId, batchNo = '', qty, expiryDate } = req.body;
-    const mrId = req.params.mrId;
-    const currentUserId = (req.user && req.user.id && mongoose.Types.ObjectId.isValid(req.user.id)) ? req.user.id : null;
-
-    let finalExpiryDate = expiryDate ? new Date(expiryDate) : null;
-    if (!finalExpiryDate && batchNo) {
-      const InventoryEntry = require('../../models/InventoryEntry');
-      const invEntry = await InventoryEntry.findOne({ productId, batchNo }).lean();
-      if (invEntry && invEntry.expiryDate) {
-        finalExpiryDate = invEntry.expiryDate;
-      }
-    }
-
-    let sampleBagItem = await MrSampleBag.findOne({ mrId, productId, batchNo });
-    if (sampleBagItem) {
-      sampleBagItem.qty += Number(qty);
-      sampleBagItem.allocatedBy = currentUserId;
-      sampleBagItem.allocatedAt = new Date();
-      if (finalExpiryDate) sampleBagItem.expiryDate = finalExpiryDate;
-      await sampleBagItem.save();
-    } else {
-      sampleBagItem = await MrSampleBag.create({
-        mrId,
-        productId,
-        batchNo,
-        qty: Number(qty),
-        expiryDate: finalExpiryDate,
-        allocatedBy: currentUserId
-      });
-    }
-
-    const Product = require('../../models/Product');
-    const prod = await Product.findById(productId);
-    if (prod) {
-      prod.stockLevel = Math.max(0, (prod.stockLevel || 0) - Number(qty));
-      await prod.save();
-    }
-
-    if (req.io) {
-      req.io.emit('medrep_updated', { type: 'sample_issued', mrId, productId });
-    }
-    res.status(201).json(sampleBagItem);
+    if (!(await verifyMrAccess(req, req.params.mrId))) return res.status(403).json({ error: 'Access denied' });
+    const { productId, batchNo = '', qty, warehouseId } = req.body;
+    const result = await issueSamplesToMr({
+      mrId: req.params.mrId,
+      items: [{ productId, batchNo, qty }],
+      warehouseId: warehouseId || null,
+      actorId: mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null,
+      actorName: req.user?.name || 'System',
+    });
+    if (req.io) req.io.emit('medrep_updated', { type: 'sample_issued', mrId: req.params.mrId, productId });
+    res.status(201).json({ warehouseId: result.warehouse._id, items: result.items });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(err.code === 'WAREHOUSE_NOT_FOUND' ? 404 : 400).json({ error: err.message, code: err.code || 'SAMPLE_ISSUE_FAILED' });
   }
 });
 
@@ -1018,237 +905,103 @@ router.post('/:mrId/sample-bag/issue', authorize('mr:edit'), validate(schemas.mr
 router.post('/sample-otp/send', authorize('mr:visits'), async (req, res) => {
   try {
     const { doctorId, doctorPhone, doctorName } = req.body;
-    if (!doctorId && !doctorPhone && !doctorName) {
-      return res.status(400).json({ error: 'doctorId, doctorPhone, or doctorName is required' });
+    if (!doctorId && !doctorPhone && !doctorName) return res.status(400).json({ error: 'doctorId, doctorPhone, or doctorName is required' });
+    const otpKey = String(doctorId || doctorPhone || doctorName).trim().toLowerCase();
+    const keyHash = crypto.createHash('sha256').update(otpKey).digest('hex');
+    const isMock = process.env.ALLOW_MOCK_OTP === 'true' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
+    if (config.isProduction && isMock) return res.status(503).json({ error: 'Mock OTP is disabled in production' });
+    if (config.isProduction && (!config.twilio?.accountSid || !config.twilio?.authToken || !config.twilio?.whatsappNumber || !doctorPhone)) {
+      return res.status(503).json({ error: 'Production sample OTP requires a configured WhatsApp provider and doctor phone number' });
     }
 
-    const otpKey = doctorId || doctorPhone || doctorName;
-    const isMock = process.env.ALLOW_MOCK_OTP === 'true' || process.env.NODE_ENV === 'test';
-    if (config.isProduction && !isMock) return res.status(503).json({ error: 'OTP provider is not configured for production' });
     const otp = isMock ? '1234' : String(Math.floor(100000 + Math.random() * 900000));
-    sampleOtpStore.set(otpKey.toString().toLowerCase(), { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
+    const codeHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    res.json({
-      success: true,
-      message: isMock ? `Sample verification OTP sent to doctor (development mock).` : 'Sample verification OTP generated; deliver it through the configured provider.',
-      otpKey,
-      ...(isMock ? { otp } : {})
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    if (!isMock) {
+      const delivery = await sendWhatsAppNotification(doctorPhone, `Your doctor sample acknowledgement OTP is ${otp}. It expires in 10 minutes.`);
+      if (!delivery?.success || delivery.simulated) return res.status(503).json({ error: 'Unable to deliver sample OTP through the configured provider' });
+    }
+
+    await MrSampleOtp.findOneAndUpdate(
+      { keyHash },
+      { $set: { codeHash, expiresAt, attempts: 0, usedAt: null } },
+      { upsert: true, new: true, runValidators: true }
+    );
+    res.json({ success: true, message: isMock ? 'Development sample OTP generated.' : 'Sample verification OTP sent to doctor.', otpKey, ...(isMock ? { otp } : {}) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/sample-otp/verify', authorize('mr:visits'), async (req, res) => {
   try {
     const { otpKey, otp } = req.body;
-    if (!otpKey || !otp) {
-      return res.status(400).json({ error: 'otpKey and otp are required' });
-    }
-
-    const record = sampleOtpStore.get(otpKey.toString().toLowerCase());
-    if (!record || record.expiresAt < Date.now()) {
-      return res.status(400).json({ verified: false, error: 'OTP expired or not requested' });
-    }
-
-    if (record.otp !== otp.toString().trim()) {
+    if (!otpKey || !otp) return res.status(400).json({ error: 'otpKey and otp are required' });
+    const keyHash = crypto.createHash('sha256').update(String(otpKey).trim().toLowerCase()).digest('hex');
+    const record = await MrSampleOtp.findOne({ keyHash });
+    if (!record || record.usedAt || record.expiresAt < new Date()) return res.status(400).json({ verified: false, error: 'OTP expired or not requested' });
+    if (record.attempts >= 5) return res.status(429).json({ verified: false, error: 'Too many OTP attempts. Request a new code.' });
+    const codeHash = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+    if (!crypto.timingSafeEqual(Buffer.from(record.codeHash), Buffer.from(codeHash))) {
+      record.attempts += 1;
+      await record.save();
       return res.status(400).json({ verified: false, error: 'Invalid OTP entered' });
     }
-
-    sampleOtpStore.delete(otpKey.toString().toLowerCase());
+    record.usedAt = new Date();
+    await record.save();
     res.json({ verified: true, message: 'Doctor sample acknowledgment OTP verified successfully.' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ─── MR Field Bag Sample Stock API ───
 
-// GET /api/medical-reps/:mrId/sample-stock — Get current sample stock in MR bag
+// GET /api/medical-reps/:mrId/sample-stock — backwards-compatible view of the canonical MR sample bag
 router.get('/:mrId/sample-stock', authorize('mr:view'), async (req, res) => {
   try {
-    const MrSampleStock = require('../../models/MrSampleStock');
-    const stock = await MrSampleStock.find({ mrId: req.params.mrId })
-      .populate('productId', 'name sku productType packing stockLevel')
-      .lean();
+    if (!(await verifyMrAccess(req, req.params.mrId))) return res.status(403).json({ error: 'Access denied' });
+    const stock = await MrSampleBag.find({ mrId: req.params.mrId }).populate('productId', 'name sku productType packing stockLevel').lean();
     res.json(stock);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/medical-reps/:mrId/sample-stock/issue — Issue/dispatch sample stock to MR bag
-router.post('/:mrId/sample-stock/issue', authorize('mr:create'), async (req, res) => {
+// POST /api/medical-reps/:mrId/sample-stock/issue — allocate approved warehouse stock into the canonical MR bag
+router.post('/:mrId/sample-stock/issue', authorize('mr:edit'), async (req, res) => {
   try {
-    const MrSampleStock = require('../../models/MrSampleStock');
-    const { items } = req.body;
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'items array is required' });
-    }
-
-    const mrId = req.params.mrId;
-    const mr = await MedicalRepresentative.findById(mrId);
+    if (!(await verifyMrAccess(req, req.params.mrId))) return res.status(403).json({ error: 'Access denied' });
+    const { items, warehouseId } = req.body;
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items array is required' });
+    const mr = await MedicalRepresentative.findById(req.params.mrId);
     if (!mr) return res.status(404).json({ error: 'MR not found' });
-
-    const updatedStock = [];
-    for (const item of items) {
-      if (!item.productId || !item.qty) continue;
-      const qtyNum = Math.max(0, parseInt(item.qty, 10) || 0);
-      if (qtyNum <= 0) continue;
-
-      const record = await MrSampleStock.findOneAndUpdate(
-        { mrId, productId: item.productId },
-        {
-          $inc: { qty: qtyNum },
-          $set: { lastIssuedAt: new Date() }
-        },
-        { upsert: true, new: true, runValidators: true }
-      ).populate('productId', 'name sku productType packing');
-
-      updatedStock.push(record);
-    }
-
-    res.json({
-      message: `Successfully issued ${updatedStock.length} sample products to ${mr.name}'s bag stock`,
-      stock: updatedStock
+    const result = await issueSamplesToMr({
+      mrId: req.params.mrId, items, warehouseId: warehouseId || null,
+      actorId: mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null,
+      actorName: req.user?.name || 'System',
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json({ message: `Sample stock allocated to ${mr.name}`, warehouseId: result.warehouse._id, stock: result.items });
+  } catch (err) { res.status(400).json({ error: err.message, code: err.code || 'SAMPLE_ISSUE_FAILED' }); }
 });
 
-// POST /api/mr-sample-stock/issue — Issue sample stock to Doctor and create issuance audit log
+// POST /api/medical-reps/sample-stock/issue-to-doctor — backwards-compatible direct issuance using the same MR bag
 router.post(['/sample-stock/issue-to-doctor', '/issue-to-doctor'], authorize('mr:visits'), async (req, res) => {
   try {
-    const MrSampleStock = require('../../models/MrSampleStock');
     const MrSampleIssuance = require('../../models/MrSampleIssuance');
     const Product = require('../../models/Product');
-
-    const { mrId, doctorId, productId, qty, unitCost, date } = req.body;
-    if (!mrId || !doctorId || !productId || !qty) {
-      return res.status(400).json({ error: 'mrId, doctorId, productId, and qty are required' });
-    }
-
-    const qtyVal = Math.max(1, parseInt(qty, 10) || 1);
-
-    await MrSampleStock.findOneAndUpdate(
-      { mrId, productId },
-      { $inc: { qty: -qtyVal } },
-      { upsert: false }
-    );
-
-    let effectiveUnitCost = Number(unitCost);
-    if (isNaN(effectiveUnitCost) || effectiveUnitCost <= 0) {
-      const prod = await Product.findById(productId).lean();
-      effectiveUnitCost = prod ? (prod.price || prod.mrp || 0) : 0;
-    }
-
-    const issuance = await MrSampleIssuance.create({
-      mrId,
-      doctorId,
-      productId,
-      qty: qtyVal,
-      unitCost: effectiveUnitCost,
-      date: date ? new Date(date) : new Date()
+    const { mrId, doctorId, productId, qty, unitCost, date, batchNo = '' } = req.body;
+    if (!mrId || !doctorId || !productId || !qty) return res.status(400).json({ error: 'mrId, doctorId, productId, and qty are required' });
+    if (!(await verifyMrAccess(req, mrId))) return res.status(403).json({ error: 'Access denied' });
+    const qtyVal = Math.max(1, Number(qty) || 1);
+    const issuance = await withTransaction(async session => {
+      await consumeSamplesFromMr({ mrId, sampleDetails: [{ productId, qty: qtyVal, batchNo }], session });
+      let effectiveUnitCost = Number(unitCost);
+      if (!(effectiveUnitCost > 0)) {
+        const prod = await Product.findById(productId).session(session).lean();
+        effectiveUnitCost = prod ? (prod.price || prod.mrp || 0) : 0;
+      }
+      const [created] = await MrSampleIssuance.create([{ mrId, doctorId, productId, qty: qtyVal, unitCost: effectiveUnitCost, date: date ? new Date(date) : new Date() }], { session });
+      return created;
     });
-
-    // Also write to SampleConversion log (conversionStatus: 'pending') for unified tracking
-    const SampleConversion = require('../../models/SampleConversion');
-    const Doctor = require('../../models/Doctor');
-
-    let mrName = req.body.mrName;
-    if (!mrName) {
-      const mrObj = await MedicalRepresentative.findById(mrId).lean();
-      mrName = mrObj ? mrObj.name : 'Medical Rep';
-    }
-
-    let doctorName = req.body.doctorName;
-    if (!doctorName) {
-      const docObj = await Doctor.findById(doctorId).lean();
-      doctorName = docObj ? docObj.name : 'Doctor';
-    }
-
-    let productName = req.body.productName;
-    if (!productName) {
-      const prodObj = await Product.findById(productId).lean();
-      productName = prodObj ? prodObj.name : 'Sample Product';
-    }
-
-    await SampleConversion.create({
-      mrId,
-      mrName,
-      doctorId,
-      doctorName,
-      productId,
-      productName,
-      samplesQtyGiven: qtyVal,
-      givenDate: date ? new Date(date) : new Date(),
-      conversionStatus: 'pending'
-    });
-
+    if (req.io) req.io.emit('medrep_updated', { type: 'sample_given_to_doctor', mrId, doctorId, productId });
     res.status(201).json(issuance);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// GET /api/medical-reps/:id/sample-roi — MR-level aggregate Sample ROI across assigned doctors
-router.get('/:id/sample-roi', authorize('mr:view'), async (req, res) => {
-  try {
-    const Invoice = require('../../models/Invoice');
-    const MrSampleIssuance = require('../../models/MrSampleIssuance');
-    const SampleConversion = require('../../models/SampleConversion');
-    const Doctor = require('../../models/Doctor');
-
-    const mrId = req.params.id;
-    const mr = await MedicalRepresentative.findById(mrId).lean();
-    if (!mr) return res.status(404).json({ error: 'MR not found' });
-
-    const doctors = await Doctor.find({ assignedMrId: mrId }).lean();
-    const docIds = doctors.map(d => d._id);
-    const docNames = doctors.map(d => d.name.trim());
-
-    const [issuances, conversions, invoices] = await Promise.all([
-      MrSampleIssuance.find({ mrId }).lean(),
-      SampleConversion.find({ mrId }).lean(),
-      Invoice.find({
-        $or: [
-          { prescribingDoctorId: { $in: docIds } },
-          { doctorName: { $in: docNames } }
-        ]
-      }).lean()
-    ]);
-
-    const totalSampleCost = issuances.reduce((sum, iss) => sum + ((iss.qty || 0) * (iss.unitCost || 0)), 0);
-
-    const convertedRecords = conversions.filter(c => c.conversionStatus === 'converted');
-    const pendingRecords = conversions.filter(c => c.conversionStatus === 'pending');
-
-    const convertedRevenue = convertedRecords.reduce((sum, c) => sum + (c.prescriptionOrderAmount || 0), 0);
-    const estimatedInvoiceRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
-
-    let totalRxRevenue = 0;
-    if (convertedRecords.length > 0) {
-      totalRxRevenue = convertedRevenue + (pendingRecords.length > 0 ? estimatedInvoiceRevenue : 0);
-    } else {
-      totalRxRevenue = estimatedInvoiceRevenue;
-    }
-
-    const roiRatio = totalSampleCost > 0 ? Number((totalRxRevenue / totalSampleCost).toFixed(2)) : 0;
-
-    res.json({
-      mrId,
-      mrName: mr.name,
-      doctorCount: doctors.length,
-      totalSampleCost: Number(totalSampleCost.toFixed(2)),
-      totalRxRevenue: Number(totalRxRevenue.toFixed(2)),
-      roiRatio,
-      invoiceCount: invoices.length,
-      sampleIssuanceCount: issuances.length
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(400).json({ error: err.message, code: err.code || 'SAMPLE_CONSUME_FAILED' }); }
 });
 
 // ─── DCR & Performance Leaderboard ───
@@ -2065,7 +1818,7 @@ router.post('/:mrId/optimize-route', authorize('mr:view'), async (req, res) => {
 });
 
 // POST /api/medical-reps/visits/:visitId/send-summary-whatsapp — Automated Post-Visit Engagement & Digital Sample Receipt Dispatch
-router.post('/visits/:visitId/send-summary-whatsapp', authorize('mr:visit'), async (req, res) => {
+router.post('/visits/:visitId/send-summary-whatsapp', authorize('mr:visits'), async (req, res) => {
   try {
     const visit = await MrVisit.findById(req.params.visitId);
     if (!visit) return res.status(404).json({ error: 'Visit record not found' });
@@ -2120,7 +1873,7 @@ router.post('/visits/:visitId/send-sample-ack-whatsapp', authorize('mr:visits'),
 });
 
 // POST /api/medical-reps/visits/:visitId/acknowledge-samples — Digitally confirm doctor sample receipt
-router.post('/visits/:visitId/acknowledge-samples', async (req, res) => {
+router.post('/visits/:visitId/acknowledge-samples', authorize('mr:visits'), async (req, res) => {
   try {
     const { doctorSignature } = req.body;
     const visit = await MrVisit.findById(req.params.visitId);

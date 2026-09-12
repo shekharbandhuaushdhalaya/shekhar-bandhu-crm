@@ -4,8 +4,12 @@ const Product = require('../../models/Product');
 const Warehouse = require('../../models/Warehouse');
 const Customer = require('../../models/Customer');
 const InventoryEntry = require('../../models/InventoryEntry');
-const StockLedger = require('../../models/StockLedger');
-const Invoice = require('../../models/Invoice');
+const Challan = require('../../models/Challan');
+const { postChallanInventory } = require('../../services/challanInventoryService');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+const { resolvePrice } = require('../../services/salesPricingService');
+const { createSalesOrder, createDraftFulfillment } = require('../../services/salesOrderService');
+const idempotency = require('../../middleware/idempotency');
 const { authorize, getRolePermissions } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
@@ -27,7 +31,7 @@ router.get('/', authorize('inventory:view'), async (req, res) => {
     }
 
     let query = Inventory.find(filter);
-    const rolePerms = await getRolePermissions(req.user.role);
+    const rolePerms = await getRolePermissions(req.user.firmRole || req.user.role, req.user.firmId || null);
     if (!rolePerms.includes('inventory:viewValue') && !rolePerms.includes('*')) {
       query = query.select('-val');
     }
@@ -39,36 +43,10 @@ router.get('/', authorize('inventory:view'), async (req, res) => {
   }
 });
 
-// PUT /api/inventories/:id — Update qty, value, and sync to product stock level
-router.put('/:id', authorize('inventory:edit'), async (req, res) => {
-  try {
-    const { qty } = req.body;
-    if (qty === undefined) {
-      return res.status(400).json({ error: 'Quantity (qty) is required' });
-    }
-
-    const item = await Inventory.findById(req.params.id);
-    if (!item) return res.status(404).json({ error: 'Inventory item not found' });
-
-    item.qty = qty;
-
-    const product = await Product.findOne({ sku: item.itemSku });
-    if (product) {
-      item.val = qty * product.price;
-      product.stockLevel = qty;
-      await product.save();
-    } else {
-      item.val = qty * 100;
-    }
-
-    await item.save();
-    if (req.io) {
-      req.io.emit('inventory_updated', { type: 'level_updated', id: item._id });
-    }
-    res.json(item);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+// Legacy aggregate Inventory records are read-only. Physical corrections must use
+// InventoryEntry stocktake/write-off workflows so StockLedger stays authoritative.
+router.put('/:id', authorize('inventory:edit'), async (_req, res) => {
+  res.status(410).json({ error: 'Direct inventory-level editing is retired. Use Inventory Entries / stocktake adjustments.', code: 'LEGACY_INVENTORY_EDIT_RETIRED' });
 });
 
 // Helper: Ensure a dealer consignment location warehouse exists for a customer
@@ -92,85 +70,33 @@ async function getOrCreateDealerWarehouse(customerId, dealerName) {
   return warehouse;
 }
 
-// POST /api/inventories/consignment/dispatch — Dispatch stock to a dealer's consignment location
+// POST /api/inventories/consignment/dispatch — company-owned stock moves by Transfer Challan.
 router.post('/consignment/dispatch', authorize('inventory:create'), validate(schemas.consignmentDispatchSchema), async (req, res) => {
   try {
     const { sourceWarehouseId, customerId, dealerName, items, notes } = req.body;
-
-    const sourceWh = await Warehouse.findById(sourceWarehouseId);
+    const [sourceWh, customer] = await Promise.all([Warehouse.findById(sourceWarehouseId), Customer.findById(customerId)]);
     if (!sourceWh) return res.status(404).json({ error: 'Source warehouse not found' });
-
+    if (!customer) return res.status(404).json({ error: 'Dealer customer not found' });
     const dealerWh = await getOrCreateDealerWarehouse(customerId, dealerName);
-
-    for (const item of items) {
-      const { productId, qtyBoxes, packing = 1, batchNo = '', vendorId = '' } = item;
-      const prod = await Product.findById(productId);
-      if (!prod) continue;
-
-      // 1. Deduct from Source Warehouse InventoryEntry
-      const sourceQuery = { warehouseId: sourceWh._id, productId, packing, vendorId };
-      if (batchNo) sourceQuery.batchNo = batchNo;
-      const sourceEntry = await InventoryEntry.findOne(sourceQuery);
-
-      if (!sourceEntry || sourceEntry.qtyBoxes < qtyBoxes) {
-        return res.status(400).json({ error: `Insufficient stock in source warehouse for product "${prod.name}". Available: ${sourceEntry ? sourceEntry.qtyBoxes : 0}, Required: ${qtyBoxes}` });
-      }
-
-      sourceEntry.qtyBoxes -= qtyBoxes;
-      await sourceEntry.save();
-
-      // 2. Increment Stock in Dealer Consignment Warehouse
-      const dealerQuery = { warehouseId: dealerWh._id, productId, packing, vendorId };
-      if (batchNo) dealerQuery.batchNo = batchNo;
-
-      let dealerEntry = await InventoryEntry.findOne(dealerQuery);
-      if (dealerEntry) {
-        dealerEntry.qtyBoxes += qtyBoxes;
-      } else {
-        dealerEntry = new InventoryEntry({
-          warehouseId: dealerWh._id,
-          warehouseName: dealerWh.name,
-          productId: prod._id,
-          productType: prod.productType || '',
-          size: prod.size || '',
-          colour: prod.colour || '',
-          shape: prod.shape || '',
-          weight: prod.weight || '',
-          hsnCode: prod.hsnCode || '',
-          vendorId,
-          qtyBoxes,
-          packing,
-          batchNo
-        });
-      }
-      await dealerEntry.save();
-
-      // 3. Record Stock Ledger Movement
-      await StockLedger.create({
-        productId: prod._id,
-        warehouseId: sourceWh._id,
-        warehouseName: sourceWh.name,
-        type: 'TRANSFER_OUT',
-        qtyBoxes: -qtyBoxes,
-        balanceBoxes: sourceEntry.qtyBoxes,
-        reference: `Consignment Transfer to ${dealerWh.name}`,
-        note: notes || `Dispatched on consignment to dealer ${dealerWh.dealerName}`,
-        createdBy: req.user ? req.user.name : 'System',
-        packing,
-        batchNo
-      });
+    const challanNo = await generateAtomicDocumentNumber('challanNo_transfer', 'TR-', 6);
+    const physicalItems = [];
+    for (const item of items || []) {
+      const product = await Product.findById(item.productId);
+      if (!product) return res.status(404).json({ error: `Product not found: ${item.productId}` });
+      physicalItems.push({ productId: product._id, name: product.name, qty: Number(item.qtyBoxes || 0), billableQty: 0, freeQty: 0, packing: Number(item.packing || 1), batchNo: item.batchNo || '', vendorId: item.vendorId || '', rate: 0, gstRate: 0, hsnCode: product.hsnCode || '' });
     }
-
-    if (req.io) {
-      req.io.emit('inventory_updated', { type: 'consignment_dispatched', dealerWarehouseId: dealerWh._id });
-    }
-    res.status(201).json({
-      message: 'Consignment stock dispatched successfully',
-      dealerWarehouse: dealerWh
+    const challan = await Challan.create({
+      challanNo, challanType: 'transfer', date: new Date(),
+      partyName: customer.company || customer.name, customerId: customer._id,
+      partyAddress: customer.billingAddress?.street || '', shippingAddress: customer.shippingAddress?.street || '', partyCity: customer.city || '', gstin: customer.gstin || '',
+      warehouseId: sourceWh._id, warehouseName: sourceWh.name,
+      destinationWarehouseId: dealerWh._id, destinationWarehouseName: dealerWh.name,
+      items: physicalItems, status: 'draft', notes: notes || `Consignment transfer to ${dealerWh.name}`,
     });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+    const posted = await postChallanInventory(challan, { userId: req.user?.id, createdBy: req.user?.name || 'System' });
+    if (req.io) { req.io.emit('challan_updated', { type: 'finalized', id: posted._id }); req.io.emit('inventory_updated', { type: 'consignment_transfer', challanId: posted._id }); }
+    res.status(201).json({ message: 'Consignment stock transferred by posted Transfer Challan', dealerWarehouse: dealerWh, challan: posted });
+  } catch (err) { res.status(400).json({ error: err.message, code: err.code || 'CONSIGNMENT_DISPATCH_FAILED' }); }
 });
 
 // GET /api/inventories/consignment/dealer-stock — View live unsold stock sitting at each dealer location
@@ -226,166 +152,98 @@ router.get('/consignment/dealer-stock', authorize('inventory:view'), async (req,
   }
 });
 
-// POST /api/inventories/consignment/settle — 1-Click Dealer Settlement (Returned -> Main WH, Sold -> Invoice)
-router.post('/consignment/settle', authorize('inventory:edit'), validate(schemas.consignmentSettleSchema), async (req, res) => {
+// POST /api/inventories/consignment/settle — returned goods use Transfer Challan; sold goods use Sale Challan.
+router.post('/consignment/settle', idempotency, authorize('inventory:edit', 'order:create', 'challan:create'), validate(schemas.consignmentSettleSchema), async (req, res) => {
   try {
     const { dealerWarehouseId, destinationWarehouseId, soldItems = [], returnedItems = [], notes } = req.body;
-
+    if (soldItems.length && returnedItems.length) {
+      return res.status(400).json({
+        error: 'Post sold and returned consignment quantities as separate settlement requests so each physical workflow is atomic and retryable.',
+        code: 'SPLIT_CONSIGNMENT_SETTLEMENT_REQUIRED',
+      });
+    }
     const dealerWh = await Warehouse.findById(dealerWarehouseId);
-    if (!dealerWh || dealerWh.type !== 'dealer_consignment') {
-      return res.status(404).json({ error: 'Dealer consignment stock location not found' });
-    }
-
-    const destWh = await Warehouse.findById(destinationWarehouseId);
-    if (!destWh) return res.status(404).json({ error: 'Destination main warehouse not found' });
-
+    if (!dealerWh || dealerWh.type !== 'dealer_consignment') return res.status(404).json({ error: 'Dealer consignment stock location not found' });
     const customer = await Customer.findById(dealerWh.customerId);
+    if (!customer) return res.status(409).json({ error: 'Dealer warehouse is not linked to an active customer', code: 'CUSTOMER_REQUIRED' });
 
-    // 1. Process Returned Items (Transfer Back: Dealer WH -> Main WH)
-    for (const ret of returnedItems) {
-      const { productId, qtyBoxes, packing = 1, batchNo = '' } = ret;
-
-      const dealerQuery = { warehouseId: dealerWh._id, productId, packing };
-      if (batchNo) dealerQuery.batchNo = batchNo;
-      const dealerEntry = await InventoryEntry.findOne(dealerQuery);
-      if (dealerEntry) {
-        dealerEntry.qtyBoxes = Math.max(0, dealerEntry.qtyBoxes - qtyBoxes);
-        await dealerEntry.save();
+    let returnChallan = null;
+    if (returnedItems.length) {
+      const destWh = await Warehouse.findById(destinationWarehouseId);
+      if (!destWh) return res.status(404).json({ error: 'Destination main warehouse not found' });
+      const items = [];
+      for (const row of returnedItems) {
+        const product = await Product.findById(row.productId);
+        if (!product) return res.status(404).json({ error: `Product not found: ${row.productId}` });
+        items.push({ productId: product._id, name: product.name, qty: Number(row.qtyBoxes || 0), billableQty: 0, freeQty: 0, packing: Number(row.packing || 1), batchNo: row.batchNo || '', rate: 0, gstRate: 0, hsnCode: product.hsnCode || '' });
       }
-
-      const destQuery = { warehouseId: destWh._id, productId, packing };
-      if (batchNo) destQuery.batchNo = batchNo;
-      let destEntry = await InventoryEntry.findOne(destQuery);
-      if (destEntry) {
-        destEntry.qtyBoxes += qtyBoxes;
-      } else {
-        const prod = await Product.findById(productId);
-        destEntry = new InventoryEntry({
-          warehouseId: destWh._id,
-          warehouseName: destWh.name,
-          productId,
-          qtyBoxes,
-          packing,
-          batchNo,
-          productType: prod ? prod.productType : '',
-          size: prod ? prod.size : '',
-          hsnCode: prod ? prod.hsnCode : ''
-        });
-      }
-      await destEntry.save();
-
-      await StockLedger.create({
-        productId,
-        warehouseId: destWh._id,
-        warehouseName: destWh.name,
-        type: 'TRANSFER_IN',
-        qtyBoxes,
-        balanceBoxes: destEntry.qtyBoxes,
-        reference: `Consignment Return from ${dealerWh.name}`,
-        note: 'Returned from dealer consignment stock',
-        createdBy: req.user ? req.user.name : 'System',
-        packing,
-        batchNo
-      });
+      const challanNo = await generateAtomicDocumentNumber('challanNo_transfer', 'TR-', 6);
+      const draft = await Challan.create({ challanNo, challanType: 'transfer', date: new Date(), partyName: customer.company || customer.name, customerId: customer._id, warehouseId: dealerWh._id, warehouseName: dealerWh.name, destinationWarehouseId: destWh._id, destinationWarehouseName: destWh.name, items, status: 'draft', notes: notes || 'Consignment return to main warehouse' });
+      returnChallan = await postChallanInventory(draft, { userId: req.user?.id, createdBy: req.user?.name || 'System' });
     }
 
-    // 2. Process Sold Items (Deduct Dealer WH & Generate GST Invoice)
-    let generatedInvoice = null;
-    if (soldItems.length > 0) {
-      const invoiceItems = [];
-      let totalBase = 0;
-      let totalTax = 0;
-
-      const isIntraState = customer ? (customer.gstin.startsWith('09') || customer.state === 'Maharashtra') : true;
-
-      for (const item of soldItems) {
-        const { productId, qtyBoxes, rate, packing = 1, batchNo = '', hsnCode = '', gstRate = 0 } = item;
-
-        const dealerQuery = { warehouseId: dealerWh._id, productId, packing };
-        if (batchNo) dealerQuery.batchNo = batchNo;
-        const dealerEntry = await InventoryEntry.findOne(dealerQuery);
-        if (dealerEntry) {
-          dealerEntry.qtyBoxes = Math.max(0, dealerEntry.qtyBoxes - qtyBoxes);
-          await dealerEntry.save();
-        }
-
-        const prod = await Product.findById(productId);
-        const itemBase = qtyBoxes * rate * packing;
-        totalBase += itemBase;
-        const tax = (itemBase * gstRate) / 100;
-        totalTax += tax;
-
-        invoiceItems.push({
-          productId,
-          name: prod ? prod.name : 'Consignment Item',
-          qty: qtyBoxes,
-          boxes: qtyBoxes,
-          packing,
-          rate,
-          hsnCode: hsnCode || (prod ? prod.hsnCode : ''),
-          gstRate,
-          batchNo
-        });
+    let saleChallan = null;
+    if (soldItems.length) {
+      const orderItems = [];
+      const fulfillmentItems = [];
+      let baseAmount = 0, taxAmount = 0;
+      for (const row of soldItems) {
+        const product = await Product.findById(row.productId);
+        if (!product) return res.status(404).json({ error: `Product not found: ${row.productId}` });
+        const qty = Number(row.qtyBoxes || 0);
+        const pricing = await resolvePrice(customer, product, qty);
+        const rate = Number(pricing.rate || 0);
+        const gstRate = Number(row.gstRate ?? product.gstRate ?? 0);
+        baseAmount += qty * rate;
+        taxAmount += qty * rate * gstRate / 100;
+        orderItems.push({ productId: product._id, name: product.name, qty, price: rate, freeQty: 0, pricingSource: 'consignment_settlement' });
+        fulfillmentItems.push({ productId: product._id, qty, packing: Number(row.packing || 1), batchNo: row.batchNo || undefined, vendorId: row.vendorId || undefined });
       }
-
-      const cgst = isIntraState ? totalTax / 2 : 0;
-      const sgst = isIntraState ? totalTax / 2 : 0;
-      const igst = !isIntraState ? totalTax : 0;
-      const rawTotal = totalBase + cgst + sgst + igst;
-      const nettTotal = Math.round(rawTotal);
-      const roundOff = nettTotal - rawTotal;
-
-      const SystemSettings = require('../../models/SystemSettings');
-      const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
-      const pfx = settings.invoicePrefix || 'INV';
-      const count = await Invoice.countDocuments();
-      const invoiceNo = `${pfx}-${(count + 1).toString().padStart(4, '0')}`;
-
-      generatedInvoice = await Invoice.create({
-        invoiceNo,
-        customerName: customer ? customer.name : dealerWh.dealerName,
-        partyAddress: customer ? (customer.billingAddress?.street || '') : '',
-        shippingAddress: customer ? (customer.shippingAddress?.street || '') : '',
-        date: new Date(),
-        amount: nettTotal,
-        status: 'unpaid',
-        mode: 'regular',
-        baseAmount: totalBase,
-        cgst,
-        sgst,
-        igst,
-        roundOff,
-        stateOfSupply: customer ? customer.state : 'Maharashtra',
-        gstin: customer ? customer.gstin : '',
+      const idempotencyKey = String(req.headers['idempotency-key'] || '').trim();
+      const orderResult = await createSalesOrder({
+        customerId: customer._id,
+        clientOrderRef: idempotencyKey ? `CONSIGNMENT:${dealerWh._id}:${idempotencyKey}` : '',
+        orderChannel: 'crm',
+        sourceType: 'direct',
         warehouseId: dealerWh._id,
-        warehouseName: dealerWh.name,
-        deductInventory: false,
-        isFinalized: true,
-        type: 'sale',
-        saleType: 'b2b',
-        reference: `Dealer Consignment Settlement - ${dealerWh.dealerName}`,
-        items: invoiceItems
-      });
-
-      if (customer) {
-        customer.regularBalance = (customer.regularBalance || 0) + nettTotal;
-        await customer.save();
+        shippingAddress: customer.shippingAddress?.street || customer.billingAddress?.street || '-',
+        billingAddress: customer.billingAddress?.street || '',
+        notes: notes || `Consignment sale settlement from ${dealerWh.name}`,
+        items: orderItems,
+      }, { customer, fixedPricing: true, notePrefix: 'Consignment settlement. ' });
+      const order = orderResult.order;
+      if (order.approvalRequired && order.approvalStatus !== 'approved') {
+        return res.status(202).json({
+          message: `Sales Order ${order.orderNo} was created and requires approval before the Sale Challan can move consignment stock.`,
+          order,
+          saleChallan: null,
+          returnChallan: null,
+          invoice: null,
+        });
       }
+
+      const draft = await createDraftFulfillment(order, { warehouseId: dealerWh._id, items: fulfillmentItems });
+      const isIntra = String(customer.gstin || '').startsWith('09') || ['uttar pradesh','up'].includes(String(customer.state || '').toLowerCase());
+      draft.partyAddress = customer.billingAddress?.street || '';
+      draft.partyCity = customer.city || '';
+      draft.gstin = customer.gstin || '';
+      draft.stateOfSupply = customer.state || '';
+      draft.baseAmount = baseAmount;
+      draft.cgst = isIntra ? taxAmount / 2 : 0;
+      draft.sgst = isIntra ? taxAmount / 2 : 0;
+      draft.igst = isIntra ? 0 : taxAmount;
+      draft.nettTotal = baseAmount + taxAmount;
+      draft.notes = notes || `Consignment sale settlement from ${dealerWh.name}`;
+      await draft.save();
+      saleChallan = await postChallanInventory(draft, { userId: req.user?.id, createdBy: req.user?.name || 'System' });
     }
 
-    if (req.io) {
-      req.io.emit('inventory_updated', { type: 'consignment_settled', dealerWarehouseId });
-    }
-
+    if (req.io) req.io.emit('inventory_updated', { type: 'consignment_settled', dealerWarehouseId, saleChallanId: saleChallan?._id, returnChallanId: returnChallan?._id });
     res.json({
-      message: 'Dealer consignment stock settled successfully',
-      soldItemsCount: soldItems.length,
-      returnedItemsCount: returnedItems.length,
-      invoice: generatedInvoice
+      message: saleChallan ? 'Consignment settled. Sold stock is now a posted Sale Challan; create/finalize its invoice from the Sales Workspace.' : 'Consignment return posted.',
+      soldItemsCount: soldItems.length, returnedItemsCount: returnedItems.length, saleChallan, returnChallan, salesOrderId: saleChallan?.salesOrderId || null, invoice: null,
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(400).json({ error: err.message, code: err.code || 'CONSIGNMENT_SETTLEMENT_FAILED' }); }
 });
 
 // GET /api/inventories/alerts/expiry — Fetch expiring raw material & finished goods batches (30/60/90 days)
@@ -428,12 +286,19 @@ router.get('/alerts/expiry', authorize('inventory:view'), async (req, res) => {
 router.get('/alerts/reorder', authorize('inventory:view'), async (req, res) => {
   try {
     const RawMaterial = require('../../models/RawMaterial');
-    const [rawMaterials, products] = await Promise.all([
+    const RawMaterialEntry = require('../../models/RawMaterialEntry');
+    const [rawMaterials, products, rawStock] = await Promise.all([
       RawMaterial.find({ minReorder: { $gt: 0 } }).lean(),
-      Product.find({ minReorderLevel: { $gt: 0 } }).lean()
+      Product.find({ minReorderLevel: { $gt: 0 } }).lean(),
+      RawMaterialEntry.aggregate([
+        { $match: { qcStatus: 'approved', qty: { $gt: 0 } } },
+        { $group: { _id: '$rawMaterialId', stockLevel: { $sum: '$qty' } } }
+      ])
     ]);
-
-    const lowStockRawMaterials = rawMaterials.filter(rm => (rm.stockLevel || 0) <= rm.minReorder);
+    const rawStockMap = new Map(rawStock.map((row) => [String(row._id), Number(row.stockLevel || 0)]));
+    const lowStockRawMaterials = rawMaterials
+      .map((rm) => ({ ...rm, stockLevel: rawStockMap.get(String(rm._id)) || 0 }))
+      .filter((rm) => rm.stockLevel <= Number(rm.minReorder || 0));
     const lowStockProducts = products.filter(p => (p.stockLevel || 0) <= (p.minReorderLevel || 0));
 
     res.json({

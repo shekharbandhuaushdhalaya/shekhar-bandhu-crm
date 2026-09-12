@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
 const webhookEventSchema = new mongoose.Schema({
   provider: { type: String, required: true },
   eventId: { type: String, required: true },
@@ -12,4 +13,5 @@ const webhookEventSchema = new mongoose.Schema({
 }, { timestamps: true });
 webhookEventSchema.index({ provider: 1, eventId: 1 }, { unique: true });
 webhookEventSchema.index({ status: 1, createdAt: -1 });
+webhookEventSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('WebhookEvent', webhookEventSchema);
