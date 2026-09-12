@@ -16,7 +16,7 @@ router.post('/login', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const customer = await Customer.findOne({ email: cleanEmail });
+    const customer = await Customer.findOne({ email: cleanEmail, ...(req.publicFirmId ? { firmId: req.publicFirmId } : {}) });
 
     if (!customer || !customer.portalEnabled || !customer.passwordHash) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -30,7 +30,8 @@ router.post('/login', async (req, res) => {
     const payload = {
       customerId: customer._id.toString(),
       email: customer.email,
-      scope: 'customer-portal'
+      scope: 'customer-portal',
+      ...(customer.firmId ? { firmId: customer.firmId.toString() } : (req.publicFirmId ? { firmId: req.publicFirmId } : {}))
     };
 
     const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '7d' });

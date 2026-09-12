@@ -37,6 +37,8 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     ['/queries', 'Web Queries'],
     ['/orders', 'Orders'],
     ['/sales-workspace', 'Sales Workspace'],
+    ['/sales-intelligence', 'Sales Intelligence & 360'],
+    ['/mr-my-day', 'MR My Day'],
     ['/quotations', 'Quotations'],
     ['/payments', 'Payments'],
     ['/ageing', 'Receivable Ageing'],
@@ -372,9 +374,11 @@ function MainLayout() {
             <Tabs.Screen name="queries" options={{ href: null }} />
             <Tabs.Screen name="orders" options={{ href: null }} />
             <Tabs.Screen name="sales-workspace" options={{ href: null }} />
+            <Tabs.Screen name="sales-intelligence" options={{ href: null }} />
             <Tabs.Screen name="pricing" options={{ href: null }} />
             <Tabs.Screen name="manufacturing" options={{ href: null }} />
             <Tabs.Screen name="medicalreps" options={{ href: null }} />
+            <Tabs.Screen name="mr-my-day" options={{ href: null }} />
             <Tabs.Screen name="doctors" options={{ href: null }} />
             <Tabs.Screen name="profile" options={{ href: null }} />
             <Tabs.Screen name="campaigns" options={{ href: null }} />

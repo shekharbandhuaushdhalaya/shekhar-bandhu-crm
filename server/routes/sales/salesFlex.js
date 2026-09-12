@@ -36,7 +36,7 @@ async function resolvePrice(customer, product, qty) {
     if (rule.discountPercent) { discountPercent = Number(rule.discountPercent); pricingSource = 'customer_rule'; }
     const tier = (rule.volumeTiers || []).filter(t => Number(qty) >= Number(t.minQty || 0)).sort((a,b) => Number(b.minQty)-Number(a.minQty))[0];
     if (tier) {
-      if (tier.customRate != null) rate = Number(tier.customRate);
+      if (tier.fixedRate != null) rate = Number(tier.fixedRate);
       if (tier.discountPercent != null) discountPercent = Number(tier.discountPercent);
       pricingSource = 'volume_tier';
     }
@@ -48,9 +48,12 @@ async function resolveScheme(customer, productId, qty) {
   const now = new Date();
   const candidates = await SalesScheme.find({ active: true, productId, validFrom: { $lte: now }, $or: [{ validUntil: null }, { validUntil: { $gte: now } }] }).lean();
   const eligible = candidates.filter(s => {
-    const custOk = !s.customerIds?.length || (customer && s.customerIds.some(id => String(id) === String(customer._id)));
-    const typeOk = !s.customerTypes?.length || (customer && s.customerTypes.includes(customer.tradeCategory));
-    return (custOk || typeOk) && Number(qty) >= Number(s.minQty || 1);
+    const hasCustomerFilter = !!s.customerIds?.length;
+    const hasTypeFilter = !!s.customerTypes?.length;
+    const custMatch = !!(customer && hasCustomerFilter && s.customerIds.some(id => String(id) === String(customer._id)));
+    const typeMatch = !!(customer && hasTypeFilter && s.customerTypes.includes(customer.tradeCategory));
+    const audienceOk = (!hasCustomerFilter && !hasTypeFilter) || custMatch || typeMatch;
+    return audienceOk && Number(qty) >= Number(s.minQty || 1);
   }).sort((a,b) => (Number(b.discountPercent||0) + Number(b.freeQty||0)) - (Number(a.discountPercent||0) + Number(a.freeQty||0)));
   if (!eligible.length) return null;
   const s = eligible[0];

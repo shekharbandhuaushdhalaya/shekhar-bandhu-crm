@@ -18,6 +18,8 @@ const orderItemSchema = new mongoose.Schema({
 
 const orderSchema = new mongoose.Schema({
   orderNo: { type: String, default: '', trim: true },
+  clientOrderRef: { type: String, default: '', trim: true },
+  orderChannel: { type: String, enum: ['crm','portal','website','phone','mr','other'], default: 'crm' },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, trim: true, lowercase: true },
@@ -68,6 +70,7 @@ const orderSchema = new mongoose.Schema({
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ firmId: 1, orderNo: 1 }, { unique: true, sparse: true });
 orderSchema.index({ firmId: 1, customerId: 1, status: 1, createdAt: -1 });
+orderSchema.index({ firmId: 1, clientOrderRef: 1 }, { unique: true, sparse: true, partialFilterExpression: { clientOrderRef: { $type: 'string', $ne: '' } } });
 
 orderSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Order', orderSchema);

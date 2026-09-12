@@ -26,6 +26,7 @@ const contactRoutes = require('./routes/crm/contacts');
 const doctorRoutes = require('./routes/crm/doctors');
 const taskRoutes = require('./routes/crm/tasks');
 const medicalRepRoutes = require('./routes/crm/medicalReps');
+const mrFieldIntelligenceRoutes = require('./routes/crm/mrFieldIntelligence');
 
 const campaignRoutes = require('./routes/marketing/campaigns');
 const socialRoutes = require('./routes/marketing/social');
@@ -38,6 +39,7 @@ const invoiceRoutes = require('./routes/sales/invoices');
 const challanRoutes = require('./routes/sales/challans');
 const orderRoutes = require('./routes/sales/orders');
 const salesFlexRoutes = require('./routes/sales/salesFlex');
+const salesIntelligenceRoutes = require('./routes/sales/salesIntelligence');
 const salesTargetRoutes = require('./routes/sales/salesTargets');
 const partiesRoutes = require('./routes/sales/parties');
 
@@ -217,6 +219,7 @@ app.use('/api/analytics', authenticateJWT, analyticsRoutes);
 app.use('/api/queries', authenticateJWT, queryRoutes);
 app.use('/api/orders', authenticateJWT, orderRoutes);
 app.use('/api/sales-workflow', authenticateJWT, salesFlexRoutes);
+app.use('/api/sales-intelligence', authenticateJWT, salesIntelligenceRoutes);
 app.use('/api/raw-materials', authenticateJWT, rawMaterialRoutes);
 app.use('/api/bom', authenticateJWT, bomRoutes);
 app.use('/api/batch-productions', authenticateJWT, batchProductionRoutes);
@@ -232,6 +235,7 @@ app.use('/api/payments/gateway', authenticateJWT, paymentGatewayRoutes);
 app.use('/api/payments/gateway/webhook', paymentGatewayRoutes);
 app.use('/api/rbac', authenticateJWT, rbacRoutes);
 app.use('/api/medical-reps', authenticateJWT, medicalRepRoutes);
+app.use('/api/mr-field', authenticateJWT, mrFieldIntelligenceRoutes);
 app.use('/api/mr-sample-stock', authenticateJWT, medicalRepRoutes);
 app.use('/api/mr-tour-plans', authenticateJWT, medicalRepRoutes);
 app.use('/api/campaigns', authenticateJWT, campaignRoutes);
@@ -319,7 +323,7 @@ app.use('/api/finance/export/tally', authenticateJWT, tallyRoutes);
 
 const portalAuthRoutes = require('./routes/public/portalAuth');
 const portalRoutes = require('./routes/portal/portal');
-app.use('/api/portal/auth', portalAuthRoutes);
+app.use('/api/portal/auth', publicTenant, portalAuthRoutes);
 app.use('/api/portal', portalRoutes);
 
 // Keep API responses consistent for unknown routes.

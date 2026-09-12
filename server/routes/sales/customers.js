@@ -203,4 +203,25 @@ router.post('/import-csv', authorize('customer:create'), async (req, res) => {
   }
 });
 
+
+// PUT /api/customers/:id/portal-access — enable/disable website self-service safely.
+router.put('/:id/portal-access', authorize('customer:edit'), async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+    if (req.body.email !== undefined) customer.email = String(req.body.email || '').trim().toLowerCase();
+    if (req.body.enabled !== undefined) customer.portalEnabled = !!req.body.enabled;
+    if (req.body.password) {
+      if (String(req.body.password).length < 8) return res.status(400).json({ error: 'Portal password must be at least 8 characters' });
+      customer.passwordHash = await bcrypt.hash(String(req.body.password), 12);
+      customer.portalEnabled = true;
+    }
+    if (customer.portalEnabled && !customer.email) return res.status(400).json({ error: 'Customer email is required for portal access' });
+    await customer.save();
+    await logAction({ action:'CUSTOMER_PORTAL_ACCESS', description:`${customer.portalEnabled?'Enabled':'Disabled'} portal access for ${customer.name}`, details:{customerId:customer._id,enabled:customer.portalEnabled}, req });
+    res.json({ id:customer._id, email:customer.email, portalEnabled:customer.portalEnabled, hasPassword:!!customer.passwordHash });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 module.exports = router;
