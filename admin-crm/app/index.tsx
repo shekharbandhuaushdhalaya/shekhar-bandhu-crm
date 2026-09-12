@@ -8,6 +8,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import Svg, { Path, Circle, Text as SvgText, Line, Defs, LinearGradient, Stop, Rect, G } from 'react-native-svg';
+import { MetricTile, Panel, WorkspaceHeader, WorkspaceTabs } from '../components/WorkspacePrimitives';
 
 function MetricCard({ title, value, icon, color, colorLight, trend }: { title: string; value: string; icon: string; color: string; colorLight: string; trend: string }) {
   const styles = useStyles(createStyles);
@@ -770,7 +771,7 @@ function FullMrAnalyticsTab() {
                   </View>
                   <View>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>{m.name}</Text>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>📍 {m.territory || 'Headquarters'} | Target: ₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
+                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>{m.territory || 'Headquarters'} • Target: ₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
                   </View>
                 </View>
                 <View style={{ backgroundColor: Number(roi) > 0 ? colors.success + '18' : colors.warning + '18', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
@@ -1110,6 +1111,7 @@ export default function DashboardScreen() {
   const perm = usePermission();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const router = useRouter();
 
   const load = useCallback(async () => {
     const [s, a, c, custs, vends, invs, prods, purchs, sales, challans, mfgData, camps] = await Promise.all([
@@ -1245,193 +1247,92 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [load]);
 
+  const overviewTabs = [
+    { id: 'overview' as const, label: 'Overview', icon: 'grid-outline' as const },
+    { id: 'mr_analytics' as const, label: 'MR & Field', icon: 'people-outline' as const },
+    { id: 'manufacturing_analytics' as const, label: 'Manufacturing', icon: 'construct-outline' as const },
+    { id: 'marketing_analytics' as const, label: 'Marketing ROI', icon: 'megaphone-outline' as const },
+  ];
+
+  const grossProfit = totalRevenue - totalCOGS;
+  const greetingName = user?.name?.split(' ')[0] || 'Team';
+  const todayLabel = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
-      {/* Main Top Dashboard Tab Navigation */}
-      <View style={{ flexDirection: 'row', backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: 4, marginBottom: Spacing.lg, borderWidth: 1, borderColor: colors.border }}>
-        <Pressable
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            paddingVertical: 10,
-            borderRadius: Radius.md,
-            backgroundColor: activeTab === 'overview' ? colors.primary : 'transparent'
-          }}
-          onPress={() => setActiveTab('overview')}
-        >
-          <Ionicons name="pie-chart-outline" size={16} color={activeTab === 'overview' ? '#fff' : colors.text.secondary} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'overview' ? '#fff' : colors.text.secondary }}>
-            Business Overview
-          </Text>
-        </Pressable>
+    <View style={styles.container}>
+      <WorkspaceHeader
+        eyebrow={todayLabel}
+        title={`Welcome back, ${greetingName}`}
+        subtitle="A focused view of sales, collections and inventory attention — without the clutter."
+        actions={[
+          { label: 'New sale', icon: 'add', onPress: () => router.push('/sales-workspace') },
+          { label: 'Record payment', icon: 'wallet-outline', onPress: () => router.push('/payments'), variant: 'secondary' },
+        ]}
+      />
+      <WorkspaceTabs tabs={overviewTabs} value={activeTab} onChange={setActiveTab} />
 
-        <Pressable
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            paddingVertical: 10,
-            borderRadius: Radius.md,
-            backgroundColor: activeTab === 'mr_analytics' ? colors.primary : 'transparent'
-          }}
-          onPress={() => setActiveTab('mr_analytics')}
-        >
-          <Ionicons name="stats-chart-outline" size={16} color={activeTab === 'mr_analytics' ? '#fff' : colors.text.secondary} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'mr_analytics' ? '#fff' : colors.text.secondary }}>
-            MR Field & ROI
-          </Text>
-        </Pressable>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      >
+        {activeTab === 'overview' ? (
+          <>
+            <View style={styles.metricsGrid}>
+              <MetricTile label="Sales revenue" value={`₹${totalRevenue.toLocaleString('en-IN')}`} icon="trending-up-outline" tone="success" helper="Finalized sales invoices" />
+              <MetricTile label="Receivables" value={`₹${recInvoice.toLocaleString('en-IN')}`} icon="wallet-outline" tone={recInvoice > 0 ? 'warning' : 'success'} helper="Outstanding from customers" />
+              <MetricTile label="Active web orders" value={String(stats.activeWebOrdersCount || 0)} icon="cart-outline" tone={stats.activeWebOrdersCount ? 'info' : 'success'} helper="Awaiting sales processing" />
+              <MetricTile label="Stock alerts" value={String(lowStockProds.length)} icon="alert-circle-outline" tone={lowStockProds.length ? 'danger' : 'success'} helper="At or below reorder level" />
+            </View>
 
-        <Pressable
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            paddingVertical: 10,
-            borderRadius: Radius.md,
-            backgroundColor: activeTab === 'manufacturing_analytics' ? colors.primary : 'transparent'
-          }}
-          onPress={() => setActiveTab('manufacturing_analytics')}
-        >
-          <Ionicons name="build-outline" size={16} color={activeTab === 'manufacturing_analytics' ? '#fff' : colors.text.secondary} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'manufacturing_analytics' ? '#fff' : colors.text.secondary }} numberOfLines={1}>
-            Manufacturing
-          </Text>
-        </Pressable>
+            <Panel title="Business pulse" subtitle="Secondary signals kept compact so the dashboard stays easy to scan.">
+              <View style={styles.pulseRow}>
+                <View style={styles.pulseItem}><Text style={styles.pulseValue}>₹{Number(stats.totalWebSales || 0).toLocaleString('en-IN')}</Text><Text style={styles.pulseLabel}>Website sales</Text></View>
+                <View style={styles.pulseDivider} />
+                <View style={styles.pulseItem}><Text style={styles.pulseValue}>{stats.completedWebOrdersCount || 0}</Text><Text style={styles.pulseLabel}>Completed deliveries</Text></View>
+                <View style={styles.pulseDivider} />
+                <View style={styles.pulseItem}><Text style={styles.pulseValue}>{stats.webQueriesCount || 0}</Text><Text style={styles.pulseLabel}>Website enquiries</Text></View>
+                {perm.can('report:view') ? <><View style={styles.pulseDivider} /><View style={styles.pulseItem}><Text style={styles.pulseValue}>₹{grossProfit.toLocaleString('en-IN')}</Text><Text style={styles.pulseLabel}>Gross profit</Text></View></> : null}
+                {perm.can('report:view') ? <><View style={styles.pulseDivider} /><View style={styles.pulseItem}><Text style={styles.pulseValue}>₹{assetValue.toLocaleString('en-IN')}</Text><Text style={styles.pulseLabel}>Stock value</Text></View></> : null}
+              </View>
+            </Panel>
 
-        <Pressable
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            paddingVertical: 10,
-            borderRadius: Radius.md,
-            backgroundColor: activeTab === 'marketing_analytics' ? colors.primary : 'transparent'
-          }}
-          onPress={() => setActiveTab('marketing_analytics')}
-        >
-          <Ionicons name="pie-chart-outline" size={16} color={activeTab === 'marketing_analytics' ? '#fff' : colors.text.secondary} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: activeTab === 'marketing_analytics' ? '#fff' : colors.text.secondary }} numberOfLines={1}>
-            Marketing ROI
-          </Text>
-        </Pressable>
-      </View>
+            <View style={styles.quickActionsRow}>
+              {[
+                { label: 'Sales workspace', sub: 'Orders and fulfillment', icon: 'cart-outline', route: '/sales-workspace' },
+                { label: 'Challans', sub: 'Dispatch and stock movement', icon: 'document-text-outline', route: '/stockmovements' },
+                { label: 'MR My Day', sub: 'Field priorities', icon: 'today-outline', route: '/mr-my-day' },
+                { label: 'Sales intelligence', sub: 'Collections and customer health', icon: 'flash-outline', route: '/sales-intelligence' },
+              ].map((item) => (
+                <Pressable key={item.label} style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]} onPress={() => router.push(item.route as any)}>
+                  <View style={styles.quickActionIcon}><Ionicons name={item.icon as any} size={18} color={colors.primary} /></View>
+                  <View style={{ flex: 1 }}><Text style={styles.quickActionLabel}>{item.label}</Text><Text style={styles.quickActionSub}>{item.sub}</Text></View>
+                  <Ionicons name="chevron-forward" size={15} color={colors.text.muted} />
+                </Pressable>
+              ))}
+            </View>
 
-      {activeTab === 'overview' ? (
-        <>
-          {/* E-Commerce Performance Panel */}
-          <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            🛒 E-Commerce Channel Stats
-          </Text>
-      <View style={[styles.metricsGrid, { marginBottom: Spacing.lg }]}>
-        <MetricCard 
-          title="E-COMM SALES" 
-          value={`₹${(stats.totalWebSales || 0).toLocaleString()}`} 
-          icon="cart-outline" 
-          color={colors.primary} 
-          colorLight={colors.primaryLight} 
-          trend="Live Storefront" 
-        />
-        <MetricCard 
-          title="ACTIVE WEB ORDERS" 
-          value={`${stats.activeWebOrdersCount || 0}`} 
-          icon="sync-outline" 
-          color={colors.warning} 
-          colorLight={colors.warningLight} 
-          trend="Needs Processing" 
-        />
-        <MetricCard 
-          title="COMPLETED DELIVERIES" 
-          value={`${stats.completedWebOrdersCount || 0}`} 
-          icon="checkmark-done-circle-outline" 
-          color={colors.success} 
-          colorLight={colors.successLight} 
-          trend="Successfully Shipped" 
-        />
-        <MetricCard 
-          title="WEB INQUIRIES" 
-          value={`${stats.webQueriesCount || 0}`} 
-          icon="chatbubble-ellipses-outline" 
-          color={colors.info} 
-          colorLight={colors.infoLight} 
-          trend="Enquiries / Quizzes" 
-        />
-      </View>
-
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.secondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        📊 B2B Ledger &amp; Inventory
-      </Text>
-      <View style={styles.metricsGrid}>
-        <FinancialSummaryCard 
-          title="TOTAL RECEIVABLES" 
-          value={`₹${recInvoice.toLocaleString()}`} 
-          label="Owed by Customers" 
-          icon="arrow-down-circle" 
-          color={colors.success}
-        />
-        {perm.can('report:view') && (
-          <FinancialSummaryCard 
-            title="TOTAL PAYABLES" 
-            value={`₹${payInvoice.toLocaleString()}`} 
-            label="Owed to Vendors" 
-            icon="arrow-up-circle" 
-            color={colors.warning}
-          />
+            <View style={styles.chartsFeedRow}>
+              {perm.can('report:view') ? (
+                <View style={styles.chartWrapper}>
+                  <MonthlySalesWidget width={chartWidth} sales={allSales} />
+                </View>
+              ) : null}
+              <View style={styles.feedWrapper}>
+                <LowStockAlerts products={lowStockProds} />
+                <ExpiryAlerts alerts={expiryAlerts} loading={expiryAlertsLoading} />
+              </View>
+            </View>
+          </>
+        ) : activeTab === 'mr_analytics' ? (
+          <FullMrAnalyticsTab />
+        ) : activeTab === 'manufacturing_analytics' ? (
+          <FullManufacturingAnalyticsTab mfgAnalytics={mfgAnalytics} />
+        ) : (
+          <DashboardMarketingAnalyticsTab campaigns={campaigns} />
         )}
-        {perm.can('report:view') && (
-          <FinancialSummaryCard 
-            title="ASSET VALUE" 
-            value={`₹${assetValue.toLocaleString()}`} 
-            label="Warehouse Stock Value" 
-            icon="cube" 
-            color={colors.primary}
-          />
-        )}
-        {perm.can('report:view') && (
-          <FinancialSummaryCard 
-            title="PROFIT & LOSS" 
-            value={`₹${(totalRevenue - totalCOGS).toLocaleString()}`} 
-            label={`Margin: ${totalRevenue ? (((totalRevenue - totalCOGS) / totalRevenue) * 100).toFixed(1) : 0}%`} 
-            icon="trending-up" 
-            color={colors.purple} 
-            breakdown1Label="REVENUE"
-            breakdown1Value={`₹${totalRevenue.toLocaleString()}`}
-            breakdown2Label="COGS (COST)"
-            breakdown2Value={`₹${totalCOGS.toLocaleString()}`}
-          />
-        )}
-      </View>
-
-      <View style={styles.chartsFeedRow}>
-        {perm.can('report:view') && (
-          <View style={styles.chartWrapper}>
-            <MonthlySalesWidget width={chartWidth} sales={allSales} />
-          </View>
-        )}
-        <View style={styles.feedWrapper}>
-          <LowStockAlerts products={lowStockProds} />
-          <ExpiryAlerts alerts={expiryAlerts} loading={expiryAlertsLoading} />
-        </View>
-      </View>
-
-        </>
-      ) : activeTab === 'mr_analytics' ? (
-        <FullMrAnalyticsTab />
-      ) : activeTab === 'manufacturing_analytics' ? (
-        <FullManufacturingAnalyticsTab mfgAnalytics={mfgAnalytics} />
-      ) : (
-        <DashboardMarketingAnalyticsTab campaigns={campaigns} />
-      )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -1470,6 +1371,17 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   activityDot: { width: 9, height: 9, borderRadius: 5, marginTop: 4 },
   activityText: { fontSize: 13, color: colors.text.primary, fontWeight: '500' },
   activityTime: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  pulseRow: { flexDirection: 'row', alignItems: 'stretch', flexWrap: 'wrap', gap: 0 },
+  pulseItem: { minWidth: 135, flexGrow: 1, flexShrink: 1, paddingVertical: 4, paddingHorizontal: 12 },
+  pulseValue: { fontSize: 16, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.2 },
+  pulseLabel: { fontSize: 10.5, color: colors.text.muted, marginTop: 3 },
+  pulseDivider: { width: 1, minHeight: 38, backgroundColor: colors.border, alignSelf: 'center' },
+  quickActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  quickAction: { flexGrow: 1, flexShrink: 1, flexBasis: 245, minWidth: 220, minHeight: 64, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, ...Shadows.card },
+  quickActionPressed: { backgroundColor: colors.bg.cardHover },
+  quickActionIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  quickActionLabel: { fontSize: 12.5, fontWeight: '800', color: colors.text.primary },
+  quickActionSub: { fontSize: 10.5, color: colors.text.muted, marginTop: 2 },
   chartsFeedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, width: '100%' },
   chartWrapper: { flexGrow: 2, flexShrink: 1, flexBasis: 500 },
   feedWrapper: { flexGrow: 1, flexShrink: 1, flexBasis: 350 },

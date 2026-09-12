@@ -9,7 +9,7 @@ import { authStorage } from '../utils/storage';
 
 const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded_v2';
 
-export const SIDEBAR_WIDTH = 248;
+export const SIDEBAR_WIDTH = 224;
 
 type NavGroup = {
   key: string;

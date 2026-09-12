@@ -11,6 +11,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { api, MedicalRepresentative, MrDailyLog, MrVisit, MrAssignment, Doctor, MrExpense, MrDashboardSummary, Product } from '../utils/api';
 import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
+import { WorkspaceHeader, WorkspaceTabs } from '../components/WorkspacePrimitives';
 
 type Tab = 'dashboard' | 'mrs' | 'portfolio' | 'attendance' | 'visits' | 'expenses';
 
@@ -223,7 +224,7 @@ export default function MedicalRepsScreen() {
         longitude: lng,
         location: prev.location ? prev.location : `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`
       }));
-      showToast(`📍 Live GPS acquired: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
+      showToast(`GPS acquired: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
     }
   };
 
@@ -240,7 +241,7 @@ export default function MedicalRepsScreen() {
         longitude: lng,
         location: prev.location ? prev.location : `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`
       }));
-      showToast(`📍 Live GPS acquired: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
+      showToast(`GPS acquired: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
     }
   };
 
@@ -395,7 +396,7 @@ export default function MedicalRepsScreen() {
           latitude: coords.latitude,
           longitude: coords.longitude
         }));
-        showToast('📍 Location logged successfully!', 'success');
+        showToast('Location logged successfully.', 'success');
       } else {
         showToast('Unable to capture location. Please grant location permissions.', 'error');
       }
@@ -441,7 +442,7 @@ export default function MedicalRepsScreen() {
       return;
     }
     if (!visitForm.latitude || !visitForm.longitude) {
-      showToast('📍 Mandatory: Please tap "Log GPS Clinic Location" button to capture clinic coordinates before saving.', 'warning');
+      showToast('GPS location is required before saving this visit.', 'warning');
       return;
     }
     try {
@@ -534,7 +535,7 @@ export default function MedicalRepsScreen() {
     }
     return (
       <View style={styles.selectorWrapper}>
-        <Text style={styles.selectorLabel}>SELECT MEDICAL REPRESENTATIVE:</Text>
+        <Text style={styles.selectorLabel}>Select medical representative</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
           {activeMRs.map(m => {
             const isSelected = selectedId === m._id;
@@ -684,7 +685,7 @@ export default function MedicalRepsScreen() {
                         </View>
                       </View>
                       <Text style={styles.mrSubText}>
-                        📍 {m.territory || 'Headquarters'}  |  Target: <Text style={{ fontWeight: '700', color: colors.text.primary }}>₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
+                        {m.territory || 'Headquarters'}  •  Target: <Text style={{ fontWeight: '700', color: colors.text.primary }}>₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
                       </Text>
                     </View>
                   </View>
@@ -970,7 +971,7 @@ export default function MedicalRepsScreen() {
                       <Text style={styles.timeBoxValue}>
                         {log.checkIn?.time ? new Date(log.checkIn.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
                       </Text>
-                      {log.checkIn?.location ? <Text style={styles.timeBoxSub}>📍 {log.checkIn.location}</Text> : null}
+                      {log.checkIn?.location ? <Text style={styles.timeBoxSub}>{log.checkIn.location}</Text> : null}
                       {log.checkIn?.latitude && log.checkIn?.longitude ? (
                         <TouchableOpacity
                           style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
@@ -992,7 +993,7 @@ export default function MedicalRepsScreen() {
                       <Text style={styles.timeBoxValue}>
                         {log.checkOut?.time ? new Date(log.checkOut.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
                       </Text>
-                      {log.checkOut?.location ? <Text style={styles.timeBoxSub}>📍 {log.checkOut.location}</Text> : null}
+                      {log.checkOut?.location ? <Text style={styles.timeBoxSub}>{log.checkOut.location}</Text> : null}
                       {log.checkOut?.latitude && log.checkOut?.longitude ? (
                         <TouchableOpacity
                           style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
@@ -1089,7 +1090,7 @@ export default function MedicalRepsScreen() {
                   <Ionicons name="location" size={16} color={(checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary} />
                   <Text style={{ fontSize: 11, fontWeight: '800', color: (checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary }}>
                     {(checkInForm.latitude && checkInForm.longitude)
-                      ? `📍 GPS Auto-Acquired: ${checkInForm.latitude.toFixed(4)}, ${checkInForm.longitude.toFixed(4)}`
+                      ? `GPS acquired: ${checkInForm.latitude.toFixed(4)}, ${checkInForm.longitude.toFixed(4)}`
                       : 'Acquiring device GPS location...'}
                   </Text>
                 </View>
@@ -1142,7 +1143,7 @@ export default function MedicalRepsScreen() {
                   <Ionicons name="location" size={16} color={(checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning} />
                   <Text style={{ fontSize: 11, fontWeight: '800', color: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning }}>
                     {(checkOutForm.latitude && checkOutForm.longitude)
-                      ? `📍 GPS Auto-Acquired: ${checkOutForm.latitude.toFixed(4)}, ${checkOutForm.longitude.toFixed(4)}`
+                      ? `GPS acquired: ${checkOutForm.latitude.toFixed(4)}, ${checkOutForm.longitude.toFixed(4)}`
                       : 'Acquiring device GPS location...'}
                   </Text>
                 </View>
@@ -1264,7 +1265,7 @@ export default function MedicalRepsScreen() {
                 {v.sampleDetails && v.sampleDetails.length > 0 && (
                   <View style={{ marginTop: 8, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, padding: 8, borderWidth: 1, borderColor: colors.border }}>
                     <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary, marginBottom: 4 }}>
-                      🎁 FREE SAMPLES DISTRIBUTED:
+                      FREE SAMPLES DISTRIBUTED
                     </Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                       {v.sampleDetails.map((s: any, idx: number) => (
@@ -1318,7 +1319,7 @@ export default function MedicalRepsScreen() {
               {/* Mandatory GPS Location Capture Section */}
               <View style={{ backgroundColor: (visitForm.latitude && visitForm.longitude) ? colors.success + '10' : colors.primary + '10', padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: (visitForm.latitude && visitForm.longitude) ? colors.success + '30' : colors.primary + '30', marginBottom: 16 }}>
                 <Text style={{ fontSize: 11, fontWeight: '800', color: (visitForm.latitude && visitForm.longitude) ? colors.success : colors.primary, marginBottom: 4 }}>
-                  📍 MANDATORY CLINIC GPS LOCATION *
+                  CLINIC GPS LOCATION *
                 </Text>
                 <Text style={{ fontSize: 10, color: colors.text.secondary, marginBottom: 10 }}>
                   Doctor visit records cannot be saved without logging physical GPS coordinates.
@@ -1344,8 +1345,8 @@ export default function MedicalRepsScreen() {
                   />
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
                     {(visitForm.latitude && visitForm.longitude)
-                      ? `✔ GPS Logged: ${visitForm.latitude.toFixed(4)}, ${visitForm.longitude.toFixed(4)}`
-                      : '📍 Log GPS Clinic Location *'}
+                      ? `GPS logged: ${visitForm.latitude.toFixed(4)}, ${visitForm.longitude.toFixed(4)}`
+                      : 'Log GPS clinic location *'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1426,7 +1427,7 @@ export default function MedicalRepsScreen() {
               {/* Free Samples Distribution Dropdown Selector */}
               <View style={[styles.formField, { backgroundColor: colors.bg.secondary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }]}>
                 <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 8 }}>
-                  🎁 ADD FREE SAMPLES DISTRIBUTED (CREATES SAMPLE CHALLAN & DEDUCTS INVENTORY)
+                  ADD FREE SAMPLES (CREATES SAMPLE CHALLAN & DEDUCTS INVENTORY)
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   {Platform.OS === 'web' ? (
@@ -1657,7 +1658,7 @@ export default function MedicalRepsScreen() {
                       </View>
                       {mrName ? (
                         <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, marginTop: 2 }}>
-                          👤 {mrName}
+                          {mrName}
                         </Text>
                       ) : null}
                       <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 2 }}>
@@ -1754,56 +1755,22 @@ export default function MedicalRepsScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* Top Header Bar with Tabs & Action Button */}
-      <View style={styles.topControlBar}>
-        <View style={styles.topBarContent}>
-          {/* Sub Navigation Pills */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, flexGrow: 1 }}>
-            {TABS.map(t => {
-              const isActive = activeTab === t.id;
-              return (
-                <TouchableOpacity
-                  key={t.id}
-                  style={[styles.subNavTab, isActive && styles.subNavTabActive]}
-                  onPress={() => setActiveTab(t.id)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name={t.icon} size={15} color={isActive ? colors.primary : colors.text.secondary} />
-                  <Text style={[styles.subNavTabText, isActive && styles.subNavTabTextActive]}>{t.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+      <WorkspaceHeader
+        eyebrow="Field sales"
+        title="Medical Representatives"
+        subtitle="Manage the field team, account portfolio, attendance, visits and expenses from one consistent workspace."
+        actions={[
+          ...(activeTab === 'mrs' && perm.can('mr:create') ? [{ label: 'New MR', icon: 'add' as const, onPress: handleOpenNewMrModal }] : []),
+          ...(activeTab === 'visits' && selectedMrForVisits && perm.can('mr:visits') ? [{ label: 'Record visit', icon: 'add' as const, onPress: () => setVisitModal(true) }] : []),
+          ...(activeTab === 'expenses' && selectedMrForVisits && perm.can('mr:expenses') ? [{ label: 'Claim expense', icon: 'add' as const, onPress: () => setExpenseModal(true) }] : []),
+        ]}
+      />
+      <WorkspaceTabs
+        tabs={TABS.map((t) => ({ id: t.id, label: t.label, icon: t.icon }))}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
-          {/* Action CTAs depending on active tab */}
-          {activeTab === 'mrs' && perm.can('mr:create') && (
-            <TouchableOpacity
-              style={styles.primaryCtaBtn}
-              onPress={handleOpenNewMrModal}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={styles.primaryCtaBtnText}>New MR</Text>
-            </TouchableOpacity>
-          )}
-
-          {activeTab === 'visits' && selectedMrForVisits && perm.can('mr:visits') && (
-            <TouchableOpacity style={styles.primaryCtaBtn} onPress={() => setVisitModal(true)} activeOpacity={0.8}>
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={styles.primaryCtaBtnText}>Record Visit</Text>
-            </TouchableOpacity>
-          )}
-
-          {activeTab === 'expenses' && selectedMrForVisits && perm.can('mr:expenses') && (
-            <TouchableOpacity style={styles.primaryCtaBtn} onPress={() => setExpenseModal(true)} activeOpacity={0.8}>
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={styles.primaryCtaBtnText}>Claim Expense</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Main Tab Screen Area */}
       <View style={styles.mainScreenContainer}>
         {activeTab === 'dashboard' && renderDashboard()}
         {activeTab === 'mrs' && renderMrList()}
@@ -1869,7 +1836,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   mainScreenContainer: {
     flex: 1,
+    width: '100%',
+    maxWidth: 1240,
+    alignSelf: 'center',
     paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.lg,
   },
 
@@ -1922,17 +1893,18 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Selector
   selectorWrapper: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: Spacing.md,
+    padding: 14,
     marginBottom: Spacing.md,
+    ...Shadows.card,
   },
   selectorLabel: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '750',
     color: colors.text.muted,
-    letterSpacing: 0.8,
+    letterSpacing: 0.55,
     marginBottom: 8,
   },
   mrSelectorChip: {
@@ -2026,9 +1998,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   kpiCard: {
     flex: 1,
     minWidth: 150,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
-    padding: 12,
+    borderColor: colors.border,
+    backgroundColor: colors.bg.card,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -2069,11 +2043,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   performanceCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: Spacing.md,
     marginBottom: Spacing.md,
+    ...Shadows.card,
   },
   performanceCardHeader: {
     flexDirection: 'row',
@@ -2151,10 +2126,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   mrDirectoryCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
+    padding: 15,
+    ...Shadows.card,
   },
   directoryCardHeader: {
     flexDirection: 'row',
@@ -2218,10 +2194,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Attendance
   attendanceCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: Spacing.md,
+    ...Shadows.card,
   },
   attendanceCardHeader: {
     flexDirection: 'row',
@@ -2281,10 +2258,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Visits
   visitCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: Spacing.md,
+    ...Shadows.card,
   },
   visitCardHeader: {
     flexDirection: 'row',
@@ -2340,10 +2318,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   expenseCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: Spacing.md,
+    ...Shadows.card,
   },
   expenseCardHeader: {
     flexDirection: 'row',
@@ -2373,11 +2352,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 40,
-    gap: 8,
+    padding: 34,
+    gap: 7,
+    ...Shadows.card,
   },
   emptyCardTitle: {
     fontSize: 15,
@@ -2416,9 +2396,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   modalCard: {
     backgroundColor: colors.bg.card,
     width: '100%',
-    maxWidth: 520,
+    maxWidth: 600,
     maxHeight: '90%',
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
@@ -2428,10 +2408,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: colors.bg.card,
   },
   modalTitleText: {
     fontSize: 16,
@@ -2446,15 +2427,14 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     fontWeight: '700',
     color: colors.text.secondary,
     marginBottom: 4,
-    textTransform: 'uppercase',
   },
   fieldInput: {
-    backgroundColor: colors.bg.primary,
+    backgroundColor: colors.bg.card,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: Radius.md,
     paddingHorizontal: 12,
-    height: 40,
+    minHeight: 42,
     fontSize: 13,
     color: colors.text.primary,
   },

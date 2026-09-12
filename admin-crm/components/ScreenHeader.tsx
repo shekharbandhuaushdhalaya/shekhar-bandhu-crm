@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { LightColors, Spacing, Radius } from '../constants/theme';
+import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
 
 type Action = {
   key: string;
@@ -21,43 +21,53 @@ type Props = {
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   container: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
+    gap: 16,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
     backgroundColor: colors.bg.primary,
   },
   titleArea: {
     flex: 1,
+    maxWidth: 760,
   },
   title: {
-    fontSize: 21,
-    fontWeight: '750',
+    fontSize: 23,
+    lineHeight: 29,
+    fontWeight: '800',
+    letterSpacing: -0.3,
     color: colors.text.primary,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12.5,
+    lineHeight: 18,
     color: colors.text.secondary,
     marginTop: 4,
   },
   actions: {
     flexDirection: 'row',
     gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
   actionBtn: {
+    minHeight: 38,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radius.sm,
-    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 13,
+    borderRadius: Radius.md,
+    backgroundColor: colors.bg.card,
     borderWidth: 1,
-    borderColor: colors.primary + '18',
+    borderColor: colors.border,
+    ...Shadows.card,
   },
   actionText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12.5,
+    fontWeight: '750',
     color: colors.primary,
   },
 });
@@ -70,25 +80,18 @@ export default function ScreenHeader({ title, subtitle, actions, style }: Props)
     <View style={[styles.container, style]}>
       <View style={styles.titleArea}>
         <Text style={styles.title}>{title}</Text>
-        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
-      {actions && actions.length > 0 && (
+      {actions?.length ? (
         <View style={styles.actions}>
-          {actions.map(action => (
-            <TouchableOpacity
-              key={action.key}
-              style={styles.actionBtn}
-              onPress={action.onPress}
-              activeOpacity={0.7}
-            >
-              {action.icon && <Ionicons name={action.icon} size={16} color={action.color || colors.primary} />}
-              <Text style={[styles.actionText, action.color ? { color: action.color } : undefined]}>
-                {action.label}
-              </Text>
+          {actions.map((action) => (
+            <TouchableOpacity key={action.key} style={styles.actionBtn} onPress={action.onPress} activeOpacity={0.72}>
+              {action.icon ? <Ionicons name={action.icon} size={16} color={action.color || colors.primary} /> : null}
+              <Text style={[styles.actionText, action.color ? { color: action.color } : undefined]}>{action.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
-      )}
+      ) : null}
     </View>
   );
 }

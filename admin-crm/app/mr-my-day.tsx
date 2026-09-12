@@ -1,10 +1,176 @@
-import { useEffect,useState } from 'react';
-import { View,Text,ScrollView,TouchableOpacity,StyleSheet,Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getApiBaseUrl } from '../utils/api';
 import { authStorage } from '../utils/storage';
-import { useTheme,useStyles } from '../utils/themeContext';
-import { Spacing,Radius } from '../constants/theme';
-async function req(path:string){const token=await authStorage.getItem('vp_crm_token');const r=await fetch(`${getApiBaseUrl()}${path}`,{headers:{...(token?{Authorization:`Bearer ${token}`}:{})}});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.error||'Request failed');return b;}
-export default function MrMyDay(){const {colors}=useTheme();const s=useStyles(styles);const [mrs,setMrs]=useState<any[]>([]);const [id,setId]=useState('');const [day,setDay]=useState<any>(null);const [coverage,setCoverage]=useState<any>(null);const [focus,setFocus]=useState<any[]>([]);const [attr,setAttr]=useState<any>(null);useEffect(()=>{req('/medical-reps?active=true').then(x=>{setMrs(x);if(x[0])load(x[0]._id)}).catch(()=>{})},[]);const load=async(x:string)=>{setId(x);try{const [d,c,f,a]=await Promise.all([req(`/mr-field/${x}/my-day`),req(`/mr-field/${x}/coverage`),req(`/mr-field/${x}/focus-products`),req(`/mr-field/${x}/attribution`)]);setDay(d);setCoverage(c);setFocus(f);setAttr(a)}catch(e:any){Alert.alert('MR My Day',e.message)}};return <View style={s.screen}><View style={s.header}><View><Text style={s.title}>MR My Day</Text><Text style={s.sub}>Today’s calls, follow-ups, collections and focus products</Text></View>{typeof document!=='undefined'&&<select value={id} onChange={(e:any)=>load(e.target.value)} style={{padding:10,borderRadius:8,minWidth:220}}>{mrs.map(m=><option key={m._id} value={m._id}>{m.name}</option>)}</select>}</View><ScrollView contentContainerStyle={s.content}><View style={s.kpis}>{Object.entries(day?.summary||{}).map(([k,v]:any)=><View style={s.kpi} key={k}><Text style={s.num}>{v}</Text><Text style={s.label}>{k.replace(/([A-Z])/g,' $1')}</Text></View>)}</View>{day?.nextVisit&&<Card title="Next"><Text style={s.main}>{day.nextVisit.doctorName}</Text><Text style={s.muted}>{day.nextVisit.clinicName||day.nextVisit.city||'Planned visit'}</Text></Card>}<Card title="Follow-ups due">{(day?.followups||[]).length?(day.followups||[]).map((x:any)=><Line key={x._id} a={x.doctorName} b={x.outcome||x.purpose}/>):<Text style={s.muted}>No follow-ups due.</Text>}</Card><Card title="Collections">{(day?.paymentPromises||[]).length?(day.paymentPromises||[]).map((x:any)=><Line key={x._id} a={x.customerName} b={`₹${Number(x.amount||0).toLocaleString('en-IN')} • ${x.status}`}/>):<Text style={s.muted}>No collections due.</Text>}</Card><Card title="Coverage"><Text style={s.main}>{coverage?.coveragePercent??0}% covered</Text><Text style={s.muted}>{coverage?.covered||0} of {coverage?.totalAssigned||0} assigned accounts visited</Text>{(coverage?.missedPriorityA||[]).slice(0,8).map((x:any)=><Line key={x._id} a={`Priority A • ${x.entityName}`} b={x.area||x.territory||'Not visited'}/>)}</Card><Card title="Focus products">{focus.length?focus.map((x:any)=><Line key={x._id} a={x.productName} b={`${x.calls}/${x.targetCalls||'-'} calls • ${x.orders}/${x.targetOrders||'-'} orders • ₹${Number(x.sales||0).toLocaleString('en-IN')}`}/>):<Text style={s.muted}>No focus products configured.</Text>}</Card><Card title="Field effectiveness"><View style={s.kpis}><Mini a="Sales" b={`₹${Number(attr?.sales||0).toLocaleString('en-IN')}`}/><Mini a="Calls" b={String(attr?.calls||0)}/><Mini a="Orders" b={String(attr?.orders||0)}/><Mini a="Visit → order" b={`${attr?.visitToOrderPercent||0}%`}/><Mini a="Field cost" b={`₹${Number(attr?.fieldCost||0).toLocaleString('en-IN')}`}/></View></Card></ScrollView></View>;function Card({title,children}:any){return <View style={s.card}><Text style={s.cardTitle}>{title}</Text>{children}</View>}function Line({a,b}:any){return <View style={s.line}><Text style={s.lineA}>{a}</Text><Text style={s.muted}>{b}</Text></View>}function Mini({a,b}:any){return <View style={s.mini}><Text style={s.num}>{b}</Text><Text style={s.label}>{a}</Text></View>}}
-const styles=(c:any)=>StyleSheet.create({screen:{flex:1,backgroundColor:c.bg.primary},header:{padding:Spacing.lg,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},title:{fontSize:26,fontWeight:'800',color:c.text.primary},sub:{color:c.text.secondary,marginTop:4},content:{padding:Spacing.lg,gap:14,paddingBottom:70},kpis:{flexDirection:'row',gap:10,flexWrap:'wrap'},kpi:{minWidth:140,flexGrow:1,padding:15,borderRadius:Radius.lg,backgroundColor:c.bg.secondary},num:{fontSize:21,fontWeight:'800',color:c.text.primary},label:{color:c.text.secondary,textTransform:'capitalize',marginTop:3},card:{padding:16,borderRadius:Radius.lg,backgroundColor:c.bg.secondary,gap:8},cardTitle:{fontSize:17,fontWeight:'800',color:c.text.primary},main:{fontSize:18,fontWeight:'800',color:c.text.primary},muted:{color:c.text.secondary},line:{paddingVertical:9,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:c.border},lineA:{fontWeight:'700',color:c.text.primary},mini:{minWidth:130,flexGrow:1}});
+import { useTheme, useStyles } from '../utils/themeContext';
+import { LightColors, Radius, Spacing } from '../constants/theme';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader } from '../components/WorkspacePrimitives';
+
+async function req(path: string) {
+  const token = await authStorage.getItem('vp_crm_token');
+  const r = await fetch(`${getApiBaseUrl()}${path}`, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(b.error || 'Request failed');
+  return b;
+}
+
+const money = (v: unknown) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
+
+export default function MrMyDay() {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const [mrs, setMrs] = useState<any[]>([]);
+  const [id, setId] = useState('');
+  const [day, setDay] = useState<any>(null);
+  const [coverage, setCoverage] = useState<any>(null);
+  const [focus, setFocus] = useState<any[]>([]);
+  const [attr, setAttr] = useState<any>(null);
+
+  useEffect(() => {
+    req('/medical-reps?active=true').then((rows) => {
+      setMrs(rows);
+      if (rows[0]) load(rows[0]._id);
+    }).catch(() => {});
+  }, []);
+
+  const load = async (mrId: string) => {
+    setId(mrId);
+    try {
+      const [d, c, f, a] = await Promise.all([
+        req(`/mr-field/${mrId}/my-day`),
+        req(`/mr-field/${mrId}/coverage`),
+        req(`/mr-field/${mrId}/focus-products`),
+        req(`/mr-field/${mrId}/attribution`),
+      ]);
+      setDay(d);
+      setCoverage(c);
+      setFocus(f);
+      setAttr(a);
+    } catch (e: any) {
+      Alert.alert('MR My Day', e.message);
+    }
+  };
+
+  const selectedMr = mrs.find((m) => m._id === id);
+  const summary = day?.summary || {};
+  const mrSelectStyle = {
+    minHeight: 40,
+    padding: '0 12px',
+    borderRadius: 10,
+    border: `1px solid ${colors.border}`,
+    background: colors.bg.card,
+    color: colors.text.primary,
+    fontSize: 13,
+    minWidth: 220,
+    outline: 'none',
+  } as any;
+
+  return (
+    <View style={styles.screen}>
+      <WorkspaceHeader
+        eyebrow="Field execution"
+        title="MR My Day"
+        subtitle={selectedMr ? `Today’s priorities for ${selectedMr.name}. Calls, follow-ups, collections and focus products in one view.` : 'Today’s calls, follow-ups, collections and focus products.'}
+        actions={Platform.OS === 'web' ? [] : undefined}
+      />
+      <View style={styles.selectorRow}>
+        <View style={styles.selectorLabelWrap}>
+          <Ionicons name="person-outline" size={16} color={colors.primary} />
+          <Text style={styles.selectorLabel}>Medical Representative</Text>
+        </View>
+        {Platform.OS === 'web' ? (
+          <select value={id} onChange={(e: any) => load(e.target.value)} style={mrSelectStyle}>
+            {mrs.map((m) => <option key={m._id} value={m._id}>{m.name}</option>)}
+          </select>
+        ) : null}
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.metrics}>
+          <MetricTile label="Visits today" value={String(summary.visits || summary.calls || 0)} icon="medkit-outline" tone="info" />
+          <MetricTile label="Follow-ups" value={String(summary.followups || summary.followUps || 0)} icon="repeat-outline" tone={Number(summary.followups || summary.followUps || 0) ? 'warning' : 'success'} />
+          <MetricTile label="Collections" value={String(summary.collections || summary.paymentPromises || 0)} icon="wallet-outline" tone="success" />
+          <MetricTile label="Orders" value={String(summary.orders || 0)} icon="cart-outline" tone="primary" />
+        </View>
+
+        {day?.nextVisit ? (
+          <Panel title="Next visit" subtitle="The most immediate field action.">
+            <View style={styles.nextVisit}>
+              <View style={styles.nextIcon}><Ionicons name="navigate-outline" size={22} color={colors.primary} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.main}>{day.nextVisit.doctorName}</Text>
+                <Text style={styles.muted}>{day.nextVisit.clinicName || day.nextVisit.city || 'Planned visit'}</Text>
+              </View>
+              <StatusPill label="Next" tone="info" />
+            </View>
+          </Panel>
+        ) : null}
+
+        <View style={styles.twoColumn}>
+          <Panel title="Follow-ups due" subtitle="Conversations that need a response today." style={styles.columnPanel}>
+            {(day?.followups || []).length ? (day.followups || []).map((x: any) => <Line key={x._id} a={x.doctorName} b={x.outcome || x.purpose || 'Follow-up due'} icon="repeat-outline" />) : <EmptyState icon="checkmark-circle-outline" title="No follow-ups due" />}
+          </Panel>
+          <Panel title="Collections" subtitle="Payment promises and collection commitments." style={styles.columnPanel}>
+            {(day?.paymentPromises || []).length ? (day.paymentPromises || []).map((x: any) => <Line key={x._id} a={x.customerName} b={`${money(x.amount)} • ${x.status}`} icon="wallet-outline" />) : <EmptyState icon="checkmark-circle-outline" title="No collections due" />}
+          </Panel>
+        </View>
+
+        <View style={styles.twoColumn}>
+          <Panel title="Coverage" subtitle="Assigned accounts visited in the current cycle." style={styles.columnPanel}>
+            <View style={styles.coverageHeader}><Text style={styles.coverageValue}>{coverage?.coveragePercent ?? 0}%</Text><Text style={styles.coverageLabel}>{coverage?.covered || 0} of {coverage?.totalAssigned || 0} accounts visited</Text></View>
+            <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.min(100, Math.max(0, Number(coverage?.coveragePercent || 0)))}%` }]} /></View>
+            {(coverage?.missedPriorityA || []).slice(0, 8).map((x: any) => <Line key={x._id} a={x.entityName} b={x.area || x.territory || 'Not visited'} icon="alert-circle-outline" badge="Priority A" />)}
+          </Panel>
+
+          <Panel title="Focus products" subtitle="Promotion effort against configured focus targets." style={styles.columnPanel}>
+            {focus.length ? focus.map((x: any) => <Line key={x._id} a={x.productName} b={`${x.calls}/${x.targetCalls || '-'} calls • ${x.orders}/${x.targetOrders || '-'} orders • ${money(x.sales)}`} icon="star-outline" />) : <EmptyState icon="star-outline" title="No focus products configured" />}
+          </Panel>
+        </View>
+
+        <Panel title="Field effectiveness" subtitle="A concise outcome view — activity, business and field cost.">
+          <View style={styles.metrics}>
+            <MetricTile label="Attributed sales" value={money(attr?.sales)} icon="trending-up-outline" tone="success" />
+            <MetricTile label="Calls" value={String(attr?.calls || 0)} icon="call-outline" tone="info" />
+            <MetricTile label="Orders" value={String(attr?.orders || 0)} icon="cart-outline" />
+            <MetricTile label="Visit → order" value={`${attr?.visitToOrderPercent || 0}%`} icon="git-compare-outline" tone="purple" />
+            <MetricTile label="Field cost" value={money(attr?.fieldCost)} icon="cash-outline" tone="warning" />
+          </View>
+        </Panel>
+      </ScrollView>
+    </View>
+  );
+
+  function Line({ a, b, icon, badge }: { a: string; b: string; icon: keyof typeof Ionicons.glyphMap; badge?: string }) {
+    return (
+      <View style={styles.line}>
+        <View style={styles.lineIcon}><Ionicons name={icon} size={15} color={colors.text.muted} /></View>
+        <View style={{ flex: 1 }}><Text style={styles.lineA}>{a}</Text><Text style={styles.muted}>{b}</Text></View>
+        {badge ? <StatusPill label={badge} tone="warning" /> : null}
+      </View>
+    );
+  }
+}
+
+const createStyles = (c: typeof LightColors) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: c.bg.primary },
+  selectorRow: { marginHorizontal: Spacing.lg, marginBottom: Spacing.sm, padding: 10, paddingLeft: 13, borderRadius: Radius.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.bg.card, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  selectorLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  selectorLabel: { fontSize: 12, fontWeight: '750', color: c.text.secondary },
+  content: { padding: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.md, paddingBottom: 64, maxWidth: 1240, width: '100%', alignSelf: 'center' },
+  metrics: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  twoColumn: { flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap', alignItems: 'flex-start' },
+  columnPanel: { flexGrow: 1, flexShrink: 1, flexBasis: 430, minWidth: 290 },
+  nextVisit: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  nextIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.primaryLight },
+  main: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  muted: { fontSize: 11.5, lineHeight: 17, color: c.text.secondary, marginTop: 2 },
+  line: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
+  lineIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg.secondary },
+  lineA: { fontSize: 12.5, fontWeight: '750', color: c.text.primary },
+  coverageHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
+  coverageValue: { fontSize: 27, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  coverageLabel: { fontSize: 11.5, color: c.text.secondary },
+  progressTrack: { height: 6, borderRadius: 999, backgroundColor: c.bg.secondary, overflow: 'hidden', marginTop: 8, marginBottom: 7 },
+  progressFill: { height: '100%', backgroundColor: c.primary, borderRadius: 999 },
+});

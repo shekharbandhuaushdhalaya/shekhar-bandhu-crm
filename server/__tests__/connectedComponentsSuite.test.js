@@ -129,7 +129,6 @@ describe('Connected Standalone Components Suite (Options 1 & 3)', () => {
 
       StockLedger.create.mockResolvedValue(true);
       SalesTarget.findOneAndUpdate.mockResolvedValue(true);
-      Order.countDocuments.mockResolvedValue(0);
 
       const mockOrder = {
         _id: 'ord_101',

@@ -26,8 +26,7 @@ async function authenticatePortalCustomer(req, res, next) {
       req.portalFirmId = activeFirmId;
       return next();
     });
-  } catch (err) {
-    console.error('PORTAL AUTH ERR 2:', err);
+  } catch (_) {
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 }

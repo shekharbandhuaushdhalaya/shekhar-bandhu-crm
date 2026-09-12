@@ -1,27 +1,201 @@
-import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getApiBaseUrl } from '../utils/api';
 import { authStorage } from '../utils/storage';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { Spacing, Radius } from '../constants/theme';
+import { LightColors, Radius, Spacing } from '../constants/theme';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTabs } from '../components/WorkspacePrimitives';
 
-async function req(path:string, init:RequestInit={}){const token=await authStorage.getItem('vp_crm_token');const r=await fetch(`${getApiBaseUrl()}${path}`,{...init,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{}) ,...(init.headers||{})}});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.error||'Request failed');return b;}
-
-type Tab='actions'|'customer'|'collections'|'lost'|'margin';
-export default function SalesIntelligence(){
- const {colors}=useTheme(); const styles=useStyles(makeStyles); const [tab,setTab]=useState<Tab>('actions'); const [actions,setActions]=useState<any>(null); const [collections,setCollections]=useState<any>(null); const [lost,setLost]=useState<any>(null); const [margin,setMargin]=useState<any[]>([]); const [customers,setCustomers]=useState<any[]>([]); const [customerId,setCustomerId]=useState(''); const [c360,setC360]=useState<any>(null); const [loading,setLoading]=useState(false);
- const load=async()=>{setLoading(true);try{const [a,c,l,m,cu]=await Promise.all([req('/sales-intelligence/action-center'),req('/sales-intelligence/collections'),req('/sales-intelligence/lost-sales'),req('/sales-intelligence/margin-report'),req('/customers?page=1&limit=300')]);setActions(a);setCollections(c);setLost(l);setMargin(m);setCustomers(Array.isArray(cu)?cu:(cu.data||[]));}catch(e:any){Alert.alert('Sales intelligence',e.message)}finally{setLoading(false)}};
- useEffect(()=>{load()},[]);
- const loadCustomer=async(id:string)=>{setCustomerId(id);if(!id)return setC360(null);try{setC360(await req(`/sales-intelligence/customers/${id}/360`));}catch(e:any){Alert.alert('Customer 360',e.message)}};
- const tabs:[Tab,string,keyof typeof Ionicons.glyphMap][]=[['actions','Action Center','flash-outline'],['customer','Customer 360','person-circle-outline'],['collections','Collections','wallet-outline'],['lost','Lost Sales','trending-down-outline'],['margin','Margins','analytics-outline']];
- return <View style={styles.screen}><View style={styles.header}><View><Text style={styles.title}>Sales Intelligence</Text><Text style={styles.sub}>What needs attention, customer context, collections and profitability</Text></View><TouchableOpacity style={styles.refresh} onPress={load}><Ionicons name="refresh" size={18} color={colors.primary}/><Text style={{color:colors.primary,fontWeight:'700'}}>Refresh</Text></TouchableOpacity></View><View style={styles.tabs}>{tabs.map(([id,label,icon])=><TouchableOpacity key={id} style={[styles.tab,tab===id&&styles.active]} onPress={()=>setTab(id)}><Ionicons name={icon} size={17} color={tab===id?'#fff':colors.text.secondary}/><Text style={[styles.tabText,tab===id&&{color:'#fff'}]}>{label}</Text></TouchableOpacity>)}</View><ScrollView contentContainerStyle={styles.content}>
- {tab==='actions'&&<><View style={styles.kpis}>{Object.entries(actions?.counts||{}).map(([k,v]:any)=><View key={k} style={styles.kpi}><Text style={styles.kpiNum}>{v}</Text><Text style={styles.kpiLabel}>{k.replace(/([A-Z])/g,' $1')}</Text></View>)}</View><Section title="Overdue invoices" rows={(actions?.overdueInvoices||[]).map((x:any)=>({a:x.invoiceNo||x.customerName,b:`₹${Number(x.balance||0).toLocaleString('en-IN')} • ${x.customerName||''}`}))}/><Section title="Partially fulfilled orders" rows={(actions?.partialOrders||[]).map((x:any)=>({a:x.orderNo,b:`${x.name} • ₹${Number(x.totalAmount||0).toLocaleString('en-IN')}`}))}/><Section title="Dormant customers (45+ days)" rows={(actions?.dormantCustomers||[]).map((x:any)=>({a:x.name,b:x.company||x.phone||''}))}/></>}
- {tab==='customer'&&<><Text style={styles.sectionTitle}>Select customer</Text>{typeof document!=='undefined'?<select value={customerId} onChange={(e:any)=>loadCustomer(e.target.value)} style={{padding:12,borderRadius:8,maxWidth:420}}><option value="">Choose customer</option>{customers.map(c=><option key={c._id} value={c._id}>{c.name}{c.company?` — ${c.company}`:''}</option>)}</select>:<TextInput style={styles.input} value={customerId} onChangeText={loadCustomer} placeholder="Customer ID"/>}{c360&&<><View style={styles.kpis}><K label="This month" value={`₹${Number(c360.summary?.monthSales||0).toLocaleString('en-IN')}`}/><K label="Outstanding" value={`₹${Number(c360.summary?.creditHealth?.totalOutstanding||0).toLocaleString('en-IN')}`}/><K label="Credit health" value={c360.summary?.creditHealth?.label||'-'}/><K label="Open orders" value={String(c360.summary?.openOrders||0)}/></View><Section title="Recent activity" rows={(c360.activity||[]).map((x:any)=>({a:x.label,b:`${x.type} • ${x.amount?`₹${Number(x.amount).toLocaleString('en-IN')} • `:''}${x.status||''}`}))}/></>}</>}
- {tab==='collections'&&<><View style={styles.kpis}>{Object.entries(collections?.buckets||{}).map(([k,v]:any)=><K key={k} label={k} value={`₹${Number(v||0).toLocaleString('en-IN')}`}/>)}</View><Section title="Promises to pay" rows={(collections?.promises||[]).map((x:any)=>({a:x.customerName,b:`₹${Number(x.amount||0).toLocaleString('en-IN')} • ${new Date(x.promisedDate).toLocaleDateString()} • ${x.status}`}))}/></>}
- {tab==='lost'&&<><View style={styles.card}><Text style={styles.big}>₹{Number(lost?.totalLostValue||0).toLocaleString('en-IN')}</Text><Text style={styles.muted}>Estimated sales lost this month</Text></View><Section title="Reasons" rows={Object.entries(lost?.byReason||{}).map(([a,b]:any)=>({a,b:`₹${Number(b).toLocaleString('en-IN')}`}))}/><Section title="Recent lost opportunities" rows={(lost?.rows||[]).slice(0,50).map((x:any)=>({a:x.productName,b:`${x.customerName||'Unknown'} • ${x.reason} • ₹${Number(x.estimatedValue||0).toLocaleString('en-IN')}`}))}/></>}
- {tab==='margin'&&<Section title="Estimated order margins" rows={margin.map((x:any)=>({a:`${x.orderNo} • ${x.customer}`,b:`Revenue ₹${Number(x.revenue||0).toLocaleString('en-IN')} • Margin ${x.marginPercent}%`}))}/>} </ScrollView></View>;
- function K({label,value}:{label:string,value:string}){return <View style={styles.kpi}><Text style={styles.kpiNum}>{value}</Text><Text style={styles.kpiLabel}>{label}</Text></View>}
- function Section({title,rows}:{title:string,rows:{a:string,b:string}[]}){return <View style={styles.card}><Text style={styles.sectionTitle}>{title}</Text>{!rows.length?<Text style={styles.muted}>Nothing needs attention.</Text>:rows.map((r,i)=><View style={styles.row} key={`${r.a}-${i}`}><Text style={styles.rowA}>{r.a}</Text><Text style={styles.rowB}>{r.b}</Text></View>)}</View>}
+async function req(path: string, init: RequestInit = {}) {
+  const token = await authStorage.getItem('vp_crm_token');
+  const r = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init.headers || {}) },
+  });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(b.error || 'Request failed');
+  return b;
 }
-const makeStyles=(c:any)=>StyleSheet.create({screen:{flex:1,backgroundColor:c.bg.primary},header:{padding:Spacing.lg,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},title:{fontSize:26,fontWeight:'800',color:c.text.primary},sub:{color:c.text.secondary,marginTop:4},refresh:{flexDirection:'row',gap:6,alignItems:'center'},tabs:{paddingHorizontal:Spacing.lg,flexDirection:'row',gap:8,flexWrap:'wrap'},tab:{flexDirection:'row',gap:6,alignItems:'center',paddingHorizontal:12,paddingVertical:9,borderRadius:Radius.md,backgroundColor:c.bg.secondary},active:{backgroundColor:c.primary},tabText:{fontWeight:'700',color:c.text.secondary},content:{padding:Spacing.lg,gap:14,paddingBottom:60},kpis:{flexDirection:'row',gap:10,flexWrap:'wrap'},kpi:{minWidth:150,flexGrow:1,padding:16,borderRadius:Radius.lg,backgroundColor:c.bg.secondary},kpiNum:{fontSize:22,fontWeight:'800',color:c.text.primary},kpiLabel:{marginTop:4,color:c.text.secondary,textTransform:'capitalize'},card:{backgroundColor:c.bg.secondary,borderRadius:Radius.lg,padding:16,gap:8},sectionTitle:{fontSize:17,fontWeight:'800',color:c.text.primary,marginBottom:4},row:{paddingVertical:10,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:c.border},rowA:{fontWeight:'700',color:c.text.primary},rowB:{color:c.text.secondary,marginTop:3},muted:{color:c.text.muted},big:{fontSize:28,fontWeight:'800',color:c.text.primary},input:{padding:12,borderWidth:1,borderColor:c.border,borderRadius:8,color:c.text.primary}});
+
+type Tab = 'actions' | 'customer' | 'collections' | 'lost' | 'margin';
+const money = (v: unknown) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
+
+export default function SalesIntelligence() {
+  const { colors } = useTheme();
+  const styles = useStyles(makeStyles);
+  const [tab, setTab] = useState<Tab>('actions');
+  const [actions, setActions] = useState<any>(null);
+  const [collections, setCollections] = useState<any>(null);
+  const [lost, setLost] = useState<any>(null);
+  const [margin, setMargin] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [customerId, setCustomerId] = useState('');
+  const [c360, setC360] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [a, c, l, m, cu] = await Promise.all([
+        req('/sales-intelligence/action-center'),
+        req('/sales-intelligence/collections'),
+        req('/sales-intelligence/lost-sales'),
+        req('/sales-intelligence/margin-report'),
+        req('/customers?page=1&limit=300'),
+      ]);
+      setActions(a);
+      setCollections(c);
+      setLost(l);
+      setMargin(m);
+      setCustomers(Array.isArray(cu) ? cu : cu.data || []);
+    } catch (e: any) {
+      Alert.alert('Sales intelligence', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const loadCustomer = async (id: string) => {
+    setCustomerId(id);
+    if (!id) return setC360(null);
+    try {
+      setC360(await req(`/sales-intelligence/customers/${id}/360`));
+    } catch (e: any) {
+      Alert.alert('Customer 360', e.message);
+    }
+  };
+
+  const tabs = useMemo(() => [
+    { id: 'actions' as Tab, label: 'Action Center', icon: 'flash-outline' as const, badge: Number(actions?.counts?.overdueInvoices || 0) + Number(actions?.counts?.partialOrders || 0) },
+    { id: 'customer' as Tab, label: 'Customer 360', icon: 'person-circle-outline' as const },
+    { id: 'collections' as Tab, label: 'Collections', icon: 'wallet-outline' as const },
+    { id: 'lost' as Tab, label: 'Lost Sales', icon: 'trending-down-outline' as const },
+    { id: 'margin' as Tab, label: 'Margins', icon: 'analytics-outline' as const },
+  ], [actions]);
+
+  const counts = actions?.counts || {};
+  const customerSelectStyle = {
+    minHeight: 42,
+    padding: '0 12px',
+    borderRadius: 10,
+    border: `1px solid ${colors.border}`,
+    background: colors.bg.card,
+    color: colors.text.primary,
+    fontSize: 13,
+    minWidth: 280,
+    maxWidth: 440,
+    outline: 'none',
+  } as any;
+
+  return (
+    <View style={styles.screen}>
+      <WorkspaceHeader
+        eyebrow="Decision support"
+        title="Sales Intelligence"
+        subtitle="A focused view of what needs attention, customer health, collections and profitability."
+        actions={[{ label: loading ? 'Refreshing…' : 'Refresh', icon: 'refresh', onPress: load, variant: 'secondary' }]}
+      />
+      <WorkspaceTabs tabs={tabs} value={tab} onChange={setTab} />
+
+      <ScrollView contentContainerStyle={styles.content}>
+        {tab === 'actions' ? (
+          <>
+            <View style={styles.metrics}>
+              <MetricTile label="Overdue invoices" value={String(counts.overdueInvoices || 0)} icon="alert-circle-outline" tone={counts.overdueInvoices ? 'danger' : 'success'} helper="Collection attention" />
+              <MetricTile label="Partial orders" value={String(counts.partialOrders || 0)} icon="layers-outline" tone={counts.partialOrders ? 'warning' : 'success'} helper="Still awaiting fulfillment" />
+              <MetricTile label="Dormant customers" value={String(counts.dormantCustomers || 0)} icon="moon-outline" tone={counts.dormantCustomers ? 'warning' : 'success'} helper="45+ days without business" />
+              <MetricTile label="Promises due" value={String(counts.paymentPromises || counts.promisesDue || 0)} icon="calendar-outline" tone="info" helper="Payment commitments" />
+            </View>
+            <View style={styles.twoColumn}>
+              <ListPanel title="Overdue invoices" icon="alert-circle-outline" empty="No overdue invoices" rows={(actions?.overdueInvoices || []).map((x: any) => ({ a: x.invoiceNo || x.customerName, b: `${x.customerName || ''} • ${money(x.balance)}`, tone: 'danger' }))} />
+              <ListPanel title="Partially fulfilled orders" icon="layers-outline" empty="No partial orders" rows={(actions?.partialOrders || []).map((x: any) => ({ a: x.orderNo, b: `${x.name} • ${money(x.totalAmount)}`, tone: 'warning' }))} />
+            </View>
+            <ListPanel title="Dormant customers" icon="person-remove-outline" empty="No dormant customers" rows={(actions?.dormantCustomers || []).map((x: any) => ({ a: x.name, b: x.company || x.phone || 'No recent activity', tone: 'neutral' }))} />
+          </>
+        ) : null}
+
+        {tab === 'customer' ? (
+          <>
+            <Panel title="Customer 360" subtitle="Choose a customer to see sales, credit health and recent activity in one place.">
+              {Platform.OS === 'web' ? (
+                <select value={customerId} onChange={(e: any) => loadCustomer(e.target.value)} style={customerSelectStyle}>
+                  <option value="">Choose customer</option>
+                  {customers.map((c) => <option key={c._id} value={c._id}>{c.name}{c.company ? ` — ${c.company}` : ''}</option>)}
+                </select>
+              ) : (
+                <TextInput style={styles.input} value={customerId} onChangeText={loadCustomer} placeholder="Customer ID" placeholderTextColor={colors.text.muted} />
+              )}
+            </Panel>
+            {c360 ? (
+              <>
+                <View style={styles.metrics}>
+                  <MetricTile label="This month" value={money(c360.summary?.monthSales)} icon="trending-up-outline" tone="success" />
+                  <MetricTile label="Outstanding" value={money(c360.summary?.creditHealth?.totalOutstanding)} icon="wallet-outline" tone={Number(c360.summary?.creditHealth?.totalOutstanding || 0) > 0 ? 'warning' : 'success'} />
+                  <MetricTile label="Credit health" value={c360.summary?.creditHealth?.label || '-'} icon="shield-checkmark-outline" tone={String(c360.summary?.creditHealth?.label || '').toLowerCase().includes('risk') ? 'danger' : 'info'} />
+                  <MetricTile label="Open orders" value={String(c360.summary?.openOrders || 0)} icon="cart-outline" />
+                </View>
+                <ListPanel title="Recent activity" icon="time-outline" empty="No recent activity" rows={(c360.activity || []).map((x: any) => ({ a: x.label, b: `${x.type}${x.amount ? ` • ${money(x.amount)}` : ''}${x.status ? ` • ${x.status}` : ''}` }))} />
+              </>
+            ) : <EmptyState icon="person-circle-outline" title="Select a customer" message="Their orders, invoices, payments and credit context will appear here." />}
+          </>
+        ) : null}
+
+        {tab === 'collections' ? (
+          <>
+            <View style={styles.metrics}>
+              {Object.entries(collections?.buckets || {}).map(([key, value]: any, index) => (
+                <MetricTile key={key} label={key} value={money(value)} icon="hourglass-outline" tone={index > 1 ? 'warning' : 'info'} />
+              ))}
+            </View>
+            <ListPanel title="Promises to pay" icon="calendar-outline" empty="No payment promises" rows={(collections?.promises || []).map((x: any) => ({ a: x.customerName, b: `${money(x.amount)} • ${new Date(x.promisedDate).toLocaleDateString('en-IN')} • ${x.status}`, tone: x.status === 'missed' ? 'danger' : 'info' }))} />
+          </>
+        ) : null}
+
+        {tab === 'lost' ? (
+          <>
+            <View style={styles.metrics}><MetricTile label="Estimated sales lost" value={money(lost?.totalLostValue)} icon="trending-down-outline" tone="danger" helper="Current month" /></View>
+            <View style={styles.twoColumn}>
+              <ListPanel title="Loss reasons" icon="analytics-outline" empty="No lost-sale reasons" rows={Object.entries(lost?.byReason || {}).map(([a, b]: any) => ({ a, b: money(b) }))} />
+              <ListPanel title="Recent lost opportunities" icon="close-circle-outline" empty="No lost opportunities" rows={(lost?.rows || []).slice(0, 50).map((x: any) => ({ a: x.productName, b: `${x.customerName || 'Unknown'} • ${x.reason} • ${money(x.estimatedValue)}`, tone: 'danger' }))} />
+            </View>
+          </>
+        ) : null}
+
+        {tab === 'margin' ? (
+          <ListPanel title="Estimated order margins" icon="analytics-outline" empty="No margin data" rows={margin.map((x: any) => ({ a: `${x.orderNo} • ${x.customer}`, b: `Revenue ${money(x.revenue)} • Margin ${x.marginPercent}%`, tone: Number(x.marginPercent) < 10 ? 'danger' : Number(x.marginPercent) < 20 ? 'warning' : 'success' }))} />
+        ) : null}
+      </ScrollView>
+    </View>
+  );
+
+  function ListPanel({ title, icon, rows, empty }: { title: string; icon: keyof typeof Ionicons.glyphMap; rows: { a: string; b: string; tone?: string }[]; empty: string }) {
+    return (
+      <Panel title={title} style={styles.listPanel}>
+        {!rows.length ? <EmptyState icon={icon} title={empty} /> : rows.map((row, i) => (
+          <View style={styles.row} key={`${row.a}-${i}`}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowA}>{row.a}</Text>
+              <Text style={styles.rowB}>{row.b}</Text>
+            </View>
+            {row.tone ? <StatusPill label={row.tone === 'danger' ? 'Attention' : row.tone === 'warning' ? 'Review' : row.tone === 'success' ? 'Healthy' : 'Open'} tone={row.tone as any} /> : null}
+          </View>
+        ))}
+      </Panel>
+    );
+  }
+}
+
+const makeStyles = (c: typeof LightColors) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: c.bg.primary },
+  content: { padding: Spacing.lg, paddingTop: Spacing.md, gap: Spacing.md, paddingBottom: 64, maxWidth: 1240, width: '100%', alignSelf: 'center' },
+  metrics: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  twoColumn: { flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap', alignItems: 'flex-start' },
+  listPanel: { flexGrow: 1, flexShrink: 1, flexBasis: 430, minWidth: 290 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
+  rowA: { fontSize: 13, fontWeight: '750', color: c.text.primary },
+  rowB: { fontSize: 11.5, lineHeight: 17, color: c.text.secondary, marginTop: 3 },
+  input: { minHeight: 42, paddingHorizontal: 12, borderWidth: 1, borderColor: c.border, borderRadius: Radius.md, color: c.text.primary, backgroundColor: c.bg.card, maxWidth: 440 },
+});

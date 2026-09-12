@@ -31,7 +31,7 @@ router.post('/login', async (req, res) => {
       customerId: customer._id.toString(),
       email: customer.email,
       scope: 'customer-portal',
-      ...(customer.firmId ? { firmId: customer.firmId.toString() } : (req.publicFirmId ? { firmId: req.publicFirmId } : {}))
+      firmId: customer.firmId ? customer.firmId.toString() : req.publicFirmId
     };
 
     const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '7d' });
