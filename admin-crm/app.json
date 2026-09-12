@@ -5,9 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "shekhar-bandhu-crm",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "splash": {
-      "backgroundColor": "#090a0f"
+      "backgroundColor": "#F5F7F4",
+      "image": "./assets/logo.png",
+      "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": true,
@@ -15,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#090a0f"
+        "backgroundColor": "#F5F7F4"
       },
       "package": "com.apexcrm.app"
     },

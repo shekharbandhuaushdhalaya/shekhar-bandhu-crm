@@ -9,7 +9,7 @@ import { authStorage } from '../utils/storage';
 
 const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded_v2';
 
-export const SIDEBAR_WIDTH = 224;
+export const SIDEBAR_WIDTH = 248;
 
 type NavGroup = {
   key: string;
@@ -241,25 +241,25 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       flexDirection: 'column',
     },
     scrollContent: {
-      paddingTop: 12,
-      paddingBottom: Spacing.sm,
+      paddingTop: 14,
+      paddingBottom: Spacing.md,
       flexGrow: 1,
     },
 
     dashboardItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 9,
-      paddingHorizontal: Spacing.sm,
-      marginHorizontal: Spacing.xs,
+      paddingVertical: 11,
+      paddingHorizontal: 12,
+      marginHorizontal: 8,
       borderRadius: Radius.md,
-      marginBottom: 4,
+      marginBottom: 5,
     },
     dashboardItemActive: {
       backgroundColor: colors.primaryLight,
     },
     dashboardText: {
-      fontSize: 13,
+      fontSize: 13.5,
       fontWeight: '600',
       color: colors.text.secondary,
       marginLeft: 10,
@@ -283,11 +283,11 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: 8,
-      paddingHorizontal: Spacing.sm,
-      marginHorizontal: Spacing.xs,
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      marginHorizontal: 8,
       borderRadius: Radius.md,
-      marginTop: 2,
+      marginTop: 4,
     },
     groupHeaderExpanded: {
       backgroundColor: colors.primaryLight,
@@ -298,9 +298,9 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       flex: 1,
     },
     groupIconBox: {
-      width: 24,
-      height: 24,
-      borderRadius: 8,
+      width: 28,
+      height: 28,
+      borderRadius: 9,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.bg.primary,
@@ -309,8 +309,8 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       backgroundColor: colors.primaryLight,
     },
     groupLabel: {
-      fontSize: 10.5,
-      fontWeight: '700',
+      fontSize: 10,
+      fontWeight: '800',
       color: colors.text.muted,
       marginLeft: 8,
       letterSpacing: 0.5,
@@ -327,9 +327,9 @@ const createSidebarStyles = (colors: typeof LightColors) =>
 
     // ── Child Items ──
     childGroup: {
-      paddingLeft: 2,
-      marginLeft: 12,
-      marginRight: Spacing.xs,
+      paddingLeft: 6,
+      marginLeft: 16,
+      marginRight: 8,
       gap: 1,
       marginBottom: 4,
       marginTop: 2,
@@ -338,9 +338,9 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     navItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 8,
-      paddingHorizontal: 8,
-      borderRadius: Radius.md,
+      paddingVertical: 9,
+      paddingHorizontal: 10,
+      borderRadius: Radius.sm,
       position: 'relative',
       overflow: 'hidden',
     },
@@ -348,7 +348,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       backgroundColor: colors.primaryLight,
     },
     navItemText: {
-      fontSize: 12.5,
+      fontSize: 13,
       fontWeight: '600',
       color: colors.text.secondary,
       marginLeft: 8,
@@ -373,14 +373,14 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     footer: {
       borderTopWidth: 1,
       borderTopColor: colors.border,
-      paddingVertical: Spacing.sm,
-      paddingHorizontal: Spacing.sm,
-      gap: 6,
+      paddingVertical: 12,
+      paddingHorizontal: 10,
+      gap: 7,
     },
     footerIconBtn: {
       flex: 1,
-      height: 34,
-      borderRadius: 6,
+      height: 38,
+      borderRadius: 10,
       borderWidth: 1,
       borderColor: colors.border,
       alignItems: 'center',
@@ -389,8 +389,8 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     },
     footerLogoutIconBtn: {
       flex: 1,
-      height: 34,
-      borderRadius: 6,
+      height: 38,
+      borderRadius: 10,
       borderWidth: 1,
       borderColor: colors.danger + '30',
       alignItems: 'center',
@@ -413,8 +413,8 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       borderRadius: 3,
     },
     badgeText: {
-      fontSize: 10.5,
-      fontWeight: '700',
+      fontSize: 10,
+      fontWeight: '800',
       marginLeft: 6,
     },
   });
@@ -479,6 +479,11 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
 
   return (
     <View style={styles.sidebar}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
+        <Text style={{ fontSize: 9.5, fontWeight: '800', letterSpacing: 1.1, color: colors.primary }}>SHEKHAR BANDHU</Text>
+        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.muted, marginTop: 2 }}>Aushdhalaya · Operations</Text>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}

@@ -79,7 +79,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
       { 
         paddingLeft: isDesktop ? 0 : Spacing.lg,
         paddingTop: isDesktop ? 0 : insets.top,
-        height: isDesktop ? 64 : 64 + insets.top
+        height: isDesktop ? 68 : 62 + insets.top
       }
     ]}>
       {/* Left section: Logo & Page Name */}
@@ -105,15 +105,15 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
           >
             <Image 
               source={require('../assets/logo.png')} 
-              style={{ width: 36, height: 36, borderRadius: 4 }}
+              style={{ width: 40, height: 40, borderRadius: 10 }}
               resizeMode="contain"
             />
             {isDesktop && (
               <View style={{ flexDirection: 'column', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, letterSpacing: 0.5, lineHeight: 15 }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.text.primary, letterSpacing: 0.5, lineHeight: 15 }}>
                   SHEKHAR BANDHU
                 </Text>
-                <Text style={{ fontSize: 9.5, fontWeight: '700', color: colors.primary, letterSpacing: 0.8, marginTop: 1 }}>
+                <Text style={{ fontSize: 9, fontWeight: '800', color: colors.primary, letterSpacing: 0.8, marginTop: 1 }}>
                   AUSHADHALAYA
                 </Text>
               </View>
@@ -123,7 +123,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
 
         {isDesktop && pageName ? (
           <View style={{ paddingHorizontal: 20 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text.primary }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary }}>
               {pageName}
             </Text>
           </View>
@@ -405,6 +405,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   mainContainer: {
     flex: 1,
+    backgroundColor: colors.bg.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -463,16 +464,16 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     gap: 10,
   },
   headerAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
   headerAvatarText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
     color: colors.text.primary,
   },
@@ -480,7 +481,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'center',
   },
   headerUserName: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
     color: colors.text.primary,
     marginBottom: 2,
