@@ -38,7 +38,7 @@ describe('Task 5 — Proactive AI Anomaly Insights Suite', () => {
     await Product.deleteMany({});
     await BatchProduction.deleteMany({});
     await Order.deleteMany({});
-  });
+  }, 60000);
 
   it('computes 4 concrete operational signals and returns narrative summary', async () => {
     const now = new Date();

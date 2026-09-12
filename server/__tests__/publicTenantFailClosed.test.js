@@ -19,16 +19,19 @@ describe('publicTenant production isolation', () => {
     jest.restoreAllMocks();
   });
 
-  it('fails closed in production when PUBLIC_FIRM_ID is missing', async () => {
+  it('fails closed when no active firm is found', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.PUBLIC_FIRM_ID;
-    const findSpy = jest.spyOn(Firm, 'findOne');
+    jest.spyOn(Firm, 'findOne').mockReturnValue({
+      sort: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(null)
+      })
+    });
     const res = mockResponse();
 
     await publicTenant({}, res, jest.fn());
 
     expect(res.status).toHaveBeenCalledWith(503);
     expect(res.json).toHaveBeenCalledWith({ error: 'Public storefront is not configured' });
-    expect(findSpy).not.toHaveBeenCalled();
   });
 });

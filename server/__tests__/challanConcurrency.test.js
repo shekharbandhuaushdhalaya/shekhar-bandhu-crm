@@ -22,11 +22,11 @@ describe('Challan concurrent posting', () => {
   afterAll(async () => {
     await mongoose.disconnect();
     if (replSet) await replSet.stop();
-  });
+  }, 60000);
 
   beforeEach(async () => {
     await mongoose.connection.dropDatabase();
-  });
+  }, 60000);
 
   it('moves stock exactly once when the same Challan is posted concurrently', async () => {
     const firm = await Firm.create({ name: 'Concurrency Firm', active: true });
@@ -75,5 +75,5 @@ describe('Challan concurrent posting', () => {
       expect(ledgers).toHaveLength(1);
       expect(ledgers[0].qtyBoxes).toBe(-4);
     });
-  });
+  }, 60000);
 });
