@@ -36,7 +36,7 @@ const customerSchema = new mongoose.Schema({
   discountPercent: { type: Number, default: 0, min: 0, max: 100 },
   tradeCategory: {
     type: String,
-    enum: ['super_stockist', 'distributor', 'retailer', 'hospital', 'direct'],
+    enum: ['super_stockist', 'distributor', 'wholesaler', 'retailer', 'hospital', 'clinic', 'institution', 'pharmacy', 'direct', 'other'],
     default: 'distributor'
   },
   tradeDiscountOverride: { type: Number, default: null, min: 0, max: 100 },

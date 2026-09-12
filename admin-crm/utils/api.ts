@@ -14,7 +14,7 @@ import type {
   TraceChallan, TraceInvoice, TraceDispatch, TraceResult, RolePermissionConfig,
   RBACPermissionsResponse, PaymentOrderResponse, PaymentVerifyResponse,
   ManufacturingAnalytics, OrderItem, Order, MedicalRepresentative, MrDailyLog,
-  MrVisit, Doctor, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics,
+  MrVisit, MrAssignment, Doctor, MrExpense, MrDashboardSummary, Campaign, CampaignAnalytics,
   ManufacturingUnit, ExpiryAlert, MrSampleStock, MrpResponse
 } from './api/types';
 
@@ -747,8 +747,9 @@ class ApiClient {
 
   // --- Challans ---
   async getChallans(search = "", modeFilter = "all"): Promise<Challan[]> {
-    const res = await this.request(`${API_BASE}/challans?search=${encodeURIComponent(search)}&mode=${encodeURIComponent(modeFilter)}`);
-    return res.json();
+    const res = await this.request(`${API_BASE}/challans?search=${encodeURIComponent(search)}&mode=${encodeURIComponent(modeFilter)}&page=1&limit=200`);
+    const body = await res.json();
+    return Array.isArray(body) ? body : (body.data || []);
   }
   async getChallan(id: string): Promise<Challan | null> {
     const res = await this.request(`${API_BASE}/challans/${id}`);
@@ -763,7 +764,11 @@ class ApiClient {
     return res.json();
   }
   async finalizeChallan(id: string): Promise<Challan> {
-    const res = await this.request(`${API_BASE}/challans/${id}/finalize`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/challans/${id}/finalize`, { method: 'PATCH', headers: { 'Idempotency-Key': `challan-finalize-${id}` } });
+    return res.json();
+  }
+  async reverseChallan(id: string): Promise<Challan> {
+    const res = await this.request(`${API_BASE}/challans/${id}/reverse`, { method: 'POST', headers: { 'Idempotency-Key': `challan-reverse-${id}` } });
     return res.json();
   }
   async convertChallanToInvoice(id: string): Promise<{ message: string; invoice: Invoice; challan: Challan }> {
@@ -1169,7 +1174,7 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
-  async completeBatchProduction(id: string, data: { actualYieldQty: number; wasteQty?: number; wasteReason?: string; qcNotes: string; qcPassedBy: string; packing?: number; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[]; warehouseId: string; qcStatus?: string; organoleptic?: string; moistureContent?: number | null; ashValue?: number | null; pHValue?: number | null; disintegrationTime?: number | null; heavyMetals?: string; microbialLimit?: string; labReportRef?: string; jobWorkerCertificateRef?: string; coaDocumentRef?: string; jobWorkCharges?: number }): Promise<BatchProduction> {
+  async completeBatchProduction(id: string, data: { actualYieldQty: number; wasteQty?: number; wasteReason?: string; qcNotes: string; qcPassedBy: string; packing?: number; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[]; warehouseId: string; qcStatus?: string; organoleptic?: string; moistureContent?: number | null; ashValue?: number | null; pHValue?: number | null; disintegrationTime?: number | null; heavyMetals?: string; microbialLimit?: string; labReportRef?: string; jobWorkerCertificateRef?: string; coaDocumentRef?: string; jobWorkCharges?: number }): Promise<any> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/complete`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
@@ -1752,6 +1757,25 @@ class ApiClient {
   async deleteMR(id: string): Promise<void> {
     await this.request(`${API_BASE}/medical-reps/${id}`, { method: 'DELETE' });
   }
+  async getMrAssignments(mrId: string, entityType?: string, active: string = 'true'): Promise<MrAssignment[]> {
+    const params = new URLSearchParams();
+    if (entityType) params.set('entityType', entityType);
+    params.set('active', active);
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/assignments?${params}`);
+    return res.json();
+  }
+  async createMrAssignment(mrId: string, data: Partial<MrAssignment>): Promise<MrAssignment> {
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/assignments`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async updateMrAssignment(id: string, data: Partial<MrAssignment>): Promise<MrAssignment> {
+    const res = await this.request(`${API_BASE}/medical-reps/assignments/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async endMrAssignment(id: string): Promise<void> {
+    await this.request(`${API_BASE}/medical-reps/assignments/${id}`, { method: 'DELETE' });
+  }
+
   async getMrAttendance(mrId: string, from?: string, to?: string): Promise<MrDailyLog[]> {
     const params = new URLSearchParams();
     if (from) params.set('from', from);

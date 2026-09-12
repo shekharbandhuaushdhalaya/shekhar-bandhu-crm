@@ -9,10 +9,10 @@ import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
-import { api, MedicalRepresentative, MrDailyLog, MrVisit, Doctor, MrExpense, MrDashboardSummary, Product } from '../utils/api';
+import { api, MedicalRepresentative, MrDailyLog, MrVisit, MrAssignment, Doctor, MrExpense, MrDashboardSummary, Product } from '../utils/api';
 import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
 
-type Tab = 'dashboard' | 'mrs' | 'attendance' | 'visits' | 'expenses';
+type Tab = 'dashboard' | 'mrs' | 'portfolio' | 'attendance' | 'visits' | 'expenses';
 
 export default function MedicalRepsScreen() {
   const { colors } = useTheme();
@@ -33,6 +33,11 @@ export default function MedicalRepsScreen() {
   const [mrSaving, setMrSaving] = useState(false);
   const [editMr, setEditMr] = useState<MedicalRepresentative | null>(null);
   const [mrForm, setMrForm] = useState({ name: '', phone: '', email: '', code: '', territory: '', monthlyTarget: 0, address: '', notes: '' });
+
+  // Flexible MR portfolio assignments
+  const [assignments, setAssignments] = useState<MrAssignment[]>([]);
+  const [assignmentModal, setAssignmentModal] = useState(false);
+  const [assignmentForm, setAssignmentForm] = useState<Partial<MrAssignment>>({ entityType: 'doctor', entityName: '', area: '', territory: '', role: 'primary', priority: 'normal', preferredVisitDays: [], notes: '' });
 
   // Attendance
   const [selectedMrForAttendance, setSelectedMrForAttendance] = useState<string>('');
@@ -120,6 +125,11 @@ export default function MedicalRepsScreen() {
     } catch { }
   }, [mrSearch, user]);
 
+  const loadAssignments = useCallback(async (mrId: string) => {
+    if (!mrId) return;
+    try { setAssignments(await api.getMrAssignments(mrId)); } catch { setAssignments([]); }
+  }, []);
+
   const loadAttendance = useCallback(async (mrId: string) => {
     if (!mrId) return;
     try { setAttendanceLogs(await api.getMrAttendance(mrId)); } catch { }
@@ -162,22 +172,24 @@ export default function MedicalRepsScreen() {
 
   useEffect(() => {
     if (activeTab === 'mrs') loadMrs();
+    else if (activeTab === 'portfolio' && selectedMrForVisits) loadAssignments(selectedMrForVisits);
     else if (activeTab === 'attendance' && selectedMrForAttendance) loadAttendance(selectedMrForAttendance);
     else if (activeTab === 'visits' && selectedMrForVisits) loadVisits(selectedMrForVisits);
     else if (activeTab === 'expenses' && selectedMrForVisits) loadExpenses(selectedMrForVisits);
     else if (activeTab === 'dashboard') loadDashboard();
-  }, [activeTab, selectedMrForAttendance, selectedMrForVisits, loadMrs, loadAttendance, loadVisits, loadExpenses, loadDashboard]);
+  }, [activeTab, selectedMrForAttendance, selectedMrForVisits, loadMrs, loadAssignments, loadAttendance, loadVisits, loadExpenses, loadDashboard]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
     if (activeTab === 'mrs') await loadMrs();
     else if (activeTab === 'dashboard') await loadDashboard();
+    else if (activeTab === 'portfolio' && selectedMrForVisits) await loadAssignments(selectedMrForVisits);
     else if (activeTab === 'attendance' && selectedMrForAttendance) await loadAttendance(selectedMrForAttendance);
     else if (activeTab === 'visits' && selectedMrForVisits) await loadVisits(selectedMrForVisits);
     else if (activeTab === 'expenses' && selectedMrForVisits) await loadExpenses(selectedMrForVisits);
     setRefreshing(false);
-  }, [activeTab, selectedMrForAttendance, selectedMrForVisits, loadMrs, loadDashboard, loadAttendance, loadVisits, loadExpenses]);
+  }, [activeTab, selectedMrForAttendance, selectedMrForVisits, loadMrs, loadDashboard, loadAssignments, loadAttendance, loadVisits, loadExpenses]);
 
   const fetchGpsLocation = (): Promise<{ latitude?: number; longitude?: number }> => {
     return new Promise((resolve) => {
@@ -494,6 +506,7 @@ export default function MedicalRepsScreen() {
   const TABS: { id: Tab; label: string; icon: keyof typeof Ionicons.glyphMap; desc: string }[] = [
     { id: 'dashboard', label: 'Overview', icon: 'stats-chart', desc: 'Performance & ROI' },
     { id: 'mrs', label: 'Team', icon: 'people', desc: 'Field Team Directory' },
+    { id: 'portfolio', label: 'Portfolio', icon: 'briefcase-outline', desc: 'Doctors, Chemists & Territories' },
     { id: 'attendance', label: 'Attendance', icon: 'location', desc: 'Check-ins & Distance' },
     { id: 'visits', label: 'Visits', icon: 'medkit', desc: 'Clinic Calls & Orders' },
     { id: 'expenses', label: 'Expenses', icon: 'wallet', desc: 'T&E & Approvals' },
@@ -1529,6 +1542,48 @@ export default function MedicalRepsScreen() {
   );
 
   // ── 5. EXPENSES RENDER ──────────────────────────────────────────────────────
+  const renderPortfolio = () => {
+    const selectedMr = mrs.find(m => m._id === selectedMrForVisits);
+    const grouped = assignments.reduce<Record<string, MrAssignment[]>>((acc, a) => { (acc[a.entityType] ||= []).push(a); return acc; }, {});
+    return (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pageSectionTitle}>MR Portfolio & Assignments</Text>
+            <Text style={styles.pageSectionSubtitle}>Assign people, accounts and territories with primary, backup or temporary ownership.</Text>
+          </View>
+          {perm.can('mr:edit') && selectedMrForVisits ? <TouchableOpacity style={styles.primaryCtaBtn} onPress={() => { setAssignmentForm({ entityType: 'doctor', entityName: '', area: '', territory: selectedMr?.territory || '', role: 'primary', priority: 'normal', preferredVisitDays: [], notes: '' }); setAssignmentModal(true); }}><Ionicons name="add" size={18} color="#fff" /><Text style={styles.primaryCtaBtnText}>Add Assignment</Text></TouchableOpacity> : null}
+        </View>
+        {mrSelector(id => { setSelectedMrForVisits(id); loadAssignments(id); }, selectedMrForVisits)}
+        {selectedMrForVisits ? <>
+          <View style={styles.infoBanner}>
+            <Ionicons name="options-outline" size={20} color={colors.primary} />
+            <Text style={styles.infoBannerText}>One MR can have multiple doctors, chemists, stockists, institutions and distributors. Assignments can be primary, secondary or temporary and can carry their own area, priority and visit-day rules.</Text>
+          </View>
+          {Object.keys(grouped).length === 0 ? <View style={styles.emptyCardContainer}><Ionicons name="briefcase-outline" size={40} color={colors.text.muted} /><Text style={styles.emptyCardTitle}>No portfolio assignments</Text><Text style={styles.emptyCardSubtitle}>Start by assigning a doctor, chemist, stockist or another field account.</Text></View> : Object.entries(grouped).map(([type, list]) => (
+            <View key={type} style={styles.sectionCard}>
+              <Text style={styles.cardTitle}>{type.charAt(0).toUpperCase()+type.slice(1)}s ({list.length})</Text>
+              {list.map(a => <View key={a._id} style={styles.assignmentRow}>
+                <View style={styles.assignmentIcon}><Ionicons name={type === 'doctor' ? 'medkit-outline' : 'business-outline'} size={18} color={colors.primary} /></View>
+                <View style={{ flex: 1 }}><Text style={styles.assignmentName}>{a.entityName}</Text><Text style={styles.assignmentMeta}>{[a.area, a.territory, a.role, `Priority ${a.priority}`].filter(Boolean).join(' • ')}</Text>{a.preferredVisitDays?.length ? <Text style={styles.assignmentMeta}>Visits: {a.preferredVisitDays.join(', ')}</Text> : null}</View>
+                {perm.can('mr:edit') ? <TouchableOpacity style={styles.circleActionBtn} onPress={async () => { try { await api.endMrAssignment(a._id); showToast('Assignment ended', 'success'); loadAssignments(selectedMrForVisits); } catch (e:any) { showToast(e.message || 'Could not end assignment', 'error'); } }}><Ionicons name="close-circle-outline" size={18} color={colors.danger} /></TouchableOpacity> : null}
+              </View>)}
+            </View>
+          ))}
+        </> : null}
+        <Modal visible={assignmentModal} animationType="fade" transparent onRequestClose={() => setAssignmentModal(false)}>
+          <View style={styles.modalOverlay}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitleText}>Add portfolio assignment</Text><TouchableOpacity onPress={() => setAssignmentModal(false)}><Ionicons name="close" size={22} color={colors.text.primary}/></TouchableOpacity></View><ScrollView style={{padding: Spacing.lg}}>
+            <Text style={styles.fieldLabelText}>Type</Text><View style={styles.choiceRow}>{['doctor','chemist','stockist','institution','distributor','other'].map(t => <TouchableOpacity key={t} style={[styles.choicePill, assignmentForm.entityType===t && styles.choicePillActive]} onPress={()=>setAssignmentForm({...assignmentForm, entityType:t as any})}><Text style={[styles.choicePillText, assignmentForm.entityType===t && styles.choicePillTextActive]}>{t}</Text></TouchableOpacity>)}</View>
+            {([['entityName','Name *','Doctor / chemist / institution name'],['entityId','Linked ID','Optional record ID'],['area','Area','e.g. Civil Lines'],['territory','Territory','e.g. Prayagraj North'],['preferredVisitTime','Preferred time','e.g. 11:00 AM'],['notes','Notes','Optional notes']] as const).map(([k,label,ph]) => <View key={k} style={styles.formField}><Text style={styles.fieldLabelText}>{label}</Text><TextInput style={styles.fieldInput} value={(assignmentForm as any)[k] || ''} onChangeText={v=>setAssignmentForm({...assignmentForm,[k]:v})} placeholder={ph} placeholderTextColor={colors.text.muted}/></View>)}
+            <Text style={styles.fieldLabelText}>Assignment role</Text><View style={styles.choiceRow}>{['primary','secondary','temporary'].map(t=><TouchableOpacity key={t} style={[styles.choicePill,assignmentForm.role===t&&styles.choicePillActive]} onPress={()=>setAssignmentForm({...assignmentForm,role:t as any})}><Text style={[styles.choicePillText,assignmentForm.role===t&&styles.choicePillTextActive]}>{t}</Text></TouchableOpacity>)}</View>
+            <Text style={styles.fieldLabelText}>Priority</Text><View style={styles.choiceRow}>{['A','B','C','normal'].map(t=><TouchableOpacity key={t} style={[styles.choicePill,assignmentForm.priority===t&&styles.choicePillActive]} onPress={()=>setAssignmentForm({...assignmentForm,priority:t as any})}><Text style={[styles.choicePillText,assignmentForm.priority===t&&styles.choicePillTextActive]}>{t}</Text></TouchableOpacity>)}</View>
+            <TouchableOpacity style={styles.modalSubmitBtn} onPress={async()=>{if(!selectedMrForVisits || !assignmentForm.entityName?.trim()){showToast('Enter an account name','error');return;} try{await api.createMrAssignment(selectedMrForVisits,assignmentForm);showToast('Assignment added','success');setAssignmentModal(false);loadAssignments(selectedMrForVisits);}catch(e:any){showToast(e.message||'Could not add assignment','error');}}}><Text style={styles.modalSubmitBtnText}>Save Assignment</Text></TouchableOpacity>
+          </ScrollView></View></View>
+        </Modal>
+      </ScrollView>
+    );
+  };
+
   const renderExpenses = () => (
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -1752,6 +1807,7 @@ export default function MedicalRepsScreen() {
       <View style={styles.mainScreenContainer}>
         {activeTab === 'dashboard' && renderDashboard()}
         {activeTab === 'mrs' && renderMrList()}
+        {activeTab === 'portfolio' && renderPortfolio()}
         {activeTab === 'attendance' && renderAttendance()}
         {activeTab === 'visits' && renderVisits()}
         {activeTab === 'expenses' && renderExpenses()}

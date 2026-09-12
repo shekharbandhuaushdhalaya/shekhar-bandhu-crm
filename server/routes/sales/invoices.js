@@ -546,6 +546,14 @@ router.patch('/sales/:id/finalize', authorize('invoice:markPaid'), async (req, r
       return res.status(400).json({ error: 'Invoice is already finalized' });
     }
 
+    // A normal sale that affects physical stock must originate from a finalized Challan.
+    // Reject before any financial side effect.
+    const isFromChallan = !!(invoice.reference || invoice.sourceDocId);
+    const isExceptionalStockFlow = false; // all sale-side physical movements require a Challan
+    if (invoice.deductInventory && !isFromChallan) {
+      return res.status(409).json({ error: 'Sale invoice cannot deduct physical stock directly. Finalize the sale Challan first and convert/reference it.', code: 'SALE_CHALLAN_REQUIRED' });
+    }
+
     // Sync Customer balance
     const cust = await Customer.findOne({
       $or: [
@@ -554,7 +562,6 @@ router.patch('/sales/:id/finalize', authorize('invoice:markPaid'), async (req, r
       ]
     });
     // If the invoice was converted from a delivery challan (has a reference/sourceDocId), the balance has already been debited by the challan dispatch
-    const isFromChallan = !!(invoice.reference || invoice.sourceDocId);
     if (cust && invoice.saleType !== 'doctor_sampling' && invoice.saleType !== 'damage' && !isFromChallan) {
       if (invoice.mode === 'cash') {
         cust.cashBalance += invoice.amount;
@@ -564,10 +571,9 @@ router.patch('/sales/:id/finalize', authorize('invoice:markPaid'), async (req, r
       await cust.save();
     }
 
-    // Deduct inventory if required (direct sales/sampling/damage)
-    if (invoice.deductInventory || invoice.saleType === 'doctor_sampling' || invoice.saleType === 'damage') {
-      await deductInventoryForInvoice(invoice);
-    }
+    // Sale-side physical stock is controlled by the Challan. A normal sale invoice
+    // must reference a finalized Challan and must never perform a second deduction.
+    // Never mutate physical stock from a sale invoice. The originating Challan is authoritative.
 
     // Automatic TCS Section 206C(1H) calculation upon finalization
     const { calculateTCS } = require('../../utils/tdsTcsCalculator');
@@ -830,8 +836,9 @@ router.delete('/sales/:id', authorize('invoice:delete'), async (req, res) => {
       }
 
       // Revert stock level if required (direct sales/sampling/damage)
-      if (invoice.deductInventory || invoice.saleType === 'doctor_sampling' || invoice.saleType === 'damage') {
-        await revertInventoryForInvoice(invoice);
+      const isExceptionalStockFlow = false; // physical stock reversals belong to Challan/return workflows
+      if (!isExceptionalStockFlow && invoice.deductInventory && !isFromChallan) {
+        return res.status(409).json({ error: 'Direct sale-invoice stock reversal is disabled. Reverse the originating Challan.', code: 'SALE_CHALLAN_REQUIRED' });
       }
     }
 

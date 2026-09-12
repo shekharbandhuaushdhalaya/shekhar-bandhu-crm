@@ -11,6 +11,7 @@ const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { getSizeInMl, consumeFromReservation, releaseAllReservations, deductPackagingMaterials, calculateAggregateMaterialSufficiency } = require('../../services/batchProductionService');
+const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
 
@@ -1033,7 +1034,6 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     });
 
     const createdEntries = [];
-    const StockMovement = require('../../models/StockMovement');
 
     for (const item of yieldItemsWithWeight) {
       const pct = totalAllocWeight > 0 ? (item.allocWeight / totalAllocWeight) : (1 / yieldItemsWithWeight.length);
@@ -1049,56 +1049,68 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       });
     }
 
-    // Generate Production GRN doc no
-    const fy = new Date().getFullYear() % 100 + '-' + (new Date().getFullYear() + 1) % 100;
-    const lastPR = await StockMovement.findOne({ docNo: { $regex: `^PR/${fy}/` } })
-      .sort({ createdAt: -1 }).lean();
-    let nextPR = 1;
-    if (lastPR) {
-      const parts = lastPR.docNo.split('/');
-      if (parts.length === 3) nextPR = parseInt(parts[2], 10) + 1;
-    }
-    const prDocNo = `PR/${fy}/${nextPR.toString().padStart(3, '0')}`;
+    // Production is completed at the manufacturing house first. The finished goods are
+    // therefore received into the manufacturing warehouse, and a SALE CHALLAN-style
+    // transfer document is created for the user-selected destination. The Challan is the
+    // authoritative document for the subsequent physical transfer.
     const now = new Date();
+    const ManufacturingUnit = require('../../models/ManufacturingUnit');
+    const Challan = require('../../models/Challan');
+    const { completeProductionReceiptAndCreateTransfer } = require('../../services/challanInventoryService');
+    let productionWarehouse = await Warehouse.findOne({ manufacturingUnitId: batch.manufacturingUnitId, type: 'manufacturing' });
+    if (!productionWarehouse) {
+      productionWarehouse = await Warehouse.findOne({ type: 'manufacturing', name: batch.manufacturingUnitName });
+      if (productionWarehouse && !productionWarehouse.manufacturingUnitId) {
+        productionWarehouse.manufacturingUnitId = batch.manufacturingUnitId;
+        await productionWarehouse.save();
+      }
+    }
+    if (!productionWarehouse) {
+      const unit = await ManufacturingUnit.findById(batch.manufacturingUnitId).lean();
+      if (!unit) return res.status(404).json({ error: 'Manufacturing unit not found for production stock location.' });
+      productionWarehouse = await Warehouse.create({
+        name: `${unit.name} — Production House`,
+        type: 'manufacturing',
+        manufacturingUnitId: unit._id,
+        addressLine1: unit.addressLine1 || '',
+        city: unit.city || '',
+        state: unit.state || '',
+        pincode: unit.pincode || '',
+        contactPerson: unit.contactPerson || '',
+        phone: unit.phone || ''
+      });
+    }
+    if (String(productionWarehouse._id) === String(warehouse._id)) {
+      return res.status(400).json({ error: 'Finished-goods destination must be different from the production house.' });
+    }
     if (batch.shelfLifeMonths) {
       const exp = new Date(now);
       exp.setMonth(exp.getMonth() + batch.shelfLifeMonths);
       batch.expiryDate = exp;
     }
 
-    const grnItems = yieldItemsWithWeight.map(item => {
+    const challanItems = yieldItemsWithWeight.map(item => {
       const pct = totalAllocWeight > 0 ? (item.allocWeight / totalAllocWeight) : (1 / yieldItemsWithWeight.length);
       const allocatedCost = totalCost * pct;
       const unitCost = item.actualYieldQty > 0 ? (allocatedCost / Number(item.actualYieldQty)) : 0;
       return {
         productId: item.productId,
-        productName: item.product.name,
+        name: item.product.name,
         qty: Number(item.actualYieldQty),
-        packing: 1,
-        purchaseRate: Number(unitCost.toFixed(2)),
+        rate: Number(unitCost.toFixed(2)),
+        packing: Number(item.packing) || 1,
+        hsnCode: item.product.hsnCode || '',
+        gstRate: item.product.gstRate || 0,
         batchNo: batch.batchNo,
-        mfgDate: now,
-        expiryDate: batch.expiryDate || new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000),
+        vendorName: 'In-House Production',
         manufacturingUnitId: batch.manufacturingUnitId,
         manufacturingUnitName: batch.manufacturingUnitName
       };
     });
 
-    const grn = await StockMovement.create({
-      docNo: prDocNo,
-      direction: 'in',
-      type: 'production',
-      date: new Date(),
-      warehouseId: warehouse._id,
-      warehouseName: warehouse.name,
-      partyName: 'In-House Production (Self)',
-      items: grnItems,
-      status: 'draft',
-      notes: `QC Sign-off by ${qcPassedBy}. Batch: ${batch.batchNo}. ${qcNotes || ''}`.trim(),
-      createdBy: qcPassedBy,
-      sourceDocType: 'batch_production',
-      sourceDocId: batch._id
-    });
+    // The actual finished-goods receipt + transfer Challan creation is performed
+    // atomically after all batch validation/cost/backfill work is complete.
+    let challan = null;
 
     const valWaste = wasteQty !== undefined ? Number(wasteQty) : Math.max(0, batch.plannedQty - valYield);
     const variancePct = batch.plannedQty > 0 ? Number((((valYield - batch.plannedQty) / batch.plannedQty) * 100).toFixed(2)) : 0;
@@ -1168,12 +1180,25 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       }
     }
 
-    await batch.save();
+    const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+    const challanNo = await generateAtomicDocumentNumber('productionTransferChallanNo', 'CH', 5);
+    const completed = await completeProductionReceiptAndCreateTransfer({
+      batch,
+      challanItems,
+      productionWarehouse,
+      destinationWarehouse: warehouse,
+      challanNo,
+      now,
+      userId: req.user ? req.user.id : null,
+      createdBy: qcPassedBy || (req.user ? req.user.name : 'System')
+    });
+    batch = completed.batch;
+    challan = completed.challan;
     if (req.io) {
       req.io.emit('mfg_batch_completed', batch);
-      req.io.emit('challan_created', grn);
+      req.io.emit('challan_created', challan);
     }
-    res.json({ batch, grn: { _id: grn._id, docNo: grn.docNo, status: grn.status } });
+    res.json({ batch, challan: { _id: challan._id, challanNo: challan.challanNo, status: challan.status, challanType: challan.challanType, sourceWarehouseId: challan.warehouseId, sourceWarehouseName: challan.warehouseName, destinationWarehouseId: challan.destinationWarehouseId, destinationWarehouseName: challan.destinationWarehouseName } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

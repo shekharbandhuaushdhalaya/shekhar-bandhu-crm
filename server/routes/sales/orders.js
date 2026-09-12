@@ -201,145 +201,47 @@ router.put('/:id', validate(schemas.orderSchema.partial()), async (req, res) => 
 });
 
 
-// POST /api/orders/public/create — Create an order from public website storefront (Unauthenticated)
+// POST /api/orders/public/create — compatibility order creation. No physical inventory movement.
 router.post('/public/create', validate(schemas.orderSchema), async (req, res) => {
   try {
     const { name, email, phone, shippingAddress, items, mrId, mrName, visitId } = req.body;
-    if (!name || !email || !phone || !shippingAddress || !items || !Array.isArray(items) || items.length === 0) {
+    if (!name || !email || !phone || !shippingAddress || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: 'Missing required order fields or items list' });
     }
-
-    // Validate items and verify stocks/prices
     let totalAmount = 0;
     const validatedItems = [];
-
     for (const item of items) {
       const dbProd = await Product.findById(item.productId);
-      if (!dbProd) {
-        return res.status(404).json({ error: `Product not found: ${item.name || item.productId}` });
-      }
-      
-      const qty = parseInt(item.qty, 10);  // qty is UNITS (pieces)
-      if (isNaN(qty) || qty <= 0) {
-        return res.status(400).json({ error: `Invalid quantity for item: ${dbProd.name}` });
-      }
-
-      // Track price from DB to avoid price manipulation from frontend. Apply discount if active.
-      const hasDiscount = dbProd.discount > 0;
-      const price = hasDiscount 
-        ? dbProd.price * (1 - dbProd.discount / 100)
-        : dbProd.price;
-
-      // Check stock across ALL warehouses
-      const allEntries = await InventoryEntry.find({
-        productId: dbProd._id,
-        qtyBoxes: { $gt: 0 }
-      }).sort({ mfgDate: 1, expiryDate: 1, createdAt: 1 });
-
-      const totalAvailableUnits = allEntries.reduce((acc, e) => acc + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
-
-      if (totalAvailableUnits < qty) {
-        return res.status(400).json({ error: `Insufficient stock for product: ${dbProd.name}. Available: ${totalAvailableUnits} units` });
-      }
-
+      if (!dbProd) return res.status(404).json({ error: `Product not found: ${item.name || item.productId}` });
+      const qty = Number(item.qty || 0);
+      if (!Number.isFinite(qty) || qty <= 0) return res.status(400).json({ error: `Invalid quantity for item: ${dbProd.name}` });
+      const price = dbProd.discount > 0 ? Number(dbProd.price || 0) * (1 - dbProd.discount / 100) : Number(dbProd.price || 0);
       totalAmount += price * qty;
-
-      // Deduct via FIFO across batches — track total boxes deducted
-      let totalDeductedBoxes = 0;
-      let unitsNeeded = qty;
-      for (const entry of allEntries) {
-        if (unitsNeeded <= 0) break;
-        const packSize = entry.packing || 1;
-        const entryUnits = (entry.qtyBoxes || 0) * packSize;
-        if (entryUnits <= 0) continue;
-
-        const deductUnits = Math.min(unitsNeeded, entryUnits);
-        const deductBoxes = Math.ceil(deductUnits / packSize);
-        const actualDeductBoxes = Math.min(deductBoxes, entry.qtyBoxes || 0);
-        if (actualDeductBoxes <= 0) continue;
-
-        entry.qtyBoxes = Math.max(0, entry.qtyBoxes - actualDeductBoxes);
-        await entry.save();
-
-        const actualDeductedUnits = actualDeductBoxes * packSize;
-        totalDeductedBoxes += actualDeductBoxes;
-
-        await StockLedger.create({
-          productId: dbProd._id,
-          warehouseId: entry.warehouseId,
-          warehouseName: entry.warehouseName,
-          type: 'OUT',
-          qtyBoxes: -actualDeductBoxes,
-          balanceBoxes: entry.qtyBoxes,
-          reference: 'Web Order',
-          note: `Auto-deducted via Web Order for ${name}`,
-          createdBy: 'System',
-          packing: packSize,
-          vendorId: entry.vendorId || '',
-          vendorName: entry.vendorName || '',
-          batchNo: entry.batchNo || '',
-        });
-
-        unitsNeeded -= actualDeductedUnits;
-      }
-
-      // Deduct stockLevel in BOXES (consistent with challans/stockMovements)
-      dbProd.stockLevel = Math.max(0, dbProd.stockLevel - totalDeductedBoxes);
-      await dbProd.save();
-
-      validatedItems.push({
-        productId: dbProd._id,
-        name: dbProd.name,
-        qty: qty,
-        price: Number(price.toFixed(2)),
-        size: dbProd.size || 'Standard',
-        deductedBoxes: totalDeductedBoxes,
-      });
+      validatedItems.push({ productId: dbProd._id, name: dbProd.name, qty, price: Number(price.toFixed(2)), size: dbProd.size || 'Standard', deductedBoxes: 0, fulfilledQty: 0, backorderedQty: qty });
     }
-
     const approvalRequired = totalAmount >= 50000;
+    const count = await Order.countDocuments({});
     const commissionAmount = mrId ? Number((totalAmount * 0.02).toFixed(2)) : 0;
-
+    const incentiveCredited = mrId ? true : false;
     const newOrder = await Order.create({
-      name,
-      email,
-      phone,
-      shippingAddress,
-      items: validatedItems,
-      totalAmount,
-      status: approvalRequired ? 'pending' : 'pending',
-      approvalRequired,
-      approvalStatus: approvalRequired ? 'pending_approval' : 'none',
-      mrId: mrId || null,
-      mrName: mrName || '',
-      visitId: visitId || null,
-      commissionAmount,
-      incentiveCredited: !!mrId
+      orderNo: `SO-${String(count+1).padStart(5,'0')}`,
+      name, email, phone, shippingAddress, items: validatedItems,
+      totalAmount: Number(totalAmount.toFixed(2)), status: 'pending', sourceType: mrId ? 'mr' : 'online',
+      sourcePersonId: mrId || null, sourcePersonName: mrName || '',
+      approvalRequired, approvalStatus: approvalRequired ? 'pending_approval' : 'none',
+      mrId: mrId || null, mrName: mrName || '', visitId: visitId || null,
+      commissionAmount, incentiveCredited
     });
-
-    // Update MR Sales Target
     if (mrId) {
       const SalesTarget = require('../../models/SalesTarget');
-      const now = new Date();
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
-      await SalesTarget.findOneAndUpdate(
-        { agentId: mrId, month, year },
-        { $inc: { achievedAmount: totalAmount } },
-        { upsert: true }
-      ).catch(() => {});
+      await SalesTarget.findOneAndUpdate({ agentId: mrId }, { $inc: { achievedAmount: totalAmount } });
     }
-
-    if (req.io) {
-      req.io.emit('order_updated', { type: 'created', id: newOrder._id });
-    }
-    res.status(201).json({ message: 'Order placed successfully', order: newOrder });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    if (req.io) req.io.emit('order_updated', { type: 'created', id: newOrder._id });
+    const orderData = newOrder.toObject ? newOrder.toObject() : newOrder;
+    res.status(201).json({ ...orderData, message: 'Order created. Inventory moves only through a finalized Challan.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// PATCH /api/orders/:id/approve — Manager approve a large-value order
 router.patch('/:id/approve', async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);

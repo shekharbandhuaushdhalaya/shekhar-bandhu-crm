@@ -1028,10 +1028,10 @@ export default function ManufacturingScreen() {
       if (qcWasteReason.trim()) payload.wasteReason = qcWasteReason.trim();
 
       const result = await api.completeBatchProduction(selectedBatchRun._id, payload);
-      const grnDocNo = (result as any)?.grn?.docNo;
+      const transferChallanNo = (result as any)?.challan?.challanNo;
 
       setSelectedBatchRun(null);
-      showToast(`Batch completed! GRN (${grnDocNo || 'N/A'}) created.`, 'success');
+      showToast(`Batch completed! Transfer Challan (${transferChallanNo || 'N/A'}) created from the production house.`, 'success');
       setQcYieldQty('');
       setQcPacking('');
       setQcWarehouseId('');

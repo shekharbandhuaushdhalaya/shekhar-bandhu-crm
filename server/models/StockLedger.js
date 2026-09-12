@@ -19,10 +19,13 @@ const stockLedgerSchema = new mongoose.Schema({
   mfgDate:       { type: Date },
   expiryDate:    { type: Date },
   manufacturingUnitId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit' },
-  manufacturingUnitName: { type: String, default: '', trim: true }
+  manufacturingUnitName: { type: String, default: '', trim: true },
+  // Idempotency key for a single authoritative physical stock movement.
+  movementKey: { type: String, default: undefined, trim: true }
 }, { timestamps: true });
 
 stockLedgerSchema.index({ productId: 1, createdAt: -1 });
+stockLedgerSchema.index({ movementKey: 1 }, { unique: true, sparse: true });
 
 stockLedgerSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('StockLedger', stockLedgerSchema);

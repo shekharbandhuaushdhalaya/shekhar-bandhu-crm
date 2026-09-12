@@ -5,6 +5,9 @@ const InventoryEntry = require('../../models/InventoryEntry');
 const Warehouse = require('../../models/Warehouse');
 const Product = require('../../models/Product');
 const StockLedger = require('../../models/StockLedger');
+const Challan = require('../../models/Challan');
+const { postChallanInventory, reverseChallanInventory } = require('../../services/challanInventoryService');
+const idempotency = require('../../middleware/idempotency');
 const { authorize } = require('../../middleware/authorize');
 
 // GET /api/inventory/transfers — List all stock transfers
@@ -106,195 +109,86 @@ router.patch('/:id/reject', authorize('inventory:edit'), async (req, res) => {
   }
 });
 
-// PATCH /api/inventory/transfers/:id/ship — Ship items (moves status to in_transit and deducts from source warehouse)
-router.patch('/:id/ship', authorize('inventory:edit'), async (req, res) => {
+// PATCH /api/inventory/transfers/:id/ship — create and post the authoritative Transfer Challan
+router.patch('/:id/ship', idempotency, authorize('inventory:edit'), async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
-    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
-    if (transfer.status !== 'pending') {
-      return res.status(400).json({ error: `Cannot ship transfer in status: ${transfer.status}` });
-    }
+    if (!transfer) return res.status(404).json({ error: 'Transfer not found', code: 'TRANSFER_NOT_FOUND' });
+    if (transfer.status !== 'pending') return res.status(400).json({ error: `Cannot ship transfer in status: ${transfer.status}`, code: 'TRANSFER_NOT_SHIPPABLE' });
 
-    // Deduct stock from source warehouse
-    for (const item of transfer.items) {
-      const entry = await InventoryEntry.findOne({
-        warehouseId: transfer.fromWarehouseId,
-        productId: item.productId,
-        packing: item.packing,
-        batchNo: item.batchNo
-      });
+    if (String(transfer.fromWarehouseId) === String(transfer.toWarehouseId)) return res.status(400).json({ error: 'Source and target warehouses must be different', code: 'SAME_WAREHOUSE_TRANSFER' });
+    const fromW = await Warehouse.findById(transfer.fromWarehouseId);
+    const toW = await Warehouse.findById(transfer.toWarehouseId);
+    if (!fromW || !toW) return res.status(404).json({ error: 'Source or target warehouse not found', code: 'WAREHOUSE_NOT_FOUND' });
 
-      if (!entry || entry.qtyBoxes < item.qtyBoxes) {
-        return res.status(400).json({
-          error: `Insufficient stock for product ${item.productName} in batch ${item.batchNo || 'unbatched'}`
-        });
-      }
-
-      entry.qtyBoxes = Math.max(0, entry.qtyBoxes - item.qtyBoxes);
-      await entry.save();
-
-      // Record OUT in StockLedger for source warehouse
-      await StockLedger.create({
-        productId: item.productId,
-        warehouseId: transfer.fromWarehouseId,
-        warehouseName: transfer.fromWarehouseName,
-        type: 'OUT',
-        qtyBoxes: -item.qtyBoxes,
-        balanceBoxes: entry.qtyBoxes,
-        reference: transfer.transferNo,
-        note: `Transit Transfer OUT to ${transfer.toWarehouseName}`,
-        createdBy: req.user ? req.user.name : 'System',
-        packing: item.packing,
-        batchNo: item.batchNo
-      });
-    }
-
+    const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+    const challanNo = await generateAtomicDocumentNumber('transferChallanNo', 'CH', 5);
+    const challan = await Challan.create({
+      challanNo,
+      date: new Date(),
+      challanType: 'transfer',
+      warehouseId: fromW._id,
+      warehouseName: fromW.name,
+      destinationWarehouseId: toW._id,
+      destinationWarehouseName: toW.name,
+      partyName: toW.name,
+      partyAddress: toW.addressLine1 || '',
+      partyCity: toW.city || '',
+      shippingAddress: [toW.addressLine1, toW.city, toW.state, toW.pincode].filter(Boolean).join(', '),
+      items: transfer.items.map(i => ({ productId: i.productId, name: i.productName || 'Product', qty: Number(i.qtyBoxes), packing: Number(i.packing) || 1, batchNo: i.batchNo || '' })),
+      status: 'draft', mode: 'regular', deductInventory: true
+    });
+    const posted = await postChallanInventory(challan, { userId: req.user?.id || null, createdBy: req.user?.name || 'System' });
+    transfer.challanId = posted._id;
+    transfer.challanNo = posted.challanNo;
     transfer.status = 'in_transit';
+    transfer.approvedBy = req.user?.name || 'System';
     await transfer.save();
 
     if (req.io) {
-      req.io.emit('transfer_updated', { type: 'shipped', id: transfer._id });
-      req.io.emit('inventory_updated', { type: 'transfer_shipped', transferId: transfer._id });
+      req.io.emit('transfer_updated', { type: 'shipped', id: transfer._id, challanId: posted._id });
+      req.io.emit('inventory_updated', { type: 'challan_transfer_posted', challanId: posted._id, transferId: transfer._id });
     }
-    res.json(transfer);
+    res.json({ transfer, challan: posted });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'INSUFFICIENT_STOCK' ? 400 : 500).json({ error: err.message, code: err.code || 'TRANSFER_SHIP_FAILED' });
   }
 });
 
-// PATCH /api/inventory/transfers/:id/receive — Receive items (moves status to completed and adds to target warehouse)
-router.patch('/:id/receive', authorize('inventory:edit'), async (req, res) => {
+// PATCH /api/inventory/transfers/:id/receive — receipt only changes logistics status;
+// physical stock was already moved by the Transfer Challan at shipment/posting.
+router.patch('/:id/receive', idempotency, authorize('inventory:edit'), async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
-    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
-    if (transfer.status !== 'in_transit') {
-      return res.status(400).json({ error: `Cannot receive transfer in status: ${transfer.status}` });
-    }
-
-    // Add stock to target warehouse
-    for (const item of transfer.items) {
-      const prod = await Product.findById(item.productId);
-      
-      let entry = await InventoryEntry.findOne({
-        warehouseId: transfer.toWarehouseId,
-        productId: item.productId,
-        packing: item.packing,
-        batchNo: item.batchNo
-      });
-
-      if (entry) {
-        entry.qtyBoxes += item.qtyBoxes;
-      } else {
-        entry = new InventoryEntry({
-          warehouseId: transfer.toWarehouseId,
-          warehouseName: transfer.toWarehouseName,
-          productId: item.productId,
-          productType: prod ? prod.productType : '',
-          size: prod ? prod.size : '',
-          colour: prod ? prod.colour : '',
-          shape: prod ? prod.shape : '',
-          weight: prod ? prod.weight : '',
-          hsnCode: prod ? prod.hsnCode : '',
-          qtyBoxes: item.qtyBoxes,
-          packing: item.packing,
-          batchNo: item.batchNo
-        });
-      }
-      await entry.save();
-
-      // Record IN in StockLedger for target warehouse
-      await StockLedger.create({
-        productId: item.productId,
-        warehouseId: transfer.toWarehouseId,
-        warehouseName: transfer.toWarehouseName,
-        type: 'IN',
-        qtyBoxes: item.qtyBoxes,
-        balanceBoxes: entry.qtyBoxes,
-        reference: transfer.transferNo,
-        note: `Transit Transfer IN from ${transfer.fromWarehouseName}`,
-        createdBy: req.user ? req.user.name : 'System',
-        packing: item.packing,
-        batchNo: item.batchNo
-      });
-    }
-
+    if (!transfer) return res.status(404).json({ error: 'Transfer not found', code: 'TRANSFER_NOT_FOUND' });
+    if (transfer.status !== 'in_transit') return res.status(400).json({ error: `Cannot receive transfer in status: ${transfer.status}`, code: 'TRANSFER_NOT_IN_TRANSIT' });
     transfer.status = 'completed';
-    transfer.approvedBy = req.user ? req.user.name : 'System';
+    transfer.approvedBy = req.user?.name || 'System';
     await transfer.save();
-
-    if (req.io) {
-      req.io.emit('transfer_updated', { type: 'received', id: transfer._id });
-      req.io.emit('inventory_updated', { type: 'transfer_received', transferId: transfer._id });
-    }
+    if (req.io) req.io.emit('transfer_updated', { type: 'received', id: transfer._id, challanId: transfer.challanId });
     res.json(transfer);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message, code: 'TRANSFER_RECEIVE_FAILED' }); }
 });
 
-// PATCH /api/inventory/transfers/:id/cancel — Cancel transfer request
-router.patch('/:id/cancel', authorize('inventory:edit'), async (req, res) => {
+// PATCH /api/inventory/transfers/:id/cancel — pending requests cancel directly; posted transfers reverse their Challan
+router.patch('/:id/cancel', idempotency, authorize('inventory:edit'), async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
-    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
-    if (['completed', 'cancelled'].includes(transfer.status)) {
-      return res.status(400).json({ error: `Cannot cancel transfer in status: ${transfer.status}` });
-    }
+    if (!transfer) return res.status(404).json({ error: 'Transfer not found', code: 'TRANSFER_NOT_FOUND' });
+    if (transfer.status === 'completed') return res.status(400).json({ error: 'Completed transfers require a controlled Challan reversal process', code: 'TRANSFER_COMPLETED_IMMUTABLE' });
+    if (transfer.status === 'cancelled') return res.status(400).json({ error: 'Transfer is already cancelled', code: 'TRANSFER_ALREADY_CANCELLED' });
 
-    // If it was already in_transit, we must revert/return stock to the source warehouse
     if (transfer.status === 'in_transit') {
-      for (const item of transfer.items) {
-        let entry = await InventoryEntry.findOne({
-          warehouseId: transfer.fromWarehouseId,
-          productId: item.productId,
-          packing: item.packing,
-          batchNo: item.batchNo
-        });
-
-        if (entry) {
-          entry.qtyBoxes += item.qtyBoxes;
-          await entry.save();
-        } else {
-          const prod = await Product.findById(item.productId);
-          entry = await InventoryEntry.create({
-            warehouseId: transfer.fromWarehouseId,
-            warehouseName: transfer.fromWarehouseName,
-            productId: item.productId,
-            productType: prod ? prod.productType : '',
-            qtyBoxes: item.qtyBoxes,
-            packing: item.packing,
-            batchNo: item.batchNo
-          });
-        }
-
-        // Record IN in StockLedger for source warehouse to roll back
-        await StockLedger.create({
-          productId: item.productId,
-          warehouseId: transfer.fromWarehouseId,
-          warehouseName: transfer.fromWarehouseName,
-          type: 'IN',
-          qtyBoxes: item.qtyBoxes,
-          balanceBoxes: entry.qtyBoxes,
-          reference: transfer.transferNo,
-          note: `Reverted: Cancelled Transfer OUT to ${transfer.toWarehouseName}`,
-          createdBy: req.user ? req.user.name : 'System',
-          packing: item.packing,
-          batchNo: item.batchNo
-        });
-      }
+      if (!transfer.challanId) return res.status(409).json({ error: 'Transfer has no authoritative Challan', code: 'TRANSFER_CHALLAN_REQUIRED' });
+      const challan = await Challan.findById(transfer.challanId);
+      if (!challan) return res.status(404).json({ error: 'Authoritative Transfer Challan not found', code: 'CHALLAN_NOT_FOUND' });
+      await reverseChallanInventory(challan, { userId: req.user?.id || null, createdBy: req.user?.name || 'System' });
     }
-
     transfer.status = 'cancelled';
     await transfer.save();
-
-    if (req.io) {
-      req.io.emit('transfer_updated', { type: 'cancelled', id: transfer._id });
-      req.io.emit('inventory_updated', { type: 'transfer_cancelled', transferId: transfer._id });
-    }
+    if (req.io) req.io.emit('transfer_updated', { type: 'cancelled', id: transfer._id, challanId: transfer.challanId });
     res.json(transfer);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(err.code === 'CHALLAN_ALREADY_REVERSED' ? 400 : 500).json({ error: err.message, code: err.code || 'TRANSFER_CANCEL_FAILED' }); }
 });
 
 module.exports = router;

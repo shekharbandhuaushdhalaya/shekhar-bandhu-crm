@@ -101,6 +101,7 @@ describe('Task 5 — Proactive AI Anomaly Insights Suite', () => {
 
     // 4. Seed Orders for Customer Order Drop
     await Order.create({
+      orderNo: 'ORD-TEST-001',
       name: 'Regular Customer Pharmacy',
       email: 'regular@pharmacy.com',
       phone: '9876543210',
@@ -109,6 +110,7 @@ describe('Task 5 — Proactive AI Anomaly Insights Suite', () => {
       createdAt: new Date(now.getTime() - 75 * 24 * 60 * 60 * 1000)
     });
     await Order.create({
+      orderNo: 'ORD-TEST-002',
       name: 'Regular Customer Pharmacy',
       email: 'regular@pharmacy.com',
       phone: '9876543210',

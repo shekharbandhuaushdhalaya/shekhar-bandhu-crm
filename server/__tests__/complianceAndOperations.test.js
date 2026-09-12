@@ -21,6 +21,11 @@ jest.mock('../models/StockMovement');
 jest.mock('../models/MrDailyLog');
 jest.mock('../models/MrExpense');
 jest.mock('../models/RolePermission');
+jest.mock('../models/Challan');
+jest.mock('../models/Counter');
+jest.mock('../utils/withTransaction', () => ({
+  withTransaction: jest.fn(async (fn) => fn(null))
+}));
 
 const Customer = require('../models/Customer');
 const Vendor = require('../models/Vendor');
@@ -41,6 +46,8 @@ const Payment = require('../models/Payment');
 const StockMovement = require('../models/StockMovement');
 const MrDailyLog = require('../models/MrDailyLog');
 const MrExpense = require('../models/MrExpense');
+const Challan = require('../models/Challan');
+const Counter = require('../models/Counter');
 
 // Routers
 const complianceRouter = require('../routes/inventory/compliance');
@@ -219,6 +226,7 @@ describe('Compliance and Operations Features', () => {
         _id: 'transfer_01',
         transferNo: 'TRSF-0001',
         fromWarehouseId: '507f1f77bcf86cd799439011',
+        toWarehouseId: '507f1f77bcf86cd799439012',
         fromWarehouseName: 'Source W',
         toWarehouseName: 'Target W',
         status: 'pending',
@@ -226,16 +234,52 @@ describe('Compliance and Operations Features', () => {
         save: jest.fn().mockResolvedValue(true)
       };
 
-      StockTransfer.findById.mockResolvedValue(mockTransfer);
-      InventoryEntry.findOne.mockResolvedValue({
-        qtyBoxes: 10,
+      const mockChallan = {
+        _id: 'challan_01',
+        challanNo: 'CH-00001',
+        challanType: 'transfer',
+        warehouseId: '507f1f77bcf86cd799439011',
+        destinationWarehouseId: '507f1f77bcf86cd799439012',
+        status: 'draft',
+        inventoryPostingStatus: 'not_posted',
+        items: [{ productId: '507f1f77bcf86cd799439013', qty: 5, packing: 1, batchNo: 'B-1' }],
         save: jest.fn().mockResolvedValue(true)
+      };
+
+      StockTransfer.findById.mockResolvedValue(mockTransfer);
+      Counter.findOneAndUpdate.mockResolvedValue({ seq: 1 });
+      const makeWarehouseObj = (id) => ({
+        _id: id,
+        name: id === '507f1f77bcf86cd799439011' ? 'Source W' : 'Target W'
       });
-      StockLedger.create.mockResolvedValue({});
+      Warehouse.findById.mockImplementation((id) => {
+        const obj = makeWarehouseObj(id);
+        const query = Promise.resolve(obj);
+        query.session = jest.fn().mockResolvedValue(obj);
+        return query;
+      });
+      Product.findById.mockReturnValue({
+        _id: '507f1f77bcf86cd799439013',
+        name: 'Product A',
+        stockLevel: 100,
+        session: jest.fn().mockResolvedValue({ _id: '507f1f77bcf86cd799439013', name: 'Product A', stockLevel: 100 })
+      });
+      Challan.create.mockResolvedValue(mockChallan);
+      Challan.findById.mockReturnValue({
+        session: jest.fn().mockResolvedValue(mockChallan)
+      });
+      InventoryEntry.findOneAndUpdate.mockReturnValue({
+        new: true,
+        session: jest.fn().mockResolvedValue({ _id: 'entry_01', qtyBoxes: 5 })
+      });
+      InventoryEntry.findOne.mockReturnValue({
+        session: jest.fn().mockResolvedValue({ _id: 'entry_02', qtyBoxes: 5, save: jest.fn().mockResolvedValue(true) })
+      });
+      StockLedger.insertMany.mockResolvedValue([]);
 
       const response = await request(app).patch('/api/inventory/transfers/transfer_01/ship');
       expect(response.status).toBe(200);
-      expect(response.body.status).toBe('in_transit');
+      expect(response.body.transfer.status).toBe('in_transit');
       expect(mockTransfer.save).toHaveBeenCalled();
     });
   });

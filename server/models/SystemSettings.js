@@ -40,7 +40,14 @@ const systemSettingsSchema = new mongoose.Schema({
   licenceSerial: { type: String, default: '1234', trim: true },
   spcReissueDeadline: { type: Date, default: new Date('2028-07-24') },
   qrImageBase64: { type: String, default: '' },
-  qrImageUrl: { type: String, default: '' }
+  qrImageUrl: { type: String, default: '' },
+  tradeDiscountMatrix: { type: mongoose.Schema.Types.Mixed, default: {} },
+  salesPolicy: {
+    autoApproveBelow: { type: Number, default: 50000 },
+    maxAutoDiscountPercent: { type: Number, default: 10 },
+    blockCreditLimit: { type: Boolean, default: true },
+    allowBackorder: { type: Boolean, default: true }
+  }
 }, { timestamps: true });
 
 systemSettingsSchema.plugin(tenantPlugin);

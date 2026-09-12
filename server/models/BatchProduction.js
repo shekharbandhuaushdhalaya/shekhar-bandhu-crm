@@ -269,6 +269,11 @@ const batchProductionSchema = new mongoose.Schema({
   receivedYieldQty: { type: Number, default: 0 },
   conversionLossPct: { type: Number, default: 0 },
   jobWorkDispatchedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  productionTransferChallanId: { type: mongoose.Schema.Types.ObjectId, ref: 'Challan', default: null },
+  productionTransferChallanNo: { type: String, default: '' },
+  productionStockPostedAt: { type: Date, default: null },
+  productionStockPostedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  productionStockTransactionId: { type: String, default: undefined, trim: true },
   supportingDocuments: [
     {
       name: { type: String, required: true },
@@ -279,6 +284,8 @@ const batchProductionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 batchProductionSchema.index({ 'ingredientsConsumed.rawMaterialEntryId': 1 });
+batchProductionSchema.index({ productionTransferChallanId: 1 }, { sparse: true });
+batchProductionSchema.index({ manufacturingUnitId: 1, status: 1, endDate: -1 });
 
 batchProductionSchema.plugin(tenantPlugin);
 const BatchProduction = mongoose.model('BatchProduction', batchProductionSchema);

@@ -1,142 +1,18 @@
 const express = require('express');
 const Challan = require('../../models/Challan');
-const Product = require('../../models/Product');
-const InventoryEntry = require('../../models/InventoryEntry');
 const Warehouse = require('../../models/Warehouse');
-const StockLedger = require('../../models/StockLedger');
+const { postChallanInventory, reverseChallanInventory } = require('../../services/challanInventoryService');
+const idempotency = require('../../middleware/idempotency');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
 const router = express.Router();
 
-// Helper: deduct inventory for a finalized challan
-async function deductInventory(challan) {
-  if (!challan.items || challan.items.length === 0 || !challan.warehouseId) return;
-
-  const warehouse = await Warehouse.findById(challan.warehouseId);
-  if (!warehouse) return;
-
-  for (const item of challan.items) {
-    if (!item.productId) continue;
-    const product = await Product.findById(item.productId);
-    if (!product) continue;
-
-    const boxesToDeduct = item.qty || 0;
-    const packing = item.packing || 1;
-
-    // 1. Decrement Product stock level
-    product.stockLevel = Math.max(0, product.stockLevel - boxesToDeduct);
-    await product.save();
-
-    // 3. Decrement specific InventoryEntry (with batchNo if provided)
-    const entryQuery = {
-      warehouseId: warehouse._id,
-      productId: product._id,
-      vendorId: item.vendorId || '',
-      packing,
-    };
-    if (item.batchNo) entryQuery.batchNo = item.batchNo;
-
-    let entry = await InventoryEntry.findOne(entryQuery);
-
-    if (entry) {
-      entry.qtyBoxes = Math.max(0, entry.qtyBoxes - boxesToDeduct);
-      await entry.save();
-    }
-
-    // 4. Record stock ledger entry (OUT movement)
-    await StockLedger.create({
-      productId: product._id,
-      warehouseId: warehouse._id,
-      warehouseName: warehouse.name,
-      type: 'OUT',
-      qtyBoxes: -boxesToDeduct,
-      balanceBoxes: entry ? entry.qtyBoxes : 0,
-      reference: challan.challanNo,
-      note: `Dispatched via Challan ${challan.challanNo} (Finalized)`,
-      createdBy: 'System',
-      packing,
-      vendorId: item.vendorId || '',
-      vendorName: item.vendorName || '',
-      batchNo: item.batchNo || '',
-    });
-  }
-}
-
-// Helper: revert inventory for a finalized challan (on delete)
-async function revertInventory(challan) {
-  if (!challan.items || challan.items.length === 0 || !challan.warehouseId) return;
-
-  const warehouse = await Warehouse.findById(challan.warehouseId);
-  if (!warehouse) return;
-
-  for (const item of challan.items) {
-    if (!item.productId) continue;
-    const product = await Product.findById(item.productId);
-    if (!product) continue;
-
-    const boxesToRevert = item.qty || 0;
-    const packing = item.packing || 1;
-
-    // 1. Revert Product stock level
-    product.stockLevel += boxesToRevert;
-    await product.save();
-
-    // 3. Revert specific InventoryEntry (with batchNo if provided)
-    const revertQuery = {
-      warehouseId: warehouse._id,
-      productId: product._id,
-      vendorId: item.vendorId || '',
-      packing,
-    };
-    if (item.batchNo) revertQuery.batchNo = item.batchNo;
-    let entry = await InventoryEntry.findOne(revertQuery);
-
-    if (entry) {
-      entry.qtyBoxes += boxesToRevert;
-    } else {
-      // Re-create entry slot if it was removed
-      entry = new InventoryEntry({
-        warehouseId: warehouse._id,
-        warehouseName: warehouse.name,
-        productId: product._id,
-        productType: product.productType || '',
-        size:        product.size        || '',
-        colour:      product.colour      || '',
-        shape:       product.shape       || '',
-        weight:      product.weight      || '',
-        hsnCode:     product.hsnCode     || '',
-        vendorId:    item.vendorId       || '',
-        vendorName:  item.vendorName     || '',
-        qtyBoxes:    boxesToRevert,
-        packing,
-      });
-    }
-    await entry.save();
-
-    // 4. Record stock ledger entry (IN movement)
-    await StockLedger.create({
-      productId: product._id,
-      warehouseId: warehouse._id,
-      warehouseName: warehouse.name,
-      type: 'IN',
-      qtyBoxes: boxesToRevert,
-      balanceBoxes: entry.qtyBoxes,
-      reference: challan.challanNo,
-      note: `Reverted via Deletion of Challan ${challan.challanNo}`,
-      createdBy: 'System',
-      packing,
-      vendorId: item.vendorId || '',
-      vendorName: item.vendorName || '',
-    });
-  }
-}
-
 // GET /api/challans — List challans with search and mode filters
 router.get('/', async (req, res) => {
   try {
-    const { search, mode } = req.query;
+    const { search, mode, page = 1, limit = 50 } = req.query;
     const filter = {};
 
     if (search) {
@@ -148,9 +24,13 @@ router.get('/', async (req, res) => {
     }
 
     filter.mode = { $in: ['pakka', 'regular'] };
-
-    const challans = await Challan.find(filter).sort({ date: -1, challanNo: -1 }).lean();
-    res.json(challans);
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(200, Math.max(1, Number(limit) || 50));
+    const [challans, total] = await Promise.all([
+      Challan.find(filter).sort({ date: -1, challanNo: -1 }).skip((pageNum - 1) * limitNum).limit(limitNum).lean(),
+      Challan.countDocuments(filter)
+    ]);
+    res.json({ data: challans, pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -184,6 +64,14 @@ router.post('/', validate(schemas.challanSchema), async (req, res) => {
       status: 'draft', // always draft on creation
     };
 
+    data.challanType = data.challanType || 'sale';
+    if (data.challanType !== 'sale' && !data.destinationWarehouseId) {
+      return res.status(400).json({ error: 'Destination warehouse is required for transfer Challans', code: 'DESTINATION_WAREHOUSE_REQUIRED' });
+    }
+    if (data.challanType !== 'sale' && data.destinationWarehouseId && String(data.destinationWarehouseId) === String(data.warehouseId)) {
+      return res.status(400).json({ error: 'Source and destination warehouses must be different', code: 'SAME_WAREHOUSE_TRANSFER' });
+    }
+
     if (!data.warehouseId) {
       return res.status(400).json({ error: 'Source warehouse is required' });
     }
@@ -193,6 +81,12 @@ router.post('/', validate(schemas.challanSchema), async (req, res) => {
       return res.status(404).json({ error: 'Selected warehouse not found' });
     }
     data.warehouseName = warehouse.name;
+
+    if (data.challanType !== 'sale') {
+      const destination = await Warehouse.findById(data.destinationWarehouseId);
+      if (!destination) return res.status(404).json({ error: 'Destination warehouse not found', code: 'DESTINATION_WAREHOUSE_NOT_FOUND' });
+      data.destinationWarehouseName = destination.name;
+    }
 
     const challan = await Challan.create(data);
     if (req.io) {
@@ -242,137 +136,108 @@ router.put('/:id', validate(schemas.challanSchema.partial()), async (req, res) =
   }
 });
 
-// PATCH /api/challans/:id/finalize — Finalize challan & deduct inventory
-router.patch('/:id/finalize', async (req, res) => {
+// PATCH /api/challans/:id/finalize — post the authoritative physical-goods transaction
+router.patch('/:id/finalize', idempotency, async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found' });
+    if (challan.status === 'finalized') return res.status(409).json({ error: 'Challan is already finalized', code: 'CHALLAN_ALREADY_POSTED' });
 
-    if (challan.status === 'finalized') {
-      return res.status(400).json({ error: 'Challan is already finalized' });
+    if (challan.challanType !== 'sale' && !challan.destinationWarehouseId) {
+      return res.status(400).json({ error: 'Destination warehouse is required for a transfer Challan', code: 'DESTINATION_WAREHOUSE_REQUIRED' });
     }
 
+    const posted = await postChallanInventory(challan, {
+      userId: req.user ? req.user.id : null,
+      createdBy: req.user ? req.user.name : 'System'
+    });
 
-
-    if (challan.deductInventory !== false) {
-      // Check stock availability before finalizing
-      if (challan.items && challan.items.length > 0 && challan.warehouseId) {
-        for (const item of challan.items) {
-          if (!item.productId) continue;
-          const entryQuery = {
-            warehouseId: challan.warehouseId,
-            productId: item.productId,
-            vendorId: item.vendorId || '',
-            packing: item.packing || 1,
-          };
-          if (item.batchNo) entryQuery.batchNo = item.batchNo;
-          const entry = await InventoryEntry.findOne(entryQuery);
-          const available = entry ? entry.qtyBoxes : 0;
-          if ((item.qty || 0) > available) {
-            return res.status(400).json({
-              error: `Insufficient stock for "${item.name}". Available: ${available} boxes, Required: ${item.qty} boxes.${item.batchNo ? ` Batch: ${item.batchNo}` : ''}`
-            });
-          }
-        }
-      }
-
-      // Deduct inventory
-      await deductInventory(challan);
-    }
-
-
-
-    // Sync Customer balance on Challan finalization
-    if (challan.partyName && challan.nettTotal > 0) {
+    // Sale-only financial side effect. Internal/production transfers never affect customer balances.
+    if (posted.challanType === 'sale' && posted.partyName && posted.nettTotal > 0) {
       const Customer = require('../../models/Customer');
-      const cust = await Customer.findOne({
-        $or: [
-          { name: challan.partyName },
-          { company: challan.partyName }
-        ]
-      });
+      const cust = await Customer.findOne({ $or: [{ name: posted.partyName }, { company: posted.partyName }] });
       if (cust) {
-        if (challan.mode === 'cash') {
-          cust.cashBalance = (cust.cashBalance || 0) + challan.nettTotal;
-        } else {
-          cust.regularBalance = (cust.regularBalance || 0) + challan.nettTotal;
-        }
+        if (posted.mode === 'cash') cust.cashBalance = (cust.cashBalance || 0) + posted.nettTotal;
+        else cust.regularBalance = (cust.regularBalance || 0) + posted.nettTotal;
         await cust.save();
       }
     }
 
-    // Update status
-    challan.status = 'finalized';
-    await challan.save();
+    if (posted.salesOrderId) {
+      const Order = require('../../models/Order');
+      const order = await Order.findById(posted.salesOrderId);
+      if (order) {
+        const postedChallans = await Challan.find({ salesOrderId: order._id, status: 'finalized', inventoryPostingStatus: 'posted' }).lean();
+        for (const oi of order.items) {
+          oi.fulfilledQty = postedChallans.flatMap(c => c.items).filter(i => String(i.productId) === String(oi.productId)).reduce((sum, i) => sum + Number(i.qty || 0), 0);
+          oi.backorderedQty = Math.max(0, Number(oi.qty || 0) + Number(oi.freeQty || 0) - Number(oi.fulfilledQty || 0));
+        }
+        const done = order.items.every(i => Number(i.backorderedQty || 0) <= 0);
+        const any = order.items.some(i => Number(i.fulfilledQty || 0) > 0);
+        order.status = done ? 'fulfilled' : (any ? 'partially_fulfilled' : 'processing');
+        await order.save();
+      }
+    }
 
     if (req.io) {
-      req.io.emit('challan_updated', { type: 'finalized', id: challan._id });
-      req.io.emit('inventory_updated', { type: 'challan_finalized', challanId: challan._id });
+      req.io.emit('challan_updated', { type: 'finalized', id: posted._id });
+      req.io.emit('inventory_updated', { type: 'challan_finalized', challanId: posted._id, challanType: posted.challanType });
     }
-    res.json(challan);
 
     const { logAction } = require('../../utils/auditLogger');
     await logAction({
-      action: 'FINALIZE_CHALLAN',
-      description: `Finalized challan: ${challan.challanNo} (Party: ${challan.partyName}, Amt: ₹${challan.nettTotal})`,
-      details: { id: challan._id },
+      action: posted.challanType === 'sale' ? 'FINALIZE_CHALLAN' : 'POST_TRANSFER_CHALLAN',
+      description: `Posted ${posted.challanType} Challan: ${posted.challanNo}`,
+      details: { id: posted._id, destinationWarehouseId: posted.destinationWarehouseId || null },
       req
     });
+
+    res.json(posted);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Challan finalization failed:', err);
+    const status = ['INSUFFICIENT_STOCK','CHALLAN_NOT_POSTABLE','SAME_WAREHOUSE_TRANSFER','DESTINATION_WAREHOUSE_REQUIRED','SOURCE_WAREHOUSE_REQUIRED','PRODUCT_NOT_FOUND','INVALID_QUANTITY'].includes(err.code) ? 400 : 500;
+    res.status(status).json({ error: err.message, code: err.code || 'INVENTORY_TRANSACTION_FAILED', details: err.details || undefined });
   }
 });
 
-// DELETE /api/challans/:id — Remove challan & revert inventories ONLY if finalized
+// POST /api/challans/:id/reverse — controlled compensating reversal for a posted Challan
+router.post('/:id/reverse', idempotency, authorize('challan:delete'), async (req, res) => {
+  try {
+    const challan = await Challan.findById(req.params.id);
+    if (!challan) return res.status(404).json({ error: 'Challan not found', code: 'CHALLAN_NOT_FOUND' });
+    const reversed = await reverseChallanInventory(challan, {
+      userId: req.user ? req.user.id : null,
+      createdBy: req.user ? req.user.name : 'System'
+    });
+    if (req.io) {
+      req.io.emit('challan_updated', { type: 'reversed', id: reversed._id });
+      req.io.emit('inventory_updated', { type: 'challan_reversed', challanId: reversed._id });
+    }
+    res.json(reversed);
+  } catch (err) {
+    const status = ['CHALLAN_NOT_FOUND','CHALLAN_NOT_REVERSIBLE','CHALLAN_ALREADY_REVERSED','REVERSAL_STOCK_SLOT_NOT_FOUND','REVERSAL_DESTINATION_STOCK_MISSING'].includes(err.code) ? 400 : 500;
+    res.status(status).json({ error: err.message, code: err.code || 'CHALLAN_REVERSAL_FAILED', details: err.details || undefined });
+  }
+});
+
+// DELETE /api/challans/:id — only drafts may be deleted; posted Challans are immutable truth documents
 router.delete('/:id', authorize('challan:delete'), async (req, res) => {
   try {
-
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found' });
 
-
-
-    // Only revert inventory and balance if challan was finalized
     if (challan.status === 'finalized') {
-      if (challan.deductInventory !== false) {
-        await revertInventory(challan);
-      }
-
-      if (challan.partyName && challan.nettTotal > 0) {
-        const Customer = require('../../models/Customer');
-        const cust = await Customer.findOne({
-          $or: [
-            { name: challan.partyName },
-            { company: challan.partyName }
-          ]
-        });
-        if (cust) {
-          if (challan.mode === 'cash') {
-            cust.cashBalance = Math.max(0, (cust.cashBalance || 0) - challan.nettTotal);
-          } else {
-            cust.regularBalance = Math.max(0, (cust.regularBalance || 0) - challan.nettTotal);
-          }
-          await cust.save();
-        }
-      }
+      return res.status(409).json({
+        error: 'Posted Challans are immutable and cannot be deleted. Use the controlled reversal workflow.',
+        code: 'POSTED_CHALLAN_IMMUTABLE'
+      });
     }
 
     await Challan.findByIdAndDelete(req.params.id);
-    if (req.io) {
-      req.io.emit('challan_updated', { type: 'deleted', id: req.params.id });
-      req.io.emit('inventory_updated', { type: 'challan_deleted', challanId: req.params.id });
-    }
+    if (req.io) req.io.emit('challan_updated', { type: 'deleted', id: req.params.id });
     res.json({ message: 'Challan deleted' });
-
-    const { logAction } = require('../../utils/auditLogger');
-    await logAction({
-      action: 'DELETE_CHALLAN',
-      description: `Deleted challan: ${challan.challanNo} (Party: ${challan.partyName})`,
-      details: { id: challan._id },
-      req
-    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message, code: 'CHALLAN_DELETE_FAILED' });
   }
 });
 
@@ -395,6 +260,9 @@ router.post('/:id/convert', async (req, res) => {
 
     if (challan.convertedToInvoice) {
       return res.status(400).json({ error: `Challan is already converted to Sale Invoice ${challan.invoiceNo}` });
+    }
+    if (challan.status !== 'finalized' || challan.inventoryPostingStatus !== 'posted') {
+      return res.status(409).json({ error: 'Finalize the Challan before creating its invoice.', code: 'CHALLAN_NOT_POSTED' });
     }
 
 
@@ -469,6 +337,7 @@ router.post('/:id/convert', async (req, res) => {
     // Create invoice data
     const invoiceData = {
       invoiceNo,
+      customerId: customer ? customer._id : null,
       customerName: challan.partyName,
       partyAddress: challan.partyAddress,
       shippingAddress: challan.shippingAddress,
@@ -485,9 +354,12 @@ router.post('/:id/convert', async (req, res) => {
       gstin: finalGstin,
       warehouseId: challan.warehouseId,
       warehouseName: challan.warehouseName,
-      deductInventory: challan.status !== 'finalized', // If challan is finalized, stock is already deducted.
+      deductInventory: false, // Challan has already posted the authoritative physical stock movement.
       isFinalized: false, // create as draft
       type: 'sale',
+      sourceDocType: 'Challan',
+      sourceDocId: challan._id,
+      reference: challan._id.toString(),
       items: invoiceItems
     };
 
@@ -498,6 +370,11 @@ router.post('/:id/convert', async (req, res) => {
     challan.invoiceId = invoice._id;
     challan.invoiceNo = invoice.invoiceNo;
     await challan.save();
+
+    if (challan.salesOrderId) {
+      const Order = require('../../models/Order');
+      await Order.findByIdAndUpdate(challan.salesOrderId, { $addToSet: { invoiceIds: invoice._id } });
+    }
 
     if (req.io) {
       req.io.emit('challan_updated', { type: 'converted', id: challan._id });

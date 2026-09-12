@@ -22,6 +22,7 @@ const stockTransferSchema = new mongoose.Schema({
 
 stockTransferSchema.index({ transferNo: 1 });
 stockTransferSchema.index({ createdAt: -1 });
+stockTransferSchema.index({ challanId: 1 }, { sparse: true });
 
 stockTransferSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('StockTransfer', stockTransferSchema);

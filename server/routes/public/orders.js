@@ -9,111 +9,36 @@ const schemas = require('../../validation/schemas');
 
 const router = express.Router();
 
-// POST /api/orders/public/create — Place an order from the website (no auth)
+// POST /api/orders/public/create — Place a website order. NEVER moves physical stock.
 router.post('/public/create', validate(schemas.orderSchema), async (req, res) => {
   try {
     const { name, email, phone, shippingAddress, items } = req.body;
-    if (!name || !email || !phone || !shippingAddress || !items || !Array.isArray(items) || items.length === 0) {
+    if (!name || !email || !phone || !shippingAddress || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: 'Missing required order fields or items list' });
     }
-
-    let totalAmount = 0;
     const validatedItems = [];
-
+    let totalAmount = 0;
     for (const item of items) {
       const dbProd = await Product.findById(item.productId);
-      if (!dbProd) {
-        return res.status(404).json({ error: `Product not found: ${item.name || item.productId}` });
-      }
-
-      const qty = parseInt(item.qty, 10);
-      if (isNaN(qty) || qty <= 0) {
-        return res.status(400).json({ error: `Invalid quantity for item: ${dbProd.name}` });
-      }
-
-      const hasDiscount = dbProd.discount > 0;
-      const price = hasDiscount
-        ? dbProd.price * (1 - dbProd.discount / 100)
-        : dbProd.price;
-
-      // Check stock across ALL warehouses
-      const allEntries = await InventoryEntry.find({
-        productId: dbProd._id,
-        qtyBoxes: { $gt: 0 }
-      }).sort({ mfgDate: 1, expiryDate: 1, createdAt: 1 });
-
-      const totalAvailableUnits = allEntries.reduce((acc, e) => acc + ((e.qtyBoxes || 0) * (e.packing || 1)), 0);
-
-      if (totalAvailableUnits < qty) {
-        return res.status(400).json({ error: `Insufficient stock for product: ${dbProd.name}. Available: ${totalAvailableUnits} units` });
-      }
-
-      let totalDeductedBoxes = 0;
-      let unitsNeeded = qty;
-      for (const entry of allEntries) {
-        if (unitsNeeded <= 0) break;
-        const packSize = entry.packing || 1;
-        const entryUnits = (entry.qtyBoxes || 0) * packSize;
-        if (entryUnits <= 0) continue;
-
-        const deductUnits = Math.min(unitsNeeded, entryUnits);
-        const deductBoxes = Math.ceil(deductUnits / packSize);
-        const actualDeductBoxes = Math.min(deductBoxes, entry.qtyBoxes || 0);
-        const actualDeductUnits = actualDeductBoxes * packSize;
-        if (actualDeductBoxes <= 0) continue;
-
-        entry.qtyBoxes -= actualDeductBoxes;
-        await entry.save();
-
-        await StockLedger.create({
-          productId: dbProd._id,
-          warehouseId: entry.warehouseId,
-          warehouseName: entry.warehouseName,
-          type: 'OUT',
-          qtyBoxes: actualDeductBoxes,
-          balanceBoxes: entry.qtyBoxes,
-          reference: `Website Order: ${name}`,
-          note: `Web sale — ${item.name}`,
-          createdBy: 'Website',
-          packing: packSize,
-          batchNo: entry.batchNo,
-        });
-
-        totalDeductedBoxes += actualDeductBoxes;
-        unitsNeeded -= actualDeductUnits;
-      }
-
-      validatedItems.push({
-        productId: dbProd._id,
-        name: dbProd.name,
-        qty,
-        price,
-        size: dbProd.size,
-        deductedBoxes: totalDeductedBoxes,
-      });
-
+      if (!dbProd) return res.status(404).json({ error: `Product not found: ${item.name || item.productId}` });
+      const qty = Number(item.qty || 0);
+      if (!Number.isFinite(qty) || qty <= 0) return res.status(400).json({ error: `Invalid quantity for item: ${dbProd.name}` });
+      const price = dbProd.discount > 0 ? Number(dbProd.price || 0) * (1 - dbProd.discount / 100) : Number(dbProd.price || 0);
+      validatedItems.push({ productId: dbProd._id, name: dbProd.name, qty, price, size: dbProd.size || '', fulfilledQty: 0, backorderedQty: qty, deductedBoxes: 0 });
       totalAmount += price * qty;
-
-      dbProd.stockLevel = Math.max(0, dbProd.stockLevel - totalDeductedBoxes);
-      await dbProd.save();
     }
-
+    const count = await Order.countDocuments({});
     const order = await Order.create({
+      orderNo: `WEB-${String(count + 1).padStart(5,'0')}`,
       name, email, phone, shippingAddress,
       items: validatedItems,
-      totalAmount,
+      totalAmount: Number(totalAmount.toFixed(2)),
       status: 'pending',
+      sourceType: 'online'
     });
-
-    if (req.io) {
-      req.io.emit('new_web_order', order);
-      req.io.emit('inventory_updated', { type: 'web_order', orderId: order._id });
-    }
-
-    res.status(201).json({ message: 'Order placed successfully', order });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    if (req.io) req.io.emit('new_web_order', order);
+    res.status(201).json({ message: 'Order placed successfully. Stock will move only when its Challan is finalized.', order });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET /api/public/orders/track/:query — Track orders by Order ID or Phone (no auth)
@@ -198,112 +123,33 @@ router.get('/public/track/:query', async (req, res) => {
   }
 });
 
-// POST /api/orders/public/webhook/storefront — Receive payment webhooks from storefronts (Razorpay/Stripe/Shopify)
+// POST /api/orders/public/webhook/storefront — Financial webhook only. Never deducts inventory.
 router.post('/public/webhook/storefront', async (req, res) => {
   try {
     const Invoice = require('../../models/Invoice');
-    const { orderNo, customerName, amount, items } = req.body; 
-
-    // Handle WooCommerce / Shopify checkout style or generic payment webhook payload:
+    const { orderNo, customerName, amount, items } = req.body;
     const targetOrderNo = orderNo || `WEB-${Date.now().toString().slice(-6)}`;
     const targetCustomerName = customerName || 'Online Store Customer';
-    const targetAmount = parseFloat(amount) || 0;
-    const targetItems = items || []; // [{ productId, name, qty, price }]
-
-    let warehouse = await Warehouse.findOne({ isDefault: true });
-    if (!warehouse) {
-      warehouse = await Warehouse.findOne().sort({ createdAt: 1 });
-    }
-    if (!warehouse) {
-      return res.status(500).json({ error: 'No warehouse configured for inventory deduction.' });
-    }
-
-    // Deduct stock for all items
+    const targetAmount = Number(amount || 0);
     const invoiceItems = [];
-    for (const item of targetItems) {
+    for (const item of (items || [])) {
       const dbProd = await Product.findById(item.productId);
-      if (dbProd) {
-        const qty = parseInt(item.qty, 10) || 1;
-        const price = parseFloat(item.price) || dbProd.price || 0;
-
-        // FIFO Inventory deduction
-        const entries = await InventoryEntry.find({
-          warehouseId: warehouse._id,
-          productId: dbProd._id
-        }).sort({ mfgDate: 1, expiryDate: 1, createdAt: 1 });
-
-        let remainingQty = qty;
-        for (const entry of entries) {
-          if (remainingQty <= 0) break;
-          const packSize = entry.packing || 1;
-          const entryUnits = (entry.qtyBoxes || 0) * packSize;
-          if (entryUnits <= 0) continue;
-
-          const deductUnits = Math.min(remainingQty, entryUnits);
-          const deductBoxes = Math.floor(deductUnits / packSize);
-          entry.qtyBoxes -= deductBoxes;
-          await entry.save();
-
-          await StockLedger.create({
-            productId: dbProd._id,
-            warehouseId: warehouse._id,
-            warehouseName: warehouse.name,
-            type: 'OUT',
-            qtyBoxes: deductBoxes,
-            balanceBoxes: entry.qtyBoxes,
-            reference: `Storefront Webhook Order: #${targetOrderNo}`,
-            note: `Online Sale — ${dbProd.name}`,
-            createdBy: 'Storefront Webhook',
-            packing: packSize,
-            batchNo: entry.batchNo,
-          });
-
-          remainingQty -= (deductBoxes * packSize);
-        }
-
-        invoiceItems.push({
-          productId: dbProd._id,
-          name: dbProd.name,
-          qty,
-          boxes: qty,
-          unit: dbProd.unit || 'pcs',
-          packing: 1,
-          rate: price,
-          gstRate: dbProd.gstRate || 18,
-          hsnCode: dbProd.hsnCode || ''
-        });
-
-        dbProd.stockLevel = Math.max(0, dbProd.stockLevel - qty);
-        await dbProd.save();
-      }
+      if (!dbProd) continue;
+      const qty = Number(item.qty || 1), price = Number(item.price || dbProd.price || 0);
+      invoiceItems.push({ productId: dbProd._id, name: dbProd.name, qty, boxes: qty, unit: dbProd.unit || 'pcs', packing: 1, rate: price, gstRate: dbProd.gstRate || 18, hsnCode: dbProd.hsnCode || '' });
     }
-
-    // Auto-create a finalized paid Invoice
+    const existing = await Invoice.findOne({ invoiceNo: `INV-${targetOrderNo}`, type: 'sale' });
+    if (existing) return res.json({ message: 'Webhook already processed', invoice: existing });
     const invoice = await Invoice.create({
-      invoiceNo: `INV-${targetOrderNo}`,
-      date: new Date(),
-      customerName: targetCustomerName,
-      amount: targetAmount,
-      status: 'paid',
-      mode: 'cash',
-      type: 'sale',
-      isFinalized: true,
-      items: invoiceItems,
-      baseAmount: targetAmount / 1.18,
-      cgst: (targetAmount - targetAmount / 1.18) / 2,
-      sgst: (targetAmount - targetAmount / 1.18) / 2,
-      amountPaid: targetAmount
+      invoiceNo: `INV-${targetOrderNo}`, date: new Date(), customerName: targetCustomerName,
+      amount: targetAmount, status: 'paid', mode: 'cash', type: 'sale', isFinalized: true,
+      deductInventory: false, sourceDocType: '', items: invoiceItems,
+      baseAmount: targetAmount / 1.18, cgst: (targetAmount - targetAmount / 1.18) / 2,
+      sgst: (targetAmount - targetAmount / 1.18) / 2, amountPaid: targetAmount
     });
-
-    if (req.io) {
-      req.io.emit('new_web_order', { orderNo: targetOrderNo, customerName: targetCustomerName, amount: targetAmount });
-      req.io.emit('inventory_updated', { type: 'webhook', invoiceId: invoice._id });
-    }
-
-    res.status(201).json({ message: 'Storefront webhook processed and invoice generated successfully', invoice });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    if (req.io) req.io.emit('new_web_order', { orderNo: targetOrderNo, customerName: targetCustomerName, amount: targetAmount });
+    res.status(201).json({ message: 'Payment recorded. Physical stock remains controlled by the Sale Challan.', invoice });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;

@@ -12,9 +12,11 @@ const warehouseSchema = new mongoose.Schema({
   phone:         { type: String, default: '', trim: true },
   isDefault:     { type: Boolean, default: false },
   type:          { type: String, enum: ['main', 'manufacturing', 'dealer_consignment'], default: 'main' },
+  manufacturingUnitId: { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit', default: null },
   customerId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
   dealerName:    { type: String, default: '', trim: true },
 }, { timestamps: true });
 
+warehouseSchema.index({ manufacturingUnitId: 1 }, { unique: true, sparse: true });
 warehouseSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Warehouse', warehouseSchema);

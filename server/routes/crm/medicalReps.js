@@ -10,6 +10,7 @@ const Contact = require('../../models/Contact');
 const Customer = require('../../models/Customer');
 const Doctor = require('../../models/Doctor');
 const MrLeave = require('../../models/MrLeave');
+const MrAssignment = require('../../models/MrAssignment');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
@@ -160,6 +161,56 @@ router.delete('/:id', authorize('mr:delete'), async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─── Flexible Portfolio / Assignment Management ───
+
+router.get('/:mrId/assignments', authorize('mr:view'), async (req, res) => {
+  try {
+    if (!(await verifyMrAccess(req, req.params.mrId))) return res.status(403).json({ error: 'Access denied' });
+    const { entityType, active = 'true', area, territory } = req.query;
+    const filter = { mrId: req.params.mrId };
+    if (active !== 'all') filter.isActive = active === 'true';
+    if (entityType) filter.entityType = entityType;
+    if (area) filter.area = { $regex: String(area).trim(), $options: 'i' };
+    if (territory) filter.territory = { $regex: String(territory).trim(), $options: 'i' };
+    const data = await MrAssignment.find(filter).sort({ priority: 1, area: 1, entityName: 1 }).lean();
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/:mrId/assignments', authorize('mr:edit'), async (req, res) => {
+  try {
+    if (!(await verifyMrAccess(req, req.params.mrId))) return res.status(403).json({ error: 'Access denied' });
+    const { entityType, entityId, entityName, entityPhone, territory, area, role, priority, preferredVisitDays, preferredVisitTime, startDate, endDate, notes } = req.body;
+    if (!entityType || !entityName) return res.status(400).json({ error: 'entityType and entityName are required' });
+    const assignment = await MrAssignment.create({ mrId: req.params.mrId, entityType, entityId: entityId || null, entityName, entityPhone, territory, area, role, priority, preferredVisitDays, preferredVisitTime, startDate, endDate, notes });
+    if (req.io) req.io.emit('medrep_updated', { type: 'assignment_created', mrId: req.params.mrId, id: assignment._id });
+    res.status(201).json(assignment);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+router.put('/assignments/:assignmentId', authorize('mr:edit'), async (req, res) => {
+  try {
+    const assignment = await MrAssignment.findByIdAndUpdate(req.params.assignmentId, req.body, { new: true, runValidators: true });
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+    res.json(assignment);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+router.delete('/assignments/:assignmentId', authorize('mr:edit'), async (req, res) => {
+  try {
+    const assignment = await MrAssignment.findByIdAndUpdate(req.params.assignmentId, { isActive: false, endDate: new Date() }, { new: true });
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+    res.json({ message: 'Assignment ended', assignment });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/assignments/entity/:entityType/:entityId', authorize('mr:view'), async (req, res) => {
+  try {
+    const data = await MrAssignment.find({ entityType: req.params.entityType, entityId: req.params.entityId, isActive: true }).populate('mrId', 'name code phone').lean();
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ─── Daily Attendance (Check-in / Check-out) ───

@@ -989,6 +989,26 @@ export type Order = {
   dispatchNo?: string | null;
 };
 
+export type MrAssignment = {
+  _id: string;
+  mrId: string;
+  entityType: 'doctor' | 'chemist' | 'stockist' | 'institution' | 'distributor' | 'other';
+  entityId?: string | null;
+  entityName: string;
+  entityPhone?: string;
+  territory?: string;
+  area?: string;
+  role: 'primary' | 'secondary' | 'temporary';
+  priority: 'A' | 'B' | 'C' | 'normal';
+  preferredVisitDays?: string[];
+  preferredVisitTime?: string;
+  startDate?: string;
+  endDate?: string | null;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
 export type MedicalRepresentative = {
   _id: string;
   name: string;
@@ -997,6 +1017,14 @@ export type MedicalRepresentative = {
   code?: string;
   photo?: string;
   territory?: string;
+  territories?: string[];
+  division?: string;
+  team?: string;
+  designation?: string;
+  employmentType?: 'full_time' | 'part_time' | 'contract' | 'other';
+  backupMrId?: string | null;
+  defaultVisitTypes?: string[];
+  targetConfig?: { sales?: number; visits?: number; newDoctors?: number; followUps?: number; orders?: number };
   reportingTo?: { _id: string; name: string; email: string } | null;
   dateOfJoining?: string;
   isActive: boolean;
