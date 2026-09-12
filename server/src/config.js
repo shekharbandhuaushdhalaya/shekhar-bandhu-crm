@@ -6,14 +6,9 @@ function required(name) {
   return value || '';
 }
 
-const defaultProdOrigins = [
-  'https://shekhar-bandhu-crm.vercel.app',
-  ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL] : [])
-];
-
 const rawOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : (isProduction ? defaultProdOrigins : []);
+  : [];
 
 const origins = rawOrigins
   .map(s => s.trim())
@@ -31,7 +26,9 @@ function positiveInt(name, fallback) {
 
 if (isProduction) {
   const jwtSecret = required('JWT_SECRET');
+  const publicFirmId = required('PUBLIC_FIRM_ID');
   if (jwtSecret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters in production');
+  if (!/^[a-f0-9]{24}$/i.test(publicFirmId)) throw new Error('PUBLIC_FIRM_ID must be a valid 24-character MongoDB ObjectId in production');
   if (origins.length === 0) throw new Error('ALLOWED_ORIGINS must contain at least one exact origin in production');
   if (origins.includes('*') || origins.some(origin => origin.includes('*'))) {
     throw new Error('Wildcard origins are not allowed in production');
@@ -63,7 +60,13 @@ module.exports = {
   enforceTenancy: process.env.ENFORCE_TENANCY !== 'false',
   workerPollMs: positiveInt('WORKER_POLL_MS', 2000),
   isOriginAllowed(origin) {
+    // Requests without an Origin header (server-to-server, health checks, curl) are not CORS requests.
     if (!origin) return true;
+
+    // Production is intentionally exact-match only. Preview domains, localhost, wildcards,
+    // and implicit Render/Vercel domains must be listed explicitly in ALLOWED_ORIGINS.
+    if (isProduction) return allowedOrigins.includes(origin);
+
     if (allowedOrigins.includes('*')) return true;
     if (allowedOrigins.includes(origin)) return true;
     if (/\.vercel\.app$/i.test(origin)) return true;

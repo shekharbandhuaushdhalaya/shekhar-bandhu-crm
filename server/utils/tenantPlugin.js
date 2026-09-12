@@ -22,21 +22,23 @@ module.exports = function tenantPlugin(schema) {
     schema.index(nextFields, nextOptions);
   }
 
-  const addTenantFilter = function () {
+  const addTenantFilter = function (next) {
     const firmId = getFirmId();
     if (firmId) {
       const query = this.getQuery();
       if (query.firmId && String(query.firmId) !== String(firmId)) {
-        this.setQuery({ _id: { $exists: false }, firmId });
+        this.setQuery({ ...query, _id: { $exists: false } });
       } else {
         this.setQuery({ ...query, firmId });
       }
     }
+    if (typeof next === 'function') next();
   };
   ['find','findOne','findOneAndUpdate','findOneAndDelete','findOneAndReplace','countDocuments','exists','distinct','deleteMany','updateMany'].forEach(h => schema.pre(h, addTenantFilter));
-  schema.pre('aggregate', function () {
+  schema.pre('aggregate', function (next) {
     const firmId = getFirmId();
     if (firmId) { const stage = { $match: { firmId } }; const first = this.pipeline()[0]; if (first && (first.$geoNear || first.$search)) this.pipeline().splice(1, 0, stage); else this.pipeline().unshift(stage); }
+    if (typeof next === 'function') next();
   });
   schema.pre('save', function(next) {
     const firmId = getFirmId();

@@ -254,6 +254,6 @@ describe('Compliance and Operations Features', () => {
       expect(response.status).toBe(200);
       expect(response.body.transfer ? response.body.transfer.status : response.body.status).toBe('in_transit');
       expect(mockTransfer.save).toHaveBeenCalled();
-    }, 20000);
+    });
   });
 });

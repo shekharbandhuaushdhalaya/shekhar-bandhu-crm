@@ -11,7 +11,8 @@
     "migrate:line-clearance-phases": "node scripts/migrate-line-clearance-phases.js",
     "backup:database": "node scripts/backup-database.js",
     "restore:database": "node scripts/restore-database.js",
-    "bootstrap:admin": "node scripts/seed-admin.js"
+    "bootstrap:admin": "node scripts/seed-admin.js",
+    "test:ci": "jest --runInBand --detectOpenHandles"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

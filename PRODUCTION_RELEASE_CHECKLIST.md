@@ -32,3 +32,12 @@
 - Forms warn about unsaved changes where appropriate.
 - Lists use pagination/search rather than loading unbounded datasets.
 - Mobile drawer, keyboard handling and narrow screens are tested.
+
+## Mandatory automated production gate
+
+The repository includes `.github/workflows/production-gate.yml`. A production release must not be deployed unless both CI jobs pass on the exact commit/tag being released.
+
+- Backend: `npm ci` → `npm run lint` → `npm run test:ci` → production dependency audit.
+- CRM frontend: `npm ci` → `npm run typecheck` → `npm run build` → production dependency audit.
+- Production CORS is exact-match only. Every browser origin must be explicitly listed in `ALLOWED_ORIGINS`.
+- `PUBLIC_FIRM_ID` is mandatory in production and must be a valid MongoDB ObjectId. Public storefront routes never guess a tenant in production.
