@@ -1,8 +1,14 @@
 const Task = require('../models/Task');
 const Notification = require('../models/Notification');
+const Firm = require('../models/Firm');
 const { checkOverdueTasks } = require('../utils/taskOverdueChecker');
 
 jest.mock('../models/Notification');
+// checkOverdueTasks now iterates every active tenant (Firm.find) and runs the
+// per-firm check inside runWithTenant, instead of doing one global scan. Mock
+// Firm so that outer loop doesn't hang on a real unconnected Mongoose model,
+// and so the per-firm body below still runs exactly once.
+jest.mock('../models/Firm');
 
 describe('Task Assignment and Overdue Detection Logic', () => {
   afterEach(() => {
@@ -36,6 +42,7 @@ describe('Task Assignment and Overdue Detection Logic', () => {
 
     jest.spyOn(Task, 'find').mockResolvedValue([mockTask]);
     Notification.create.mockResolvedValue({ _id: 'notif_1' });
+    Firm.find.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: 'firm_1' }]) }) });
 
     await checkOverdueTasks(null);
 

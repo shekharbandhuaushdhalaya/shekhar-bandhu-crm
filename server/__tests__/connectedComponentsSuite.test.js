@@ -111,33 +111,14 @@ describe('Connected Standalone Components Suite (Options 1 & 3)', () => {
 
   // Option 3 Tests
   describe('Option 3: Field MR Order Booking ↔ Sales Targets & Commissions', () => {
-    test('POST /api/orders/public/create with mrId calculates 2% commission and updates SalesTarget', async () => {
-      Product.findById.mockResolvedValue({
-        _id: 'prod_1',
-        name: 'Ashwagandha Syrup',
-        price: 200,
-        discount: 0,
-        stockLevel: 100,
-        save: jest.fn().mockResolvedValue(true)
-      });
-
-      InventoryEntry.find.mockReturnValue({
-        sort: jest.fn().mockResolvedValue([
-          { _id: 'inv_1', qtyBoxes: 50, packing: 1, save: jest.fn() }
-        ])
-      });
-
-      StockLedger.create.mockResolvedValue(true);
-      SalesTarget.findOneAndUpdate.mockResolvedValue(true);
-
-      const mockOrder = {
-        _id: 'ord_101',
-        totalAmount: 10000,
-        mrId: 'mr_777',
-        commissionAmount: 200
-      };
-      Order.create.mockResolvedValue(mockOrder);
-
+    // POST /api/orders/public/create was intentionally retired (410 Gone) as
+    // part of hardening public/customer-facing order creation: unauthenticated
+    // order submission with commission calculation was a legitimate attack
+    // surface (fake orders could credit a fabricated mrId with commission and
+    // move a real SalesTarget). Public order submission must now go through
+    // the authenticated customer portal, which creates a Sales Order instead.
+    // See routes/public/orders.js and routes/sales/orders.js.
+    test('POST /api/orders/public/create is retired and returns 410 Gone', async () => {
       const res = await request(app)
         .post('/api/orders/public/create')
         .send({
@@ -150,15 +131,9 @@ describe('Connected Standalone Components Suite (Options 1 & 3)', () => {
           items: [{ productId: 'prod_1', qty: 50 }]
         });
 
-      expect(res.status).toBe(201);
-      expect(Order.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mrId: 'mr_777',
-          commissionAmount: 200,
-          incentiveCredited: true
-        })
-      );
-      expect(SalesTarget.findOneAndUpdate).toHaveBeenCalled();
+      expect(res.status).toBe(410);
+      expect(res.body.code).toBe('LEGACY_ORDER_ENDPOINT_RETIRED');
+      expect(Order.create).not.toHaveBeenCalled();
     });
 
     test('GET /api/medical-reps/:mrId/sales-performance returns MR sales ledger & commissions', async () => {

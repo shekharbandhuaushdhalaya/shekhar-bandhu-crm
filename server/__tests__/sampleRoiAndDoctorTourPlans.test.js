@@ -3,7 +3,14 @@ const request = require('supertest');
 
 jest.mock('../models/Doctor');
 jest.mock('../models/Invoice');
-jest.mock('../models/MrSampleStock');
+// Field-bag sample stock now lives on the canonical MrSampleBag model, and
+// sample issuance to a doctor runs inside a real Mongoose transaction via
+// mrSampleInventoryService.consumeSamplesFromMr (see routes/crm/medicalReps.js).
+jest.mock('../models/MrSampleBag');
+jest.mock('../services/mrSampleInventoryService');
+jest.mock('../utils/withTransaction', () => ({
+  withTransaction: jest.fn(work => work(null)),
+}));
 jest.mock('../models/MrSampleIssuance');
 jest.mock('../models/MedicalRepresentative');
 jest.mock('../models/MrVisit');
@@ -14,12 +21,12 @@ jest.mock('../models/SampleConversion');
 
 const Doctor = require('../models/Doctor');
 const Invoice = require('../models/Invoice');
-const MrSampleStock = require('../models/MrSampleStock');
 const MrSampleIssuance = require('../models/MrSampleIssuance');
 const MedicalRepresentative = require('../models/MedicalRepresentative');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
 const SampleConversion = require('../models/SampleConversion');
+const { consumeSamplesFromMr } = require('../services/mrSampleInventoryService');
 
 RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
 
@@ -48,25 +55,37 @@ describe('Task 3: Sample Issuance Log, Doctor ROI & Doctor-Linked Tour Planning'
   });
 
   describe('3a. Sample Issuance Log', () => {
+    // Issuance now runs inside a real Mongoose transaction: sample stock is
+    // debited from the canonical MrSampleBag via
+    // mrSampleInventoryService.consumeSamplesFromMr (mocked below) instead of
+    // a direct MrSampleStock.findOneAndUpdate, and MrSampleIssuance/
+    // SampleConversion are both created with the transaction session. See
+    // routes/crm/medicalReps.js.
     test('POST /api/mr-sample-stock/issue-to-doctor decrements stock and creates MrSampleIssuance and SampleConversion records', async () => {
-      MrSampleStock.findOneAndUpdate.mockResolvedValue({ mrId: 'mr_101', productId: 'prod_101', qty: 20 });
+      consumeSamplesFromMr.mockResolvedValue({ mrId: 'mr_101', productId: 'prod_101', qty: 15 });
       Product.findById.mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ price: 150, name: 'Ashwagandha Churna' })
+        session: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({ price: 150, name: 'Ashwagandha Churna' })
+        })
       });
       MedicalRepresentative.findById.mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ _id: 'mr_101', name: 'Ramesh' })
+        session: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({ _id: 'mr_101', name: 'Ramesh' })
+        })
       });
       Doctor.findById.mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ _id: 'doc_101', name: 'Dr. S. K. Roy' })
+        session: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({ _id: 'doc_101', name: 'Dr. S. K. Roy' })
+        })
       });
-      MrSampleIssuance.create.mockImplementation(async (data) => ({
+      MrSampleIssuance.create.mockImplementation(async ([data]) => [{
         _id: 'issuance_1',
         ...data
-      }));
-      SampleConversion.create.mockImplementation(async (data) => ({
+      }]);
+      SampleConversion.create.mockImplementation(async ([data]) => [{
         _id: 'conversion_1',
         ...data
-      }));
+      }]);
 
       const res = await request(app)
         .post('/api/mr-sample-stock/issue-to-doctor')
@@ -79,25 +98,30 @@ describe('Task 3: Sample Issuance Log, Doctor ROI & Doctor-Linked Tour Planning'
         });
 
       expect(res.status).toBe(201);
-      expect(MrSampleStock.findOneAndUpdate).toHaveBeenCalledWith(
-        { mrId: 'mr_101', productId: 'prod_101' },
-        { $inc: { qty: -5 } },
-        { upsert: false }
+      expect(consumeSamplesFromMr).toHaveBeenCalledWith(expect.objectContaining({
+        mrId: 'mr_101',
+        sampleDetails: [expect.objectContaining({ productId: 'prod_101', qty: 5 })]
+      }));
+      expect(MrSampleIssuance.create).toHaveBeenCalledWith(
+        [expect.objectContaining({
+          mrId: 'mr_101',
+          doctorId: 'doc_101',
+          productId: 'prod_101',
+          qty: 5,
+          unitCost: 150
+        })],
+        expect.any(Object)
       );
-      expect(MrSampleIssuance.create).toHaveBeenCalledWith(expect.objectContaining({
-        mrId: 'mr_101',
-        doctorId: 'doc_101',
-        productId: 'prod_101',
-        qty: 5,
-        unitCost: 150
-      }));
-      expect(SampleConversion.create).toHaveBeenCalledWith(expect.objectContaining({
-        mrId: 'mr_101',
-        doctorId: 'doc_101',
-        productId: 'prod_101',
-        samplesQtyGiven: 5,
-        conversionStatus: 'pending'
-      }));
+      expect(SampleConversion.create).toHaveBeenCalledWith(
+        [expect.objectContaining({
+          mrId: 'mr_101',
+          doctorId: 'doc_101',
+          productId: 'prod_101',
+          samplesQtyGiven: 5,
+          conversionStatus: 'pending'
+        })],
+        expect.any(Object)
+      );
     });
   });
 

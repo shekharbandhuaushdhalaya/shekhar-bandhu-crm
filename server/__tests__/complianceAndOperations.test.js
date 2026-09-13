@@ -21,6 +21,26 @@ jest.mock('../models/StockMovement');
 jest.mock('../models/MrDailyLog');
 jest.mock('../models/MrExpense');
 jest.mock('../models/RolePermission');
+// The stock-transfer and MR routes exercised here allocate document numbers
+// through the atomic, tenant-scoped Counter model (see utils/documentCounter.js);
+// mock it so findOneAndUpdate() doesn't hang against a real unconnected model.
+jest.mock('../models/Counter', () => ({
+  findOneAndUpdate: jest.fn().mockResolvedValue({ seq: 1 }),
+}));
+// Stock-transfer shipping now creates/posts an authoritative Transfer Challan
+// instead of deducting stock directly (see routes/inventory/transfers.js).
+jest.mock('../models/Challan');
+jest.mock('../services/challanInventoryService', () => ({
+  postChallanInventory: jest.fn(),
+  reverseChallanInventory: jest.fn(),
+}));
+// MR visit creation + sample consumption is now one real Mongoose transaction
+// (see routes/crm/medicalReps.js). Real transactions need a replica-set
+// connection this sandbox doesn't have, so run the callback without a session
+// for these mocked-model unit tests.
+jest.mock('../utils/withTransaction', () => ({
+  withTransaction: jest.fn(work => work(null)),
+}));
 
 const Customer = require('../models/Customer');
 const Vendor = require('../models/Vendor');
@@ -41,6 +61,8 @@ const Payment = require('../models/Payment');
 const StockMovement = require('../models/StockMovement');
 const MrDailyLog = require('../models/MrDailyLog');
 const MrExpense = require('../models/MrExpense');
+const Challan = require('../models/Challan');
+const { postChallanInventory } = require('../services/challanInventoryService');
 
 // Routers
 const complianceRouter = require('../routes/inventory/compliance');
@@ -163,7 +185,10 @@ describe('Compliance and Operations Features', () => {
       Doctor.findById.mockResolvedValue(null);
       Doctor.findOne.mockResolvedValue(mockDocLoc);
 
-      MrVisit.create.mockImplementation(data => Promise.resolve({ _id: 'visit_99', ...data }));
+      // MrVisit.create is now called as MrVisit.create([data], { session }) inside
+      // withTransaction, so the mock must resolve to an array (Mongoose's own
+      // array-form behavior) for the route's `const [created] = ...` destructure.
+      MrVisit.create.mockImplementation(([data]) => Promise.resolve([{ _id: 'visit_99', ...data }]));
       MedicalRepresentative.findById.mockResolvedValue({ name: 'Rajesh' });
       StockMovement.countDocuments.mockResolvedValue(0);
       StockMovement.create.mockResolvedValue({});
@@ -210,32 +235,42 @@ describe('Compliance and Operations Features', () => {
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.transferNo).toBe('TRSF-0001');
+      // Stock-transfer numbers are now 5-digit padded via the atomic Counter
+      // (routes/inventory/transfers.js), up from 4 digits previously.
+      expect(response.body.transferNo).toBe('TRSF-00001');
       expect(response.body.status).toBe('pending');
     });
 
-    test('PATCH /api/inventory/transfers/:id/ship handles stock deduction from source', async () => {
+    // Shipping was reworked to route physical movement through a single
+    // authoritative Transfer Challan (posted via challanInventoryService)
+    // instead of deducting InventoryEntry/StockLedger directly in this route.
+    test('PATCH /api/inventory/transfers/:id/ship creates/posts the authoritative Transfer Challan', async () => {
       const mockTransfer = {
         _id: 'transfer_01',
-        transferNo: 'TRSF-0001',
-        fromWarehouseId: '507f1f77bcf86cd799439011',
-        fromWarehouseName: 'Source W',
-        toWarehouseName: 'Target W',
+        transferNo: 'TRSF-00001',
+        fromWarehouseId: { equals: jest.fn().mockReturnValue(false) },
+        toWarehouseId: 'wh_to_1',
+        items: [{ productId: '507f1f77bcf86cd799439013', productName: 'Syp Kof-K', qtyBoxes: 5, packing: 1, batchNo: 'B-1' }],
         status: 'pending',
-        items: [{ productId: '507f1f77bcf86cd799439013', qtyBoxes: 5, packing: 1, batchNo: 'B-1' }],
         save: jest.fn().mockResolvedValue(true)
       };
 
       StockTransfer.findById.mockResolvedValue(mockTransfer);
-      InventoryEntry.findOne.mockResolvedValue({
-        qtyBoxes: 10,
-        save: jest.fn().mockResolvedValue(true)
-      });
-      StockLedger.create.mockResolvedValue({});
+      Warehouse.findById
+        .mockResolvedValueOnce({ _id: 'wh_from_1', name: 'Varanasi Central' })
+        .mockResolvedValueOnce({ _id: 'wh_to_1', name: 'Delhi Depot', addressLine1: 'Depot Rd', city: 'Delhi', state: 'DL', pincode: '110001' });
+      Challan.findById.mockResolvedValue(null);
+      Challan.findOne.mockResolvedValue(null);
+      const createdChallan = { _id: 'challan_1', challanNo: 'TR-CH-00001' };
+      Challan.create.mockResolvedValue(createdChallan);
+      postChallanInventory.mockResolvedValue({ _id: 'challan_1', challanNo: 'TR-CH-00001' });
 
       const response = await request(app).patch('/api/inventory/transfers/transfer_01/ship');
       expect(response.status).toBe(200);
-      expect(response.body.status).toBe('in_transit');
+      expect(response.body.transfer.status).toBe('in_transit');
+      expect(response.body.challan.challanNo).toBe('TR-CH-00001');
+      expect(Challan.create).toHaveBeenCalled();
+      expect(postChallanInventory).toHaveBeenCalledWith(createdChallan, expect.any(Object));
       expect(mockTransfer.save).toHaveBeenCalled();
     });
   });

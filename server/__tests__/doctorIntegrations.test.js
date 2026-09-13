@@ -4,7 +4,10 @@ const request = require('supertest');
 // Mocks
 jest.mock('../models/Doctor');
 jest.mock('../models/Invoice');
-jest.mock('../models/MrSampleStock');
+// The MR field-bag sample stock read/write path was consolidated onto the
+// canonical MrSampleBag model (Warehouse -> MR Bag -> Doctor); MrSampleStock
+// is no longer read by these routes. See routes/crm/medicalReps.js.
+jest.mock('../models/MrSampleBag');
 jest.mock('../models/MedicalRepresentative');
 jest.mock('../models/MrVisit');
 jest.mock('../models/Notification');
@@ -16,6 +19,19 @@ jest.mock('../models/RetentionSample');
 jest.mock('../models/Product');
 jest.mock('../models/RolePermission');
 jest.mock('../models/PharmacopoeiaEntry');
+// sendDoctorGreetings/checkOverdueTasks-style scanners now iterate every
+// active tenant (Firm.find) and run per-firm inside runWithTenant. Mock Firm
+// so this outer loop doesn't hang on a real unconnected Mongoose model.
+jest.mock('../models/Firm');
+// Sample issuance to the MR field bag and MrVisit creation now run inside a
+// real Mongoose transaction (see services/mrSampleInventoryService.js and
+// routes/crm/medicalReps.js). Run the callback without a session for these
+// mocked-model unit tests, since a real replica-set transaction isn't
+// available in this sandbox.
+jest.mock('../utils/withTransaction', () => ({
+  withTransaction: jest.fn(work => work(null)),
+}));
+jest.mock('../services/mrSampleInventoryService');
 jest.mock('../utils/botanicalLookup', () => ({
   getBotanicalProfile: jest.fn().mockResolvedValue({ latinName: 'Withania somnifera', partUsed: 'Root', standard: 'API', monographRef: 'API Part I, Vol I, Pg 15' })
 }));
@@ -24,7 +40,7 @@ jest.setTimeout(15000);
 
 const Doctor = require('../models/Doctor');
 const Invoice = require('../models/Invoice');
-const MrSampleStock = require('../models/MrSampleStock');
+const MrSampleBag = require('../models/MrSampleBag');
 const MedicalRepresentative = require('../models/MedicalRepresentative');
 const MrVisit = require('../models/MrVisit');
 const Notification = require('../models/Notification');
@@ -87,7 +103,7 @@ describe('5 CRM Enhancements Integration Suite', () => {
 
   describe('2. MR Field Bag Sample Stock', () => {
     test('GET /api/medical-reps/:mrId/sample-stock returns MR bag inventory', async () => {
-      MrSampleStock.find.mockReturnValue({
+      MrSampleBag.find.mockReturnValue({
         populate: jest.fn().mockReturnValue({
           lean: jest.fn().mockResolvedValue([{ mrId: 'mr_1', qty: 10 }])
         })
@@ -98,11 +114,13 @@ describe('5 CRM Enhancements Integration Suite', () => {
       expect(res.body).toHaveLength(1);
     });
 
+    // Issuance now goes through mrSampleInventoryService.issueSamplesToMr inside
+    // a transaction rather than a direct MrSampleStock.findOneAndUpdate; mock the
+    // service itself since it owns the Warehouse/InventoryEntry/StockLedger writes.
     test('POST /api/medical-reps/:mrId/sample-stock/issue updates bag stock', async () => {
       MedicalRepresentative.findById.mockResolvedValue({ name: 'Rajesh' });
-      MrSampleStock.findOneAndUpdate.mockReturnValue({
-        populate: jest.fn().mockResolvedValue({ mrId: 'mr_1', qty: 15 })
-      });
+      const { issueSamplesToMr } = require('../services/mrSampleInventoryService');
+      issueSamplesToMr.mockResolvedValue({ warehouse: { _id: 'wh_1' }, items: [{ mrId: 'mr_1', qty: 15 }] });
 
       const res = await request(app)
         .post('/api/medical-reps/mr_1/sample-stock/issue')
@@ -115,6 +133,8 @@ describe('5 CRM Enhancements Integration Suite', () => {
 
   describe('3. Automated Doctor Birthday & Anniversary Greetings', () => {
     test('sendDoctorGreetings dispatches SMS & creates notification for matching doctor event', async () => {
+      const Firm = require('../models/Firm');
+      Firm.find.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: 'firm_1' }]) }) });
       const today = new Date();
       Doctor.find.mockReturnValue({
         populate: jest.fn().mockReturnValue({
@@ -132,8 +152,10 @@ describe('5 CRM Enhancements Integration Suite', () => {
 
       Notification.create.mockResolvedValue({});
 
-      const result = await sendDoctorGreetings();
-      expect(result.sentCount).toBeGreaterThanOrEqual(1);
+      // sendDoctorGreetings() now iterates every active tenant/Firm and
+      // returns one result per firm (see utils/digestScheduler.js).
+      const results = await sendDoctorGreetings();
+      expect(results[0].sentCount).toBeGreaterThanOrEqual(1);
       expect(Notification.create).toHaveBeenCalled();
     });
   });

@@ -9,6 +9,11 @@ jest.mock('../models/RetentionSample');
 jest.mock('../models/Recall');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/RolePermission');
+// Order tracking now resolves dispatches through the authoritative Challan
+// (posted, finalized) instead of a direct Order->Dispatch lookup; see
+// routes/portal/portal.js. Mock Challan so Challan.find() doesn't hang
+// against a real unconnected Mongoose model.
+jest.mock('../models/Challan');
 jest.mock('../middleware/authenticatePortalCustomer', () => ({
   authenticatePortalCustomer: (req, res, next) => {
     req.customer = req.customer || {
@@ -29,6 +34,7 @@ const Dispatch = require('../models/Dispatch');
 const RetentionSample = require('../models/RetentionSample');
 const Recall = require('../models/Recall');
 const SystemSettings = require('../models/SystemSettings');
+const Challan = require('../models/Challan');
 const RolePermission = require('../models/RolePermission');
 
 RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
@@ -128,51 +134,60 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
       expect(res.body[0].orderNo).toBe('ORD-1001');
     });
 
+    // Tracking was reworked to resolve dispatches through the authoritative,
+    // posted Sale Challan linked to the order (see routes/portal/portal.js),
+    // and the customer scope is now enforced inside the Order query itself
+    // (Order.findOne({ _id, customerId })) rather than checked after the fetch.
     test('GET /api/portal/orders/:id/track returns tracking info if customer owns order', async () => {
-      Order.findById.mockReturnValue({
+      Order.findOne.mockReturnValue({
         lean: jest.fn().mockResolvedValue({
           _id: 'ord_1',
           orderNo: 'ORD-1001',
           customerId: 'cust_999',
-          customerName: 'Sharma Pharmacy',
           status: 'dispatched',
           totalAmount: 15000
         })
       });
 
-      Dispatch.findOne.mockReturnValue({
-        lean: jest.fn().mockResolvedValue({
-          _id: 'disp_1',
-          orderId: 'ord_1',
-          carrier: 'VRL Logistics',
-          vehicleNo: 'UP65-AT-1234',
-          ewayBillNo: 'EWB-99887766',
-          status: 'in_transit'
+      Challan.find.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue([{ _id: 'challan_1', challanNo: 'CH-0001' }])
+        })
+      });
+
+      Dispatch.find.mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue([{
+            _id: 'disp_1',
+            challanId: 'challan_1',
+            transporter: 'VRL Logistics',
+            vehicleNo: 'UP65-AT-1234',
+            status: 'in_transit',
+            dispatchDate: new Date('2026-09-01')
+          }])
         })
       });
 
       const res = await request(app).get('/api/portal/orders/ord_1/track');
       expect(res.status).toBe(200);
       expect(res.body.orderNo).toBe('ORD-1001');
-      expect(res.body.tracking.dispatched).toBe(true);
-      expect(res.body.tracking.carrier).toBe('VRL Logistics');
-      expect(res.body.tracking.vehicleNo).toBe('UP65-AT-1234');
+      expect(Array.isArray(res.body.tracking)).toBe(true);
+      expect(res.body.tracking[0].transporter).toBe('VRL Logistics');
+      expect(res.body.tracking[0].vehicleNo).toBe('UP65-AT-1234');
     });
 
-    test('GET /api/portal/orders/:id/track returns 403 if order belongs to another customer', async () => {
-      Order.findById.mockReturnValue({
-        lean: jest.fn().mockResolvedValue({
-          _id: 'ord_other',
-          orderNo: 'ORD-9999',
-          customerId: 'cust_other_888',
-          customerName: 'Other Store',
-          status: 'dispatched'
-        })
+    // Because the customer scope is now part of the query, an order that
+    // belongs to another customer simply doesn't match and returns 404 —
+    // this avoids leaking whether the order ID exists at all (an improvement
+    // over the previous fetch-then-403 pattern).
+    test('GET /api/portal/orders/:id/track returns 404 if order belongs to another customer', async () => {
+      Order.findOne.mockReturnValue({
+        lean: jest.fn().mockResolvedValue(null)
       });
 
       const res = await request(app).get('/api/portal/orders/ord_other/track');
-      expect(res.status).toBe(403);
-      expect(res.body.error).toContain('Forbidden');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toContain('Order not found');
     });
   });
 

@@ -9,6 +9,12 @@ jest.mock('../models/ProductionPlan');
 jest.mock('../models/Product');
 jest.mock('../models/Warehouse');
 jest.mock('../models/RolePermission');
+// quarantine.js allocates lot/report numbers through the atomic, tenant-scoped
+// Counter model (see utils/documentCounter.js); mock it so findOneAndUpdate()
+// doesn't hang against a real unconnected Mongoose model.
+jest.mock('../models/Counter', () => ({
+  findOneAndUpdate: jest.fn().mockResolvedValue({ seq: 1 }),
+}));
 jest.mock('../routes/analytics/demandForecasting', () => ({
   computeDemandForecast: jest.fn().mockResolvedValue([
     {

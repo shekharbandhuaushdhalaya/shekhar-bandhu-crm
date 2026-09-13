@@ -10,6 +10,12 @@ jest.mock('../models/BillOfMaterials');
 jest.mock('../models/ProductionPlan');
 jest.mock('../models/Warehouse');
 jest.mock('../models/RolePermission');
+// This route allocates ProductionPlan numbers through the atomic, tenant-scoped
+// Counter model (see utils/documentCounter.js); mock it so findOneAndUpdate()
+// doesn't hang against a real unconnected Mongoose model.
+jest.mock('../models/Counter', () => ({
+  findOneAndUpdate: jest.fn().mockResolvedValue({ seq: 1 }),
+}));
 
 const Product = require('../models/Product');
 const Invoice = require('../models/Invoice');

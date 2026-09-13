@@ -11,6 +11,13 @@ jest.mock('../models/RawMaterialQuarantine');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/RawMaterialEntry');
 jest.mock('../models/RawMaterial');
+// coa.js and quarantine.js now allocate document numbers through the atomic,
+// tenant-scoped Counter model (see utils/documentCounter.js). Without this
+// mock, findOneAndUpdate() hits a real unconnected Mongoose model and the
+// test hangs until Jest's per-test timeout instead of failing fast.
+jest.mock('../models/Counter', () => ({
+  findOneAndUpdate: jest.fn().mockResolvedValue({ seq: 1 }),
+}));
 
 jest.setTimeout(10000);
 

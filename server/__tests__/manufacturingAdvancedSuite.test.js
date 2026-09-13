@@ -6,6 +6,12 @@ jest.mock('../models/BatchProduction');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/AuditLog');
 jest.mock('../models/RolePermission');
+// The job-work dispatch flow allocates a Challan number through the atomic,
+// tenant-scoped Counter model (see utils/documentCounter.js); mock it so
+// findOneAndUpdate() doesn't hang against a real unconnected Mongoose model.
+jest.mock('../models/Counter', () => ({
+  findOneAndUpdate: jest.fn().mockResolvedValue({ seq: 1 }),
+}));
 
 const BatchProduction = require('../models/BatchProduction');
 const SystemSettings = require('../models/SystemSettings');

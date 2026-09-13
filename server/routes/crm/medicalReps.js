@@ -991,12 +991,32 @@ router.post(['/sample-stock/issue-to-doctor', '/issue-to-doctor'], authorize('mr
     const qtyVal = Math.max(1, Number(qty) || 1);
     const issuance = await withTransaction(async session => {
       await consumeSamplesFromMr({ mrId, sampleDetails: [{ productId, qty: qtyVal, batchNo }], session });
+      const prod = await Product.findById(productId).session(session).lean();
       let effectiveUnitCost = Number(unitCost);
       if (!(effectiveUnitCost > 0)) {
-        const prod = await Product.findById(productId).session(session).lean();
         effectiveUnitCost = prod ? (prod.price || prod.mrp || 0) : 0;
       }
       const [created] = await MrSampleIssuance.create([{ mrId, doctorId, productId, qty: qtyVal, unitCost: effectiveUnitCost, date: date ? new Date(date) : new Date() }], { session });
+
+      // Also write to SampleConversion log (conversionStatus: 'pending') for unified
+      // tracking, feeding the Doctor/MR Sample ROI reports. This mirrors the
+      // pre-stabilization behavior, which was dropped in the transactional rewrite.
+      const SampleConversion = require('../../models/SampleConversion');
+      const Doctor = require('../../models/Doctor');
+      const [mrObj, docObj] = await Promise.all([
+        req.body.mrName ? null : MedicalRepresentative.findById(mrId).session(session).lean(),
+        req.body.doctorName ? null : Doctor.findById(doctorId).session(session).lean(),
+      ]);
+      const mrName = req.body.mrName || (mrObj ? mrObj.name : 'Medical Rep');
+      const doctorName = req.body.doctorName || (docObj ? docObj.name : 'Doctor');
+      const productName = req.body.productName || (prod ? prod.name : 'Sample Product');
+      await SampleConversion.create([{
+        mrId, mrName, doctorId, doctorName, productId, productName,
+        samplesQtyGiven: qtyVal,
+        givenDate: date ? new Date(date) : new Date(),
+        conversionStatus: 'pending'
+      }], { session });
+
       return created;
     });
     if (req.io) req.io.emit('medrep_updated', { type: 'sample_given_to_doctor', mrId, doctorId, productId });
@@ -1305,6 +1325,70 @@ router.put('/leaves/:id/status', authorize('mr:edit'), async (req, res) => {
 // ─── MR P&L / ROI Dashboard ───
 
 // GET /api/medical-reps/roi-dashboard — Compute per-MR / territory profitability
+// GET /api/medical-reps/:id/sample-roi — MR-level aggregate Sample ROI across assigned doctors
+// NOTE: this route existed in the pre-stabilization codebase and was dropped
+// during the medicalReps.js sample-bag consolidation with no replacement
+// (the similarly-named /roi-dashboard below computes a different metric via
+// calculateMRProfitability). Restored as-is; worth confirming with the
+// product owner whether /roi-dashboard was meant to supersede it.
+router.get('/:id/sample-roi', authorize('mr:view'), async (req, res) => {
+  try {
+    const Invoice = require('../../models/Invoice');
+    const MrSampleIssuance = require('../../models/MrSampleIssuance');
+    const SampleConversion = require('../../models/SampleConversion');
+    const Doctor = require('../../models/Doctor');
+
+    const mrId = req.params.id;
+    const mr = await MedicalRepresentative.findById(mrId).lean();
+    if (!mr) return res.status(404).json({ error: 'MR not found' });
+
+    const doctors = await Doctor.find({ assignedMrId: mrId }).lean();
+    const docIds = doctors.map(d => d._id);
+    const docNames = doctors.map(d => d.name.trim());
+
+    const [issuances, conversions, invoices] = await Promise.all([
+      MrSampleIssuance.find({ mrId }).lean(),
+      SampleConversion.find({ mrId }).lean(),
+      Invoice.find({
+        $or: [
+          { prescribingDoctorId: { $in: docIds } },
+          { doctorName: { $in: docNames } }
+        ]
+      }).lean()
+    ]);
+
+    const totalSampleCost = issuances.reduce((sum, iss) => sum + ((iss.qty || 0) * (iss.unitCost || 0)), 0);
+
+    const convertedRecords = conversions.filter(c => c.conversionStatus === 'converted');
+    const pendingRecords = conversions.filter(c => c.conversionStatus === 'pending');
+
+    const convertedRevenue = convertedRecords.reduce((sum, c) => sum + (c.prescriptionOrderAmount || 0), 0);
+    const estimatedInvoiceRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+
+    let totalRxRevenue = 0;
+    if (convertedRecords.length > 0) {
+      totalRxRevenue = convertedRevenue + (pendingRecords.length > 0 ? estimatedInvoiceRevenue : 0);
+    } else {
+      totalRxRevenue = estimatedInvoiceRevenue;
+    }
+
+    const roiRatio = totalSampleCost > 0 ? Number((totalRxRevenue / totalSampleCost).toFixed(2)) : 0;
+
+    res.json({
+      mrId,
+      mrName: mr.name,
+      doctorCount: doctors.length,
+      totalSampleCost: Number(totalSampleCost.toFixed(2)),
+      totalRxRevenue: Number(totalRxRevenue.toFixed(2)),
+      roiRatio,
+      invoiceCount: invoices.length,
+      sampleIssuanceCount: issuances.length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/roi-dashboard', authorize('mr:view'), async (req, res) => {
   try {
     const { mrId, month, year } = req.query;
