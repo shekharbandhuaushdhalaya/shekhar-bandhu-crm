@@ -8,6 +8,7 @@ const Customer = require('../../models/Customer');
 const Vendor = require('../../models/Vendor');
 const { authorize } = require('../../middleware/authorize');
 const { withTransaction } = require('../../utils/withTransaction');
+const idempotency = require('../../middleware/requiredIdempotency');
 
 // GET /api/inventory/compliance/near-expiry — Get batches expiring soon (default 90 days)
 router.get('/near-expiry', authorize('inventory:view'), async (req, res) => {
@@ -68,7 +69,7 @@ router.get('/license-alerts', authorize('inventory:view'), async (req, res) => {
 });
 
 // POST /api/inventory/compliance/write-off — Write off expired or damaged stock
-router.post('/write-off', authorize('inventory:edit'), async (req, res) => {
+router.post('/write-off', idempotency, authorize('inventory:edit'), async (req, res) => {
   try {
     const { productId, warehouseId, packing, batchNo, reason } = req.body;
     const qty = Number(req.body.qtyBoxes);

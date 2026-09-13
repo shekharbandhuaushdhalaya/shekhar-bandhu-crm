@@ -42,29 +42,9 @@ const STATE_MAP = {
   '38': 'Ladakh'
 };
 
-const MOCK_COMPANIES = [
-  'Arogya Ayurvedic Herbs',
-  'Bhandari Pharma Care',
-  'Varanasi Herbals & Botanicals',
-  'Sri Kashi Ayurvedic Aushdhalaya',
-  'Ganga Valley Distributors',
-  'Divine Ayur Pharma',
-  'Nirvana Wellness Trading',
-  'Himalaya Botanical Traders'
-];
-
-const MOCK_CITIES = {
-  '09': 'Varanasi',
-  '27': 'Mumbai',
-  '07': 'New Delhi',
-  '19': 'Kolkata',
-  '33': 'Chennai',
-  '29': 'Bengaluru',
-  '24': 'Ahmedabad',
-  '23': 'Bhopal'
-};
-
-// POST /api/parties/verify-gstin — Verify GSTIN and return auto-filled company profile
+// POST /api/parties/verify-gstin — Validate GSTIN syntax. Authoritative taxpayer
+// lookup requires a configured government/GSP provider and is deliberately not
+// faked from the PAN characters.
 router.post('/verify-gstin', validate(schemas.gstinVerifySchema), (req, res) => {
   const { gstin } = req.body;
   if (!gstin) {
@@ -79,24 +59,15 @@ router.post('/verify-gstin', validate(schemas.gstinVerifySchema), (req, res) => 
   }
 
   const stateCode = cleanGstin.substring(0, 2);
-  const state = STATE_MAP[stateCode] || 'Uttar Pradesh';
-  const panLetters = cleanGstin.substring(2, 7);
-
-  // Generate deterministic details based on the GSTIN
-  const companyIndex = (panLetters.charCodeAt(0) + panLetters.charCodeAt(1)) % MOCK_COMPANIES.length;
-  const baseCompany = MOCK_COMPANIES[companyIndex];
-  const companyName = `${baseCompany} (${panLetters})`;
-
-  const city = MOCK_CITIES[stateCode] || 'Varanasi';
-  const sector = 1 + (panLetters.charCodeAt(2) % 20);
-  const plot = 100 + (panLetters.charCodeAt(3) % 90);
-  const billingAddress = `Plot No. ${plot}, Sector ${sector}, Industrial Area, ${city}, ${state}`;
-
+  const state = STATE_MAP[stateCode] || null;
   res.json({
-    companyName,
-    billingAddress,
+    verified: false,
+    formatValid: true,
+    source: 'format-only',
+    message: 'GSTIN format is valid. Company name and address require an authoritative GST/GSP lookup.',
+    gstin: cleanGstin,
     state,
-    placeOfSupply: `${stateCode}-${state}`
+    placeOfSupply: state ? `${stateCode}-${state}` : stateCode
   });
 });
 

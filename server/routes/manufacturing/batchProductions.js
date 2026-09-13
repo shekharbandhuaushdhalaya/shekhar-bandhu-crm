@@ -3,6 +3,7 @@ const BatchProduction = require('../../models/BatchProduction');
 const BillOfMaterials = require('../../models/BillOfMaterials');
 const RawMaterial = require('../../models/RawMaterial');
 const RawMaterialEntry = require('../../models/RawMaterialEntry');
+const RawMaterialLedger = require('../../models/RawMaterialLedger');
 const Product = require('../../models/Product');
 const Warehouse = require('../../models/Warehouse');
 const InventoryEntry = require('../../models/InventoryEntry');
@@ -13,6 +14,9 @@ const schemas = require('../../validation/schemas');
 const { getSizeInMl, consumeFromReservation, releaseAllReservations, deductPackagingMaterials, calculateAggregateMaterialSufficiency } = require('../../services/batchProductionService');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const { resolveManufacturingWarehouse } = require('../../services/manufacturingWarehouseService');
+const { withTransaction } = require('../../utils/withTransaction');
+const idempotency = require('../../middleware/requiredIdempotency');
+const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
 
@@ -1270,50 +1274,52 @@ router.patch('/:id/correct', authorize('manufacturing:correctReleased'), async (
 });
 
 // PATCH /api/batch-productions/:id/cancel — Cancel active production run, revert raw materials stock
-router.patch('/:id/cancel', authorize('manufacturing:edit'), validate(schemas.batchCancelSchema), async (req, res) => {
+router.patch('/:id/cancel', idempotency, authorize('manufacturing:edit'), validate(schemas.batchCancelSchema), async (req, res) => {
   try {
-    const batch = await BatchProduction.findById(req.params.id);
-    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    const batch = await withTransaction(async session => {
+      const current = await BatchProduction.findById(req.params.id).session(session);
+      if (!current) throw Object.assign(new Error('Batch production run not found'), { status: 404, code: 'BATCH_NOT_FOUND' });
+      if (current.status === 'completed') throw Object.assign(new Error('Cannot cancel a completed batch'), { status: 400, code: 'BATCH_COMPLETED' });
+      if (current.status === 'cancelled') throw Object.assign(new Error('Batch is already cancelled'), { status: 409, code: 'BATCH_ALREADY_CANCELLED' });
 
-    if (batch.status === 'completed') {
-      return res.status(400).json({ error: 'Cannot cancel a completed batch' });
-    }
-    if (batch.status === 'cancelled') {
-      return res.status(400).json({ error: 'Batch is already cancelled' });
-    }
-
-    for (const item of batch.ingredientsConsumed) {
-      const entry = await RawMaterialEntry.findById(item.rawMaterialEntryId);
-      if (entry) {
-        entry.qty += item.qtyConsumed;
-        await entry.save();
-      } else {
-        await RawMaterialEntry.create({
+      for (let idx = 0; idx < (current.ingredientsConsumed || []).length; idx += 1) {
+        const item = current.ingredientsConsumed[idx];
+        const entry = await RawMaterialEntry.findById(item.rawMaterialEntryId).session(session);
+        if (!entry) throw Object.assign(new Error(`Consumed raw-material entry ${item.rawMaterialEntryId} no longer exists; reconcile before cancelling`), { status: 409, code: 'RAW_MATERIAL_ENTRY_NOT_FOUND' });
+        entry.qty = Number(entry.qty || 0) + Number(item.qtyConsumed || 0);
+        await entry.save({ session });
+        await RawMaterialLedger.create([{
           rawMaterialId: item.rawMaterialId,
-          batchNo: item.batchNo,
-          qty: item.qtyConsumed,
-          purchaseRate: 0
-        });
+          warehouseId: entry.warehouseId,
+          warehouseName: entry.warehouseName || '',
+          type: 'IN',
+          qty: Number(item.qtyConsumed || 0),
+          balance: entry.qty,
+          reference: `BATCH-CANCEL:${current.batchNo}`,
+          movementKey: `batch-cancel:${current._id}:${idx}`,
+          note: `Raw material restored after cancelling batch ${current.batchNo}`,
+          createdBy: req.user?.name || 'System',
+          batchNo: entry.batchNo || '',
+        }], { session });
       }
-    }
 
-    batch.stages.forEach(s => {
-      if (s.status === 'in_progress') {
-        s.status = 'pending';
-        s.startedAt = null;
-      }
+      current.stages.forEach(s => {
+        if (s.status === 'in_progress') { s.status = 'pending'; s.startedAt = null; }
+      });
+      current.status = 'cancelled';
+      current.endDate = new Date();
+      await current.save({ session });
+      return current;
     });
-    batch.status = 'cancelled';
-    batch.endDate = new Date();
-    await batch.save();
 
     if (req.io) {
       req.io.emit('mfg_batch_cancelled', { batchNo: batch.batchNo, id: batch._id });
       req.io.emit('inventory_updated', { type: 'batch_cancelled', batchNo: batch.batchNo });
     }
+    await logAction({ action: 'BATCH_CANCELLED', description: `Cancelled batch ${batch.batchNo} and restored consumed raw materials`, details: { id: batch._id, batchNo: batch.batchNo }, req });
     res.json(batch);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'BATCH_CANCEL_FAILED' });
   }
 });
 

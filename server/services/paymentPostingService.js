@@ -211,6 +211,7 @@ async function postGatewayPayment({ invoice, amount, transactionId, gatewayOrder
         type: 'receive', partyType: 'Customer', partyId: fresh.customerId,
         partyName: fresh.customerName, amount: payAmount, mode: 'regular', paymentMethod: 'UPI',
         referenceNo: transactionId || '', notes: `Gateway payment for ${fresh.invoiceNo}`,
+        gatewayTransactionId: transactionId || '', gatewayOrderId: gatewayOrderId || '',
       },
       allocations: [{ invoiceId: fresh._id, amountAllocated: payAmount }],
       session,

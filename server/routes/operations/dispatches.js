@@ -9,7 +9,7 @@ const { validate } = require('../../middleware/validate');
 const { authorize } = require('../../middleware/authorize');
 const schemas = require('../../validation/schemas');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
-const idempotency = require('../../middleware/idempotency');
+const idempotency = require('../../middleware/requiredIdempotency');
 
 const TRANSITIONS = {
   pending: new Set(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned']),

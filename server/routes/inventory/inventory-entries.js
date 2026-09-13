@@ -7,6 +7,9 @@ const Warehouse = require('../../models/Warehouse');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { withTransaction } = require('../../utils/withTransaction');
+const idempotency = require('../../middleware/requiredIdempotency');
+const { logAction } = require('../../utils/auditLogger');
+const { getFirmId } = require('../../utils/tenantContext');
 
 const router = express.Router();
 
@@ -98,7 +101,7 @@ router.get('/consolidated', authorize('inventory:view'), async (req, res) => {
 });
 
 // POST /api/inventory-entries — Manual stock receipt. Inventory slot, aggregate stock and ledger post atomically.
-router.post('/', authorize('inventory:create'), validate(schemas.inventoryEntrySchema), async (req, res) => {
+router.post('/', idempotency, authorize('inventory:create'), validate(schemas.inventoryEntrySchema), async (req, res) => {
   try {
     const result = await withTransaction(async (session) => {
       const { warehouseId, productId, note, reference, createdBy, vendorId, vendorName, batchNo, mfgDate, expiryDate } = req.body;
@@ -132,17 +135,19 @@ router.post('/', authorize('inventory:create'), validate(schemas.inventoryEntryS
         productId, warehouseId, warehouseName: warehouse.name, type: 'IN', qtyBoxes, balanceBoxes: entry.qtyBoxes,
         reference: reference || '', note: note || 'Manual stock receipt', createdBy: createdBy || req.user?.name || '', packing,
         vendorId: resolvedVendorId, vendorName: resolvedVendorName, batchNo: resolvedBatchNo, mfgDate: entry.mfgDate, expiryDate: entry.expiryDate,
+        movementKey: req.headers['idempotency-key'] ? `${getFirmId() || 'firm'}:inventory-entry:${req.headers['idempotency-key']}` : undefined,
         createdAt: req.body.createdAt ? new Date(req.body.createdAt) : undefined,
       }], { session });
       return entry;
     });
     if (req.io) req.io.emit('inventory_updated', { type: 'entry_created', id: result._id, productId: result.productId });
+    await logAction({ action: 'INVENTORY_RECEIPT_CREATED', description: `Received ${result.qtyBoxes} boxes into ${result.warehouseName}`, details: { id: result._id, productId: result.productId, warehouseId: result.warehouseId }, req });
     res.status(201).json(result);
   } catch (err) { res.status(['WAREHOUSE_NOT_FOUND','PRODUCT_NOT_FOUND'].includes(err.code) ? 404 : 400).json({ error: err.message, code: err.code }); }
 });
 
 // PUT /api/inventory-entries/:id — Manual adjustment. Slot, aggregate stock and ledger post atomically.
-router.put('/:id', authorize('inventory:edit'), validate(schemas.inventoryEntrySchema.partial()), async (req, res) => {
+router.put('/:id', idempotency, authorize('inventory:edit'), validate(schemas.inventoryEntrySchema.partial()), async (req, res) => {
   try {
     const result = await withTransaction(async (session) => {
       const { type, note, reference, createdBy, createdAt } = req.body;
@@ -169,11 +174,13 @@ router.put('/:id', authorize('inventory:edit'), validate(schemas.inventoryEntryS
         productId: entry.productId, warehouseId: entry.warehouseId, warehouseName: entry.warehouseName, type: movementType,
         qtyBoxes: delta, balanceBoxes: newBalance, reference: reference || '', note: note || 'Manual stock adjustment',
         createdBy: createdBy || req.user?.name || '', packing: entry.packing, vendorId: entry.vendorId || '', vendorName: entry.vendorName || '', batchNo: entry.batchNo || '',
+        movementKey: req.headers['idempotency-key'] ? `${getFirmId() || 'firm'}:inventory-adjust:${req.headers['idempotency-key']}` : undefined,
         createdAt: createdAt ? new Date(createdAt) : undefined,
       }], { session });
       return entry;
     });
     if (req.io) req.io.emit('inventory_updated', { type: 'entry_adjusted', id: result._id });
+    await logAction({ action: 'INVENTORY_ENTRY_ADJUSTED', description: `Adjusted inventory entry ${result._id}`, details: { id: result._id, productId: result.productId, warehouseId: result.warehouseId, qtyBoxes: result.qtyBoxes }, req });
     res.json(result);
   } catch (err) { res.status(err.code === 'INVENTORY_ENTRY_NOT_FOUND' ? 404 : 400).json({ error: err.message, code: err.code }); }
 });
@@ -191,6 +198,7 @@ router.patch('/:id', authorize('inventory:edit'), async (req, res) => {
     }
     const entry = await InventoryEntry.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true });
     if (!entry) return res.status(404).json({ error: 'Inventory entry not found' });
+    await logAction({ action: 'INVENTORY_METADATA_UPDATED', description: `Updated inventory metadata for ${entry._id}`, details: { id: entry._id, fields: Object.keys(updates) }, req });
     res.json(entry);
   } catch (err) {
     res.status(400).json({ error: err.message });

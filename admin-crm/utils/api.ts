@@ -58,6 +58,10 @@ export function setApiBaseUrl(newUrl: string): void {
   API_BASE = newUrl;
 }
 
+export function createMutationKey(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export const getImageUrl = (imagePath: string | undefined): string => {
   if (!imagePath) return '';
   if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
@@ -793,7 +797,7 @@ class ApiClient {
   async convertChallanToInvoice(id: string, idempotencyKey?: string): Promise<{ message: string; invoice: Invoice; challan: Challan }> {
     const res = await this.request(`${API_BASE}/challans/${id}/convert`, {
       method: 'POST',
-      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      headers: { 'Idempotency-Key': idempotencyKey || createMutationKey(`challan-convert-${id}`) },
     });
     return res.json();
   }
@@ -811,12 +815,21 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/inventory-entries/consolidated?search=${encodeURIComponent(search)}`);
     return res.json();
   }
-  async addStock(data: any) {
-    const res = await this.request(`${API_BASE}/inventory-entries`, { method: 'POST', body: JSON.stringify(data) });
+  async getInventoryReconciliation(filters: { warehouseId?: string; productId?: string; limit?: number } = {}): Promise<any> {
+    const params = new URLSearchParams();
+    if (filters.warehouseId) params.set('warehouseId', filters.warehouseId);
+    if (filters.productId) params.set('productId', filters.productId);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await this.request(`${API_BASE}/inventory/reconciliation${query}`);
     return res.json();
   }
-  async adjustStock(id: string, data: any) {
-    const res = await this.request(`${API_BASE}/inventory-entries/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  async addStock(data: any, idempotencyKey?: string) {
+    const res = await this.request(`${API_BASE}/inventory-entries`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey || createMutationKey('inventory-receipt') }, body: JSON.stringify(data) });
+    return res.json();
+  }
+  async adjustStock(id: string, data: any, idempotencyKey?: string) {
+    const res = await this.request(`${API_BASE}/inventory-entries/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': idempotencyKey || createMutationKey(`inventory-adjust-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
 
@@ -997,8 +1010,8 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/inventory-entries/expiry-alerts?days=${days}`);
     return res.json();
   }
-  async createInventoryEntry(data: Partial<InventoryEntry>): Promise<InventoryEntry> {
-    const res = await this.request(`${API_BASE}/inventory-entries`, { method: 'POST', body: JSON.stringify(data) });
+  async createInventoryEntry(data: Partial<InventoryEntry>, idempotencyKey?: string): Promise<InventoryEntry> {
+    const res = await this.request(`${API_BASE}/inventory-entries`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey || createMutationKey('inventory-entry') }, body: JSON.stringify(data) });
     return res.json();
   }
   async getStockLedger(productId: string, warehouseId?: string, packing?: number, vendorId?: string, startDate?: string, endDate?: string): Promise<StockLedger[]> {
@@ -1024,8 +1037,8 @@ class ApiClient {
     const res = await this.request(url);
     return res.json();
   }
-  async createPayment(data: Partial<Payment>): Promise<Payment> {
-    const res = await this.request(`${API_BASE}/payments`, { method: 'POST', body: JSON.stringify(data) });
+  async createPayment(data: Partial<Payment>, idempotencyKey?: string): Promise<Payment> {
+    const res = await this.request(`${API_BASE}/payments`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey || createMutationKey('payment') }, body: JSON.stringify(data) });
     return res.json();
   }
   async deletePayment(id: string): Promise<boolean> {
@@ -1128,8 +1141,8 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/raw-materials/entries`);
     return res.json();
   }
-  async inwardRawMaterial(data: { rawMaterialId: string; batchNo: string; qty: number; purchaseRate: number; vendorId?: string; vendorName?: string; expiryDate?: string }): Promise<RawMaterialEntry> {
-    const res = await this.request(`${API_BASE}/raw-materials/entries`, { method: 'POST', body: JSON.stringify(data) });
+  async inwardRawMaterial(data: { rawMaterialId: string; batchNo: string; qty: number; purchaseRate: number; vendorId?: string; vendorName?: string; expiryDate?: string }, idempotencyKey?: string): Promise<RawMaterialEntry> {
+    const res = await this.request(`${API_BASE}/raw-materials/entries`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey || createMutationKey('raw-material-entry') }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteRawMaterialEntry(id: string): Promise<boolean> {
@@ -1137,9 +1150,10 @@ class ApiClient {
     return res.ok;
   }
 
-  async adjustRawMaterialStock(id: string, newStockLevel: number, reason: string): Promise<any> {
+  async adjustRawMaterialStock(id: string, newStockLevel: number, reason: string, idempotencyKey?: string): Promise<any> {
     const res = await this.request(`${API_BASE}/raw-materials/${id}/adjust-stock`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey || createMutationKey(`raw-material-adjust-${id}`) },
       body: JSON.stringify({ newStockLevel, reason })
     });
     return res.json();
@@ -1196,7 +1210,7 @@ class ApiClient {
     return res.json();
   }
   async cancelBatchProduction(id: string): Promise<BatchProduction> {
-    const res = await this.request(`${API_BASE}/batch-productions/${id}/cancel`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/cancel`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`batch-cancel-${id}`) } });
     return res.json();
   }
   async getBatchGenealogy(id: string): Promise<BatchGenealogy> {
@@ -1252,7 +1266,7 @@ class ApiClient {
   }
   async verifyPayment(data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; invoiceId: string }): Promise<PaymentVerifyResponse> {
     const res = await this.request(`${API_BASE}/payments/gateway/verify`, {
-      method: 'POST', body: JSON.stringify(data)
+      method: 'POST', headers: { 'Idempotency-Key': `gateway-verify-${data.razorpay_payment_id}` }, body: JSON.stringify(data)
     });
     return res.json();
   }
@@ -1328,7 +1342,7 @@ class ApiClient {
   }
   async issueSampleToDoctor(data: { mrId: string; doctorId: string; productId: string; qty: number; unitCost?: number; date?: string }): Promise<any> {
     const res = await this.request(`${API_BASE}/mr-sample-stock/issue-to-doctor`, {
-      method: 'POST', body: JSON.stringify(data)
+      method: 'POST', headers: { 'Idempotency-Key': createMutationKey('sample-doctor') }, body: JSON.stringify(data)
     });
     return res.json();
   }
@@ -1595,8 +1609,8 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/dispatches?status=${status}&search=${encodeURIComponent(search)}`);
     return res.json();
   }
-  async createDispatch(data: Partial<Dispatch>): Promise<Dispatch> {
-    const res = await this.request(`${API_BASE}/dispatches`, { method: 'POST', body: JSON.stringify(data) });
+  async createDispatch(data: Partial<Dispatch>, idempotencyKey?: string): Promise<Dispatch> {
+    const res = await this.request(`${API_BASE}/dispatches`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey || createMutationKey('dispatch') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateDispatch(id: string, data: Partial<Dispatch>): Promise<Dispatch> {
@@ -1660,6 +1674,7 @@ class ApiClient {
   async issueMrSampleStock(mrId: string, items: { productId: string; qty: number }[]): Promise<any> {
     const res = await this.request(`${API_BASE}/medical-reps/${mrId}/sample-stock/issue`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': createMutationKey(`sample-mr-${mrId}`) },
       body: JSON.stringify({ items })
     });
     return res.json();

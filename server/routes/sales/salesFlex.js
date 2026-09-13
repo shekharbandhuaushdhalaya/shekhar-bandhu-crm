@@ -15,7 +15,7 @@ const { money, getSalesPolicy } = require('../../services/salesPricingService');
 const { createSalesOrder, createDraftFulfillment } = require('../../services/salesOrderService');
 const { createSplitPayments } = require('../../services/paymentPostingService');
 const { createSalesReturn, postSalesReturn, reverseSalesReturn } = require('../../services/salesReturnService');
-const idempotency = require('../../middleware/idempotency');
+const idempotency = require('../../middleware/requiredIdempotency');
 
 const router = express.Router();
 const nonExpiredFilter = () => ({ $or: [{ expiryDate: null }, { expiryDate: { $exists: false } }, { expiryDate: { $gt: new Date() } }] });
@@ -73,7 +73,7 @@ router.post('/orders/:id/reconcile-fulfillment', authorize('order:fulfill'), asy
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-router.post('/invoices/:id/split-payment', authorize('payment:create'), async (req, res) => {
+router.post('/invoices/:id/split-payment', idempotency, authorize('payment:create'), async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ _id: req.params.id, type: 'sale', isFinalized: true });
     if (!invoice || !invoice.customerId) return res.status(404).json({ error: 'Finalized customer-linked Sale Invoice not found', code: 'INVOICE_NOT_FOUND' });
@@ -92,14 +92,14 @@ router.post('/returns', authorize('salesreturn:create'), async (req, res) => {
   try { res.status(201).json(await createSalesReturn(req.body)); }
   catch (error) { res.status(error.code?.includes('NOT_FOUND') ? 404 : 400).json({ error: error.message, code: error.code || 'RETURN_CREATE_FAILED' }); }
 });
-router.post('/returns/:id/post', authorize('salesreturn:post'), async (req, res) => {
+router.post('/returns/:id/post', idempotency, authorize('salesreturn:post'), async (req, res) => {
   try {
     const result = await postSalesReturn(req.params.id, { id: req.user?.id, name: req.user?.name || 'System' });
     if (req.io) { req.io.emit('inventory_updated', { type: 'sales_return_posted', returnId: req.params.id }); req.io.emit('invoice_updated', { type: 'sales_return_credit', returnId: req.params.id }); }
     res.json(result);
   } catch (error) { res.status(400).json({ error: error.message, code: error.code || 'RETURN_POST_FAILED' }); }
 });
-router.post('/returns/:id/reverse', authorize('salesreturn:reverse'), async (req, res) => {
+router.post('/returns/:id/reverse', idempotency, authorize('salesreturn:reverse'), async (req, res) => {
   try {
     const result = await reverseSalesReturn(req.params.id, { id: req.user?.id, name: req.user?.name || 'System' }, req.body.reason || '');
     if (req.io) req.io.emit('inventory_updated', { type: 'sales_return_reversed', returnId: req.params.id });

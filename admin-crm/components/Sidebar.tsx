@@ -64,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Products & Pricing', route: 'products', icon: 'cube-outline', activeIcon: 'cube' },
       { label: 'Inventories & Warehouses', route: 'inventories', icon: 'home-outline', activeIcon: 'home' },
+      { label: 'Inventory Reconciliation', route: 'inventory-reconciliation', icon: 'git-compare-outline', activeIcon: 'git-compare', permission: 'inventory:view' },
       { label: 'Manufacturing & BMR', route: 'manufacturing', icon: 'hammer-outline', activeIcon: 'hammer' },
       { label: 'GMP & AYUSH Compliance', route: 'compliance', icon: 'shield-checkmark-outline', activeIcon: 'shield-checkmark', permission: 'quality:view' },
     ],
@@ -75,6 +76,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Payments', route: 'payments', icon: 'cash-outline', activeIcon: 'cash' },
       { label: 'Receivable Ageing', route: 'ageing', icon: 'hourglass-outline', activeIcon: 'hourglass' },
+      { label: 'GST Returns', route: 'gst-returns', icon: 'document-attach-outline', activeIcon: 'document-attach', permission: 'report:view' },
       { label: 'Credit / Debit Notes', route: 'credit-notes', icon: 'swap-horizontal-outline', activeIcon: 'swap-horizontal' },
     ],
   },

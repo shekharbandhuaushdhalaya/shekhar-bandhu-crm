@@ -41,6 +41,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     ['/invoices/purchase', 'Purchase Invoices'],
     ['/products', 'Products'],
     ['/inventories', 'Inventories'],
+    ['/inventory-reconciliation', 'Inventory Reconciliation'],
     ['/leads', 'Leads'],
     ['/queries', 'Web Queries'],
     ['/orders', 'Orders'],
@@ -462,6 +463,7 @@ function MainLayout() {
             <Tabs.Screen name="credit-notes" options={{ href: null }} />
             <Tabs.Screen name="gst-returns" options={{ href: null }} />
             <Tabs.Screen name="inventories" options={{ href: null }} />
+            <Tabs.Screen name="inventory-reconciliation" options={{ href: null }} />
             <Tabs.Screen name="inventorydispatch" options={{ href: null }} />
             <Tabs.Screen name="invoices/sale" options={{ href: null }} />
             <Tabs.Screen name="invoices/purchase" options={{ href: null }} />

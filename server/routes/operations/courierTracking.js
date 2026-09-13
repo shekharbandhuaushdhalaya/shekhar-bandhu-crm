@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const WebhookEvent = require('../../models/WebhookEvent');
 const Dispatch = require('../../models/Dispatch');
@@ -8,6 +9,7 @@ const { recomputeOrderLogisticsFromChallan } = require('../../services/dispatchS
 
 const router = express.Router();
 const allowedStatuses = new Set(['pending','dispatched','in_transit','out_for_delivery','delivered','returned']);
+const publicTrackingLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many tracking lookups, please try again later.' } });
 
 function safeHexEqual(provided, expected) {
   try {
@@ -18,7 +20,7 @@ function safeHexEqual(provided, expected) {
 }
 
 // Public tracking is storefront-tenant scoped. It exposes only logistics-safe fields.
-router.get('/track/:trackingId', publicTenant, async (req, res) => {
+router.get('/track/:trackingId', publicTrackingLimiter, publicTenant, async (req, res) => {
   try {
     const trackingId = String(req.params.trackingId || '').trim();
     if (!trackingId) return res.status(400).json({ error: 'Tracking number is required' });

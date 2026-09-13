@@ -54,6 +54,8 @@ const paymentSchema = new mongoose.Schema({
     default: '', 
     trim: true 
   },
+  gatewayTransactionId: { type: String, default: '', trim: true },
+  gatewayOrderId: { type: String, default: '', trim: true },
   notes: { 
     type: String, 
     default: '', 
@@ -90,6 +92,7 @@ paymentSchema.pre('save', function (next) {
 // Index for easy searching
 paymentSchema.index({ partyName: 'text', paymentMethod: 'text', referenceNo: 'text' });
 paymentSchema.index({ date: -1, createdAt: -1 });
+paymentSchema.index({ firmId: 1, gatewayTransactionId: 1 }, { unique: true, sparse: true, partialFilterExpression: { gatewayTransactionId: { $type: 'string', $ne: '' } } });
 
 paymentSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Payment', paymentSchema);

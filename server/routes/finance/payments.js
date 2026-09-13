@@ -7,6 +7,7 @@ const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { createPaymentAndAllocate, allocateExistingPayment, reversePayment } = require('../../services/paymentPostingService');
+const idempotency = require('../../middleware/requiredIdempotency');
 
 const router = express.Router();
 
@@ -49,7 +50,7 @@ router.get('/', authorize('payment:view'), async (req, res) => {
 });
 
 // POST /api/payments — Create a new payment and update balances atomically
-router.post('/', authorize('payment:create'), validate(schemas.paymentSchema), async (req, res) => {
+router.post('/', idempotency, authorize('payment:create'), validate(schemas.paymentSchema), async (req, res) => {
   try {
     const { type, partyType, partyId, amount, mode, allocations = [] } = req.body;
     if (!type || !partyType || !partyId || !(Number(amount) > 0)) {

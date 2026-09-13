@@ -8,7 +8,10 @@ module.exports = async function idempotency(req, res, next) {
   const firmId = getFirmId();
   const scope = { firmId: firmId || null, key, method: req.method, path: req.path, fingerprint };
   try {
-    const existing = await IdempotencyKey.findOne(scope).lean();
+    const existing = await IdempotencyKey.findOne({ firmId: scope.firmId, key: scope.key, method: scope.method, path: scope.path }).lean();
+    if (existing && existing.fingerprint !== fingerprint) {
+      return res.status(409).json({ error: 'Idempotency-Key was already used for a different request', code: 'IDEMPOTENCY_KEY_CONFLICT' });
+    }
     if (existing?.status === 'completed') return res.status(existing.statusCode || 200).json(existing.response);
     if (existing?.status === 'processing') {
       const age = Date.now() - new Date(existing.createdAt || 0).getTime();

@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const SystemSettings = require('../../models/SystemSettings');
 const WebhookEvent = require('../../models/WebhookEvent');
 const Invoice = require('../../models/Invoice');
-const idempotency = require('../../middleware/idempotency');
+const idempotency = require('../../middleware/requiredIdempotency');
 const { authorize } = require('../../middleware/authorize');
 const { postGatewayPayment } = require('../../services/paymentPostingService');
 const { runWithTenant, getFirmId } = require('../../utils/tenantContext');
@@ -99,7 +99,13 @@ router.post('/webhook', async (req, res) => {
         if (!invoice.gatewayOrderId || invoice.gatewayOrderId !== gatewayOrderId) throw Object.assign(new Error('Webhook gateway order does not match invoice'), { code: 'GATEWAY_ORDER_MISMATCH' });
         const outstanding = money(Math.max(0, Number(invoice.amount || 0) - Number(invoice.amountPaid || 0)));
         if (outstanding > 0 && paymentId) {
-          await postGatewayPayment({ invoice, amount: Math.min(outstanding, Number(paymentEntity?.amount || orderEntity?.amount_paid || 0) / 100 || outstanding), transactionId: paymentId, gatewayOrderId, gatewayData: { event, webhook: true, capturedAt: new Date() } });
+          try {
+            await postGatewayPayment({ invoice, amount: Math.min(outstanding, Number(paymentEntity?.amount || orderEntity?.amount_paid || 0) / 100 || outstanding), transactionId: paymentId, gatewayOrderId, gatewayData: { event, webhook: true, capturedAt: new Date() } });
+          } catch (error) {
+            if (error?.code !== 11000) throw error;
+            // A distinct provider event can repeat the same transaction ID;
+            // the unique Payment gatewayTransactionId makes that a safe no-op.
+          }
         }
       }
       await WebhookEvent.updateOne({ provider: 'razorpay', eventId }, { $set: { status: 'processed', processedAt: new Date() } });

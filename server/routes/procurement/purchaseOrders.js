@@ -14,6 +14,7 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const { withTransaction } = require('../../utils/withTransaction');
+const idempotency = require('../../middleware/requiredIdempotency');
 
 const router = express.Router();
 
@@ -62,7 +63,7 @@ router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchem
 
 // Create a GRN and inward accepted goods atomically. Accepted receipts remain under_test
 // until QC explicitly approves their InventoryEntry/RawMaterialEntry.
-router.post('/:id/grn', authorize('vendor:edit'), validate(schemas.grnSchema), async (req, res) => {
+router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.grnSchema), async (req, res) => {
   try {
     const result = await withTransaction(async session => {
       const po = await PurchaseOrder.findById(req.params.id).session(session);

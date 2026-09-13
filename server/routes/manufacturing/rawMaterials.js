@@ -1,28 +1,33 @@
 const express = require('express');
 const RawMaterial = require('../../models/RawMaterial');
 const RawMaterialEntry = require('../../models/RawMaterialEntry');
+const RawMaterialLedger = require('../../models/RawMaterialLedger');
 const Warehouse = require('../../models/Warehouse');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/requiredIdempotency');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const router = express.Router();
+const { withTransaction } = require('../../utils/withTransaction');
+const { logAction } = require('../../utils/auditLogger');
+const { getFirmId } = require('../../utils/tenantContext');
 
 const { getBotanicalInfo, resolveHerbDetails } = require('../../utils/botanicalLookup');
 
-async function resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId } = {}) {
+async function resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId, session } = {}) {
   if (warehouseId) {
-    const warehouse = await Warehouse.findById(warehouseId);
+    const warehouse = await Warehouse.findById(warehouseId).session(session || null);
     if (!warehouse) { const e = new Error('Warehouse not found'); e.code = 'WAREHOUSE_NOT_FOUND'; throw e; }
     return warehouse;
   }
   if (manufacturingUnitId) {
-    const warehouse = await Warehouse.findOne({ manufacturingUnitId, type: 'manufacturing' });
+    const warehouse = await Warehouse.findOne({ manufacturingUnitId, type: 'manufacturing' }).session(session || null);
     if (!warehouse) { const e = new Error('No manufacturing warehouse is mapped to this manufacturing unit'); e.code = 'MANUFACTURING_WAREHOUSE_NOT_MAPPED'; throw e; }
     return warehouse;
   }
-  const manufacturing = await Warehouse.find({ type: 'manufacturing' }).sort({ isDefault: -1, createdAt: 1 }).limit(2);
+  const manufacturing = await Warehouse.find({ type: 'manufacturing' }).sort({ isDefault: -1, createdAt: 1 }).limit(2).session(session || null);
   if (manufacturing.length === 1) return manufacturing[0];
-  const defaults = await Warehouse.find({ isDefault: true }).limit(2);
+  const defaults = await Warehouse.find({ isDefault: true }).limit(2).session(session || null);
   if (defaults.length === 1) return defaults[0];
   const e = new Error('warehouseId is required because the firm has more than one possible raw-material warehouse');
   e.code = 'WAREHOUSE_REQUIRED';
@@ -386,7 +391,7 @@ router.get('/expiry-alerts', authorize('manufacturing:view'), async (req, res) =
 });
 
 // POST /api/raw-materials/entries — Inward a batch of raw material (Raw material stock entry)
-router.post('/entries', authorize('manufacturing:create'), validate(schemas.rawMaterialEntrySchema), async (req, res) => {
+router.post('/entries', idempotency, authorize('manufacturing:create'), validate(schemas.rawMaterialEntrySchema), async (req, res) => {
   try {
     const { rawMaterialId, batchNo, qty, purchaseRate, vendorId, vendorName, expiryDate, warehouseId, manufacturingUnitId } = req.body;
     if (!rawMaterialId || !batchNo || qty === undefined || purchaseRate === undefined) {
@@ -402,41 +407,57 @@ router.post('/entries', authorize('manufacturing:create'), validate(schemas.rawM
       return res.status(400).json({ error: 'Purchase rate must be a non-negative number' });
     }
 
-    const rm = await RawMaterial.findById(rawMaterialId);
-    if (!rm) return res.status(404).json({ error: 'Raw material definition not found' });
-    const warehouse = await resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId });
+    const entry = await withTransaction(async session => {
+      const rm = await RawMaterial.findById(rawMaterialId).session(session);
+      if (!rm) throw Object.assign(new Error('Raw material definition not found'), { code: 'RAW_MATERIAL_NOT_FOUND' });
+      const warehouse = await resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId, session });
 
-    // Batch identity is warehouse-specific. Never merge stock from different physical locations.
-    let entry = await RawMaterialEntry.findOne({ rawMaterialId, warehouseId: warehouse._id, batchNo: batchNo.trim().toUpperCase() });
-    if (entry) {
-      // Add to existing quantity
-      entry.initialQty = (entry.initialQty || entry.qty || 0) + valQty;
-      entry.qty += valQty;
-      entry.purchaseRate = valRate; // overwrite rate or average it
-      if (expiryDate) entry.expiryDate = new Date(expiryDate);
-      await entry.save();
-    } else {
-      entry = await RawMaterialEntry.create({
-        rawMaterialId,
-        batchNo: batchNo.trim().toUpperCase(),
-        initialQty: valQty,
-        qty: valQty,
-        purchaseRate: valRate,
-        vendorId: vendorId || null,
-        vendorName: vendorName ? vendorName.trim() : '',
+      // Batch identity is warehouse-specific. Never merge stock from different physical locations.
+      let current = await RawMaterialEntry.findOne({ rawMaterialId, warehouseId: warehouse._id, batchNo: batchNo.trim().toUpperCase() }).session(session);
+      if (current) {
+        current.initialQty = (current.initialQty || current.qty || 0) + valQty;
+        current.qty += valQty;
+        current.purchaseRate = valRate;
+        if (expiryDate) current.expiryDate = new Date(expiryDate);
+        await current.save({ session });
+      } else {
+        [current] = await RawMaterialEntry.create([{
+          rawMaterialId,
+          batchNo: batchNo.trim().toUpperCase(),
+          initialQty: valQty,
+          qty: valQty,
+          purchaseRate: valRate,
+          vendorId: vendorId || null,
+          vendorName: vendorName ? vendorName.trim() : '',
+          warehouseId: warehouse._id,
+          warehouseName: warehouse.name,
+          qcStatus: 'under_test',
+          expiryDate: expiryDate ? new Date(expiryDate) : null
+        }], { session });
+      }
+      await RawMaterialLedger.create([{
+        rawMaterialId: rm._id,
         warehouseId: warehouse._id,
         warehouseName: warehouse.name,
-        qcStatus: 'under_test',
-        expiryDate: expiryDate ? new Date(expiryDate) : null
-      });
-    }
+        type: 'IN',
+        qty: valQty,
+        balance: Number(current.qty || 0),
+        batchNo: current.batchNo,
+        reference: req.body.reference || '',
+        note: 'Raw-material stock receipt',
+        movementKey: req.headers['idempotency-key'] ? `${getFirmId() || 'firm'}:raw-entry:${req.headers['idempotency-key']}` : undefined,
+        createdBy: req.user?.name || 'System',
+      }], { session });
+      return current;
+    });
 
     if (req.io) {
       req.io.emit('raw_material_updated', { type: 'entry_created', id: entry._id });
     }
+    await logAction({ action: 'RAW_MATERIAL_ENTRY_CREATED', description: `Received ${valQty} units of raw material batch ${batchNo}`, details: { id: entry._id, rawMaterialId, warehouseId: entry.warehouseId, qty: valQty }, req });
     res.status(201).json(entry);
   } catch (err) {
-    const status = ['WAREHOUSE_NOT_FOUND','WAREHOUSE_REQUIRED','MANUFACTURING_WAREHOUSE_NOT_MAPPED'].includes(err.code) ? 400 : 500;
+    const status = ['WAREHOUSE_NOT_FOUND','WAREHOUSE_REQUIRED','MANUFACTURING_WAREHOUSE_NOT_MAPPED','RAW_MATERIAL_NOT_FOUND'].includes(err.code) ? 400 : 500;
     res.status(status).json({ error: err.message, code: err.code });
   }
 });
@@ -454,6 +475,7 @@ router.patch('/entries/:id/qc-status', authorize('manufacturing:qcApprove'), asy
 
     entry.qcStatus = qcStatus;
     await entry.save();
+    await logAction({ action: 'RAW_MATERIAL_QC_STATUS_CHANGED', description: `Set raw-material batch ${entry.batchNo} QC status to ${qcStatus}`, details: { id: entry._id, qcStatus }, req });
 
     if (req.io) {
       req.io.emit('raw_material_updated', { type: 'qc_status_changed', id: entry._id, qcStatus });
@@ -493,6 +515,7 @@ router.post('/entries/:id/clean', authorize('manufacturing:edit'), validate(sche
     entry.qty = cleaned; // update usable qty
 
     await entry.save();
+    await logAction({ action: 'RAW_MATERIAL_CLEANING_RECORDED', description: `Recorded cleaning adjustment for batch ${entry.batchNo}`, details: { id: entry._id, cleanedQty: cleaned, loss, notes: notes || '' }, req });
     if (req.io) {
       req.io.emit('raw_material_updated', { type: 'entry_cleaned', id: entry._id });
     }
@@ -505,8 +528,14 @@ router.post('/entries/:id/clean', authorize('manufacturing:edit'), validate(sche
 // DELETE /api/raw-materials/entries/:id — Void/Delete a stock entry
 router.delete('/entries/:id', authorize('manufacturing:delete'), async (req, res) => {
   try {
+    const reason = String(req.body?.reason || '').trim();
+    if (!reason) return res.status(400).json({ error: 'A reason is required when voiding a raw-material stock entry', code: 'ADJUSTMENT_REASON_REQUIRED' });
+    const existing = await RawMaterialEntry.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Stock entry not found' });
+    if (Number(existing.qty || 0) > 0) return res.status(409).json({ error: 'Stock entries with remaining quantity cannot be deleted; use an approved stock adjustment first.', code: 'RAW_MATERIAL_ENTRY_HAS_STOCK' });
     const deleted = await RawMaterialEntry.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Stock entry not found' });
+    await logAction({ action: 'RAW_MATERIAL_ENTRY_VOIDED', description: `Voided raw-material stock entry ${req.params.id}`, details: { id: req.params.id, reason }, req });
     res.json({ message: 'Stock entry removed successfully', id: req.params.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -599,51 +628,66 @@ router.get('/purchases/list', authorize('manufacturing:view'), async (req, res) 
 });
 
 // POST /api/raw-materials/purchase — Create a bulk purchase (creates RawMaterialEntry records)
-router.post('/purchase', authorize('manufacturing:create'), async (req, res) => {
+router.post('/purchase', idempotency, authorize('manufacturing:create'), async (req, res) => {
   try {
     const { vendorId, vendorName, date, items, warehouseId, manufacturingUnitId } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'At least one item is required' });
     }
 
-    const warehouse = await resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId });
+    const result = await withTransaction(async session => {
+      const warehouse = await resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId, session });
 
-    // Generate purchase reference atomically for this tenant.
-    const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const purchaseRef = await generateAtomicDocumentNumber(`rawMaterialPurchase_${dateStr}`, `PR-${dateStr}-`, 3);
+      // Generate purchase reference atomically for this tenant.
+      const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const purchaseRef = await generateAtomicDocumentNumber(`rawMaterialPurchase_${dateStr}`, `PR-${dateStr}-`, 3, session);
 
-    const created = [];
-    for (const item of items) {
-      if (!item.rawMaterialId || !item.batchNo || !item.qty) {
-        continue;
+      const created = [];
+      for (const item of items) {
+        if (!item.rawMaterialId || !item.batchNo || !(Number(item.qty) > 0)) continue;
+        const [entry] = await RawMaterialEntry.create([{
+          rawMaterialId: item.rawMaterialId,
+          batchNo: item.batchNo.trim().toUpperCase(),
+          initialQty: Number(item.qty),
+          qty: Number(item.qty),
+          purchaseRate: Number(item.purchaseRate) || 0,
+          vendorId: vendorId || undefined,
+          vendorName: vendorName || item.vendorName || '',
+          expiryDate: item.expiryDate || undefined,
+          purchaseRef,
+          warehouseId: warehouse._id,
+          warehouseName: warehouse.name,
+          qcStatus: 'under_test',
+        }], { session });
+        await RawMaterialLedger.create([{
+          rawMaterialId: item.rawMaterialId,
+          warehouseId: warehouse._id,
+          warehouseName: warehouse.name,
+          type: 'IN',
+          qty: Number(item.qty),
+          balance: Number(entry.qty || 0),
+          batchNo: entry.batchNo,
+          reference: purchaseRef,
+          note: 'Raw-material purchase receipt',
+          movementKey: `${getFirmId() || 'firm'}:raw-purchase:${purchaseRef}:${created.length}`,
+          createdBy: req.user?.name || 'System',
+        }], { session });
+        created.push(entry);
       }
-      const entry = await RawMaterialEntry.create({
-        rawMaterialId: item.rawMaterialId,
-        batchNo: item.batchNo.trim().toUpperCase(),
-        initialQty: Number(item.qty),
-        qty: Number(item.qty),
-        purchaseRate: Number(item.purchaseRate) || 0,
-        vendorId: vendorId || undefined,
-        vendorName: vendorName || item.vendorName || '',
-        expiryDate: item.expiryDate || undefined,
-        purchaseRef,
-        warehouseId: warehouse._id,
-        warehouseName: warehouse.name,
-        qcStatus: 'under_test',
-      });
-      created.push(entry);
-    }
-
-    res.status(201).json({ purchaseRef, entries: created });
+      if (!created.length) throw Object.assign(new Error('At least one valid purchase item is required'), { code: 'PURCHASE_ITEMS_REQUIRED' });
+      return { purchaseRef, entries: created };
+    });
+    await logAction({ action: 'RAW_MATERIAL_PURCHASE_CREATED', description: `Created raw-material purchase ${result.purchaseRef}`, details: { purchaseRef: result.purchaseRef, entryIds: result.entries.map(e => e._id) }, req });
+    res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
 // POST /api/raw-materials/:id/adjust-stock — Adjust raw material stock level with audit reason
-router.post('/:id/adjust-stock', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/adjust-stock', idempotency, authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { newStockLevel, reason, warehouseId, manufacturingUnitId } = req.body;
     if (newStockLevel === undefined || newStockLevel === null) {
@@ -657,69 +701,75 @@ router.post('/:id/adjust-stock', authorize('manufacturing:edit'), async (req, re
       return res.status(400).json({ error: 'Reason for adjustment is required' });
     }
 
-    const rm = await RawMaterial.findById(req.params.id);
-    if (!rm) return res.status(404).json({ error: 'Raw material not found' });
-    const warehouse = await resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId });
+    const result = await withTransaction(async session => {
+      const rm = await RawMaterial.findById(req.params.id).session(session);
+      if (!rm) throw Object.assign(new Error('Raw material not found'), { code: 'RAW_MATERIAL_NOT_FOUND' });
+      const warehouse = await resolveRawMaterialWarehouse({ warehouseId, manufacturingUnitId, session });
 
-    // Adjust one physical warehouse only; never silently rebalance stock across locations.
-    const entries = await RawMaterialEntry.find({ rawMaterialId: req.params.id, warehouseId: warehouse._id });
-    const currentStock = entries.reduce((s, e) => s + (e.qty || 0), 0);
-    const diff = Number((targetStock - currentStock).toFixed(3));
+      // Adjust one physical warehouse only; never silently rebalance stock across locations.
+      const entries = await RawMaterialEntry.find({ rawMaterialId: req.params.id, warehouseId: warehouse._id }).sort({ expiryDate: 1, createdAt: 1 }).session(session);
+      const currentStock = entries.reduce((s, e) => s + (e.qty || 0), 0);
+      const diff = Number((targetStock - currentStock).toFixed(3));
+      if (diff === 0) return { rm, currentStock, diff };
 
-    if (diff === 0) {
-      return res.json({ message: 'No adjustment needed', stockLevel: currentStock });
-    }
-
-    if (diff < 0) {
-      // Reduce stock (FIFO)
-      entries.sort((a, b) => {
-        if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
-        if (a.expiryDate && !b.expiryDate) return -1;
-        if (!a.expiryDate && b.expiryDate) return 1;
-        return new Date(a.createdAt) - new Date(b.createdAt);
-      });
-
-      let toReduce = Math.abs(diff);
-      for (const entry of entries) {
-        if (toReduce <= 0.0001) break;
-        if ((entry.qty || 0) <= 0) continue;
-        const reduce = Math.min(toReduce, entry.qty);
-        entry.qty = Number((entry.qty - reduce).toFixed(3));
-        entry.cleaningNotes = `${entry.cleaningNotes ? entry.cleaningNotes + '\n' : ''}Stock Adjustment: -${reduce} units on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`;
-        await entry.save();
-        toReduce -= reduce;
-      }
-    } else {
-      // Increase stock
-      const latestEntry = entries.length > 0 ? entries[entries.length - 1] : null;
-      if (latestEntry) {
-        latestEntry.qty = Number((latestEntry.qty + diff).toFixed(3));
-        latestEntry.initialQty = Number((latestEntry.initialQty + diff).toFixed(3));
-        latestEntry.cleaningNotes = `${latestEntry.cleaningNotes ? latestEntry.cleaningNotes + '\n' : ''}Stock Adjustment: +${diff} units on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`;
-        await latestEntry.save();
+      if (diff < 0) {
+        let toReduce = Math.abs(diff);
+        for (const entry of entries) {
+          if (toReduce <= 0.0001) break;
+          if ((entry.qty || 0) <= 0) continue;
+          const reduce = Math.min(toReduce, entry.qty);
+          entry.qty = Number((entry.qty - reduce).toFixed(3));
+          entry.cleaningNotes = `${entry.cleaningNotes ? entry.cleaningNotes + '\n' : ''}Stock Adjustment: -${reduce} units on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`;
+          await entry.save({ session });
+          toReduce -= reduce;
+        }
+        if (toReduce > 0.0001) throw Object.assign(new Error('Unable to reduce the requested quantity from available batches'), { code: 'ADJUSTMENT_EXCEEDS_STOCK' });
       } else {
-        await RawMaterialEntry.create({
-          rawMaterialId: rm._id,
-          batchNo: `ADJ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
-          initialQty: diff,
-          qty: diff,
-          purchaseRate: 0,
-          vendorName: 'Stock Adjustment',
-          warehouseId: warehouse._id,
-          warehouseName: warehouse.name,
-          qcStatus: 'approved',
-          cleaningNotes: `Initial adjustment on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`
-        });
+        const latestEntry = entries.length > 0 ? entries[entries.length - 1] : null;
+        if (latestEntry) {
+          latestEntry.qty = Number((latestEntry.qty + diff).toFixed(3));
+          latestEntry.initialQty = Number((latestEntry.initialQty + diff).toFixed(3));
+          latestEntry.cleaningNotes = `${latestEntry.cleaningNotes ? latestEntry.cleaningNotes + '\n' : ''}Stock Adjustment: +${diff} units on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`;
+          await latestEntry.save({ session });
+        } else {
+          await RawMaterialEntry.create([{
+            rawMaterialId: rm._id,
+            batchNo: `ADJ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
+            initialQty: diff,
+            qty: diff,
+            purchaseRate: 0,
+            vendorName: 'Stock Adjustment',
+            warehouseId: warehouse._id,
+            warehouseName: warehouse.name,
+            qcStatus: 'approved',
+            cleaningNotes: `Initial adjustment on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`
+          }], { session });
+        }
       }
-    }
+      await RawMaterialLedger.create([{
+        rawMaterialId: rm._id,
+        warehouseId: warehouse._id,
+        warehouseName: warehouse.name,
+        type: 'ADJUSTMENT',
+        qty: diff,
+        balance: targetStock,
+        reference: `ADJ:${rm._id}`,
+        note: reason.trim(),
+        movementKey: `${getFirmId() || 'firm'}:raw-adjust:${req.headers['idempotency-key'] || `${rm._id}:${Date.now()}`}`,
+        createdBy: req.user?.name || 'System',
+      }], { session });
+      return { rm, currentStock, diff };
+    });
 
     if (req.io) {
-      req.io.emit('raw_material_updated', { type: 'stock_adjusted', id: rm._id });
+      req.io.emit('raw_material_updated', { type: 'stock_adjusted', id: result.rm._id });
     }
-
-    res.json({ message: 'Stock adjusted successfully', diff, currentStock, newStock: targetStock });
+    await logAction({ action: 'RAW_MATERIAL_STOCK_ADJUSTED', description: `Adjusted raw-material stock by ${result.diff} units`, details: { id: result.rm._id, warehouseId, diff: result.diff, currentStock: result.currentStock, newStock: targetStock, reason: reason.trim() }, req });
+    if (result.diff === 0) return res.json({ message: 'No adjustment needed', stockLevel: result.currentStock });
+    res.json({ message: 'Stock adjusted successfully', diff: result.diff, currentStock: result.currentStock, newStock: targetStock });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = ['RAW_MATERIAL_NOT_FOUND','ADJUSTMENT_EXCEEDS_STOCK'].includes(err.code) ? 409 : 500;
+    res.status(status).json({ error: err.message, code: err.code });
   }
 });
 

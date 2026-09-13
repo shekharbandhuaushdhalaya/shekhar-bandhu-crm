@@ -11,6 +11,7 @@ const { authorize } = require('../../middleware/authorize');
 const schemas = require('../../validation/schemas');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const { withTransaction } = require('../../utils/withTransaction');
+const idempotency = require('../../middleware/requiredIdempotency');
 
 async function nextSampleNo() { return generateAtomicDocumentNumber('sampleNo', 'SMP', 5); }
 function fail(code, message) { const e = new Error(message); e.code = code; return e; }
@@ -78,7 +79,7 @@ router.get('/', authorize('inventory:view'), async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/', authorize('inventory:create'), validate(schemas.sampleSchema), async (req, res) => {
+router.post('/', idempotency, authorize('inventory:create'), validate(schemas.sampleSchema), async (req, res) => {
   try {
     const result = await withTransaction(async session => {
       const warehouse = req.body.warehouseId

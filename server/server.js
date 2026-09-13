@@ -363,6 +363,7 @@ app.use((err, req, res, next) => {
 // Start workers/server only after MongoDB is ready. This prevents accepting production
 // traffic while the database is unavailable and makes readiness meaningful.
 const { startWorker, stopWorker } = require('./services/jobQueue');
+require('./services/notificationJobs');
 let serverStarted = false;
 function startApplication() {
   if (serverStarted) return;

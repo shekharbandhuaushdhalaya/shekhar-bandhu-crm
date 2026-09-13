@@ -1,6 +1,8 @@
 const InventoryEntry = require('../models/InventoryEntry');
 const StockLedger = require('../models/StockLedger');
 const Challan = require('../models/Challan');
+const RawMaterialEntry = require('../models/RawMaterialEntry');
+const RawMaterialLedger = require('../models/RawMaterialLedger');
 
 /**
  * Compares stored warehouse stock with the append-only stock ledger.
@@ -13,16 +15,20 @@ async function reconcileInventory({ warehouseId, productId, limit = 500 } = {}) 
   if (productId) { entryFilter.productId = productId; ledgerFilter.productId = productId; }
 
   const entries = await InventoryEntry.find(entryFilter).lean();
-  const ledgers = await StockLedger.find(ledgerFilter).sort({ createdAt: 1, _id: 1 }).limit(limit * 20).lean();
+  const ledgerSlotTotals = await StockLedger.aggregate([
+    { $match: ledgerFilter },
+    { $group: { _id: { warehouseId: '$warehouseId', productId: '$productId', vendorId: { $ifNull: ['$vendorId', ''] }, packing: { $ifNull: ['$packing', 1] }, batchNo: { $ifNull: ['$batchNo', ''] } }, qty: { $sum: '$qtyBoxes' } } }
+  ]);
+  const checkedLedgerRows = await StockLedger.countDocuments(ledgerFilter);
   const bySlot = new Map();
   for (const e of entries) {
     const key = [e.warehouseId, e.productId, e.vendorId || '', e.packing || 1, e.batchNo || ''].join('|');
     bySlot.set(key, Number(e.qtyBoxes || 0));
   }
   const calculated = new Map();
-  for (const l of ledgers) {
-    const key = [l.warehouseId, l.productId, l.vendorId || '', l.packing || 1, l.batchNo || ''].join('|');
-    calculated.set(key, (calculated.get(key) || 0) + Number(l.qtyBoxes || 0));
+  for (const l of ledgerSlotTotals) {
+    const key = [l._id.warehouseId, l._id.productId, l._id.vendorId || '', l._id.packing || 1, l._id.batchNo || ''].join('|');
+    calculated.set(key, Number(l.qty || 0));
   }
 
   const discrepancies = [];
@@ -41,7 +47,24 @@ async function reconcileInventory({ warehouseId, productId, limit = 500 } = {}) 
   const refs = new Set((await StockLedger.find({ ...ledgerFilter, reference: { $in: finalized.map(c => c.challanNo) } }).select('reference').lean()).map(x => x.reference));
   const orphanPostedChallans = finalized.filter(c => !refs.has(c.challanNo));
 
-  return { ok: discrepancies.length === 0 && orphanPostedChallans.length === 0, discrepancies, orphanPostedChallans, checkedInventorySlots: keys.size, checkedLedgerRows: ledgers.length };
+  const rawEntryFilter = {};
+  const rawLedgerFilter = {};
+  if (warehouseId) { rawEntryFilter.warehouseId = warehouseId; rawLedgerFilter.warehouseId = warehouseId; }
+  const rawEntries = await RawMaterialEntry.find(rawEntryFilter).select('rawMaterialId warehouseId batchNo qty').lean();
+  const rawLedgerTotals = await RawMaterialLedger.aggregate([
+    { $match: rawLedgerFilter },
+    { $group: { _id: { rawMaterialId: '$rawMaterialId', warehouseId: '$warehouseId', batchNo: { $ifNull: ['$batchNo', ''] } }, qty: { $sum: '$qty' } } }
+  ]);
+  const rawStored = new Map(rawEntries.map(e => [[e.rawMaterialId, e.warehouseId, e.batchNo || ''].join('|'), Number(e.qty || 0)]));
+  const rawDiscrepancies = [];
+  for (const row of rawLedgerTotals) {
+    const key = [row._id.rawMaterialId, row._id.warehouseId, row._id.batchNo || ''].join('|');
+    const stored = Number(rawStored.get(key) || 0);
+    const ledger = Number(row.qty || 0);
+    if (Math.abs(stored - ledger) > 0.0001) rawDiscrepancies.push({ rawMaterialId: row._id.rawMaterialId, warehouseId: row._id.warehouseId, batchNo: row._id.batchNo || '', storedQty: stored, ledgerQty: ledger, difference: Number((stored - ledger).toFixed(4)) });
+  }
+
+  return { ok: discrepancies.length === 0 && orphanPostedChallans.length === 0 && rawDiscrepancies.length === 0, discrepancies, rawMaterialDiscrepancies: rawDiscrepancies.slice(0, limit), orphanPostedChallans, checkedInventorySlots: keys.size, checkedLedgerRows, checkedRawMaterialLedgerRows: rawLedgerTotals.length };
 }
 
 module.exports = { reconcileInventory };

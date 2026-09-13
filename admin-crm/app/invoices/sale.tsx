@@ -998,6 +998,34 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   const nettTotal = Math.round(rawTotal);
   const roundOff = nettTotal - rawTotal;
 
+  // Sale invoices are intentionally derived from posted Sale Challans. Keep
+  // the edit modal for legacy corrections, but remove the unsafe standalone
+  // create form from the production workflow.
+  if (visible && !invoiceToEdit) {
+    return (
+      <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={26} color={colors.text.primary} /></TouchableOpacity>
+            <Text style={styles.modalTitle}>Create Sale Invoice</Text>
+            <View style={{ width: 26 }} />
+          </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, gap: 12 }}>
+            <Ionicons name="document-text-outline" size={48} color={colors.primary} />
+            <Text style={{ ...Typography.h2, color: colors.text.primary, textAlign: 'center' }}>Create from a posted Sale Challan</Text>
+            <Text style={{ ...Typography.body, color: colors.text.secondary, textAlign: 'center' }}>
+              Stock and billing must stay linked. Prepare and finalize the Sale Challan in Sales Workspace, then convert it to an invoice.
+            </Text>
+            <TouchableOpacity style={[styles.addBtn, { width: 'auto', height: 44, paddingHorizontal: 16, flexDirection: 'row', gap: 8 }]} onPress={() => { onClose(); router.push('/sales-workspace?tab=challans'); }}>
+              <Ionicons name="arrow-forward-circle-outline" size={18} color="#fff" />
+              <Text style={{ ...Typography.caption, color: '#fff', fontWeight: '800' }}>Open Sales Workspace</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>

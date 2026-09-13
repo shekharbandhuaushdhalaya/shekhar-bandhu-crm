@@ -1,9 +1,11 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const Product = require('../../models/Product');
+const ProductRating = require('../../models/ProductRating');
 const InventoryEntry = require('../../models/InventoryEntry');
 const { validate } = require('../../middleware/validate');
 const { z } = require('zod');
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -110,6 +112,18 @@ router.post('/:id/rate', ratingLimiter, validate(z.object({ rating: z.number().m
     const val = Number(req.body.rating);
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const day = new Date().toISOString().slice(0, 10);
+    const source = `${req.ip || 'unknown'}|${req.get('user-agent') || ''}|${day}`;
+    const fingerprint = crypto.createHash('sha256').update(source).digest('hex');
+    try {
+      await ProductRating.create({ productId: product._id, fingerprint, rating: val });
+    } catch (error) {
+      if (error?.code === 11000) {
+        return res.status(409).json({ error: 'This product has already been rated from this device today.', code: 'RATING_ALREADY_SUBMITTED' });
+      }
+      throw error;
+    }
 
     const currentCount = Number(product.ratingCount || 0);
     const currentAvg = Number(product.rating || 0);

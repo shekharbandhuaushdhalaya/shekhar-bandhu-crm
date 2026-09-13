@@ -19,6 +19,10 @@
 - Monitor 5xx rate, DB health, worker dead jobs and external integration failures.
 - CI must pass backend lint/tests and frontend TypeScript/web export gates before release.
 - Production CORS is exact HTTPS-origin only; deployment-provider subdomains are not implicitly trusted.
+- Run `npm run preflight:production` with the production environment before deploying.
+- Run `npm run verify:indexes` against staging and production after migrations; investigate every missing or duplicate index before opening traffic.
+- Run `GET /api/inventory/reconciliation` with an inventory-authorized account after each stock migration and after any incident. This report is read-only and must be archived with the release record.
+- High-risk mutation clients must send a stable `Idempotency-Key` (stock receipts/adjustments, posted-Challan invoice conversion, payments, returns, GRNs, and dispatches).
 
 ## Operational rules
 - Never run destructive reset endpoints in production.
@@ -38,6 +42,14 @@ Business models are tenant-scoped through `firmId`. The server derives the activ
 - Store backups in independent storage; do not rely on the application container filesystem.
 - Test restores regularly using `RESTORE_CONFIRM=YES npm run restore:database -- /path/to/archive.gz` against a staging database first.
 - The HTTP `/api/system/backup` and `/api/system/restore` endpoints intentionally do not perform database backup/restore operations.
+
+## Stock integrity response
+
+The reconciliation endpoint compares InventoryEntry slots with the append-only
+StockLedger and flags finalized Challans that have no corresponding ledger
+reference. It never repairs records automatically. Any variance requires a
+documented stocktake/approval and an auditable adjustment using the normal
+inventory workflow.
 
 ## Production startup safety
 - Do not set `RUN_STARTUP_MIGRATIONS=true` in production.

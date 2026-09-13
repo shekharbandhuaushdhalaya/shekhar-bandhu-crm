@@ -1,5 +1,7 @@
 const express = require('express');
 const { authorize } = require('../../middleware/authorize');
+const BroadcastCampaign = require('../../models/BroadcastCampaign');
+const { enqueue } = require('../../services/jobQueue');
 
 const router = express.Router();
 
@@ -17,19 +19,20 @@ router.post('/broadcast', authorize('contact:create'), async (req, res) => {
       .map(p => (p || '').toString().trim().replace(/[^0-9+]/g, ''))
       .filter(p => p.length >= 10);
 
-    const broadcastResult = {
-      campaignTitle,
-      totalRecipients: validPhones.length,
-      status: 'queued',
-      dispatchedAt: new Date(),
-      sampleRecipients: validPhones.slice(0, 5)
-    };
+    if (!validPhones.length) return res.status(400).json({ error: 'At least one valid recipient phone number is required' });
+    const campaign = await BroadcastCampaign.create({
+      title: String(campaignTitle).trim(),
+      message: String(messageBody).trim(),
+      recipients: validPhones.map(phone => ({ phone, status: 'queued' })),
+      createdBy: req.user?.id || null,
+    });
+    const job = await enqueue('whatsapp.broadcast', { broadcastId: campaign._id }, { firmId: campaign.firmId });
 
     if (req.io) {
-      req.io.emit('whatsapp_broadcast', { type: 'dispatched', campaignTitle, recipientsCount: validPhones.length });
+      req.io.emit('whatsapp_broadcast', { type: 'queued', campaignId: campaign._id, recipientsCount: validPhones.length });
     }
 
-    res.status(201).json(broadcastResult);
+    res.status(201).json({ campaignId: campaign._id, jobId: job._id, campaignTitle: campaign.title, totalRecipients: validPhones.length, status: campaign.status, queuedAt: campaign.queuedAt });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
