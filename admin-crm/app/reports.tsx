@@ -1,12 +1,12 @@
+import { StatusPill } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet, RefreshControl,
-  useWindowDimensions, Pressable, TouchableOpacity, Platform,
-  TextInput, Alert, ActivityIndicator
-} from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Pressable, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, Invoice, ManufacturingAnalytics, RawMaterial, RawMaterialEntry } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
@@ -390,7 +390,7 @@ export default function ReportsScreen() {
           <td>${rm.unit}</td>
           <td class="right">${rm.minReorder}</td>
           <td class="right">₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-          <td style="text-align:center; color:${isLow ? '#dc3545' : '#198754'}; font-weight:700">${isLow ? '⚠ LOW' : '✓ OK'}</td>
+          <td style="text-align:center; color:${isLow ? '#dc3545' : '#198754'}; font-weight:700">${isLow ? ' LOW' : ' OK'}</td>
         </tr>
       `;
     });
@@ -538,26 +538,13 @@ export default function ReportsScreen() {
         <select
           value={activeTab}
           onChange={(e: any) => setActiveTab(e.target.value as ReportTab)}
-          style={{
-            width: '100%',
-            height: 38,
-            padding: '0 12px',
-            borderRadius: 8,
-            border: `1px solid ${colors.primary}`,
-            backgroundColor: colors.bg.card,
-            color: colors.primary,
-            fontSize: 13,
-            fontWeight: '700',
-            outline: 'none',
-            cursor: 'pointer',
-            boxShadow: '0px 2px 4px rgba(0,0,0,0.04)'
-          }}
+          style={{ ...Typography.bodySm, width: '100%', height: 38, padding: '0 12px', borderRadius: 8, border: `1px solid ${colors.primary}`, backgroundColor: colors.bg.card, color: colors.primary, fontWeight: '700', outline: 'none', cursor: 'pointer', boxShadow: '0px 2px 4px rgba(0,0,0,0.04)' }}
         >
-          <option value="accounting">📊 Monthly Accounting Register</option>
-          <option value="gst">🧾 GST Returns (GSTR-1 & GSTR-3B)</option>
-          <option value="aging">⏳ Receivables Aging</option>
-          <option value="manufacturing">🏭 Manufacturing Analytics</option>
-          <option value="rawmaterials">🌿 Raw Materials Stock Register</option>
+          <option value="accounting"> Monthly Accounting Register</option>
+          <option value="gst"> GST Returns (GSTR-1 & GSTR-3B)</option>
+          <option value="aging"> Receivables Aging</option>
+          <option value="manufacturing"> Manufacturing Analytics</option>
+          <option value="rawmaterials"> Raw Materials Stock Register</option>
         </select>
       ) : (
         <TouchableOpacity
@@ -574,16 +561,16 @@ export default function ReportsScreen() {
           }}
           onPress={() => {
             Alert.alert('Select Report Section', '', [
-              { text: '📊 Monthly Accounting', onPress: () => setActiveTab('accounting') },
-              { text: '🧾 GST Returns (GSTR-1 & GSTR-3B)', onPress: () => setActiveTab('gst') },
-              { text: '⏳ Receivables Aging', onPress: () => setActiveTab('aging') },
-              { text: '🏭 Manufacturing Analytics', onPress: () => setActiveTab('manufacturing') },
-              { text: '🌿 Raw Materials', onPress: () => setActiveTab('rawmaterials') }
+              { text: ' Monthly Accounting', onPress: () => setActiveTab('accounting') },
+              { text: ' GST Returns (GSTR-1 & GSTR-3B)', onPress: () => setActiveTab('gst') },
+              { text: ' Receivables Aging', onPress: () => setActiveTab('aging') },
+              { text: ' Manufacturing Analytics', onPress: () => setActiveTab('manufacturing') },
+              { text: ' Raw Materials', onPress: () => setActiveTab('rawmaterials') }
             ]);
           }}
         >
-          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-            {activeTab === 'accounting' ? '📊 Monthly Accounting' : activeTab === 'gst' ? '🧾 GST Returns' : activeTab === 'aging' ? '⏳ Receivables Aging' : activeTab === 'manufacturing' ? '🏭 Manufacturing Analytics' : '🌿 Raw Materials'}
+          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
+            {activeTab === 'accounting' ? ' Monthly Accounting' : activeTab === 'gst' ? ' GST Returns' : activeTab === 'aging' ? ' Receivables Aging' : activeTab === 'manufacturing' ? ' Manufacturing Analytics' : ' Raw Materials'}
           </Text>
           <Ionicons name="chevron-down" size={14} color={colors.primary} />
         </TouchableOpacity>
@@ -740,7 +727,7 @@ export default function ReportsScreen() {
                     </View>
                     <View style={styles.previewCell}>
                       <Text style={styles.previewCellLabel}>Report Period</Text>
-                      <Text style={[styles.previewCellValue, { color: colors.text.secondary, fontSize: 14 }]}>{MONTHS_SHORT[reportMonth]} {reportYear}</Text>
+                      <Text style={[styles.previewCellValue, { ...Typography.body, color: colors.text.secondary }]}>{MONTHS_SHORT[reportMonth]} {reportYear}</Text>
                     </View>
                   </View>
                 );
@@ -990,16 +977,14 @@ export default function ReportsScreen() {
                       <View key={idx}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' }}>
                           <View style={{ flex: 1, marginRight: 8 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>
+                            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                               Batch {item.batchNo} · {item.productName}
                             </Text>
-                            <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                            <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 2 }}>
                               Yielded {item.actualYieldQty} / {item.plannedQty} planned units
                             </Text>
                           </View>
-                          <View style={[styles.efficiencyBadge, { backgroundColor: barColor + '20', borderColor: barColor }]}>
-                            <Text style={{ fontSize: 13, fontWeight: '800', color: barColor }}>{item.efficiency}%</Text>
-                          </View>
+                          <StatusPill  label={<>{item.efficiency}%</>} textStyle={{ ...Typography.bodySm, fontWeight: '800', color: barColor }} />
                         </View>
                         <View style={{ height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' }}>
                           <View style={{ height: '100%', width: `${Math.min(100, item.efficiency)}%`, backgroundColor: barColor, borderRadius: 4 }} />
@@ -1011,7 +996,7 @@ export default function ReportsScreen() {
               ) : (
                 <View style={{ alignItems: 'center', padding: 32 }}>
                   <Ionicons name="bar-chart-outline" size={36} color={colors.text.secondary} />
-                  <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 8 }}>No completed yield batches to analyze yet.</Text>
+                  <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 8 }}>No completed yield batches to analyze yet.</Text>
                 </View>
               )}
             </View>
@@ -1045,19 +1030,17 @@ export default function ReportsScreen() {
                       <View key={run.id || idx} style={[styles.timelineRow, { borderLeftColor: statusColor }]}>
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>
+                            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                               {run.batchNo}
                             </Text>
-                            <View style={[styles.statusPill, { backgroundColor: statusColor + '15', borderColor: statusColor }]}>
-                              <Text style={{ fontSize: 9, fontWeight: '800', color: statusColor }}>{run.status.toUpperCase()}</Text>
-                            </View>
+                            <StatusPill  label={<>{run.status.toUpperCase()}</>} textStyle={{ ...Typography.eyebrow, fontWeight: '800', color: statusColor }} />
                           </View>
-                          <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 2 }}>{run.productName}</Text>
-                          <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>{start} → {end}</Text>
+                          <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginTop: 2 }}>{run.productName}</Text>
+                          <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>{start} → {end}</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{run.actualYieldQty || run.plannedQty} units</Text>
-                          <Text style={{ fontSize: 10, color: colors.text.muted }}>Planned: {run.plannedQty}</Text>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{run.actualYieldQty || run.plannedQty} units</Text>
+                          <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Planned: {run.plannedQty}</Text>
                         </View>
                       </View>
                     );
@@ -1066,7 +1049,7 @@ export default function ReportsScreen() {
               ) : (
                 <View style={{ alignItems: 'center', padding: 32 }}>
                   <Ionicons name="calendar-outline" size={36} color={colors.text.secondary} />
-                  <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 8 }}>No production timeline data found.</Text>
+                  <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 8 }}>No production timeline data found.</Text>
                 </View>
               )}
             </View>
@@ -1126,7 +1109,7 @@ export default function ReportsScreen() {
                   </View>
                   <View style={styles.previewCell}>
                     <Text style={styles.previewCellLabel}>Stock Value</Text>
-                    <Text style={[styles.previewCellValue, { color: colors.success, fontSize: 14 }]}>
+                    <Text style={[styles.previewCellValue, { ...Typography.body, color: colors.success }]}>
                       ₹{totalStockValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                     </Text>
                   </View>
@@ -1177,7 +1160,7 @@ export default function ReportsScreen() {
                       >
                         <View style={[styles.expiryDot, { backgroundColor: isCritical ? colors.danger : colors.warning }]} />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.expiryMaterialName}>🌿 {rmName}</Text>
+                          <Text style={styles.expiryMaterialName}> {rmName}</Text>
                           <Text style={styles.expiryBatchInfo}>
                             Batch: <Text style={{ fontWeight: '700' }}>{alert.batchNo}</Text>
                             {'  ·  '}Stock: {alert.rawMaterialId && typeof alert.rawMaterialId === 'object' && isIntegerQty(alert.rawMaterialId.unit, alert.rawMaterialId.category) ? alert.qty.toFixed(0) : alert.qty.toFixed(2)} {rmUnit}
@@ -1230,7 +1213,7 @@ export default function ReportsScreen() {
                       onChangeText={setRmSearchText}
                       placeholder="Search materials..."
                       placeholderTextColor={colors.text.muted}
-                      style={{ fontSize: 13, color: colors.text.primary, flex: 1, paddingVertical: 2 }}
+                      style={{ ...Typography.bodySm, color: colors.text.primary, flex: 1, paddingVertical: 2 }}
                     />
                   </View>
                 </View>
@@ -1289,9 +1272,7 @@ export default function ReportsScreen() {
                             </Text>
                             <View style={{ width: 56, alignItems: 'center' }}>
                               {isLow ? (
-                                <View style={[styles.statusPill, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
-                                  <Text style={{ fontSize: 9, fontWeight: '800', color: colors.danger }}>LOW</Text>
-                                </View>
+                                <StatusPill  label={<>LOW</>} textStyle={{ ...Typography.eyebrow, fontWeight: '800', color: colors.danger }} />
                               ) : (
                                 <Ionicons name="checkmark-circle" size={18} color={colors.success} />
                               )}
@@ -1304,10 +1285,10 @@ export default function ReportsScreen() {
                     {/* Total row */}
                     {filteredMaterials.length > 0 && (
                       <View style={[styles.rmSummaryRow, { backgroundColor: colors.primary + '08', borderTopWidth: 2, borderTopColor: colors.primary }]}>
-                        <Text style={{ flex: 2.5, fontSize: 12, fontWeight: '800', color: colors.primary }}>TOTAL</Text>
+                        <Text style={{ ...Typography.bodySm, flex: 2.5, fontWeight: '800', color: colors.primary }}>TOTAL</Text>
                         <Text style={{ flex: 1 }} />
                         <Text style={{ flex: 1 }} />
-                        <Text style={[styles.rmTd, { flex: 1.3, textAlign: 'right', color: colors.primary, fontWeight: '800', fontSize: 14 }]}>
+                        <Text style={[styles.rmTd, { ...Typography.body, flex: 1.3, textAlign: 'right', color: colors.primary, fontWeight: '800' }]}>
                           ₹{totalStockValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                         </Text>
                         <View style={{ width: 56 }} />
@@ -1365,9 +1346,7 @@ export default function ReportsScreen() {
                               <View style={{ flex: 2 }}>
                                 <Text style={styles.rmMaterialName} numberOfLines={1}>{rmName}</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                                  <View style={[styles.batchPill, { backgroundColor: colors.primary + '12' }]}>
-                                    <Text style={{ fontSize: 9, fontWeight: '700', color: colors.primary }}>{entry.batchNo}</Text>
-                                  </View>
+                                  <StatusPill  label={<>{entry.batchNo}</>} textStyle={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary }} />
                                   {entry.vendorName ? (
                                     <Text style={styles.rmSkuLabel}>{entry.vendorName}</Text>
                                   ) : null}
@@ -1389,7 +1368,7 @@ export default function ReportsScreen() {
                                       {expDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
                                     </Text>
                                     {daysLeft !== null && isNearExpiry && (
-                                      <Text style={{ fontSize: 9, fontWeight: '700', color: isCritical ? colors.danger : colors.warning }}>
+                                      <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: isCritical ? colors.danger : colors.warning }}>
                                         {daysLeft <= 0 ? 'EXPIRED' : `${daysLeft}d left`}
                                       </Text>
                                     )}
@@ -1424,7 +1403,7 @@ export default function ReportsScreen() {
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>View Logs</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.primary }}>View Logs</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.primary} />
               </View>
             </View>
@@ -1453,18 +1432,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  pageTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text.primary,
-    letterSpacing: 0.3,
-  },
-  pageSubtitle: {
-    fontSize: 12,
-    color: colors.text.muted,
-    marginTop: 2,
-    fontWeight: '500',
-  },
+  pageTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  pageSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2, fontWeight: '500' },
 
   // Tab bar
   tabBarScroll: {
@@ -1494,11 +1463,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  tabPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text.secondary,
-  },
+  tabPillText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   tabPillTextActive: {
     color: '#fff',
     fontWeight: '700',
@@ -1526,16 +1491,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  sectionCardTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  sectionCardSubtitle: {
-    fontSize: 12,
-    color: colors.text.muted,
-    marginTop: 2,
-  },
+  sectionCardTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  sectionCardSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   iconBadge: {
     width: 44,
     height: 44,
@@ -1567,12 +1524,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  dropdownTriggerText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginRight: 6,
-  },
+  dropdownTriggerText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary, marginRight: 6 },
   dropdownPanel: {
     position: 'absolute',
     top: 44,
@@ -1594,10 +1546,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   dropdownItemActive: {
     backgroundColor: colors.primary + '10',
   },
-  dropdownItemText: {
-    fontSize: 13,
-    color: colors.text.primary,
-  },
+  dropdownItemText: { ...Typography.bodySm, color: colors.text.primary },
   generateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1607,11 +1556,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: 40,
     borderRadius: Radius.md,
   },
-  generateBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  generateBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   previewGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1626,18 +1571,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  previewCellLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  previewCellValue: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
+  previewCellLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', marginBottom: 6 },
+  previewCellValue: { ...Typography.h2, fontWeight: '800' },
 
   // GST
   gstGrid: {
@@ -1649,19 +1584,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingHorizontal: 4,
     gap: 6,
   },
-  gstLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text.muted,
-  },
-  gstValue: {
-    fontSize: 26,
-    fontWeight: '800',
-  },
-  gstSubtext: {
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
+  gstLabel: { ...Typography.bodySm, fontWeight: '600', color: colors.text.muted },
+  gstValue: { ...Typography.display, fontWeight: '800' },
+  gstSubtext: { ...Typography.caption, color: colors.text.secondary },
   itcBanner: {
     flexDirection: 'row',
     gap: 12,
@@ -1670,20 +1595,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
   },
-  itcBannerTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  itcBannerValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#000',
-    marginVertical: 2,
-  },
-  itcBannerDesc: {
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
+  itcBannerTitle: { ...Typography.bodySm, fontWeight: '700' },
+  itcBannerValue: { ...Typography.h1, fontWeight: '800', color: '#000', marginVertical: 2 },
+  itcBannerDesc: { ...Typography.caption, color: colors.text.secondary },
   gstMonthRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1692,12 +1606,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  gstMonthLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.primary,
-    width: 60,
-  },
+  gstMonthLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, width: 60 },
   gstMonthValues: {
     flexDirection: 'row',
     flex: 1,
@@ -1709,17 +1618,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'flex-end',
     minWidth: 80,
   },
-  gstMonthChipLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  gstMonthChipValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 2,
-  },
+  gstMonthChipLabel: { ...Typography.eyebrow, fontWeight: '700', textTransform: 'uppercase' },
+  gstMonthChipValue: { ...Typography.bodySm, fontWeight: '700', marginTop: 2 },
 
   // Aging
   agingGrid: {
@@ -1737,17 +1637,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  agingCardLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  agingCardValue: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
+  agingCardLabel: { ...Typography.eyebrow, fontWeight: '700', textTransform: 'uppercase', marginBottom: 8 },
+  agingCardValue: { ...Typography.h2, fontWeight: '800' },
   overdueAlert: {
     flexDirection: 'row',
     gap: 12,
@@ -1756,44 +1647,19 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
   },
-  overdueAlertTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  overdueAlertValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    marginVertical: 2,
-  },
-  overdueAlertDesc: {
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
+  overdueAlertTitle: { ...Typography.bodySm, fontWeight: '700' },
+  overdueAlertValue: { ...Typography.h1, fontWeight: '800', marginVertical: 2 },
+  overdueAlertDesc: { ...Typography.caption, color: colors.text.secondary },
   overdueRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
   },
-  overdueRowParty: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  overdueRowInvNo: {
-    fontSize: 11,
-    color: colors.text.muted,
-    marginTop: 2,
-  },
-  overdueRowAmt: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  overdueRowDays: {
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 2,
-  },
+  overdueRowParty: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  overdueRowInvNo: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
+  overdueRowAmt: { ...Typography.body, fontWeight: '800' },
+  overdueRowDays: { ...Typography.eyebrow, fontWeight: '700', marginTop: 2 },
 
   // Manufacturing
   mfgValGrid: {
@@ -1817,21 +1683,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 4,
   },
-  mfgValLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  mfgValValue: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  mfgValSub: {
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
+  mfgValLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' },
+  mfgValValue: { ...Typography.h1, fontWeight: '800' },
+  mfgValSub: { ...Typography.caption, color: colors.text.secondary },
   efficiencyBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -1867,26 +1721,10 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
-  expiryMaterialName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  expiryBatchInfo: {
-    fontSize: 11,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  expiryDate: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  expiryDaysLeft: {
-    fontSize: 10,
-    fontWeight: '800',
-    marginTop: 2,
-    textTransform: 'uppercase' as const,
-  },
+  expiryMaterialName: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  expiryBatchInfo: { ...Typography.caption, color: colors.text.secondary, marginTop: 2 },
+  expiryDate: { ...Typography.bodySm, fontWeight: '700' },
+  expiryDaysLeft: { ...Typography.eyebrow, fontWeight: '800', marginTop: 2, textTransform: 'uppercase' as const },
   toggleGroup: {
     flexDirection: 'row',
     gap: 6,
@@ -1906,11 +1744,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  toggleBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text.secondary,
-  },
+  toggleBtnText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   toggleBtnTextActive: {
     color: '#fff',
     fontWeight: '700',
@@ -1936,13 +1770,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.sm,
     marginBottom: 4,
   },
-  rmTh: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.text.muted,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-  },
+  rmTh: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' as const },
   rmSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1957,20 +1785,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius: Radius.sm,
   },
-  rmMaterialName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  rmSkuLabel: {
-    fontSize: 10,
-    color: colors.text.muted,
-    marginTop: 2,
-  },
-  rmTd: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
+  rmMaterialName: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  rmSkuLabel: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
+  rmTd: { ...Typography.bodySm, color: colors.text.secondary },
   batchPill: {
     paddingHorizontal: 7,
     paddingVertical: 2,

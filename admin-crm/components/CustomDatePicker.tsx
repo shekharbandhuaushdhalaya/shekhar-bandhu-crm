@@ -1,8 +1,10 @@
+import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
+import { AppText as Text } from './AppText';
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Pressable, Modal, Platform, Dimensions } from 'react-native';
+import { View, Pressable, Modal, Platform, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/themeContext';
-import { Radius } from '../constants/theme';
+import { Radius, Typography } from '../constants/theme';
 
 interface CustomDatePickerProps {
   value: string; // ISO date string "YYYY-MM-DD"
@@ -133,7 +135,7 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
   return (
     <View style={{ width: compact ? undefined : '100%' }}>
       {label ? (
-        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+        <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', marginBottom: 4 }}>
           {label}
         </Text>
       ) : null}
@@ -156,7 +158,7 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
       >
         <Ionicons name="calendar" size={compact ? 14 : 16} color={value ? colors.primary : colors.text.muted} />
         {!iconOnly && (
-          <Text style={{ flex: 1, color: value ? colors.text.primary : colors.text.muted, fontWeight: value ? '700' : '400', fontSize: compact ? 12 : 13 }} numberOfLines={1}>
+          <Text style={{ flex: 1, color: value ? colors.text.primary : colors.text.muted, fontWeight: value ? '700' : '400', fontSize: compact ? Typography.bodySm.fontSize : Typography.body.fontSize }} numberOfLines={1}>
             {formattedLabel}
           </Text>
         )}
@@ -197,7 +199,7 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
               <TouchableOpacity onPress={() => handleMonthChange(-1)} style={{ padding: 6, borderRadius: 6, backgroundColor: colors.bg.secondary }}>
                 <Ionicons name="chevron-back" size={16} color={colors.text.primary} />
               </TouchableOpacity>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>
                 {monthNames[viewMonth]} {viewYear}
               </Text>
               <TouchableOpacity onPress={() => handleMonthChange(1)} style={{ padding: 6, borderRadius: 6, backgroundColor: colors.bg.secondary }}>
@@ -208,7 +210,7 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
             {/* Weekday Labels */}
             <View style={{ flexDirection: 'row', marginBottom: 6 }}>
               {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(w => (
-                <Text key={w} style={{ flex: 1, textAlign: 'center', fontSize: 10, fontWeight: '800', color: colors.text.muted }}>{w}</Text>
+                <Text key={w} style={{ ...Typography.eyebrow, flex: 1, textAlign: 'center', fontWeight: '800', color: colors.text.muted }}>{w}</Text>
               ))}
             </View>
 
@@ -237,7 +239,7 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
                     }, isSelected && { backgroundColor: colors.primary }, isToday && !isSelected && { borderWidth: 1, borderColor: colors.primary }]}
                     onPress={() => handleSelectDay(dayNum)}
                   >
-                    <Text style={[{ fontSize: 12, fontWeight: isSelected || isToday ? '800' : '500', color: isSelected ? '#fff' : colors.text.primary }]}>
+                    <Text style={[{ ...Typography.bodySm, fontWeight: isSelected || isToday ? '800' : '500', color: isSelected ? '#fff' : colors.text.primary }]}>
                       {dayNum}
                     </Text>
                   </TouchableOpacity>
@@ -248,10 +250,10 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
             {/* Footer */}
             <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: 10, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <TouchableOpacity onPress={() => { onChange(new Date().toISOString().split('T')[0]); setOpen(false); }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>Today</Text>
+                <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>Today</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setOpen(false)}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted }}>Close</Text>
+                <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.muted }}>Close</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

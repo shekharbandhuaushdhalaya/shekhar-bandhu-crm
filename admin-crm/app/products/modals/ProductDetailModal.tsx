@@ -1,7 +1,9 @@
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppText as Text } from './../../../components/AppText';
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
+import { View, ScrollView, Modal, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing } from '../../../constants/theme';
+import { Spacing, Typography } from '../../../constants/theme';
 import { api, Product, getImageUrl } from '../../../utils/api';
 import { useAuth } from '../../../utils/auth';
 import { usePermission } from '../../../utils/permissions';
@@ -232,20 +234,20 @@ export default function ProductDetailModal({ product, visible, onClose, onDelete
           </View>
 
           <View style={{ marginTop: 20 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>Available Sizes & Pricing:</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>Available Sizes & Pricing:</Text>
             <View style={{ borderRadius: 6, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}>
               <View style={{ flexDirection: 'row', backgroundColor: colors.bg.secondary, padding: 8 }}>
-                <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: colors.text.muted }}>Size</Text>
-                <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.muted }}>B2B Price</Text>
-                <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.muted }}>MRP</Text>
-                <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.text.muted }}>Stock</Text>
+                <Text style={{ ...Typography.caption, flex: 1.5, fontWeight: '700', color: colors.text.muted }}>Size</Text>
+                <Text style={{ ...Typography.caption, flex: 1.2, fontWeight: '700', color: colors.text.muted }}>B2B Price</Text>
+                <Text style={{ ...Typography.caption, flex: 1.2, fontWeight: '700', color: colors.text.muted }}>MRP</Text>
+                <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.text.muted }}>Stock</Text>
               </View>
               {allVariants.map((v, idx) => (
                 <View key={idx} style={{ flexDirection: 'row', padding: 8, borderTopWidth: 1, borderTopColor: colors.border, alignItems: 'center' }}>
-                  <Text style={{ flex: 1.5, fontSize: 12, color: colors.text.primary, fontWeight: '600' }}>{v.size || 'N/A'}</Text>
-                  <Text style={{ flex: 1.2, fontSize: 12, color: colors.text.primary }}>₹{v.price}</Text>
-                  <Text style={{ flex: 1.2, fontSize: 12, color: colors.text.primary }}>{v.mrp ? `₹${v.mrp}` : '—'}</Text>
-                  <Text style={{ flex: 1, fontSize: 12, color: v.stockLevel <= v.minReorder ? colors.danger : colors.text.primary, fontWeight: v.stockLevel <= v.minReorder ? '700' : 'normal' }}>
+                  <Text style={{ ...Typography.bodySm, flex: 1.5, color: colors.text.primary, fontWeight: '600' }}>{v.size || 'N/A'}</Text>
+                  <Text style={{ ...Typography.bodySm, flex: 1.2, color: colors.text.primary }}>₹{v.price}</Text>
+                  <Text style={{ ...Typography.bodySm, flex: 1.2, color: colors.text.primary }}>{v.mrp ? `₹${v.mrp}` : '—'}</Text>
+                  <Text style={{ ...Typography.bodySm, flex: 1, color: v.stockLevel <= v.minReorder ? colors.danger : colors.text.primary, fontWeight: v.stockLevel <= v.minReorder ? '700' : 'normal' }}>
                     {v.stockLevel} units
                   </Text>
                 </View>

@@ -1,7 +1,10 @@
+import { EmptyState } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, useWindowDimensions } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, STAGES, Stage, getStageColors, LightColors } from '../constants/theme';
+import { Spacing, Radius, STAGES, Stage, getStageColors, LightColors, Typography } from '../constants/theme';
 import { api, Contact } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 
@@ -60,10 +63,7 @@ function PipelineColumn({ stage, contacts, onMoveContact, width }: { stage: Stag
           </View>
         ))}
         {contacts.length === 0 && (
-          <View style={styles.emptyColumn}>
-            <Ionicons name="file-tray-outline" size={28} color={colors.text.muted} />
-            <Text style={styles.emptyColText}>No deals</Text>
-          </View>
+          <EmptyState title={<>No deals</>}  />
         )}
       </ScrollView>
     </View>
@@ -138,26 +138,26 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   summaryBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginTop: Spacing.lg, marginBottom: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg },
   summaryItem: { alignItems: 'center' },
-  summaryLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.5, marginBottom: 4 },
-  summaryValue: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
+  summaryLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginBottom: 4 },
+  summaryValue: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
   summaryDivider: { width: 1, height: 30, backgroundColor: colors.border },
   column: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, borderTopWidth: 3, paddingBottom: Spacing.md, marginTop: Spacing.sm },
   columnHeader: { flexDirection: 'row', alignItems: 'center', padding: Spacing.lg, paddingBottom: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
-  columnTitle: { fontSize: 15, fontWeight: '800', color: colors.text.primary },
-  columnSub: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  columnTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  columnSub: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
   columnCount: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  columnCountText: { fontSize: 13, fontWeight: '800' },
+  columnCountText: { ...Typography.bodySm, fontWeight: '800' },
   dealCard: { backgroundColor: colors.bg.primary, borderRadius: Radius.md, marginHorizontal: Spacing.md, marginTop: Spacing.sm, padding: Spacing.md, borderWidth: 1, borderColor: colors.border },
   dealTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   dealAvatar: { width: 34, height: 34, borderRadius: 17, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)' },
-  dealAvatarText: { fontSize: 14, fontWeight: '800', color: colors.text.primary },
-  dealName: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  dealCompany: { fontSize: 11, color: colors.text.secondary },
+  dealAvatarText: { ...Typography.body, fontWeight: '800', color: colors.text.primary },
+  dealName: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  dealCompany: { ...Typography.caption, color: colors.text.secondary },
   dealMid: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
-  dealValue: { fontSize: 12, color: colors.success, fontWeight: '700' },
+  dealValue: { ...Typography.bodySm, color: colors.success, fontWeight: '700' },
   moveRow: { flexDirection: 'row', justifyContent: 'space-between' },
   moveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: 'rgba(255,255,255,0.03)' },
-  moveBtnText: { fontSize: 9, fontWeight: '800', color: colors.text.muted },
+  moveBtnText: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },
   emptyColumn: { alignItems: 'center', paddingTop: 30 },
-  emptyColText: { fontSize: 12, color: colors.text.muted, marginTop: 6 },
+  emptyColText: { ...Typography.bodySm, color: colors.text.muted, marginTop: 6 },
 });

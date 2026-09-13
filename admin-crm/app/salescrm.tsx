@@ -1,11 +1,11 @@
+import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet, RefreshControl,
-  TouchableOpacity, TextInput, Modal, Pressable,
-  useWindowDimensions, Platform, Alert
-} from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, Pressable, useWindowDimensions, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, Complaint, Sample, SampleItem, SalesTarget, CommissionReport, Product } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
@@ -203,7 +203,7 @@ export default function SalesCRMScreen() {
                   activeOpacity={0.7}
                 >
                   <Ionicons name={tab.icon as any} size={14} color={active ? '#fff' : colors.text.secondary} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.text.primary }}>{tab.label}</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: active ? '#fff' : colors.text.primary }}>{tab.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -251,22 +251,16 @@ export default function SalesCRMScreen() {
 
             {/* List */}
             {complaints.length === 0 ? (
-              <View style={styles.emptyBox}><Ionicons name="chatbubble-ellipses-outline" size={40} color={colors.text.secondary} /><Text style={styles.emptyText}>No complaints found.</Text></View>
+              <EmptyState title={<>No complaints found.</>}  />
             ) : complaints.map(cmp => (
               <View key={cmp._id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: statusColors[cmp.status] || colors.border }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                       <Text style={styles.cardTitle}>{cmp.complaintNo}</Text>
-                      <View style={[styles.badge, { backgroundColor: statusColors[cmp.status] + '20', borderColor: statusColors[cmp.status] }]}>
-                        <Text style={[styles.badgeText, { color: statusColors[cmp.status] }]}>{cmp.status.replace('_',' ').toUpperCase()}</Text>
-                      </View>
-                      <View style={[styles.badge, { backgroundColor: priorityColors[cmp.priority] + '20', borderColor: priorityColors[cmp.priority] }]}>
-                        <Text style={[styles.badgeText, { color: priorityColors[cmp.priority] }]}>{cmp.priority.toUpperCase()}</Text>
-                      </View>
-                      <View style={[styles.badge, { backgroundColor: colors.info + '20', borderColor: colors.info }]}>
-                        <Text style={[styles.badgeText, { color: colors.info }]}>{cmp.type.toUpperCase()}</Text>
-                      </View>
+                      <StatusPill  label={<>{cmp.status.replace('_',' ').toUpperCase()}</>} textStyle={[styles.badgeText, { color: statusColors[cmp.status] }]} />
+                      <StatusPill  label={<>{cmp.priority.toUpperCase()}</>} textStyle={[styles.badgeText, { color: priorityColors[cmp.priority] }]} />
+                      <StatusPill  label={<>{cmp.type.toUpperCase()}</>} textStyle={[styles.badgeText, { color: colors.info }]} />
                     </View>
                     <Text style={styles.cardSubTitle}>{cmp.customerName}{cmp.customerPhone ? ` · ${cmp.customerPhone}` : ''}</Text>
                     {cmp.invoiceNo ? <Text style={styles.metaText}>Invoice: {cmp.invoiceNo}{cmp.productName ? ` · ${cmp.productName}` : ''}</Text> : null}
@@ -285,9 +279,9 @@ export default function SalesCRMScreen() {
                 <Text style={styles.descriptionText}>{cmp.description}</Text>
                 {cmp.resolution ? (
                   <View style={[styles.resolutionBox, { backgroundColor: colors.success + '10', borderColor: colors.success }]}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>RESOLUTION</Text>
-                    <Text style={{ fontSize: 12, color: colors.text.primary, marginTop: 2 }}>{cmp.resolution}</Text>
-                    {cmp.resolvedBy ? <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>By: {cmp.resolvedBy}</Text> : null}
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.success }}>RESOLUTION</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.primary, marginTop: 2 }}>{cmp.resolution}</Text>
+                    {cmp.resolvedBy ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>By: {cmp.resolvedBy}</Text> : null}
                   </View>
                 ) : null}
                 <Text style={styles.dateText}>{new Date(cmp.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
@@ -308,7 +302,7 @@ export default function SalesCRMScreen() {
                 { label: 'Total MRP', val: `₹${samples.reduce((s, x) => s + x.totalMrpValue, 0).toLocaleString('en-IN')}`, color: colors.danger, isText: true },
               ].map(s => (
                 <View key={s.label} style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: s.color, fontSize: s.isText ? 14 : 22 }]}>{s.val}</Text>
+                  <Text style={[styles.statValue, { color: s.color, fontSize: s.isText ? Typography.body.fontSize : Typography.h1.fontSize }]}>{s.val}</Text>
                   <Text style={styles.statLabel}>{s.label}</Text>
                 </View>
               ))}
@@ -324,19 +318,17 @@ export default function SalesCRMScreen() {
             </View>
 
             {samples.length === 0 ? (
-              <View style={styles.emptyBox}><Ionicons name="gift-outline" size={40} color={colors.text.secondary} /><Text style={styles.emptyText}>No samples logged yet.</Text></View>
+              <EmptyState title={<>No samples logged yet.</>}  />
             ) : samples.map(smp => (
               <View key={smp._id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: sampleStatusColors[smp.status] || colors.primary }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                       <Text style={styles.cardTitle}>{smp.sampleNo}</Text>
-                      <View style={[styles.badge, { backgroundColor: sampleStatusColors[smp.status] + '20', borderColor: sampleStatusColors[smp.status] }]}>
-                        <Text style={[styles.badgeText, { color: sampleStatusColors[smp.status] }]}>{smp.status.replace('_',' ').toUpperCase()}</Text>
-                      </View>
+                      <StatusPill  label={<>{smp.status.replace('_',' ').toUpperCase()}</>} textStyle={[styles.badgeText, { color: sampleStatusColors[smp.status] }]} />
                     </View>
-                    <Text style={styles.cardSubTitle}>🎁 To: {smp.givenTo}{smp.designation ? ` (${smp.designation})` : ''}</Text>
-                    {smp.location ? <Text style={styles.metaText}>📍 {smp.location}</Text> : null}
+                    <Text style={styles.cardSubTitle}> To: {smp.givenTo}{smp.designation ? ` (${smp.designation})` : ''}</Text>
+                    {smp.location ? <Text style={styles.metaText}> {smp.location}</Text> : null}
                     {smp.purpose ? <Text style={styles.metaText}>Purpose: {smp.purpose}</Text> : null}
                     <Text style={styles.metaText}>
                       By: {smp.givenBy} · {new Date(smp.date).toLocaleDateString('en-IN')}
@@ -352,9 +344,9 @@ export default function SalesCRMScreen() {
                 <View style={{ marginTop: 10, gap: 4 }}>
                   {smp.items.map((item, idx) => (
                     <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: colors.border }}>
-                      <Text style={{ fontSize: 12, color: colors.text.primary, flex: 2 }}>{item.productName}{item.size ? ` (${item.size})` : ''}</Text>
-                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>× {item.qty}</Text>
-                      <Text style={{ fontSize: 12, color: colors.success, fontWeight: '700' }}>₹{item.mrp}</Text>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.primary, flex: 2 }}>{item.productName}{item.size ? ` (${item.size})` : ''}</Text>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>× {item.qty}</Text>
+                      <Text style={{ ...Typography.bodySm, color: colors.success, fontWeight: '700' }}>₹{item.mrp}</Text>
                     </View>
                   ))}
                 </View>
@@ -378,13 +370,13 @@ export default function SalesCRMScreen() {
             <View style={styles.card}>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.secondary }}>Period:</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>Period:</Text>
                   {Platform.OS === 'web' ? (
                     <>
-                      <select value={targetMonth} onChange={(e: any) => setTargetMonth(parseInt(e.target.value))} style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13 }}>
+                      <select value={targetMonth} onChange={(e: any) => setTargetMonth(parseInt(e.target.value))} style={{ ...Typography.bodySm, padding: '6px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary }}>
                         {MONTHS_FULL.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                       </select>
-                      <select value={targetYear} onChange={(e: any) => setTargetYear(parseInt(e.target.value))} style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13 }}>
+                      <select value={targetYear} onChange={(e: any) => setTargetYear(parseInt(e.target.value))} style={{ ...Typography.bodySm, padding: '6px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary }}>
                         {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                       </select>
                     </>
@@ -392,7 +384,7 @@ export default function SalesCRMScreen() {
                     <TextInput style={styles.smallInput} value={`${targetMonth}/${targetYear}`} onChangeText={v => {}} placeholder="MM/YYYY" />
                   )}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ fontSize: 13, color: colors.text.secondary }}>Commission %:</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Commission %:</Text>
                     <TextInput style={[styles.smallInput, { width: 60 }]} value={commissionRate} onChangeText={setCommissionRate} keyboardType="numeric" placeholder="5" />
                   </View>
                 </View>
@@ -407,7 +399,7 @@ export default function SalesCRMScreen() {
             {commission && commission.agents.length > 0 && (
               <View style={styles.card}>
                 <Text style={styles.sectionTitle}>Commission Report — {MONTHS_FULL[targetMonth - 1]} {targetYear}</Text>
-                <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>Commission Rate: {commission.commissionRate}% on finalized invoices</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginBottom: 12 }}>Commission Rate: {commission.commissionRate}% on finalized invoices</Text>
                 {/* Table header */}
                 <View style={[styles.tableHeader]}>
                   <Text style={[styles.th, { flex: 2 }]}>AGENT</Text>
@@ -421,10 +413,10 @@ export default function SalesCRMScreen() {
                   return (
                     <View key={i} style={[styles.tableRow, i % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
                       <View style={{ flex: 2 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{ag.agentName}</Text>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{ag.agentName}</Text>
                         {pct !== null && (
                           <View>
-                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Target: ₹{target!.targetAmount.toLocaleString()} ({pct}%)</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Target: ₹{target!.targetAmount.toLocaleString()} ({pct}%)</Text>
                             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: 'hidden' }}>
                               <View style={{ height: '100%', width: `${pct}%`, backgroundColor: pct >= 100 ? colors.success : pct >= 75 ? colors.warning : colors.danger, borderRadius: 2 }} />
                             </View>
@@ -438,7 +430,7 @@ export default function SalesCRMScreen() {
                   );
                 })}
                 <View style={[styles.tableRow, { backgroundColor: colors.primary + '08', borderTopWidth: 2, borderTopColor: colors.primary }]}>
-                  <Text style={{ flex: 2, fontSize: 12, fontWeight: '800', color: colors.primary }}>TOTAL</Text>
+                  <Text style={{ ...Typography.bodySm, flex: 2, fontWeight: '800', color: colors.primary }}>TOTAL</Text>
                   <Text style={[styles.td, { flex: 1, textAlign: 'right', fontWeight: '800', color: colors.primary }]}>{commission.agents.reduce((s, a) => s + a.invoiceCount, 0)}</Text>
                   <Text style={[styles.td, { flex: 1.2, textAlign: 'right', fontWeight: '800', color: colors.primary }]}>₹{commission.agents.reduce((s, a) => s + a.totalSales, 0).toLocaleString()}</Text>
                   <Text style={[styles.td, { flex: 1.2, textAlign: 'right', fontWeight: '800', color: colors.success }]}>₹{commission.agents.reduce((s, a) => s + a.commission, 0).toLocaleString()}</Text>
@@ -446,7 +438,7 @@ export default function SalesCRMScreen() {
               </View>
             )}
             {commission && commission.agents.length === 0 && (
-              <View style={styles.emptyBox}><Ionicons name="trophy-outline" size={40} color={colors.text.secondary} /><Text style={styles.emptyText}>No finalized invoices found for this period.</Text></View>
+              <EmptyState title={<>No finalized invoices found for this period.</>}  />
             )}
 
             {/* Targets list */}
@@ -455,9 +447,9 @@ export default function SalesCRMScreen() {
                 <Text style={styles.sectionTitle}>Targets Set for {MONTHS_FULL[targetMonth - 1]} {targetYear}</Text>
                 {targets.map((t, i) => (
                   <View key={t._id} style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{t.agentName}</Text>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{t.agentName}</Text>
                     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>₹{t.targetAmount.toLocaleString()}</Text>
+                      <Text style={{ ...Typography.body, fontWeight: '800', color: colors.primary }}>₹{t.targetAmount.toLocaleString()}</Text>
                       <TouchableOpacity onPress={async () => { await api.deleteSalesTarget(t._id); load(); }}>
                         <Ionicons name="trash-outline" size={14} color={colors.danger} />
                       </TouchableOpacity>
@@ -600,8 +592,8 @@ export default function SalesCRMScreen() {
                                 setSmpProductResults([]);
                                 setSmpProductDropdownIdx(null);
                               }}>
-                              <Text style={{ fontSize: 12, color: colors.text.primary }}>{p.name}</Text>
-                              <Text style={{ fontSize: 10, color: colors.text.muted }}>MRP: ₹{p.price} | {p.size || 'N/A'}</Text>
+                              <Text style={{ ...Typography.bodySm, color: colors.text.primary }}>{p.name}</Text>
+                              <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>MRP: ₹{p.price} | {p.size || 'N/A'}</Text>
                             </TouchableOpacity>
                           ))}
                         </View>
@@ -615,7 +607,7 @@ export default function SalesCRMScreen() {
               ))}
               <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }} onPress={() => setSmpItems([...smpItems, { productName: '', qty: 1, mrp: 0 }])}>
                 <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>Add Product</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '600' }}>Add Product</Text>
               </TouchableOpacity>
             </ScrollView>
             <View style={styles.modalFooter}>
@@ -639,7 +631,7 @@ export default function SalesCRMScreen() {
             <ScrollView style={styles.modalForm}>
               <Text style={styles.inputLabel}>Select Agent *</Text>
               {Platform.OS === 'web' ? (
-                <select value={tgtAgentId} onChange={(e: any) => { setTgtAgentId(e.target.value); setTgtAgentName(users.find(u => u._id === e.target.value)?.name || ''); }} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13, marginBottom: 12, width: '100%' }}>
+                <select value={tgtAgentId} onChange={(e: any) => { setTgtAgentId(e.target.value); setTgtAgentName(users.find(u => u._id === e.target.value)?.name || ''); }} style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, marginBottom: 12, width: '100%' }}>
                   <option value="">-- Select Agent --</option>
                   {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.role})</option>)}
                 </select>
@@ -648,7 +640,7 @@ export default function SalesCRMScreen() {
               )}
               <Text style={styles.inputLabel}>Target Amount (₹) *</Text>
               <TextInput style={styles.input} value={tgtAmount} onChangeText={setTgtAmount} placeholder="e.g. 100000" keyboardType="numeric" placeholderTextColor={colors.text.muted} />
-              <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 4 }}>Period: {MONTHS_FULL[targetMonth - 1]} {targetYear}</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 4 }}>Period: {MONTHS_FULL[targetMonth - 1]} {targetYear}</Text>
             </ScrollView>
             <View style={styles.modalFooter}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowTargetModal(false)}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
@@ -664,54 +656,54 @@ export default function SalesCRMScreen() {
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   pageHeader: { paddingHorizontal: Spacing.lg, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
-  pageSubtitle: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
+  pageTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  pageSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   tabBarScroll: { backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, flexGrow: 0 },
   tabBarContent: { paddingHorizontal: Spacing.lg, paddingVertical: 10, gap: 8, flexDirection: 'row' },
   tabPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border },
   tabPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabPillText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  tabPillText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   tabPillTextActive: { color: '#fff', fontWeight: '700' },
   content: { padding: Spacing.lg, maxWidth: 1200, alignSelf: 'center', width: '100%' },
   card: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: 12 },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
   statCard: { flex: 1, minWidth: 80, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  statValue: { fontSize: 22, fontWeight: '800' },
-  statLabel: { fontSize: 10, color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4, textAlign: 'center' },
+  statValue: { ...Typography.h1, fontWeight: '800' },
+  statLabel: { ...Typography.eyebrow, color: colors.text.muted, textTransform: 'uppercase', marginTop: 4, textAlign: 'center' },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.md },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  addBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   filterChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary },
-  filterChipText: { fontSize: 11, fontWeight: '600', color: colors.text.secondary },
-  cardTitle: { fontSize: 14, fontWeight: '800', color: colors.text.primary },
-  cardSubTitle: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
-  metaText: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
-  descriptionText: { fontSize: 13, color: colors.text.secondary, marginTop: 4, lineHeight: 18 },
+  filterChipText: { ...Typography.caption, fontWeight: '600', color: colors.text.secondary },
+  cardTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary },
+  cardSubTitle: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
+  metaText: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
+  descriptionText: { ...Typography.bodySm, color: colors.text.secondary, marginTop: 4 },
   badge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
-  badgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  dateText: { fontSize: 10, color: colors.text.muted, marginTop: 8 },
+  badgeText: { ...Typography.eyebrow, fontWeight: '800' },
+  dateText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 8 },
   resolutionBox: { padding: 10, borderRadius: Radius.sm, borderWidth: 1, marginTop: 8 },
   iconBtn: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   emptyBox: { alignItems: 'center', padding: 40, gap: 8 },
-  emptyText: { fontSize: 13, color: colors.text.muted },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: 8 },
+  emptyText: { ...Typography.bodySm, color: colors.text.muted },
+  sectionTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 8 },
   tableHeader: { flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 4, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, marginBottom: 4 },
-  th: { fontSize: 10, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  th: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   tableRow: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderRadius: Radius.sm },
-  td: { fontSize: 13, color: colors.text.secondary },
-  smallInput: { backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13, color: colors.text.primary, width: 100 },
+  td: { ...Typography.bodySm, color: colors.text.secondary },
+  smallInput: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 6, color: colors.text.primary, width: 100 },
   // Modal styles
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   modalContainer: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, width: '90%', maxWidth: 520, maxHeight: '85%', zIndex: 10, borderWidth: 1, borderColor: colors.border },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalForm: { padding: 16, maxHeight: 420 },
   modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: colors.border },
-  modalError: { margin: 12, padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontSize: 12, fontWeight: '600' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
-  input: { backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.text.primary, marginBottom: 12 },
+  modalError: { ...Typography.bodySm, margin: 12, padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontWeight: '600' },
+  inputLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
+  input: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 12 },
   cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  cancelBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  cancelBtnText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   submitBtn: { flex: 2, paddingVertical: 12, borderRadius: Radius.md, backgroundColor: colors.primary, alignItems: 'center' },
-  submitBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  submitBtnText: { ...Typography.bodySm, fontWeight: '700', color: '#fff' },
 });

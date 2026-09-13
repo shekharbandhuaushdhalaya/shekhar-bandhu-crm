@@ -1,8 +1,10 @@
+import { StatusPill, WorkspaceLoading } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
+import { Typography } from './../constants/theme';
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  ScrollView, View, Text, StyleSheet, ActivityIndicator, TouchableOpacity,
-  Modal, TextInput
-} from 'react-native';
+import { ScrollView, View, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
 import ScreenHeader from '../components/ScreenHeader';
@@ -215,22 +217,20 @@ export default function ComplianceScreen() {
                             <Text style={styles.codePill}>{item.code || `EQ-${idx + 1}`}</Text>
                             <Text style={[styles.itemTitle, { color: colors.text.primary }]}>{item.name}</Text>
                           </View>
-                          <View style={[styles.statusBadge, { backgroundColor: item.status === 'active' ? colors.successLight : colors.warningLight }]}>
-                            <Text style={[styles.statusBadgeText, { color: item.status === 'active' ? colors.success : colors.warning }]}>
+                          <StatusPill  label={<>
                               {(item.status || 'ACTIVE').toUpperCase()}
-                            </Text>
-                          </View>
+                            </>} textStyle={[styles.statusBadgeText, { color: item.status === 'active' ? colors.success : colors.warning }]} />
                         </View>
 
                         <Text style={[styles.itemDetailText, { color: colors.text.secondary }]}>
-                          ⚙️ Category: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{item.category?.toUpperCase() || 'MANUFACTURING'}</Text>
+                           Category: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{item.category?.toUpperCase() || 'MANUFACTURING'}</Text>
                           {'  |  '}
-                          🏭 Unit: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{item.manufacturingUnitId?.name || 'Main Plant'}</Text>
+                           Unit: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{item.manufacturingUnitId?.name || 'Main Plant'}</Text>
                         </Text>
 
                         {item.calibrationDueDate && (
                           <Text style={[styles.itemDetailText, { color: colors.text.secondary, marginTop: 4 }]}>
-                            📅 Next Calibration Due: <Text style={{ fontWeight: '700', color: colors.primary }}>{new Date(item.calibrationDueDate).toLocaleDateString()}</Text>
+                             Next Calibration Due: <Text style={{ fontWeight: '700', color: colors.primary }}>{new Date(item.calibrationDueDate).toLocaleDateString()}</Text>
                           </Text>
                         )}
 
@@ -249,7 +249,7 @@ export default function ComplianceScreen() {
                             }}
                           >
                             <Ionicons name="checkmark-done-circle-outline" size={14} color="#fff" />
-                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Log Calibration</Text>
+                            <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Log Calibration</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -298,7 +298,7 @@ export default function ComplianceScreen() {
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <WorkspaceLoading />
           <Text style={{ marginTop: 10, color: colors.text.secondary }}>Loading compliance modules...</Text>
         </View>
       ) : (
@@ -322,9 +322,7 @@ export default function ComplianceScreen() {
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={[styles.badgePill, { backgroundColor: colors.successLight }]}>
-                  <Text style={[styles.badgeText, { color: colors.success }]}>CONNECTED</Text>
-                </View>
+                <StatusPill  label={<>CONNECTED</>} textStyle={[styles.badgeText, { color: colors.success }]} />
                 <Ionicons name="chevron-forward" size={18} color={colors.text.secondary} />
               </View>
             </View>
@@ -512,42 +510,42 @@ export default function ComplianceScreen() {
 const styles = StyleSheet.create({
   container: { padding: 20, gap: 14 },
   headerBanner: { padding: 16, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 12, alignItems: 'center' },
-  bannerTitle: { fontSize: 15, fontWeight: '700' },
-  bannerSub: { fontSize: 13, marginTop: 2, lineHeight: 18 },
+  bannerTitle: { ...Typography.h3, fontWeight: '700' },
+  bannerSub: { ...Typography.bodySm, marginTop: 2 },
   loadingBox: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   card: { padding: 18, borderWidth: 1, borderRadius: 12 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   iconBadge: { width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 16, fontWeight: '700' },
-  count: { fontSize: 13, marginTop: 2 },
+  title: { ...Typography.h3, fontWeight: '700' },
+  count: { ...Typography.bodySm, marginTop: 2 },
   badgePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  badgeText: { fontSize: 11, fontWeight: '800' },
-  note: { marginTop: 12, fontSize: 13, lineHeight: 18 },
+  badgeText: { ...Typography.caption, fontWeight: '800' },
+  note: { ...Typography.bodySm, marginTop: 12 },
   actionBtn: { padding: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
   modalContent: { width: '100%', maxWidth: 700, maxHeight: '85%', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column' },
   modalCard: { width: '100%', maxWidth: 500, borderRadius: 14, padding: 16 },
   modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)' },
-  modalTitle: { fontSize: 17, fontWeight: '800' },
-  modalSub: { fontSize: 12, marginTop: 2 },
+  modalTitle: { ...Typography.h2, fontWeight: '800' },
+  modalSub: { ...Typography.bodySm, marginTop: 2 },
   emptyCard: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { marginTop: 10, fontSize: 14 },
+  emptyText: { ...Typography.body, marginTop: 10 },
   detailItemCard: { padding: 14, borderWidth: 1, borderRadius: 10, marginBottom: 10 },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  codePill: { backgroundColor: 'rgba(0,0,0,0.06)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 11, fontWeight: '800' },
-  itemTitle: { fontSize: 15, fontWeight: '700' },
-  itemDetailText: { fontSize: 13 },
+  codePill: { ...Typography.caption, backgroundColor: 'rgba(0,0,0,0.06)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontWeight: '800' },
+  itemTitle: { ...Typography.h3, fontWeight: '700' },
+  itemDetailText: { ...Typography.bodySm },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
-  statusBadgeText: { fontSize: 10, fontWeight: '800' },
+  statusBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
   miniActionBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 },
   smallAddBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  smallAddBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  smallAddBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   closeBtn: { padding: 14, backgroundColor: '#333', borderRadius: 10, alignItems: 'center', marginTop: 10 },
   field: { marginBottom: 12 },
-  fieldLabel: { fontSize: 12, fontWeight: '700', marginBottom: 4 },
-  input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 },
+  fieldLabel: { ...Typography.bodySm, fontWeight: '700', marginBottom: 4 },
+  input: { ...Typography.body, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.06)' },
-  chipText: { fontSize: 11, fontWeight: '700', color: '#555' },
+  chipText: { ...Typography.caption, fontWeight: '700', color: '#555' },
   modalFooterRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)' },
   modalCancelBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
   modalSubmitBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },

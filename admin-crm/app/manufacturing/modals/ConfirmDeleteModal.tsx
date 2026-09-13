@@ -1,5 +1,8 @@
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Modal, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../utils/themeContext';
 
@@ -67,20 +70,20 @@ export default function ConfirmDeleteModal({
           <View style={{ padding: 16 }}>
             {/* Raw Material Info Summary Card */}
             <View style={[styles.infoCard, { backgroundColor: colors.bg.secondary, borderColor: colors.border }]}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary }}>
-                🌿 {rawMaterial.name}
+              <Text style={{ ...Typography.body, fontWeight: '700', color: colors.text.primary }}>
+                 {rawMaterial.name}
               </Text>
               {rawMaterial.botanicalName ? (
-                <Text style={{ fontSize: 11, fontStyle: 'italic', color: colors.text.secondary, marginTop: 2 }}>
+                <Text style={{ ...Typography.caption, fontStyle: 'italic', color: colors.text.secondary, marginTop: 2 }}>
                   {rawMaterial.botanicalName}
                 </Text>
               ) : null}
               
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.secondary }}>
+                <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.secondary }}>
                   Category: <Text style={{ color: colors.text.primary }}>{rawMaterial.category || 'Herb'}</Text>
                 </Text>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.secondary }}>
+                <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.secondary }}>
                   Stock Qty: <Text style={{ fontWeight: '800', color: isBlocked ? colors.danger : colors.success }}>
                     {stock} {rawMaterial.unit || 'kg'}
                   </Text>
@@ -92,7 +95,7 @@ export default function ConfirmDeleteModal({
             {errorMessage ? (
               <View style={[styles.errorBanner, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
                 <Ionicons name="alert-circle" size={16} color={colors.danger} />
-                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.danger, flex: 1 }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.danger, flex: 1 }}>
                   {errorMessage}
                 </Text>
               </View>
@@ -104,13 +107,13 @@ export default function ConfirmDeleteModal({
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
                   <Ionicons name="shield-half-outline" size={20} color={colors.danger} style={{ marginTop: 2 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.danger }}>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.danger }}>
                       Stock Quantity &gt; 0 Blocked
                     </Text>
-                    <Text style={{ fontSize: 11.5, color: colors.text.primary, marginTop: 4, lineHeight: 16 }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.primary, marginTop: 4 }}>
                       This raw material currently has <Text style={{ fontWeight: '800', color: colors.danger }}>{stock} {rawMaterial.unit}</Text> in inventory.
                     </Text>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 6, fontStyle: 'italic' }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 6, fontStyle: 'italic' }}>
                       Safety Rule: Materials with stock quantity greater than 0 cannot be deleted from the system list. Please adjust or issue remaining stock to 0 first.
                     </Text>
                   </View>
@@ -121,10 +124,10 @@ export default function ConfirmDeleteModal({
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
                   <Ionicons name="alert-circle-outline" size={20} color={colors.warning} style={{ marginTop: 2 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.warning }}>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.warning }}>
                       Are you sure you want to delete this ingredient?
                     </Text>
-                    <Text style={{ fontSize: 11.5, color: colors.text.primary, marginTop: 4, lineHeight: 16 }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.primary, marginTop: 4 }}>
                       Double Check: This will remove <Text style={{ fontWeight: '700' }}>{rawMaterial.name}</Text> from your raw material master catalog.
                     </Text>
                   </View>
@@ -140,7 +143,7 @@ export default function ConfirmDeleteModal({
               disabled={submitting}
               style={[styles.btnCancel, { borderColor: colors.border, backgroundColor: colors.bg.secondary }]}
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                 {isBlocked ? 'Close' : 'Cancel'}
               </Text>
             </TouchableOpacity>
@@ -156,7 +159,7 @@ export default function ConfirmDeleteModal({
                 ) : (
                   <>
                     <Ionicons name="trash" size={14} color="#fff" style={{ marginRight: 4 }} />
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '800', color: '#fff' }}>
                       Yes, Delete Material
                     </Text>
                   </>
@@ -199,10 +202,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1
   },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '800'
-  },
+  headerTitle: { ...Typography.body, fontWeight: '800' },
   iconContainer: {
     width: 30,
     height: 30,

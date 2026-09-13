@@ -1,8 +1,11 @@
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../utils/auth';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { useTheme, useStyles } from '../utils/themeContext';
 
 // Premium Ayurvedic Color Theme constants
@@ -176,7 +179,7 @@ export default function LoginScreen() {
                 </View>
                 <Text style={styles.artSubtitle}>{theme.subtitle}</Text>
                 <View style={styles.artDivider} />
-                <Text style={{ fontSize: 15, fontWeight: '700', color: BRAND_GOLD, fontStyle: 'italic', marginBottom: 12, lineHeight: 22 }}>
+                <Text style={{ ...Typography.h3, fontWeight: '700', color: BRAND_GOLD, fontStyle: 'italic', marginBottom: 12 }}>
                   {theme.quote}
                 </Text>
                 <Text style={styles.artDescription}>
@@ -280,8 +283,8 @@ export default function LoginScreen() {
                     <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                       <Ionicons name="shield-checkmark-outline" size={30} color={colors.primary} />
                     </View>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text.primary, marginBottom: 4 }}>Two-Factor Authentication</Text>
-                    <Text style={{ fontSize: 12, color: colors.text.secondary, textAlign: 'center', lineHeight: 18 }}>
+                    <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 4 }}>Two-Factor Authentication</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.secondary, textAlign: 'center' }}>
                       Open Google Authenticator and enter the 6-digit code for your account.
                     </Text>
                   </View>
@@ -291,7 +294,7 @@ export default function LoginScreen() {
                     <View style={[styles.inputContainer, error ? styles.inputError : null]}>
                       <Ionicons name="keypad-outline" size={18} color={colors.primary} style={styles.inputIcon} />
                       <TextInput
-                        style={[styles.input, { letterSpacing: 8, fontSize: 18, fontWeight: '700' }]}
+                        style={[styles.input, { ...Typography.h2, fontWeight: '700' }]}
                         placeholder="000000"
                         placeholderTextColor={colors.text.muted}
                         value={totpCode}
@@ -319,7 +322,7 @@ export default function LoginScreen() {
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={() => { setMfaStep(false); setTotpCode(''); setError(null); }} style={{ marginTop: 14, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, color: colors.text.secondary, fontWeight: '600' }}>← Back to Login</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.secondary, fontWeight: '600' }}>← Back to Login</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -327,7 +330,7 @@ export default function LoginScreen() {
             </View>
 
             <Text style={styles.footerText}>
-              🔒 Secure SSL Encrypted Gateway
+               Secure SSL Encrypted Gateway
             </Text>
           </ScrollView>
         </View>
@@ -382,20 +385,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     marginTop: 60,
     maxWidth: 440,
   },
-  artTitle: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: 3,
-  },
-  artSubtitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#ffffff',
-    opacity: 0.8,
-    letterSpacing: 2,
-    marginTop: 4,
-  },
+  artTitle: { ...Typography.display, fontWeight: '900', color: '#ffffff' },
+  artSubtitle: { ...Typography.bodySm, fontWeight: '800', color: '#ffffff', opacity: 0.8, marginTop: 4 },
   artDivider: {
     width: 50,
     height: 3,
@@ -403,19 +394,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     marginVertical: 20,
     borderRadius: 2,
   },
-  artDescription: {
-    fontSize: 14,
-    color: '#ffffff',
-    lineHeight: 22,
-    opacity: 0.9,
-    fontWeight: '500',
-  },
-  artFooter: {
-    color: '#ffffff',
-    fontSize: 11,
-    opacity: 0.7,
-    fontWeight: '500',
-  },
+  artDescription: { ...Typography.body, color: '#ffffff', opacity: 0.9, fontWeight: '500' },
+  artFooter: { ...Typography.caption, color: '#ffffff', opacity: 0.7, fontWeight: '500' },
   formPanel: {
     flex: 1,
     backgroundColor: colors.bg.primary,
@@ -435,18 +415,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: 70,
     marginBottom: 6,
   },
-  mobileTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text.primary,
-    letterSpacing: 1.5,
-  },
-  mobileSubtitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
+  mobileTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  mobileSubtitle: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary, marginTop: 2 },
   card: {
     backgroundColor: colors.bg.card,
     borderRadius: Radius.lg,
@@ -463,30 +433,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  greetingText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: colors.text.primary,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  welcomeSub: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: 26,
-  },
+  greetingText: { ...Typography.h1, fontWeight: '900', color: colors.text.primary, textAlign: 'center', marginBottom: 4 },
+  welcomeSub: { ...Typography.bodySm, color: colors.text.secondary, textAlign: 'center', marginBottom: 26 },
   formGroup: {
     marginBottom: Spacing.lg,
   },
-  label: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.text.secondary,
-    marginBottom: Spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  label: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary, marginBottom: Spacing.sm, textTransform: 'uppercase' },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -504,12 +456,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   inputIcon: {
     marginRight: 10,
   },
-  input: {
-    flex: 1,
-    color: colors.text.primary,
-    fontSize: 13,
-    height: '100%',
-  },
+  input: { ...Typography.bodySm, flex: 1, color: colors.text.primary, height: '100%' },
   passwordToggle: {
     padding: Spacing.sm,
   },
@@ -527,11 +474,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  loginBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  loginBtnText: { ...Typography.body, color: '#ffffff', fontWeight: '700' },
   errorAlert: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -542,17 +485,6 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     padding: Spacing.md,
     marginBottom: Spacing.lg,
   },
-  errorText: {
-    color: colors.danger,
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
-  },
-  footerText: {
-    fontSize: 11,
-    color: colors.text.muted,
-    textAlign: 'center',
-    marginTop: 26,
-    fontWeight: '500',
-  },
+  errorText: { ...Typography.bodySm, color: colors.danger, fontWeight: '600', flex: 1 },
+  footerText: { ...Typography.caption, color: colors.text.muted, textAlign: 'center', marginTop: 26, fontWeight: '500' },
 });

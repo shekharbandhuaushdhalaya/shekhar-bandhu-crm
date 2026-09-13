@@ -1,5 +1,9 @@
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../../components/AppTextInput';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Pressable, Platform } from 'react-native';
+import { View, Modal, ScrollView, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -148,7 +152,7 @@ export default function LaunchBatchModal({
                       setProdJobWorkerName('');
                     }
                   }}
-                  style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                  style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                 >
                   <option value="">-- Choose Product --</option>
                   {products.filter(p => !p.parentId).map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
@@ -166,7 +170,7 @@ export default function LaunchBatchModal({
                     <select
                       value={prodBomId}
                       onChange={(e: any) => setProdBomId(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                      style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                     >
                       {productRecipes.map(b => (
                         <option key={b._id} value={b._id}>
@@ -182,18 +186,18 @@ export default function LaunchBatchModal({
             )}
 
             {productRecipes.length === 1 && (
-              <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
-                📋 Recipe: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{productRecipes[0].recipeName || 'Standard Recipe'}</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
+                 Recipe: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{productRecipes[0].recipeName || 'Standard Recipe'}</Text>
               </Text>
             )}
 
             {/* Size Variants — Multi-size batch planning */}
             {prodPlannedYields.length > 0 && (
               <View style={{ marginBottom: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>
-                  📐 Size Variants (Multi-Size Batch)
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>
+                   Size Variants (Multi-Size Batch)
                 </Text>
-                <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginBottom: 8 }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginBottom: 8 }}>
                   Enable the sizes you want to produce in this batch and enter quantities for each.
                 </Text>
                 {prodPlannedYields.map((yieldItem, idx) => {
@@ -212,7 +216,7 @@ export default function LaunchBatchModal({
                       >
                         {yieldItem.enabled && <Ionicons name="checkmark" size={14} color="#fff" />}
                       </TouchableOpacity>
-                      <Text style={{ flex: 1, fontSize: 12, color: colors.text.primary }}>
+                      <Text style={{ ...Typography.bodySm, flex: 1, color: colors.text.primary }}>
                         {childProduct?.size || yieldItem.size || 'Size'}
                       </Text>
                       <TextInput
@@ -232,7 +236,7 @@ export default function LaunchBatchModal({
                   );
                 })}
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 6, borderTopWidth: 0.5, borderTopColor: colors.border, marginTop: 4 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
                     Total: {computedTotalQty} units{computedVolumeLabel}
                   </Text>
                 </View>
@@ -245,7 +249,7 @@ export default function LaunchBatchModal({
                 <select
                   value={prodManufacturingUnitId}
                   onChange={(e: any) => setProdManufacturingUnitId(e.target.value)}
-                  style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                  style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                 >
                   <option value="">-- Select Manufacturing Unit --</option>
                   {manufacturingUnits.map(m => <option key={m._id} value={m._id}>{m.name} ({(m as any).city || 'Default'})</option>)}
@@ -266,7 +270,7 @@ export default function LaunchBatchModal({
                     if (val === 'in_house') setProdJobWorkMode('none');
                     else setProdJobWorkMode('raw_materials_supplied');
                   }}
-                  style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                  style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                 >
                   <option value="in_house">In-House Manufacturing</option>
                   <option value="job_work">Third-Party Job Work (Outsourced)</option>
@@ -289,7 +293,7 @@ export default function LaunchBatchModal({
                         const matchingV = vendors.find(v => v._id === val);
                         setProdJobWorkerName(matchingV ? ((matchingV as any).company || matchingV.name) : '');
                       }}
-                      style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                      style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                     >
                       <option value="">-- Choose Job Worker Vendor --</option>
                       {vendors.map(v => (
@@ -307,7 +311,7 @@ export default function LaunchBatchModal({
                     <select
                       value={prodJobWorkMode}
                       onChange={(e: any) => setProdJobWorkMode(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                      style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                     >
                       <option value="raw_materials_supplied">Raw Materials Supplied (We Provide Ingredients)</option>
                       <option value="direct_purchase">Direct Purchase of Finished Bulk (Vendor Raw Materials)</option>
@@ -336,7 +340,7 @@ export default function LaunchBatchModal({
                     <select
                       value={prodPackagingMode}
                       onChange={(e: any) => setProdPackagingMode(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                      style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                     >
                       <option value="self_packed">Self-Packed (Deduct Bottles/Labels/Caps from our Stock)</option>
                       <option value="packed_by_vendor">Packed by Vendor (Finished Goods Received fully Boxed)</option>
@@ -352,7 +356,7 @@ export default function LaunchBatchModal({
               <>
                 <Text style={styles.inputLabel}>Total Planned Yield {computedVolumeLabel || '(units)'}</Text>
                 <View style={[styles.input, { justifyContent: 'center', backgroundColor: colors.bg.secondary }]}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>{computedTotalQty}</Text>
+                  <Text style={{ ...Typography.body, fontWeight: '700', color: colors.primary }}>{computedTotalQty}</Text>
                 </View>
               </>
             ) : (
@@ -375,63 +379,63 @@ export default function LaunchBatchModal({
                 onChangeText={setProdExpiryMonths}
                 keyboardType="numeric"
               />
-              <Text style={{ fontSize: 12, color: colors.text.secondary, minWidth: 50 }}>months</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.secondary, minWidth: 50 }}>months</Text>
             </View>
             {computedExpiryDate ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, paddingHorizontal: 2 }}>
                 <Ionicons name="calendar-outline" size={13} color={colors.success} />
-                <Text style={{ fontSize: 12, color: colors.success, fontWeight: '700' }}>
+                <Text style={{ ...Typography.bodySm, color: colors.success, fontWeight: '700' }}>
                   Expires: {computedExpiryDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   <Text style={{ fontWeight: '400', color: colors.text.secondary }}>  (MFG date auto-set at batch completion)</Text>
                 </Text>
               </View>
             ) : (
-              <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>Enter shelf life in months to auto-calculate expiry date</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, marginBottom: 12 }}>Enter shelf life in months to auto-calculate expiry date</Text>
             )}
 
             {!isDirectPurchaseJobWork && (
               <Text style={styles.warningDisclaimer}>
-                ⚠️ Starting this batch will automatically deduct the corresponding raw material quantities from active stock batches (FIFO). If stocks are insufficient, the launch will be blocked.
+                 Starting this batch will automatically deduct the corresponding raw material quantities from active stock batches (FIFO). If stocks are insufficient, the launch will be blocked.
               </Text>
             )}
             {isDirectPurchaseJobWork && prodPackagingMode === 'packed_by_vendor' && (
               <Text style={[styles.warningDisclaimer, { color: colors.primary, borderColor: colors.primary + '30', backgroundColor: colors.primary + '08' }]}>
-                ℹ️ Under Direct Purchase Job Work, raw material stock deductions are skipped since ingredients are provided and processed by the third-party vendor.
+                ℹ Under Direct Purchase Job Work, raw material stock deductions are skipped since ingredients are provided and processed by the third-party vendor.
               </Text>
             )}
             {isDirectPurchaseJobWork && prodPackagingMode === 'self_packed' && (
               <Text style={styles.warningDisclaimer}>
-                ⚠️ Under Direct Purchase Job Work, raw material ingredients are provided by the vendor, but packaging materials (bottles, caps, labels) will be deducted from your stock since packaging is self-packed.
+                 Under Direct Purchase Job Work, raw material ingredients are provided by the vendor, but packaging materials (bottles, caps, labels) will be deducted from your stock since packaging is self-packed.
               </Text>
             )}
 
             {previewIngredients.length > 0 && (
               <View style={{ marginTop: 16, padding: 12, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>
-                  📋 Auto-Deduction Ingredients Preview:
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>
+                   Auto-Deduction Ingredients Preview:
                 </Text>
                 {previewIngredients.map((item, idx) => {
                   const isShortage = item.available < item.qtyNeeded;
                   return (
                     <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: idx === previewIngredients.length - 1 ? 0 : 0.5, borderBottomColor: colors.border }}>
                       <View style={{ flex: 1, marginRight: 8 }}>
-                        <Text style={{ fontSize: 12, color: colors.text.primary }}>
-                          {item.itemType === 'packaging' ? '📦' : '🌿'} {item.name}{' '}
-                          <Text style={{ fontSize: 10.5, color: colors.text.muted }}>
+                        <Text style={{ ...Typography.bodySm, color: colors.text.primary }}>
+                          {item.itemType === 'packaging' ? '' : ''} {item.name}{' '}
+                          <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>
                             ({item.ratioLabel})
                           </Text>
                         </Text>
-                        <Text style={{ fontSize: 10.5, color: isShortage ? colors.danger : colors.text.secondary, marginTop: 2 }}>
+                        <Text style={{ ...Typography.eyebrow, color: isShortage ? colors.danger : colors.text.secondary, marginTop: 2 }}>
                           Available in Unit: {item.available.toFixed(2)} {item.unit}
                         </Text>
                       </View>
                       <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: isShortage ? colors.danger : colors.text.primary }}>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '700', color: isShortage ? colors.danger : colors.text.primary }}>
                           {item.qtyNeeded.toFixed(2)} {item.unit}
                         </Text>
                         {isShortage && (
                           <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
-                            <Text style={{ fontSize: 9, color: colors.danger, fontWeight: '800' }}>SHORTAGE</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.danger, fontWeight: '800' }}>SHORTAGE</Text>
                           </View>
                         )}
                       </View>

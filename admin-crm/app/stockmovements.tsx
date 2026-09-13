@@ -1,13 +1,15 @@
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { api, StockMovement } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { LightColors, Spacing, Radius } from '../constants/theme';
+import { LightColors, Spacing, Radius, Typography } from '../constants/theme';
 import ScreenHeader from '../components/ScreenHeader';
 import { DataTable, Column } from '../components/DataTable';
-import { WorkspaceTabs, EmptyState, WorkspaceError } from '../components/WorkspacePrimitives';
+import { WorkspaceTabs, EmptyState, WorkspaceError, StatusPill, WorkspaceTransition } from './../components/WorkspacePrimitives';
 import InventoryDispatchScreen from './inventorydispatch';
 
 const typeLabel = (value?: string) => ({
@@ -42,7 +44,7 @@ export default function StockMovementsArchive() {
     { key: 'type', title: 'Legacy type', width: 170, render: (r) => <Text style={styles.text}>{typeLabel(r.type)}</Text> },
     { key: 'partyName', title: 'Party / reference', flex: 1, render: (r) => <Text style={styles.text} numberOfLines={1}>{r.partyName || r.sourceDocType || '—'}</Text> },
     { key: 'warehouseName', title: 'Warehouse', width: 170 },
-    { key: 'status', title: 'Status', width: 110, render: (r) => <View style={styles.status}><Text style={styles.statusText}>{r.status}</Text></View> },
+    { key: 'status', title: 'Status', width: 110, render: (r) => <StatusPill  label={<>{r.status}</>} textStyle={styles.statusText} /> },
     { key: 'items', title: 'Items', width: 80, align: 'right', render: (r) => <Text style={styles.strong}>{r.items?.length || 0}</Text> },
   ], [styles]);
 
@@ -50,7 +52,7 @@ export default function StockMovementsArchive() {
     <View style={styles.screen}>
       <ScreenHeader title="Logistics" subtitle="Dispatches are created only from posted authoritative Challans." />
       <WorkspaceTabs tabs={[{ id: 'archive', label: 'Movement Archive', icon: 'archive-outline' }, { id: 'dispatches', label: 'Dispatches', icon: 'car-outline' }]} value={tab} onChange={(v) => setTab(v as any)} />
-      <View style={{ flex: 1 }}><InventoryDispatchScreen /></View>
+      <WorkspaceTransition value={tab} style={{ flex: 1 }}><InventoryDispatchScreen /></WorkspaceTransition>
     </View>
   );
 
@@ -61,7 +63,7 @@ export default function StockMovementsArchive() {
         subtitle="Read-only history from the retired StockMovement engine. New sales/transfers use Challans; samples, production, returns and write-offs use their dedicated workflows."
       />
       <WorkspaceTabs tabs={[{ id: 'archive', label: 'Movement Archive', icon: 'archive-outline' }, { id: 'dispatches', label: 'Dispatches', icon: 'car-outline' }]} value={tab} onChange={(v) => setTab(v as any)} />
-      <View style={styles.toolbar}>
+      <WorkspaceTransition value={tab} style={styles.toolbar}>
         <View style={styles.searchBox}>
           <Ionicons name="search" size={17} color={colors.text.muted} />
           <TextInput
@@ -77,7 +79,7 @@ export default function StockMovementsArchive() {
           <Ionicons name="lock-closed-outline" size={15} color={colors.primary} />
           <Text style={styles.noticeText}>Archive is read-only</Text>
         </View>
-      </View>
+      </WorkspaceTransition>
       {error ? <View style={styles.errorWrap}><WorkspaceError message={error} onRetry={() => load(false)} /></View> : (
         <View style={styles.tableWrap}>
           <DataTable
@@ -99,13 +101,13 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, flexWrap: 'wrap' },
   searchBox: { flex: 1, minWidth: 260, maxWidth: 620, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, backgroundColor: colors.bg.card },
-  input: { flex: 1, minHeight: 40, color: colors.text.primary, fontSize: 13 },
+  input: { ...Typography.bodySm, flex: 1, minHeight: 40, color: colors.text.primary },
   notice: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary },
-  noticeText: { color: colors.text.secondary, fontSize: 11.5, fontWeight: '700' },
+  noticeText: { ...Typography.caption, color: colors.text.secondary, fontWeight: '700' },
   tableWrap: { flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.lg },
   errorWrap: { paddingHorizontal: Spacing.lg },
-  text: { fontSize: 12.5, color: colors.text.secondary },
-  strong: { fontSize: 12.5, fontWeight: '800', color: colors.text.primary },
+  text: { ...Typography.bodySm, color: colors.text.secondary },
+  strong: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
   status: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border },
-  statusText: { fontSize: 10.5, fontWeight: '700', color: colors.text.secondary, textTransform: 'capitalize' },
+  statusText: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary, textTransform: 'capitalize' },
 });

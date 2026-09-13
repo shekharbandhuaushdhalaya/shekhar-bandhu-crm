@@ -1,10 +1,12 @@
+import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
+import { AppText as Text } from './AppText';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useEffect, useState, useRef } from 'react';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { usePermission } from '../utils/permissions';
-import { LightColors, Spacing, Radius } from '../constants/theme';
+import { LightColors, Spacing, Radius, Typography } from '../constants/theme';
 import { authStorage } from '../utils/storage';
 
 const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded_v2';
@@ -252,6 +254,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     dashboardItem: {
       flexDirection: 'row',
       alignItems: 'center',
+      minHeight: 44,
       paddingVertical: 9,
       paddingHorizontal: Spacing.sm,
       marginHorizontal: Spacing.xs,
@@ -261,12 +264,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     dashboardItemActive: {
       backgroundColor: colors.primaryLight,
     },
-    dashboardText: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.text.secondary,
-      marginLeft: 10,
-    },
+    dashboardText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginLeft: 10 },
     dashboardTextActive: {
       color: colors.primary,
       fontWeight: '700',
@@ -285,6 +283,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     groupHeader: {
       flexDirection: 'row',
       alignItems: 'center',
+      minHeight: 44,
       justifyContent: 'space-between',
       paddingVertical: 8,
       paddingHorizontal: Spacing.sm,
@@ -311,14 +310,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     groupIconBoxExpanded: {
       backgroundColor: colors.primaryLight,
     },
-    groupLabel: {
-      fontSize: 10.5,
-      fontWeight: '700',
-      color: colors.text.muted,
-      marginLeft: 8,
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
-    },
+    groupLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginLeft: 8, textTransform: 'uppercase' },
     groupLabelExpanded: {
       color: colors.primary,
     },
@@ -341,6 +333,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     navItem: {
       flexDirection: 'row',
       alignItems: 'center',
+      minHeight: 44,
       paddingVertical: 8,
       paddingHorizontal: 8,
       borderRadius: Radius.md,
@@ -350,14 +343,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     navItemActive: {
       backgroundColor: colors.primaryLight,
     },
-    navItemText: {
-      fontSize: 12.5,
-      fontWeight: '600',
-      color: colors.text.secondary,
-      marginLeft: 8,
-      flex: 1,
-      flexShrink: 1,
-    },
+    navItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginLeft: 8, flex: 1, flexShrink: 1 },
     navItemTextActive: {
       color: colors.primary,
       fontWeight: '700',
@@ -382,7 +368,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     },
     footerIconBtn: {
       flex: 1,
-      height: 34,
+      minHeight: 44,
       borderRadius: 6,
       borderWidth: 1,
       borderColor: colors.border,
@@ -392,7 +378,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     },
     footerLogoutIconBtn: {
       flex: 1,
-      height: 34,
+      minHeight: 44,
       borderRadius: 6,
       borderWidth: 1,
       borderColor: colors.danger + '30',
@@ -415,11 +401,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       height: 6,
       borderRadius: 3,
     },
-    badgeText: {
-      fontSize: 10.5,
-      fontWeight: '700',
-      marginLeft: 6,
-    },
+    badgeText: { ...Typography.eyebrow, fontWeight: '700', marginLeft: 6 },
   });
 
 function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; isOnline?: boolean; logout?: () => void }) {

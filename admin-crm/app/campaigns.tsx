@@ -1,24 +1,14 @@
+import { WorkspaceLoading, StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  ActivityIndicator,
-  RefreshControl,
-  Pressable,
-  Platform,
-  Switch,
-  Image,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, Modal, ActivityIndicator, RefreshControl, Pressable, Platform, Switch, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { api, Campaign } from '../utils/api';
 import { usePermission } from '../utils/permissions';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: '#6b7280',
@@ -280,7 +270,7 @@ export default function CampaignsScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <WorkspaceLoading />
         <Text style={styles.loadingText}>Loading Campaigns...</Text>
       </View>
     );
@@ -321,7 +311,7 @@ export default function CampaignsScreen() {
           <Ionicons name="megaphone-outline" size={18} color={colors.text.muted} />
 
           <TextInput
-            style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 120 }}
+            style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 120 }}
             placeholder="Search campaigns..."
             placeholderTextColor={colors.text.muted}
             value={search}
@@ -344,7 +334,7 @@ export default function CampaignsScreen() {
                 gap: 6,
               }}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>
+              <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary }}>
                 {statusFilter ? statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1) : 'All Statuses'}
               </Text>
               <Ionicons name={isStatusDropdownOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.secondary} />
@@ -388,11 +378,7 @@ export default function CampaignsScreen() {
                       borderBottomColor: colors.border + '40',
                     })}
                   >
-                    <Text style={{
-                      fontSize: 11,
-                      fontWeight: statusFilter === item.val ? '700' : '600',
-                      color: statusFilter === item.val ? colors.primary : colors.text.secondary,
-                    }}>
+                    <Text style={{ ...Typography.caption, fontWeight: statusFilter === item.val ? '700' : '600', color: statusFilter === item.val ? colors.primary : colors.text.secondary }}>
                       {item.label}
                     </Text>
                   </Pressable>
@@ -407,7 +393,7 @@ export default function CampaignsScreen() {
               onPress={openCreateModal}
             >
               <Ionicons name="add" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>New Campaign</Text>
+              <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>New Campaign</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -423,9 +409,7 @@ export default function CampaignsScreen() {
             <View style={styles.cardTop}>
               <View style={styles.cardTitleRow}>
                 <Text style={styles.cardTitle} numberOfLines={1}>{c.name}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: (STATUS_COLORS[c.status] || '#6b7280') + '15', borderColor: STATUS_COLORS[c.status] || '#6b7280' }]}>
-                  <Text style={[styles.statusText, { color: STATUS_COLORS[c.status] || '#6b7280' }]}>{c.status.toUpperCase()}</Text>
-                </View>
+                <StatusPill  label={<>{c.status.toUpperCase()}</>} textStyle={[styles.statusText, { color: STATUS_COLORS[c.status] || '#6b7280' }]} />
               </View>
               <Text style={styles.cardPlatform}>{PLATFORM_LABELS[c.platform] || c.platform}</Text>
             </View>
@@ -501,10 +485,7 @@ export default function CampaignsScreen() {
         {/* Active & Scheduled Social Promotions Feed */}
         <Text style={[styles.sectionTitle, { marginTop: 24, paddingHorizontal: Spacing.sm }]}>Active & Scheduled Social Promotions Feed</Text>
         {socialPosts.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="megaphone-outline" size={48} color={colors.text.muted} />
-            <Text style={styles.emptyText}>No social promotions published yet.</Text>
-          </View>
+          <EmptyState title={<>No social promotions published yet.</>}  />
         ) : (
           socialPosts.map(post => (
             <View key={post.id} style={styles.socialFeedCard}>
@@ -516,9 +497,7 @@ export default function CampaignsScreen() {
                     <Text style={styles.feedCardTime}>{formatDate(post.publishedAt)}</Text>
                   </View>
                 </View>
-                <View style={[styles.statusBadge, post.status === 'Published' ? { backgroundColor: '#10b98115', borderColor: '#10b981' } : { backgroundColor: '#3b82f615', borderColor: '#3b82f6' }]}>
-                  <Text style={[styles.statusText, post.status === 'Published' ? { color: '#10b981' } : { color: '#3b82f6' }]}>{post.status.toUpperCase()}</Text>
-                </View>
+                <StatusPill  label={<>{post.status.toUpperCase()}</>} textStyle={[styles.statusText, post.status === 'Published' ? { color: '#10b981' } : { color: '#3b82f6' }]} />
               </View>
 
               <View style={styles.feedCardPlatforms}>
@@ -534,7 +513,7 @@ export default function CampaignsScreen() {
                   return (
                     <View key={p} style={[styles.feedPlatformBadge, { backgroundColor: details.color + '15' }]}>
                       <Ionicons name={details.icon} size={12} color={details.color} />
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: details.color }}>{details.name}</Text>
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: details.color }}>{details.name}</Text>
                     </View>
                   );
                 })}
@@ -603,19 +582,7 @@ export default function CampaignsScreen() {
                         type="date"
                         value={form.startDate}
                         onChange={(e: any) => setForm(p => ({ ...p, startDate: e.target.value }))}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: Radius.md,
-                          border: `1px solid ${colors.border}`,
-                          backgroundColor: colors.bg.primary,
-                          color: colors.text.primary,
-                          fontSize: 13,
-                          height: 40,
-                          width: '100%',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          marginBottom: 14,
-                        } as any}
+                        style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: Radius.md, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, height: 40, width: '100%', outline: 'none', boxSizing: 'border-box', marginBottom: 14 } as any}
                       />
                     ) : (
                       <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.muted} value={form.startDate} onChangeText={v => setForm(p => ({ ...p, startDate: v }))} />
@@ -628,19 +595,7 @@ export default function CampaignsScreen() {
                         type="date"
                         value={form.endDate}
                         onChange={(e: any) => setForm(p => ({ ...p, endDate: e.target.value }))}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: Radius.md,
-                          border: `1px solid ${colors.border}`,
-                          backgroundColor: colors.bg.primary,
-                          color: colors.text.primary,
-                          fontSize: 13,
-                          height: 40,
-                          width: '100%',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          marginBottom: 14,
-                        } as any}
+                        style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: Radius.md, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, height: 40, width: '100%', outline: 'none', boxSizing: 'border-box', marginBottom: 14 } as any}
                       />
                     ) : (
                       <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.muted} value={form.endDate} onChangeText={v => setForm(p => ({ ...p, endDate: v }))} />
@@ -659,7 +614,7 @@ export default function CampaignsScreen() {
                 {form.platform === 'social_media' && (
                   <View style={{ backgroundColor: colors.bg.secondary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: 14 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text.primary }}>Publish directly to connected social pages?</Text>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>Publish directly to connected social pages?</Text>
                       <Switch
                         value={publishSocialNow}
                         onValueChange={setPublishSocialNow}
@@ -775,7 +730,7 @@ export default function CampaignsScreen() {
                       imageLoadError ? (
                         <View style={{ padding: 12, backgroundColor: '#f0f2f5', borderRadius: 4, alignItems: 'center', justifyContent: 'center', marginBottom: 8, gap: 4 }}>
                           <Ionicons name="warning-outline" size={20} color={colors.warning} />
-                          <Text style={{ fontSize: 11, color: colors.text.secondary, textAlign: 'center' }}>Not a direct image URL</Text>
+                          <Text style={{ ...Typography.caption, color: colors.text.secondary, textAlign: 'center' }}>Not a direct image URL</Text>
                         </View>
                       ) : (
                         <Image source={{ uri: campaignSocialImage }} style={styles.mockImage} resizeMode="cover" onError={() => setImageLoadError(true)} />
@@ -821,7 +776,7 @@ export default function CampaignsScreen() {
                       imageLoadError ? (
                         <View style={[styles.mockImagePlaceholderIg, { gap: 6 }]}>
                           <Ionicons name="warning-outline" size={24} color={colors.warning} />
-                          <Text style={{ fontSize: 11, color: colors.text.muted, paddingHorizontal: 16, textAlign: 'center' }}>Not a direct image URL</Text>
+                          <Text style={{ ...Typography.caption, color: colors.text.muted, paddingHorizontal: 16, textAlign: 'center' }}>Not a direct image URL</Text>
                         </View>
                       ) : (
                         <Image source={{ uri: campaignSocialImage }} style={styles.mockImageIg} resizeMode="cover" onError={() => setImageLoadError(true)} />
@@ -850,9 +805,7 @@ export default function CampaignsScreen() {
                 {previewPlatform === 'google' && (
                   <View style={styles.googleMockCard}>
                     <View style={styles.googleMockHeader}>
-                      <View style={styles.googleAdBadge}>
-                        <Text style={styles.googleAdBadgeText}>Sponsored</Text>
-                      </View>
+                      <StatusPill  label={<>Sponsored</>} textStyle={styles.googleAdBadgeText} />
                       <Text style={styles.googleMockUrl} numberOfLines={1}>https://www.shekharbandhu.com/products</Text>
                     </View>
                     <Text style={styles.googleMockTitle} numberOfLines={1}>
@@ -876,7 +829,7 @@ export default function CampaignsScreen() {
                         imageLoadError ? (
                           <View style={[styles.emailMockImage, { backgroundColor: '#f5f5f5', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
                             <Ionicons name="warning-outline" size={20} color={colors.warning} />
-                            <Text style={{ fontSize: 10, color: colors.text.muted, textAlign: 'center', paddingHorizontal: 12 }}>Not a direct image URL</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, textAlign: 'center', paddingHorizontal: 12 }}>Not a direct image URL</Text>
                           </View>
                         ) : (
                           <Image source={{ uri: campaignSocialImage }} style={styles.emailMockImage} resizeMode="cover" onError={() => setImageLoadError(true)} />
@@ -936,9 +889,7 @@ export default function CampaignsScreen() {
                   </TouchableOpacity>
                 </View>
                 <ScrollView style={styles.modalForm}>
-                  <View style={[styles.statusBadge, { alignSelf: 'flex-start', backgroundColor: (STATUS_COLORS[detailCampaign.status] || '#6b7280') + '15', borderColor: STATUS_COLORS[detailCampaign.status] || '#6b7280', marginBottom: 12 }]}>
-                    <Text style={[styles.statusText, { color: STATUS_COLORS[detailCampaign.status] || '#6b7280' }]}>{detailCampaign.status.toUpperCase()}</Text>
-                  </View>
+                  <StatusPill  label={<>{detailCampaign.status.toUpperCase()}</>} textStyle={[styles.statusText, { color: STATUS_COLORS[detailCampaign.status] || '#6b7280' }]} />
                   <DetailRow label="Platform" value={PLATFORM_LABELS[detailCampaign.platform] || detailCampaign.platform} />
                   <DetailRow label="Period" value={`${formatDate(detailCampaign.startDate)} — ${formatDate(detailCampaign.endDate)}`} />
                   <DetailRow label="Budget" value={formatCurrency(detailCampaign.budget)} />
@@ -949,7 +900,7 @@ export default function CampaignsScreen() {
                   {detailCampaign.createdBy ? <DetailRow label="Created By" value={detailCampaign.createdBy.name} /> : null}
                   {detailCampaign.launchedAt ? <DetailRow label="Launched At" value={formatDate(detailCampaign.launchedAt)} /> : null}
 
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, marginTop: 16, marginBottom: 8 }}>Analytics</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginTop: 16, marginBottom: 8 }}>Analytics</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                     {[
                       { label: 'Impressions', value: detailCampaign.analytics.impressions },
@@ -959,8 +910,8 @@ export default function CampaignsScreen() {
                       { label: 'Revenue', value: formatCurrency(detailCampaign.analytics.revenue) },
                     ].map(a => (
                       <View key={a.label} style={{ backgroundColor: colors.bg.secondary, borderRadius: Radius.md, padding: 12, minWidth: 100, flex: 1 }}>
-                        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary }}>{a.value}</Text>
-                        <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '600' }}>{a.label}</Text>
+                        <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary }}>{a.value}</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' }}>{a.label}</Text>
                       </View>
                     ))}
                   </View>
@@ -993,8 +944,8 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border + '50' }}>
-      <Text style={{ flex: 0.35, fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>{label}</Text>
-      <Text style={{ flex: 0.65, fontSize: 12, color: colors.text.primary }}>{value}</Text>
+      <Text style={{ ...Typography.bodySm, flex: 0.35, fontWeight: '700', color: colors.text.secondary }}>{label}</Text>
+      <Text style={{ ...Typography.bodySm, flex: 0.65, color: colors.text.primary }}>{value}</Text>
     </View>
   );
 }
@@ -1003,144 +954,144 @@ const createStyles = (colors: typeof LightColors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg.primary },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary },
-    loadingText: { marginTop: 12, fontSize: 14, color: colors.text.secondary, fontWeight: '600' },
+    loadingText: { ...Typography.body, marginTop: 12, color: colors.text.secondary, fontWeight: '600' },
     statsRow: { flexDirection: 'row', gap: 8, padding: Spacing.lg, paddingBottom: 0 },
     statBox: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, padding: 12, alignItems: 'center' },
-    statValue: { fontSize: 20, fontWeight: '800' },
-    statLabel: { fontSize: 10, color: colors.text.muted, fontWeight: '600', marginTop: 2 },
+    statValue: { ...Typography.h1, fontWeight: '800' },
+    statLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600', marginTop: 2 },
     searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: Spacing.lg, paddingBottom: 0 },
     searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, height: 40 },
-    searchInput: { flex: 1, fontSize: 13, color: colors.text.primary, marginLeft: 6 },
+    searchInput: { ...Typography.bodySm, flex: 1, color: colors.text.primary, marginLeft: 6 },
     filterGroup: { flexDirection: 'row', gap: 4 },
     filterChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-    filterChipText: { fontSize: 10, fontWeight: '600', color: colors.text.secondary, textTransform: 'capitalize' },
+    filterChipText: { ...Typography.eyebrow, fontWeight: '600', color: colors.text.secondary, textTransform: 'capitalize' },
     addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
     scrollContent: { padding: Spacing.lg, gap: 12 },
     card: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, position: 'relative' },
     cardTop: { marginBottom: 8 },
     cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    cardTitle: { fontSize: 14, fontWeight: '800', color: colors.text.primary, flex: 1 },
+    cardTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary, flex: 1 },
     statusBadge: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1.5 },
-    statusText: { fontSize: 8, fontWeight: '800', letterSpacing: 0.3 },
-    cardPlatform: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+    statusText: { ...Typography.eyebrow, fontWeight: '800' },
+    cardPlatform: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
     cardMeta: { flexDirection: 'row', gap: 16, marginBottom: 8 },
     metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    metaText: { fontSize: 11, color: colors.text.secondary },
+    metaText: { ...Typography.caption, color: colors.text.secondary },
     cardAnalytics: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border + '50', borderBottomWidth: 1, borderBottomColor: colors.border + '50' },
     analyticsItem: { flex: 1, alignItems: 'center' },
-    analyticsValue: { fontSize: 13, fontWeight: '800', color: colors.text.primary },
-    analyticsLabel: { fontSize: 8, color: colors.text.muted, fontWeight: '600' },
+    analyticsValue: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
+    analyticsLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' },
     cardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
     actionBtnLaunch: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#10b981', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm },
     actionBtnPause: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f59e0b', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm },
     actionBtnComplete: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#6366f1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm },
-    actionBtnText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+    actionBtnText: { ...Typography.caption, color: '#fff', fontWeight: '700' },
     rowOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.6)', justifyContent: 'center', alignItems: 'center', borderRadius: Radius.lg },
     emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
-    emptyText: { fontSize: 14, color: colors.text.muted, fontWeight: '600' },
+    emptyText: { ...Typography.body, color: colors.text.muted, fontWeight: '600' },
     emptyBtn: { backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: Radius.md },
-    emptyBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    emptyBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
 
     // Modal
     modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContainer: { width: '90%', maxWidth: 520, maxHeight: '90%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', elevation: 20 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-    modalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary, flex: 1 },
+    modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, flex: 1 },
     modalCloseBtn: { padding: 4 },
     modalForm: { padding: Spacing.lg },
-    inputLabel: { fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-    input: { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.text.primary, marginBottom: 14 },
+    inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase' },
+    input: { ...Typography.bodySm, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 14 },
     platformRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
     platformChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.primary },
-    platformChipText: { fontSize: 10, fontWeight: '600', color: colors.text.secondary },
+    platformChipText: { ...Typography.eyebrow, fontWeight: '600', color: colors.text.secondary },
     modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, gap: 12, backgroundColor: colors.bg.secondary },
     cancelBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border },
-    cancelBtnText: { color: colors.text.secondary, fontSize: 13, fontWeight: '700' },
+    cancelBtnText: { ...Typography.bodySm, color: colors.text.secondary, fontWeight: '700' },
     submitBtn: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center', minWidth: 100 },
-    submitBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    submitBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
     errorAlert: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.danger + '10', borderWidth: 1, borderColor: colors.danger + '30', borderRadius: Radius.md, marginHorizontal: Spacing.lg, marginTop: Spacing.md, padding: 10 },
-    errorAlertText: { color: colors.danger, fontSize: 12, fontWeight: '600', flex: 1 },
+    errorAlertText: { ...Typography.bodySm, color: colors.danger, fontWeight: '600', flex: 1 },
 
     // Social feed card styles
     socialFeedCard: { backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.lg, padding: Spacing.md, gap: 10, marginBottom: 12 },
     feedCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     feedCardImageThumb: { width: 36, height: 36, borderRadius: 4 },
     feedCardContentTextCol: { marginLeft: 2, justifyContent: 'center' },
-    feedCardText: { fontSize: 12.5, fontWeight: '700', color: colors.text.primary, maxWidth: 200 },
-    feedCardTime: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
+    feedCardText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, maxWidth: 200 },
+    feedCardTime: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
     feedCardPlatforms: { flexDirection: 'row', gap: 6 },
     feedPlatformBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm },
     feedCardMetrics: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.border + '50', paddingTop: 8, gap: 12 },
     feedMetricItem: { flex: 1, alignItems: 'center' },
-    feedMetricValue: { fontSize: 13, fontWeight: '800', color: colors.text.primary },
-    feedMetricLabel: { fontSize: 8, color: colors.text.muted, fontWeight: '600' },
+    feedMetricValue: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
+    feedMetricLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' },
 
     // Social platforms select row
     platformSelectorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
     platformSelectorChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.bg.primary },
-    platformSelectorText: { fontSize: 11, fontWeight: '600', color: colors.text.secondary },
+    platformSelectorText: { ...Typography.caption, fontWeight: '600', color: colors.text.secondary },
 
     // Live preview styles
     previewToggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 },
-    previewTitle: { fontSize: 13, fontWeight: '800', color: colors.text.primary },
+    previewTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
     previewPills: { flexDirection: 'row', gap: 6, backgroundColor: colors.bg.secondary, padding: 3, borderRadius: Radius.sm },
     previewPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm },
     previewPillActive: { backgroundColor: colors.bg.card, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-    previewPillText: { fontSize: 10, fontWeight: '700', color: colors.text.secondary },
+    previewPillText: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary },
 
     // Facebook mock styles
     fbMockCard: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#e4e6eb', padding: 12, width: '100%' },
     mockHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
     mockAvatar: { width: 36, height: 36, borderRadius: 18 },
     mockUserInfo: { flex: 1, marginLeft: 8 },
-    mockProfileName: { fontSize: 12.5, fontWeight: '700', color: '#050505' },
-    mockLocation: { fontSize: 11, color: '#65676b', marginTop: 1 },
+    mockProfileName: { ...Typography.bodySm, fontWeight: '700', color: '#050505' },
+    mockLocation: { ...Typography.caption, color: '#65676b', marginTop: 1 },
     mockTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
-    mockTime: { fontSize: 11, color: '#65676b' },
-    mockText: { fontSize: 13, color: '#050505', marginBottom: 8, lineHeight: 18 },
+    mockTime: { ...Typography.caption, color: '#65676b' },
+    mockText: { ...Typography.bodySm, color: '#050505', marginBottom: 8 },
     mockImage: { width: '100%', height: 180, borderRadius: 4, marginBottom: 8 },
     mockStatsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: '#ced0d4' },
-    mockStatsText: { fontSize: 11.5, color: '#65676b' },
+    mockStatsText: { ...Typography.caption, color: '#65676b' },
     mockActionsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 6 },
     mockActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
-    mockActionText: { fontSize: 12, fontWeight: '600', color: '#65676b' },
+    mockActionText: { ...Typography.bodySm, fontWeight: '600', color: '#65676b' },
 
     // Instagram mock styles
     igMockCard: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#dbdbdb', paddingVertical: 10, width: '100%' },
     mockImageIg: { width: '100%', height: 260 },
     mockImagePlaceholderIg: { width: '100%', height: 260, backgroundColor: '#fafafa', alignItems: 'center', justifyContent: 'center' },
     mockActionsIg: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10 },
-    mockLikesIg: { fontSize: 12.5, fontWeight: '700', color: '#262626', paddingHorizontal: 12, marginBottom: 4 },
-    mockCaptionIg: { fontSize: 12.5, color: '#262626', paddingHorizontal: 12, lineHeight: 16 },
+    mockLikesIg: { ...Typography.bodySm, fontWeight: '700', color: '#262626', paddingHorizontal: 12, marginBottom: 4 },
+    mockCaptionIg: { ...Typography.bodySm, color: '#262626', paddingHorizontal: 12 },
 
     // Google Ad mock styles
     googleMockCard: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#dadce0', padding: 16, width: '100%', gap: 6 },
     googleMockHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     googleAdBadge: { backgroundColor: '#f1f3f4', borderWidth: 1, borderColor: '#dadce0', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
-    googleAdBadgeText: { fontSize: 9, fontWeight: '700', color: '#202124' },
-    googleMockUrl: { fontSize: 11, color: '#202124', flex: 1 },
-    googleMockTitle: { fontSize: 16, color: '#1a0dab', fontWeight: '500' },
-    googleMockDesc: { fontSize: 13, color: '#4d5156', lineHeight: 18 },
+    googleAdBadgeText: { ...Typography.eyebrow, fontWeight: '700', color: '#202124' },
+    googleMockUrl: { ...Typography.caption, color: '#202124', flex: 1 },
+    googleMockTitle: { ...Typography.h3, color: '#1a0dab', fontWeight: '500' },
+    googleMockDesc: { ...Typography.bodySm, color: '#4d5156' },
 
     // Email mock styles
     emailMockCard: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0', width: '100%', height: 350, overflow: 'hidden' },
     emailMockHeader: { backgroundColor: '#f5f5f5', padding: 10, borderBottomWidth: 1, borderBottomColor: '#e0e0e0', gap: 4 },
-    emailMockLabel: { fontSize: 10.5, color: '#444444', fontWeight: '500' },
+    emailMockLabel: { ...Typography.eyebrow, color: '#444444', fontWeight: '500' },
     emailMockBody: { padding: 16, backgroundColor: '#ffffff', flex: 1 },
-    emailMockLogo: { fontSize: 15, fontWeight: '800', color: colors.primary, textAlign: 'center', marginVertical: 8 },
+    emailMockLogo: { ...Typography.h3, fontWeight: '800', color: colors.primary, textAlign: 'center', marginVertical: 8 },
     emailMockImage: { width: '100%', height: 120, borderRadius: 4, marginBottom: 12 },
-    emailMockContentText: { fontSize: 12, color: '#333333', lineHeight: 18, marginBottom: 16 },
+    emailMockContentText: { ...Typography.bodySm, color: '#333333', marginBottom: 16 },
     emailMockBtn: { backgroundColor: colors.primary, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 4, alignSelf: 'center', marginBottom: 16 },
-    emailMockBtnText: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
+    emailMockBtnText: { ...Typography.bodySm, color: '#ffffff', fontWeight: '700' },
 
     // SMS mock styles
     smsMockCard: { backgroundColor: '#f4f4f7', borderRadius: 8, borderWidth: 1, borderColor: '#d1d1d6', padding: 12, width: '100%', gap: 10 },
     smsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'center', marginBottom: 4 },
     smsAvatar: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#e5e5ea', alignItems: 'center', justifyContent: 'center' },
-    smsSender: { fontSize: 10.5, fontWeight: '600', color: '#8e8e93' },
+    smsSender: { ...Typography.eyebrow, fontWeight: '600', color: '#8e8e93' },
     smsBubble: { backgroundColor: '#e5e5ea', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '85%', alignSelf: 'flex-start', position: 'relative' },
-    smsText: { fontSize: 13, color: '#000000', lineHeight: 17 },
-    smsTime: { fontSize: 8.5, color: '#8e8e93', marginTop: 4, alignSelf: 'flex-end' },
-    sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.text.primary, marginBottom: 12, letterSpacing: 0.3 },
+    smsText: { ...Typography.bodySm, color: '#000000' },
+    smsTime: { ...Typography.eyebrow, color: '#8e8e93', marginTop: 4, alignSelf: 'flex-end' },
+    sectionTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary, marginBottom: 12 },
   });

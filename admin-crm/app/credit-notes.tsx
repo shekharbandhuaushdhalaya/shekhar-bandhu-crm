@@ -1,11 +1,11 @@
+import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, RefreshControl, Modal, ActivityIndicator,
-  Pressable, Platform, Alert
-} from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, ActivityIndicator, Pressable, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, CreditNote, Customer, Vendor } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { FIRM_DETAILS } from '../constants/firm';
@@ -31,14 +31,14 @@ const printCreditNote = (note: CreditNote) => {
   const signatureBlock = (FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
     <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 38px; width: auto; object-fit: contain; margin-bottom: 2px;" />
     <div style="font-weight:bold; font-size: 10px; color: #15803d; margin-bottom: 2px;">
-      ✔ DIGITALLY SIGNED ${docTitle}
+       DIGITALLY SIGNED ${docTitle}
     </div>
     <div style="border: 1px dashed #16a34a; background-color: #f0fdf4; border-radius: 4px; padding: 5px; font-size: 8px; text-align: left; line-height: 1.3; display: flex; align-items: center; gap: 8px;">
       <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`GST ${docTitle} Verification | Seller: ${FIRM_DETAILS.name} | GSTIN: ${FIRM_DETAILS.gstin || ''} | Doc: ${note.noteNo} | InvRef: ${note.invoiceNo || 'N/A'} | Date: ${dateStr} | Amt: ₹${grandTotal.toFixed(2)} | CGST Rule 53 Compliant`)}" style="width: 48px; height: 48px; border: 1px solid #16a34a; padding: 2px; background: #fff; border-radius: 3px; flex-shrink: 0;" />
       <div style="flex: 1;">
         <strong>Signed By:</strong> ${FIRM_DETAILS.name}<br/>
         <strong>GSTIN:</strong> ${FIRM_DETAILS.gstin || ''}<br/>
-        <span style="color: #15803d; font-weight: bold;">✔ Certified under CGST Rule 53 &amp; Sec 5 IT Act.</span>
+        <span style="color: #15803d; font-weight: bold;"> Certified under CGST Rule 53 &amp; Sec 5 IT Act.</span>
       </div>
     </div>
   ` : `
@@ -230,7 +230,7 @@ export default function CreditNotesPage() {
           }}>
             <Ionicons name="search" size={18} color={colors.text.muted} />
             <TextInput
-              style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 100 }}
+              style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 100 }}
               placeholder="Search by Note #, Party, Invoice..."
               placeholderTextColor={colors.text.muted}
               value={search}
@@ -241,18 +241,7 @@ export default function CreditNotesPage() {
               <select
                 value={filterType}
                 onChange={(e: any) => setFilterType(e.target.value)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  border: `1px solid ${colors.border}`,
-                  backgroundColor: colors.bg.secondary,
-                  color: colors.text.primary,
-                  fontSize: 12,
-                  fontWeight: '600',
-                  outline: 'none',
-                  height: 34,
-                  cursor: 'pointer'
-                }}
+                style={{ ...Typography.bodySm, padding: '6px 12px', borderRadius: 6, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontWeight: '600', outline: 'none', height: 34, cursor: 'pointer' }}
               >
                 <option value="all">All Notes</option>
                 <option value="credit_note">Credit Notes</option>
@@ -279,7 +268,7 @@ export default function CreditNotesPage() {
                   ]);
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                   {filterType === 'all' ? 'All Notes' : filterType === 'credit_note' ? 'Credit Notes' : 'Debit Notes'}
                 </Text>
                 <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
@@ -291,7 +280,7 @@ export default function CreditNotesPage() {
               onPress={() => setShowModal(true)}
             >
               <Ionicons name="add" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>New Note</Text>
+              <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>New Note</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -321,28 +310,17 @@ export default function CreditNotesPage() {
                 <View style={styles.cardHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={styles.cardTitle}>{note.noteNo}</Text>
-                    <View style={[styles.badge, { backgroundColor: isCredit ? colors.success + '18' : colors.danger + '18' }]}>
-                      <Text style={[styles.badgeText, { color: isCredit ? colors.success : colors.danger }]}>
+                    <StatusPill  label={<>
                         {isCredit ? 'CREDIT NOTE' : 'DEBIT NOTE'}
-                      </Text>
-                    </View>
+                      </>} textStyle={[styles.badgeText, { color: isCredit ? colors.success : colors.danger }]} />
                   </View>
 
-                  <View style={[
-                    styles.badge,
-                    {
-                      backgroundColor: note.status === 'finalized' ? colors.successLight : note.status === 'draft' ? colors.warningLight : colors.dangerLight,
-                      borderColor: note.status === 'finalized' ? colors.success : note.status === 'draft' ? colors.warning : colors.danger,
-                      borderWidth: 1
-                    }
-                  ]}>
-                    <Text style={[
+                  <StatusPill  label={<>
+                      {note.status.toUpperCase()}
+                    </>} textStyle={[
                       styles.badgeText,
                       { color: note.status === 'finalized' ? colors.success : note.status === 'draft' ? colors.warning : colors.danger }
-                    ]}>
-                      {note.status.toUpperCase()}
-                    </Text>
-                  </View>
+                    ]} />
                 </View>
 
                 <Text style={styles.cardSub}>
@@ -382,10 +360,7 @@ export default function CreditNotesPage() {
           })}
 
           {!loading && notes.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="document-text-outline" size={40} color={colors.text.muted} />
-              <Text style={styles.emptyText}>No Credit / Debit Notes recorded.</Text>
-            </View>
+            <EmptyState title={<>No Credit / Debit Notes recorded.</>}  />
           )}
         </ScrollView>
 
@@ -632,16 +607,7 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
                 <select
                   value={reason}
                   onChange={(e: any) => setReason(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: `1px solid ${colors.border}`,
-                    backgroundColor: colors.bg.primary,
-                    color: colors.text.primary,
-                    fontSize: 13,
-                    outline: 'none',
-                  }}
+                  style={{ ...Typography.bodySm, width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, outline: 'none' }}
                 >
                   <option value="01 - Sales Return / Goods Rejection">01 - Sales Return / Goods Rejection</option>
                   <option value="02 - Post Sale Discount / Rate Difference">02 - Post Sale Discount / Rate Difference</option>
@@ -666,7 +632,7 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
               {loadingInvoices ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 44 }}>
                   <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={{ fontSize: 12, color: colors.text.muted }}>Fetching customer invoices...</Text>
+                  <Text style={{ ...Typography.bodySm, color: colors.text.muted }}>Fetching customer invoices...</Text>
                 </View>
               ) : (customerInvoices.length > 0 && Platform.OS === 'web') ? (
                 <select
@@ -679,17 +645,7 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
                       setTotalAmount((selected.baseAmount || selected.amount || 0).toString());
                     }
                   }}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: `1px solid ${colors.border}`,
-                    backgroundColor: colors.bg.primary,
-                    color: colors.text.primary,
-                    fontSize: 13,
-                    outline: 'none',
-                    height: 44,
-                  }}
+                  style={{ ...Typography.bodySm, width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, outline: 'none', height: 44 }}
                 >
                   <option value="">-- Select Linked Invoice --</option>
                   {customerInvoices.map((inv) => (
@@ -711,8 +667,8 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
 
             {/* Amount & Tax Breakdown */}
             <View style={{ backgroundColor: colors.bg.secondary, borderRadius: Radius.md, padding: 12, marginBottom: Spacing.md, borderWidth: 1, borderColor: colors.border }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, marginBottom: 8, textTransform: 'uppercase' }}>
-                💰 GST Tax & Value Adjustment (Rule 53)
+              <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary, marginBottom: 8, textTransform: 'uppercase' }}>
+                 GST Tax & Value Adjustment (Rule 53)
               </Text>
               
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
@@ -734,17 +690,7 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
                     <select
                       value={gstRate}
                       onChange={(e: any) => setGstRate(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: 8,
-                        border: `1px solid ${colors.border}`,
-                        backgroundColor: colors.bg.card,
-                        color: colors.text.primary,
-                        fontSize: 13,
-                        outline: 'none',
-                        height: 44,
-                      }}
+                      style={{ ...Typography.bodySm, width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.card, color: colors.text.primary, outline: 'none', height: 44 }}
                     >
                       <option value="0">0% (Nil / Exempt)</option>
                       <option value="5">5% GST</option>
@@ -772,10 +718,10 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
                 const total = base + tax;
                 return (
                   <View style={{ marginTop: 4, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 11, color: colors.text.muted }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted }}>
                       Tax: ₹{tax.toFixed(2)} ({rate > 0 ? `CGST: ₹${(tax/2).toFixed(2)} | SGST: ₹${(tax/2).toFixed(2)}` : 'Nil'})
                     </Text>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: type === 'credit_note' ? colors.success : colors.danger }}>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '800', color: type === 'credit_note' ? colors.success : colors.danger }}>
                       Total: ₹{total.toFixed(2)}
                     </Text>
                   </View>
@@ -807,55 +753,55 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   innerContainer: { flex: 1, width: '100%' },
   header: { marginBottom: Spacing.md, gap: 10 },
   searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, height: 44, gap: 8 },
-  searchInput: { flex: 1, height: '100%', color: colors.text.primary, fontSize: 14 },
+  searchInput: { ...Typography.body, flex: 1, height: '100%', color: colors.text.primary },
   filterRow: { flexDirection: 'row', gap: 8 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border },
   filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterChipText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
+  filterChipText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
 
   summaryRow: { flexDirection: 'row', gap: 16, paddingHorizontal: Spacing.lg, marginTop: Spacing.xs, marginBottom: Spacing.md },
   statCard: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1 },
-  statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  statValue: { fontSize: 18, fontWeight: '800', marginTop: 2 },
+  statLabel: { ...Typography.eyebrow, fontWeight: '700' },
+  statValue: { ...Typography.h2, fontWeight: '800', marginTop: 2 },
 
   card: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardTitle: { fontSize: 15, fontWeight: '800', color: colors.text.primary },
-  cardSub: { fontSize: 13, color: colors.text.secondary, marginBottom: 4 },
-  metaText: { fontSize: 11, color: colors.text.muted, marginBottom: 4 },
-  cardAmount: { fontSize: 18, fontWeight: '800', marginBottom: 4 },
-  cardReason: { fontSize: 12, color: colors.text.muted, fontStyle: 'italic', marginBottom: 6 },
+  cardTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  cardSub: { ...Typography.bodySm, color: colors.text.secondary, marginBottom: 4 },
+  metaText: { ...Typography.caption, color: colors.text.muted, marginBottom: 4 },
+  cardAmount: { ...Typography.h2, fontWeight: '800', marginBottom: 4 },
+  cardReason: { ...Typography.bodySm, color: colors.text.muted, fontStyle: 'italic', marginBottom: 6 },
   cardActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.sm },
-  actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  actionBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  badgeText: { fontSize: 10, fontWeight: '800' },
+  badgeText: { ...Typography.eyebrow, fontWeight: '800' },
   emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { marginTop: 10, color: colors.text.muted, fontSize: 14 },
+  emptyText: { ...Typography.body, marginTop: 10, color: colors.text.muted },
 
   fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0px 4px 10px rgba(0,0,0,0.3)' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', maxWidth: 500, backgroundColor: colors.bg.card, borderRadius: Radius.lg, maxHeight: '90%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   closeBtn: { padding: 4 },
   modalBody: { padding: Spacing.lg },
-  modalError: { padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontSize: 12, fontWeight: '600', marginBottom: Spacing.md },
-  label: { fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { height: 44, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, backgroundColor: colors.bg.primary, color: colors.text.primary, fontSize: 14 },
+  modalError: { ...Typography.bodySm, padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontWeight: '600', marginBottom: Spacing.md },
+  label: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase' },
+  input: { ...Typography.body, height: 44, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, backgroundColor: colors.bg.primary, color: colors.text.primary },
   
   toggleBtn: { flex: 1, height: 40, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.primary, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
-  toggleText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary, textAlign: 'center' },
+  toggleText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, textAlign: 'center' },
   
   dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 150, zIndex: 9999, elevation: 5, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)' },
   dropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  dropdownItemText: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
-  dropdownItemSub: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  dropdownItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
+  dropdownItemSub: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
 
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, gap: 10 },
   cancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.md, backgroundColor: colors.bg.secondary },
-  cancelBtnText: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
+  cancelBtnText: { ...Typography.body, fontWeight: '600', color: colors.text.primary },
   saveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: Radius.md, backgroundColor: colors.primary },
-  saveBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' }
+  saveBtnText: { ...Typography.body, fontWeight: '700', color: '#fff' }
 });

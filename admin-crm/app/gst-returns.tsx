@@ -1,7 +1,13 @@
+import ScreenHeader from '../components/ScreenHeader';
+import { DataTable } from '../components/DataTable';
+import { WorkspaceLoading } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Modal, TextInput, Alert, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, getApiBaseUrl } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 
@@ -61,6 +67,7 @@ function GstReturnsPage() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="GST returns" subtitle="Review the selected period and manage filing records." />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: Spacing.lg }} refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} tintColor={colors.primary} />}>
         {/* Top Controls: Return Type Tabs & Month Navigation */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: Spacing.lg }}>
@@ -79,7 +86,7 @@ function GstReturnsPage() {
             <TouchableOpacity onPress={handlePrevMonth} style={{ padding: 4 }}>
               <Ionicons name="chevron-back" size={18} color={colors.primary} />
             </TouchableOpacity>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary, minWidth: 130, textAlign: 'center' }}>
+            <Text style={{ ...Typography.body, fontWeight: '700', color: colors.text.primary, minWidth: 130, textAlign: 'center' }}>
               {months[month - 1]} {year}
             </Text>
             <TouchableOpacity onPress={handleNextMonth} style={{ padding: 4 }}>
@@ -102,7 +109,7 @@ function GstReturnsPage() {
             }}
           >
             <Ionicons name="code-download-outline" size={15} color={colors.primary} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Download JSON Utility</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>Download JSON Utility</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -117,7 +124,7 @@ function GstReturnsPage() {
             }}
           >
             <Ionicons name="document-text-outline" size={15} color={colors.success} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>Download CSV / Excel</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.success }}>Download CSV / Excel</Text>
           </TouchableOpacity>
         </View>
 
@@ -128,15 +135,15 @@ function GstReturnsPage() {
               <Ionicons name={filingStatus?.filed ? "shield-checkmark" : "alert-circle"} size={20} color={filingStatus?.filed ? colors.success : colors.warning} />
             </View>
             <View>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                 Filing Status: {filingStatus?.filed ? 'FILED' : 'PENDING FILING'}
               </Text>
               {filingStatus?.filed ? (
-                <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 1 }}>
                   ARN: {filingStatus.filing.arn} | Date: {new Date(filingStatus.filing.filedDate).toLocaleDateString('en-IN')}
                 </Text>
               ) : (
-                <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>Download the JSON utility and upload to the GST portal</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 1 }}>Download the JSON utility and upload to the GST portal</Text>
               )}
             </View>
           </View>
@@ -148,11 +155,11 @@ function GstReturnsPage() {
                 onPress={() => Platform.OS === 'web' ? window.open(filingStatus.filing.supportingDocuments[0].url, '_blank') : Alert.alert('View Document', filingStatus.filing.supportingDocuments[0].url)}
               >
                 <Ionicons name="document-attach" size={13} color={colors.primary} />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>View Receipt</Text>
+                <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>View Receipt</Text>
               </TouchableOpacity>
             ) : (
               <View style={{ backgroundColor: colors.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
-                <Text style={{ fontSize: 11, color: colors.text.muted }}>No Receipt Attached</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted }}>No Receipt Attached</Text>
               </View>
             )
           ) : (
@@ -165,13 +172,13 @@ function GstReturnsPage() {
               }}
             >
               <Ionicons name="checkmark-done" size={13} color="#fff" />
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>Record ARN</Text>
+              <Text style={{ ...Typography.caption, fontWeight: '800', color: '#fff' }}>Record ARN</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+          <WorkspaceLoading />
         ) : data && view === 'gstr1' ? (
           <Gstr1View data={data} colors={colors} styles={styles} />
         ) : data && view === 'gstr3b' ? (
@@ -191,7 +198,7 @@ function GstReturnsPage() {
             <TouchableOpacity onPress={() => setArnModalVisible(false)}>
               <Ionicons name="close" size={24} color={colors.text.primary} />
             </TouchableOpacity>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text.primary }}>Record Return Filing ARN</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary }}>Record Return Filing ARN</Text>
             <TouchableOpacity onPress={async () => {
               if (!arnInput.trim()) {
                 alert('Please enter the application reference number (ARN)');
@@ -217,21 +224,21 @@ function GstReturnsPage() {
           </View>
 
           <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
-            <Text style={{ fontSize: 11, color: colors.text.muted, fontWeight: '800', textTransform: 'uppercase', marginBottom: 4 }}>Period</Text>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text.primary, marginBottom: 14 }}>{months[month - 1]} {year} - {view.toUpperCase()}</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.muted, fontWeight: '800', textTransform: 'uppercase', marginBottom: 4 }}>Period</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: 14 }}>{months[month - 1]} {year} - {view.toUpperCase()}</Text>
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>Government ARN *</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>Government ARN *</Text>
             <TextInput 
-              style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, fontSize: 13, color: colors.text.primary, marginBottom: 16 }}
+              style={{ ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.text.primary, marginBottom: 16 }}
               placeholder="e.g. AA090726123456F"
               value={arnInput}
               onChangeText={setArnInput}
             />
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>Acknowledgement PDF Receipt (Optional)</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>Acknowledgement PDF Receipt (Optional)</Text>
             {acknowledgementUrl ? (
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}>
-                <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600', flex: 1 }} numberOfLines={1}>Filing_Receipt.pdf</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '600', flex: 1 }} numberOfLines={1}>Filing_Receipt.pdf</Text>
                 <TouchableOpacity onPress={() => setAcknowledgementUrl('')}>
                   <Ionicons name="trash-outline" size={16} color={colors.danger} />
                 </TouchableOpacity>
@@ -267,7 +274,7 @@ function GstReturnsPage() {
                   }
                 }}
               >
-                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '700' }}>+ Upload Government PDF Receipt</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>+ Upload Government PDF Receipt</Text>
               </TouchableOpacity>
             )}
           </ScrollView>
@@ -307,26 +314,26 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <Text style={styles.sectionTitle}>Table 9B: Credit / Debit Notes (Registered & Unregistered)</Text>
           <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.primary + '15' }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>GSTR-1 Statutory Table 9B</Text>
+            <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>GSTR-1 Statutory Table 9B</Text>
           </View>
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginTop: 4 }}>
           <View>
             <Text style={styles.label}>Credit Notes Issued (-)</Text>
             <Text style={[styles.value, { color: colors.danger }]}>- ₹{(table9B_CN.baseAmount || 0).toLocaleString('en-IN')}</Text>
-            <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>{table9B_CN.count || 0} Credit Notes</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>{table9B_CN.count || 0} Credit Notes</Text>
           </View>
           <View>
             <Text style={styles.label}>Debit Notes Issued (+)</Text>
             <Text style={[styles.value, { color: colors.success }]}>+ ₹{(table9B_DN.baseAmount || 0).toLocaleString('en-IN')}</Text>
-            <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>{table9B_DN.count || 0} Debit Notes</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>{table9B_DN.count || 0} Debit Notes</Text>
           </View>
           <View>
             <Text style={styles.label}>Net Tax Adjustment</Text>
             <Text style={[styles.value, { color: colors.primary }]}>
               ₹{((table9B_DN.cgst + table9B_DN.sgst + table9B_DN.igst) - (table9B_CN.cgst + table9B_CN.sgst + table9B_CN.igst)).toLocaleString('en-IN')}
             </Text>
-            <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>Reflected in GSTR-1 & GSTR-3B</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>Reflected in GSTR-1 & GSTR-3B</Text>
           </View>
         </View>
       </View>
@@ -334,9 +341,7 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
       {/* B2B Table */}
       <View style={{ marginBottom: Spacing.lg }}>
         <Text style={styles.sectionTitle}>B2B Registered Invoices ({data.b2b?.length || 0})</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={[styles.table, { width: '100%', minWidth: 850 }]}>
-            <View style={styles.tableHeaderRow}>
+        <DataTable data={data.b2b || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={1000} embedded renderTableHeader={() => (<View style={styles.tableHeaderRow}>
               <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>Invoice No</Text></View>
               <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 180 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>GSTIN</Text></View>
@@ -344,9 +349,7 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
               <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>CGST (₹)</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>SGST (₹)</Text></View>
               <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>IGST (₹)</Text></View>
-            </View>
-
-            {data.b2b?.map((inv: any, i: number) => (
+            </View>)} renderTableRow={(inv: any, i: number) => (
               <View key={i} style={styles.tableBodyRow}>
                 <View style={[styles.tableCellContainer, { width: 140 }]}>
                   <Text style={[styles.tableCell, { fontWeight: '700' }]}>{inv.invoiceNo}</Text>
@@ -355,7 +358,7 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
                   <Text style={styles.tableCell} numberOfLines={1}>{inv.customerName}</Text>
                 </View>
                 <View style={[styles.tableCellContainer, { width: 140 }]}>
-                  <Text style={[styles.tableCell, { fontFamily: 'monospace', fontSize: 12 }]}>{inv.gstin}</Text>
+                  <Text style={[styles.tableCell, { ...Typography.bodySm }]}>{inv.gstin}</Text>
                 </View>
                 <View style={[styles.tableCellContainer, { width: 120 }]}>
                   <Text style={styles.tableCell}>₹{(inv.taxableValue || 0).toLocaleString('en-IN')}</Text>
@@ -370,15 +373,7 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
                   <Text style={styles.tableCell}>₹{(inv.igst || 0).toLocaleString('en-IN')}</Text>
                 </View>
               </View>
-            ))}
-
-            {(!data.b2b || data.b2b.length === 0) && (
-              <View style={{ padding: 24, alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, color: colors.text.muted }}>No B2B invoices found for this month.</Text>
-              </View>
-            )}
-          </View>
-        </ScrollView>
+            )}  />
       </View>
 
       {/* B2C Summary */}
@@ -413,7 +408,7 @@ function Gstr3bView({ data, colors, styles }: { data: any; colors: any; styles: 
   return (
     <View style={{ gap: Spacing.lg }}>
       <View style={[styles.summaryCard, { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg }]}>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>3.1 Outward Taxable Supplies (Sales & Notes)</Text>
+        <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>3.1 Outward Taxable Supplies (Sales & Notes)</Text>
         <InfoRow label="Net Taxable Base (Gross Sales - Credit Notes + Debit Notes)" value={`₹${(outward.taxableValue || 0).toLocaleString('en-IN')}`} />
         <InfoRow label="Credit Notes Deductions (-)" value={`- ₹${(outward.creditNoteDeduction || 0).toLocaleString('en-IN')} (${outward.creditNotesCount || 0} Notes)`} />
         <InfoRow label="Debit Notes Additions (+)" value={`+ ₹${(outward.debitNoteAddition || 0).toLocaleString('en-IN')} (${outward.debitNotesCount || 0} Notes)`} />
@@ -425,7 +420,7 @@ function Gstr3bView({ data, colors, styles }: { data: any; colors: any; styles: 
       </View>
 
       <View style={[styles.summaryCard, { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg }]}>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>4. Eligible Input Tax Credit (ITC - Purchases)</Text>
+        <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>4. Eligible Input Tax Credit (ITC - Purchases)</Text>
         <InfoRow label="Total Inward Taxable Value" value={`₹${(inward.taxableValue || 0).toLocaleString('en-IN')}`} />
         <InfoRow label="ITC CGST" value={`₹${(inward.itcCGST || 0).toLocaleString('en-IN')}`} />
         <InfoRow label="ITC SGST" value={`₹${(inward.itcSGST || 0).toLocaleString('en-IN')}`} />
@@ -444,8 +439,8 @@ function InfoRow({ label, value, isBold }: { label: string; value: string; isBol
   const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border + '40' }}>
-      <Text style={{ color: colors.text.secondary, fontSize: 13 }}>{label}</Text>
-      <Text style={{ color: colors.text.primary, fontWeight: isBold ? '800' : '600', fontSize: isBold ? 14 : 13 }}>{value}</Text>
+      <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>{label}</Text>
+      <Text style={{ color: colors.text.primary, fontWeight: isBold ? '800' : '600', fontSize: isBold ? Typography.body.fontSize : Typography.bodySm.fontSize }}>{value}</Text>
     </View>
   );
 }
@@ -453,20 +448,20 @@ function InfoRow({ label, value, isBold }: { label: string; value: string; isBol
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   tabBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.sm },
-  tabBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
-  label: { fontSize: 10, color: colors.text.muted, fontWeight: '700', letterSpacing: 0.5 },
-  value: { fontSize: 18, fontWeight: '800', color: colors.text.primary, marginTop: 4 },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.text.primary, marginBottom: 12 },
+  tabBtnText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
+  label: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' },
+  value: { ...Typography.h2, fontWeight: '800', color: colors.text.primary, marginTop: 4 },
+  sectionTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 12 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   statCard: { flex: 1, minWidth: 200, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1 },
-  statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  statValue: { fontSize: 18, fontWeight: '800', marginTop: 4 },
+  statLabel: { ...Typography.eyebrow, fontWeight: '700' },
+  statValue: { ...Typography.h2, fontWeight: '800', marginTop: 4 },
   table: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
-  tableCell: { fontSize: 13, color: colors.text.primary },
+  tableCell: { ...Typography.bodySm, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   summaryCard: { padding: Spacing.md },
   exportBtn: {

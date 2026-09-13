@@ -1,20 +1,9 @@
+import { StatusPill } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  useWindowDimensions,
-  RefreshControl,
-  Platform,
-  Modal,
-  Linking,
-  Switch
-} from 'react-native';
+import { View, StyleSheet, ScrollView, ActivityIndicator, Alert, useWindowDimensions, RefreshControl, Platform, Modal, Linking, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../utils/auth';
@@ -25,7 +14,7 @@ import { api, getApiBaseUrl, setApiBaseUrl } from '../utils/api';
 import { authStorage } from '../utils/storage';
 import { CustomDatePicker } from '../components/CustomDatePicker';
 import { updateActiveFirmDetails } from '../constants/firm';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import AyurvedicLoader from '../components/AyurvedicLoader';
 
 export default function ProfileScreen() {
@@ -721,8 +710,8 @@ export default function ProfileScreen() {
                         />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary }}>{f.name}</Text>
-                        <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>
+                        <Text style={{ ...Typography.body, fontWeight: '700', color: colors.text.primary }}>{f.name}</Text>
+                        <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>
                           {f.role || 'Member Entity'} {f.firmGstin ? `• GSTIN: ${f.firmGstin}` : ''}
                         </Text>
                       </View>
@@ -730,7 +719,7 @@ export default function ProfileScreen() {
                         <ActivityIndicator size="small" color={colors.primary} />
                       ) : isSelected ? (
                         <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.primary }}>
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#ffffff' }}>ACTIVE</Text>
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: '#ffffff' }}>ACTIVE</Text>
                         </View>
                       ) : null}
                     </TouchableOpacity>
@@ -845,7 +834,7 @@ export default function ProfileScreen() {
                         <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' }}>
                           <View style={{ width: `${passStrength.score}%`, height: '100%', backgroundColor: passStrength.color }} />
                         </View>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: passStrength.color }}>
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: passStrength.color }}>
                           Strength: {passStrength.label}
                         </Text>
                       </View>
@@ -878,8 +867,8 @@ export default function ProfileScreen() {
                           size={14}
                           color={isMatching ? colors.success : colors.danger}
                         />
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: isMatching ? colors.success : colors.danger }}>
-                          {isMatching ? '✔ Passwords Match' : '✖ Passwords do not match'}
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: isMatching ? colors.success : colors.danger }}>
+                          {isMatching ? ' Passwords Match' : ' Passwords do not match'}
                         </Text>
                       </View>
                     )}
@@ -914,10 +903,10 @@ export default function ProfileScreen() {
           </View>
           <View style={[styles.cardContent, { flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'flex-start', gap: 16 }]}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>
                 {user?.mfaEnabled ? '2FA is Currently Enabled' : '2FA is Not Enabled'}
               </Text>
-              <Text style={{ fontSize: 11, color: colors.text.muted, lineHeight: 16 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.muted }}>
                 Add an extra layer of security to your account. When enabled, you will need to enter a time-based code from an authenticator app (like Google Authenticator) during login.
               </Text>
             </View>
@@ -961,7 +950,7 @@ export default function ProfileScreen() {
     <View style={styles.formContainer}>
       {!canEdit && (
         <View style={{ backgroundColor: colors.warning + '20', padding: Spacing.md, borderRadius: Radius.sm, marginBottom: Spacing.md }}>
-          <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '600' }}>
+          <Text style={{ ...Typography.bodySm, color: colors.warning, fontWeight: '600' }}>
             Viewing company configuration. Only administrators can edit these settings.
           </Text>
         </View>
@@ -991,7 +980,7 @@ export default function ProfileScreen() {
             onPress={() => setCompanySubTab(tab.id as any)}
           >
             <Ionicons name={tab.icon as any} size={14} color={companySubTab === tab.id ? colors.primary : colors.text.secondary} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: companySubTab === tab.id ? colors.primary : colors.text.secondary }} numberOfLines={1}>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: companySubTab === tab.id ? colors.primary : colors.text.secondary }} numberOfLines={1}>
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -1075,10 +1064,10 @@ export default function ProfileScreen() {
               {/* AYUSH Manufacturing License & GMP Section */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <Ionicons name="shield-checkmark-outline" size={16} color={colors.success} />
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>AYUSH Manufacturing License & GMP</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>AYUSH Manufacturing License & GMP</Text>
               </View>
 
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 10, lineHeight: 14 }}>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 10 }}>
                 Enter your AYUSH / State Drug Authority manufacturing license number and GMP certificate details. License format: e.g. "AYU/MFG/UP/12345" or as issued by your State Licensing Authority under Drugs & Cosmetics Act.
               </Text>
 
@@ -1095,9 +1084,9 @@ export default function ProfileScreen() {
                     autoCapitalize="characters"
                   />
                   {manufacturingLicenseNo.trim() && !/^[A-Z0-9\/\-\.\s]+$/i.test(manufacturingLicenseNo.trim()) ? (
-                    <Text style={{ fontSize: 9, color: colors.danger, marginTop: -2, marginBottom: 6 }}>⚠ Invalid format</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.danger, marginTop: -2, marginBottom: 6 }}> Invalid format</Text>
                   ) : manufacturingLicenseNo.trim() ? (
-                    <Text style={{ fontSize: 9, color: colors.success, marginTop: -2, marginBottom: 6 }}>✓ Valid format</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.success, marginTop: -2, marginBottom: 6 }}> Valid format</Text>
                   ) : null}
                 </View>
 
@@ -1110,7 +1099,7 @@ export default function ProfileScreen() {
                     compact
                   />
                   {licenseValidTill && new Date(licenseValidTill) < new Date() ? (
-                    <Text style={{ fontSize: 9, color: colors.danger, marginTop: 4, marginBottom: 6 }}>⚠ Expired</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.danger, marginTop: 4, marginBottom: 6 }}> Expired</Text>
                   ) : null}
                 </View>
 
@@ -1149,8 +1138,8 @@ export default function ProfileScreen() {
               <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 24 }}>
                 {/* Left Side: Bank Account Details */}
                 <View style={{ flex: 1.2 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    🏦 Bank Account Details
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase' }}>
+                     Bank Account Details
                   </Text>
 
                   <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
@@ -1173,7 +1162,7 @@ export default function ProfileScreen() {
                         )}
                       </View>
                       {bankIfsc.trim() && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(bankIfsc.trim()) ? (
-                        <Text style={{ fontSize: 9, color: colors.danger, marginTop: 4, marginBottom: 6 }}>⚠ Invalid 11-digit IFSC code</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.danger, marginTop: 4, marginBottom: 6 }}> Invalid 11-digit IFSC code</Text>
                       ) : null}
                     </View>
 
@@ -1194,7 +1183,7 @@ export default function ProfileScreen() {
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <Text style={styles.label}>Bank Name</Text>
-                        <Text style={{ fontSize: 9, color: colors.text.muted, fontStyle: 'italic', marginBottom: 6 }}>(Auto-filled)</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontStyle: 'italic', marginBottom: 6 }}>(Auto-filled)</Text>
                       </View>
                       <TextInput
                         style={styles.input}
@@ -1208,7 +1197,7 @@ export default function ProfileScreen() {
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <Text style={styles.label}>Branch Name</Text>
-                        <Text style={{ fontSize: 9, color: colors.text.muted, fontStyle: 'italic', marginBottom: 6 }}>(Auto-filled)</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontStyle: 'italic', marginBottom: 6 }}>(Auto-filled)</Text>
                       </View>
                       <TextInput
                         style={styles.input}
@@ -1226,8 +1215,8 @@ export default function ProfileScreen() {
 
                 {/* Right Side: UPI & QR Code Details */}
                 <View style={{ flex: 1.2 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    📱 UPI & QR Code Details
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase' }}>
+                     UPI & QR Code Details
                   </Text>
 
                   <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
@@ -1296,7 +1285,7 @@ export default function ProfileScreen() {
                         ) : (
                           <Ionicons name="cloud-upload-outline" size={16} color={colors.primary} />
                         )}
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }} numberOfLines={1}>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }} numberOfLines={1}>
                           {qrUploading ? 'Uploading...' : (qrImageUrl || qrImageBase64) ? 'Change QR' : 'Upload QR Image'}
                         </Text>
                       </TouchableOpacity>
@@ -1305,7 +1294,7 @@ export default function ProfileScreen() {
                     {/* Right sub-column: QR Code Preview */}
                     {(qrImageUrl || qrImageBase64) ? (
                       <View style={{ alignItems: 'flex-start' }}>
-                        <Text style={{ fontSize: 9, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', marginBottom: 4 }}>
                           Invoice QR Preview
                         </Text>
 
@@ -1367,21 +1356,21 @@ export default function ProfileScreen() {
               {/* Bottom Section: Payment Gateway Credentials (Razorpay) */}
               <View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    💳 Online Payment Gateway Credentials (Razorpay)
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' }}>
+                     Online Payment Gateway Credentials (Razorpay)
                   </Text>
 
                   <TouchableOpacity
                     style={[styles.toggleBtn, paymentGatewayEnabled && { backgroundColor: colors.success }]}
                     onPress={() => setPaymentGatewayEnabled(!paymentGatewayEnabled)}
                   >
-                    <Text style={{ color: paymentGatewayEnabled ? '#fff' : colors.text.secondary, fontSize: 11, fontWeight: '700' }}>
+                    <Text style={{ ...Typography.caption, color: paymentGatewayEnabled ? '#fff' : colors.text.secondary, fontWeight: '700' }}>
                       {paymentGatewayEnabled ? 'ENABLED' : 'DISABLED'}
                     </Text>
                   </TouchableOpacity>
                 </View>
 
-                <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12 }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 12 }}>
                   Configure your Razorpay API keys to accept online customer invoice payments & auto-reconcile settlements.
                 </Text>
 
@@ -1439,7 +1428,7 @@ export default function ProfileScreen() {
               <Text style={styles.cardTitle}>Connected Pages & Accounts</Text>
             </View>
             <View style={styles.cardContent}>
-              <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, marginBottom: 12 }}>
                 Link your brand's official social media pages, Google Ads, and communication channels to enable automated multi-platform promotions and analytics sync.
               </Text>
 
@@ -1469,12 +1458,12 @@ export default function ProfileScreen() {
                         style={Platform.OS === 'web' ? { transform: [{ scale: 0.8 }] } : { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                       />
                     </View>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text.primary }} numberOfLines={1}>{acc.name}</Text>
-                    <Text style={{ fontSize: 9, color: colors.text.secondary }} numberOfLines={1}>
+                    <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.primary }} numberOfLines={1}>{acc.name}</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.text.secondary }} numberOfLines={1}>
                       {acc.connected ? acc.page : 'Not Connected'}
                     </Text>
                     {acc.connected && (
-                      <Text style={{ fontSize: 9, fontWeight: '700', color: colors.primary, marginTop: 1 }} numberOfLines={1}>
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary, marginTop: 1 }} numberOfLines={1}>
                         {acc.followers}
                       </Text>
                     )}
@@ -1491,7 +1480,7 @@ export default function ProfileScreen() {
               <Text style={styles.cardTitle}>Artificial Intelligence Credentials (Google Gemini 2.5)</Text>
             </View>
             <View style={[styles.cardContent, { pointerEvents: canEdit ? 'auto' : 'none' }]}>
-              <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, marginBottom: 12 }}>
                 Configure your Google AI Studio API Key to power the natural language Business AI Assistant and executive CRM analytics.
               </Text>
 
@@ -1506,8 +1495,8 @@ export default function ProfileScreen() {
                   secureTextEntry
                 />
               </View>
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 6 }}>
-                Status: {geminiApiKey ? '✔ Key configured (Gemini 2.5 Flash Engine Enabled)' : '⚠️ Not configured'}
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 6 }}>
+                Status: {geminiApiKey ? ' Key configured (Gemini 2.5 Flash Engine Enabled)' : ' Not configured'}
               </Text>
             </View>
           </View>
@@ -1602,7 +1591,7 @@ export default function ProfileScreen() {
 
               <Text style={styles.label}>Invoice Terms & Conditions</Text>
               <TextInput
-                style={[styles.input, { minHeight: 100, fontSize: 12 }]}
+                style={[styles.input, { ...Typography.bodySm, minHeight: 100 }]}
                 value={defaultTerms}
                 onChangeText={setDefaultTerms}
                 placeholder="Type default terms printed on documents..."
@@ -1655,7 +1644,7 @@ export default function ProfileScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="refresh-outline" size={16} color={colors.text.secondary} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.secondary }}>Revert Changes</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>Revert Changes</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -1672,11 +1661,9 @@ export default function ProfileScreen() {
           <Text style={styles.overviewName}>{user?.name}</Text>
           <Text style={styles.overviewEmail}>{user?.email}</Text>
 
-          <View style={[styles.badge, { borderColor: roleColors[user?.role || 'agent'], backgroundColor: roleColors[user?.role || 'agent'] + '12' }]}>
-            <Text style={[styles.badgeText, { color: roleColors[user?.role || 'agent'] }]}>
+          <StatusPill  label={<>
               {user?.role?.toUpperCase()}
-            </Text>
-          </View>
+            </>} textStyle={[styles.badgeText, { color: roleColors[user?.role || 'agent'] }]} />
         </View>
       </View>
     </View>
@@ -1688,7 +1675,7 @@ export default function ProfileScreen() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Ionicons name="business-outline" size={20} color={colors.primary} />
-            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary }}>Manufacturing Facilities & Units</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary }}>Manufacturing Facilities & Units</Text>
           </View>
           {canEdit && (
             <TouchableOpacity
@@ -1707,16 +1694,16 @@ export default function ProfileScreen() {
               <View key={unit._id} style={{ backgroundColor: colors.bg.primary, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftColor: colors.primary, borderLeftWidth: 4 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>{unit.name}</Text>
+                    <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>{unit.name}</Text>
                     {unit.code ? (
                       <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>{unit.code}</Text>
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>{unit.code}</Text>
                       </View>
                     ) : null}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.sm }}>
-                      <Text style={{ fontSize: 9, fontWeight: '800', color: colors.success }}>OPERATIONAL</Text>
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}>OPERATIONAL</Text>
                     </View>
                     {canEdit && (
                       <TouchableOpacity
@@ -1724,7 +1711,7 @@ export default function ProfileScreen() {
                         onPress={() => handleOpenEditUnit(unit)}
                       >
                         <Ionicons name="pencil" size={12} color={colors.primary} />
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Edit Unit</Text>
+                        <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>Edit Unit</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1732,16 +1719,16 @@ export default function ProfileScreen() {
 
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
                   <View style={{ flex: 1, minWidth: 120 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>LOCATION</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>LOCATION</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
                       {[unit.addressLine1, unit.city, unit.state, unit.pincode].filter(Boolean).join(', ') || 'No address specified'}
                     </Text>
                   </View>
                   {unit.contactPerson ? (
                     <View style={{ flex: 1, minWidth: 120 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>CONTACT</Text>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
-                        👤 {unit.contactPerson} {unit.phone ? `(${unit.phone})` : ''}
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>CONTACT</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
+                         {unit.contactPerson} {unit.phone ? `(${unit.phone})` : ''}
                       </Text>
                     </View>
                   ) : null}
@@ -1752,7 +1739,7 @@ export default function ProfileScreen() {
         ) : (
           <View style={{ padding: 24, alignItems: 'center' }}>
             <Ionicons name="business-outline" size={40} color={colors.text.muted} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.secondary, marginTop: 8 }}>No Manufacturing Units Configured</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginTop: 8 }}>No Manufacturing Units Configured</Text>
             {canEdit && (
               <TouchableOpacity
                 style={[styles.btnPrimary, { width: 'auto', paddingHorizontal: 16, marginTop: 12 }]}
@@ -1793,7 +1780,7 @@ export default function ProfileScreen() {
           <Ionicons name="key-outline" size={16} color={activeTab === 'profile' ? colors.primary : colors.text.secondary} />
           <Text style={[styles.tabText, activeTab === 'profile' && styles.tabActiveText]}>My Credentials</Text>
           <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 6 }}>
-            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.success }}>✔ Active Keys</Text>
+            <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}> Active Keys</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1804,7 +1791,7 @@ export default function ProfileScreen() {
           <Ionicons name="business-outline" size={16} color={activeTab === 'company' ? colors.primary : colors.text.secondary} />
           <Text style={[styles.tabText, activeTab === 'company' && styles.tabActiveText]}>Company Configuration</Text>
           <View style={{ backgroundColor: colors.primary + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 6 }}>
-            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>✔ GST Verified</Text>
+            <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}> GST Verified</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1815,7 +1802,7 @@ export default function ProfileScreen() {
           <Ionicons name="hammer-outline" size={16} color={activeTab === 'units' ? colors.primary : colors.text.secondary} />
           <Text style={[styles.tabText, activeTab === 'units' && styles.tabActiveText]}>Manufacturing Facilities</Text>
           <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 6 }}>
-            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.warning }}>{manufacturingUnits.length} Units</Text>
+            <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.warning }}>{manufacturingUnits.length} Units</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -1832,7 +1819,7 @@ export default function ProfileScreen() {
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
             <View style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, width: '100%', maxWidth: 500, padding: 20, borderWidth: 1, borderColor: colors.border }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text.primary }}>
+                <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary }}>
                   {editingUnitId ? 'Edit Manufacturing Unit' : 'Define New Manufacturing Unit'}
                 </Text>
                 <TouchableOpacity onPress={() => setUnitModalVisible(false)}>
@@ -1842,7 +1829,7 @@ export default function ProfileScreen() {
 
               {unitError ? (
                 <View style={{ backgroundColor: colors.danger + '15', padding: 10, borderRadius: Radius.sm, marginBottom: 12 }}>
-                  <Text style={{ color: colors.danger, fontSize: 11, fontWeight: '700' }}>{unitError}</Text>
+                  <Text style={{ ...Typography.caption, color: colors.danger, fontWeight: '700' }}>{unitError}</Text>
                 </View>
               ) : null}
 
@@ -1908,7 +1895,7 @@ export default function ProfileScreen() {
             
             <View style={{ padding: Spacing.xl }}>
               <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                <Text style={{ fontSize: 13, color: colors.text.primary, textAlign: 'center', marginBottom: 16, lineHeight: 18 }}>
+                <Text style={{ ...Typography.bodySm, color: colors.text.primary, textAlign: 'center', marginBottom: 16 }}>
                   1. Download Google Authenticator or Authy.{'\n'}
                   2. Scan the QR code below.
                 </Text>
@@ -1922,8 +1909,8 @@ export default function ProfileScreen() {
                   </View>
                 )}
                 
-                <Text style={{ fontSize: 11, color: colors.text.muted }}>Can't scan? Use this secret key:</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary, letterSpacing: 1, marginTop: 4 }}>
+                <Text style={{ ...Typography.caption, color: colors.text.muted }}>Can't scan? Use this secret key:</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, marginTop: 4 }}>
                   {mfaSecret}
                 </Text>
               </View>
@@ -1933,7 +1920,7 @@ export default function ProfileScreen() {
               <View style={{ marginTop: 20 }}>
                 <Text style={styles.label}>3. Enter 6-Digit Code</Text>
                 <TextInput
-                  style={[styles.input, { letterSpacing: 8, fontSize: 18, fontWeight: '700', textAlign: 'center' }]}
+                  style={[styles.input, { ...Typography.h2, fontWeight: '700', textAlign: 'center' }]}
                   placeholder="000000"
                   placeholderTextColor={colors.text.muted}
                   value={mfaCode}
@@ -1968,7 +1955,7 @@ export default function ProfileScreen() {
             
             <View style={{ padding: Spacing.xl }}>
               <View style={{ backgroundColor: colors.warning + '15', padding: 12, borderRadius: Radius.sm, marginBottom: 20 }}>
-                <Text style={{ fontSize: 12, color: colors.warning, fontWeight: '600' }}>
+                <Text style={{ ...Typography.bodySm, color: colors.warning, fontWeight: '600' }}>
                   Disabling 2FA makes your account less secure.
                 </Text>
               </View>
@@ -1988,7 +1975,7 @@ export default function ProfileScreen() {
                 <View>
                   <Text style={styles.label}>Authenticator Code</Text>
                   <TextInput
-                    style={[styles.input, { letterSpacing: 4, fontSize: 16, fontWeight: '700' }]}
+                    style={[styles.input, { ...Typography.h3, fontWeight: '700' }]}
                     placeholder="000000"
                     keyboardType="number-pad"
                     maxLength={6}
@@ -2050,11 +2037,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text.secondary,
-  },
+  tabText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   tabActiveText: {
     color: colors.primary,
     fontWeight: '800',
@@ -2086,33 +2069,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingBottom: 12,
     marginBottom: 16,
   },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
+  cardTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   cardContent: {
     gap: 12,
   },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  input: {
-    backgroundColor: colors.bg.primary,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
+  label: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', marginBottom: 2 },
+  input: { ...Typography.bodySm, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 4 },
   rowInputs: {
     flexDirection: 'row',
   },
@@ -2138,16 +2100,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 12,
     marginTop: 8,
   },
-  btnText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  btnTextSecondary: {
-    color: colors.text.primary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  btnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
+  btnTextSecondary: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '700' },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2176,32 +2130,16 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.02)',
     marginBottom: 16,
   },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: '800',
-  },
-  overviewName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  overviewEmail: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    marginBottom: 12,
-  },
+  avatarText: { ...Typography.display, fontWeight: '800' },
+  overviewName: { ...Typography.h2, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  overviewEmail: { ...Typography.bodySm, color: colors.text.secondary, marginBottom: 12 },
   badge: {
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
+  badgeText: { ...Typography.eyebrow, fontWeight: '800' },
   divider: {
     height: 1,
     backgroundColor: colors.border,
@@ -2213,10 +2151,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  permissionText: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
+  permissionText: { ...Typography.bodySm, color: colors.text.secondary },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2225,16 +2160,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.02)',
   },
-  metaLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    fontWeight: '500',
-  },
-  metaValue: {
-    fontSize: 12,
-    color: colors.text.primary,
-    fontWeight: '700',
-  },
+  metaLabel: { ...Typography.bodySm, color: colors.text.secondary, fontWeight: '500' },
+  metaValue: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '700' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -2260,11 +2187,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.bg.primary,
   },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   closeBtn: {
     padding: 4,
   },

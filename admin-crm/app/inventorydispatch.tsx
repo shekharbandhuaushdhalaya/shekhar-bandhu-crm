@@ -1,14 +1,13 @@
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet, RefreshControl,
-  TouchableOpacity, TextInput, Modal, Pressable,
-  useWindowDimensions, Platform, Alert
-} from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, Pressable, useWindowDimensions, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, Dispatch, DeadStockItem, Challan } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
+import { WorkspaceLoading, WorkspaceError, StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 
 export default function InventoryDispatchScreen() {
   const { colors } = useTheme();
@@ -154,22 +153,20 @@ export default function InventoryDispatchScreen() {
 
             {/* List */}
             {dispatches.length === 0 ? (
-              <View style={styles.emptyBox}><Ionicons name="bus-outline" size={40} color={colors.text.secondary} /><Text style={styles.emptyText}>No dispatch records found.</Text></View>
+              <EmptyState title={<>No dispatch records found.</>}  />
             ) : dispatches.map(disp => (
               <View key={disp._id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: dispatchStatusColors[disp.status] || colors.primary }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
                       <Text style={styles.cardTitle}>{disp.dispatchNo}</Text>
-                      <View style={[styles.badge, { backgroundColor: dispatchStatusColors[disp.status] + '20', borderColor: dispatchStatusColors[disp.status] }]}>
-                        <Text style={[styles.badgeText, { color: dispatchStatusColors[disp.status] }]}>{disp.status.toUpperCase()}</Text>
-                      </View>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>
+                      <StatusPill  label={<>{disp.status.toUpperCase()}</>} textStyle={[styles.badgeText, { color: dispatchStatusColors[disp.status] }]} />
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>
                         {disp.invoiceNo ? `Invoice: ${disp.invoiceNo}` : `Challan: ${disp.challanNo}`}
                       </Text>
                     </View>
                     <Text style={styles.cardSubTitle}>Party: {disp.customerName}</Text>
-                    <Text style={styles.metaText}>📍 Address: {disp.shippingAddress}</Text>
+                    <Text style={styles.metaText}> Address: {disp.shippingAddress}</Text>
 
                     {/* Dispatch Details */}
                     <View style={styles.detailsGrid}>
@@ -218,7 +215,7 @@ export default function InventoryDispatchScreen() {
               <Text style={styles.inputLabel}>Posted Sale Challan *</Text>
               <Text style={[styles.metaText, { marginBottom: 8 }]}>Dispatch can only be created from an authoritative posted Sale Challan.</Text>
               {Platform.OS === 'web' ? (
-                <select value={selectedChallan?._id || ''} onChange={(e: any) => setSelectedChallan(challans.find(c => c._id === e.target.value) || null)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13, marginBottom: 12, width: '100%' }}>
+                <select value={selectedChallan?._id || ''} onChange={(e: any) => setSelectedChallan(challans.find(c => c._id === e.target.value) || null)} style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, marginBottom: 12, width: '100%' }}>
                   <option value="">-- Select posted Sale Challan --</option>
                   {challans.map(c => <option key={c._id} value={c._id}>{c.challanNo} - {c.partyName} ({c.items?.reduce((n, x) => n + Number(x.qty || 0), 0) || 0} boxes)</option>)}
                 </select>
@@ -281,7 +278,7 @@ export default function InventoryDispatchScreen() {
             <ScrollView style={styles.modalForm}>
               <Text style={styles.inputLabel}>Status *</Text>
               {Platform.OS === 'web' ? (
-                <select value={statusVal} onChange={(e: any) => setStatusVal(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontSize: 13, width: '100%' }}>
+                <select value={statusVal} onChange={(e: any) => setStatusVal(e.target.value)} style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, width: '100%' }}>
                   {(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned'] as const).map(s => (
                     <option key={s} value={s}>{s.replace('_',' ').toUpperCase()}</option>
                   ))}
@@ -304,53 +301,53 @@ export default function InventoryDispatchScreen() {
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   pageHeader: { paddingHorizontal: Spacing.lg, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
-  pageSubtitle: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
+  pageTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  pageSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   tabBarScroll: { backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabBarContent: { paddingHorizontal: Spacing.lg, paddingVertical: 10, gap: 8, flexDirection: 'row' },
   tabPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border },
   tabPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabPillText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  tabPillText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   tabPillTextActive: { color: '#fff', fontWeight: '700' },
   content: { padding: Spacing.lg, maxWidth: 1200, alignSelf: 'center', width: '100%' },
   card: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: 12 },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
   statCard: { flex: 1, minWidth: 80, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  statValue: { fontSize: 22, fontWeight: '800' },
-  statLabel: { fontSize: 10, color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4, textAlign: 'center' },
+  statValue: { ...Typography.h1, fontWeight: '800' },
+  statLabel: { ...Typography.eyebrow, color: colors.text.muted, textTransform: 'uppercase', marginTop: 4, textAlign: 'center' },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.md },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  addBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   filterChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary },
-  filterChipText: { fontSize: 11, fontWeight: '600', color: colors.text.secondary },
-  cardTitle: { fontSize: 14, fontWeight: '800', color: colors.text.primary },
-  cardSubTitle: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
-  metaText: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
-  dateText: { fontSize: 10, color: colors.text.muted, marginTop: 8 },
+  filterChipText: { ...Typography.caption, fontWeight: '600', color: colors.text.secondary },
+  cardTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary },
+  cardSubTitle: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
+  metaText: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
+  dateText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 8 },
   detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm },
-  detailsItem: { fontSize: 12, color: colors.text.secondary, width: '45%' },
+  detailsItem: { ...Typography.bodySm, color: colors.text.secondary, width: '45%' },
   iconBtn: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   emptyBox: { alignItems: 'center', padding: 40, gap: 8 },
-  emptyText: { fontSize: 13, color: colors.text.muted },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: 8 },
+  emptyText: { ...Typography.bodySm, color: colors.text.muted },
+  sectionTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 8 },
   tableHeader: { flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 4, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, marginBottom: 4 },
-  th: { fontSize: 10, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  th: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   tableRow: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderRadius: Radius.sm },
-  td: { fontSize: 13, color: colors.text.secondary },
+  td: { ...Typography.bodySm, color: colors.text.secondary },
   // Modal styles
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   modalContainer: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, width: '90%', maxWidth: 520, maxHeight: '85%', zIndex: 10, borderWidth: 1, borderColor: colors.border },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalForm: { padding: 16, maxHeight: 420 },
   modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: colors.border },
-  modalError: { margin: 12, padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontSize: 12, fontWeight: '600' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
-  input: { backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.text.primary, marginBottom: 12 },
+  modalError: { ...Typography.bodySm, margin: 12, padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontWeight: '600' },
+  inputLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
+  input: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 12 },
   badge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
-  badgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+  badgeText: { ...Typography.eyebrow, fontWeight: '800' },
   cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  cancelBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  cancelBtnText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   submitBtn: { flex: 2, paddingVertical: 12, borderRadius: Radius.md, backgroundColor: colors.primary, alignItems: 'center' },
-  submitBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  submitBtnText: { ...Typography.bodySm, fontWeight: '700', color: '#fff' },
 });

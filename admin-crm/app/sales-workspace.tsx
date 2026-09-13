@@ -1,11 +1,14 @@
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, RefreshControl, Alert, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Alert, Platform, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { api } from '../utils/api';
-import { LightColors, Radius, Shadows, Spacing } from '../constants/theme';
-import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
+import { LightColors, Radius, Shadows, Spacing, Typography } from '../constants/theme';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTransition, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 
 type Tab = 'dashboard' | 'orders' | 'challans' | 'schemes' | 'returns' | 'commissions';
 
@@ -180,6 +183,35 @@ export default function SalesWorkspace() {
     } finally { setBusyAction(''); }
   };
 
+  const renderOrderCard = ({ item: order }: { item: any }) => {
+    const fulfilled = (order.items || []).reduce((sum: number, item: any) => sum + Number(item.fulfilledQty || 0), 0);
+    const ordered = (order.items || []).reduce((sum: number, item: any) => sum + Number(item.qty || 0) + Number(item.freeQty || 0), 0);
+    const pendingApproval = order.approvalStatus === 'pending_approval';
+    return (
+      <View style={styles.orderCard}>
+        <View style={styles.orderTop}>
+          <View style={{ flex: 1, minWidth: 220 }}>
+            <View style={styles.orderTitleRow}>
+              <Text style={styles.rowMain}>{order.orderNo || `#${order._id.slice(-6)}`}</Text>
+              <StatusPill label={(order.status || 'draft').replaceAll('_', ' ')} tone={order.status === 'fulfilled' ? 'success' : order.status === 'cancelled' ? 'danger' : pendingApproval ? 'warning' : 'info'} />
+            </View>
+            <Text style={styles.customerName}>{order.name || order.customerName || 'Customer'}</Text>
+            <Text style={styles.rowSub}>{order.items?.length || 0} items • {order.sourcePersonName || order.mrName || order.sourceType || 'Direct'}</Text>
+          </View>
+          <Text style={styles.orderAmount}>{formatMoney(order.totalAmount)}</Text>
+        </View>
+        <View style={styles.fulfillmentTrack}><View style={[styles.fulfillmentFill, { width: `${ordered ? Math.min(100, (fulfilled / ordered) * 100) : 0}%` }]} /></View>
+        <View style={styles.orderFooter}>
+          <Text style={styles.fulfillmentText}>Fulfilled {fulfilled} of {ordered}</Text>
+          <View style={styles.rowActions}>
+            {pendingApproval ? <TouchableOpacity style={styles.secondaryButton} onPress={() => approve(order._id)}><Text style={styles.secondaryButtonText}>Approve</Text></TouchableOpacity> : null}
+            {!pendingApproval && !['fulfilled', 'cancelled', 'delivered'].includes(order.status) ? <TouchableOpacity style={styles.primarySmallButton} onPress={() => prepareRemainingChallan(order)}><Ionicons name="document-text-outline" size={14} color="#fff" /><Text style={styles.primarySmallButtonText}>Prepare Challan</Text></TouchableOpacity> : null}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const actOnChallan = async (challan: any, action: 'finalize' | 'convert' | 'reverse') => {
     if (busyAction) return;
     const key = `${action}:${challan._id}`;
@@ -213,16 +245,7 @@ export default function SalesWorkspace() {
     ? Object.entries(searchResults).flatMap(([type, rows]: any) => (rows || []).map((x: any) => ({ type, ...x })))
     : [];
 
-  const webSelectStyle = {
-    minHeight: 42,
-    padding: '0 12px',
-    borderRadius: 10,
-    border: `1px solid ${colors.border}`,
-    background: colors.bg.card,
-    color: colors.text.primary,
-    fontSize: 13,
-    outline: 'none',
-  } as any;
+  const webSelectStyle = { ...Typography.bodySm, minHeight: 42, padding: '0 12px', borderRadius: 10, border: `1px solid ${colors.border}`, background: colors.bg.card, color: colors.text.primary, outline: 'none' } as any;
 
   return (
     <View style={styles.screen}>
@@ -309,7 +332,7 @@ export default function SalesWorkspace() {
         style={{ flex: 1 }}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
-      >
+      ><WorkspaceTransition value={tab}>
         {tab === 'dashboard' ? (
           <>
             <View style={styles.metricsGrid}>
@@ -346,34 +369,15 @@ export default function SalesWorkspace() {
 
         {tab === 'orders' ? (
           <Panel title="Order pipeline" subtitle="Review fulfillment, approvals and remaining quantities from one place.">
-            {!orders.length ? <EmptyState icon="cart-outline" title="No sales orders" message="New and website orders will appear here." /> : orders.map((order) => {
-              const fulfilled = (order.items || []).reduce((sum: number, item: any) => sum + Number(item.fulfilledQty || 0), 0);
-              const ordered = (order.items || []).reduce((sum: number, item: any) => sum + Number(item.qty || 0) + Number(item.freeQty || 0), 0);
-              const pendingApproval = order.approvalStatus === 'pending_approval';
-              return (
-                <View style={styles.orderCard} key={order._id}>
-                  <View style={styles.orderTop}>
-                    <View style={{ flex: 1, minWidth: 220 }}>
-                      <View style={styles.orderTitleRow}>
-                        <Text style={styles.rowMain}>{order.orderNo || `#${order._id.slice(-6)}`}</Text>
-                        <StatusPill label={(order.status || 'draft').replaceAll('_', ' ')} tone={order.status === 'fulfilled' ? 'success' : order.status === 'cancelled' ? 'danger' : pendingApproval ? 'warning' : 'info'} />
-                      </View>
-                      <Text style={styles.customerName}>{order.name || order.customerName || 'Customer'}</Text>
-                      <Text style={styles.rowSub}>{order.items?.length || 0} items • {order.sourcePersonName || order.mrName || order.sourceType || 'Direct'}</Text>
-                    </View>
-                    <Text style={styles.orderAmount}>{formatMoney(order.totalAmount)}</Text>
-                  </View>
-                  <View style={styles.fulfillmentTrack}><View style={[styles.fulfillmentFill, { width: `${ordered ? Math.min(100, (fulfilled / ordered) * 100) : 0}%` }]} /></View>
-                  <View style={styles.orderFooter}>
-                    <Text style={styles.fulfillmentText}>Fulfilled {fulfilled} of {ordered}</Text>
-                    <View style={styles.rowActions}>
-                      {pendingApproval ? <TouchableOpacity style={styles.secondaryButton} onPress={() => approve(order._id)}><Text style={styles.secondaryButtonText}>Approve</Text></TouchableOpacity> : null}
-                      {!pendingApproval && !['fulfilled', 'cancelled', 'delivered'].includes(order.status) ? <TouchableOpacity style={styles.primarySmallButton} onPress={() => prepareRemainingChallan(order)}><Ionicons name="document-text-outline" size={14} color="#fff" /><Text style={styles.primarySmallButtonText}>Prepare Challan</Text></TouchableOpacity> : null}
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            <FlatList
+              data={orders}
+              keyExtractor={(order) => order._id}
+              renderItem={renderOrderCard}
+              scrollEnabled={false}
+              ListEmptyComponent={<EmptyState icon="cart-outline" title="No sales orders" message="New and website orders will appear here." />}
+              initialNumToRender={12}
+              windowSize={5}
+            />
           </Panel>
         ) : null}
 
@@ -467,7 +471,7 @@ export default function SalesWorkspace() {
             <View style={styles.totalRow}><Text style={styles.totalLabel}>Total commission</Text><Text style={styles.totalValue}>{formatMoney(commissions?.total)}</Text></View>
           </Panel>
         ) : null}
-      </ScrollView> : null}
+      </WorkspaceTransition></ScrollView> : null}
     </View>
   );
 }
@@ -477,14 +481,14 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   inlinePanelWrap: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
   searchWrap: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
   searchBar: { minHeight: 44, maxWidth: 760, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingLeft: 13, paddingRight: 5, flexDirection: 'row', alignItems: 'center', gap: 9, ...Shadows.card },
-  searchInput: { flex: 1, minHeight: 42, color: colors.text.primary, fontSize: 13 },
+  searchInput: { ...Typography.bodySm, flex: 1, minHeight: 42, color: colors.text.primary },
   iconButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   searchButton: { minHeight: 34, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: colors.primaryLight },
-  searchButtonText: { color: colors.primary, fontSize: 11.5, fontWeight: '800' },
+  searchButtonText: { ...Typography.caption, color: colors.primary, fontWeight: '800' },
   searchResults: { gap: 8, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
   searchChip: { backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 11, paddingVertical: 9, width: 170 },
-  searchChipType: { fontSize: 8.5, fontWeight: '800', letterSpacing: 0.6, color: colors.primary },
-  searchChipText: { fontSize: 12, fontWeight: '700', color: colors.text.primary, marginTop: 2 },
+  searchChipType: { ...Typography.eyebrow, fontWeight: '800', color: colors.primary },
+  searchChipText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginTop: 2 },
   content: { padding: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 64, gap: Spacing.md, maxWidth: 1240, width: '100%', alignSelf: 'center' },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   twoColumn: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, alignItems: 'flex-start' },
@@ -492,34 +496,34 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   dataRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
-  rowMain: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  rowSub: { fontSize: 11.5, lineHeight: 17, color: colors.text.muted, marginTop: 3 },
-  customerName: { fontSize: 12.5, fontWeight: '600', color: colors.text.secondary, marginTop: 3 },
-  money: { fontSize: 13, fontWeight: '800', color: colors.text.primary },
+  rowMain: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  rowSub: { ...Typography.caption, color: colors.text.muted, marginTop: 3 },
+  customerName: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginTop: 3 },
+  money: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
   healthRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  healthLabel: { fontSize: 12, color: colors.text.secondary },
-  healthValue: { fontSize: 14, fontWeight: '800', color: colors.text.primary },
+  healthLabel: { ...Typography.bodySm, color: colors.text.secondary },
+  healthValue: { ...Typography.body, fontWeight: '800', color: colors.text.primary },
   ruleBox: { marginTop: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 11, borderRadius: Radius.md, backgroundColor: colors.primaryLight },
-  ruleText: { flex: 1, fontSize: 11.5, lineHeight: 17, color: colors.text.secondary },
+  ruleText: { ...Typography.caption, flex: 1, color: colors.text.secondary },
   orderCard: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   orderTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   orderTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
-  orderAmount: { fontSize: 15, fontWeight: '800', color: colors.text.primary },
+  orderAmount: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   fulfillmentTrack: { height: 5, borderRadius: 999, backgroundColor: colors.bg.secondary, overflow: 'hidden', marginTop: 12 },
   fulfillmentFill: { height: '100%', backgroundColor: colors.success, borderRadius: 999 },
   orderFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 9, flexWrap: 'wrap' },
-  fulfillmentText: { fontSize: 10.5, fontWeight: '600', color: colors.text.muted },
+  fulfillmentText: { ...Typography.eyebrow, fontWeight: '600', color: colors.text.muted },
   rowActions: { flexDirection: 'row', gap: 7, flexWrap: 'wrap' },
   primarySmallButton: { minHeight: 32, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  primarySmallButtonText: { color: '#fff', fontSize: 10.5, fontWeight: '800' },
+  primarySmallButtonText: { ...Typography.eyebrow, color: '#fff', fontWeight: '800' },
   secondaryButton: { minHeight: 32, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  secondaryButtonText: { color: colors.primary, fontSize: 10.5, fontWeight: '800' },
+  secondaryButtonText: { ...Typography.eyebrow, color: colors.primary, fontWeight: '800' },
   primaryButton: { minHeight: 42, paddingHorizontal: 15, borderRadius: Radius.md, backgroundColor: colors.primary, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
-  primaryButtonText: { color: '#fff', fontWeight: '800', fontSize: 12.5 },
+  primaryButtonText: { ...Typography.bodySm, color: '#fff', fontWeight: '800' },
   formRow: { flexDirection: 'row', gap: 9, flexWrap: 'wrap', marginBottom: 9, alignItems: 'center' },
-  input: { minWidth: 145, flexGrow: 1, flexShrink: 1, minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 11, color: colors.text.primary, backgroundColor: colors.bg.card, fontSize: 12.5 },
-  inputWide: { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 11, color: colors.text.primary, backgroundColor: colors.bg.card, marginBottom: 9, fontSize: 12.5 },
+  input: { ...Typography.bodySm, minWidth: 145, flexGrow: 1, flexShrink: 1, minHeight: 44, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 11, color: colors.text.primary, backgroundColor: colors.bg.card },
+  inputWide: { ...Typography.bodySm, minHeight: 44, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 11, color: colors.text.primary, backgroundColor: colors.bg.card, marginBottom: 9 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, marginTop: 6, borderTopWidth: 1, borderTopColor: colors.border },
-  totalLabel: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-  totalValue: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
+  totalLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
+  totalValue: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
 });

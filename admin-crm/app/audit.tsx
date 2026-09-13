@@ -1,23 +1,17 @@
+import ScreenHeader from '../components/ScreenHeader';
+import { DataTable } from '../components/DataTable';
+import { StatusPill, WorkspaceLoading, EmptyState } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  ActivityIndicator,
-  useWindowDimensions,
-  RefreshControl,
-  Platform
-} from 'react-native';
+import { View, StyleSheet, ScrollView, Modal, ActivityIndicator, useWindowDimensions, RefreshControl, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { api } from '../utils/api';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import UnauthorizedScreen from '../components/UnauthorizedScreen';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 
@@ -163,15 +157,13 @@ export default function AuditLogsScreen() {
             <Text style={styles.logEmail}>{item.userEmail || 'anonymous'}</Text>
           </View>
           <View style={{ flex: 2, alignItems: 'flex-start' }}>
-            <View style={[styles.actionBadge, { backgroundColor: actionBg }]}>
-              <Text style={[styles.actionBadgeText, { color: actionColor }]}>{item.action}</Text>
-            </View>
+            <StatusPill  label={<>{item.action}</>} textStyle={[styles.actionBadgeText, { color: actionColor }]} />
           </View>
           <Text style={[styles.cell, { flex: 4 }]}>{item.description}</Text>
           <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
             <Text style={styles.logIp}>{item.ipAddress || '—'}</Text>
             {item.details && (
-              <Text style={{ fontSize: 10, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
+              <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
                 VIEW DETAIL
               </Text>
             )}
@@ -188,9 +180,7 @@ export default function AuditLogsScreen() {
         activeOpacity={0.7}
       >
         <View style={styles.logCardHeader}>
-          <View style={[styles.actionBadge, { backgroundColor: actionBg }]}>
-            <Text style={[styles.actionBadgeText, { color: actionColor }]}>{item.action}</Text>
-          </View>
+          <StatusPill  label={<>{item.action}</>} textStyle={[styles.actionBadgeText, { color: actionColor }]} />
           <Text style={styles.logCardTime}>{dateStr} {timeStr}</Text>
         </View>
         
@@ -206,6 +196,7 @@ export default function AuditLogsScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="Audit log" subtitle="Review activity and changes across your workspace." />
       {/* Filter and Search Bar */}
       <View style={styles.searchBar}>
         <View style={styles.searchFieldContainer}>
@@ -246,7 +237,7 @@ export default function AuditLogsScreen() {
       {/* Log Feed */}
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <WorkspaceLoading />
           <Text style={{ marginTop: 12, color: colors.text.secondary }}>Loading audit records...</Text>
         </View>
       ) : (
@@ -256,34 +247,26 @@ export default function AuditLogsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         >
           {logs.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="folder-open-outline" size={48} color={colors.text.muted} />
-              <Text style={styles.emptyText}>No audit log entries found</Text>
-            </View>
+            <EmptyState title={<>No audit log entries found</>}  />
           ) : (
             <View style={styles.logsContainer}>
               {isDesktop ? (
-                <View style={styles.table}>
-                  {/* Table Header */}
-                  <View style={styles.tableHeader}>
+                <DataTable data={sortedLogs || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={900} embedded renderTableHeader={() => (<View style={styles.tableHeader}>
                     <TouchableOpacity style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center' }} onPress={() => { setSortField('timestamp'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>Timestamp</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' }}>Timestamp</Text>
                       {sortField === 'timestamp' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
                     <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }} onPress={() => { setSortField('user'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>User</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' }}>User</Text>
                       {sortField === 'user' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
                     <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }} onPress={() => { setSortField('action'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>Action</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' }}>Action</Text>
                       {sortField === 'action' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
                     <Text style={[styles.headerCell, { flex: 4 }]}>Description</Text>
                     <Text style={[styles.headerCell, { flex: 1.5, textAlign: 'right' }]}>IP & Detail</Text>
-                  </View>
-                  {/* Rows */}
-                  {sortedLogs.map(renderLogItem)}
-                </View>
+                  </View>)} renderTableRow={renderLogItem}  />
               ) : (
                 sortedLogs.map(renderLogItem)
               )}
@@ -398,16 +381,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    marginTop: 4,
-  },
+  title: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  subtitle: { ...Typography.bodySm, color: colors.text.secondary, marginTop: 4 },
   deniedContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -428,17 +403,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
       web: { boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }
     })
   },
-  deniedTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  deniedText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  deniedTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  deniedText: { ...Typography.bodySm, color: colors.text.secondary, textAlign: 'center' },
   searchBar: {
     flexDirection: 'row',
     padding: Spacing.lg,
@@ -454,12 +420,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: 12,
   },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    fontSize: 13,
-    color: colors.text.primary,
-  },
+  searchInput: { ...Typography.bodySm, flex: 1, height: 40, color: colors.text.primary },
   searchBtn: {
     backgroundColor: colors.primary,
     borderRadius: Radius.md,
@@ -467,22 +428,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  searchBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  dateInput: {
-    width: 110,
-    height: 40,
-    fontSize: 12,
-    color: colors.text.primary,
-    backgroundColor: colors.bg.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: 10,
-  },
+  searchBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
+  dateInput: { ...Typography.bodySm, width: 110, height: 40, color: colors.text.primary, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 10 },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -494,10 +441,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  emptyText: {
-    fontSize: 14,
-    color: colors.text.muted,
-  },
+  emptyText: { ...Typography.body, color: colors.text.muted },
   logsContainer: {
     paddingHorizontal: Spacing.lg,
   },
@@ -516,13 +460,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  headerCell: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  headerCell: { ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -531,34 +469,16 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
   },
-  cell: {
-    fontSize: 13,
-    color: colors.text.primary,
-  },
-  logUser: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  logEmail: {
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
-  logIp: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    fontWeight: '500',
-  },
+  cell: { ...Typography.bodySm, color: colors.text.primary },
+  logUser: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  logEmail: { ...Typography.caption, color: colors.text.secondary },
+  logIp: { ...Typography.bodySm, color: colors.text.secondary, fontWeight: '500' },
   actionBadge: {
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  actionBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
+  actionBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
   logCard: {
     backgroundColor: colors.bg.card,
     borderRadius: Radius.md,
@@ -573,15 +493,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  logCardTime: {
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
-  logCardDesc: {
-    fontSize: 13,
-    color: colors.text.primary,
-    lineHeight: 18,
-  },
+  logCardTime: { ...Typography.caption, color: colors.text.secondary },
+  logCardDesc: { ...Typography.bodySm, color: colors.text.primary },
   logCardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -590,14 +503,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingTop: 8,
     marginTop: 4,
   },
-  logCardUser: {
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
-  logCardIp: {
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
+  logCardUser: { ...Typography.caption, color: colors.text.secondary },
+  logCardIp: { ...Typography.caption, color: colors.text.secondary },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -619,15 +526,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderColor: colors.border,
     opacity: 0.5,
   },
-  pagerText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  pageLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
+  pagerText: { ...Typography.bodySm, fontWeight: '600', color: colors.primary },
+  pageLabel: { ...Typography.bodySm, color: colors.text.secondary },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -653,11 +553,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalScroll: {
     padding: Spacing.lg,
   },
@@ -669,31 +565,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'space-between',
     gap: 20,
   },
-  detailLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    width: 120,
-  },
-  detailVal: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.text.primary,
-    textAlign: 'right',
-  },
+  detailLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', width: 120 },
+  detailVal: { ...Typography.bodySm, flex: 1, color: colors.text.primary, textAlign: 'right' },
   jsonContainer: {
     marginTop: 20,
   },
-  jsonLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
+  jsonLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', marginBottom: 8 },
   jsonBox: {
     backgroundColor: colors.bg.primary,
     borderRadius: Radius.md,
@@ -701,9 +578,5 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderColor: colors.border,
     padding: Spacing.md,
   },
-  jsonText: {
-    fontFamily: Platform.select({ ios: 'Courier', android: 'monospace', web: 'monospace' }),
-    fontSize: 12,
-    color: colors.text.primary,
-  },
+  jsonText: { ...Typography.bodySm, color: colors.text.primary },
 });

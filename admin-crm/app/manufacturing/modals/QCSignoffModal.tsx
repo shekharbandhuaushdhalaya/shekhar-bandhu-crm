@@ -1,5 +1,9 @@
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../../components/AppTextInput';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
+import { View, Modal, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -97,7 +101,7 @@ export default function QCSignoffModal({
                   }}
                 >
                   <Ionicons name={opt === 'approved' ? 'checkmark-circle-outline' : 'close-circle-outline'} size={16} color={qcStatus === opt ? '#fff' : (opt === 'approved' ? colors.success : colors.danger)} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: qcStatus === opt ? '#fff' : colors.text.secondary }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: qcStatus === opt ? '#fff' : colors.text.secondary }}>
                     {opt === 'approved' ? 'APPROVE BATCH' : 'REJECT BATCH'}
                   </Text>
                 </TouchableOpacity>
@@ -110,15 +114,15 @@ export default function QCSignoffModal({
             {/* Planned Sizes summary (multi-size batches) */}
             {selectedBatchRun && (selectedBatchRun as any).plannedYields?.length > 0 && (
               <View style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, marginBottom: 10 }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary, marginBottom: 6 }}>Planned Sizes at Launch:</Text>
+                <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary, marginBottom: 6 }}>Planned Sizes at Launch:</Text>
                 <View style={{ gap: 4 }}>
                   {((selectedBatchRun as any).plannedYields as any[]).map((py: any, idx: number) => {
                     const prodId = typeof py.productId === 'object' ? (py.productId as any)._id : py.productId;
                     const prod = products.find(p => p._id === prodId);
                     return (
                       <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 }}>
-                        <Text style={{ fontSize: 11, color: colors.text.secondary }}>{prod ? `${prod.name} (${prod.size || 'Std'})` : prodId}</Text>
-                        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>{py.plannedQty} units</Text>
+                        <Text style={{ ...Typography.caption, color: colors.text.secondary }}>{prod ? `${prod.name} (${prod.size || 'Std'})` : prodId}</Text>
+                        <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.primary }}>{py.plannedQty} units</Text>
                       </View>
                     );
                   })}
@@ -142,7 +146,7 @@ export default function QCSignoffModal({
                           borderColor: qcEnableSplit === val ? (val ? colors.primary : colors.text.muted) : colors.border
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: qcEnableSplit === val ? '#fff' : colors.text.secondary }}>{label}</Text>
+                        <Text style={{ ...Typography.caption, fontWeight: '700', color: qcEnableSplit === val ? '#fff' : colors.text.secondary }}>{label}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -150,12 +154,12 @@ export default function QCSignoffModal({
 
                 {qcEnableSplit && (
                   <View style={{ marginBottom: 16 }}>
-                    <Text style={[styles.formIngredientsTitle, { fontSize: 12, marginBottom: 8 }]}>Split Quantities across Products:</Text>
+                    <Text style={[styles.formIngredientsTitle, { ...Typography.bodySm, marginBottom: 8 }]}>Split Quantities across Products:</Text>
                     {qcYields.map((item, idx) => (
                       <View key={idx} style={[styles.bomIngredientInputRow, { gap: 6 }]}>
                         <View style={[styles.pickerWrapper, { flex: 2, marginBottom: 0 }]}>
                           {Platform.OS === 'web' ? (
-                            <select value={item.productId} onChange={(e: any) => onQcYieldChange(idx, 'productId', e.target.value)} style={{ flex: 1, padding: 8, fontSize: 11, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
+                            <select value={item.productId} onChange={(e: any) => onQcYieldChange(idx, 'productId', e.target.value)} style={{ ...Typography.caption, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
                               <option value="">-- Choose Product/Size --</option>
                               {splitProducts.map(p => <option key={p._id} value={p._id}>{p.name} ({p.size || 'Std'})</option>)}
                             </select>
@@ -181,7 +185,7 @@ export default function QCSignoffModal({
             <Text style={styles.inputLabel}>Target Storage Warehouse (Finished Goods) *</Text>
             <View style={styles.pickerWrapper}>
               {Platform.OS === 'web' ? (
-                <select value={qcWarehouseId} onChange={(e: any) => setQcWarehouseId(e.target.value)} style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
+                <select value={qcWarehouseId} onChange={(e: any) => setQcWarehouseId(e.target.value)} style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
                   <option value="">-- Choose Warehouse --</option>
                   {warehouses.map(w => <option key={w._id} value={w._id}>{w.name} ({(w as any).city || 'Default'})</option>)}
                 </select>
@@ -198,7 +202,7 @@ export default function QCSignoffModal({
 
             {/* GMP Lab Parameters */}
             <View style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, marginVertical: 14 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>🔬 GMP Lab Specifications & Testing</Text>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}> GMP Lab Specifications & Testing</Text>
               <Text style={styles.inputLabel}>Organoleptic Description</Text>
               <TextInput style={styles.input} placeholder="Color, odour, taste (e.g. Dark brown, herbal odour)" placeholderTextColor={colors.text.muted} value={qcOrganoleptic} onChangeText={setQcOrganoleptic} />
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -236,7 +240,7 @@ export default function QCSignoffModal({
                             borderColor: val === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.border
                           }}
                         >
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: val === opt ? '#fff' : colors.text.secondary }}>{opt.toUpperCase()}</Text>
+                          <Text style={{ ...Typography.caption, fontWeight: '700', color: val === opt ? '#fff' : colors.text.secondary }}>{opt.toUpperCase()}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -264,7 +268,7 @@ export default function QCSignoffModal({
             <TextInput style={[styles.input, { height: 80, paddingVertical: 8 }]} placeholder="Enter quality verification notes..." placeholderTextColor={colors.text.muted} value={qcNotes} onChangeText={setQcNotes} multiline numberOfLines={3} />
 
             <Text style={styles.warningDisclaimer}>
-              ✅ Submitting this approval will officially complete the batch, close the manufacturing run, and add the actual yield stock to the Finished Goods Warehouse.
+               Submitting this approval will officially complete the batch, close the manufacturing run, and add the actual yield stock to the Finished Goods Warehouse.
             </Text>
           </ScrollView>
           <View style={styles.modalFooter}>

@@ -1,10 +1,12 @@
+import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
+import { AppText as Text } from './AppText';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useTheme } from '../utils/themeContext';
-import { Radius, Spacing } from '../constants/theme';
+import { Radius, Spacing, Typography } from '../constants/theme';
 
 interface Props {
   title?: string;
@@ -60,8 +62,8 @@ export default function UnauthorizedScreen({
 
         {requiredPermission && (
           <View style={[styles.permPill, { backgroundColor: colors.bg.secondary, borderColor: colors.border }]}>
-            <Text style={{ fontSize: 11, color: colors.text.muted }}>Required Permission Badge:</Text>
-            <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>{requiredPermission}</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.muted }}>Required Permission Badge:</Text>
+            <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>{requiredPermission}</Text>
           </View>
         )}
 
@@ -122,24 +124,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 10,
   },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  description: {
-    fontSize: 13,
-    lineHeight: 20,
-    textAlign: 'center',
-    maxWidth: 420,
-    marginBottom: 16,
-  },
+  badgeText: { ...Typography.caption, fontWeight: '800' },
+  title: { ...Typography.h1, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  description: { ...Typography.bodySm, textAlign: 'center', maxWidth: 420, marginBottom: 16 },
   permPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -164,11 +151,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
   },
-  primaryBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
+  primaryBtnText: { ...Typography.bodySm, color: '#ffffff', fontWeight: '800' },
   secondaryBtn: {
     flex: 1,
     height: 42,
@@ -180,8 +163,5 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
   },
-  secondaryBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
+  secondaryBtnText: { ...Typography.bodySm, fontWeight: '800' },
 });

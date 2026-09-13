@@ -1,17 +1,16 @@
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
-  ActivityIndicator, Modal, RefreshControl, useWindowDimensions,
-  Platform, Pressable
-} from 'react-native';
+import { View, StyleSheet, ScrollView, ActivityIndicator, Modal, RefreshControl, useWindowDimensions, Platform, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { api, MedicalRepresentative, MrDailyLog, MrVisit, MrAssignment, Doctor, MrExpense, MrDashboardSummary, Product } from '../utils/api';
-import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
-import { WorkspaceHeader, WorkspaceTabs } from '../components/WorkspacePrimitives';
+import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
+import { WorkspaceHeader, WorkspaceTabs, WorkspaceLoading, StatusPill, EmptyState, WorkspaceTransition } from './../components/WorkspacePrimitives';
 
 type Tab = 'dashboard' | 'mrs' | 'portfolio' | 'attendance' | 'visits' | 'expenses';
 
@@ -527,10 +526,7 @@ export default function MedicalRepsScreen() {
     const activeMRs = mrs.filter(m => m.isActive);
     if (activeMRs.length === 0) {
       return (
-        <View style={styles.emptyInlineCard}>
-          <Ionicons name="information-circle-outline" size={20} color={colors.text.muted} />
-          <Text style={styles.emptyInlineText}>No active Medical Representatives found.</Text>
-        </View>
+        <EmptyState title={<>No active Medical Representatives found.</>}  />
       );
     }
     return (
@@ -566,8 +562,8 @@ export default function MedicalRepsScreen() {
     if (!dashboard) {
       return (
         <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ marginTop: 12, color: colors.text.muted, fontSize: 13, fontWeight: '600' }}>Calculating Field Performance & Analytics...</Text>
+          <WorkspaceLoading />
+          <Text style={{ ...Typography.bodySm, marginTop: 12, color: colors.text.muted, fontWeight: '600' }}>Calculating Field Performance & Analytics...</Text>
         </View>
       );
     }
@@ -578,7 +574,7 @@ export default function MedicalRepsScreen() {
         <View style={styles.heroFilterBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>Performance Window:</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>Performance Window:</Text>
           </View>
           <View style={styles.segmentedControl}>
             {[
@@ -646,18 +642,14 @@ export default function MedicalRepsScreen() {
             </View>
             <View>
               <Text style={styles.kpiLabel}>DISTANCE COVERED</Text>
-              <Text style={[styles.kpiValue, { color: colors.info }]}>{(totals.distance || 0).toFixed(0)} <Text style={{ fontSize: 14 }}>km</Text></Text>
+              <Text style={[styles.kpiValue, { color: colors.info }]}>{(totals.distance || 0).toFixed(0)} <Text style={{ ...Typography.body }}>km</Text></Text>
             </View>
           </View>
         </View>
 
         {/* MR Performance Breakdown */}
         {mrData.length === 0 ? (
-          <View style={styles.emptyCardContainer}>
-            <Ionicons name="analytics-outline" size={40} color={colors.text.muted} />
-            <Text style={styles.emptyCardTitle}>No Activity Records</Text>
-            <Text style={styles.emptyCardSubtitle}>No doctor visits or field logs recorded for the selected window.</Text>
-          </View>
+          <EmptyState title={<>No Activity Records</>} message={<>No doctor visits or field logs recorded for the selected window.</>} />
         ) : (
           <View style={{ marginTop: Spacing.md }}>
             <View style={styles.sectionHeaderRow}>
@@ -678,11 +670,9 @@ export default function MedicalRepsScreen() {
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Text style={styles.mrNameText}>{m.name}</Text>
-                        <View style={[styles.roiBadge, { backgroundColor: Number(roi) > 0 ? colors.successLight : colors.warningLight }]}>
-                          <Text style={[styles.roiBadgeText, { color: Number(roi) > 0 ? colors.success : colors.warning }]}>
+                        <StatusPill  label={<>
                             ROI: {roi}%
-                          </Text>
-                        </View>
+                          </>} textStyle={[styles.roiBadgeText, { color: Number(roi) > 0 ? colors.success : colors.warning }]} />
                       </View>
                       <Text style={styles.mrSubText}>
                         {m.territory || 'Headquarters'}  •  Target: <Text style={{ fontWeight: '700', color: colors.text.primary }}>₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
@@ -693,8 +683,8 @@ export default function MedicalRepsScreen() {
                   {/* Target Achievement Progress Bar */}
                   <View style={{ marginTop: 12, marginBottom: 12 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted }}>MONTHLY TARGET PROGRESS</Text>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>{targetAchievement}% Achieved</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.muted }}>MONTHLY TARGET PROGRESS</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>{targetAchievement}% Achieved</Text>
                     </View>
                     <View style={styles.progressBarTrack}>
                       <View style={[styles.progressBarFill, { width: `${targetAchievement}%`, backgroundColor: targetAchievement >= 100 ? colors.success : colors.primary }]} />
@@ -757,10 +747,14 @@ export default function MedicalRepsScreen() {
           />
         </View>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
-        <View style={styles.cardsGrid}>
-          {mrs.map(m => (
-            <View key={m._id} style={[styles.mrDirectoryCard, !m.isActive && { opacity: 0.7 }]}>
+      <FlatList
+        data={mrs}
+        keyExtractor={(m) => m._id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.cardsGrid}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        renderItem={({ item: m }) => (
+            <View key={m._id} style={[styles.mrDirectoryCard, !m.isActive && { opacity: 0.7 }]}> 
               <View style={styles.directoryCardHeader}>
                 <View style={[styles.avatarLarge, { backgroundColor: m.isActive ? colors.primary + '15' : colors.text.muted + '15', borderColor: m.isActive ? colors.primary : colors.text.muted }]}>
                   <Text style={[styles.avatarLargeText, { color: m.isActive ? colors.primary : colors.text.muted }]}>{m.name.charAt(0)}</Text>
@@ -768,11 +762,11 @@ export default function MedicalRepsScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <Text style={styles.mrDirectoryName}>{m.name}</Text>
-                    {m.code ? <View style={styles.codePill}><Text style={styles.codePillText}>{m.code}</Text></View> : null}
+                    {m.code ? <StatusPill  label={<>{m.code}</>} textStyle={styles.codePillText} /> : null}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                     <View style={[styles.statusDot, { backgroundColor: m.isActive ? colors.success : colors.danger }]} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: m.isActive ? colors.success : colors.danger }}>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: m.isActive ? colors.success : colors.danger }}>
                       {m.isActive ? 'Active' : 'Inactive'}
                     </Text>
                   </View>
@@ -816,20 +810,12 @@ export default function MedicalRepsScreen() {
               </View>
 
               {m.notes ? (
-                <Text style={styles.directoryNotesText} numberOfLines={2}>📝 {m.notes}</Text>
+                <Text style={styles.directoryNotesText} numberOfLines={2}>{m.notes}</Text>
               ) : null}
             </View>
-          ))}
-        </View>
-
-        {mrs.length === 0 && (
-          <View style={styles.emptyCardContainer}>
-            <Ionicons name="people-outline" size={40} color={colors.text.muted} />
-            <Text style={styles.emptyCardTitle}>No Medical Representatives Found</Text>
-            <Text style={styles.emptyCardSubtitle}>Add your first representative to start tracking visits, targets and field activity.</Text>
-          </View>
         )}
-      </ScrollView>
+        ListEmptyComponent={<EmptyState title={<>No Medical Representatives Found</>} message={<>Add your first representative to start tracking visits, targets and field activity.</>} />}
+      />
 
       {/* Modal: Add/Edit MR */}
       <Modal visible={mrModal} animationType="fade" transparent onRequestClose={() => setMrModal(false)}>
@@ -917,8 +903,8 @@ export default function MedicalRepsScreen() {
           {/* Action Header for Field Attendance */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, backgroundColor: colors.bg.card, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
             <View>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>FIELD ATTENDANCE & ODOMETER</Text>
-              <Text style={{ fontSize: 11, color: colors.text.secondary }}>Track daily check-in, check-out times & travel KM</Text>
+              <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>FIELD ATTENDANCE & ODOMETER</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Track daily check-in, check-out times & travel KM</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {perm.can('mr:attendance') && (
@@ -928,14 +914,14 @@ export default function MedicalRepsScreen() {
                     onPress={handleOpenCheckInModal}
                   >
                     <Ionicons name="enter-outline" size={15} color="#fff" />
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Check-In</Text>
+                    <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Check-In</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.primaryCtaBtn, { height: 32, paddingHorizontal: 10, backgroundColor: colors.warning }]}
                     onPress={handleOpenCheckOutModal}
                   >
                     <Ionicons name="exit-outline" size={15} color="#fff" />
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Check-Out</Text>
+                    <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Check-Out</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -950,7 +936,7 @@ export default function MedicalRepsScreen() {
                   <View style={styles.attendanceCardHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>
+                      <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>
                         {new Date(log.date).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
                       </Text>
                     </View>
@@ -978,7 +964,7 @@ export default function MedicalRepsScreen() {
                           onPress={() => Platform.OS === 'web' && window.open(`https://www.google.com/maps?q=${log.checkIn?.latitude},${log.checkIn?.longitude}`, '_blank')}
                         >
                           <Ionicons name="location" size={12} color={colors.primary} />
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>
                             GPS: {log.checkIn.latitude.toFixed(4)}, {log.checkIn.longitude.toFixed(4)} (Open Map)
                           </Text>
                         </TouchableOpacity>
@@ -1000,7 +986,7 @@ export default function MedicalRepsScreen() {
                           onPress={() => Platform.OS === 'web' && window.open(`https://www.google.com/maps?q=${log.checkOut?.latitude},${log.checkOut?.longitude}`, '_blank')}
                         >
                           <Ionicons name="location" size={12} color={colors.warning} />
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: colors.warning }}>
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.warning }}>
                             GPS: {log.checkOut.latitude.toFixed(4)}, {log.checkOut.longitude.toFixed(4)} (Open Map)
                           </Text>
                         </TouchableOpacity>
@@ -1015,7 +1001,7 @@ export default function MedicalRepsScreen() {
                       {(log.startKmReading || log.endKmReading) ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                           <Ionicons name="speedometer-outline" size={14} color={colors.text.primary} />
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                             Odometer: <Text style={{ color: colors.text.muted }}>{log.startKmReading || 0} km</Text>
                             <Text style={{ color: colors.text.muted }}> → </Text>
                             <Text style={{ color: colors.text.muted }}>{log.endKmReading || '—'} km</Text>
@@ -1029,7 +1015,7 @@ export default function MedicalRepsScreen() {
                       {log.gpsDistance ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                           <Ionicons name="navigate-outline" size={14} color={colors.success} />
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                             GPS Distance (straight line): <Text style={{ color: colors.success, fontWeight: '800' }}>{log.gpsDistance} km</Text>
                           </Text>
                         </View>
@@ -1042,7 +1028,7 @@ export default function MedicalRepsScreen() {
                           return (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.warningLight, paddingVertical: 4, paddingHorizontal: 8, borderRadius: Radius.sm }}>
                               <Ionicons name="warning-outline" size={13} color={colors.warning} />
-                              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.warning }}>
+                              <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.warning }}>
                                 Odometer vs GPS differs by {pct.toFixed(0)}% — please verify
                               </Text>
                             </View>
@@ -1057,20 +1043,12 @@ export default function MedicalRepsScreen() {
             })}
 
             {attendanceLogs.length === 0 && (
-              <View style={styles.emptyCardContainer}>
-                <Ionicons name="calendar-outline" size={40} color={colors.text.muted} />
-                <Text style={styles.emptyCardTitle}>No Attendance Records</Text>
-                <Text style={styles.emptyCardSubtitle}>Selected MR has not submitted any field check-ins yet.</Text>
-              </View>
+              <EmptyState title={<>No Attendance Records</>} message={<>Selected MR has not submitted any field check-ins yet.</>} />
             )}
           </View>
         </ScrollView>
       ) : (
-        <View style={styles.emptyCardContainer}>
-          <Ionicons name="hand-left-outline" size={40} color={colors.text.muted} />
-          <Text style={styles.emptyCardTitle}>Select a Medical Representative</Text>
-          <Text style={styles.emptyCardSubtitle}>Choose an MR from the chips above to inspect field attendance.</Text>
-        </View>
+        <EmptyState title={<>Select a Medical Representative</>} message={<>Choose an MR from the chips above to inspect field attendance.</>} />
       )}
 
       {/* Modal: Field Check-In */}
@@ -1088,7 +1066,7 @@ export default function MedicalRepsScreen() {
               <View style={{ backgroundColor: (checkInForm.latitude && checkInForm.longitude) ? colors.success + '15' : colors.primary + '15', padding: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: (checkInForm.latitude && checkInForm.longitude) ? colors.success + '30' : colors.primary + '30', marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="location" size={16} color={(checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary} />
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: (checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: (checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary }}>
                     {(checkInForm.latitude && checkInForm.longitude)
                       ? `GPS acquired: ${checkInForm.latitude.toFixed(4)}, ${checkInForm.longitude.toFixed(4)}`
                       : 'Acquiring device GPS location...'}
@@ -1141,7 +1119,7 @@ export default function MedicalRepsScreen() {
               <View style={{ backgroundColor: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success + '15' : colors.warning + '15', padding: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success + '30' : colors.warning + '30', marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="location" size={16} color={(checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning} />
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning }}>
                     {(checkOutForm.latitude && checkOutForm.longitude)
                       ? `GPS acquired: ${checkOutForm.latitude.toFixed(4)}, ${checkOutForm.longitude.toFixed(4)}`
                       : 'Acquiring device GPS location...'}
@@ -1177,8 +1155,8 @@ export default function MedicalRepsScreen() {
                     if (gpsDist > 0) {
                       const suggestedEnd = todayLog.startKmReading + gpsDist;
                       return (
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.info, marginTop: 4 }}>
-                          📡 GPS suggests ~{gpsDist} km travelled. Estimated end: {suggestedEnd} km
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.info, marginTop: 4 }}>
+                           GPS suggests ~{gpsDist} km travelled. Estimated end: {suggestedEnd} km
                         </Text>
                       );
                     }
@@ -1220,29 +1198,27 @@ export default function MedicalRepsScreen() {
                     <Ionicons name="person-outline" size={18} color={colors.success} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>{v.doctorName}</Text>
-                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>
+                    <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>{v.doctorName}</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>
                       {v.clinicName} {v.specialization ? `(${v.specialization})` : ''} {v.city ? `• ${v.city}` : ''}
                     </Text>
                   </View>
 
-                  <View style={[styles.statusBadgePill, { backgroundColor: v.purpose === 'promotion' ? colors.primaryLight : colors.warningLight }]}>
-                    <Text style={[styles.statusBadgePillText, { color: v.purpose === 'promotion' ? colors.primary : colors.warning }]}>
+                  <StatusPill  label={<>
                       {v.purpose.toUpperCase()}
-                    </Text>
-                  </View>
+                    </>} textStyle={[styles.statusBadgePillText, { color: v.purpose === 'promotion' ? colors.primary : colors.warning }]} />
                 </View>
 
                 <View style={styles.visitCardMetaRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="calendar-outline" size={13} color={colors.text.muted} />
-                    <Text style={{ fontSize: 12, color: colors.text.muted }}>{new Date(v.date).toLocaleDateString('en-IN')}</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.muted }}>{new Date(v.date).toLocaleDateString('en-IN')}</Text>
                   </View>
 
                   {v.checkIn?.time ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Ionicons name="time-outline" size={13} color={colors.text.muted} />
-                      <Text style={{ fontSize: 12, color: colors.text.muted }}>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.muted }}>
                         {new Date(v.checkIn.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                       </Text>
                     </View>
@@ -1251,26 +1227,24 @@ export default function MedicalRepsScreen() {
                   {v.orderTaken ? (
                     <View style={[styles.statusBadgePill, { backgroundColor: colors.successLight }]}>
                       <Ionicons name="checkmark-circle" size={12} color={colors.success} />
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.success }}>
+                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.success }}>
                         Order: ₹{(v.orderAmount || 0).toLocaleString('en-IN')}
                       </Text>
                     </View>
                   ) : (
-                    <View style={[styles.statusBadgePill, { backgroundColor: colors.bg.secondary }]}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.muted }}>No Order Taken</Text>
-                    </View>
+                    <StatusPill  label={<>No Order Taken</>} textStyle={{ ...Typography.caption, fontWeight: '600', color: colors.text.muted }} />
                   )}
                 </View>
 
                 {v.sampleDetails && v.sampleDetails.length > 0 && (
                   <View style={{ marginTop: 8, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, padding: 8, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary, marginBottom: 4 }}>
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary, marginBottom: 4 }}>
                       FREE SAMPLES DISTRIBUTED
                     </Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                       {v.sampleDetails.map((s: any, idx: number) => (
                         <View key={idx} style={{ backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.sm }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                          <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
                             {s.productId?.name || s.name || 'Sample Product'} × {s.qty || 1}
                           </Text>
                         </View>
@@ -1281,28 +1255,20 @@ export default function MedicalRepsScreen() {
 
                 {v.feedback ? (
                   <View style={styles.feedbackBox}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>DOCTOR FEEDBACK</Text>
-                    <Text style={{ fontSize: 12, color: colors.text.primary, marginTop: 2 }}>{v.feedback}</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>DOCTOR FEEDBACK</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.primary, marginTop: 2 }}>{v.feedback}</Text>
                   </View>
                 ) : null}
               </View>
             ))}
 
             {visits.length === 0 && (
-              <View style={styles.emptyCardContainer}>
-                <Ionicons name="medkit-outline" size={40} color={colors.text.muted} />
-                <Text style={styles.emptyCardTitle}>No Doctor Visits Recorded</Text>
-                <Text style={styles.emptyCardSubtitle}>No doctor calls or clinic visits logged for this Medical Representative.</Text>
-              </View>
+              <EmptyState title={<>No Doctor Visits Recorded</>} message={<>No doctor calls or clinic visits logged for this Medical Representative.</>} />
             )}
           </View>
         </ScrollView>
       ) : (
-        <View style={styles.emptyCardContainer}>
-          <Ionicons name="hand-left-outline" size={40} color={colors.text.muted} />
-          <Text style={styles.emptyCardTitle}>Select a Medical Representative</Text>
-          <Text style={styles.emptyCardSubtitle}>Choose an MR from above to view their recorded clinic visits.</Text>
-        </View>
+        <EmptyState title={<>Select a Medical Representative</>} message={<>Choose an MR from above to view their recorded clinic visits.</>} />
       )}
 
       {/* Modal: Add Visit */}
@@ -1318,10 +1284,10 @@ export default function MedicalRepsScreen() {
             <ScrollView style={{ padding: Spacing.lg }}>
               {/* Mandatory GPS Location Capture Section */}
               <View style={{ backgroundColor: (visitForm.latitude && visitForm.longitude) ? colors.success + '10' : colors.primary + '10', padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: (visitForm.latitude && visitForm.longitude) ? colors.success + '30' : colors.primary + '30', marginBottom: 16 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: (visitForm.latitude && visitForm.longitude) ? colors.success : colors.primary, marginBottom: 4 }}>
+                <Text style={{ ...Typography.caption, fontWeight: '800', color: (visitForm.latitude && visitForm.longitude) ? colors.success : colors.primary, marginBottom: 4 }}>
                   CLINIC GPS LOCATION *
                 </Text>
-                <Text style={{ fontSize: 10, color: colors.text.secondary, marginBottom: 10 }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginBottom: 10 }}>
                   Doctor visit records cannot be saved without logging physical GPS coordinates.
                 </Text>
 
@@ -1343,7 +1309,7 @@ export default function MedicalRepsScreen() {
                     size={18}
                     color="#fff"
                   />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: '#fff' }}>
                     {(visitForm.latitude && visitForm.longitude)
                       ? `GPS logged: ${visitForm.latitude.toFixed(4)}, ${visitForm.longitude.toFixed(4)}`
                       : 'Log GPS clinic location *'}
@@ -1387,8 +1353,8 @@ export default function MedicalRepsScreen() {
                           }}
                           onPress={() => handleSelectDoctorSuggestion(doc)}
                         >
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{doc.name}</Text>
-                          <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{doc.name}</Text>
+                          <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                             {[doc.clinicName, doc.specialization, doc.city].filter(Boolean).join(' • ')}
                           </Text>
                         </TouchableOpacity>
@@ -1426,25 +1392,13 @@ export default function MedicalRepsScreen() {
 
               {/* Free Samples Distribution Dropdown Selector */}
               <View style={[styles.formField, { backgroundColor: colors.bg.secondary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }]}>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 8 }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginBottom: 8 }}>
                   ADD FREE SAMPLES (CREATES SAMPLE CHALLAN & DEDUCTS INVENTORY)
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   {Platform.OS === 'web' ? (
                     <select
-                      style={{
-                        flex: 1,
-                        minWidth: 180,
-                        height: 38,
-                        borderRadius: Radius.md,
-                        borderColor: colors.border,
-                        borderWidth: 1,
-                        backgroundColor: colors.bg.card,
-                        color: colors.text.primary,
-                        paddingLeft: 10,
-                        fontSize: 13,
-                        outline: 'none'
-                      }}
+                      style={{ ...Typography.bodySm, flex: 1, minWidth: 180, height: 38, borderRadius: Radius.md, borderColor: colors.border, borderWidth: 1, backgroundColor: colors.bg.card, color: colors.text.primary, paddingLeft: 10, outline: 'none' }}
                       value={sampleProdId}
                       onChange={(e) => setSampleProdId(e.target.value)}
                     >
@@ -1479,21 +1433,21 @@ export default function MedicalRepsScreen() {
                     activeOpacity={0.8}
                   >
                     <Ionicons name="add-circle-outline" size={16} color="#fff" />
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Add Sample</Text>
+                    <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Add Sample</Text>
                   </TouchableOpacity>
                 </View>
 
                 {visitForm.sampleDetails.length > 0 && (
                   <View style={{ gap: 6, marginTop: 12 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted }}>ADDED SAMPLES LIST:</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.muted }}>ADDED SAMPLES LIST:</Text>
                     {visitForm.sampleDetails.map((s, idx) => (
                       <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, flex: 1 }}>{s.name}</Text>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, flex: 1 }}>{s.name}</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                           <TouchableOpacity style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }} onPress={() => handleUpdateSampleQty(s.productId, -1)}>
                             <Ionicons name="remove" size={14} color={colors.text.primary} />
                           </TouchableOpacity>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary, minWidth: 20, textAlign: 'center' }}>{s.qty}</Text>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, minWidth: 20, textAlign: 'center' }}>{s.qty}</Text>
                           <TouchableOpacity style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }} onPress={() => handleUpdateSampleQty(s.productId, 1)}>
                             <Ionicons name="add" size={14} color={colors.text.primary} />
                           </TouchableOpacity>
@@ -1508,10 +1462,10 @@ export default function MedicalRepsScreen() {
               </View>
 
               <View style={[styles.formField, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.bg.secondary, padding: 10, borderRadius: Radius.md }]}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>Was an order booked during this call?</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>Was an order booked during this call?</Text>
                 <TouchableOpacity style={[styles.chipPill, visitForm.orderTaken && { backgroundColor: colors.success }]} onPress={() => setVisitForm({ ...visitForm, orderTaken: !visitForm.orderTaken })}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: visitForm.orderTaken ? '#fff' : colors.text.primary }}>
-                    {visitForm.orderTaken ? '✓ YES, ORDER BOOKED' : 'NO ORDER'}
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: visitForm.orderTaken ? '#fff' : colors.text.primary }}>
+                    {visitForm.orderTaken ? ' YES, ORDER BOOKED' : 'NO ORDER'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1561,7 +1515,7 @@ export default function MedicalRepsScreen() {
             <Ionicons name="options-outline" size={20} color={colors.primary} />
             <Text style={styles.infoBannerText}>One MR can have multiple doctors, chemists, stockists, institutions and distributors. Assignments can be primary, secondary or temporary and can carry their own area, priority and visit-day rules.</Text>
           </View>
-          {Object.keys(grouped).length === 0 ? <View style={styles.emptyCardContainer}><Ionicons name="briefcase-outline" size={40} color={colors.text.muted} /><Text style={styles.emptyCardTitle}>No portfolio assignments</Text><Text style={styles.emptyCardSubtitle}>Start by assigning a doctor, chemist, stockist or another field account.</Text></View> : Object.entries(grouped).map(([type, list]) => (
+          {Object.keys(grouped).length === 0 ? <EmptyState title={<>No portfolio assignments</>} message={<>Start by assigning a doctor, chemist, stockist or another field account.</>} /> : Object.entries(grouped).map(([type, list]) => (
             <View key={type} style={styles.sectionCard}>
               <Text style={styles.cardTitle}>{type.charAt(0).toUpperCase()+type.slice(1)}s ({list.length})</Text>
               {list.map(a => <View key={a._id} style={styles.assignmentRow}>
@@ -1604,15 +1558,15 @@ export default function MedicalRepsScreen() {
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
                 <View style={[styles.kpiCard, { flex: 1, padding: 12, backgroundColor: colors.bg.card }]}>
                   <Text style={styles.kpiLabel}>TOTAL CLAIMED</Text>
-                  <Text style={[styles.kpiValue, { fontSize: 16, color: colors.primary }]}>₹{total.toLocaleString('en-IN')}</Text>
+                  <Text style={[styles.kpiValue, { ...Typography.h3, color: colors.primary }]}>₹{total.toLocaleString('en-IN')}</Text>
                 </View>
                 <View style={[styles.kpiCard, { flex: 1, padding: 12, backgroundColor: colors.bg.card }]}>
                   <Text style={styles.kpiLabel}>APPROVED</Text>
-                  <Text style={[styles.kpiValue, { fontSize: 16, color: colors.success }]}>₹{approved.toLocaleString('en-IN')}</Text>
+                  <Text style={[styles.kpiValue, { ...Typography.h3, color: colors.success }]}>₹{approved.toLocaleString('en-IN')}</Text>
                 </View>
                 <View style={[styles.kpiCard, { flex: 1, padding: 12, backgroundColor: colors.bg.card }]}>
                   <Text style={styles.kpiLabel}>PENDING APPROVAL</Text>
-                  <Text style={[styles.kpiValue, { fontSize: 16, color: colors.warning }]}>₹{pending.toLocaleString('en-IN')}</Text>
+                  <Text style={[styles.kpiValue, { ...Typography.h3, color: colors.warning }]}>₹{pending.toLocaleString('en-IN')}</Text>
                 </View>
               </View>
             );
@@ -1653,15 +1607,15 @@ export default function MedicalRepsScreen() {
 
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary, textTransform: 'capitalize' }}>{e.category} Claim</Text>
-                        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>₹{e.amount.toLocaleString('en-IN')}</Text>
+                        <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary, textTransform: 'capitalize' }}>{e.category} Claim</Text>
+                        <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary }}>₹{e.amount.toLocaleString('en-IN')}</Text>
                       </View>
                       {mrName ? (
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, marginTop: 2 }}>
+                        <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary, marginTop: 2 }}>
                           {mrName}
                         </Text>
                       ) : null}
-                      <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 2 }}>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginTop: 2 }}>
                         Submitted on {new Date(e.date).toLocaleDateString('en-IN')} {e.description ? `• ${e.description}` : ''}
                       </Text>
                     </View>
@@ -1677,11 +1631,11 @@ export default function MedicalRepsScreen() {
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         <TouchableOpacity style={[styles.miniApproveBtn, { backgroundColor: colors.success }]} onPress={() => handleApproveExpense(e._id, 'approved')}>
                           <Ionicons name="checkmark" size={14} color="#fff" />
-                          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Approve</Text>
+                          <Text style={{ ...Typography.caption, color: '#fff', fontWeight: '700' }}>Approve</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.miniApproveBtn, { backgroundColor: colors.danger }]} onPress={() => handleApproveExpense(e._id, 'rejected')}>
                           <Ionicons name="close" size={14} color="#fff" />
-                          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Reject</Text>
+                          <Text style={{ ...Typography.caption, color: '#fff', fontWeight: '700' }}>Reject</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1691,20 +1645,12 @@ export default function MedicalRepsScreen() {
             })}
 
             {expenses.length === 0 && (
-              <View style={styles.emptyCardContainer}>
-                <Ionicons name="wallet-outline" size={40} color={colors.text.muted} />
-                <Text style={styles.emptyCardTitle}>No Expense Claims</Text>
-                <Text style={styles.emptyCardSubtitle}>No travel or field expenses logged for this Medical Representative.</Text>
-              </View>
+              <EmptyState title={<>No Expense Claims</>} message={<>No travel or field expenses logged for this Medical Representative.</>} />
             )}
           </View>
         </ScrollView>
       ) : (
-        <View style={styles.emptyCardContainer}>
-          <Ionicons name="hand-left-outline" size={40} color={colors.text.muted} />
-          <Text style={styles.emptyCardTitle}>Select a Medical Representative</Text>
-          <Text style={styles.emptyCardSubtitle}>Choose an MR from above to inspect their submitted expense claims.</Text>
-        </View>
+        <EmptyState title={<>Select a Medical Representative</>} message={<>Choose an MR from above to inspect their submitted expense claims.</>} />
       )}
 
       {/* Modal: Add Expense */}
@@ -1771,14 +1717,14 @@ export default function MedicalRepsScreen() {
         onChange={setActiveTab}
       />
 
-      <View style={styles.mainScreenContainer}>
+      <WorkspaceTransition value={activeTab} style={styles.mainScreenContainer}>
         {activeTab === 'dashboard' && renderDashboard()}
         {activeTab === 'mrs' && renderMrList()}
         {activeTab === 'portfolio' && renderPortfolio()}
         {activeTab === 'attendance' && renderAttendance()}
         {activeTab === 'visits' && renderVisits()}
         {activeTab === 'expenses' && renderExpenses()}
-      </View>
+      </WorkspaceTransition>
     </View>
   );
 }
@@ -1811,11 +1757,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   subNavTabActive: {
     backgroundColor: colors.primaryLight,
   },
-  subNavTabText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
+  subNavTabText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   subNavTabTextActive: {
     color: colors.primary,
   },
@@ -1828,11 +1770,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  primaryCtaBtnText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  primaryCtaBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
 
   mainScreenContainer: {
     flex: 1,
@@ -1853,16 +1791,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     marginBottom: 2,
     flexWrap: 'wrap',
   },
-  pageSectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  pageSectionSubtitle: {
-    fontSize: 12,
-    color: colors.text.muted,
-    marginTop: 2,
-  },
+  pageSectionTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  pageSectionSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   searchBox: {
     minWidth: 220,
     maxWidth: 380,
@@ -1870,19 +1800,15 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    height: 38,
+    minHeight: 44,
+    height: 44,
     paddingHorizontal: 11,
     borderRadius: Radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.bg.card,
   },
-  searchInput: {
-    flex: 1,
-    height: 38,
-    fontSize: 12,
-    color: colors.text.primary,
-  },
+  searchInput: { ...Typography.bodySm, flex: 1, minHeight: 44, height: 44, color: colors.text.primary },
 
   loadingBox: {
     alignItems: 'center',
@@ -1900,13 +1826,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     marginBottom: Spacing.md,
     ...Shadows.card,
   },
-  selectorLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.text.muted,
-    letterSpacing: 0.55,
-    marginBottom: 8,
-  },
+  selectorLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginBottom: 8 },
   mrSelectorChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1930,23 +1850,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mrSelectorAvatarText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.primary,
-  },
-  mrSelectorChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
+  mrSelectorAvatarText: { ...Typography.bodySm, fontWeight: '800', color: colors.primary },
+  mrSelectorChipText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   mrSelectorChipTextActive: {
     color: '#fff',
   },
-  mrSelectorChipSub: {
-    fontSize: 9,
-    color: colors.text.muted,
-  },
+  mrSelectorChipSub: { ...Typography.eyebrow, color: colors.text.muted },
 
   // Hero Filter Bar & Segmented Control
   heroFilterBar: {
@@ -1979,11 +1888,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   segmentedBtnActive: {
     backgroundColor: colors.primary,
   },
-  segmentedBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.secondary,
-  },
+  segmentedBtnText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
   segmentedBtnTextActive: {
     color: '#fff',
   },
@@ -2014,33 +1919,15 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  kpiLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.text.muted,
-    letterSpacing: 0.5,
-  },
-  kpiValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    marginTop: 2,
-  },
+  kpiLabel: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },
+  kpiValue: { ...Typography.h2, fontWeight: '800', marginTop: 2 },
 
   // Performance Card
   sectionHeaderRow: {
     marginBottom: Spacing.sm,
   },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.text.muted,
-    letterSpacing: 0.8,
-  },
-  sectionSubtitle: {
-    fontSize: 11,
-    color: colors.text.muted,
-    marginTop: 1,
-  },
+  sectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.muted },
+  sectionSubtitle: { ...Typography.caption, color: colors.text.muted, marginTop: 1 },
   performanceCard: {
     backgroundColor: colors.bg.card,
     borderRadius: Radius.lg,
@@ -2062,29 +1949,15 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLargeText: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  mrNameText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  mrSubText: {
-    fontSize: 11,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
+  avatarLargeText: { ...Typography.h2, fontWeight: '800' },
+  mrNameText: { ...Typography.body, fontWeight: '800', color: colors.text.primary },
+  mrSubText: { ...Typography.caption, color: colors.text.secondary, marginTop: 2 },
   roiBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
-  roiBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
+  roiBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
   progressBarTrack: {
     height: 6,
     borderRadius: 3,
@@ -2107,17 +1980,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     minWidth: 70,
     alignItems: 'center',
   },
-  statGridValue: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  statGridLabel: {
-    fontSize: 9,
-    color: colors.text.muted,
-    fontWeight: '600',
-    marginTop: 2,
-  },
+  statGridValue: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
+  statGridLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600', marginTop: 2 },
 
   // MR Directory Cards
   cardsGrid: {
@@ -2138,11 +2002,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  mrDirectoryName: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
+  mrDirectoryName: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   codePill: {
     backgroundColor: colors.bg.secondary,
     borderWidth: 1,
@@ -2151,11 +2011,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 1,
     borderRadius: 4,
   },
-  codePillText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.text.secondary,
-  },
+  codePillText: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.secondary },
   statusDot: {
     width: 6,
     height: 6,
@@ -2180,16 +2036,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  directoryInfoText: {
-    fontSize: 12,
-    color: colors.text.primary,
-  },
-  directoryNotesText: {
-    fontSize: 11,
-    color: colors.text.muted,
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
+  directoryInfoText: { ...Typography.bodySm, color: colors.text.primary },
+  directoryNotesText: { ...Typography.caption, color: colors.text.muted, fontStyle: 'italic', marginTop: 8 },
 
   // Attendance
   attendanceCard: {
@@ -2215,10 +2063,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.sm,
     justifyContent: 'center',
   },
-  statusBadgePillText: {
-    fontSize: 9,
-    fontWeight: '800',
-  },
+  statusBadgePillText: { ...Typography.eyebrow, fontWeight: '800' },
   timeTimelineGrid: {
     flexDirection: 'row',
     gap: 10,
@@ -2229,22 +2074,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.sm,
     padding: 10,
   },
-  timeBoxLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.text.muted,
-  },
-  timeBoxValue: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.text.primary,
-    marginTop: 4,
-  },
-  timeBoxSub: {
-    fontSize: 10,
-    color: colors.text.muted,
-    marginTop: 2,
-  },
+  timeBoxLabel: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },
+  timeBoxValue: { ...Typography.body, fontWeight: '800', color: colors.text.primary, marginTop: 4 },
+  timeBoxSub: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
   distanceFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2308,11 +2140,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  filterChipItemText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.secondary,
-  },
+  filterChipItemText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
   filterChipItemTextActive: {
     color: '#fff',
   },
@@ -2359,16 +2187,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     gap: 7,
     ...Shadows.card,
   },
-  emptyCardTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  emptyCardSubtitle: {
-    fontSize: 12,
-    color: colors.text.muted,
-    textAlign: 'center',
-  },
+  emptyCardTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  emptyCardSubtitle: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center' },
   emptyInlineCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2380,10 +2200,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderColor: colors.border,
     marginBottom: Spacing.md,
   },
-  emptyInlineText: {
-    fontSize: 12,
-    color: colors.text.muted,
-  },
+  emptyInlineText: { ...Typography.bodySm, color: colors.text.muted },
 
   // Modal Styles
   modalOverlay: {
@@ -2414,30 +2231,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.bg.card,
   },
-  modalTitleText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
+  modalTitleText: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   formField: {
     marginBottom: 12,
   },
-  fieldLabelText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  fieldInput: {
-    backgroundColor: colors.bg.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: 12,
-    minHeight: 42,
-    fontSize: 13,
-    color: colors.text.primary,
-  },
+  fieldLabelText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 4 },
+  fieldInput: { ...Typography.bodySm, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, minHeight: 42, color: colors.text.primary },
   chipPill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -2450,11 +2249,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  chipPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.text.secondary,
-  },
+  chipPillText: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary },
   chipPillTextActive: {
     color: '#fff',
   },
@@ -2469,12 +2264,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary + '30',
   },
-  infoBannerText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.text.secondary,
-  },
+  infoBannerText: { ...Typography.bodySm, flex: 1, color: colors.text.secondary },
   sectionCard: {
     marginBottom: Spacing.md,
     padding: Spacing.md,
@@ -2483,12 +2273,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  cardTitle: {
-    marginBottom: 8,
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
+  cardTitle: { ...Typography.bodySm, marginBottom: 8, fontWeight: '800', color: colors.text.primary },
   assignmentRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2505,16 +2290,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.primaryLight,
   },
-  assignmentName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  assignmentMeta: {
-    marginTop: 2,
-    fontSize: 11,
-    color: colors.text.muted,
-  },
+  assignmentName: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  assignmentMeta: { ...Typography.caption, marginTop: 2, color: colors.text.muted },
   choiceRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2533,12 +2310,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  choicePillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.secondary,
-    textTransform: 'capitalize',
-  },
+  choicePillText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'capitalize' },
   choicePillTextActive: {
     color: '#fff',
   },
@@ -2559,20 +2331,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  modalCancelBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.secondary,
-  },
+  modalCancelBtnText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
   modalSubmitBtn: {
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: Radius.sm,
     backgroundColor: colors.primary,
   },
-  modalSubmitBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-  },
+  modalSubmitBtnText: { ...Typography.bodySm, fontWeight: '700', color: '#fff' },
 });

@@ -30,7 +30,7 @@ export function TableSkeleton({ rows = 6, columns = 4 }: TableSkeletonProps) {
             key={`row-${rowIdx}`} 
             style={[
               styles.row, 
-              { borderBottomColor: colors.border + '50' }
+              { borderBottomColor: colors.border }
             ]}
           >
             {Array.from({ length: columns }).map((_, colIdx) => (
@@ -40,7 +40,7 @@ export function TableSkeleton({ rows = 6, columns = 4 }: TableSkeletonProps) {
                   height={colIdx === 0 ? 32 : 14} 
                   borderRadius={colIdx === 0 ? 16 : 4} 
                 />
-                {colIdx > 0 && Math.random() > 0.5 && (
+                {colIdx > 0 && (rowIdx + colIdx) % 2 === 0 && (
                   <Skeleton width="40%" height={10} borderRadius={2} style={{ marginTop: 6 }} />
                 )}
               </View>

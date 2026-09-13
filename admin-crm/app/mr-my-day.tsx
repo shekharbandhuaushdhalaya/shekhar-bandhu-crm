@@ -1,9 +1,10 @@
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { LightColors, Radius, Spacing } from '../constants/theme';
+import { LightColors, Radius, Spacing, Typography } from '../constants/theme';
 import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 
 const req = <T = any,>(path: string) => api.requestJson<T>(path);
@@ -55,17 +56,7 @@ export default function MrMyDay() {
 
   const selectedMr = mrs.find((m) => m._id === id);
   const summary = day?.summary || {};
-  const mrSelectStyle = {
-    minHeight: 40,
-    padding: '0 12px',
-    borderRadius: 10,
-    border: `1px solid ${colors.border}`,
-    background: colors.bg.card,
-    color: colors.text.primary,
-    fontSize: 13,
-    minWidth: 220,
-    outline: 'none',
-  } as any;
+  const mrSelectStyle = { ...Typography.bodySm, minHeight: 40, padding: '0 12px', borderRadius: 10, border: `1px solid ${colors.border}`, background: colors.bg.card, color: colors.text.primary, minWidth: 220, outline: 'none' } as any;
 
   return (
     <View style={styles.screen}>
@@ -159,21 +150,21 @@ const createStyles = (c: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: c.bg.primary },
   selectorRow: { marginHorizontal: Spacing.lg, marginBottom: Spacing.sm, padding: 10, paddingLeft: 13, borderRadius: Radius.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.bg.card, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   selectorLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  selectorLabel: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
+  selectorLabel: { ...Typography.bodySm, fontWeight: '700', color: c.text.secondary },
   content: { padding: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.md, paddingBottom: 64, maxWidth: 1240, width: '100%', alignSelf: 'center' },
   metrics: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   twoColumn: { flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap', alignItems: 'flex-start' },
   columnPanel: { flexGrow: 1, flexShrink: 1, flexBasis: 430, minWidth: 290 },
   nextVisit: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   nextIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.primaryLight },
-  main: { fontSize: 15, fontWeight: '800', color: c.text.primary },
-  muted: { fontSize: 11.5, lineHeight: 17, color: c.text.secondary, marginTop: 2 },
+  main: { ...Typography.h3, fontWeight: '800', color: c.text.primary },
+  muted: { ...Typography.caption, color: c.text.secondary, marginTop: 2 },
   line: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
   lineIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg.secondary },
-  lineA: { fontSize: 12.5, fontWeight: '700', color: c.text.primary },
+  lineA: { ...Typography.bodySm, fontWeight: '700', color: c.text.primary },
   coverageHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
-  coverageValue: { fontSize: 27, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
-  coverageLabel: { fontSize: 11.5, color: c.text.secondary },
+  coverageValue: { ...Typography.display, fontWeight: '800', color: c.text.primary },
+  coverageLabel: { ...Typography.caption, color: c.text.secondary },
   progressTrack: { height: 6, borderRadius: 999, backgroundColor: c.bg.secondary, overflow: 'hidden', marginTop: 8, marginBottom: 7 },
   progressFill: { height: '100%', backgroundColor: c.primary, borderRadius: 999 },
 });

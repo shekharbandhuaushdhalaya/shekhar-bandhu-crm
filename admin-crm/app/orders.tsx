@@ -1,8 +1,14 @@
+import ScreenHeader from '../components/ScreenHeader';
+import { DataTable } from '../components/DataTable';
+import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, TextInput, ActivityIndicator, Alert, Modal, DeviceEventEmitter, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, DeviceEventEmitter, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
+import { Spacing, Radius, LightColors, Shadows, Typography } from '../constants/theme';
 import { api, Order } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
@@ -33,6 +39,8 @@ export default function OrdersScreen() {
 
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { width: winWidth } = useWindowDimensions();
+  const isDesktop = winWidth > 768;
   const { showToast } = useToast();
   const router = useRouter();
 
@@ -201,6 +209,7 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="Orders" subtitle="Review customer orders, fulfillment and delivery status." />
       {/* Integrated Search & Filter Header */}
       <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xs }}>
         <View style={{
@@ -217,7 +226,7 @@ export default function OrdersScreen() {
         }}>
           <Ionicons name="search" size={18} color={colors.text.muted} />
           <TextInput
-            style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 100 }}
+            style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 100 }}
             placeholder="Search orders by customer, tracking, address..."
             placeholderTextColor={colors.text.muted}
             value={search}
@@ -234,18 +243,7 @@ export default function OrdersScreen() {
             <select
               value={activeTab}
               onChange={(e: any) => setActiveTab(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: `1px solid ${colors.border}`,
-                backgroundColor: colors.bg.secondary,
-                color: colors.text.primary,
-                fontSize: 12,
-                fontWeight: '600',
-                outline: 'none',
-                height: 34,
-                cursor: 'pointer'
-              }}
+            style={{ ...Typography.bodySm, padding: '6px 12px', borderRadius: 6, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontWeight: '600', outline: 'none', minHeight: 44, height: 44, cursor: 'pointer' }}
             >
               <option value="all">All Statuses ({orders.length})</option>
               <option value="pending">Pending ({orders.filter(o => o.status === 'pending').length})</option>
@@ -263,7 +261,8 @@ export default function OrdersScreen() {
                 borderColor: colors.border,
                 borderRadius: 6,
                 paddingHorizontal: 10,
-                height: 34,
+                minHeight: 44,
+                height: 44,
                 gap: 6
               }}
               onPress={() => {
@@ -280,7 +279,7 @@ export default function OrdersScreen() {
                 })));
               }}
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                 {activeTab.toUpperCase()} ({activeTab === 'all' ? orders.length : orders.filter(o => o.status === activeTab).length})
               </Text>
               <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
@@ -303,10 +302,7 @@ export default function OrdersScreen() {
           }
         }}
       >
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={[styles.table, { width: '100%', minWidth: 1000 }]}>
-            {/* Table Header */}
-            <View style={styles.tableHeaderRow}>
+        <DataTable data={filteredOrders || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={1100} embedded renderTableHeader={() => (<View style={styles.tableHeaderRow}>
               <View style={[styles.tableHeaderCellContainer, { width: 140 }]}>
                 <Text style={styles.tableHeaderCell}>Order &amp; Date</Text>
               </View>
@@ -325,10 +321,7 @@ export default function OrdersScreen() {
               <View style={[styles.tableHeaderCellContainer, { width: 200, borderRightWidth: 0 }]}>
                 <Text style={styles.tableHeaderCell}>Action</Text>
               </View>
-            </View>
-
-            {/* Table Body Rows */}
-            {filteredOrders.map(o => {
+            </View>)} renderTableRow={o => {
               const statusColor = getStatusColor(o.status);
               return (
                 <TouchableOpacity
@@ -350,7 +343,7 @@ export default function OrdersScreen() {
 
                 <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
                   <Text style={styles.primaryText} numberOfLines={1}>{o.name}</Text>
-                  <Text style={styles.subText} numberOfLines={1}>📞 {o.phone}</Text>
+                  <Text style={styles.subText} numberOfLines={1}>Phone: {o.phone}</Text>
                 </View>
 
                 <View style={[styles.tableCellContainer, { flex: 1.2, minWidth: 140 }]}>
@@ -363,11 +356,9 @@ export default function OrdersScreen() {
                 </View>
 
                 <View style={[styles.tableCellContainer, { width: 130 }]}>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(o.status) + '15', borderColor: getStatusColor(o.status) }]}>
-                    <Text style={[styles.statusBadgeText, { color: getStatusColor(o.status) }]}>
+                  <StatusPill  label={<>
                       {o.status.toUpperCase()}
-                    </Text>
-                  </View>
+                    </>} textStyle={[styles.statusBadgeText, { color: getStatusColor(o.status) }]} />
                 </View>
 
                 <View style={[styles.tableCellContainer, { width: 200, borderRightWidth: 0, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'flex-start' }]}>
@@ -406,25 +397,19 @@ export default function OrdersScreen() {
                 </View>
               </TouchableOpacity>
             );
-          })}
-          </View>
-        </ScrollView>
+          }} isRefreshing={refreshing} onRefresh={onRefresh} onLoadMore={() => { if (page < totalPages) setPage(p => p + 1); }} />
 
         {filteredOrders.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="cart-outline" size={40} color={colors.text.muted} />
-            <Text style={styles.emptyTitle}>No Orders Found</Text>
-            <Text style={styles.emptySubtitle}>
+          <EmptyState title={<>No Orders Found</>} message={<>
               {activeTab === 'all'
                 ? 'No B2B orders have been placed yet.'
                 : `No orders with status "${activeTab}" found.`}
-            </Text>
-          </View>
+            </>} />
         )}
         
         {page < totalPages && (
           <View style={{ padding: 20, alignItems: 'center' }}>
-            <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
+            <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Loading more...</Text>
           </View>
         )}
       </ScrollView>
@@ -437,12 +422,12 @@ export default function OrdersScreen() {
           transparent={true}
           onRequestClose={() => setSelectedOrder(null)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxWidth: 650 }]}>
+          <View style={[styles.modalOverlay, !isDesktop && styles.modalOverlayMobile]}>
+            <View style={[styles.modalContent, { maxWidth: 650 }, !isDesktop && styles.modalContentMobile]}>
               <View style={styles.modalHeader}>
                 <View>
                   <Text style={styles.modalTitle}>Order Details: #{selectedOrder._id}</Text>
-                  <Text style={{ fontSize: 11, color: colors.text.muted }}>
+                  <Text style={{ ...Typography.caption, color: colors.text.muted }}>
                     Placed on {new Date(selectedOrder.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                   </Text>
                 </View>
@@ -455,16 +440,14 @@ export default function OrdersScreen() {
                 {/* Status Bar */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
                   <View>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>ORDER STATUS</Text>
-                    <Text style={{ fontSize: 10, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
-                      🏦 Routed to: {(selectedOrder as any).paymentMethod === 'COD' ? 'Courier COD Clearing' : 'Razorpay Online Clearing'}
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>ORDER STATUS</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
+                      Routed to: {(selectedOrder as any).paymentMethod === 'COD' ? 'Courier COD Clearing' : 'Razorpay Online Clearing'}
                     </Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedOrder.status) + '15', borderColor: getStatusColor(selectedOrder.status) }]}>
-                    <Text style={[styles.statusBadgeText, { color: getStatusColor(selectedOrder.status) }]}>
+                  <StatusPill  label={<>
                       {selectedOrder.status.toUpperCase()}
-                    </Text>
-                  </View>
+                    </>} textStyle={[styles.statusBadgeText, { color: getStatusColor(selectedOrder.status) }]} />
                 </View>
 
                 {/* Customer Details Card */}
@@ -477,8 +460,8 @@ export default function OrdersScreen() {
                     </TouchableOpacity>
                   </View>
                   <Text style={styles.customerName}>{selectedOrder.name}</Text>
-                  <Text style={styles.customerContact}>📞 {selectedOrder.phone}  |  ✉️ {selectedOrder.email}</Text>
-                  <Text style={styles.customerAddress}>📍 {selectedOrder.shippingAddress}</Text>
+                  <Text style={styles.customerContact}>Phone: {selectedOrder.phone}  |  Email: {selectedOrder.email}</Text>
+                  <Text style={styles.customerAddress}>Address: {selectedOrder.shippingAddress}</Text>
                 </View>
 
                 {/* Logistics & Tracking */}
@@ -583,12 +566,12 @@ export default function OrdersScreen() {
       {/* Edit Details Modal */}
       <Modal
         visible={editingOrder !== null}
-        animationType="fade"
+        animationType="slide"
         transparent={true}
         onRequestClose={() => setEditingOrder(null)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <View style={[styles.modalOverlay, !isDesktop && styles.modalOverlayMobile]}>
+          <View style={[styles.modalContent, !isDesktop && styles.modalContentMobile]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Update Order Details</Text>
               <TouchableOpacity onPress={() => setEditingOrder(null)}>
@@ -729,62 +712,64 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Table styles
   table: { flex: 1, width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, justifyContent: 'center' },
   
-  primaryText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  subText: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
-  orderIdText: { fontSize: 13, fontWeight: '800', color: colors.text.primary, fontFamily: 'monospace' },
-  orderDate: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  primaryText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  subText: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
+  orderIdText: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
+  orderDate: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
 
   statusBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignItems: 'center' },
-  statusBadgeText: { fontSize: 9, fontWeight: '800' },
+  statusBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
   
   actionPillBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, borderWidth: 1 },
-  actionPillText: { fontSize: 11, fontWeight: '700' },
+  actionPillText: { ...Typography.caption, fontWeight: '700' },
 
   customerBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 4 },
-  boxTitle: { fontSize: 11, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', marginBottom: 4 },
+  boxTitle: { ...Typography.caption, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', marginBottom: 4 },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  editBtnText: { fontSize: 11, fontWeight: '700', color: colors.primary },
-  customerName: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
-  customerContact: { fontSize: 12, color: colors.text.secondary, marginVertical: 3 },
-  customerAddress: { fontSize: 12, color: colors.text.secondary },
+  editBtnText: { ...Typography.caption, fontWeight: '700', color: colors.primary },
+  customerName: { ...Typography.body, fontWeight: '700', color: colors.text.primary },
+  customerContact: { ...Typography.bodySm, color: colors.text.secondary, marginVertical: 3 },
+  customerAddress: { ...Typography.bodySm, color: colors.text.secondary },
 
   courierBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 4, borderLeftWidth: 3, borderLeftColor: colors.warning },
-  courierInfoText: { fontSize: 12, color: colors.text.primary, marginVertical: 2 },
+  courierInfoText: { ...Typography.bodySm, color: colors.text.primary, marginVertical: 2 },
 
   itemsBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 4 },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  itemNameText: { fontSize: 13, color: colors.text.primary, flex: 1 },
-  itemQtyPriceText: { fontSize: 12, color: colors.text.secondary, marginLeft: 8 },
+  itemNameText: { ...Typography.bodySm, color: colors.text.primary, flex: 1 },
+  itemQtyPriceText: { ...Typography.bodySm, color: colors.text.secondary, marginLeft: 8 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, marginTop: 8, paddingTop: 8 },
-  totalLabel: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  totalValue: { fontSize: 14, fontWeight: '800', color: colors.primary },
+  totalLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  totalValue: { ...Typography.body, fontWeight: '800', color: colors.primary },
   
   primaryActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.sm },
-  primaryActionBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  primaryActionBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
 
   emptyContainer: { alignItems: 'center', paddingVertical: 60, gap: 10 },
-  emptyTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
-  emptySubtitle: { fontSize: 13, color: colors.text.muted, textAlign: 'center', paddingHorizontal: 20 },
+  emptyTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  emptySubtitle: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', paddingHorizontal: 20 },
 
   // Edit Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  modalOverlayMobile: { justifyContent: 'flex-end', alignItems: 'stretch', padding: 0 },
   modalContent: { backgroundColor: colors.bg.card, width: '100%', maxWidth: 500, maxHeight: '90%', borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.hover },
+  modalContentMobile: { maxWidth: '100%', maxHeight: '92%', borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalBody: { padding: Spacing.lg, gap: Spacing.md },
-  sectionHeaderTitle: { fontSize: 13, fontWeight: '800', color: colors.primary, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionHeaderTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 4, textTransform: 'uppercase' },
   formGroup: { gap: 4 },
-  inputLabel: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
-  textInput: { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 40, color: colors.text.primary, fontSize: 14 },
+  inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
+  textInput: { ...Typography.body, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, minHeight: 44, height: 44, color: colors.text.primary },
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.primary + '30' },
   modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border },
-  cancelBtnText: { color: colors.text.secondary, fontWeight: '700', fontSize: 13 },
+  cancelBtnText: { ...Typography.bodySm, color: colors.text.secondary, fontWeight: '700' },
   saveBtn: { backgroundColor: colors.primary },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  saveBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
 });

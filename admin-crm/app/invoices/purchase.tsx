@@ -1,8 +1,12 @@
+import { StatusPill, EmptyState } from './../../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../components/AppTextInput';
+import { AppText as Text } from './../../components/AppText';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Alert, DeviceEventEmitter } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Alert, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { Spacing, Radius, LightColors } from '../../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../../constants/theme';
 import { api, Invoice, Product, RawMaterial, Vendor, Warehouse, ManufacturingUnit } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
@@ -180,7 +184,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
                 onPress={handleUploadInvoiceDoc}
               >
                 <Ionicons name="cloud-upload-outline" size={13} color={colors.success} />
-                <Text style={{ fontSize: 10, color: colors.success, fontWeight: '700' }}>Upload Receipt</Text>
+                <Text style={{ ...Typography.eyebrow, color: colors.success, fontWeight: '700' }}>Upload Receipt</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.profileSupplier}>{invoice.supplierName}</Text>
@@ -220,11 +224,11 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
                       Base: ₹{invoice.baseAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'} | Rate: {invoice.gstRate || 0}%
                     </Text>
                     {invoice.igst && invoice.igst > 0 ? (
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                         IGST: ₹{invoice.igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Inter-state)
                       </Text>
                     ) : (
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                         CGST: ₹{(invoice.cgst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | SGST: ₹{(invoice.sgst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Intra-state)
                       </Text>
                     )}
@@ -339,7 +343,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
 
           {invoice.items && invoice.items.length > 0 && (
             <View style={{ marginTop: 20 }}>
-              <Text style={[styles.formLabel, { marginBottom: 8, fontSize: 14, color: colors.text.primary }]}>Invoice Items</Text>
+              <Text style={[styles.formLabel, { ...Typography.body, marginBottom: 8, color: colors.text.primary }]}>Invoice Items</Text>
               <View style={styles.detailTable}>
                 {/* Table Header */}
                 <View style={styles.detailTableHeader}>
@@ -367,7 +371,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
                       <View style={{ flex: 3.5 }}>
                         <Text style={[styles.detailTableCell, { fontWeight: '600', paddingRight: 4 }]} numberOfLines={2}>{item.name}</Text>
                         {(item.batchNo || item.expiryDate) ? (
-                          <Text style={{ fontSize: 9, color: colors.text.secondary, marginTop: 2 }}>
+                          <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 2 }}>
                             {item.batchNo ? `Batch: ${item.batchNo}` : ''}
                             {item.batchNo && item.expiryDate ? ' | ' : ''}
                             {item.expiryDate ? `Exp: ${new Date(item.expiryDate).toLocaleDateString('en-IN')}` : ''}
@@ -387,7 +391,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
 
           {/* Supporting Documents Vault */}
           <View style={{ gap: 6, marginVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Scanned Receipts:</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}> Supporting Documents & Scanned Receipts:</Text>
             
             {invoice.supportingDocuments && invoice.supportingDocuments.length > 0 ? (
               <View style={{ gap: 6, marginTop: 4 }}>
@@ -395,7 +399,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
                   <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
                     <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                       <Ionicons name="document-attach" size={15} color={colors.primary} />
-                      <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleDeleteInvoiceDoc(doc.url)} style={{ padding: 4 }}>
                       <Ionicons name="trash-outline" size={14} color={colors.danger} />
@@ -404,7 +408,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
                 ))}
               </View>
             ) : (
-              <Text style={{ fontSize: 11, color: colors.text.muted, fontStyle: 'italic', marginTop: 2 }}>No supporting documents uploaded.</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, fontStyle: 'italic', marginTop: 2 }}>No supporting documents uploaded.</Text>
             )}
           </View>
 
@@ -830,13 +834,13 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
   }));
 
   const materialTypeLabel = (type?: string) => ({
-    raw_material: '🌿 Raw Material',
-    packaging: '📦 Packaging',
-    consumable: '⚙️ Consumable',
-    excipient: '🧪 Excipient',
-    semi_finished: '🏭 Semi-Finished',
-    other: '📋 Other'
-  } as Record<string, string>)[type || 'raw_material'] || '📋 Material';
+    raw_material: ' Raw Material',
+    packaging: ' Packaging',
+    consumable: ' Consumable',
+    excipient: ' Excipient',
+    semi_finished: ' Semi-Finished',
+    other: ' Other'
+  } as Record<string, string>)[type || 'raw_material'] || ' Material';
 
   const handleSelectRowItem = (id: string, item: typeof selectableItems[0]) => {
     setRows(prev => prev.map(r => {
@@ -1094,11 +1098,11 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                             <Text style={styles.customSelectItemText}>{vName}</Text>
                             {isNonGst ? (
                               <View style={{ backgroundColor: colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.warning }}>
-                                <Text style={{ fontSize: 9, fontWeight: '700', color: colors.warning }}>💵 Non-GST</Text>
+                                <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.warning }}> Non-GST</Text>
                               </View>
                             ) : (
                               <View style={{ backgroundColor: colors.success + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success }}>
-                                <Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>📄 GST Vendor</Text>
+                                <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.success }}> GST Vendor</Text>
                               </View>
                             )}
                           </View>
@@ -1111,7 +1115,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                     })}
                     {filteredVendors.length === 0 && (
                       <View style={{ padding: 12 }}>
-                        <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>
+                        <Text style={{ ...Typography.bodySm, color: colors.text.muted, textAlign: 'center' }}>
                           No suppliers found (typing custom name)
                         </Text>
                       </View>
@@ -1121,7 +1125,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                       onPress={() => setShowVendorDropdown(false)}
                     >
                       <Text style={[styles.customSelectItemText, { color: colors.primary, textAlign: 'center' }]}>
-                        ✓ Use typed custom name
+                         Use typed custom name
                       </Text>
                     </TouchableOpacity>
                   </ScrollView>
@@ -1171,13 +1175,13 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                           setShowWarehouseDropdown(false);
                         }}
                       >
-                        <Text style={[styles.customSelectItemText, { color: colors.primary, fontWeight: '700' }]}>🏭 {m.name}</Text>
+                        <Text style={[styles.customSelectItemText, { color: colors.primary, fontWeight: '700' }]}> {m.name}</Text>
                         <Text style={styles.customSelectItemSubtext}>{m.city ? `${m.city}, ${m.state || ''}` : 'Factory Unit'}</Text>
                       </TouchableOpacity>
                     ))}
                     {filteredUnits.length === 0 && (
                       <View style={{ padding: 12 }}>
-                        <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>
+                        <Text style={{ ...Typography.bodySm, color: colors.text.muted, textAlign: 'center' }}>
                           No matching manufacturing units found
                         </Text>
                       </View>
@@ -1214,8 +1218,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                         setMode('regular');
                       }}
                     >
-                      <Text style={[styles.modeBtnText, { fontSize: 11 }, mode === 'regular' && { color: colors.primary, fontWeight: '700' }, isNonGstVendor && { color: colors.text.muted }]} numberOfLines={1}>
-                        📄 Regular GST {isNonGstVendor ? '(Off)' : ''}
+                      <Text style={[styles.modeBtnText, { ...Typography.caption }, mode === 'regular' && { color: colors.primary, fontWeight: '700' }, isNonGstVendor && { color: colors.text.muted }]} numberOfLines={1}>
+                         Regular GST {isNonGstVendor ? '(Off)' : ''}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -1225,8 +1229,8 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                       ]}
                       onPress={() => setMode('cash')}
                     >
-                      <Text style={[styles.modeBtnText, { fontSize: 11 }, mode === 'cash' && { color: colors.warning, fontWeight: '700' }]} numberOfLines={1}>
-                        💵 Non-GST / Cash
+                      <Text style={[styles.modeBtnText, { ...Typography.caption }, mode === 'cash' && { color: colors.warning, fontWeight: '700' }]} numberOfLines={1}>
+                         Non-GST / Cash
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1269,10 +1273,10 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="cube-outline" size={18} color={colors.primary} />
-                <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>Items Breakdown *</Text>
+                <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>Items Breakdown *</Text>
               </View>
               <View style={{ backgroundColor: colors.primary + '12', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary + '25' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>{rows.length} {rows.length === 1 ? 'Line Item' : 'Line Items'}</Text>
+                <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>{rows.length} {rows.length === 1 ? 'Line Item' : 'Line Items'}</Text>
               </View>
             </View>
             
@@ -1299,15 +1303,15 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                   borderRadius: Radius.md,
                   marginBottom: 8
                 }}>
-                  <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Material / Packaging *</Text>
-                  <Text style={{ width: 110, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Qty / Unit *</Text>
-                  <Text style={{ width: 95, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Rate (₹)</Text>
-                  <Text style={{ width: 100, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Batch No</Text>
-                  <Text style={{ width: 44, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Exp</Text>
+                  <Text style={{ ...Typography.caption, flex: 1, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' }}>Material / Packaging *</Text>
+                  <Text style={{ ...Typography.caption, width: 110, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', textAlign: 'center' }}>Qty / Unit *</Text>
+                  <Text style={{ ...Typography.caption, width: 95, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', textAlign: 'right' }}>Rate (₹)</Text>
+                  <Text style={{ ...Typography.caption, width: 100, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' }}>Batch No</Text>
+                  <Text style={{ ...Typography.caption, width: 44, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', textAlign: 'center' }}>Exp</Text>
                   {mode === 'regular' && (
-                    <Text style={{ width: 75, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>GST Rate</Text>
+                    <Text style={{ ...Typography.caption, width: 75, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', textAlign: 'center' }}>GST Rate</Text>
                   )}
-                  <Text style={{ width: 120, fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Line Total (₹)</Text>
+                  <Text style={{ ...Typography.caption, width: 120, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', textAlign: 'right' }}>Line Total (₹)</Text>
                   <View style={{ width: 36 }} />
                 </View>
 
@@ -1378,14 +1382,14 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                               ))}
                               {rowFilteredItems.length === 0 && (
                                 <View style={{ padding: 10 }}>
-                                  <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'center' }}>No materials or packaging found in Manufacturing Material Master</Text>
+                                  <Text style={{ ...Typography.caption, color: colors.text.muted, textAlign: 'center' }}>No materials or packaging found in Manufacturing Material Master</Text>
                                 </View>
                               )}
                               <TouchableOpacity
                                 style={[styles.rowDropdownItem, { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary }]}
                                 onPress={() => setRows(prev => prev.map(r => r.id === row.id ? { ...r, showProductDropdown: false } : r))}
                               >
-                                <Text style={{ fontSize: 11, color: colors.primary, textAlign: 'center', fontWeight: 'bold' }}>Close</Text>
+                                <Text style={{ ...Typography.caption, color: colors.primary, textAlign: 'center', fontWeight: 'bold' }}>Close</Text>
                               </TouchableOpacity>
                             </ScrollView>
                           </View>
@@ -1416,7 +1420,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
                         />
                         {row.unit ? (
                           <View style={{ position: 'absolute', right: 5, backgroundColor: colors.primary + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.primary + '30' }}>
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>{row.unit}</Text>
+                            <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>{row.unit}</Text>
                           </View>
                         ) : null}
                       </View>
@@ -1492,7 +1496,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
                       {/* Row Subtotal */}
                       <View style={{ width: 120, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 4 }}>
-                         <Text style={[styles.tableRowSubtotal, { fontSize: 13, fontWeight: '800', color: colors.text.primary }]} numberOfLines={1}>
+                         <Text style={[styles.tableRowSubtotal, { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }]} numberOfLines={1}>
                            ₹{rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                          </Text>
                       </View>
@@ -1518,11 +1522,11 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
           {/* Freight & Logistics Details */}
           <View style={{ backgroundColor: '#fdfdfd', padding: 14, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginTop: 10, marginBottom: 10 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text.primary, marginBottom: 12 }}>
+            <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: 12 }}>
               Freight & Logistics Notes
             </Text>
 
-            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.secondary, marginBottom: 8 }}>
+            <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginBottom: 8 }}>
               Charges Added in Vendor's Bill (Taxable)
             </Text>
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
@@ -1540,7 +1544,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
               </View>
             </View>
 
-            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.secondary, marginBottom: 8, marginTop: 4 }}>
+            <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginBottom: 8, marginTop: 4 }}>
               External Transport Details
             </Text>
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
@@ -1748,8 +1752,8 @@ export default function PurchaseInvoicesScreen() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
         <Ionicons name="lock-closed" size={48} color={colors.danger} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
-        <Text style={{ fontSize: 13, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>You do not have permission to access purchase invoices.</Text>
+        <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
+        <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>You do not have permission to access purchase invoices.</Text>
       </View>
     );
   }
@@ -1793,14 +1797,9 @@ export default function PurchaseInvoicesScreen() {
       title: 'Doc Status',
       width: 120,
       render: (item) => (
-        <View style={[styles.statusBadge, {
-          borderColor: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning),
-          backgroundColor: (item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)) + '12'
-        }]}>
-          <Text style={[styles.statusText, {
+        <StatusPill  label={<>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</>} textStyle={[styles.statusText, {
             color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
-          }]}>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</Text>
-        </View>
+          }]} />
       )
     },
     {
@@ -1810,7 +1809,7 @@ export default function PurchaseInvoicesScreen() {
       render: (item) => {
         const overdueInfo = getOverdueText(item, vendors, colors);
         return (
-          <Text style={{ fontSize: 13, fontWeight: '600', color: overdueInfo.color }}>
+          <Text style={{ ...Typography.bodySm, fontWeight: '600', color: overdueInfo.color }}>
             {overdueInfo.text}
           </Text>
         );
@@ -1826,7 +1825,7 @@ export default function PurchaseInvoicesScreen() {
           style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 }} 
           onPress={() => { setSelectedInv(item); setDetailVisible(true); }}
         >
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>View</Text>
+          <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: 'bold' }}>View</Text>
         </TouchableOpacity>
       )
     }
@@ -1867,7 +1866,7 @@ export default function PurchaseInvoicesScreen() {
                     size={16} 
                     color={modeFilter === 'cash' ? colors.warning : colors.primary} 
                   />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>
                     {modeFilter === 'all' ? 'All Bills' : modeFilter === 'regular' ? 'GST Invoices' : 'Cash / Non-GST'}
                   </Text>
                   <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
@@ -1888,9 +1887,9 @@ export default function PurchaseInvoicesScreen() {
                     elevation: 6
                   }}>
                     {[
-                      { id: 'all', label: '🌐 All Bills' },
-                      { id: 'regular', label: '📄 GST Invoices' },
-                      { id: 'cash', label: '💵 Non-GST / Cash' },
+                      { id: 'all', label: ' All Bills' },
+                      { id: 'regular', label: ' GST Invoices' },
+                      { id: 'cash', label: ' Non-GST / Cash' },
                     ].map(f => (
                       <TouchableOpacity
                         key={f.id}
@@ -1906,11 +1905,7 @@ export default function PurchaseInvoicesScreen() {
                           setShowFilterDropdown(false);
                         }}
                       >
-                        <Text style={{
-                          fontSize: 13,
-                          fontWeight: modeFilter === f.id ? '700' : '500',
-                          color: modeFilter === f.id ? colors.primary : colors.text.primary
-                        }}>
+                        <Text style={{ ...Typography.bodySm, fontWeight: modeFilter === f.id ? '700' : '500', color: modeFilter === f.id ? colors.primary : colors.text.primary }}>
                           {f.label}
                         </Text>
                       </TouchableOpacity>
@@ -1939,10 +1934,7 @@ export default function PurchaseInvoicesScreen() {
             isLoadingMore={page < totalPages}
             onRowPress={(item) => { setSelectedInv(item); setDetailVisible(true); }}
             ListEmptyComponent={
-              <View style={styles.emptyTableContainer}>
-                <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                <Text style={styles.emptyText}>No invoices found</Text>
-              </View>
+              <EmptyState title={<>No invoices found</>}  />
             }
           />
         </View>
@@ -1981,101 +1973,101 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   innerContainer: { flex: 1, width: '100%' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs, paddingHorizontal: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, minHeight: 46 },
-  searchInput: { flex: 1, height: 42, color: colors.text.primary, fontSize: 13 },
+  searchInput: { ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary },
   addBtn: { width: 34, height: 34, borderRadius: Radius.sm, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
 
   table: { flex: 1, width: '100%', minWidth: 950, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
-  tableCell: { fontSize: 13, color: colors.text.primary },
+  tableCell: { ...Typography.bodySm, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
-  primaryText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  secondaryText: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
-  outstandingText: { fontSize: 13, fontWeight: '800' },
+  primaryText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  secondaryText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
+  outstandingText: { ...Typography.bodySm, fontWeight: '800' },
   actionIconButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' },
   emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { fontSize: 13, color: colors.text.muted, marginTop: 8 },
+  emptyText: { ...Typography.bodySm, color: colors.text.muted, marginTop: 8 },
 
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, alignSelf: 'flex-start' },
-  statusText: { fontSize: 10, fontWeight: '800' },
+  statusText: { ...Typography.eyebrow, fontWeight: '800' },
 
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 950, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
   profileAvatar: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.purple + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  profileName: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
-  profileSupplier: { fontSize: 14, color: colors.text.secondary },
+  profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  profileSupplier: { ...Typography.body, color: colors.text.secondary },
   infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 16 },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  infoLabel: { fontSize: 11, color: colors.text.muted, fontWeight: '600' },
-  infoValue: { fontSize: 14, color: colors.text.primary, fontWeight: '500' },
+  infoLabel: { ...Typography.caption, color: colors.text.muted, fontWeight: '600' },
+  infoValue: { ...Typography.body, color: colors.text.primary, fontWeight: '500' },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, marginTop: 24, marginBottom: 16 },
-  deleteBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  deleteBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
 
   formGroup: { marginBottom: 16 },
-  formLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
+  formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, height: 40 },
-  formInputText: { flex: 1, height: 40, color: colors.text.primary, fontSize: 13 },
+  formInputText: { ...Typography.bodySm, flex: 1, height: 40, color: colors.text.primary },
   statusSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   statusBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  statusBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
+  statusBtnText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
 
   modeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, alignSelf: 'flex-start' },
-  modeText: { fontSize: 8, fontWeight: '800' },
+  modeText: { ...Typography.eyebrow, fontWeight: '800' },
   modeSelector: { flexDirection: 'row', gap: 10, marginTop: 0, marginBottom: 0 },
   modeBtn: { flex: 1, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  modeBtnText: { fontSize: 12, fontWeight: '700', color: colors.text.secondary },
+  modeBtnText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
 
   filterTabContainer: { flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, gap: 8 },
   filterTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  filterTabText: { fontSize: 12, fontWeight: '500' },
+  filterTabText: { ...Typography.bodySm, fontWeight: '500' },
 
   gstCalculationPreview: { marginTop: 16, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary },
-  previewTitle: { fontSize: 12, fontWeight: '700', color: colors.text.primary, marginBottom: 8 },
+  previewTitle: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 8 },
   previewRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  previewLabel: { fontSize: 12, color: colors.text.secondary },
-  previewValue: { fontSize: 12, fontWeight: '600', color: colors.text.primary },
+  previewLabel: { ...Typography.bodySm, color: colors.text.secondary },
+  previewValue: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   previewDivider: { height: 1, backgroundColor: colors.border, marginVertical: 6 },
 
   // Dropdown search panel selector additions
   customSearchSelectContainer: { position: 'relative', width: '100%' },
   customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)', elevation: 4 },
   customSelectItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  customSelectItemText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  customSelectItemSubtext: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
+  customSelectItemText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  customSelectItemSubtext: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
 
   // New Tabular Items & Detail table styles
   addItemBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.primary, borderRadius: Radius.md, paddingVertical: 10, marginTop: 14, marginBottom: 10, borderStyle: 'dashed' },
-  addItemBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  addItemBtnText: { ...Typography.bodySm, color: colors.primary, fontWeight: '700' },
   
   tableHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, paddingHorizontal: 4, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, marginBottom: 8 },
-  tableHeaderLabel: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
+  tableHeaderLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
   tableRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border + '50', paddingHorizontal: 4 },
-  tableInput: { height: 36, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, fontSize: 13, color: colors.text.primary },
+  tableInput: { ...Typography.bodySm, height: 36, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, color: colors.text.primary },
   tableInputLocked: { height: 36, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, justifyContent: 'center' },
-  tableInputLockedText: { fontSize: 13, color: colors.text.muted, fontWeight: '600' },
+  tableInputLockedText: { ...Typography.bodySm, color: colors.text.muted, fontWeight: '600' },
   tableInputBtn: { height: 36, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, justifyContent: 'center' },
-  tableInputBtnText: { fontSize: 13, color: colors.text.primary, fontWeight: '600' },
-  tableRowSubtotal: { fontSize: 12, fontWeight: '600', color: colors.text.primary },
+  tableInputBtnText: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' },
+  tableRowSubtotal: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   
   rowDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, boxShadow: '0px 2px 3px rgba(0,0,0,0.1)', elevation: 5 },
   rowDropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  rowDropdownItemText: { fontSize: 12, fontWeight: '700', color: colors.text.primary },
-  rowDropdownItemSubtext: { fontSize: 9, color: colors.text.muted, marginTop: 1 },
+  rowDropdownItemText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  rowDropdownItemSubtext: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
 
   rowGstDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, boxShadow: '0px 2px 3px rgba(0,0,0,0.1)', elevation: 5 },
   rowGstDropdownItem: { padding: 8, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
-  rowGstDropdownItemText: { fontSize: 12, fontWeight: '600', color: colors.text.primary },
+  rowGstDropdownItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
 
   detailTable: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   detailTableHeader: { flexDirection: 'row', backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, paddingHorizontal: 12 },
-  detailTableHeaderCell: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
+  detailTableHeaderCell: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
   detailTableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border + '50', paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center' },
-  detailTableCell: { fontSize: 12, color: colors.text.primary },
+  detailTableCell: { ...Typography.bodySm, color: colors.text.primary },
   printBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#2563eb', borderRadius: Radius.md, paddingVertical: 13, marginTop: 24, marginBottom: 8 },
-  printBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' }
+  printBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' }
 });

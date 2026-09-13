@@ -1,5 +1,10 @@
+import { WorkspaceLoading } from './../../../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../../components/AppTextInput';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Pressable, ActivityIndicator, Platform } from 'react-native';
+import { View, Modal, ScrollView, Pressable, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -174,8 +179,8 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
           {/* Header */}
           <View style={styles.modalHeader}>
             <View>
-              <Text style={styles.modalTitle}>📖 Ayurvedic Pharmacopoeia Library (API / AFI)</Text>
-              <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+              <Text style={styles.modalTitle}> Ayurvedic Pharmacopoeia Library (API / AFI)</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 2 }}>
                 Official Ayurvedic Ingredients Master Monograph Database & Verification Review
               </Text>
             </View>
@@ -193,8 +198,8 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                 borderBottomColor: viewTab === 'all' ? colors.primary : 'transparent'
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: viewTab === 'all' ? colors.primary : colors.text.secondary }}>
-                📚 All Monograph Database
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: viewTab === 'all' ? colors.primary : colors.text.secondary }}>
+                 All Monograph Database
               </Text>
             </TouchableOpacity>
 
@@ -206,11 +211,11 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                 flexDirection: 'row', alignItems: 'center', gap: 6
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: viewTab === 'unverified' ? (colors.warning || '#f59e0b') : colors.text.secondary }}>
-                ⚠️ Pending Review
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: viewTab === 'unverified' ? (colors.warning || '#f59e0b') : colors.text.secondary }}>
+                 Pending Review
               </Text>
               <View style={{ backgroundColor: (colors.warning || '#f59e0b') + '20', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.warning || '#f59e0b' }}>
+                <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.warning || '#f59e0b' }}>
                   {unverifiedCount}
                 </Text>
               </View>
@@ -225,10 +230,10 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
               flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10
             }}>
               <View style={{ flex: 1, minWidth: 240 }}>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>
-                  ⚡ Bulk Import Ayurvedic Ingredients
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary }}>
+                   Bulk Import Ayurvedic Ingredients
                 </Text>
-                <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginTop: 2 }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 2 }}>
                   Instantly populate your Raw Materials Master with all standard Ayurvedic herbs, oils & Rasa Shastra minerals.
                 </Text>
               </View>
@@ -245,7 +250,7 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                 ) : (
                   <Ionicons name="cloud-download-outline" size={16} color="#fff" />
                 )}
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>
+                <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '800' }}>
                   {importingAll ? 'Importing All...' : 'Import All Monograph Ingredients'}
                 </Text>
               </TouchableOpacity>
@@ -257,7 +262,7 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
             <View style={{ flex: 2, minWidth: 200, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 }}>
               <Ionicons name="search-outline" size={16} color={colors.text.muted} style={{ marginRight: 6 }} />
               <TextInput
-                style={{ flex: 1, fontSize: 13, color: colors.text.primary, padding: 0 }}
+                style={{ ...Typography.bodySm, flex: 1, color: colors.text.primary, padding: 0 }}
                 placeholder="Search Ayurvedic name, botanical binomial, or monograph ref..."
                 placeholderTextColor={colors.text.muted}
                 value={search}
@@ -287,7 +292,7 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                         borderColor: active ? colors.primary : colors.border
                       }}
                     >
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#fff' : colors.text.secondary }}>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: active ? '#fff' : colors.text.secondary }}>
                         {std === 'all' ? 'All Standards' : std}
                       </Text>
                     </TouchableOpacity>
@@ -300,14 +305,14 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
           {/* List Content */}
           {loading ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={{ color: colors.text.secondary, marginTop: 8, fontSize: 12 }}>Loading Ayurvedic Pharmacopoeia database...</Text>
+              <WorkspaceLoading />
+              <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginTop: 8 }}>Loading Ayurvedic Pharmacopoeia database...</Text>
             </View>
           ) : (
             <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ gap: 12 }}>
               {monographs.length === 0 ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
-                  <Text style={{ color: colors.text.muted, fontSize: 13 }}>
+                  <Text style={{ ...Typography.bodySm, color: colors.text.muted }}>
                     {viewTab === 'unverified' ? 'All pharmacopoeia entries have been verified!' : 'No pharmacopoeia monographs match your search.'}
                   </Text>
                 </View>
@@ -320,36 +325,36 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
                       <View style={{ flex: 1, minWidth: 240 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.primary }}>
-                            🌿 {m.ayurvedicName}
+                          <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary }}>
+                             {m.ayurvedicName}
                           </Text>
                           <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.primary + '40' }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
+                            <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary }}>
                               {m.pharmacopoeialStandard || 'API'} Monograph
                             </Text>
                           </View>
                           {m.verified === false ? (
                             <View style={{ backgroundColor: (colors.warning || '#f59e0b') + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: (colors.warning || '#f59e0b') + '50' }}>
-                              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.warning || '#d97706' }}>
-                                ⚠️ Pending Review (AI-generated)
+                              <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.warning || '#d97706' }}>
+                                 Pending Review (AI-generated)
                               </Text>
                             </View>
                           ) : (
                             <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success + '40' }}>
-                              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.success }}>
-                                ✅ Verified Official
+                              <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}>
+                                 Verified Official
                               </Text>
                             </View>
                           )}
                           {m.isScheduleE1 && (
                             <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: colors.danger + '40' }}>
-                              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.danger }}>
-                                ⚠️ Schedule E1 Toxic Herb
+                              <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.danger }}>
+                                 Schedule E1 Toxic Herb
                               </Text>
                             </View>
                           )}
                         </View>
-                        <Text style={{ fontSize: 12, fontStyle: 'italic', fontWeight: '600', color: colors.text.secondary, marginTop: 3 }}>
+                        <Text style={{ ...Typography.bodySm, fontStyle: 'italic', fontWeight: '600', color: colors.text.secondary, marginTop: 3 }}>
                           {m.botanicalName} {m.family ? `(${m.family})` : ''}
                         </Text>
                       </View>
@@ -371,7 +376,7 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                             ) : (
                               <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
                             )}
-                            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#fff' }}>
+                            <Text style={{ ...Typography.caption, fontWeight: '800', color: '#fff' }}>
                               Approve & Verify
                             </Text>
                           </TouchableOpacity>
@@ -391,7 +396,7 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                           ) : (
                             <Ionicons name="add-circle-outline" size={16} color={colors.success} />
                           )}
-                          <Text style={{ fontSize: 11.5, fontWeight: '800', color: colors.success }}>
+                          <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.success }}>
                             Import to Raw Materials
                           </Text>
                         </TouchableOpacity>
@@ -400,31 +405,31 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
 
                     {/* Metadata Specs & Monograph Citation Edit */}
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, backgroundColor: colors.bg.secondary, padding: 8, borderRadius: 6, alignItems: 'center' }}>
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                         Part Used: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{m.partUsed || 'Whole'}</Text>
                       </Text>
                       {editingRefId === m._id ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 220 }}>
-                          <Text style={{ fontSize: 11, color: colors.text.secondary }}>Ref:</Text>
+                          <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Ref:</Text>
                           <TextInput
-                            style={{ flex: 1, fontSize: 11, color: colors.text.primary, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}
+                            style={{ ...Typography.caption, flex: 1, color: colors.text.primary, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}
                             value={refText}
                             onChangeText={setRefText}
                           />
                           <TouchableOpacity onPress={() => handleVerify(m)} style={{ backgroundColor: colors.success, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>Save</Text>
+                            <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: '#fff' }}>Save</Text>
                           </TouchableOpacity>
                         </View>
                       ) : (
                         <TouchableOpacity onPress={() => { setEditingRefId(m._id); setRefText(m.monographRef || ''); }}>
-                          <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                          <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                             Ref: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{m.monographRef || '(Click to edit ref)'}</Text>
                             <Ionicons name="pencil-outline" size={11} color={colors.primary} style={{ marginLeft: 4 }} />
                           </Text>
                         </TouchableOpacity>
                       )}
                       {m.dosage && (
-                        <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                        <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                           Dosage: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{m.dosage}</Text>
                         </Text>
                       )}
@@ -435,17 +440,17 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 }}>
                         {m.rasa?.length > 0 && (
                           <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 10, color: colors.text.muted }}>Rasa: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{m.rasa.join(', ')}</Text></Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Rasa: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{m.rasa.join(', ')}</Text></Text>
                           </View>
                         )}
                         {m.virya && (
                           <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 10, color: colors.text.muted }}>Virya: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{m.virya}</Text></Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Virya: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{m.virya}</Text></Text>
                           </View>
                         )}
                         {m.vipaka && (
                           <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 10, color: colors.text.muted }}>Vipaka: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{m.vipaka}</Text></Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Vipaka: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{m.vipaka}</Text></Text>
                           </View>
                         )}
                       </View>
@@ -453,17 +458,17 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
 
                     {m.therapeuticUses?.length > 0 && (
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.primary }}>Therapeutic Uses:</Text>
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary }}>Therapeutic Uses:</Text>
                         {m.therapeuticUses.map((use: string, uIdx: number) => (
                           <View key={uIdx} style={{ backgroundColor: colors.primary + '10', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 9.5, fontWeight: '600', color: colors.primary }}>{use}</Text>
+                            <Text style={{ ...Typography.eyebrow, fontWeight: '600', color: colors.primary }}>{use}</Text>
                           </View>
                         ))}
                       </View>
                     )}
 
                     {m.description && (
-                      <Text style={{ fontSize: 11, color: colors.text.secondary, lineHeight: 15 }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                         {m.description}
                       </Text>
                     )}
@@ -482,7 +487,7 @@ export default function PharmacopoeiaModal({ visible, onClose, onRefreshMaterial
                   {loadingMore ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
                       Load More Monographs (Page {page + 1})
                     </Text>
                   )}

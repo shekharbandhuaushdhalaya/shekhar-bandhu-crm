@@ -1,5 +1,9 @@
+import { WorkspaceLoading } from './../../../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView, Pressable, ActivityIndicator, Platform } from 'react-native';
+import { View, Modal, ScrollView, Pressable, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -88,7 +92,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               <tbody>
                 ${(bmrReport.ingredients || []).map((ing: any) => `
                   <tr>
-                    <td><strong>${ing.name}</strong> ${ing.isScheduleE1 ? '<span class="badge-e1">⚠️ E1 POISON</span>' : ''}</td>
+                    <td><strong>${ing.name}</strong> ${ing.isScheduleE1 ? '<span class="badge-e1"> E1 POISON</span>' : ''}</td>
                     <td><em>${ing.botanicalName || '—'}</em></td>
                     <td>${ing.partUsed || '—'}</td>
                     <td>${ing.batchNo}</td>
@@ -191,7 +195,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
           <View style={styles.modalHeader}>
             <View>
               <Text style={styles.modalTitle}>Batch Manufacturing Record (BMR)</Text>
-              <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 2 }}>
                 AYUSH GMP (Schedule T) Quality Compliance Audit & Master Formula Record
               </Text>
             </View>
@@ -202,43 +206,43 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
 
           {loadingBmr ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <WorkspaceLoading />
             </View>
           ) : bmrReport ? (
             <ScrollView style={[styles.modalForm, { padding: 16 }]} contentContainerStyle={{ gap: 16 }}>
               {/* Official Header Branding & AYUSH License Bar */}
               <View style={{ alignItems: 'center', borderBottomWidth: 2, borderBottomColor: colors.primary, paddingBottom: 12, marginBottom: 4 }}>
-                <Text style={{ fontSize: 19, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                <Text style={{ ...Typography.h2, fontWeight: '800', color: colors.primary }}>
                   {header.firmName || FIRM_DETAILS.name}
                 </Text>
-                <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+                <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 2 }}>
                   {header.firmAddress || FIRM_DETAILS.address}
                 </Text>
 
                 {/* AYUSH License Badges */}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, justifyContent: 'center' }}>
                   <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 0.5, borderColor: colors.primary + '40' }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>
-                      📜 AYUSH Mfg Lic No: {header.manufacturingLicenseNo || 'AYUSH-1983-UP'}
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>
+                       AYUSH Mfg Lic No: {header.manufacturingLicenseNo || 'AYUSH-1983-UP'}
                     </Text>
                   </View>
                   <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success + '40' }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: colors.success }}>
-                      🛡️ AYUSH GMP Cert: {header.gmpCertificateNo || 'GMP-AYUSH-2026-VNS'}
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}>
+                       AYUSH GMP Cert: {header.gmpCertificateNo || 'GMP-AYUSH-2026-VNS'}
                     </Text>
                   </View>
                   <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>
-                      🏷️ Dosage Category: {bmrReport.productCategory || 'Ayurvedic Formulated Medicine'}
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary }}>
+                       Dosage Category: {bmrReport.productCategory || 'Ayurvedic Formulated Medicine'}
                     </Text>
                   </View>
                 </View>
 
-                <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text.primary, marginTop: 10, letterSpacing: 1 }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginTop: 10 }}>
                   OFFICIAL BATCH MANUFACTURING RECORD (BMR)
                 </Text>
                 {bmrReport.bomSnapshot?.formulationStandardRef ? (
-                  <Text style={{ fontSize: 11, fontStyle: 'italic', color: colors.primary, marginTop: 2 }}>
+                  <Text style={{ ...Typography.caption, fontStyle: 'italic', color: colors.primary, marginTop: 2 }}>
                     Formulation Standard Reference: {bmrReport.bomSnapshot.formulationStandardRef}
                   </Text>
                 ) : null}
@@ -247,7 +251,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               {/* Section I: Batch Identification & Pre-Execution Approvals */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                     SECTION I: BATCH IDENTIFICATION, PRE-EXECUTION APPROVAL & LINE CLEARANCE
                   </Text>
                 </View>
@@ -257,14 +261,14 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                     { label: 'Product Name & SKU:', val: `${bmrReport.productName} (${bmrReport.productSku})` },
                     { label: 'Theoretical Planned Batch Qty:', val: `${bmrReport.plannedQty} units` },
                     { label: 'Actual Packaged Yield Output:', val: `${bmrReport.actualYieldQty} units`, valColor: colors.success },
-                    { label: 'Manufacturing & Expiry Dates:', val: `${fmtDate(bmrReport.mfgDate)} ➔ ${fmtDate(bmrReport.expiryDate)} (${bmrReport.shelfLifeMonths || 36} Months Shelf-Life)` },
+                    { label: 'Manufacturing & Expiry Dates:', val: `${fmtDate(bmrReport.mfgDate)}  ${fmtDate(bmrReport.expiryDate)} (${bmrReport.shelfLifeMonths || 36} Months Shelf-Life)` },
                     { label: 'Pre-Execution BMR Approval:', val: bmrReport.bmrApprovedByName ? `${bmrReport.bmrApprovedByName} (${fmtDateTime(bmrReport.bmrApprovedAt)})` : 'Pending Pre-Approval' },
                     { label: 'Line Clearance Verification:', val: bmrReport.lineClearance ? `${bmrReport.lineClearance.clearedByName} (${fmtDateTime(bmrReport.lineClearance.clearedAt)}) — Prev Batch: ${bmrReport.lineClearance.previousBatchNo || 'None'}` : 'Pending Line Clearance' },
-                    { label: 'Manufacturing Timeline:', val: `${fmtDate(bmrReport.startDate)} ➔ ${bmrReport.endDate ? fmtDate(bmrReport.endDate) : 'Ongoing'}` }
+                    { label: 'Manufacturing Timeline:', val: `${fmtDate(bmrReport.startDate)}  ${bmrReport.endDate ? fmtDate(bmrReport.endDate) : 'Ongoing'}` }
                   ].map(({ label, val, valColor }) => (
                     <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>{label}</Text>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: valColor || colors.text.primary }}>{val}</Text>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>{label}</Text>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: valColor || colors.text.primary }}>{val}</Text>
                     </View>
                   ))}
                 </View>
@@ -273,46 +277,46 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               {/* Section II: Raw Material Master Recipe & Botanical Compliance */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                     SECTION II: BOTANICAL RAW MATERIALS & MASTER RECIPE TRACEABILITY
                   </Text>
                 </View>
                 <View style={{ padding: 8 }}>
                   <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6, backgroundColor: colors.bg.secondary + '60', paddingHorizontal: 4 }}>
-                    <Text style={{ flex: 2, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary }}>Ingredient & Botanical Name</Text>
-                    <Text style={{ flex: 1.2, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary }}>Part Used</Text>
-                    <Text style={{ flex: 1.2, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary }}>Inward Batch</Text>
-                    <Text style={{ flex: 1.2, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Qty Consumed</Text>
-                    <Text style={{ flex: 1.2, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Pharmacopoeia</Text>
+                    <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.secondary }}>Ingredient & Botanical Name</Text>
+                    <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary }}>Part Used</Text>
+                    <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary }}>Inward Batch</Text>
+                    <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Qty Consumed</Text>
+                    <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Pharmacopoeia</Text>
                   </View>
                   {bmrReport.ingredients && bmrReport.ingredients.map((ing: any, idx: number) => (
                     <View key={idx} style={{ flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border, paddingHorizontal: 4, alignItems: 'center' }}>
                       <View style={{ flex: 2 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>{ing.name}</Text>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{ing.name}</Text>
                           {ing.isScheduleE1 && (
                             <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, borderWidth: 0.5, borderColor: colors.danger }}>
-                              <Text style={{ fontSize: 8.5, fontWeight: '800', color: colors.danger }}>⚠️ E1 Poison</Text>
+                              <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.danger }}> E1 Poison</Text>
                             </View>
                           )}
                         </View>
                         {ing.botanicalName ? (
-                          <Text style={{ fontSize: 10, fontStyle: 'italic', color: colors.text.secondary, marginTop: 1 }}>
+                          <Text style={{ ...Typography.eyebrow, fontStyle: 'italic', color: colors.text.secondary, marginTop: 1 }}>
                             {ing.botanicalName}
                           </Text>
                         ) : null}
                       </View>
-                      <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.primary }}>{ing.partUsed || '—'}</Text>
-                      <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '600', color: colors.text.primary }}>{ing.batchNo}</Text>
-                      <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '700', color: colors.text.primary, textAlign: 'right' }}>
+                      <Text style={{ ...Typography.caption, flex: 1.2, color: colors.text.primary }}>{ing.partUsed || '—'}</Text>
+                      <Text style={{ ...Typography.caption, flex: 1.2, fontWeight: '600', color: colors.text.primary }}>{ing.batchNo}</Text>
+                      <Text style={{ ...Typography.caption, flex: 1.2, fontWeight: '700', color: colors.text.primary, textAlign: 'right' }}>
                         {ing.qtyConsumed} {ing.unit}
                       </Text>
                       <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.primary }}>
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary }}>
                           {ing.pharmacopoeialStandard || 'API'}
                         </Text>
                         {ing.monographRef ? (
-                          <Text style={{ fontSize: 8.5, color: colors.text.muted }}>{ing.monographRef}</Text>
+                          <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{ing.monographRef}</Text>
                         ) : null}
                       </View>
                     </View>
@@ -323,39 +327,39 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               {/* Section III: Manufacturing Stage Process Operations Log */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                     SECTION III: STAGE-BY-STAGE MANUFACTURING OPERATIONS LOG
                   </Text>
                 </View>
                 <View style={{ padding: 8 }}>
                   <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6, backgroundColor: colors.bg.secondary + '60', paddingHorizontal: 4 }}>
-                    <Text style={{ width: 28, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary }}>#</Text>
-                    <Text style={{ flex: 2, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary }}>Stage Operation Name</Text>
-                    <Text style={{ flex: 1, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary }}>Status</Text>
-                    <Text style={{ flex: 1.5, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary }}>Completed At</Text>
-                    <Text style={{ flex: 1.5, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary }}>Operator / Chemist</Text>
+                    <Text style={{ ...Typography.eyebrow, width: 28, fontWeight: '700', color: colors.text.secondary }}>#</Text>
+                    <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.secondary }}>Stage Operation Name</Text>
+                    <Text style={{ ...Typography.eyebrow, flex: 1, fontWeight: '700', color: colors.text.secondary }}>Status</Text>
+                    <Text style={{ ...Typography.eyebrow, flex: 1.5, fontWeight: '700', color: colors.text.secondary }}>Completed At</Text>
+                    <Text style={{ ...Typography.eyebrow, flex: 1.5, fontWeight: '700', color: colors.text.secondary }}>Operator / Chemist</Text>
                   </View>
                   {(bmrReport.stages || []).map((s: any, idx: number) => {
                     const isDone = s.status === 'completed';
                     return (
                       <View key={idx} style={{ flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border, paddingHorizontal: 4, alignItems: 'center' }}>
-                        <Text style={{ width: 28, fontSize: 11, fontWeight: '700', color: colors.text.muted }}>{idx + 1}</Text>
+                        <Text style={{ ...Typography.caption, width: 28, fontWeight: '700', color: colors.text.muted }}>{idx + 1}</Text>
                         <View style={{ flex: 2 }}>
-                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.text.primary }}>{s.name}</Text>
-                          {s.notes ? <Text style={{ fontSize: 9.5, color: colors.text.muted, marginTop: 1 }}>{s.notes}</Text> : null}
+                          <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>{s.name}</Text>
+                          {s.notes ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 }}>{s.notes}</Text> : null}
                         </View>
                         <View style={{ flex: 1 }}>
                           <View style={{
                             backgroundColor: isDone ? colors.success + '15' : colors.warning + '15',
                             paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'
                           }}>
-                            <Text style={{ fontSize: 9, fontWeight: '800', color: isDone ? colors.success : colors.warning }}>
+                            <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: isDone ? colors.success : colors.warning }}>
                               {(s.status || 'pending').toUpperCase()}
                             </Text>
                           </View>
                         </View>
-                        <Text style={{ flex: 1.5, fontSize: 10.5, color: colors.text.primary }}>{fmtDateTime(s.completedAt)}</Text>
-                        <Text style={{ flex: 1.5, fontSize: 10.5, fontWeight: '600', color: colors.text.primary }}>{s.completedBy || '—'}</Text>
+                        <Text style={{ ...Typography.eyebrow, flex: 1.5, color: colors.text.primary }}>{fmtDateTime(s.completedAt)}</Text>
+                        <Text style={{ ...Typography.eyebrow, flex: 1.5, fontWeight: '600', color: colors.text.primary }}>{s.completedBy || '—'}</Text>
                       </View>
                     );
                   })}
@@ -365,31 +369,31 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               {/* Section IV: Material Balance & Yield Variance */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                     SECTION IV: MATERIAL BALANCE & YIELD VARIANCE LOG
                   </Text>
                 </View>
                 <View style={{ padding: 12, gap: 8 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Theoretical Planned Yield:</Text>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>{bmrReport.plannedQty} units</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Theoretical Planned Yield:</Text>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{bmrReport.plannedQty} units</Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Actual Packaged Output Yield:</Text>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>{bmrReport.actualYieldQty} units</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Actual Packaged Output Yield:</Text>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.success }}>{bmrReport.actualYieldQty} units</Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Process Waste / Scrap Qty:</Text>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: bmrReport.wasteQty > 0 ? colors.danger : colors.text.primary }}>{bmrReport.wasteQty} units</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Process Waste / Scrap Qty:</Text>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: bmrReport.wasteQty > 0 ? colors.danger : colors.text.primary }}>{bmrReport.wasteQty} units</Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 12, color: colors.text.secondary }}>Yield Variance %:</Text>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: Math.abs(bmrReport.variancePercent) > 5 ? colors.danger : colors.success }}>
-                      {bmrReport.variancePercent}% {Math.abs(bmrReport.variancePercent) > 5 ? '⚠️ Out of Tolerance' : '✅ Within Tolerance'}
+                    <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Yield Variance %:</Text>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '800', color: Math.abs(bmrReport.variancePercent) > 5 ? colors.danger : colors.success }}>
+                      {bmrReport.variancePercent}% {Math.abs(bmrReport.variancePercent) > 5 ? ' Out of Tolerance' : ' Within Tolerance'}
                     </Text>
                   </View>
                   {bmrReport.wasteReason ? (
-                    <Text style={{ fontSize: 11, color: colors.text.secondary, fontStyle: 'italic', marginTop: 2 }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary, fontStyle: 'italic', marginTop: 2 }}>
                       Variance / Waste Note: {bmrReport.wasteReason}
                     </Text>
                   ) : null}
@@ -400,24 +404,24 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               {bmrReport.labelReconciliation && bmrReport.labelReconciliation.length > 0 && (
                 <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                   <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                    <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                       SECTION V: PRINTED PACKAGING & LABEL RECONCILIATION
                     </Text>
                   </View>
                   <View style={{ padding: 8 }}>
                     <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
                       {['Printed Component', 'Issued', 'Used', 'Damaged', 'Returned', 'Status'].map((h, i) => (
-                        <Text key={h} style={{ flex: i === 0 ? 2 : 1, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary, textAlign: i > 0 && i < 5 ? 'right' : 'left' }}>{h}</Text>
+                        <Text key={h} style={{ ...Typography.eyebrow, flex: i === 0 ? 2 : 1, fontWeight: '700', color: colors.text.secondary, textAlign: i > 0 && i < 5 ? 'right' : 'left' }}>{h}</Text>
                       ))}
                     </View>
                     {bmrReport.labelReconciliation.map((rec: any, idx: number) => (
                       <View key={idx} style={{ flexDirection: 'row', paddingVertical: 4 }}>
-                        <Text style={{ flex: 2, fontSize: 11, color: colors.text.primary }}>{rec.name}</Text>
-                        <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{rec.qtyIssued}</Text>
-                        <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary, textAlign: 'right' }}>{rec.qtyUsed}</Text>
-                        <Text style={{ flex: 1, fontSize: 11, color: colors.danger, textAlign: 'right' }}>{rec.qtyDamaged}</Text>
-                        <Text style={{ flex: 1, fontSize: 11, color: colors.success, textAlign: 'right' }}>{rec.qtyReturnedToStore}</Text>
-                        <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: rec.reconciled ? colors.success : colors.warning }}>
+                        <Text style={{ ...Typography.caption, flex: 2, color: colors.text.primary }}>{rec.name}</Text>
+                        <Text style={{ ...Typography.caption, flex: 1, color: colors.text.primary, textAlign: 'right' }}>{rec.qtyIssued}</Text>
+                        <Text style={{ ...Typography.caption, flex: 1, color: colors.text.primary, textAlign: 'right' }}>{rec.qtyUsed}</Text>
+                        <Text style={{ ...Typography.caption, flex: 1, color: colors.danger, textAlign: 'right' }}>{rec.qtyDamaged}</Text>
+                        <Text style={{ ...Typography.caption, flex: 1, color: colors.success, textAlign: 'right' }}>{rec.qtyReturnedToStore}</Text>
+                        <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: rec.reconciled ? colors.success : colors.warning }}>
                           {rec.reconciled ? 'RECONCILED' : 'DISCREPANCY'}
                         </Text>
                       </View>
@@ -430,23 +434,23 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               {bmrReport.retentionSamples && bmrReport.retentionSamples.length > 0 && (
                 <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                   <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                    <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                       SECTION VI: RETENTION (REFERENCE) SAMPLES ROOM RECORD
                     </Text>
                   </View>
                   <View style={{ padding: 8 }}>
                     <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 6 }}>
                       {['Product Name', 'Qty Retained', 'Storage Location', 'Mandatory Retention Until', 'Status'].map((h, i) => (
-                        <Text key={h} style={{ flex: i === 0 || i === 2 ? 1.5 : 1, fontSize: 10.5, fontWeight: '700', color: colors.text.secondary }}>{h}</Text>
+                        <Text key={h} style={{ ...Typography.eyebrow, flex: i === 0 || i === 2 ? 1.5 : 1, fontWeight: '700', color: colors.text.secondary }}>{h}</Text>
                       ))}
                     </View>
                     {bmrReport.retentionSamples.map((rs: any, idx: number) => (
                       <View key={idx} style={{ flexDirection: 'row', paddingVertical: 4 }}>
-                        <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }}>{rs.productName}</Text>
-                        <Text style={{ flex: 1, fontSize: 11, color: colors.text.primary }}>{rs.qtyRetained} {rs.unit || 'units'}</Text>
-                        <Text style={{ flex: 1.5, fontSize: 11, color: colors.text.primary }}>{rs.storageLocation || 'QC Shelf'}</Text>
-                        <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: colors.primary }}>{fmtDate(rs.retentionUntil)}</Text>
-                        <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: rs.status === 'stored' ? colors.success : colors.text.muted }}>
+                        <Text style={{ ...Typography.caption, flex: 1.5, color: colors.text.primary }}>{rs.productName}</Text>
+                        <Text style={{ ...Typography.caption, flex: 1, color: colors.text.primary }}>{rs.qtyRetained} {rs.unit || 'units'}</Text>
+                        <Text style={{ ...Typography.caption, flex: 1.5, color: colors.text.primary }}>{rs.storageLocation || 'QC Shelf'}</Text>
+                        <Text style={{ ...Typography.caption, flex: 1, fontWeight: '600', color: colors.primary }}>{fmtDate(rs.retentionUntil)}</Text>
+                        <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: rs.status === 'stored' ? colors.success : colors.text.muted }}>
                           {rs.status.toUpperCase()}
                         </Text>
                       </View>
@@ -458,11 +462,11 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               {/* Section VII: QC Specifications & Analytical Testing Limits */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                     SECTION VII: QC LABORATORY PHYSICOCHEMICAL TESTING & LIMITS
                   </Text>
                   <View style={{ backgroundColor: bmrReport.qcStatus === 'rejected' ? colors.danger : colors.success, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                    <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: '#fff' }}>
                       {bmrReport.qcStatus === 'rejected' ? 'REJECTED' : 'APPROVED'}
                     </Text>
                   </View>
@@ -470,8 +474,8 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                 <View style={{ padding: 12, gap: 8 }}>
                   {bmrReport.qcParameters && (
                     <View style={{ backgroundColor: colors.bg.primary, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border, gap: 6, marginBottom: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '800', color: colors.text.secondary, letterSpacing: 0.5 }}>
-                        🔬 PARAMETER SPECIFICATIONS VS OBSERVED TEST RESULTS
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.text.secondary }}>
+                         PARAMETER SPECIFICATIONS VS OBSERVED TEST RESULTS
                       </Text>
                       <View style={{ gap: 4, marginTop: 4 }}>
                         {[
@@ -484,16 +488,16 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                           bmrReport.qcParameters.microbialLimit && { label: 'Microbial Limit Test', val: bmrReport.qcParameters.microbialLimit, limit: 'Within API Limits' },
                         ].filter(Boolean).map((item: any) => (
                           <View key={item.label} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                            <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                               {item.label}: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{item.val}</Text>
                             </Text>
-                            <Text style={{ fontSize: 10, color: colors.text.muted }}>Limit: {item.limit}</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Limit: {item.limit}</Text>
                           </View>
                         ))}
                       </View>
                     </View>
                   )}
-                  <Text style={{ fontSize: 11.5, color: colors.text.primary }}>
+                  <Text style={{ ...Typography.caption, color: colors.text.primary }}>
                     <Text style={{ fontWeight: '700' }}>QC Inspector Remarks: </Text>{bmrReport.qcNotes}
                   </Text>
                 </View>
@@ -502,26 +506,26 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               {/* Section VIII: Statutory Maker-Checker Signatures */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                     SECTION VIII: STATUTORY MAKER-CHECKER & MARKET RELEASE SIGNATURES
                   </Text>
                 </View>
                 <View style={{ padding: 12, gap: 10 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>Manufacturing Chemist Sign-Off:</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Manufacturing Chemist Sign-Off:</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
                       {bmrReport.bmrApprovedByName || 'Authorized Manufacturing Chemist'}
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>Analytical Chemist (QC Inspection):</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Analytical Chemist (QC Inspection):</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
                       {bmrReport.qcPassedBy || 'Authorized QC Inspector'}
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>Authorized QA Market Releaser:</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: bmrReport.releasedByName ? colors.success : colors.warning }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Authorized QA Market Releaser:</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: bmrReport.releasedByName ? colors.success : colors.warning }}>
                       {bmrReport.releasedByName ? `${bmrReport.releasedByName} (${fmtDateTime(bmrReport.releasedAt)})` : 'Pending Market Release'}
                     </Text>
                   </View>

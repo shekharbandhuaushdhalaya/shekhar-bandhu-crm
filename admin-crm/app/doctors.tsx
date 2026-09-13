@@ -1,9 +1,9 @@
+import { WorkspaceLoading, StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
-  ActivityIndicator, Modal, RefreshControl, useWindowDimensions,
-  Platform, FlatList
-} from 'react-native';
+import { View, StyleSheet, ScrollView, ActivityIndicator, Modal, RefreshControl, useWindowDimensions, Platform, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
@@ -11,7 +11,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { api, Doctor, MedicalRepresentative } from '../utils/api';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
-import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
+import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
 
 type ViewTab = 'directory' | 'matrix' | 'events';
 
@@ -333,14 +333,10 @@ export default function DoctorsScreen() {
 
           {loading ? (
             <View style={styles.centerLoading}>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <WorkspaceLoading />
             </View>
           ) : doctors.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="medkit-outline" size={48} color={colors.text.muted} />
-              <Text style={styles.emptyTitle}>No Doctor Records Found</Text>
-              <Text style={styles.emptySub}>Add doctors to your field force directory to manage MR promotions and sample quotas.</Text>
-            </View>
+            <EmptyState title={<>No Doctor Records Found</>} message={<>Add doctors to your field force directory to manage MR promotions and sample quotas.</>} />
           ) : (
             <ScrollView
               contentContainerStyle={{ padding: Spacing.md, gap: Spacing.md }}
@@ -361,13 +357,11 @@ export default function DoctorsScreen() {
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <Text style={styles.doctorName}>{doc.name}</Text>
                             {doc.category ? (
-                              <View style={[styles.catBadge, { backgroundColor: catStyle.bg }]}>
-                                <Text style={[styles.catBadgeText, { color: catStyle.text }]}>Cat {doc.category}</Text>
-                              </View>
+                              <StatusPill  label={<>Cat {doc.category}</>} textStyle={[styles.catBadgeText, { color: catStyle.text }]} />
                             ) : null}
                           </View>
                           {doc.specialization || doc.specialty ? (
-                            <Text style={styles.specText}>🔬 {doc.specialization || doc.specialty}</Text>
+                            <Text style={styles.specText}> {doc.specialization || doc.specialty}</Text>
                           ) : null}
                         </View>
 
@@ -431,7 +425,7 @@ export default function DoctorsScreen() {
                             }}
                           >
                             <Ionicons name="trending-up-outline" size={13} color={colors.primary} />
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Sample ROI</Text>
+                            <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>Sample ROI</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -471,9 +465,7 @@ export default function DoctorsScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={styles.doctorName}>{item.name}</Text>
-                    <View style={[styles.catBadge, { backgroundColor: (categoryBadgeColors[item.category] || categoryBadgeColors['C']).bg }]}>
-                      <Text style={[styles.catBadgeText, { color: (categoryBadgeColors[item.category] || categoryBadgeColors['C']).text }]}>Cat {item.category}</Text>
-                    </View>
+                    <StatusPill  label={<>Cat {item.category}</>} textStyle={[styles.catBadgeText, { color: (categoryBadgeColors[item.category] || categoryBadgeColors['C']).text }]} />
                   </View>
                   <Text style={styles.specText}>{item.clinic ? `${item.clinic} • ` : ''}{item.specialization || item.specialty || 'General Practitioner'}</Text>
                 </View>
@@ -509,7 +501,7 @@ export default function DoctorsScreen() {
                     <Text style={styles.doctorName}>{evt.doctorName}</Text>
                     <Text style={styles.specText}>{evt.clinic || 'Clinic'} | {evt.eventType}</Text>
                   </View>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
                     {new Date(evt.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                   </Text>
                 </View>
@@ -736,16 +728,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  screenTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  screenSubtitle: {
-    fontSize: 12,
-    color: colors.text.muted,
-    marginTop: 2,
-  },
+  screenTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  screenSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -755,11 +739,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 8,
     borderRadius: Radius.md,
   },
-  primaryBtnText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  primaryBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   tabBar: {
     flexDirection: 'row',
     backgroundColor: colors.bg.secondary,
@@ -779,11 +759,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   tabItemActive: {
     borderBottomColor: colors.primary,
   },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text.muted,
-  },
+  tabText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.muted },
   tabTextActive: {
     color: colors.primary,
     fontWeight: '700',
@@ -808,11 +784,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: 38,
     gap: 6,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.text.primary,
-  },
+  searchInput: { ...Typography.bodySm, flex: 1, color: colors.text.primary },
   filterChips: {
     flexDirection: 'row',
     gap: 6,
@@ -829,11 +801,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.primary + '15',
     borderColor: colors.primary,
   },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text.muted,
-  },
+  chipText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.muted },
   chipTextActive: {
     color: colors.primary,
     fontWeight: '700',
@@ -849,19 +817,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.xl,
   },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginTop: 10,
-  },
-  emptySub: {
-    fontSize: 13,
-    color: colors.text.muted,
-    textAlign: 'center',
-    marginTop: 4,
-    maxWidth: 320,
-  },
+  emptyTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginTop: 10 },
+  emptySub: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', marginTop: 4, maxWidth: 320 },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -890,30 +847,15 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.primary,
-  },
-  doctorName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
+  avatarText: { ...Typography.h3, fontWeight: '800', color: colors.primary },
+  doctorName: { ...Typography.body, fontWeight: '700', color: colors.text.primary },
   catBadge: {
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 4,
   },
-  catBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  specText: {
-    fontSize: 11,
-    color: colors.text.muted,
-    marginTop: 1,
-  },
+  catBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
+  specText: { ...Typography.caption, color: colors.text.muted, marginTop: 1 },
   iconBtn: {
     width: 28,
     height: 28,
@@ -933,10 +875,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  detailText: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
+  detailText: { ...Typography.bodySm, color: colors.text.secondary },
   loadMoreBtn: {
     paddingVertical: 12,
     alignItems: 'center',
@@ -946,11 +885,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderColor: colors.border,
     marginTop: Spacing.md,
   },
-  loadMoreText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primary,
-  },
+  loadMoreText: { ...Typography.bodySm, fontWeight: '700', color: colors.primary },
   sectionCard: {
     backgroundColor: colors.bg.secondary,
     borderRadius: Radius.md,
@@ -959,15 +894,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     padding: Spacing.md,
     gap: Spacing.md,
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  sectionSub: {
-    fontSize: 12,
-    color: colors.text.muted,
-  },
+  sectionTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  sectionSub: { ...Typography.bodySm, color: colors.text.muted },
   matrixRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -976,12 +904,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  complianceText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
+  complianceText: { ...Typography.caption, fontWeight: '700', color: colors.text.primary, marginBottom: 4 },
   progressBarTrack: {
     width: '100%',
     height: 6,
@@ -1032,11 +955,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  modalTitleText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
+  modalTitleText: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   formGroup: {
     marginBottom: 12,
   },
@@ -1044,22 +963,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  label: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  input: {
-    backgroundColor: colors.bg.primary,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: 10,
-    height: 38,
-    fontSize: 13,
-    color: colors.text.primary,
-  },
+  label: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 4 },
+  input: { ...Typography.bodySm, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 10, height: 38, color: colors.text.primary },
   catSelectBtn: {
     flex: 1,
     height: 34,
@@ -1074,11 +979,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.primary + '15',
     borderColor: colors.primary,
   },
-  catSelectText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.muted,
-  },
+  catSelectText: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
   catSelectTextActive: {
     color: colors.primary,
   },
@@ -1094,11 +995,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.primary + '15',
     borderColor: colors.primary,
   },
-  mrChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.text.muted,
-  },
+  mrChipText: { ...Typography.caption, fontWeight: '600', color: colors.text.muted },
   mrChipTextActive: {
     color: colors.primary,
     fontWeight: '700',
@@ -1111,9 +1008,5 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     marginTop: 10,
     marginBottom: 20,
   },
-  submitBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '800',
-  },
+  submitBtnText: { ...Typography.body, color: '#fff', fontWeight: '800' },
 });

@@ -1,24 +1,13 @@
+import { WorkspaceLoading, StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-  TextInput,
-  Modal,
-  ActivityIndicator,
-  useWindowDimensions,
-  RefreshControl,
-  Pressable,
-  Alert,
-  Platform
-} from 'react-native';
+import { View, StyleSheet, ScrollView, Switch, Modal, ActivityIndicator, useWindowDimensions, RefreshControl, Pressable, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { api, RolePermissionConfig } from '../utils/api';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 
 type UserItem = {
   _id: string;
@@ -403,7 +392,7 @@ export default function RbacScreen() {
   if (loading && activeTab === 'users') {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <WorkspaceLoading />
         <Text style={styles.loadingText}>Loading Access Controls...</Text>
       </View>
     );
@@ -463,9 +452,7 @@ export default function RbacScreen() {
                   <View style={{ flex: 1 }}>
                     <View style={styles.nameRow}>
                       <Text style={styles.userName}>{item.name}</Text>
-                      <View style={[styles.roleBadge, { borderColor: getRoleColor(item.role, colors), backgroundColor: getRoleColor(item.role, colors) + '10' }]}>
-                        <Text style={[styles.roleBadgeText, { color: getRoleColor(item.role, colors) }]}>{item.role.toUpperCase()}</Text>
-                      </View>
+                      <StatusPill  label={<>{item.role.toUpperCase()}</>} textStyle={[styles.roleBadgeText, { color: getRoleColor(item.role, colors) }]} />
                     </View>
                     <Text style={styles.userEmail}>{item.email}</Text>
                     {(() => {
@@ -476,11 +463,11 @@ export default function RbacScreen() {
                         <View style={{ marginTop: 6 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isOnline ? colors.success : '#999' }} />
-                            <Text style={{ fontSize: 11, color: isOnline ? colors.success : colors.text.muted, fontWeight: isOnline ? '600' : '400' }}>
+                            <Text style={{ ...Typography.caption, color: isOnline ? colors.success : colors.text.muted, fontWeight: isOnline ? '600' : '400' }}>
                               {isOnline ? 'Online' : 'Offline'}
                             </Text>
                             {item.lastActive && (
-                              <Text style={{ fontSize: 10, color: colors.text.muted }}> • Active {formatTimeAgo(item.lastActive)}</Text>
+                              <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}> • Active {formatTimeAgo(item.lastActive)}</Text>
                             )}
                           </View>
                         </View>
@@ -534,10 +521,7 @@ export default function RbacScreen() {
             ))}
 
             {users.length === 0 && (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="people-outline" size={40} color={colors.text.muted} />
-                <Text style={styles.emptyText}>No users registered in system</Text>
-              </View>
+              <EmptyState title={<>No users registered in system</>}  />
             )}
           </View>
         )}
@@ -562,7 +546,7 @@ export default function RbacScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 12, lineHeight: 15 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, marginBottom: 12 }}>
                 Configure exactly what each role can access. Changes take effect immediately for all users with that role.
               </Text>
               <View style={styles.roleSelectorRow}>
@@ -613,13 +597,13 @@ export default function RbacScreen() {
             }}>
               <Ionicons name="search-outline" size={18} color={colors.text.muted} />
               <TextInput
-                style={{ flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 10 }}
+                style={{ ...Typography.body, flex: 1, color: colors.text.primary, paddingVertical: 10 }}
                   placeholder="Search permissions..."
                   placeholderTextColor={colors.text.muted}
                   value={searchPerm}
                   onChangeText={setSearchPerm}
                 />
-                <Text style={{ fontSize: 10, color: colors.text.muted }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>
                   {editPermissions.size} / {allPermissions.length} selected
                 </Text>
               </View>
@@ -627,7 +611,7 @@ export default function RbacScreen() {
             {/* Permission Matrix */}
             {permLoading ? (
               <View style={{ alignItems: 'center', padding: 40 }}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <WorkspaceLoading />
               </View>
             ) : (
               <View style={styles.tableContainer}>
@@ -698,7 +682,7 @@ export default function RbacScreen() {
                 disabled={permSaving || BUILTIN_ROLES.includes(selectedRole) === false}
               >
                 <Ionicons name="refresh-outline" size={16} color={colors.danger} />
-                <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>Reset to Defaults</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.danger, fontWeight: '700' }}>Reset to Defaults</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.savePermBtn, { backgroundColor: colors.primary, borderColor: colors.primary, flex: 1 }]}
@@ -710,7 +694,7 @@ export default function RbacScreen() {
                 ) : (
                   <>
                     <Ionicons name="cloud-upload-outline" size={16} color="#fff" />
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Save Permissions for {selectedRole.toUpperCase()}</Text>
+                    <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Save Permissions for {selectedRole.toUpperCase()}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -831,36 +815,36 @@ const createStyles = (colors: typeof LightColors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg.primary },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary },
-    loadingText: { marginTop: 12, fontSize: 14, color: colors.text.secondary, fontWeight: '600' },
+    loadingText: { ...Typography.body, marginTop: 12, color: colors.text.secondary, fontWeight: '600' },
     tabRow: { flexDirection: 'row', backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border },
     tabBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 6, borderBottomWidth: 3, borderBottomColor: 'transparent' },
-    tabText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
+    tabText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
     addButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.md, gap: 4 },
-    addButtonText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+    addButtonText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
     scrollContent: { padding: Spacing.lg },
     card: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10 },
-    cardTitleText: { fontSize: 15, fontWeight: '800', color: colors.text.primary },
+    cardTitleText: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
     userRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 16, position: 'relative', gap: 12 },
     userInfoCol: { flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 260, flex: 1 },
     avatar: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.02)' },
-    avatarText: { fontSize: 16, fontWeight: '800' },
+    avatarText: { ...Typography.h3, fontWeight: '800' },
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
-    userName: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
+    userName: { ...Typography.body, fontWeight: '700', color: colors.text.primary },
     roleBadge: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1.5 },
-    roleBadgeText: { fontSize: 8, fontWeight: '800' },
-    userEmail: { fontSize: 12, color: colors.text.secondary },
+    roleBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
+    userEmail: { ...Typography.bodySm, color: colors.text.secondary },
     actionsCol: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 20 },
     roleGroup: { flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: Radius.sm, overflow: 'hidden', flexWrap: 'wrap' },
     roleOptionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRightWidth: 1, borderRightColor: colors.border, backgroundColor: 'rgba(0,0,0,0.01)' },
-    roleOptionText: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
+    roleOptionText: { ...Typography.eyebrow, fontWeight: '600', color: colors.text.muted },
     cashToggleGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    cashToggleLabel: { fontSize: 11, color: colors.text.secondary },
+    cashToggleLabel: { ...Typography.caption, color: colors.text.secondary },
     deleteBtn: { padding: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.danger + '20', backgroundColor: colors.danger + '08' },
     rowOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.6)', justifyContent: 'center', alignItems: 'center', borderRadius: Radius.md },
     emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, gap: 10 },
-    emptyText: { fontSize: 13, color: colors.text.muted, fontWeight: '600' },
-    helpText: { fontSize: 10, color: colors.text.muted, marginTop: -12, marginBottom: 16, lineHeight: 14 },
+    emptyText: { ...Typography.bodySm, color: colors.text.muted, fontWeight: '600' },
+    helpText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: -12, marginBottom: 16 },
 
     // --- Permission Styles ---
     roleSelectorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
@@ -869,18 +853,18 @@ const createStyles = (colors: typeof LightColors) =>
       borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, 
       minWidth: 140, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 
     },
-    roleSelectorText: { fontSize: 13, fontWeight: '700', letterSpacing: 0.3, marginBottom: 4 },
-    roleSelectorCount: { fontSize: 11, fontWeight: '600' },
+    roleSelectorText: { ...Typography.bodySm, fontWeight: '700', marginBottom: 4 },
+    roleSelectorCount: { ...Typography.caption, fontWeight: '600' },
     
     // --- Table Permission Styles ---
     tableContainer: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
     tableHeaderRow: { flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-    thText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+    thText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase' },
     tableRow: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.primary },
-    tdResourceLabel: { fontSize: 13, fontWeight: '800', color: colors.text.primary, textTransform: 'capitalize', marginBottom: 4 },
-    tdCount: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+    tdResourceLabel: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, textTransform: 'capitalize', marginBottom: 4 },
+    tdCount: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' },
     tdCheckboxBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 70, paddingVertical: 4 },
-    tdActionText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary, textTransform: 'capitalize' },
+    tdActionText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, textTransform: 'capitalize' },
     
     savePermBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: Radius.lg, borderWidth: 1 },
 
@@ -889,23 +873,23 @@ const createStyles = (colors: typeof LightColors) =>
     modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContainer: { width: '90%', maxWidth: 480, maxHeight: '90%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', elevation: 20 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-    modalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
+    modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
     modalCloseBtn: { padding: 4 },
     modalForm: { padding: Spacing.lg },
-    inputLabel: { fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-    input: { backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.text.primary, marginBottom: 16 },
+    inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase' },
+    input: { ...Typography.bodySm, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 16 },
     modalRoleGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
     modalRoleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: colors.border, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: 14 },
-    modalRoleText: { fontSize: 10, fontWeight: '600', color: colors.text.secondary },
+    modalRoleText: { ...Typography.eyebrow, fontWeight: '600', color: colors.text.secondary },
     radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.1)' },
     modalCashAccessRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderRadius: Radius.md, padding: 12, borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
-    modalCashLabel: { fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 2 },
-    modalCashDesc: { fontSize: 11, color: colors.text.muted, lineHeight: 14 },
+    modalCashLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 2 },
+    modalCashDesc: { ...Typography.caption, color: colors.text.muted },
     modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, gap: 12, backgroundColor: colors.bg.secondary },
     cancelBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border },
-    cancelBtnText: { color: colors.text.secondary, fontSize: 13, fontWeight: '700' },
+    cancelBtnText: { ...Typography.bodySm, color: colors.text.secondary, fontWeight: '700' },
     submitBtn: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center', minWidth: 110 },
-    submitBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    submitBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
     errorAlert: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.danger + '10', borderWidth: 1, borderColor: colors.danger + '30', borderRadius: Radius.md, marginHorizontal: Spacing.lg, marginTop: Spacing.md, padding: 10 },
-    errorAlertText: { color: colors.danger, fontSize: 12, fontWeight: '600', flex: 1 },
+    errorAlertText: { ...Typography.bodySm, color: colors.danger, fontWeight: '600', flex: 1 },
   });

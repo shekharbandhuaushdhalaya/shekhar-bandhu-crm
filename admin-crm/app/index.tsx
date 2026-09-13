@@ -1,14 +1,16 @@
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Pressable, FlatList, TouchableOpacity, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Pressable, FlatList, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
+import { Spacing, Radius, LightColors, Shadows, Typography } from '../constants/theme';
 import { api, DashboardStats, Activity, Contact, Product, Invoice, Challan, ConsolidatedInventory, MrDashboardSummary, ExpiryAlert, Campaign } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import Svg, { Path, Circle, Text as SvgText, Line, Defs, LinearGradient, Stop, Rect, G } from 'react-native-svg';
-import { MetricTile, Panel, WorkspaceHeader, WorkspaceTabs } from '../components/WorkspacePrimitives';
+import { MetricTile, Panel, WorkspaceHeader, WorkspaceTabs, WorkspaceLoading, WorkspaceTransition } from './../components/WorkspacePrimitives';
 
 function MetricCard({ title, value, icon, color, colorLight, trend }: { title: string; value: string; icon: string; color: string; colorLight: string; trend: string }) {
   const styles = useStyles(createStyles);
@@ -209,12 +211,12 @@ function LowStockAlerts({ products }: { products: Product[] }) {
           {products.map((p, i) => (
             <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: i === products.length - 1 ? 0 : 1, borderBottomColor: colors.border }}>
               <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 13 }} numberOfLines={1}>{p.name}</Text>
-                <Text style={{ color: colors.text.muted, fontSize: 11, marginTop: 2 }}>SKU: {p.sku}</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{p.name}</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>SKU: {p.sku}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 13 }}>{p.stockLevel} in stock</Text>
-                <Text style={{ color: colors.text.muted, fontSize: 11, marginTop: 2 }}>Min required: {p.minReorder || 0}</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.danger, fontWeight: '700' }}>{p.stockLevel} in stock</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>Min required: {p.minReorder || 0}</Text>
               </View>
             </View>
           ))}
@@ -260,12 +262,12 @@ function ExpiryAlerts({ alerts, loading }: { alerts: ExpiryAlert[]; loading: boo
               <View key={a._id} style={{ paddingVertical: 8, borderBottomWidth: i === alerts.length - 1 ? 0 : 1, borderBottomColor: colors.border }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 13 }} numberOfLines={1}>{a.productType} {a.size ? `(${a.size})` : ''}</Text>
-                    <Text style={{ color: colors.text.muted, fontSize: 11 }}>Batch: {a.batchNo} • {a.warehouseName}</Text>
-                    <Text style={{ color: colors.text.muted, fontSize: 11 }}>Exp: {expDate} • {a.qtyBoxes} boxes</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{a.productType} {a.size ? `(${a.size})` : ''}</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted }}>Batch: {a.batchNo} • {a.warehouseName}</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted }}>Exp: {expDate} • {a.qtyBoxes} boxes</Text>
                   </View>
                   <View style={{ backgroundColor: isExpired ? colors.danger + '20' : colors.warning + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: isExpired ? colors.danger : colors.warning }}>
+                    <Text style={{ ...Typography.caption, fontWeight: '800', color: isExpired ? colors.danger : colors.warning }}>
                       {isExpired ? `EXPIRED` : `${a.daysToExpiry}d left`}
                     </Text>
                   </View>
@@ -395,11 +397,7 @@ function MonthlySalesWidget({ width, sales }: { width: number; sales: Invoice[] 
               gap: 6,
             }}
           >
-            <Text style={{
-              fontSize: 11,
-              fontWeight: '700',
-              color: colors.text.secondary,
-            }}>
+            <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary }}>
               {activeFY}
             </Text>
             <Ionicons name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={14} color={colors.text.secondary} />
@@ -437,11 +435,7 @@ function MonthlySalesWidget({ width, sales }: { width: number; sales: Invoice[] 
                     borderBottomColor: colors.border,
                   })}
                 >
-                  <Text style={{
-                    fontSize: 11,
-                    fontWeight: activeFY === fy ? '700' : '600',
-                    color: activeFY === fy ? colors.primary : colors.text.secondary,
-                  }}>
+                  <Text style={{ ...Typography.caption, fontWeight: activeFY === fy ? '700' : '600', color: activeFY === fy ? colors.primary : colors.text.secondary }}>
                     {fy}
                   </Text>
                 </Pressable>
@@ -659,7 +653,7 @@ function FullMrAnalyticsTab() {
   if (!mrDashboard) {
     return (
       <View style={{ padding: 24, alignItems: 'center' }}>
-        <Text style={{ color: colors.text.muted, fontSize: 13 }}>Loading MR Field Analytics...</Text>
+        <Text style={{ ...Typography.bodySm, color: colors.text.muted }}>Loading MR Field Analytics...</Text>
       </View>
     );
   }
@@ -675,8 +669,8 @@ function FullMrAnalyticsTab() {
             <Ionicons name="location" size={20} color="#fff" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>MR Daily Attendance & GPS Logs</Text>
-            <Text style={{ fontSize: 11, color: colors.text.secondary }}>Inspect live check-ins, check-outs, odometer distance & map coordinates</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>MR Daily Attendance & GPS Logs</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Inspect live check-ins, check-outs, odometer distance & map coordinates</Text>
           </View>
         </View>
 
@@ -694,7 +688,7 @@ function FullMrAnalyticsTab() {
           activeOpacity={0.8}
         >
           <Ionicons name="footsteps-outline" size={16} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>View GPS Attendance</Text>
+          <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '800' }}>View GPS Attendance</Text>
         </TouchableOpacity>
       </View>
 
@@ -702,7 +696,7 @@ function FullMrAnalyticsTab() {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.card, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>Performance Window:</Text>
+          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>Performance Window:</Text>
         </View>
         <View style={{ flexDirection: 'row', backgroundColor: colors.bg.primary, padding: 2, borderRadius: Radius.sm, gap: 4 }}>
           {[
@@ -720,7 +714,7 @@ function FullMrAnalyticsTab() {
               }}
               onPress={() => setDateRange(d.id)}
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: dateRange === d.id ? '#fff' : colors.text.secondary }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: dateRange === d.id ? '#fff' : colors.text.secondary }}>
                 {d.label}
               </Text>
             </Pressable>
@@ -731,30 +725,30 @@ function FullMrAnalyticsTab() {
       {/* KPI Cards */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.primary + '30' }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>DOCTOR VISITS</Text>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.primary, marginTop: 4 }}>{totals.visits}</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>DOCTOR VISITS</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.primary, marginTop: 4 }}>{totals.visits}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.success + '30' }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>BOOKED ORDERS</Text>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.success, marginTop: 4 }}>{totals.orders}</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>BOOKED ORDERS</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.success, marginTop: 4 }}>{totals.orders}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.warning + '30' }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>TOTAL ORDER VALUE</Text>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.warning, marginTop: 4 }}>₹{(totals.orderValue || 0).toLocaleString('en-IN')}</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>TOTAL ORDER VALUE</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.warning, marginTop: 4 }}>₹{(totals.orderValue || 0).toLocaleString('en-IN')}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.danger + '30' }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>EXPENSES SUBMITTED</Text>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.danger, marginTop: 4 }}>₹{(totals.expenses || 0).toLocaleString('en-IN')}</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>EXPENSES SUBMITTED</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.danger, marginTop: 4 }}>₹{(totals.expenses || 0).toLocaleString('en-IN')}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.info + '30' }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>DISTANCE COVERED</Text>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.info, marginTop: 4 }}>{(totals.distance || 0).toFixed(0)} <Text style={{ fontSize: 14 }}>km</Text></Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>DISTANCE COVERED</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.info, marginTop: 4 }}>{(totals.distance || 0).toFixed(0)} <Text style={{ ...Typography.body }}>km</Text></Text>
         </View>
       </View>
 
       {/* Individual MR Performance Cards */}
       <View style={{ gap: 12 }}>
-        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>
+        <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>
           MR INDIVIDUAL PERFORMANCE & ROI ({mrData.length} ACTIVE REPS)
         </Text>
 
@@ -767,15 +761,15 @@ function FullMrAnalyticsTab() {
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>{m.name.charAt(0)}</Text>
+                    <Text style={{ ...Typography.body, fontWeight: '800', color: colors.primary }}>{m.name.charAt(0)}</Text>
                   </View>
                   <View>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>{m.name}</Text>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>{m.territory || 'Headquarters'} • Target: ₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
+                    <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>{m.name}</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary }}>{m.territory || 'Headquarters'} • Target: ₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
                   </View>
                 </View>
                 <View style={{ backgroundColor: Number(roi) > 0 ? colors.success + '18' : colors.warning + '18', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: Number(roi) > 0 ? colors.success : colors.warning }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: Number(roi) > 0 ? colors.success : colors.warning }}>
                     ROI: {roi}%
                   </Text>
                 </View>
@@ -784,8 +778,8 @@ function FullMrAnalyticsTab() {
               {/* Progress Bar */}
               <View style={{ marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted }}>MONTHLY TARGET PROGRESS</Text>
-                  <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>{targetAchievement}% Achieved</Text>
+                  <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>MONTHLY TARGET PROGRESS</Text>
+                  <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>{targetAchievement}% Achieved</Text>
                 </View>
                 <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
                   <View style={{ width: `${targetAchievement}%`, height: '100%', backgroundColor: targetAchievement >= 100 ? colors.success : colors.primary }} />
@@ -795,24 +789,24 @@ function FullMrAnalyticsTab() {
               {/* Metrics Grid */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.bg.primary, padding: 10, borderRadius: Radius.md }}>
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>{m.visits}</Text>
-                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Visits</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>{m.visits}</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Visits</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>{m.orders}</Text>
-                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Orders</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>{m.orders}</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Orders</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>₹{(m.orderValue || 0).toLocaleString('en-IN')}</Text>
-                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Sales</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.success }}>₹{(m.orderValue || 0).toLocaleString('en-IN')}</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Sales</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.danger }}>₹{(m.expenses || 0).toLocaleString('en-IN')}</Text>
-                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Expenses</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.danger }}>₹{(m.expenses || 0).toLocaleString('en-IN')}</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Expenses</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.info }}>{m.totalDistance.toFixed(0)} km</Text>
-                  <Text style={{ fontSize: 9, color: colors.text.muted }}>Distance</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.info }}>{m.totalDistance.toFixed(0)} km</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Distance</Text>
                 </View>
               </View>
             </View>
@@ -832,16 +826,16 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
   if (!mfgAnalytics) {
     return (
       <View style={{ padding: 24, alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 12 }}>Loading Manufacturing Analytics...</Text>
+        <WorkspaceLoading />
+        <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 12 }}>Loading Manufacturing Analytics...</Text>
       </View>
     );
   }
 
   return (
     <View style={{ gap: 16 }}>
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        🏭 Manufacturing Facility Financial & Asset Valuation
+      <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' }}>
+         Manufacturing Facility Financial & Asset Valuation
       </Text>
 
       <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16 }}>
@@ -852,8 +846,8 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
               <Ionicons name="leaf-outline" size={20} color={colors.success} />
             </View>
             <View>
-              <Text style={{ fontSize: 11, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>Raw Stock Valuation</Text>
-              <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>Raw Stock Valuation</Text>
+              <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
                 ₹{(mfgAnalytics?.netRawMaterialValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </Text>
             </View>
@@ -867,8 +861,8 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
               <Ionicons name="cube-outline" size={20} color={colors.primary} />
             </View>
             <View>
-              <Text style={{ fontSize: 11, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>Finished Goods Value</Text>
-              <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>Finished Goods Value</Text>
+              <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
                 ₹{(mfgAnalytics?.netFinishedGoodsValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </Text>
             </View>
@@ -882,8 +876,8 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
               <Ionicons name="wallet-outline" size={20} color={colors.primary} />
             </View>
             <View>
-              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Facility Assets</Text>
-              <Text style={{ fontSize: 20, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
+              <Text style={{ ...Typography.caption, color: colors.primary, fontWeight: '700', textTransform: 'uppercase' }}>Total Facility Assets</Text>
+              <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
                 ₹{((mfgAnalytics?.netRawMaterialValue || 0) + (mfgAnalytics?.netFinishedGoodsValue || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </Text>
             </View>
@@ -893,7 +887,7 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
 
       {/* Yield Efficiencies */}
       <View style={[styles.chartCard, { padding: 16 }]}>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginBottom: 16 }}>Yield Performance & Recipe Efficiency</Text>
+        <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: 16 }}>Yield Performance & Recipe Efficiency</Text>
         
         {mfgAnalytics?.yieldPerformance && mfgAnalytics.yieldPerformance.length > 0 ? (
           <View style={{ gap: 16 }}>
@@ -904,10 +898,10 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
                 <View key={idx}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' }}>
                     <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>Batch: {item.batchNo} · {item.productName}</Text>
-                      <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>Yielded {item.actualYieldQty} / {item.plannedQty} planned units</Text>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>Batch: {item.batchNo} · {item.productName}</Text>
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 2 }}>Yielded {item.actualYieldQty} / {item.plannedQty} planned units</Text>
                     </View>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: barColor }}>{item.efficiency}%</Text>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: barColor }}>{item.efficiency}%</Text>
                   </View>
                   {/* Progress bar */}
                   <View style={{ height: 8, width: '100%', backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' }}>
@@ -920,7 +914,7 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
         ) : (
           <View style={{ alignItems: 'center', padding: 24 }}>
             <Ionicons name="bar-chart-outline" size={32} color={colors.text.secondary} />
-            <Text style={{ color: colors.text.secondary, fontSize: 13, marginTop: 8 }}>No completed yield batches to analyze.</Text>
+            <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginTop: 8 }}>No completed yield batches to analyze.</Text>
           </View>
         )}
       </View>
@@ -960,8 +954,8 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
             <Ionicons name="pie-chart" size={20} color="#fff" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>Marketing Financial ROI Analysis</Text>
-            <Text style={{ fontSize: 11, color: colors.text.secondary }}>Compare campaign spends, yields, and net profits across channels</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>Marketing Financial ROI Analysis</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Compare campaign spends, yields, and net profits across channels</Text>
           </View>
         </View>
       </View>
@@ -969,16 +963,16 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
       {/* ROI Cards */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.primary }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Budget</Text>
-          <Text style={{ fontSize: 22, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>{formatCurrency(totalBudget)}</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Budget</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>{formatCurrency(totalBudget)}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.warning }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Spent</Text>
-          <Text style={{ fontSize: 22, fontWeight: '800', color: colors.warning, marginTop: 4 }}>{formatCurrency(totalSpent)}</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Spent</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.warning, marginTop: 4 }}>{formatCurrency(totalSpent)}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.success }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Revenue Yield</Text>
-          <Text style={{ fontSize: 22, fontWeight: '800', color: colors.success, marginTop: 4 }}>{formatCurrency(totalRevenue)}</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Revenue Yield</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.success, marginTop: 4 }}>{formatCurrency(totalRevenue)}</Text>
         </View>
       </View>
 
@@ -987,36 +981,36 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
         <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
           <Ionicons name="trending-up" size={24} color={netProfit >= 0 ? colors.success : colors.danger} />
           <View style={{ marginLeft: 10 }}>
-            <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Net Yield Profit</Text>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: netProfit >= 0 ? colors.success : colors.danger, marginTop: 2 }}>{formatCurrency(netProfit)}</Text>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Net Yield Profit</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '800', color: netProfit >= 0 ? colors.success : colors.danger, marginTop: 2 }}>{formatCurrency(netProfit)}</Text>
           </View>
         </View>
 
         <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
           <Ionicons name="speedometer-outline" size={24} color={colors.primary} />
           <View style={{ marginLeft: 10 }}>
-            <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Return on Spend (ROI)</Text>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginTop: 2 }}>{overallRoi.toFixed(1)}%</Text>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Return on Spend (ROI)</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary, marginTop: 2 }}>{overallRoi.toFixed(1)}%</Text>
           </View>
         </View>
 
         <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
           <Ionicons name="people" size={24} color="#6366f1" />
           <View style={{ marginLeft: 10 }}>
-            <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Cost Per Lead (CAC)</Text>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: '#6366f1', marginTop: 2 }}>{formatCurrency(averageCac)}</Text>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Cost Per Lead (CAC)</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '800', color: '#6366f1', marginTop: 2 }}>{formatCurrency(averageCac)}</Text>
           </View>
         </View>
       </View>
 
       {/* Yield Analysis by Channel */}
       <View style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md }}>
-        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>Yield Analysis by Channel</Text>
+        <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>Yield Analysis by Channel</Text>
         <View style={{ flexDirection: 'row', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border + '50', marginBottom: 8 }}>
-          <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: colors.text.secondary }}>Channel</Text>
-          <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Spent</Text>
-          <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Revenue</Text>
-          <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>ROI %</Text>
+          <Text style={{ ...Typography.caption, flex: 1.5, fontWeight: '700', color: colors.text.secondary }}>Channel</Text>
+          <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Spent</Text>
+          <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Revenue</Text>
+          <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>ROI %</Text>
         </View>
 
         {['social_media', 'google', 'email', 'sms', 'whatsapp', 'other'].map(platform => {
@@ -1036,13 +1030,13 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
             <View key={platform} style={{ flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border + '30', alignItems: 'center' }}>
               <View style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: platformColor }} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                   {PLATFORM_LABELS[platform] || platform}
                 </Text>
               </View>
-              <Text style={{ flex: 1, fontSize: 11, textAlign: 'right', color: colors.text.secondary }}>{formatCurrency(spent)}</Text>
-              <Text style={{ flex: 1, fontSize: 11, textAlign: 'right', color: colors.success, fontWeight: '700' }}>{formatCurrency(revenue)}</Text>
-              <Text style={{ flex: 1, fontSize: 11, textAlign: 'right', fontWeight: '700', color: profit >= 0 ? colors.success : colors.danger }}>
+              <Text style={{ ...Typography.caption, flex: 1, textAlign: 'right', color: colors.text.secondary }}>{formatCurrency(spent)}</Text>
+              <Text style={{ ...Typography.caption, flex: 1, textAlign: 'right', color: colors.success, fontWeight: '700' }}>{formatCurrency(revenue)}</Text>
+              <Text style={{ ...Typography.caption, flex: 1, textAlign: 'right', fontWeight: '700', color: profit >= 0 ? colors.success : colors.danger }}>
                 {roi.toFixed(0)}%
               </Text>
             </View>
@@ -1052,7 +1046,7 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
 
       {/* Campaign Financial Efficiency Table */}
       <View style={{ gap: 10 }}>
-        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>Campaign Financial Efficiency</Text>
+        <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>Campaign Financial Efficiency</Text>
         {campaigns.map(c => {
           const profit = c.analytics.revenue - c.spent;
           const roi = c.spent > 0 ? (profit / c.spent) * 100 : 0;
@@ -1064,12 +1058,12 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
           return (
             <View key={c._id} style={{ flexDirection: 'row', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: platformColor, padding: 12, justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }} numberOfLines={1}>{c.name}</Text>
-                <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>Spent: {formatCurrency(c.spent)}</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }} numberOfLines={1}>{c.name}</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>Spent: {formatCurrency(c.spent)}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>+{formatCurrency(c.analytics.revenue)}</Text>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: profit >= 0 ? colors.success : colors.danger, marginTop: 2 }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.success }}>+{formatCurrency(c.analytics.revenue)}</Text>
+                <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: profit >= 0 ? colors.success : colors.danger, marginTop: 2 }}>
                   ROI: {roi.toFixed(0)}%
                 </Text>
               </View>
@@ -1275,7 +1269,7 @@ export default function DashboardScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-      >
+      ><WorkspaceTransition value={activeTab}>
         {activeTab === 'overview' ? (
           <>
             <View style={styles.metricsGrid}>
@@ -1331,7 +1325,7 @@ export default function DashboardScreen() {
         ) : (
           <DashboardMarketingAnalyticsTab campaigns={campaigns} />
         )}
-      </ScrollView>
+      </WorkspaceTransition></ScrollView>
     </View>
   );
 }
@@ -1339,49 +1333,49 @@ export default function DashboardScreen() {
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
   content: { padding: Spacing.lg, width: '100%', maxWidth: 1200, alignSelf: 'center' },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
-  subheading: { fontSize: 14, color: colors.text.secondary, marginBottom: Spacing.lg },
+  heading: { ...Typography.display, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  subheading: { ...Typography.body, color: colors.text.secondary, marginBottom: Spacing.lg },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginBottom: Spacing.md },
-  metricCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
+  metricCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, maxWidth: 340, backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
   metricHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
-  metricTitle: { fontSize: 11, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.5 },
-  metricValue: { fontSize: 26, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
-  metricTrend: { fontSize: 12, fontWeight: '600' },
+  metricTitle: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
+  metricValue: { ...Typography.display, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  metricTrend: { ...Typography.bodySm, fontWeight: '600' },
   metricFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.xs },
-  metricSubtext: { fontSize: 11, color: colors.text.muted },
+  metricSubtext: { ...Typography.caption, color: colors.text.muted },
   summaryCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
   summaryCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
-  summaryCardTitle: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.5 },
-  summaryCardValue: { fontSize: 24, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
-  summaryCardLabel: { fontSize: 11, color: colors.text.secondary },
+  summaryCardTitle: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted },
+  summaryCardValue: { ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  summaryCardLabel: { ...Typography.caption, color: colors.text.secondary },
   breakdownRow: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 8, alignItems: 'center' },
   breakdownItem: { flex: 1 },
-  breakdownLabel: { fontSize: 9, color: colors.text.muted, fontWeight: '700', letterSpacing: 0.5 },
-  breakdownValue: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginTop: 2 },
+  breakdownLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' },
+  breakdownValue: { ...Typography.body, fontWeight: '700', color: colors.text.primary, marginTop: 2 },
   breakdownSeparator: { width: 1, backgroundColor: colors.border, alignSelf: 'stretch', marginVertical: 2 },
   chartLegend: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: Spacing.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: 11, color: colors.text.secondary, fontWeight: '600' },
-  legendVal: { fontSize: 13, color: colors.text.primary, fontWeight: '700', marginTop: 2 },
+  legendText: { ...Typography.caption, color: colors.text.secondary, fontWeight: '600' },
+  legendVal: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '700', marginTop: 2 },
   chartCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: Spacing.lg, ...Shadows.card },
-  chartTitle: { fontSize: 15, fontWeight: '700', color: colors.text.primary, marginBottom: Spacing.lg },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary, marginBottom: Spacing.md },
+  chartTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: Spacing.lg },
+  sectionTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: Spacing.md },
   activityItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 14 },
   activityDot: { width: 9, height: 9, borderRadius: 5, marginTop: 4 },
-  activityText: { fontSize: 13, color: colors.text.primary, fontWeight: '500' },
-  activityTime: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  activityText: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' },
+  activityTime: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
   pulseRow: { flexDirection: 'row', alignItems: 'stretch', flexWrap: 'wrap', gap: 0 },
   pulseItem: { minWidth: 135, flexGrow: 1, flexShrink: 1, paddingVertical: 4, paddingHorizontal: 12 },
-  pulseValue: { fontSize: 16, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.2 },
-  pulseLabel: { fontSize: 10.5, color: colors.text.muted, marginTop: 3 },
+  pulseValue: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  pulseLabel: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 3 },
   pulseDivider: { width: 1, minHeight: 38, backgroundColor: colors.border, alignSelf: 'center' },
   quickActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   quickAction: { flexGrow: 1, flexShrink: 1, flexBasis: 245, minWidth: 220, minHeight: 64, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, ...Shadows.card },
   quickActionPressed: { backgroundColor: colors.bg.cardHover },
   quickActionIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  quickActionLabel: { fontSize: 12.5, fontWeight: '800', color: colors.text.primary },
-  quickActionSub: { fontSize: 10.5, color: colors.text.muted, marginTop: 2 },
+  quickActionLabel: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
+  quickActionSub: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
   chartsFeedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, width: '100%' },
   chartWrapper: { flexGrow: 2, flexShrink: 1, flexBasis: 500 },
   feedWrapper: { flexGrow: 1, flexShrink: 1, flexBasis: 350 },

@@ -1,8 +1,11 @@
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../../components/AppTextInput';
+import { AppText as Text } from './../../../components/AppText';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform, Image, Pressable, Alert } from 'react-native';
+import { View, ScrollView, Modal, KeyboardAvoidingView, Platform, Image, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Spacing, Radius } from '../../../constants/theme';
+import { Spacing, Radius, Typography } from '../../../constants/theme';
 import { api, Product, getImageUrl } from '../../../utils/api';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { useToast } from '../../../utils/ToastContext';
@@ -774,7 +777,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 style={{ width: 80, height: 80, borderRadius: 8, borderStyle: 'dashed', borderWidth: 1.5, borderColor: colors.primary, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.secondary }}
               >
                 <Ionicons name="add" size={24} color={colors.primary} />
-                <Text style={{ fontSize: 9, color: colors.primary, fontWeight: '700', marginTop: 4 }}>Add Photo</Text>
+                <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700', marginTop: 4 }}>Add Photo</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -790,7 +793,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 borderColor: activeFormTab === 'basic' ? colors.primary : 'transparent'
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: activeFormTab === 'basic' ? colors.primary : colors.text.secondary }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: activeFormTab === 'basic' ? colors.primary : colors.text.secondary }}>
                 1. Basic Details
               </Text>
             </TouchableOpacity>
@@ -804,7 +807,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 borderColor: activeFormTab === 'recipe' ? colors.primary : 'transparent'
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: activeFormTab === 'recipe' ? colors.primary : colors.text.secondary }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: activeFormTab === 'recipe' ? colors.primary : colors.text.secondary }}>
                 2. Formulation Recipe (BOM)
               </Text>
             </TouchableOpacity>
@@ -862,14 +865,14 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
               </View>
 
               <View style={[styles.formSectionHeader, { marginTop: 12 }]}><Text style={styles.formSectionTitle}>Product Sizes & Pricing</Text></View>
-              <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
+              <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
                 Define the sizes/packaging units for this formulation. At least one size is required.
               </Text>
 
               {variantsList.map((variant, index) => (
                 <View key={index} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: Platform.OS === 'web' ? 'nowrap' : 'wrap' }}>
                   <View style={[styles.formInput, { flex: 1, minWidth: 90 }]}>
-                    <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>Size:</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted, marginRight: 4 }}>Size:</Text>
                     <TextInput
                       style={styles.formInputText}
                       placeholder={`e.g. 250`}
@@ -882,11 +885,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                       }}
                       keyboardType="numeric"
                     />
-                    <Text style={{ fontSize: 11, color: colors.text.muted, marginLeft: 2 }}>{getSizeUnit()}</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted, marginLeft: 2 }}>{getSizeUnit()}</Text>
                   </View>
 
                   <View style={[styles.formInput, { flex: 1.2, minWidth: 100 }]}>
-                    <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>B2B ₹:</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted, marginRight: 4 }}>B2B ₹:</Text>
                     <TextInput
                       style={styles.formInputText}
                       placeholder="Price"
@@ -902,7 +905,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                   </View>
 
                   <View style={[styles.formInput, { flex: 1.2, minWidth: 100 }]}>
-                    <Text style={{ fontSize: 11, color: colors.text.muted, marginRight: 4 }}>MRP ₹:</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted, marginRight: 4 }}>MRP ₹:</Text>
                     <TextInput
                       style={styles.formInputText}
                       placeholder="MRP"
@@ -937,7 +940,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10', marginTop: 6, marginBottom: 16 }}
               >
                 <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Add Size Variant</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>Add Size Variant</Text>
               </TouchableOpacity>
 
               <View style={styles.formGroup}>
@@ -956,7 +959,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                     <select
                       value={gstRate}
                       onChange={(e: any) => setGstRate(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 14, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
+                      style={{ ...Typography.body, flex: 1, padding: 8, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
                     >
                       <option value="0">0% (Exempt)</option>
                       <option value="5">5% (Ayurvedic Classical / Herbs)</option>
@@ -1180,7 +1183,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 marginBottom: 10
               }}
             >
-              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Next: Configure Recipe (BOM)</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Next: Configure Recipe (BOM)</Text>
               <Ionicons name="arrow-forward-outline" size={16} color={colors.primary} />
             </TouchableOpacity>
           )}
@@ -1211,13 +1214,13 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                     onPress={() => setBomIsActive(true)}
                     style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: bomIsActive ? colors.success : colors.bg.secondary, borderWidth: 1, borderColor: bomIsActive ? colors.success : colors.border }}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: bomIsActive ? '#fff' : colors.text.secondary }}>Active</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: bomIsActive ? '#fff' : colors.text.secondary }}>Active</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setBomIsActive(false)}
                     style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: !bomIsActive ? colors.danger : colors.bg.secondary, borderWidth: 1, borderColor: !bomIsActive ? colors.danger : colors.border }}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: !bomIsActive ? '#fff' : colors.text.secondary }}>Inactive</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: !bomIsActive ? '#fff' : colors.text.secondary }}>Inactive</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1229,7 +1232,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                     <select
                       value={bomDefaultProductionType}
                       onChange={(e: any) => setBomDefaultProductionType(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 14, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
+                      style={{ ...Typography.body, flex: 1, padding: 8, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
                     >
                       <option value="in_house">In-House Manufacturing</option>
                       <option value="job_work">Third-Party Job Work (Outsourced)</option>
@@ -1249,7 +1252,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                         <select
                           value={bomDefaultJobWorkerId}
                           onChange={(e: any) => setBomDefaultJobWorkerId(e.target.value)}
-                          style={{ flex: 1, padding: 8, fontSize: 14, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
+                          style={{ ...Typography.body, flex: 1, padding: 8, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
                         >
                           <option value="">-- Choose Default Contract Manufacturer --</option>
                           {vendors.map(v => (
@@ -1269,7 +1272,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                         <select
                           value={bomDefaultJobWorkMode}
                           onChange={(e: any) => setBomDefaultJobWorkMode(e.target.value)}
-                          style={{ flex: 1, padding: 8, fontSize: 14, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
+                          style={{ ...Typography.body, flex: 1, padding: 8, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
                         >
                           <option value="raw_materials_supplied">Raw Materials Supplied (We Provide Ingredients)</option>
                           <option value="direct_purchase">Direct Purchase of Finished Bulk (Vendor Raw Materials)</option>
@@ -1287,7 +1290,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                         <select
                           value={bomDefaultPackagingMode}
                           onChange={(e: any) => setBomDefaultPackagingMode(e.target.value)}
-                          style={{ flex: 1, padding: 8, fontSize: 14, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
+                          style={{ ...Typography.body, flex: 1, padding: 8, borderWidth: 0, outlineWidth: 0, backgroundColor: 'transparent', color: colors.text.primary }}
                         >
                           <option value="self_packed">Self-Packed (Deduct Bottles/Labels/Caps from our Stock)</option>
                           <option value="packed_by_vendor">Packed by Vendor (Finished Goods Received fully Boxed)</option>
@@ -1300,8 +1303,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 </>
               )}
 
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 20, marginBottom: 4 }}>📋 Step 1: Manufacturing Process Stages:</Text>
-              <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginBottom: 10 }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginTop: 20, marginBottom: 4 }}> Step 1: Manufacturing Process Stages:</Text>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginBottom: 10 }}>
                 Define each stage first (e.g. Kwath, Fermentation, Filtration). Then you can assign each ingredient to the stage where it is added in Step 2.
               </Text>
               {bomStages.map((item, idx) => (
@@ -1335,37 +1338,37 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 onPress={handleAddStageRow}
               >
                 <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Stage</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Add Stage</Text>
               </TouchableOpacity>
 
               <View style={{ backgroundColor: colors.primary + '10', borderRadius: 8, borderWidth: 1, borderColor: colors.primary + '30', padding: 12, marginBottom: 12 }}>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginBottom: 4 }}>
-                  📊 Formulation Standard
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginBottom: 4 }}>
+                   Formulation Standard
                 </Text>
-                <Text style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 10 }}>
+                <Text style={{ ...Typography.caption, color: colors.text.secondary, marginBottom: 10 }}>
                   Enter ingredient quantities for this batch size. The system scales automatically to the actual production quantity.
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>1 Batch =</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>1 Batch =</Text>
                   <View style={[styles.formInput, { flex: 1, height: 42, flexDirection: 'row', alignItems: 'center', maxWidth: 140 }]}>
                     <TextInput
-                      style={[styles.formInputText, { flex: 1, fontSize: 16, fontWeight: '700' }]}
+                      style={[styles.formInputText, { ...Typography.h3, flex: 1, fontWeight: '700' }]}
                       value={formulationBasis}
                       onChangeText={setFormulationBasis}
                       keyboardType="numeric"
                       placeholder="e.g. 10"
                       placeholderTextColor={colors.text.muted}
                     />
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary, marginRight: 8 }}>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginRight: 8 }}>
                       {formulaStd.unit}
                     </Text>
                   </View>
                   {formulationBasis ? (
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, flex: 1 }}>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, flex: 1 }}>
                       → Formula per {formulationBasis} {formulaStd.unit}
                     </Text>
                   ) : (
-                    <Text style={{ fontSize: 12, color: colors.text.muted, flex: 1 }}>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.muted, flex: 1 }}>
                       ← Enter batch size
                     </Text>
                   )}
@@ -1373,7 +1376,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
               </View>
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, marginBottom: 8 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>🌿 Step 2: Formulation Ingredients:</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}> Step 2: Formulation Ingredients:</Text>
                 <View style={{
                   backgroundColor: colors.primary + '15',
                   paddingHorizontal: 8,
@@ -1382,28 +1385,28 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                   borderWidth: 1,
                   borderColor: colors.primary + '40'
                 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                     Total: {totalFormulaQty.toFixed(3)} {formulaStd.unit}
                   </Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
                 Enter each ingredient quantity {formulaStd.label}. When a batch is launched, amounts are scaled automatically to the actual planned yield.
               </Text>
               {bomStages.filter(s => s.name.trim()).length === 0 && (
                 <View style={{ backgroundColor: colors.warning + '18', borderWidth: 1, borderColor: colors.warning + '40', borderRadius: 6, padding: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Ionicons name="information-circle-outline" size={16} color={colors.warning} />
-                  <Text style={{ fontSize: 11, color: colors.warning, flex: 1 }}>
+                  <Text style={{ ...Typography.caption, color: colors.warning, flex: 1 }}>
                     Add your process stages above first — then you can assign each ingredient to its stage.
                   </Text>
                 </View>
               )}
 
               <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 2, marginBottom: 4 }}>
-                <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>INGREDIENT</Text>
-                <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>QTY ({formulaStd.unit}) / {formulationBasis}{formulaStd.unit}</Text>
+                <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.muted }}>INGREDIENT</Text>
+                <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.muted }}>QTY ({formulaStd.unit}) / {formulationBasis}{formulaStd.unit}</Text>
                 {bomStages.filter(s => s.name.trim()).length > 0 && (
-                  <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>ADDED IN STAGE</Text>
+                  <Text style={{ ...Typography.eyebrow, flex: 1.5, fontWeight: '700', color: colors.text.muted }}>ADDED IN STAGE</Text>
                 )}
               </View>
               {bomIngredients.map((item, idx) => {
@@ -1418,11 +1421,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                         <select
                           value={item.rawMaterialId}
                           onChange={(e: any) => handleIngredientChange(idx, 'rawMaterialId', e.target.value)}
-                          style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                          style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                         >
                           <option value="">-- Select Formulation Material --</option>
                           {formulationMaterials.map(rm => {
-                            const icon = rm.category === 'Excipient' ? '💧' : (rm.category === 'Packaging' ? '📦' : '🌿');
+                            const icon = rm.category === 'Excipient' ? '' : (rm.category === 'Packaging' ? '' : '');
                             return (
                               <option key={rm._id} value={rm._id}>{icon} {rm.name} ({rm.sku})</option>
                             );
@@ -1448,12 +1451,12 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                         keyboardType="numeric"
                       />
                       {rmUnit ? (
-                        <Text style={{ fontSize: 11, color: colors.primary, marginRight: 6, fontWeight: '800', minWidth: 24, textAlign: 'right' }}>{rmUnit}</Text>
+                        <Text style={{ ...Typography.caption, color: colors.primary, marginRight: 6, fontWeight: '800', minWidth: 24, textAlign: 'right' }}>{rmUnit}</Text>
                       ) : (() => {
                         const val = parseFloat(item.qtyRequired) || 0;
                         const pct = (val * 100).toFixed(1);
                         return (
-                          <Text style={{ fontSize: 10, color: colors.primary, marginRight: 8, fontWeight: '700' }}>
+                          <Text style={{ ...Typography.eyebrow, color: colors.primary, marginRight: 8, fontWeight: '700' }}>
                             {pct}%
                           </Text>
                         );
@@ -1465,7 +1468,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                           <select
                             value={(item as any).stageName || ''}
                             onChange={(e: any) => handleIngredientChange(idx, 'stageName', e.target.value)}
-                            style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                            style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                           >
                             <option value="">-- At batch start --</option>
                             {bomStages.filter(s => s.name.trim()).map((s, si) => (
@@ -1495,11 +1498,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 onPress={() => handleAddIngredientRow('formulation')}
               >
                 <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Add Formulation Raw Material</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Add Formulation Raw Material</Text>
               </TouchableOpacity>
 
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 16, marginBottom: 4 }}>📦 Packaging Materials per Size Variant (Per-Unit Pcs):</Text>
-              <Text style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 12 }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginTop: 16, marginBottom: 4 }}> Packaging Materials per Size Variant (Per-Unit Pcs):</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, marginBottom: 12 }}>
                 Define container, cap, label, or boxes required for each specific size variant of this formulation.
               </Text>
 
@@ -1510,7 +1513,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
 
                 return (
                   <View key={`var-pkg-${vIdx}`} style={{ marginBottom: 16, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary + '40' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: 8 }}>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, marginBottom: 8 }}>
                       Size Variant: {sizeDisplay}
                     </Text>
 
@@ -1521,11 +1524,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                             <select
                               value={pkg.rawMaterialId}
                               onChange={(e: any) => handleVariantPackagingChange(vIdx, pIdx, 'rawMaterialId', e.target.value)}
-                              style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                              style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                             >
                               <option value="">-- Select Packaging Material --</option>
                               {packagingMaterials.map(rm => (
-                                <option key={rm._id} value={rm._id}>📦 {rm.name}</option>
+                                <option key={rm._id} value={rm._id}> {rm.name}</option>
                               ))}
                             </select>
                           ) : (
@@ -1547,7 +1550,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                             onChangeText={(val) => handleVariantPackagingChange(vIdx, pIdx, 'qtyRequired', val)}
                             keyboardType="numeric"
                           />
-                          <Text style={{ fontSize: 10, color: colors.primary, marginRight: 6, fontWeight: '700' }}>Pcs/unit</Text>
+                          <Text style={{ ...Typography.eyebrow, color: colors.primary, marginRight: 6, fontWeight: '700' }}>Pcs/unit</Text>
                         </View>
                         {bomStages.filter(s => s.name.trim()).length > 0 && (
                           <View style={[styles.formInput, { flex: 1.2, height: 42 }]}>
@@ -1555,7 +1558,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                               <select
                                 value={pkg.stageName || ''}
                                 onChange={(e: any) => handleVariantPackagingChange(vIdx, pIdx, 'stageName', e.target.value)}
-                                style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                                style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                               >
                                 <option value="">-- At batch start --</option>
                                 {bomStages.filter(s => s.name.trim()).map((s, si) => (
@@ -1584,7 +1587,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                       onPress={() => handleAddVariantPackagingRow(vIdx)}
                     >
                       <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Add Packaging Material</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>Add Packaging Material</Text>
                     </TouchableOpacity>
                   </View>
                 );
@@ -1621,7 +1624,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 onPress={() => setActiveFormTab('basic')}
               >
                 <Ionicons name="arrow-back-outline" size={16} color={colors.text.secondary} />
-                <Text style={{ color: colors.text.secondary, fontWeight: '700', fontSize: 13 }}>Back to Product Details</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.secondary, fontWeight: '700' }}>Back to Product Details</Text>
               </TouchableOpacity>
             </>
           )}

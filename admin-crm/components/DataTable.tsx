@@ -1,7 +1,11 @@
+import { EmptyState } from './WorkspacePrimitives';
+import { Skeleton } from './Skeleton';
+import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
+import { AppText as Text } from './AppText';
 import React, { useCallback, memo } from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, RefreshControl, ViewStyle, TextStyle, TouchableOpacity, DimensionValue } from 'react-native';
+import { View, StyleSheet, FlatList, ScrollView, RefreshControl, ViewStyle, TextStyle, DimensionValue } from 'react-native';
 import { useTheme } from '../utils/themeContext';
-import { Radius, Spacing, Shadows } from '../constants/theme';
+import { Radius, Spacing, Shadows, Typography } from '../constants/theme';
 import { TableSkeleton } from './TableSkeleton';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -16,7 +20,11 @@ export interface Column<T> {
 
 interface DataTableProps<T> {
   data: T[];
-  columns: Column<T>[];
+  columns?: Column<T>[];
+  renderTableHeader?: () => React.ReactElement;
+  renderTableRow?: (item: T, index: number) => React.ReactElement;
+  minWidth?: number;
+  embedded?: boolean;
   keyExtractor: (item: T, index: number) => string;
   isLoading?: boolean;
   isRefreshing?: boolean;
@@ -35,7 +43,11 @@ interface DataTableProps<T> {
 
 function DataTableInner<T>({
   data,
-  columns,
+  columns = [],
+  renderTableHeader,
+  renderTableRow,
+  minWidth = 800,
+  embedded = false,
   keyExtractor,
   isLoading = false,
   isRefreshing = false,
@@ -51,7 +63,9 @@ function DataTableInner<T>({
 }: DataTableProps<T>) {
   const { colors } = useTheme();
 
-  const renderHeader = useCallback(() => (
+  const renderHeader = useCallback(() => renderTableHeader ? (
+    <View style={{ backgroundColor: colors.bg.cardHover, borderBottomWidth: 1, borderBottomColor: colors.border }}>{renderTableHeader()}</View>
+  ) : (
     <View style={[styles.headerRow, { backgroundColor: colors.bg.secondary, borderBottomColor: colors.border }, headerStyle]}>
       {columns.map((col) => (
         <View
@@ -68,13 +82,17 @@ function DataTableInner<T>({
         </View>
       ))}
     </View>
-  ), [columns, colors, headerStyle, headerTextStyle]);
+  ), [columns, colors, headerStyle, headerTextStyle, renderTableHeader]);
 
   const renderRow = useCallback(({ item, index }: { item: T; index: number }) => {
+    if (renderTableRow) {
+      const row = renderTableRow(item, index);
+      return React.cloneElement(row as React.ReactElement<{ style?: any }>, { style: [(row.props as any).style, { backgroundColor: index % 2 ? colors.bg.cardHover : colors.bg.card, borderBottomColor: colors.border }] });
+    }
     const customRowStyle = typeof rowStyle === 'function' ? rowStyle(item) : rowStyle;
     
     return (
-      <View style={[styles.row, { borderBottomColor: colors.border + '50' }, customRowStyle]}>
+      <View style={[styles.row, { borderBottomColor: colors.border, backgroundColor: index % 2 ? colors.bg.cardHover : colors.bg.card }, customRowStyle]}>
         {columns.map((col) => (
           <View
             key={`${keyExtractor(item, index)}-${col.key}`}
@@ -87,21 +105,21 @@ function DataTableInner<T>({
             {col.render ? (
               col.render(item)
             ) : (
-              <Text style={{ fontSize: 13, color: colors.text.primary }} numberOfLines={1}>
-                {String((item as any)[col.key] || '')}
+              <Text style={{ ...Typography.bodySm, color: colors.text.primary }} numberOfLines={1}>
+                {String((item as any)[col.key] ?? '')}
               </Text>
             )}
           </View>
         ))}
       </View>
     );
-  }, [columns, colors, keyExtractor, rowStyle]);
+  }, [columns, colors, keyExtractor, rowStyle, renderTableRow]);
 
   const renderFooter = useCallback(() => {
     if (!isLoadingMore) return null;
     return (
       <View style={{ padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more...</Text>
+        <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Loading more...</Text>
       </View>
     );
   }, [isLoadingMore, colors]);
@@ -111,17 +129,35 @@ function DataTableInner<T>({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg.card, borderColor: colors.border }, containerStyle]}>
+    <View style={[styles.container, { backgroundColor: colors.bg.card, borderColor: colors.border }, embedded && { flex: 0, height: 420 }, containerStyle]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }} contentContainerStyle={{ minWidth: '100%' }}>
-        <View style={{ minWidth: 800, flex: 1 }}>
-          <FlatList
+        <View style={{ minWidth, flex: 1 }}>
+          {embedded ? <FlatList
+            data={data}
+            keyExtractor={keyExtractor}
+            ListHeaderComponent={renderHeader}
+            stickyHeaderIndices={[0]}
+            renderItem={renderRow}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={data.length === 0 ? { flex: 1 } : undefined}
+            ListEmptyComponent={ListEmptyComponent || <EmptyState title="No records to display" message="Try adjusting your filters or add your first record." />}
+            refreshControl={onRefresh ? <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}
+            onEndReached={onLoadMore}
+            onEndReachedThreshold={0.5}
+            initialNumToRender={12}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            windowSize={7}
+            ListFooterComponent={renderFooter}
+          /> : <FlatList
             data={data}
             keyExtractor={keyExtractor}
             ListHeaderComponent={renderHeader}
             stickyHeaderIndices={[0]}
             renderItem={renderRow}
             contentContainerStyle={data.length === 0 ? { flex: 1 } : undefined}
-            ListEmptyComponent={ListEmptyComponent}
+            ListEmptyComponent={ListEmptyComponent || <EmptyState title="No records to display" message="Try adjusting your filters or add your first record." />}
             refreshControl={
               onRefresh ? (
                 <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />
@@ -133,10 +169,9 @@ function DataTableInner<T>({
             maxToRenderPerBatch={10}
             updateCellsBatchingPeriod={50}
             windowSize={7}
-            removeClippedSubviews
             keyboardShouldPersistTaps="handled"
             ListFooterComponent={renderFooter}
-          />
+          />}
         </View>
       </ScrollView>
     </View>
@@ -160,11 +195,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderBottomWidth: 1,
   },
-  headerText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.35,
-  },
+  headerText: { ...Typography.caption, fontWeight: '700' },
   row: {
     flexDirection: 'row',
     paddingVertical: 13,

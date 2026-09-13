@@ -1,5 +1,8 @@
+import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
+import { AppText as Text } from './AppText';
+import { Typography } from './../constants/theme';
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface Props {
@@ -55,12 +58,12 @@ const styles = StyleSheet.create({
     flex: 1, justifyContent: 'center', alignItems: 'center',
     padding: 24, backgroundColor: '#F7F9F7', gap: 12
   },
-  title: { fontSize: 18, fontWeight: '800', color: '#26332D' },
-  message: { fontSize: 13, color: '#617068', textAlign: 'center', maxWidth: 300 },
+  title: { ...Typography.h2, fontWeight: '800', color: '#26332D' },
+  message: { ...Typography.bodySm, color: '#617068', textAlign: 'center', maxWidth: 300 },
   button: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#58796C', paddingHorizontal: 20, paddingVertical: 10,
     borderRadius: 8, marginTop: 8
   },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 14 }
+  buttonText: { ...Typography.body, color: '#fff', fontWeight: '700' }
 });

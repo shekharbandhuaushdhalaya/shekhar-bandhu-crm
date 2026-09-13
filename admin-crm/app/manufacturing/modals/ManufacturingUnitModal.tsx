@@ -1,5 +1,8 @@
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../../components/AppTextInput';
+import { AppText as Text } from './../../../components/AppText';
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Pressable, Platform } from 'react-native';
+import { View, Modal, ScrollView, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';

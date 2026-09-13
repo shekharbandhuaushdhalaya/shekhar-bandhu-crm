@@ -1,10 +1,13 @@
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { LightColors, Radius, Spacing } from '../constants/theme';
-import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
+import { LightColors, Radius, Spacing, Typography } from '../constants/theme';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTransition, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 
 const req = <T = any,>(path: string, init: RequestInit = {}) => api.requestJson<T>(path, init);
 
@@ -71,18 +74,7 @@ export default function SalesIntelligence() {
   ], [actions]);
 
   const counts = actions?.counts || {};
-  const customerSelectStyle = {
-    minHeight: 42,
-    padding: '0 12px',
-    borderRadius: 10,
-    border: `1px solid ${colors.border}`,
-    background: colors.bg.card,
-    color: colors.text.primary,
-    fontSize: 13,
-    minWidth: 280,
-    maxWidth: 440,
-    outline: 'none',
-  } as any;
+  const customerSelectStyle = { ...Typography.bodySm, minHeight: 42, padding: '0 12px', borderRadius: 10, border: `1px solid ${colors.border}`, background: colors.bg.card, color: colors.text.primary, minWidth: 280, maxWidth: 440, outline: 'none' } as any;
 
   return (
     <View style={styles.screen}>
@@ -96,7 +88,7 @@ export default function SalesIntelligence() {
 
       {loading ? <WorkspaceLoading title="Loading Sales Intelligence…" message="Fetching action items, collections, customer health and profitability." /> : null}
       {!loading && error ? <WorkspaceError message={error} onRetry={load} /> : null}
-      {!loading && !error ? <ScrollView contentContainerStyle={styles.content}>
+      {!loading && !error ? <ScrollView contentContainerStyle={styles.content}><WorkspaceTransition value={tab}>
         {tab === 'actions' ? (
           <>
             <View style={styles.metrics}>
@@ -163,7 +155,7 @@ export default function SalesIntelligence() {
         {tab === 'margin' ? (
           <ListPanel title="Estimated order margins" icon="analytics-outline" empty="No margin data" rows={margin.map((x: any) => ({ a: `${x.orderNo} • ${x.customer}`, b: `Revenue ${money(x.revenue)} • Margin ${x.marginPercent}%`, tone: Number(x.marginPercent) < 10 ? 'danger' : Number(x.marginPercent) < 20 ? 'warning' : 'success' }))} />
         ) : null}
-      </ScrollView> : null}
+      </WorkspaceTransition></ScrollView> : null}
     </View>
   );
 
@@ -191,7 +183,7 @@ const makeStyles = (c: typeof LightColors) => StyleSheet.create({
   twoColumn: { flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap', alignItems: 'flex-start' },
   listPanel: { flexGrow: 1, flexShrink: 1, flexBasis: 430, minWidth: 290 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
-  rowA: { fontSize: 13, fontWeight: '700', color: c.text.primary },
-  rowB: { fontSize: 11.5, lineHeight: 17, color: c.text.secondary, marginTop: 3 },
+  rowA: { ...Typography.bodySm, fontWeight: '700', color: c.text.primary },
+  rowB: { ...Typography.caption, color: c.text.secondary, marginTop: 3 },
   input: { minHeight: 42, paddingHorizontal: 12, borderWidth: 1, borderColor: c.border, borderRadius: Radius.md, color: c.text.primary, backgroundColor: c.bg.card, maxWidth: 440 },
 });

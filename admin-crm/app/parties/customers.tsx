@@ -1,7 +1,11 @@
+import { StatusPill, EmptyState } from './../../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../components/AppTextInput';
+import { AppText as Text } from './../../components/AppText';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Pressable, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, ScrollView, Pressable, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors } from '../../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../../constants/theme';
 import { api, Customer, Invoice } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
@@ -149,12 +153,12 @@ function CustomerDetailModal({
             {isCash ? (
               <View style={[styles.gstinBadge, { backgroundColor: colors.warning + '18', borderColor: colors.warning + '30', borderWidth: 1, marginTop: 8, alignSelf: 'center' }]}>
                 <Ionicons name="cash" size={11} color={colors.warning} />
-                <Text style={[styles.gstinText, { color: colors.warning, fontSize: 11 }]}>Cash Customer</Text>
+                <Text style={[styles.gstinText, { ...Typography.caption, color: colors.warning }]}>Cash Customer</Text>
               </View>
             ) : (
               <View style={[styles.gstinBadge, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '30', borderWidth: 1, marginTop: 8, alignSelf: 'center' }]}>
                 <Ionicons name="business" size={11} color={colors.primary} />
-                <Text style={[styles.gstinText, { color: colors.primary, fontSize: 11 }]}>GST Customer</Text>
+                <Text style={[styles.gstinText, { ...Typography.caption, color: colors.primary }]}>GST Customer</Text>
               </View>
             )}
           </View>
@@ -294,7 +298,7 @@ function CustomerDetailModal({
             {loadingOrders ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
             ) : customerOrders.length === 0 ? (
-              <Text style={{ fontSize: 13, color: colors.text.muted, marginVertical: 8, fontStyle: 'italic' }}>
+              <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginVertical: 8, fontStyle: 'italic' }}>
                 No Sales Orders found for this customer.
               </Text>
             ) : (
@@ -311,10 +315,10 @@ function CustomerDetailModal({
                     alignItems: 'center'
                   }}>
                     <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', fontFamily: 'monospace', color: colors.text.primary }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                         #{o._id.substring(o._id.length - 8).toUpperCase()}
                       </Text>
-                      <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>
                         Date: {new Date(o.createdAt).toLocaleDateString()}  |  Amt: ₹{o.totalAmount}
                       </Text>
                     </View>
@@ -326,7 +330,7 @@ function CustomerDetailModal({
                       borderWidth: 1,
                       borderColor: getOrderStatusColor(o.status)
                     }}>
-                      <Text style={{ fontSize: 9, fontWeight: '800', color: getOrderStatusColor(o.status), textTransform: 'uppercase' }}>
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: getOrderStatusColor(o.status), textTransform: 'uppercase' }}>
                         {o.status}
                       </Text>
                     </View>
@@ -784,7 +788,7 @@ function AddEditCustomerModal({
               {Platform.OS === 'web' ? React.createElement('select', {
                 value: selectedDropdownTerm,
                 onChange: (e: any) => handleDropdownTermChange(e.target.value),
-                style: { flex: 1, padding: 8, fontSize: 14, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
+                style: { ...Typography.body, flex: 1, padding: 8, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
               }, [
                 React.createElement('option', { value: 'Due on Receipt', key: 'receipt' }, 'Due on Receipt'),
                 React.createElement('option', { value: 'Net 15', key: '15' }, 'Net 15 (15 Days)'),
@@ -796,7 +800,7 @@ function AddEditCustomerModal({
               ]) : (
                 <>
                   <TouchableOpacity style={{ flex: 1, height: '100%', justifyContent: 'center' }} onPress={() => setShowTermsDropdown(!showTermsDropdown)}>
-                    <Text style={{ color: selectedDropdownTerm ? colors.text.primary : colors.text.muted, fontSize: 14 }}>
+                    <Text style={{ ...Typography.body, color: selectedDropdownTerm ? colors.text.primary : colors.text.muted }}>
                       {selectedDropdownTerm === 'Custom' ? 'Custom...' : (selectedDropdownTerm || 'Select Terms...')}
                     </Text>
                   </TouchableOpacity>
@@ -897,7 +901,7 @@ function AddEditCustomerModal({
               size={24}
               color={shippingSameAsBilling ? colors.primary : colors.text.muted}
             />
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary }}>
+            <Text style={{ ...Typography.body, fontWeight: '700', color: colors.text.primary }}>
               Shipping Address is same as Billing Address
             </Text>
           </TouchableOpacity>
@@ -955,7 +959,7 @@ function AddEditCustomerModal({
                       onPress={handleAutoFillGst}
                       style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: colors.primary + '15', borderRadius: 4, marginLeft: 8 }}
                     >
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Auto-Fill</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>Auto-Fill</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -1328,19 +1332,19 @@ function CustomerLedgerModal({
           <View style={styles.ledgerHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.ledgerTitle}>Customer Ledger</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary, marginTop: 2 }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, marginTop: 2 }}>
                 {customer.company || customer.name}
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
               <TouchableOpacity onPress={() => setShowPaymentModal(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success + '1A', paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.success }}>
                 <Ionicons name="card-outline" size={16} color={colors.success} />
-                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.success }}>Receive</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.success }}>Receive</Text>
               </TouchableOpacity>
               {Platform.OS === 'web' && (
                 <TouchableOpacity onPress={printLedger} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.bg.card, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border }}>
                   <Ionicons name="print-outline" size={16} color={colors.text.primary} />
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }}>Print</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>Print</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={onClose}>
@@ -1359,7 +1363,7 @@ function CustomerLedgerModal({
                 ]}
               >
                 <Ionicons name="business" size={16} color={activeLedgerMode === 'regular' ? colors.primary : colors.text.muted} />
-                <Text style={[{ fontSize: 13, fontWeight: '700', color: colors.text.muted }, activeLedgerMode === 'regular' && { color: colors.primary }]}>Invoice (GST) Ledger</Text>
+                <Text style={[{ ...Typography.bodySm, fontWeight: '700', color: colors.text.muted }, activeLedgerMode === 'regular' && { color: colors.primary }]}>Invoice (GST) Ledger</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setActiveLedgerMode('cash')}
@@ -1369,7 +1373,7 @@ function CustomerLedgerModal({
                 ]}
               >
                 <Ionicons name="cash" size={16} color={activeLedgerMode === 'cash' ? colors.warning : colors.text.muted} />
-                <Text style={[{ fontSize: 13, fontWeight: '700', color: colors.text.muted }, activeLedgerMode === 'cash' && { color: colors.warning }]}>Cash Ledger</Text>
+                <Text style={[{ ...Typography.bodySm, fontWeight: '700', color: colors.text.muted }, activeLedgerMode === 'cash' && { color: colors.warning }]}>Cash Ledger</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1379,30 +1383,30 @@ function CustomerLedgerModal({
           {/* Date Filter */}
           <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingVertical: 10, gap: 10, backgroundColor: colors.bg.primary, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted, marginBottom: 4 }}>From Date</Text>
+              <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginBottom: 4 }}>From Date</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderRadius: 6, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10 }}>
                 <Ionicons name="calendar-outline" size={14} color={colors.text.muted} />
                 {Platform.OS === 'web' ? React.createElement('input', {
                   type: 'date',
                   value: startDate,
                   onChange: (e: any) => setStartDate(e.target.value),
-                  style: { flex: 1, padding: 8, fontSize: 12, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
+                  style: { ...Typography.bodySm, flex: 1, padding: 8, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
                 }) : (
-                  <TextInput style={{ flex: 1, height: 36, color: colors.text.primary, fontSize: 12, paddingLeft: 8 }} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.muted} value={startDate} onChangeText={setStartDate} />
+                  <TextInput style={{ ...Typography.bodySm, flex: 1, height: 36, color: colors.text.primary, paddingLeft: 8 }} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.muted} value={startDate} onChangeText={setStartDate} />
                 )}
               </View>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.muted, marginBottom: 4 }}>To Date</Text>
+              <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginBottom: 4 }}>To Date</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderRadius: 6, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10 }}>
                 <Ionicons name="calendar-outline" size={14} color={colors.text.muted} />
                 {Platform.OS === 'web' ? React.createElement('input', {
                   type: 'date',
                   value: endDate,
                   onChange: (e: any) => setEndDate(e.target.value),
-                  style: { flex: 1, padding: 8, fontSize: 12, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
+                  style: { ...Typography.bodySm, flex: 1, padding: 8, border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
                 }) : (
-                  <TextInput style={{ flex: 1, height: 36, color: colors.text.primary, fontSize: 12, paddingLeft: 8 }} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.muted} value={endDate} onChangeText={setEndDate} />
+                  <TextInput style={{ ...Typography.bodySm, flex: 1, height: 36, color: colors.text.primary, paddingLeft: 8 }} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.muted} value={endDate} onChangeText={setEndDate} />
                 )}
               </View>
             </View>
@@ -1427,7 +1431,7 @@ function CustomerLedgerModal({
                     <Text style={[styles.ledgerCell, { width: 80 }]}></Text>
                     <Text style={[styles.ledgerCell, { width: 80 }]}></Text>
                     <Text style={[styles.ledgerCell, { width: 120 }]}></Text>
-                    <Text style={[styles.ledgerCell, { width: 130, textAlign: 'right', fontWeight: '800', fontSize: 14, color: bal.color }]}>
+                    <Text style={[styles.ledgerCell, { ...Typography.body, width: 130, textAlign: 'right', fontWeight: '800', color: bal.color }]}>
                       {bal.label} {fmt(closingBalance)}
                     </Text>
                   </View>
@@ -1436,12 +1440,12 @@ function CustomerLedgerModal({
                 {loading ? (
                   <View style={{ padding: 32, alignItems: 'center', width: 670 }}>
                     <ActivityIndicator color={colors.primary} />
-                    <Text style={{ color: colors.text.muted, marginTop: 8, fontSize: 12 }}>Loading transactions…</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 8 }}>Loading transactions…</Text>
                   </View>
                 ) : rows.length === 0 ? (
                   <View style={{ padding: 32, alignItems: 'center', width: 670 }}>
                     <Ionicons name="receipt-outline" size={32} color={colors.text.muted} />
-                    <Text style={{ color: colors.text.muted, marginTop: 8, fontSize: 12 }}>No transactions found for this customer</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 8 }}>No transactions found for this customer</Text>
                   </View>
                 ) : rows.map((row) => {
                   const d = new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
@@ -1469,7 +1473,7 @@ function CustomerLedgerModal({
 
                   return (
                     <View key={row._id} style={styles.ledgerRow}>
-                      <Text style={[styles.ledgerCell, { width: 100, fontSize: 11 }]}>{d}</Text>
+                      <Text style={[styles.ledgerCell, { ...Typography.caption, width: 100 }]}>{d}</Text>
                       <Text style={[styles.ledgerCell, { width: 160, fontWeight: '600' }]} numberOfLines={1}>{row.no}</Text>
                       <View style={{ width: 80, paddingRight: 8, justifyContent: 'center' }}>
                         <Text style={[styles.modeBadge,
@@ -1479,12 +1483,9 @@ function CustomerLedgerModal({
                           {row.mode === 'regular' ? 'GST' : 'Cash'}
                         </Text>
                       </View>
-                      <Text style={[styles.ledgerCell, {
-                        width: 80, fontSize: 11, fontWeight: isOverdue ? 'bold' : 'normal',
-                        color: (row.status === 'paid' || row.status === 'finalized' || row.status === 'Received') ? colors.success
+                      <Text style={[styles.ledgerCell, { ...Typography.caption, width: 80, fontWeight: isOverdue ? 'bold' : 'normal', color: (row.status === 'paid' || row.status === 'finalized' || row.status === 'Received') ? colors.success
                           : isOverdue ? colors.danger
-                            : colors.text.muted
-                      }]}>
+                            : colors.text.muted }]}>
                         {displayStatus}
                       </Text>
                       <Text style={[styles.ledgerCell, { width: 120, textAlign: 'right', fontWeight: '700', color: row.amount > 0 ? colors.success : colors.danger }]}>
@@ -1498,7 +1499,7 @@ function CustomerLedgerModal({
                 })}
 
                 <View style={[styles.ledgerRow, { backgroundColor: colors.bg.secondary, borderTopWidth: 2, borderTopColor: colors.border }]}>
-                  <Text style={[styles.ledgerCell, { width: 100, color: colors.text.muted, fontSize: 11 }]}>Opening</Text>
+                  <Text style={[styles.ledgerCell, { ...Typography.caption, width: 100, color: colors.text.muted }]}>Opening</Text>
                   <Text style={[styles.ledgerCell, { width: 160, color: colors.text.muted }]}>Opening Balance</Text>
                   <Text style={[styles.ledgerCell, { width: 80 }]}></Text>
                   <Text style={[styles.ledgerCell, { width: 80 }]}></Text>
@@ -1513,7 +1514,7 @@ function CustomerLedgerModal({
 
           <View style={styles.ledgerFooter}>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-              <Text style={{ color: colors.text.secondary, fontWeight: '700', fontSize: 14 }}>Close</Text>
+              <Text style={{ ...Typography.body, color: colors.text.secondary, fontWeight: '700' }}>Close</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -1645,7 +1646,7 @@ export default function CustomersScreen() {
       render: (c) => (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="person-outline" size={12} color={colors.text.muted} />
-          <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
+          <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
             {toTitleCase(c.contactPerson || c.name) || '—'}
           </Text>
         </View>
@@ -1672,7 +1673,7 @@ export default function CustomersScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Ionicons name="location-outline" size={13} color={colors.danger} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>{toTitleCase(billing.city) || '—'}</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>{toTitleCase(billing.city) || '—'}</Text>
               {c.state || billing.state ? <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(c.state || billing.state)}</Text> : null}
             </View>
           </View>
@@ -1691,11 +1692,9 @@ export default function CustomersScreen() {
         const color = amount > 0 ? (isCash ? colors.warning : colors.success) : amount < 0 ? colors.danger : colors.text.muted;
         const bg = amount > 0 ? (isCash ? colors.warning + '12' : colors.success + '12') : amount < 0 ? colors.danger + '12' : colors.bg.secondary;
         return (
-          <View style={[styles.balanceBadge, { backgroundColor: bg, borderColor: color + '30', borderWidth: 1 }]}>
-            <Text style={[styles.balanceText, { color, fontSize: 13, fontWeight: '800' }]}>
+          <StatusPill  label={<>
               {label} {Math.abs(amount).toLocaleString('en-IN')}
-            </Text>
-          </View>
+            </>} textStyle={[styles.balanceText, { ...Typography.bodySm, color, fontWeight: '800' }]} />
         );
       }
     },
@@ -1791,12 +1790,9 @@ export default function CustomersScreen() {
             isLoadingMore={page < totalPages}
             onRowPress={(c) => { setSelectedCust(c); setLedgerVisible(true); }}
             ListEmptyComponent={
-              <View style={styles.emptyTableContainer}>
-                <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                <Text style={styles.emptyText}>
+              <EmptyState title={<>
                   No {activeTab === 'gst' ? 'GST' : 'Cash / Unregistered'} customers registered
-                </Text>
-              </View>
+                </>}  />
             }
           />
         </View>
@@ -1834,100 +1830,100 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
-  searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+  searchInput: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 10, fontSize: 13 },
+  emptyText: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', marginTop: 10 },
 
   table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
-  tableCell: { fontSize: 13, color: colors.text.primary },
+  tableCell: { ...Typography.bodySm, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
 
   // Avatar styles
   avatarCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  avatarCircleText: { fontSize: 13, fontWeight: '800' },
+  avatarCircleText: { ...Typography.bodySm, fontWeight: '800' },
 
   // GSTIN Pill Badge
   gstinBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '0a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary + '20', alignSelf: 'flex-start' },
-  gstinText: { fontSize: 11, color: colors.primary, fontFamily: 'monospace', fontWeight: '600' },
+  gstinText: { ...Typography.caption, color: colors.primary, fontWeight: '600' },
 
   // Balance Pill Badge
   balanceBadge: { flexDirection: 'row', alignItems: 'baseline', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.md },
-  balanceBadgeLabel: { fontSize: 9, fontWeight: '900' },
+  balanceBadgeLabel: { ...Typography.eyebrow, fontWeight: '900' },
 
   // Text styles
-  primaryText: { fontSize: 13, fontWeight: '800', color: colors.text.primary },
-  secondaryText: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
-  monoText: { fontSize: 12, color: colors.text.secondary, fontFamily: 'monospace' },
-  naText: { fontSize: 12, color: colors.text.muted, fontStyle: 'italic' },
-  balanceText: { fontSize: 14, fontWeight: '800' },
+  primaryText: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
+  secondaryText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
+  monoText: { ...Typography.bodySm, color: colors.text.secondary },
+  naText: { ...Typography.bodySm, color: colors.text.muted, fontStyle: 'italic' },
+  balanceText: { ...Typography.body, fontWeight: '800' },
 
   // Action button
   viewBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10' },
-  viewBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  viewBtnText: { ...Typography.bodySm, fontWeight: '700', color: colors.primary },
 
   emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
 
   // Modals
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
   profileAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.purple + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  profileAvatarText: { fontSize: 28, fontWeight: '800', color: colors.purple },
-  profileName: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
-  profileCompany: { fontSize: 14, color: colors.text.secondary },
+  profileAvatarText: { ...Typography.display, fontWeight: '800', color: colors.purple },
+  profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  profileCompany: { ...Typography.body, color: colors.text.secondary },
   infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 14 },
   infoSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 10, marginBottom: 4 },
-  infoSectionTitle: { fontSize: 12, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  infoSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoIcon: { width: 22, textAlign: 'center' },
-  infoLabel: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
-  infoValue: { fontSize: 13, color: colors.text.primary, fontWeight: '600' },
+  infoLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' },
+  infoValue: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' },
 
   editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, flex: 1 },
-  editBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  editBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, width: 120 },
-  deleteBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  deleteBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
 
   formSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 20, marginBottom: 12 },
-  formSectionTitle: { fontSize: 12, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' },
+  formSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' },
   formGroup: { marginBottom: 16 },
-  formLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
+  formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
-  formInputText: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+  formInputText: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
 
   // Cash selector additions
   typeSelectorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  typeSelectorText: { fontSize: 13, fontWeight: '700' },
+  typeSelectorText: { ...Typography.bodySm, fontWeight: '700' },
 
   // Tab filter styles
   tabContainer: { flexDirection: 'row', gap: 10, marginHorizontal: Spacing.lg, marginBottom: Spacing.sm },
   tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  tabText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  tabText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
 
   // Dropdown filter styles
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
-  filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
   filterDropdownPanel: { position: 'absolute', top: 52, right: 50, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
-  filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
+  filterDropdownItemText: { ...Typography.bodySm, color: colors.text.primary },
 
   // Ledger modal
   ledgerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center' },
   ledgerSheet: { backgroundColor: colors.bg.primary, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', borderTopWidth: 1, borderColor: colors.border, width: '100%' },
   ledgerHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  ledgerTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+  ledgerTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   ledgerTable: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
   ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, marginTop: 12 },
-  ledgerHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, paddingRight: 8 },
+  ledgerHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', paddingRight: 8 },
   ledgerRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border + '80', paddingVertical: 10, alignItems: 'center' },
-  ledgerCell: { fontSize: 13, color: colors.text.primary, paddingRight: 8 },
-  modeBadge: { fontSize: 10, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
+  ledgerCell: { ...Typography.bodySm, color: colors.text.primary, paddingRight: 8 },
+  modeBadge: { ...Typography.eyebrow, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
   ledgerFooter: { padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary },
   closeBtn: { alignItems: 'center', padding: 12, borderRadius: Radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border },
 
@@ -1949,8 +1945,5 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border
   },
-  customSelectItemText: {
-    fontSize: 14,
-    color: colors.text.primary
-  },
+  customSelectItemText: { ...Typography.body, color: colors.text.primary },
 });

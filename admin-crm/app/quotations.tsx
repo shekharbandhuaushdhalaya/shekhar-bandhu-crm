@@ -1,8 +1,12 @@
+import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
 import * as Print from 'expo-print';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, Quotation, Product, Customer, Warehouse, InventoryEntry, QuotationItem } from '../utils/api';
 import { getStateStrWithCode } from '../utils/gst';
 import { useAuth } from '../utils/auth';
@@ -312,14 +316,14 @@ const printQuotation = (invoice: Quotation) => {
             ${(FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl) ? `
               <img src="${FIRM_DETAILS.signatureBase64 || FIRM_DETAILS.signatureUrl}" style="max-height: 38px; width: auto; object-fit: contain; margin-bottom: 2px;" />
               <div style="font-weight:bold; font-size: 10px; color: #15803d; margin-bottom: 4px;">
-                ✔ DIGITALLY SIGNED QUOTATION
+                 DIGITALLY SIGNED QUOTATION
               </div>
               <div style="border: 1px dashed #16a34a; background-color: #f0fdf4; border-radius: 4px; padding: 5px; font-size: 8px; text-align: left; line-height: 1.3; display: flex; align-items: center; gap: 8px;">
                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`GST Quotation Verification | Seller: ${FIRM_DETAILS.name} | GSTIN: ${FIRM_DETAILS.gstin || ''} | Quotation: ${invoice.quotationNo} | Date: ${new Date(invoice.date || Date.now()).toLocaleDateString('en-IN')} | Amt: ₹${finalGrandTotal.toFixed(2)} | Sec 5 IT Act Certified`)}" style="width: 48px; height: 48px; border: 1px solid #16a34a; padding: 2px; background: #fff; border-radius: 3px; flex-shrink: 0;" />
                 <div style="flex: 1;">
                   <strong>Signed By:</strong> ${FIRM_DETAILS.name}<br/>
                   <strong>GSTIN:</strong> ${FIRM_DETAILS.gstin || ''}<br/>
-                  <span style="color: #15803d; font-weight: bold;">✔ Certified under Sec 5 IT Act 2000.</span>
+                  <span style="color: #15803d; font-weight: bold;"> Certified under Sec 5 IT Act 2000.</span>
                 </div>
               </div>
             ` : `
@@ -431,6 +435,8 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
   const styles = useStyles(createStyles);
   const { user } = useAuth();
   const perm = usePermission();
+  const { width: winWidth } = useWindowDimensions();
+  const isDesktop = winWidth > 768;
 
   if (!invoice) return null;
 
@@ -449,8 +455,9 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
   const isOutstanding = invoice.status !== 'paid';
 
   return (
-    <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
-      <View style={styles.modalContainer}>
+    <Modal animationType="slide" presentationStyle={Platform.OS === 'ios' && !isDesktop ? 'pageSheet' : 'overFullScreen'} visible={visible} onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+      <View style={[styles.modalContainer, !isDesktop && styles.modalContainerMobile]}>
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={26} color={colors.text.primary} />
@@ -502,11 +509,11 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
                       Base: ₹{invoice.baseAmount?.toLocaleString() || '0'} | Rate: {invoice.gstRate || 0}%
                     </Text>
                     {invoice.igst && invoice.igst > 0 ? (
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                         IGST: ₹{invoice.igst.toLocaleString()} (Inter-state)
                       </Text>
                     ) : (
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                         CGST: ₹{(invoice.cgst || 0).toLocaleString()} | SGST: ₹{(invoice.sgst || 0).toLocaleString()} (Intra-state)
                       </Text>
                     )}
@@ -574,7 +581,7 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
                     {(it as any).batchNo ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
                         <Ionicons name="barcode-outline" size={11} color={colors.primary} />
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace' }}>
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary }}>
                           Batch: {(it as any).batchNo}
                         </Text>
                       </View>
@@ -590,45 +597,45 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
             {invoice.mode === 'pakka' && ((invoice.cgst || 0) > 0 || (invoice.sgst || 0) > 0 || (invoice.igst || 0) > 0) ? (
               <View style={{ borderTopWidth: 2, borderTopColor: colors.border, paddingTop: 10, marginTop: 4, gap: 6, paddingBottom: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={[styles.itemNameText, { fontSize: 12, color: colors.text.secondary }]}>Base Amount</Text>
-                  <Text style={[styles.itemQtyText, { fontSize: 12, color: colors.text.secondary }]}>
+                  <Text style={[styles.itemNameText, { ...Typography.bodySm, color: colors.text.secondary }]}>Base Amount</Text>
+                  <Text style={[styles.itemQtyText, { ...Typography.bodySm, color: colors.text.secondary }]}>
                     ₹{(invoice.baseAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
                 </View>
                 {(invoice.cgst || 0) > 0 || (invoice.sgst || 0) > 0 ? (
                   <>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={[styles.itemNameText, { fontSize: 11, color: colors.text.muted }]}>CGST</Text>
-                      <Text style={[styles.itemQtyText, { fontSize: 11, color: colors.text.muted }]}>
+                      <Text style={[styles.itemNameText, { ...Typography.caption, color: colors.text.muted }]}>CGST</Text>
+                      <Text style={[styles.itemQtyText, { ...Typography.caption, color: colors.text.muted }]}>
                         ₹{(invoice.cgst || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </Text>
                     </View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={[styles.itemNameText, { fontSize: 11, color: colors.text.muted }]}>SGST</Text>
-                      <Text style={[styles.itemQtyText, { fontSize: 11, color: colors.text.muted }]}>
+                      <Text style={[styles.itemNameText, { ...Typography.caption, color: colors.text.muted }]}>SGST</Text>
+                      <Text style={[styles.itemQtyText, { ...Typography.caption, color: colors.text.muted }]}>
                         ₹{(invoice.sgst || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </Text>
                     </View>
                   </>
                 ) : (
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={[styles.itemNameText, { fontSize: 11, color: colors.text.muted }]}>IGST</Text>
-                    <Text style={[styles.itemQtyText, { fontSize: 11, color: colors.text.muted }]}>
+                    <Text style={[styles.itemNameText, { ...Typography.caption, color: colors.text.muted }]}>IGST</Text>
+                    <Text style={[styles.itemQtyText, { ...Typography.caption, color: colors.text.muted }]}>
                       ₹{(invoice.igst || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Text>
                   </View>
                 )}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8, marginTop: 4 }}>
-                  <Text style={[styles.itemNameText, { fontWeight: '800', fontSize: 14 }]}>Nett Total</Text>
-                  <Text style={[styles.itemQtyText, { fontSize: 16, color: colors.success }]}>
+                  <Text style={[styles.itemNameText, { ...Typography.body, fontWeight: '800' }]}>Nett Total</Text>
+                  <Text style={[styles.itemQtyText, { ...Typography.h3, color: colors.success }]}>
                     ₹{(invoice.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
                 </View>
               </View>
             ) : (
               <View style={[styles.itemRowDetail, { borderTopWidth: 2, borderTopColor: colors.border, paddingVertical: 14, marginTop: 4 }]}>
-                <Text style={[styles.itemNameText, { fontWeight: '800', fontSize: 14 }]}>Grand Total</Text>
-                <Text style={[styles.itemQtyText, { fontSize: 16, color: colors.success }]}>
+                <Text style={[styles.itemNameText, { ...Typography.body, fontWeight: '800' }]}>Grand Total</Text>
+                <Text style={[styles.itemQtyText, { ...Typography.h3, color: colors.success }]}>
                   ₹{(invoice.amount || invoice.baseAmount || (invoice.items || []).reduce((acc, it) => acc + (it.qty * (it.rate || 0) * (it.packing || 1)), 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
@@ -704,6 +711,7 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
           )}
         </ScrollView>
       </View>
+      </View>
     </Modal>
   );
 }
@@ -711,6 +719,8 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
 function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visible: boolean; onClose: () => void; onSaved: () => void; invoiceToEdit?: Quotation | null }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { width: winWidth } = useWindowDimensions();
+  const isDesktop = winWidth > 768;
 
 
   const [quotationNo, setQuotationNo] = useState('');
@@ -1034,8 +1044,9 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
   const roundOff = nettTotal - rawTotal;
 
   return (
-    <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
+    <Modal animationType="slide" presentationStyle={Platform.OS === 'ios' && !isDesktop ? 'pageSheet' : 'overFullScreen'} visible={visible} onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.modalContainer, !isDesktop && styles.modalContainerMobile]}>
 
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={onClose}>
@@ -1181,7 +1192,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                   })}
                   {filteredCustomers.length === 0 && (
                     <View style={{ padding: 12 }}>
-                      <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.muted, textAlign: 'center' }}>
                         No customers found (typing custom name)
                       </Text>
                     </View>
@@ -1191,7 +1202,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                     onPress={() => setShowCustomerDropdown(false)}
                   >
                     <Text style={[styles.customSelectItemText, { color: colors.primary, textAlign: 'center' }]}>
-                      ✓ Use typed custom name
+                       Use typed custom name
                     </Text>
                   </TouchableOpacity>
                 </ScrollView>
@@ -1237,7 +1248,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
             <Text style={styles.sectionTitle}>Quotation Items</Text>
             <TouchableOpacity style={styles.addItemRowBtn} onPress={addItemRow}>
               <Ionicons name="add" size={14} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>Add Item</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Add Item</Text>
             </TouchableOpacity>
           </View>
 
@@ -1299,7 +1310,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                         ))}
                         {filtered.length === 0 && (
                           <View style={{ padding: 12 }}>
-                            <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>No available stock entries in this warehouse</Text>
+                            <Text style={{ ...Typography.bodySm, color: colors.text.muted, textAlign: 'center' }}>No available stock entries in this warehouse</Text>
                           </View>
                         )}
                         <TouchableOpacity
@@ -1307,7 +1318,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                           onPress={() => setActiveItemDropdownIdx(null)}
                         >
                           <Text style={[styles.customSelectItemText, { color: colors.primary, textAlign: 'center' }]}>
-                            ✓ Close list
+                             Close list
                           </Text>
                         </TouchableOpacity>
                       </ScrollView>
@@ -1404,8 +1415,8 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
                   </View>
 
                   <View style={{ flex: 1.5, minWidth: 90, alignItems: 'flex-end', justifyContent: 'center', minHeight: 40, marginTop: 12 }}>
-                    <Text style={{ fontSize: 9, color: colors.text.muted, fontWeight: '600' }}>Amount</Text>
-                    <Text style={{ fontSize: 12, color: colors.success, fontWeight: '800' }}>
+                    <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' }}>Amount</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.success, fontWeight: '800' }}>
                       ₹{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Text>
                   </View>
@@ -1419,13 +1430,13 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
 
                 {it.productId ? (
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                    <Text style={{ fontSize: 10, color: hasError ? colors.danger : colors.text.muted, fontWeight: '600' }}>
-                      {hasError ? `⚠ Exceeds stock: ${maxQty} boxes` : `Stock: ${maxQty} boxes (Pack: ${it.packing || 1})`}
+                    <Text style={{ ...Typography.eyebrow, color: hasError ? colors.danger : colors.text.muted, fontWeight: '600' }}>
+                      {hasError ? ` Exceeds stock: ${maxQty} boxes` : `Stock: ${maxQty} boxes (Pack: ${it.packing || 1})`}
                     </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Ionicons name="barcode-outline" size={11} color={colors.primary} />
                       <TextInput
-                        style={{ fontSize: 10, fontWeight: '700', color: colors.primary, fontFamily: 'monospace', borderBottomWidth: 1, borderBottomColor: colors.primary + '50', minWidth: 80, paddingVertical: 1 }}
+                        style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary, borderBottomWidth: 1, borderBottomColor: colors.primary + '50', minWidth: 80, paddingVertical: 1 }}
                         placeholder="Batch No."
                         placeholderTextColor={colors.text.muted}
                         value={it.batchNo || ''}
@@ -1457,18 +1468,18 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
               {isIntraState ? (
                 <>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                    <Text style={[styles.grandTotalLabel, { fontSize: 12, fontWeight: '500', color: colors.text.muted }]}>CGST:</Text>
-                    <Text style={[styles.grandTotalValue, { fontSize: 12, fontWeight: '500', color: colors.text.muted }]}>₹{cgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    <Text style={[styles.grandTotalLabel, { ...Typography.bodySm, fontWeight: '500', color: colors.text.muted }]}>CGST:</Text>
+                    <Text style={[styles.grandTotalValue, { ...Typography.bodySm, fontWeight: '500', color: colors.text.muted }]}>₹{cgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                    <Text style={[styles.grandTotalLabel, { fontSize: 12, fontWeight: '500', color: colors.text.muted }]}>SGST:</Text>
-                    <Text style={[styles.grandTotalValue, { fontSize: 12, fontWeight: '500', color: colors.text.muted }]}>₹{sgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    <Text style={[styles.grandTotalLabel, { ...Typography.bodySm, fontWeight: '500', color: colors.text.muted }]}>SGST:</Text>
+                    <Text style={[styles.grandTotalValue, { ...Typography.bodySm, fontWeight: '500', color: colors.text.muted }]}>₹{sgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                   </View>
                 </>
               ) : (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                  <Text style={[styles.grandTotalLabel, { fontSize: 12, fontWeight: '500', color: colors.text.muted }]}>IGST:</Text>
-                  <Text style={[styles.grandTotalValue, { fontSize: 12, fontWeight: '500', color: colors.text.muted }]}>₹{igst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                  <Text style={[styles.grandTotalLabel, { ...Typography.bodySm, fontWeight: '500', color: colors.text.muted }]}>IGST:</Text>
+                  <Text style={[styles.grandTotalValue, { ...Typography.bodySm, fontWeight: '500', color: colors.text.muted }]}>₹{igst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                 </View>
               )}
               <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, marginTop: 4, flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -1484,6 +1495,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -1555,14 +1567,9 @@ export default function QuotationsScreen() {
       title: 'Doc Status',
       width: 130,
       render: (item) => (
-        <View style={[styles.statusBadge, {
-          borderColor: item.isFinalized ? colors.success : colors.warning,
-          backgroundColor: (item.isFinalized ? colors.success : colors.warning) + '12'
-        }]}>
-          <Text style={[styles.statusText, {
+        <StatusPill  label={<>{item.isFinalized ? 'FINALIZED' : 'DRAFT'}</>} textStyle={[styles.statusText, {
             color: item.isFinalized ? colors.success : colors.warning
-          }]}>{item.isFinalized ? 'FINALIZED' : 'DRAFT'}</Text>
-        </View>
+          }]} />
       )
     },
     {
@@ -1570,14 +1577,9 @@ export default function QuotationsScreen() {
       title: 'Status',
       width: 130,
       render: (item) => (
-        <View style={[styles.statusBadge, {
-          borderColor: item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning,
-          backgroundColor: (item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning) + '12'
-        }]}>
-          <Text style={[styles.statusText, {
+        <StatusPill  label={<>{item.status.toUpperCase()}</>} textStyle={[styles.statusText, {
             color: item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning
-          }]}>{item.status.toUpperCase()}</Text>
-        </View>
+          }]} />
       )
     },
     {
@@ -1612,7 +1614,7 @@ export default function QuotationsScreen() {
           }}>
             <Ionicons name="search" size={18} color={colors.text.muted} />
             <TextInput
-              style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 100 }}
+              style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 100 }}
               placeholder="Search quotations by number, customer..."
               placeholderTextColor={colors.text.muted}
               value={search}
@@ -1620,7 +1622,7 @@ export default function QuotationsScreen() {
             />
             <TouchableOpacity style={{ height: 34, paddingHorizontal: 14, borderRadius: Radius.sm, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }} onPress={() => { setQuotationToEdit(null); setAddVisible(true); }}>
               <Ionicons name="add" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>New Quotation</Text>
+              <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>New Quotation</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1634,10 +1636,7 @@ export default function QuotationsScreen() {
             onRefresh={onRefresh}
             onRowPress={(item) => { setSelectedInv(item); setDetailVisible(true); }}
             ListEmptyComponent={
-              <View style={styles.emptyTableContainer}>
-                <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                <Text style={styles.emptyText}>No quotations found</Text>
-              </View>
+              <EmptyState title={<>No quotations found</>}  />
             }
           />
         </View>
@@ -1673,89 +1672,91 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   innerContainer: { flex: 1, width: '100%' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
-  searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+  searchInput: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 40, fontSize: 13 },
+  emptyText: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', marginTop: 40 },
 
   table: { flex: 1, width: '100%', minWidth: 950, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
-  tableCell: { fontSize: 13, color: colors.text.primary },
+  tableCell: { ...Typography.bodySm, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
-  primaryText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  secondaryText: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
-  outstandingText: { fontSize: 13, fontWeight: '800' },
+  primaryText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  secondaryText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
+  outstandingText: { ...Typography.bodySm, fontWeight: '800' },
   actionIconButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' },
   emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
 
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, alignSelf: 'flex-start' },
-  statusText: { fontSize: 10, fontWeight: '800' },
+  statusText: { ...Typography.eyebrow, fontWeight: '800' },
 
-  modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center' },
+  modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  modalContainerMobile: { flex: 0, maxHeight: '92%', maxWidth: '100%', alignSelf: 'stretch', marginTop: 'auto', borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderWidth: 1, borderBottomWidth: 0 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
   profileAvatar: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  profileName: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
-  profileCustomer: { fontSize: 14, color: colors.text.secondary },
+  profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  profileCustomer: { ...Typography.body, color: colors.text.secondary },
   infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 16 },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  infoLabel: { fontSize: 11, color: colors.text.muted, fontWeight: '600' },
-  infoValue: { fontSize: 14, color: colors.text.primary, fontWeight: '500' },
+  infoLabel: { ...Typography.caption, color: colors.text.muted, fontWeight: '600' },
+  infoValue: { ...Typography.body, color: colors.text.primary, fontWeight: '500' },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, marginTop: 24, marginBottom: 16 },
-  deleteBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  deleteBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
 
   formGroup: { marginBottom: 16 },
-  formLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
+  formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
-  formInputText: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+  formInputText: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
   statusSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   statusBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  statusBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
+  statusBtnText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
 
   modeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, alignSelf: 'flex-start' },
-  modeText: { fontSize: 8, fontWeight: '800' },
+  modeText: { ...Typography.eyebrow, fontWeight: '800' },
   modeSelector: { flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 16 },
   modeBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-  modeBtnText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  modeBtnText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
 
 
 
   gstCalculationPreview: { marginTop: 16, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary },
-  previewTitle: { fontSize: 12, fontWeight: '700', color: colors.text.primary, marginBottom: 8 },
+  previewTitle: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 8 },
   previewRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  previewLabel: { fontSize: 12, color: colors.text.secondary },
-  previewValue: { fontSize: 12, fontWeight: '600', color: colors.text.primary },
+  previewLabel: { ...Typography.bodySm, color: colors.text.secondary },
+  previewValue: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   previewDivider: { height: 1, backgroundColor: colors.border, marginVertical: 6 },
 
   // Missing from earlier migration
   customSearchSelectContainer: { position: 'relative', width: '100%' },
   customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)', elevation: 4 },
   customSelectItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  customSelectItemText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  customSelectItemSubtext: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
+  customSelectItemText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  customSelectItemSubtext: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
   itemCardForm: { backgroundColor: colors.bg.secondary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: 12 },
-  itemSublabel: { fontSize: 10, fontWeight: '700', color: colors.text.secondary, marginBottom: 4 },
+  itemSublabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary, marginBottom: 4 },
   grandTotalContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.secondary, padding: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginVertical: 12 },
-  grandTotalLabel: { fontSize: 14, fontWeight: '800', color: colors.text.primary },
-  grandTotalValue: { fontSize: 16, fontWeight: '800', color: colors.success },
+  grandTotalLabel: { ...Typography.body, fontWeight: '800', color: colors.text.primary },
+  grandTotalValue: { ...Typography.h3, fontWeight: '800', color: colors.success },
   itemRowDetail: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, alignItems: 'center' },
-  itemSubTextDetail: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  itemSubTextDetail: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
 
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginBottom: 8 },
+  sectionTitle: { ...Typography.body, fontWeight: '700', color: colors.text.primary, marginBottom: 8 },
   itemsCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.lg },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 },
   itemRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  itemNameText: { fontSize: 13, color: colors.text.primary, fontWeight: '500' },
-  itemQtyText: { fontSize: 13, color: colors.primary, fontWeight: '700' },
+  itemNameText: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' },
+  itemQtyText: { ...Typography.bodySm, color: colors.primary, fontWeight: '700' },
   printBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#2563eb', borderRadius: Radius.md, paddingVertical: 13, marginTop: 24, marginBottom: 8 },
-  printBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  printBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: colors.primary + '40', backgroundColor: colors.primary + '10' },
-  actionBtnText: { fontSize: 11, fontWeight: '700' },
+  actionBtnText: { ...Typography.caption, fontWeight: '700' },
   addItemRowBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: colors.primary + '30', backgroundColor: colors.primary + '08' },
-  itemInput: { backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 40, color: colors.text.primary, fontSize: 13 },
+  itemInput: { ...Typography.bodySm, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 40, color: colors.text.primary },
   itemRemoveBtn: { width: 40, height: 40, borderRadius: 6, borderWidth: 1, borderColor: colors.danger + '30', backgroundColor: colors.danger + '08', alignItems: 'center', justifyContent: 'center' }
 });

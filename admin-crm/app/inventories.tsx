@@ -1,7 +1,11 @@
+import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, DeviceEventEmitter } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product, DeadStockItem } from '../utils/api';
 import { useAuth } from '../utils/auth';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
@@ -130,7 +134,7 @@ const StockDisplay = ({ qtyBoxes, packing = 1, showSign = false, textStyle = {} 
   const color = isNegative ? colors.danger : (totalPcs === 0 ? colors.text.muted : colors.success);
   return (
     <Text style={[textStyle, { color, fontWeight: '800' }]}>
-      {sign}{totalPcs} <Text style={{ fontSize: (textStyle.fontSize || 14) * 0.8, fontWeight: '600' }}>Pcs</Text>
+      {sign}{totalPcs} <Text style={{ ...Typography.caption, fontWeight: '600' }}>Pcs</Text>
     </Text>
   );
 };
@@ -527,7 +531,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                       ))}
                       {filteredProducts.length === 0 && (
                         <View style={{ padding: 12 }}>
-                          <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>No products found</Text>
+                          <Text style={{ ...Typography.bodySm, color: colors.text.muted, textAlign: 'center' }}>No products found</Text>
                         </View>
                       )}
                     </ScrollView>
@@ -585,7 +589,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                       ))}
                       {filteredVendors.length === 0 && (
                         <View style={{ padding: 12 }}>
-                          <Text style={{ fontSize: 12, color: colors.text.muted, textAlign: 'center' }}>No vendors found</Text>
+                          <Text style={{ ...Typography.bodySm, color: colors.text.muted, textAlign: 'center' }}>No vendors found</Text>
                         </View>
                       )}
                     </ScrollView>
@@ -625,7 +629,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                       type: 'date',
                       value: mfgDate,
                       onChange: (e: any) => setMfgDate(e.target.value),
-                      style: { padding: 8, borderRadius: 6, border: '1px solid #ccc', fontSize: 14 }
+                      style: { ...Typography.body, padding: 8, borderRadius: 6, border: '1px solid #ccc' }
                     })
                   ) : (
                     <TextInput
@@ -645,7 +649,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                       type: 'date',
                       value: expiryDate,
                       onChange: (e: any) => setExpiryDate(e.target.value),
-                      style: { padding: 8, borderRadius: 6, border: '1px solid #ccc', fontSize: 14 }
+                      style: { ...Typography.body, padding: 8, borderRadius: 6, border: '1px solid #ccc' }
                     })
                   ) : (
                     <TextInput
@@ -666,7 +670,7 @@ function AddStockModal({ visible, initialProductId, onClose, onSaved, warehouses
                     type: 'date',
                     value: date,
                     onChange: (e: any) => setDate(e.target.value),
-                    style: { padding: 8, borderRadius: 6, border: '1px solid #ccc', fontSize: 14 }
+                    style: { ...Typography.body, padding: 8, borderRadius: 6, border: '1px solid #ccc' }
                   })
                 ) : (
                   <TextInput
@@ -809,7 +813,7 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
             <View style={styles.dialogHeader}>
               <View>
                 <Text style={styles.dialogTitle}>Adjust Stock Level</Text>
-                <Text style={{ fontSize: 11, color: colors.text.muted }}>{entry.warehouseName} | {getDisplayName(entry, products)} (Current: {formatStock(entry.qtyBoxes, entry.packing)})</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted }}>{entry.warehouseName} | {getDisplayName(entry, products)} (Current: {formatStock(entry.qtyBoxes, entry.packing)})</Text>
               </View>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close" size={24} color={colors.text.muted} />
@@ -875,7 +879,7 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
                     type: 'date',
                     value: date,
                     onChange: (e: any) => setDate(e.target.value),
-                    style: { padding: 8, borderRadius: 6, border: '1px solid #ccc', fontSize: 14 }
+                    style: { ...Typography.body, padding: 8, borderRadius: 6, border: '1px solid #ccc' }
                   })
                 ) : (
                   <TextInput
@@ -963,9 +967,9 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
           <View style={styles.dialogHeader}>
             <View>
               <Text style={styles.dialogTitle}>Stock Ledger</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary, marginTop: 2 }}>{productInfo.name}</Text>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, marginTop: 2 }}>{productInfo.name}</Text>
               {warehouseId && warehouseId !== 'all' ? (
-                <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 1 }}>Godown Filter: Active</Text>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 }}>Godown Filter: Active</Text>
               ) : null}
             </View>
             <TouchableOpacity onPress={onClose}>
@@ -975,17 +979,17 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.primary, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, height: 32 }}>
-              <Text style={{ fontSize: 12, color: colors.text.muted, marginRight: 6 }}>From:</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginRight: 6 }}>From:</Text>
               {Platform.OS === 'web' ? (
                 React.createElement('input', {
                   type: 'date',
                   value: startDate,
                   onChange: (e: any) => setStartDate(e.target.value),
-                  style: { border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: colors.text.primary, fontFamily: 'inherit' }
+                  style: { ...Typography.bodySm, border: 'none', outline: 'none', background: 'transparent', color: colors.text.primary }
                 })
               ) : (
                 <TextInput
-                  style={{ fontSize: 12, color: colors.text.primary, minWidth: 90 }}
+                  style={{ ...Typography.bodySm, color: colors.text.primary, minWidth: 90 }}
                   placeholder="YYYY-MM-DD"
                   value={startDate}
                   onChangeText={setStartDate}
@@ -993,17 +997,17 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
               )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.primary, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, height: 32 }}>
-              <Text style={{ fontSize: 12, color: colors.text.muted, marginRight: 6 }}>To:</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginRight: 6 }}>To:</Text>
               {Platform.OS === 'web' ? (
                 React.createElement('input', {
                   type: 'date',
                   value: endDate,
                   onChange: (e: any) => setEndDate(e.target.value),
-                  style: { border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: colors.text.primary, fontFamily: 'inherit' }
+                  style: { ...Typography.bodySm, border: 'none', outline: 'none', background: 'transparent', color: colors.text.primary }
                 })
               ) : (
                 <TextInput
-                  style={{ fontSize: 12, color: colors.text.primary, minWidth: 90 }}
+                  style={{ ...Typography.bodySm, color: colors.text.primary, minWidth: 90 }}
                   placeholder="YYYY-MM-DD"
                   value={endDate}
                   onChangeText={setEndDate}
@@ -1012,7 +1016,7 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
             </View>
             {(startDate || endDate) && (
               <TouchableOpacity onPress={() => { setStartDate(''); setEndDate(''); }} style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={{ fontSize: 12, color: colors.text.secondary }}>Clear</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Clear</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1063,12 +1067,10 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
 
                   return (
                     <View key={log._id} style={styles.ledgerBodyRow}>
-                      <Text style={[styles.ledgerCell, { flex: 1.2, fontSize: 11 }]}>{txDate}</Text>
+                      <Text style={[styles.ledgerCell, { ...Typography.caption, flex: 1.2 }]}>{txDate}</Text>
                       <Text style={[styles.ledgerCell, { flex: 1.5 }]} numberOfLines={1}>{log.warehouseName}</Text>
                       <View style={[styles.ledgerCell, { width: 90 }]}>
-                        <View style={[styles.typeBadge, { backgroundColor: badgeBg }]}>
-                          <Text style={[styles.typeBadgeText, { color: badgeText }]}>{log.type}</Text>
-                        </View>
+                        <StatusPill  label={<>{log.type}</>} textStyle={[styles.typeBadgeText, { color: badgeText }]} />
                       </View>
                       <Text style={[styles.ledgerCell, { width: 90, textAlign: 'center', color: colors.text.secondary }]}>
                         {log.packing || 0} Pcs
@@ -1083,11 +1085,11 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
                         {log.reference ? <Text style={styles.ledgerRefText}>Ref: {log.reference}</Text> : null}
                         {log.note ? <Text style={styles.ledgerNoteText}>{log.note}</Text> : null}
                         {log.manufacturingUnitName ? (
-                          <Text style={{ fontSize: 9.5, fontWeight: '700', color: colors.primary, marginTop: 1 }}>
-                            🏭 {log.manufacturingUnitName}
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary, marginTop: 1 }}>
+                             {log.manufacturingUnitName}
                           </Text>
                         ) : null}
-                        {!log.reference && !log.note && !log.manufacturingUnitName ? <Text style={{ color: colors.text.muted, fontSize: 11 }}>—</Text> : null}
+                        {!log.reference && !log.note && !log.manufacturingUnitName ? <Text style={{ ...Typography.caption, color: colors.text.muted }}>—</Text> : null}
                       </View>
                       <Text style={[styles.ledgerCell, { flex: 1 }]} numberOfLines={1}>{log.createdBy || 'System'}</Text>
                     </View>
@@ -1097,7 +1099,7 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
                 {ledger.length === 0 && (
                   <View style={{ padding: 40, alignItems: 'center' }}>
                     <Ionicons name="clipboard-outline" size={24} color={colors.text.muted} />
-                    <Text style={{ color: colors.text.muted, fontSize: 12, marginTop: 6 }}>No ledger actions recorded yet</Text>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 6 }}>No ledger actions recorded yet</Text>
                   </View>
                 )}
               </View>
@@ -1521,7 +1523,7 @@ export default function InventoriesScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, flex: 1, minWidth: 250, height: 40 }}>
               <Ionicons name="search" size={16} color={colors.text.muted} />
               <TextInput
-                style={{ flex: 1, height: '100%', color: colors.text.primary, fontSize: 13 }}
+                style={{ ...Typography.bodySm, flex: 1, height: '100%', color: colors.text.primary }}
                 placeholder="Search items..."
                 placeholderTextColor={colors.text.muted}
                 value={search}
@@ -1574,7 +1576,7 @@ export default function InventoriesScreen() {
                           <Text style={[styles.filterDropdownItemText, selectedVendorId === v._id && { fontWeight: '700', color: colors.primary }]}>
                             {toTitleCase(v.displayName || v.name)}
                           </Text>
-                          {v.company ? <Text style={{ fontSize: 10, color: colors.text.muted }}>{v.company}</Text> : null}
+                          {v.company ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{v.company}</Text> : null}
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -1626,7 +1628,7 @@ export default function InventoriesScreen() {
                             <Text style={[styles.filterDropdownItemText, selectedWarehouseId === w._id && { fontWeight: '700', color: colors.primary }]}>
                               {w.name}
                             </Text>
-                            <Text style={{ fontSize: 10, color: colors.text.muted }}>{w.city}, {w.state}</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{w.city}, {w.state}</Text>
                           </TouchableOpacity>
                           {perm.can('inventory:viewValue') && (
                             <TouchableOpacity
@@ -1664,7 +1666,7 @@ export default function InventoriesScreen() {
                         }}
                       >
                         <Ionicons name="add-circle" size={16} color={colors.primary} />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
                           Add New Warehouse
                         </Text>
                       </TouchableOpacity>
@@ -1694,7 +1696,7 @@ export default function InventoriesScreen() {
                 }}
               >
                 <Ionicons name="cube-outline" size={16} color="#fff" />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: '#fff' }}>
                   {showDeadStock ? 'Dead Stock' : showZero ? 'Zero Stock' : showTransfers ? 'Transfers' : 'Stock Actions'}
                 </Text>
                 <Ionicons name={showStockActionsDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#fff" />
@@ -1733,7 +1735,7 @@ export default function InventoriesScreen() {
                       }}
                     >
                       <Ionicons name="add-circle" size={16} color={colors.primary} />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
                         + Add Stock Entry
                       </Text>
                     </TouchableOpacity>
@@ -1760,7 +1762,7 @@ export default function InventoriesScreen() {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Ionicons name="checkmark-circle-outline" size={16} color={(!showZero && !showDeadStock && !showTransfers) ? colors.success : colors.text.secondary} />
-                      <Text style={{ fontSize: 12, fontWeight: (!showZero && !showDeadStock && !showTransfers) ? '700' : '600', color: (!showZero && !showDeadStock && !showTransfers) ? colors.success : colors.text.secondary }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: (!showZero && !showDeadStock && !showTransfers) ? '700' : '600', color: (!showZero && !showDeadStock && !showTransfers) ? colors.success : colors.text.secondary }}>
                         In-Stock View
                       </Text>
                     </View>
@@ -1790,7 +1792,7 @@ export default function InventoriesScreen() {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Ionicons name={showZero ? "eye" : "eye-off-outline"} size={16} color={showZero ? colors.warning : colors.text.secondary} />
-                      <Text style={{ fontSize: 12, fontWeight: showZero ? '700' : '600', color: showZero ? colors.warning : colors.text.secondary }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: showZero ? '700' : '600', color: showZero ? colors.warning : colors.text.secondary }}>
                         Zero Stock View
                       </Text>
                     </View>
@@ -1820,7 +1822,7 @@ export default function InventoriesScreen() {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Ionicons name="skull-outline" size={16} color={showDeadStock ? colors.danger : colors.text.secondary} />
-                      <Text style={{ fontSize: 12, fontWeight: showDeadStock ? '700' : '600', color: showDeadStock ? colors.danger : colors.text.secondary }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: showDeadStock ? '700' : '600', color: showDeadStock ? colors.danger : colors.text.secondary }}>
                         Dead Stock (90+ Days)
                       </Text>
                     </View>
@@ -1846,7 +1848,7 @@ export default function InventoriesScreen() {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Ionicons name="swap-horizontal" size={16} color={showTransfers ? colors.primary : colors.text.secondary} />
-                      <Text style={{ fontSize: 12, fontWeight: showTransfers ? '700' : '600', color: showTransfers ? colors.primary : colors.text.secondary }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: showTransfers ? '700' : '600', color: showTransfers ? colors.primary : colors.text.secondary }}>
                         Stock Transfers
                       </Text>
                     </View>
@@ -1876,7 +1878,7 @@ export default function InventoriesScreen() {
                 <>
                   <View style={styles.tableHeaderRow}>
                     <View style={[styles.tableHeaderCellContainer, styles.col12]}><Text style={styles.tableHeaderCell}>Transfer No</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, styles.col15]}><Text style={styles.tableHeaderCell}>From ➔ To</Text></View>
+                    <View style={[styles.tableHeaderCellContainer, styles.col15]}><Text style={styles.tableHeaderCell}>From  To</Text></View>
                     <View style={[styles.tableHeaderCellContainer, styles.col20]}><Text style={styles.tableHeaderCell}>Items</Text></View>
                     <View style={[styles.tableHeaderCellContainer, styles.col10]}><Text style={styles.tableHeaderCell}>Status</Text></View>
                     <View style={[styles.tableHeaderCellContainer, styles.col18, styles.colNoBorder]}><Text style={styles.tableHeaderCell}>Actions</Text></View>
@@ -1886,33 +1888,25 @@ export default function InventoriesScreen() {
                     <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
                       <View style={[styles.tableCellContainer, styles.col12]}>
                         <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.transferNo}</Text>
-                        <Text style={{ fontSize: 9, color: colors.text.muted }}>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>
                           {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : ''}
                         </Text>
                       </View>
                       <View style={[styles.tableCellContainer, styles.col15]}>
-                        <Text style={[styles.tableCell, { fontSize: 11, fontWeight: '700' }]}>{item.fromWarehouseName}</Text>
-                        <Text style={{ fontSize: 10, color: colors.text.muted }}>➔ {item.toWarehouseName}</Text>
+                        <Text style={[styles.tableCell, { ...Typography.caption, fontWeight: '700' }]}>{item.fromWarehouseName}</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}> {item.toWarehouseName}</Text>
                       </View>
                       <View style={[styles.tableCellContainer, styles.col20]}>
                         {(item.items || []).map((it: any, i: number) => (
-                          <Text key={i} style={{ fontSize: 10.5, color: colors.text.primary }} numberOfLines={1}>
+                          <Text key={i} style={{ ...Typography.eyebrow, color: colors.text.primary }} numberOfLines={1}>
                             • {it.productName} ({it.qtyBoxes} Box{it.qtyBoxes !== 1 ? 'es' : ''})
                           </Text>
                         ))}
                       </View>
                       <View style={[styles.tableCellContainer, styles.col10]}>
-                        <View style={[styles.statusBadgeContainer, {
-                          backgroundColor: item.status === 'completed' ? colors.success + '20' : item.status === 'in_transit' ? colors.primary + '20' : item.status === 'cancelled' ? colors.danger + '20' : colors.warning + '20'
-                        }]}>
-                          <Text style={{
-                            fontSize: 10,
-                            fontWeight: '700',
-                            color: item.status === 'completed' ? colors.success : item.status === 'in_transit' ? colors.primary : item.status === 'cancelled' ? colors.danger : colors.warning
-                          }}>
+                        <StatusPill  label={<>
                             {item.status.toUpperCase()}
-                          </Text>
-                        </View>
+                          </>} textStyle={{ ...Typography.eyebrow, fontWeight: '700', color: item.status === 'completed' ? colors.success : item.status === 'in_transit' ? colors.primary : item.status === 'cancelled' ? colors.danger : colors.warning }} />
                       </View>
                       <View style={[styles.tableCellContainer, styles.col18, styles.colNoBorder, styles.actionsCell]}>
                         {item.status === 'pending' && perm.can('inventory:edit') && (
@@ -1928,7 +1922,7 @@ export default function InventoriesScreen() {
                               }
                             }}
                           >
-                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>Ship</Text>
+                            <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Ship</Text>
                           </TouchableOpacity>
                         )}
                         {item.status === 'in_transit' && perm.can('inventory:edit') && (
@@ -1944,7 +1938,7 @@ export default function InventoriesScreen() {
                               }
                             }}
                           >
-                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>Receive</Text>
+                            <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Receive</Text>
                           </TouchableOpacity>
                         )}
                         {(item.status === 'in_transit' || item.status === 'completed') && Platform.OS === 'web' && (
@@ -2023,7 +2017,7 @@ export default function InventoriesScreen() {
                               printTransferChallan(item);
                             }}
                           >
-                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>Print Challan</Text>
+                            <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Print Challan</Text>
                           </TouchableOpacity>
                         )}
                         {['pending', 'in_transit'].includes(item.status) && perm.can('inventory:edit') && (
@@ -2039,7 +2033,7 @@ export default function InventoriesScreen() {
                               }
                             }}
                           >
-                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>Cancel</Text>
+                            <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Cancel</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -2049,7 +2043,7 @@ export default function InventoriesScreen() {
                   {transfers.length === 0 && (
                     <View style={{ padding: 40, alignItems: 'center' }}>
                       <Ionicons name="swap-horizontal-outline" size={36} color={colors.text.muted} />
-                      <Text style={{ marginTop: 8, color: colors.text.muted, fontSize: 13 }}>No warehouse stock transfers found.</Text>
+                      <Text style={{ ...Typography.bodySm, marginTop: 8, color: colors.text.muted }}>No warehouse stock transfers found.</Text>
                     </View>
                   )}
 
@@ -2059,7 +2053,7 @@ export default function InventoriesScreen() {
                       onPress={() => setAddTransferVisible(true)}
                     >
                       <Ionicons name="add-circle" size={16} color="#fff" />
-                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Request Stock Transfer</Text>
+                      <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Request Stock Transfer</Text>
                     </TouchableOpacity>
                   )}
                 </>
@@ -2078,7 +2072,7 @@ export default function InventoriesScreen() {
                     <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
                       <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
                         <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.productName}</Text>
-                        <Text style={{ fontSize: 10, color: colors.text.muted }}>SKU: {item.productSku} · Size: {item.size}</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>SKU: {item.productSku} · Size: {item.size}</Text>
                       </View>
                       <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
                         <Text style={styles.tableCell}>{item.warehouseName}</Text>
@@ -2098,12 +2092,12 @@ export default function InventoriesScreen() {
                   {deadStockItems.length === 0 ? (
                     <View style={{ padding: 40, alignItems: 'center' }}>
                       <Ionicons name="checkmark-circle-outline" size={36} color={colors.success} />
-                      <Text style={{ marginTop: 8, color: colors.text.muted, fontSize: 13 }}>All products have active stock movement!</Text>
+                      <Text style={{ ...Typography.bodySm, marginTop: 8, color: colors.text.muted }}>All products have active stock movement!</Text>
                     </View>
                   ) : (
                     <View style={[styles.tableBodyRow, { backgroundColor: colors.danger + '0d', borderTopWidth: 2, borderTopColor: colors.danger }]}>
                       <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: colors.danger }}>TOTAL DEAD STOCK</Text>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.danger }}>TOTAL DEAD STOCK</Text>
                       </View>
                       <View style={[styles.tableCellContainer, { flex: 1.8 }]} />
                       <View style={[styles.tableCellContainer, { flex: 1.2 }]}>
@@ -2152,10 +2146,7 @@ export default function InventoriesScreen() {
                   ))}
 
                   {processedItems.length === 0 && (
-                    <View style={styles.emptyTableContainer}>
-                      <Ionicons name="cube-outline" size={36} color={colors.text.muted} />
-                      <Text style={styles.emptyText}>No consolidated inventory items found</Text>
-                    </View>
+                    <EmptyState title={<>No consolidated inventory items found</>}  />
                   )}
                 </>
               ) : (
@@ -2190,10 +2181,7 @@ export default function InventoriesScreen() {
                   ))}
 
                   {processedItems.length === 0 && (
-                    <View style={styles.emptyTableContainer}>
-                      <Ionicons name="cube-outline" size={36} color={colors.text.muted} />
-                      <Text style={styles.emptyText}>No stock logs in this Godown</Text>
-                    </View>
+                    <EmptyState title={<>No stock logs in this Godown</>}  />
                   )}
                 </>
               )}
@@ -2331,7 +2319,7 @@ function AddTransferModal({ visible, onClose, onSaved, warehouses, products }: {
                     <select
                       value={fromWarehouseId}
                       onChange={(e: any) => setFromWarehouseId(e.target.value)}
-                      style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, width: '100%', fontSize: 13 }}
+                      style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, width: '100%' }}
                     >
                       {warehouses.map(w => <option key={w._id} value={w._id}>{w.name}</option>)}
                     </select>
@@ -2346,7 +2334,7 @@ function AddTransferModal({ visible, onClose, onSaved, warehouses, products }: {
                     <select
                       value={toWarehouseId}
                       onChange={(e: any) => setToWarehouseId(e.target.value)}
-                      style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, width: '100%', fontSize: 13 }}
+                      style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, width: '100%' }}
                     >
                       {warehouses.map(w => <option key={w._id} value={w._id}>{w.name}</option>)}
                     </select>
@@ -2368,7 +2356,7 @@ function AddTransferModal({ visible, onClose, onSaved, warehouses, products }: {
                           next[idx].productId = e.target.value;
                           setItems(next);
                         }}
-                        style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, width: '100%', fontSize: 13 }}
+                        style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.primary, color: colors.text.primary, width: '100%' }}
                       >
                         <option value="">Select Product</option>
                         {products.map(p => <option key={p._id} value={p._id}>{p.name} ({p.size})</option>)}
@@ -2414,7 +2402,7 @@ function AddTransferModal({ visible, onClose, onSaved, warehouses, products }: {
                 onPress={() => setItems([...items, { productId: '', qtyBoxes: '1', packing: '1', batchNo: '' }])}
               >
                 <Ionicons name="add-circle" size={16} color={colors.primary} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Add Line Item</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>Add Line Item</Text>
               </TouchableOpacity>
 
               <View style={styles.formGroup}>
@@ -2471,11 +2459,11 @@ const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolida
         <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
           <Text style={styles.primaryText}>{getDisplayName(item)}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-            <Text style={{ fontSize: 10, color: colors.text.muted }}>HSN: {item.hsnCode}</Text>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>HSN: {item.hsnCode}</Text>
             {isLowStock && (
               <View style={{ backgroundColor: colors.warning + '20', borderColor: colors.warning + '60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                <Text style={{ fontSize: 9, fontWeight: '800', color: colors.warning }}>
-                  ⚠️ LOW STOCK ({item.totalBoxes}/{minReorderVal})
+                <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.warning }}>
+                   LOW STOCK ({item.totalBoxes}/{minReorderVal})
                 </Text>
               </View>
             )}
@@ -2496,16 +2484,14 @@ const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolida
                   {w.warehouseName}: 
                 </Text>
                 <View style={{ marginLeft: 4 }}>
-                  <StockDisplay qtyBoxes={w.qtyBoxes} packing={item.vendorDetails[0]?.packing || 1} textStyle={{ fontSize: 10, color: colors.text.primary }} />
+                  <StockDisplay qtyBoxes={w.qtyBoxes} packing={item.vendorDetails[0]?.packing || 1} textStyle={{ ...Typography.eyebrow, color: colors.text.primary }} />
                 </View>
               </View>
             ))
           ) : (
-            <View style={styles.warehouseBadge}>
-              <Text style={styles.warehouseBadgeText}>
+            <StatusPill  label={<>
                 {currentWarehouseName}
-              </Text>
-            </View>
+              </>} textStyle={styles.warehouseBadgeText} />
           )}
         </View>
 
@@ -2513,9 +2499,9 @@ const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolida
           <StockDisplay 
             qtyBoxes={item.totalBoxes} 
             packing={item.vendorDetails[0]?.packing || 1} 
-            textStyle={{ fontWeight: '700', fontSize: 13 }} 
+            textStyle={{ ...Typography.bodySm, fontWeight: '700' }} 
           />
-          <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
+          <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>
             across {item.vendorDetails.length} batch{item.vendorDetails.length !== 1 ? 'es' : ''}
           </Text>
         </View>
@@ -2539,7 +2525,7 @@ const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolida
                 onPress={() => onShowLedger({ id: item.productId, name: getDisplayName(item), vendorId: '' })}
               >
                 <View>
-                  <Text style={{ fontWeight: '700', color: colors.text.primary, fontSize: 13 }}>0 Boxes</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>0 Boxes</Text>
                 </View>
                 <View style={styles.breakdownActionBadge}>
                   <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
@@ -2571,8 +2557,8 @@ const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolida
                       </Text>
                       {vd.manufacturingUnitName ? (
                         <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '800', color: colors.primary }}>
-                            🏭 {vd.manufacturingUnitName}
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>
+                             {vd.manufacturingUnitName}
                           </Text>
                         </View>
                       ) : null}
@@ -2588,12 +2574,12 @@ const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolida
                       : daysLeft <= 90 ? '#eab308'
                       : colors.text.muted;
                     const expiryLabel = daysLeft === null ? ''
-                      : daysLeft < 0 ? ' ⚠ EXPIRED'
-                      : daysLeft <= 30 ? ` ⚠ ${daysLeft}d left`
+                      : daysLeft < 0 ? '  EXPIRED'
+                      : daysLeft <= 30 ? `  ${daysLeft}d left`
                       : daysLeft <= 90 ? ` (${daysLeft}d)`
                       : '';
                     return (
-                      <Text style={{ fontSize: 9, color: expiryColor, marginTop: 2, fontWeight: daysLeft !== null && daysLeft <= 30 ? '700' : '400' }}>
+                      <Text style={{ ...Typography.eyebrow, color: expiryColor, marginTop: 2, fontWeight: daysLeft !== null && daysLeft <= 30 ? '700' : '400' }}>
                         {vd.mfgDate ? `Mfg: ${new Date(vd.mfgDate).toLocaleDateString('en-IN')}` : ''}
                         {vd.mfgDate && vd.expiryDate ? ' | ' : ''}
                         {vd.expiryDate ? `Exp: ${new Date(vd.expiryDate).toLocaleDateString('en-IN')}${expiryLabel}` : ''}
@@ -2612,18 +2598,16 @@ const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolida
                           {w.warehouseName}: 
                         </Text>
                         <View style={{ marginLeft: 4 }}>
-                          <StockDisplay qtyBoxes={w.qtyBoxes} packing={vd.packing} textStyle={{ fontSize: 10, color: colors.primary }} />
+                          <StockDisplay qtyBoxes={w.qtyBoxes} packing={vd.packing} textStyle={{ ...Typography.eyebrow, color: colors.primary }} />
                         </View>
                       </View>
                     ))
                   ) : (
                     <>
                       {vd.warehouses.map((wh: any, wIdx: number) => (
-                        <View key={wIdx} style={styles.warehouseBadge}>
-                          <Text style={styles.warehouseBadgeText}>
+                        <StatusPill key={wIdx} label={<>
                             {wh.warehouseName}
-                          </Text>
-                        </View>
+                          </>} textStyle={styles.warehouseBadgeText} />
                       ))}
                       {perm.can('inventory:edit') && (
                         <TouchableOpacity
@@ -2646,9 +2630,9 @@ const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolida
                     <StockDisplay 
                       qtyBoxes={vd.qtyBoxes} 
                       packing={vd.packing} 
-                      textStyle={{ fontWeight: '700', fontSize: 13 }} 
+                      textStyle={{ ...Typography.bodySm, fontWeight: '700' }} 
                     />
-                    <Text style={{ fontSize: 9, color: colors.text.muted }}>Subtotal</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Subtotal</Text>
                   </View>
                   <View style={styles.breakdownActionBadge}>
                     <Ionicons name="clipboard-outline" size={10} color={colors.text.secondary} />
@@ -2672,25 +2656,25 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
   
   topHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
-  topHeaderTitle: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
+  topHeaderTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
   headerBtnPrimary: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, borderRadius: Radius.md, paddingHorizontal: 16, height: 40, gap: 8, borderWidth: 1, borderColor: colors.primary },
-  headerBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  headerBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
 
   summaryBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginTop: Spacing.lg, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg },
   summaryItem: { alignItems: 'center' },
-  summaryLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.5, marginBottom: 4 },
-  summaryValue: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+  summaryLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginBottom: 4 },
+  summaryValue: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   summaryDivider: { width: 1, height: 26, backgroundColor: colors.border },
   
   controlsBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginVertical: Spacing.md, paddingHorizontal: 14, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, zIndex: 1100 },
-  searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+  searchInput: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
-  filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
   filterDropdownPanel: { position: 'absolute', top: 52, right: Spacing.lg, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 280, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
-  filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
+  filterDropdownItemText: { ...Typography.bodySm, color: colors.text.primary },
 
   // Control sub bar & vendor filter
   controlSubBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: Spacing.lg, marginBottom: Spacing.md, gap: 12, zIndex: 1050 },
@@ -2698,42 +2682,42 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   table: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden', flex: 1 },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: 'transparent' },
-  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
-  tableCell: { fontSize: 13, color: colors.text.primary },
+  tableCell: { ...Typography.bodySm, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
-  primaryText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 10, fontSize: 13 },
+  primaryText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  emptyText: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', marginTop: 10 },
   emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center', width: '100%' },
 
   warehouseBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border },
-  warehouseBadgeText: { fontSize: 11, color: colors.text.secondary, fontWeight: '600' },
+  warehouseBadgeText: { ...Typography.caption, color: colors.text.secondary, fontWeight: '600' },
 
   actionBtnSecondary: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 5, gap: 4, backgroundColor: colors.primary + '08' },
-  actionBtnSecondaryText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  actionBtnSecondaryText: { ...Typography.bodySm, color: colors.primary, fontWeight: '700' },
 
   // Grouped and Expandable sub-rows
   expandableGroupContainer: { borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.card },
   expandedBreakdownArea: { backgroundColor: colors.bg.primary + '30', borderLeftWidth: 3, borderLeftColor: colors.primary, paddingVertical: 4 },
   expandedBreakdownRow: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center' },
-  breakdownVendorText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  breakdownPackingText: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
+  breakdownVendorText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  breakdownPackingText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
   breakdownActionBadge: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, backgroundColor: colors.bg.secondary, gap: 4 },
-  breakdownActionText: { fontSize: 10, fontWeight: '700', color: colors.text.secondary },
+  breakdownActionText: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary },
 
   // Modals Styling
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   dialogSheet: { width: '90%', maxWidth: 500, maxHeight: '90%', flexDirection: 'column', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
   dialogContainer: { width: '100%', flex: 1 },
   dialogHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, marginBottom: 8 },
-  dialogTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+  dialogTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   
   formGroup: { marginBottom: 14 },
   formRow: { flexDirection: 'row' },
-  formLabel: { fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 4, textTransform: 'uppercase' },
-  formInput: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 42, color: colors.text.primary, fontSize: 14 },
-  errorText: { color: colors.danger, fontSize: 12, fontWeight: '700', marginBottom: 12, backgroundColor: colors.danger + '10', padding: 8, borderRadius: Radius.sm, borderLeftWidth: 3, borderLeftColor: colors.danger },
+  formLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 4, textTransform: 'uppercase' },
+  formInput: { ...Typography.body, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 42, color: colors.text.primary },
+  errorText: { ...Typography.bodySm, color: colors.danger, fontWeight: '700', marginBottom: 12, backgroundColor: colors.danger + '10', padding: 8, borderRadius: Radius.sm, borderLeftWidth: 3, borderLeftColor: colors.danger },
 
   dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
   dialogCancel: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
@@ -2745,27 +2729,27 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   clearProductSelection: { position: 'absolute', right: 12 },
   customSelectPanel: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginTop: 4, overflow: 'hidden', boxShadow: '0px 4px 8px rgba(0,0,0,0.1)', elevation: 5 },
   customSelectItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  customSelectItemText: { fontSize: 13, color: colors.text.primary, fontWeight: '700' },
-  customSelectItemSubtext: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
+  customSelectItemText: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '700' },
+  customSelectItemSubtext: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
 
   // Adjustment Type
   adjustmentTypeContainer: { flexDirection: 'row', gap: 8, marginTop: 2 },
   adjustmentTypeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 8, gap: 4 },
-  adjustmentTypeBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
+  adjustmentTypeBtnText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
 
   // Ledger sheets (Wider modal for ledger logs)
   ledgerSheet: { width: '98%', maxWidth: 1200, height: '88%', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
   ledgerTable: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
-  ledgerHeaderCell: { fontSize: 10, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  ledgerHeaderCell: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   ledgerBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
-  ledgerCell: { fontSize: 12, color: colors.text.primary, paddingRight: 6 },
+  ledgerCell: { ...Typography.bodySm, color: colors.text.primary, paddingRight: 6 },
   
   typeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
-  typeBadgeText: { fontSize: 9, fontWeight: '800' },
+  typeBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
   
-  ledgerRefText: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
-  ledgerNoteText: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
+  ledgerRefText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
+  ledgerNoteText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
 
   // Transfers Layout Overrides
   col10: { flex: 1 },

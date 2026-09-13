@@ -1,7 +1,11 @@
+import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, Alert, useWindowDimensions, DeviceEventEmitter } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, Alert, useWindowDimensions, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, Payment, Customer, Vendor } from '../utils/api';
 import { shortenPartyName } from '../utils/string';
 import { useAuth } from '../utils/auth';
@@ -199,8 +203,8 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
             {partyId && (
               <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 10, marginBottom: Spacing.md, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View>
-                  <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>CURRENT DUE BALANCE</Text>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 2 }}>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>CURRENT DUE BALANCE</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginTop: 2 }}>
                     GST: ₹{((parties.find(p => p._id === partyId)?.regularBalance) || 0).toLocaleString('en-IN')}
                     {canAccessCash && ` | Cash: ₹${((parties.find(p => p._id === partyId)?.cashBalance) || 0).toLocaleString('en-IN')}`}
                   </Text>
@@ -215,7 +219,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
                     }
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Fill Due</Text>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>Fill Due</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -226,7 +230,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
               <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0 }]}>
                 <Text style={{ paddingLeft: 12, paddingRight: 4, color: colors.text.secondary, fontWeight: '700' }}>₹</Text>
                 <TextInput
-                  style={{ flex: 1, height: '100%', color: colors.text.primary, fontSize: 14 }}
+                  style={{ ...Typography.body, flex: 1, height: '100%', color: colors.text.primary }}
                   placeholder="0.00"
                   placeholderTextColor={colors.text.muted}
                   value={amount}
@@ -245,10 +249,10 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
                   type: 'date',
                   value: date,
                   onChange: (e: any) => setDate(e.target.value),
-                  style: { flex: 1, height: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary, fontSize: 14 }
+                  style: { ...Typography.body, flex: 1, height: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: colors.text.primary }
                 }) : (
                   <TextInput
-                    style={{ flex: 1, height: '100%', color: colors.text.primary, fontSize: 14 }}
+                    style={{ ...Typography.body, flex: 1, height: '100%', color: colors.text.primary }}
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor={colors.text.muted}
                     value={date}
@@ -359,34 +363,34 @@ export function PaymentDetailModal({ visible, payment, onClose }: { visible: boo
           </View>
           <View style={styles.modalBody}>
             <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 12, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Party</Text>
-              <Text style={{ fontSize: 16, color: colors.text.primary, fontWeight: '700' }}>{payment.partyName} <Text style={{ fontSize: 12, fontWeight: '400', color: colors.text.muted }}>({payment.partyType})</Text></Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Party</Text>
+              <Text style={{ ...Typography.h3, color: colors.text.primary, fontWeight: '700' }}>{payment.partyName} <Text style={{ ...Typography.bodySm, fontWeight: '400', color: colors.text.muted }}>({payment.partyType})</Text></Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
               <View>
-                <Text style={{ fontSize: 12, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Date</Text>
-                <Text style={{ fontSize: 14, color: colors.text.primary }}>{new Date(payment.date).toLocaleDateString('en-IN')}</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Date</Text>
+                <Text style={{ ...Typography.body, color: colors.text.primary }}>{new Date(payment.date).toLocaleDateString('en-IN')}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 12, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Amount</Text>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: payment.type === 'receive' ? colors.success : colors.danger }}>
+                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Amount</Text>
+                <Text style={{ ...Typography.h3, fontWeight: '800', color: payment.type === 'receive' ? colors.success : colors.danger }}>
                   {payment.type === 'receive' ? '+ ' : '- '}₹{payment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
               <View>
-                <Text style={{ fontSize: 12, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Mode & Method</Text>
-                <Text style={{ fontSize: 14, color: colors.text.primary }}>{payment.mode === 'regular' ? 'GST (Regular)' : 'Cash'} - {payment.paymentMethod}</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Mode & Method</Text>
+                <Text style={{ ...Typography.body, color: colors.text.primary }}>{payment.mode === 'regular' ? 'GST (Regular)' : 'Cash'} - {payment.paymentMethod}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 12, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Reference No</Text>
-                <Text style={{ fontSize: 14, color: colors.text.primary }}>{payment.referenceNo || 'N/A'}</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Reference No</Text>
+                <Text style={{ ...Typography.body, color: colors.text.primary }}>{payment.referenceNo || 'N/A'}</Text>
               </View>
             </View>
             <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 12, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Notes</Text>
-              <Text style={{ fontSize: 14, color: colors.text.primary }}>{payment.notes || 'None'}</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Notes</Text>
+              <Text style={{ ...Typography.body, color: colors.text.primary }}>{payment.notes || 'None'}</Text>
             </View>
           </View>
         </View>
@@ -430,7 +434,7 @@ export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boo
         date: new Date(date).toISOString(),
       });
 
-      alert(`✓ Gateway Payout Settled Successfully! Net ₹${netDeposited.toLocaleString('en-IN')} deposited to Bank Account.`);
+      alert(` Gateway Payout Settled Successfully! Net ₹${netDeposited.toLocaleString('en-IN')} deposited to Bank Account.`);
       onSaved();
       onClose();
     } catch (err: any) {
@@ -455,7 +459,7 @@ export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boo
           </View>
 
           <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-            <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 14, lineHeight: 15 }}>
+            <Text style={{ ...Typography.caption, color: colors.text.muted, marginBottom: 14 }}>
               Reconcile bulk payouts received from Razorpay online gateway or Courier COD remittance directly into your Bank Account.
             </Text>
 
@@ -476,7 +480,7 @@ export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boo
                   }}
                   onPress={() => setSelectedGateway(g._id)}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: selectedGateway === g._id ? '700' : '500', color: selectedGateway === g._id ? colors.primary : colors.text.primary }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: selectedGateway === g._id ? '700' : '500', color: selectedGateway === g._id ? colors.primary : colors.text.primary }}>
                     {g.name}
                   </Text>
                   {selectedGateway === g._id && <Ionicons name="checkmark-circle" size={16} color={colors.primary} />}
@@ -511,11 +515,11 @@ export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boo
             </View>
 
             <View style={{ backgroundColor: colors.success + '12', borderRadius: Radius.md, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: colors.success + '30' }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.success, textTransform: 'uppercase' }}>Net Bank Deposit</Text>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.success, marginTop: 2 }}>
+              <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.success, textTransform: 'uppercase' }}>Net Bank Deposit</Text>
+              <Text style={{ ...Typography.h2, fontWeight: '800', color: colors.success, marginTop: 2 }}>
                 ₹{netDeposited.toLocaleString('en-IN')}
               </Text>
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>
                 (Gross ₹{Number(grossAmount || 0).toLocaleString('en-IN')} − Fee ₹{Number(feeAmount || 0).toLocaleString('en-IN')})
               </Text>
             </View>
@@ -640,7 +644,7 @@ export default function PaymentsScreen() {
       key: 'date',
       title: 'Date',
       width: 120,
-      render: (p) => <Text style={{ fontSize: 13, color: colors.text.primary }}>{new Date(p.date).toLocaleDateString('en-IN')}</Text>
+      render: (p) => <Text style={{ ...Typography.bodySm, color: colors.text.primary }}>{new Date(p.date).toLocaleDateString('en-IN')}</Text>
     },
     {
       key: 'partyName',
@@ -649,8 +653,8 @@ export default function PaymentsScreen() {
       width: 200,
       render: (p) => (
         <View>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }} numberOfLines={1}>{p.partyName}</Text>
-          <Text style={{ fontSize: 10, color: colors.text.muted }}>{p.partyType}</Text>
+          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }} numberOfLines={1}>{p.partyName}</Text>
+          <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{p.partyType}</Text>
         </View>
       )
     },
@@ -659,11 +663,9 @@ export default function PaymentsScreen() {
       title: 'Type',
       width: 100,
       render: (p) => (
-        <View style={[styles.badge, { backgroundColor: p.type === 'receive' ? colors.success + '15' : colors.danger + '15' }]}>
-          <Text style={[styles.badgeText, { color: p.type === 'receive' ? colors.success : colors.danger }]}>
+        <StatusPill  label={<>
             {p.type === 'receive' ? 'RECEIVED' : 'PAID'}
-          </Text>
-        </View>
+          </>} textStyle={[styles.badgeText, { color: p.type === 'receive' ? colors.success : colors.danger }]} />
       )
     },
     {
@@ -671,7 +673,7 @@ export default function PaymentsScreen() {
       title: 'Mode',
       width: 100,
       render: (p) => (
-        <Text style={{ fontSize: 12, color: colors.text.secondary }}>{p.mode === 'regular' ? 'GST' : 'Cash'} ({p.paymentMethod})</Text>
+        <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>{p.mode === 'regular' ? 'GST' : 'Cash'} ({p.paymentMethod})</Text>
       )
     },
     {
@@ -680,7 +682,7 @@ export default function PaymentsScreen() {
       width: 120,
       align: 'right',
       render: (p) => (
-        <Text style={{ fontSize: 13, fontWeight: '800', color: p.type === 'receive' ? colors.success : colors.danger }}>
+        <Text style={{ ...Typography.bodySm, fontWeight: '800', color: p.type === 'receive' ? colors.success : colors.danger }}>
           {p.type === 'receive' ? '+' : '-'} ₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
         </Text>
       )
@@ -766,7 +768,7 @@ export default function PaymentsScreen() {
                 onPress={() => setSettleVisible(true)}
               >
                 <Ionicons name="card-outline" size={16} color={colors.primary} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Settle Gateway Payout</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>Settle Gateway Payout</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.danger }]} onPress={() => { setAddType('make'); setAddVisible(true); }}>
                 <Ionicons name="remove" size={20} color="#fff" />
@@ -811,10 +813,7 @@ export default function PaymentsScreen() {
             onRefresh={onRefresh}
             onRowPress={(p) => { setSelectedPayment(p); setDetailVisible(true); }}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="wallet-outline" size={32} color={colors.text.muted} />
-                <Text style={styles.emptyText}>No payments recorded.</Text>
-              </View>
+              <EmptyState title={<>No payments recorded.</>}  />
             }
           />
         </View>
@@ -831,57 +830,57 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   innerContainer: { flex: 1, width: '100%' },
   headerBar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.sm },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
-  searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+  searchInput: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
   
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
-  filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
   filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 160, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
-  filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
+  filterDropdownItemText: { ...Typography.bodySm, color: colors.text.primary },
 
   tableCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   tableHeader: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border },
-  th: { fontSize: 11, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.5 },
+  th: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableRow: { flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: 1, borderBottomColor: colors.border },
-  td: { fontSize: 13, color: colors.text.primary },
+  td: { ...Typography.bodySm, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  badgeText: { ...Typography.eyebrow, fontWeight: '700' },
   statCard: { flex: 1, minWidth: 130, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1 },
-  statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  statValue: { fontSize: 16, fontWeight: '800', marginTop: 2 },
+  statLabel: { ...Typography.eyebrow, fontWeight: '700' },
+  statValue: { ...Typography.h3, fontWeight: '800', marginTop: 2 },
   actionPillBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' },
-  actionPillText: { fontSize: 11, fontWeight: '700' },
+  actionPillText: { ...Typography.caption, fontWeight: '700' },
   iconBtn: { padding: 6 },
   emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { marginTop: 10, color: colors.text.muted, fontSize: 14 },
+  emptyText: { ...Typography.body, marginTop: 10, color: colors.text.muted },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', maxWidth: 500, backgroundColor: colors.bg.card, borderRadius: Radius.lg, maxHeight: '90%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   closeBtn: { padding: 4 },
   modalBody: { padding: Spacing.lg },
   row: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.md },
-  label: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { height: 44, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, backgroundColor: colors.bg.primary, color: colors.text.primary, fontSize: 14 },
+  label: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase' },
+  input: { ...Typography.body, height: 44, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, backgroundColor: colors.bg.primary, color: colors.text.primary },
   
   toggleGroup: { flexDirection: 'row', height: 44, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   toggleBtn: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary },
-  toggleText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  toggleText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   
   dropdownWrap: { position: 'relative' },
   dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 220, zIndex: 9999, elevation: 20, overflow: 'hidden', boxShadow: '0px 4px 12px rgba(0,0,0,0.18)' },
   dropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  dropdownItemText: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
-  dropdownItemSub: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  dropdownItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
+  dropdownItemSub: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
 
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, gap: 10 },
   cancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.md, backgroundColor: colors.bg.secondary },
-  cancelBtnText: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
+  cancelBtnText: { ...Typography.body, fontWeight: '600', color: colors.text.primary },
   saveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: Radius.md, backgroundColor: colors.primary },
-  saveBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' }
+  saveBtnText: { ...Typography.body, fontWeight: '700', color: '#fff' }
 });

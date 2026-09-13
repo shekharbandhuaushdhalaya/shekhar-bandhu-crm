@@ -1,3 +1,5 @@
+import type { TextStyle } from 'react-native';
+
 // Official Brand Design System for Shekhar Bandhu Aushdhalaya
 export const LightColors = {
   bg: {
@@ -72,9 +74,9 @@ export const Spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
 export const Radius = { sm: 8, md: 12, lg: 16, xl: 24 };
 
 export const Shadows = {
-  card: { boxShadow: '0px 2px 10px rgba(39, 56, 47, 0.04)', elevation: 1 },
+  card: { boxShadow: '0px 1px 2px rgba(43,26,24,0.06), 0px 8px 20px rgba(43,26,24,0.05)', elevation: 2 },
   header: { boxShadow: '0px 1px 6px rgba(39, 56, 47, 0.03)', elevation: 1 },
-  hover: { boxShadow: '0px 5px 14px rgba(39, 56, 47, 0.07)', elevation: 2 },
+  hover: { boxShadow: '0px 2px 4px rgba(43,26,24,0.08), 0px 10px 24px rgba(43,26,24,0.09)', elevation: 3 },
 };
 
 export type Stage = 'lead' | 'contacted' | 'proposal' | 'negotiation' | 'won' | 'lost';
@@ -87,3 +89,22 @@ export const getStageColors = (colors: typeof LightColors) => ({
   won: colors.pipeline.won,
   lost: colors.pipeline.lost,
 });
+
+// Named font weights are bundled locally, so offline and native rendering match web.
+export const Typography = {
+  display: { fontFamily: 'Manrope_800', fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.4 },
+  h1: { fontFamily: 'Manrope_800', fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.3 },
+  h2: { fontFamily: 'Manrope_800', fontSize: 17, lineHeight: 22, fontWeight: '800' },
+  h3: { fontFamily: 'Manrope_700', fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  body: { fontFamily: 'Inter_500', fontSize: 14, lineHeight: 20, fontWeight: '500' },
+  bodySm: { fontFamily: 'Inter_500', fontSize: 12.5, lineHeight: 18, fontWeight: '500' },
+  caption: { fontFamily: 'Inter_600', fontSize: 11, lineHeight: 15, fontWeight: '600' },
+  eyebrow: { fontFamily: 'Inter_800', fontSize: 10, lineHeight: 13, fontWeight: '800', letterSpacing: 0.9, textTransform: 'uppercase' },
+} satisfies Record<string, TextStyle>;
+
+export function withAlpha(color: string, alpha = 0.1): string {
+  const hex = color.replace('#', '');
+  if (/^[0-9a-f]{6}$/i.test(hex)) return `rgba(${parseInt(hex.slice(0, 2), 16)},${parseInt(hex.slice(2, 4), 16)},${parseInt(hex.slice(4, 6), 16)},${alpha})`;
+  const rgb = color.match(/rgba?\(([^)]+)\)/);
+  return rgb ? `rgba(${rgb[1].split(',').slice(0, 3).join(',')},${alpha})` : color;
+}

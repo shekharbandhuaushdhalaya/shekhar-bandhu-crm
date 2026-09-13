@@ -1,8 +1,10 @@
+import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
+import { AppText as Text } from './AppText';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Text, StyleSheet, TouchableOpacity, View, Platform, useWindowDimensions, Modal } from 'react-native';
+import { Animated, StyleSheet, View, Platform, useWindowDimensions, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/themeContext';
-import { Radius, Spacing, Shadows } from '../constants/theme';
+import { Radius, Spacing, Shadows, Typography } from '../constants/theme';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -139,11 +141,7 @@ const styles = StyleSheet.create({
   icon: {
     marginRight: 10,
   },
-  message: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  message: { ...Typography.body, flex: 1, fontWeight: '600' },
   closeBtn: {
     marginLeft: 12,
     padding: 4,

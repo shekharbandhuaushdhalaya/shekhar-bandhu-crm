@@ -1,7 +1,11 @@
+import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, TextInput, Image, Modal, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Image, Modal, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
+import { Spacing, Radius, LightColors, Shadows, Typography } from '../constants/theme';
 import { api, ProductQuery, getImageUrl } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
@@ -109,7 +113,7 @@ export default function QueriesScreen() {
         }}>
           <Ionicons name="search" size={18} color={colors.text.muted} />
           <TextInput
-            style={{ flex: 1, height: 42, color: colors.text.primary, fontSize: 13, minWidth: 100 }}
+            style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 100 }}
             placeholder="Search queries by name, product, text..."
             placeholderTextColor={colors.text.muted}
             value={search}
@@ -126,18 +130,7 @@ export default function QueriesScreen() {
             <select
               value={activeTab}
               onChange={(e: any) => setActiveTab(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: `1px solid ${colors.border}`,
-                backgroundColor: colors.bg.secondary,
-                color: colors.text.primary,
-                fontSize: 12,
-                fontWeight: '600',
-                outline: 'none',
-                height: 34,
-                cursor: 'pointer'
-              }}
+              style={{ ...Typography.bodySm, padding: '6px 12px', borderRadius: 6, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontWeight: '600', outline: 'none', height: 34, cursor: 'pointer' }}
             >
               <option value="all">All Statuses ({queries.length})</option>
               <option value="pending">Pending ({queries.filter(q => q.status === 'pending').length})</option>
@@ -172,7 +165,7 @@ export default function QueriesScreen() {
                 })));
               }}
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
                 {activeTab.toUpperCase()} ({activeTab === 'all' ? queries.length : queries.filter(q => q.status === activeTab).length})
               </Text>
               <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
@@ -197,11 +190,9 @@ export default function QueriesScreen() {
                   {new Date(q.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                 </Text>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(q.status) + '15', borderColor: getStatusColor(q.status) }]}>
-                <Text style={[styles.statusBadgeText, { color: getStatusColor(q.status) }]}>
+              <StatusPill  label={<>
                   {q.status.toUpperCase()}
-                </Text>
-              </View>
+                </>} textStyle={[styles.statusBadgeText, { color: getStatusColor(q.status) }]} />
             </View>
 
             {/* Product Interest banner */}
@@ -299,15 +290,11 @@ export default function QueriesScreen() {
         ))}
 
         {filteredQueries.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="mail-unread-outline" size={48} color={colors.text.muted} />
-            <Text style={styles.emptyTitle}>No Queries Found</Text>
-            <Text style={styles.emptySubtitle}>
+          <EmptyState title={<>No Queries Found</>} message={<>
               {activeTab === 'all' 
                 ? 'No inquiries have been submitted yet.' 
                 : `No queries with status "${activeTab}" found.`}
-            </Text>
-          </View>
+            </>} />
         )}
       </ScrollView>
 
@@ -334,44 +321,44 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   topBar: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.sm },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 44 },
-  searchInput: { flex: 1, height: '100%', color: colors.text.primary, fontSize: 14, marginLeft: 8 },
+  searchInput: { ...Typography.body, flex: 1, height: '100%', color: colors.text.primary, marginLeft: 8 },
   tabsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border },
   tabBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabBtnText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
+  tabBtnText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   tabBtnTextActive: { color: '#fff', fontWeight: '700' },
   badge: { marginLeft: 6, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  badgeText: { ...Typography.eyebrow, fontWeight: '700' },
   queryCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  submitterName: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
-  submissionDate: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  submitterName: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  submissionDate: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
   statusBadge: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  statusBadgeText: { fontSize: 9, fontWeight: '800' },
+  statusBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
   productBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.sm, marginBottom: 12 },
-  productBannerText: { fontSize: 12, color: colors.text.secondary },
-  productNameText: { fontSize: 12, fontWeight: '700', color: colors.text.primary },
+  productBannerText: { ...Typography.bodySm, color: colors.text.secondary },
+  productNameText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   contactRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 12 },
   contactItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  contactText: { fontSize: 12, color: colors.text.secondary },
+  contactText: { ...Typography.bodySm, color: colors.text.secondary },
   messageBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, borderLeftColor: colors.primary, borderLeftWidth: 2, marginBottom: 12 },
-  messageLabel: { fontSize: 11, fontWeight: '700', color: colors.text.muted, marginBottom: 4 },
-  messageText: { fontSize: 13, color: colors.text.primary, lineHeight: 18 },
+  messageLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted, marginBottom: 4 },
+  messageText: { ...Typography.bodySm, color: colors.text.primary },
   attachmentBox: { marginBottom: 16 },
-  attachmentLabel: { fontSize: 11, fontWeight: '700', color: colors.text.muted, marginBottom: 6 },
+  attachmentLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted, marginBottom: 6 },
   attachmentThumb: { width: '100%', height: 160, borderRadius: Radius.sm, backgroundColor: '#000' },
   zoomOverlay: { position: 'absolute', bottom: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
-  zoomText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  zoomText: { ...Typography.caption, color: '#fff', fontWeight: '600' },
   cardActions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.sm, borderWidth: 1, backgroundColor: 'rgba(255,255,255,0.02)' },
-  actionBtnText: { fontSize: 12, fontWeight: '700' },
+  actionBtnText: { ...Typography.bodySm, fontWeight: '700' },
   primaryActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 7, borderRadius: Radius.sm },
-  primaryActionBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  primaryActionBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   successLabel: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
-  successLabelText: { color: colors.success, fontSize: 12, fontWeight: '700' },
+  successLabelText: { ...Typography.bodySm, color: colors.success, fontWeight: '700' },
   emptyContainer: { alignItems: 'center', paddingVertical: 80, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
-  emptySubtitle: { fontSize: 13, color: colors.text.muted, textAlign: 'center', paddingHorizontal: 20 },
+  emptyTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  emptySubtitle: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', paddingHorizontal: 20 },
   overlayContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   overlayImage: { width: '90%', height: '80%' },
   overlayCloseBtn: { position: 'absolute', top: 40, right: 24, zIndex: 10 }

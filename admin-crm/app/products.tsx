@@ -1,8 +1,12 @@
+import { EmptyState } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, FlatList, KeyboardAvoidingView, Platform, Image, Pressable, DeviceEventEmitter } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, FlatList, KeyboardAvoidingView, Platform, Image, Pressable, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, Product, getImageUrl } from '../utils/api';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
@@ -194,7 +198,7 @@ export default function ProductsScreen() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
             {allVariants.map((v, idx) => (
               <View key={idx} style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.primary }}>
+                <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.primary }}>
                   {v.size || 'N/A'}{v.price !== undefined ? ` (₹${v.price})` : ''}
                 </Text>
               </View>
@@ -231,7 +235,7 @@ export default function ProductsScreen() {
           onPress={() => setTopTab('products')}
         >
           <Ionicons name="cube-outline" size={16} color={topTab === 'products' ? colors.primary : colors.text.secondary} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: topTab === 'products' ? colors.primary : colors.text.secondary }}>
+          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: topTab === 'products' ? colors.primary : colors.text.secondary }}>
             Product Catalog
           </Text>
         </TouchableOpacity>
@@ -240,7 +244,7 @@ export default function ProductsScreen() {
           onPress={() => setTopTab('pricing')}
         >
           <Ionicons name="pricetag-outline" size={16} color={topTab === 'pricing' ? colors.primary : colors.text.secondary} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: topTab === 'pricing' ? colors.primary : colors.text.secondary }}>
+          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: topTab === 'pricing' ? colors.primary : colors.text.secondary }}>
             Pricing &amp; Discounts
           </Text>
         </TouchableOpacity>
@@ -327,10 +331,7 @@ export default function ProductsScreen() {
                 isRefreshing={refreshing}
                 onRefresh={onRefresh}
                 ListEmptyComponent={
-                  <View style={styles.emptyTableContainer}>
-                    <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                    <Text style={styles.emptyText}>No products found</Text>
-                  </View>
+                  <EmptyState title={<>No products found</>}  />
                 }
               />
               {hasMore && (
@@ -339,7 +340,7 @@ export default function ProductsScreen() {
                   disabled={loadingMore}
                   onPress={handleLoadMore}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
                     {loadingMore ? 'Loading More...' : `Load More Products (Page ${page + 1} of ${totalPages})`}
                   </Text>
                 </TouchableOpacity>

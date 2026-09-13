@@ -1,5 +1,9 @@
+import { StatusPill } from './../../../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, Alert } from 'react-native';
+import { View, ScrollView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -71,11 +75,9 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                   </TouchableOpacity>
                 </View>
               </View>
-              <View style={[styles.statusBadge, { borderColor: getStatusColor(batch.status), backgroundColor: getStatusColor(batch.status) + '10' }]}>
-                <Text style={[styles.statusBadgeText, { color: getStatusColor(batch.status) }]}>
+              <StatusPill  label={<>
                   {batch.status.toUpperCase()}
-                </Text>
-              </View>
+                </>} textStyle={[styles.statusBadgeText, { color: getStatusColor(batch.status) }]} />
             </View>
 
             {/* Planned Sizes (multi-size batch) */}
@@ -86,7 +88,7 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                   const prod = products.find(p => p._id === pId);
                   return (
                     <View key={idx} style={{ backgroundColor: colors.primary + '15', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '600', color: colors.primary }}>
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '600', color: colors.primary }}>
                         {prod ? `${prod.size || prod.name}` : '?'}: {py.plannedQty}
                       </Text>
                     </View>
@@ -98,29 +100,29 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
             {/* Essential Key Metrics Bar */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, backgroundColor: colors.bg.secondary, padding: 10, borderRadius: 8, marginVertical: 8 }}>
               <View style={{ flex: 1, minWidth: 90 }}>
-                <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>OUTPUT QTY</Text>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>OUTPUT QTY</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>
                   {isFinished ? `${batch.actualYieldQty} / ${batch.plannedQty} Pcs` : `${batch.plannedQty} Pcs`}
                 </Text>
               </View>
               <View style={{ flex: 1, minWidth: 100 }}>
-                <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>TOTAL COST</Text>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.warning }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>TOTAL COST</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.warning }}>
                   ₹{((batch.rawMaterialCost || 0) + (batch.overheadCost || 0)).toFixed(2)}
                   {hasUnitCost ? ` (₹${batch.unitProductionCost?.toFixed(2)}/pc)` : ''}
                 </Text>
               </View>
               <View style={{ flex: 1, minWidth: 90 }}>
-                <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>STARTED</Text>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.secondary }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>STARTED</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>
                   {batch.startDate ? new Date(batch.startDate).toLocaleDateString('en-IN') : '—'}
                 </Text>
               </View>
               {batch.qcPassedBy ? (
                 <View style={{ flex: 1, minWidth: 110 }}>
-                  <Text style={{ fontSize: 10, color: colors.text.muted, fontWeight: '700' }}>QC INSPECTOR</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }} numberOfLines={1}>
-                    ✓ {batch.qcPassedBy}
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>QC INSPECTOR</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.success }} numberOfLines={1}>
+                     {batch.qcPassedBy}
                   </Text>
                 </View>
               ) : null}
@@ -212,14 +214,7 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                           </View>
 
                           {/* Stage Title Label */}
-                          <Text style={{
-                            fontSize: 10,
-                            fontWeight: isActive ? '800' : (isStageCompleted ? '700' : '500'),
-                            color: isActive ? colors.primary : (isStageCompleted ? colors.text.primary : colors.text.muted),
-                            textAlign: 'center',
-                            marginTop: 6,
-                            lineHeight: 12
-                          }} numberOfLines={2}>
+                          <Text style={{ ...Typography.eyebrow, fontWeight: isActive ? '800' : (isStageCompleted ? '700' : '500'), color: isActive ? colors.primary : (isStageCompleted ? colors.text.primary : colors.text.muted), textAlign: 'center', marginTop: 6 }} numberOfLines={2}>
                             {stage.name}
                           </Text>
                         </TouchableOpacity>
@@ -240,7 +235,7 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                         onPress={() => onAdvanceStage(batch._id, activeIdx)}
                       >
                         <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>
+                        <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }} numberOfLines={1}>
                           Complete: {activeStageName}
                         </Text>
                       </TouchableOpacity>
@@ -249,14 +244,14 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                         onPress={() => onSkipStage(batch._id, activeIdx)}
                       >
                         <Ionicons name="play-forward-outline" size={14} color={colors.warning} />
-                        <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '700' }}>Skip</Text>
+                        <Text style={{ ...Typography.bodySm, color: colors.warning, fontWeight: '700' }}>Skip</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={{ flex: 1, minWidth: 70, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.danger + '20', borderWidth: 1, borderColor: colors.danger }}
                         onPress={() => onFailStage(batch._id, activeIdx)}
                       >
                         <Ionicons name="close-circle-outline" size={14} color={colors.danger} />
-                        <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>Fail</Text>
+                        <Text style={{ ...Typography.bodySm, color: colors.danger, fontWeight: '700' }}>Fail</Text>
                       </TouchableOpacity>
                     </View>
                   );
@@ -269,7 +264,7 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6 }}
               onPress={() => toggleBatchExpanded(batch._id)}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+              <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>
                 {expandedBatchIds[batch._id] ? 'Hide Materials & Operator Logs' : `View Materials Consumed (${batch.ingredientsConsumed.length}) & Logs`}
               </Text>
               <Ionicons name={expandedBatchIds[batch._id] ? 'chevron-up' : 'chevron-down'} size={14} color={colors.primary} />
@@ -280,11 +275,11 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
               <View style={{ backgroundColor: colors.bg.secondary, padding: 10, borderRadius: 6, marginTop: 4, gap: 8 }}>
                 {batch.stages.some((s: any) => s.status === 'completed' || s.status === 'skipped') && (
                   <View style={{ gap: 4 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Operator Audit Log:</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>Operator Audit Log:</Text>
                     {batch.stages
                       .filter((s: any) => s.status === 'completed' || s.status === 'skipped')
                       .map((s: any, idx: number) => (
-                        <Text key={idx} style={{ fontSize: 10, color: colors.text.secondary }}>
+                        <Text key={idx} style={{ ...Typography.eyebrow, color: colors.text.secondary }}>
                           • <Text style={{ fontWeight: '700', color: colors.text.primary }}>{s.name}</Text>: {s.status === 'completed' ? 'Completed' : 'Skipped'} by <Text style={{ color: colors.primary, fontWeight: '600' }}>{s.completedBy || 'Operator'}</Text>
                           {s.notes ? ` — "${s.notes}"` : ''}
                         </Text>
@@ -294,9 +289,9 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
 
                 {batch.ingredientsConsumed.length > 0 && (
                   <View style={{ gap: 3 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Raw Materials Consumed (FIFO):</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>Raw Materials Consumed (FIFO):</Text>
                     {batch.ingredientsConsumed.map((ing: any, idx: number) => (
-                      <Text key={idx} style={{ fontSize: 10, color: colors.text.secondary }}>
+                      <Text key={idx} style={{ ...Typography.eyebrow, color: colors.text.secondary }}>
                         • {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Material'} (Batch: {ing.batchNo}) — {(() => {
                           const r = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId : null;
                           return r && isIntegerQty(r.unit, r.category) ? ing.qtyConsumed.toFixed(0) : ing.qtyConsumed.toFixed(2);
@@ -309,31 +304,31 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                 {/* QC Parameters Log */}
                 {batch.qcParameters && (
                   <View style={{ gap: 4, marginTop: 4, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>🔬 QC Testing Parameters Log:</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}> QC Testing Parameters Log:</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
                       {batch.qcParameters.organoleptic ? (
-                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Organoleptic: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.organoleptic}</Text></Text></View>
+                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>Organoleptic: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.organoleptic}</Text></Text></View>
                       ) : null}
                       {batch.qcParameters.moistureContent !== null ? (
-                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Moisture: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.moistureContent}% w/w</Text></Text></View>
+                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>Moisture: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.moistureContent}% w/w</Text></Text></View>
                       ) : null}
                       {batch.qcParameters.ashValue !== null ? (
-                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Ash Value: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.ashValue}% w/w</Text></Text></View>
+                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>Ash Value: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.ashValue}% w/w</Text></Text></View>
                       ) : null}
                       {batch.qcParameters.pHValue !== null ? (
-                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>pH: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.pHValue}</Text></Text></View>
+                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>pH: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.pHValue}</Text></Text></View>
                       ) : null}
                       {batch.qcParameters.disintegrationTime !== null ? (
-                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Disintegration: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.disintegrationTime} mins</Text></Text></View>
+                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>Disintegration: <Text style={{ color: colors.text.primary, fontWeight: '600' }}>{batch.qcParameters.disintegrationTime} mins</Text></Text></View>
                       ) : null}
                       {batch.qcParameters.heavyMetals ? (
-                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Heavy Metals: <Text style={{ color: batch.qcParameters.heavyMetals === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{batch.qcParameters.heavyMetals}</Text></Text></View>
+                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>Heavy Metals: <Text style={{ color: batch.qcParameters.heavyMetals === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{batch.qcParameters.heavyMetals}</Text></Text></View>
                       ) : null}
                       {batch.qcParameters.microbialLimit ? (
-                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Microbial: <Text style={{ color: batch.qcParameters.microbialLimit === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{batch.qcParameters.microbialLimit}</Text></Text></View>
+                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>Microbial: <Text style={{ color: batch.qcParameters.microbialLimit === 'Pass' ? colors.success : colors.danger, fontWeight: '800' }}>{batch.qcParameters.microbialLimit}</Text></Text></View>
                       ) : null}
                       {batch.qcParameters.labReportRef ? (
-                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ fontSize: 9.5, color: colors.text.secondary }}>Lab Ref: <Text style={{ color: colors.primary, fontWeight: '700' }}>{batch.qcParameters.labReportRef}</Text></Text></View>
+                        <View style={{ minWidth: 120, flex: 1 }}><Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>Lab Ref: <Text style={{ color: colors.primary, fontWeight: '700' }}>{batch.qcParameters.labReportRef}</Text></Text></View>
                       ) : null}
                     </View>
                   </View>
@@ -341,7 +336,7 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
 
                 {/* Supporting Documents Vault */}
                 <View style={{ gap: 6, marginTop: 8, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>📎 Supporting Documents & Certification:</Text>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}> Supporting Documents & Certification:</Text>
 
                   {batch.supportingDocuments && batch.supportingDocuments.length > 0 ? (
                     <View style={{ gap: 4, marginTop: 2 }}>
@@ -349,7 +344,7 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                         <View key={docIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.primary, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
                           <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.open(doc.url, '_blank') : Alert.alert('View Document', doc.url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                             <Ionicons name="document-attach-outline" size={13} color={colors.primary} />
-                            <Text style={{ fontSize: 10.5, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{doc.name}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity onPress={() => onDeleteBatchDoc(batch._id, doc.url)} style={{ padding: 2 }}>
                             <Ionicons name="trash-outline" size={12} color={colors.danger} />
@@ -358,7 +353,7 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                       ))}
                     </View>
                   ) : (
-                    <Text style={{ fontSize: 10, color: colors.text.muted, fontStyle: 'italic' }}>No supporting documents uploaded.</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontStyle: 'italic' }}>No supporting documents uploaded.</Text>
                   )}
                 </View>
               </View>
@@ -375,9 +370,9 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
               <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: colors.warning + '15', borderWidth: 1, borderColor: colors.warning, marginBottom: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <Ionicons name="flask-outline" size={15} color={colors.warning} />
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.warning }}>ALL STAGES COMPLETE — QC SIGN-OFF REQUIRED</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.warning }}>ALL STAGES COMPLETE — QC SIGN-OFF REQUIRED</Text>
                 </View>
-                <Text style={{ fontSize: 11, color: colors.text.secondary }}>All manufacturing stages are done. Complete QC inspection to inward finished stock into inventory.</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.secondary }}>All manufacturing stages are done. Complete QC inspection to inward finished stock into inventory.</Text>
               </View>
             )}
             {/* Action Controls Row */}

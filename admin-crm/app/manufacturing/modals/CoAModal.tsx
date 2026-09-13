@@ -1,5 +1,9 @@
+import { WorkspaceLoading } from './../../../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView, Pressable, ActivityIndicator, Platform } from 'react-native';
+import { View, Modal, ScrollView, Pressable, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -140,7 +144,7 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
           <View style={styles.modalHeader}>
             <View>
               <Text style={styles.modalTitle}>Certificate of Analysis (CoA)</Text>
-              <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 2 }}>
                 AYUSH & Pharmacopoeial (API) Quality Control Laboratory Certificate
               </Text>
             </View>
@@ -151,41 +155,41 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
 
           {loadingCoa ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <WorkspaceLoading />
             </View>
           ) : coaData ? (
             <ScrollView style={[styles.modalForm, { padding: 16 }]} contentContainerStyle={{ gap: 16 }}>
               {/* Header Branding */}
               <View style={{ alignItems: 'center', borderBottomWidth: 2, borderBottomColor: colors.primary, paddingBottom: 12 }}>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>
+                <Text style={{ ...Typography.h2, fontWeight: '800', color: colors.primary }}>
                   {coaData.firmDetails?.name || FIRM_DETAILS.name}
                 </Text>
-                <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 2 }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 2 }}>
                   {coaData.firmDetails?.address || FIRM_DETAILS.address}
                 </Text>
 
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                   <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 0.5, borderColor: colors.primary + '40' }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>
-                      📜 AYUSH Mfg Lic: {coaData.manufacturingLicenseNo || coaData.firmDetails?.licenseNo || 'AYUSH-1983-UP'}
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>
+                       AYUSH Mfg Lic: {coaData.manufacturingLicenseNo || coaData.firmDetails?.licenseNo || 'AYUSH-1983-UP'}
                     </Text>
                   </View>
                   <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success + '40' }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: colors.success }}>
-                      🛡️ AYUSH GMP Cert: {coaData.gmpCertificateNo || coaData.firmDetails?.gmpCertNo || 'GMP-AYUSH-2026-VNS'}
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}>
+                       AYUSH GMP Cert: {coaData.gmpCertificateNo || coaData.firmDetails?.gmpCertNo || 'GMP-AYUSH-2026-VNS'}
                     </Text>
                   </View>
                   <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>
-                      📖 Standard: {coaData.pharmacopoeialStandard || 'API (Ayurvedic Pharmacopoeia)'}
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary }}>
+                       Standard: {coaData.pharmacopoeialStandard || 'API (Ayurvedic Pharmacopoeia)'}
                     </Text>
                   </View>
                 </View>
 
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, marginTop: 10, letterSpacing: 1 }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginTop: 10 }}>
                   CERTIFICATE OF ANALYSIS (CoA)
                 </Text>
-                <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>
                   Report No: {coaData.coaNumber || coaData._id || 'CoA-2026-001'}
                 </Text>
               </View>
@@ -193,7 +197,7 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
               {/* Sample & Batch Identification */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
                     Sample & Batch Identification Metadata
                   </Text>
                 </View>
@@ -202,13 +206,13 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
                     { label: 'Product Name:', val: coaData.productName || coaData.batchDetails?.productName },
                     { label: 'Batch Reference Number:', val: coaData.batchNo || coaData.batchDetails?.batchNo },
                     { label: 'Dosage Form / Category:', val: coaData.dosageForm || 'Herbal Preparation' },
-                    { label: 'Mfg Date / Expiry Date:', val: `${fmtDate(coaData.manufacturingDate || coaData.batchDetails?.mfgDate)} ➔ ${fmtDate(coaData.expiryDate || coaData.batchDetails?.expiryDate)}` },
+                    { label: 'Mfg Date / Expiry Date:', val: `${fmtDate(coaData.manufacturingDate || coaData.batchDetails?.mfgDate)}  ${fmtDate(coaData.expiryDate || coaData.batchDetails?.expiryDate)}` },
                     { label: 'Date of Quality Testing:', val: fmtDate(coaData.testingDate || coaData.batchDetails?.testingDate) },
                     { label: 'Sample Quantity Tested:', val: coaData.sampleQuantityTested || '100g' }
                   ].map(({ label, val }) => (
                     <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>{label}</Text>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>{val}</Text>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>{label}</Text>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{val}</Text>
                     </View>
                   ))}
                 </View>
@@ -217,7 +221,7 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
               {/* Organoleptic & Physicochemical Parameters */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
                     I & II. Organoleptic Evaluation & Physicochemical Parameters
                   </Text>
                 </View>
@@ -230,9 +234,9 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
                     { param: 'Disintegration Time', limit: pc.disintegrationLimit || 'NMT 30 mins', result: `${pc.disintegrationTimeMinutes || 12} mins` }
                   ].map((row, idx) => (
                     <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
-                      <Text style={{ flex: 1.8, fontSize: 11, fontWeight: '600', color: colors.text.primary }}>{row.param}</Text>
-                      <Text style={{ flex: 1.2, fontSize: 10.5, color: colors.text.muted }}>Spec: {row.limit}</Text>
-                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.success, textAlign: 'right' }}>{row.result} (PASS)</Text>
+                      <Text style={{ ...Typography.caption, flex: 1.8, fontWeight: '600', color: colors.text.primary }}>{row.param}</Text>
+                      <Text style={{ ...Typography.eyebrow, flex: 1.2, color: colors.text.muted }}>Spec: {row.limit}</Text>
+                      <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.success, textAlign: 'right' }}>{row.result} (PASS)</Text>
                     </View>
                   ))}
                 </View>
@@ -241,11 +245,11 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
               {/* Heavy Metals Safety Analysis (AYUSH Gazette Limits) */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
                     III. Heavy Metals Safety Limits (AYUSH Statutory Limits)
                   </Text>
                   <View style={{ backgroundColor: (hm.passed !== false) ? colors.success : colors.danger, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 3 }}>
-                    <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>{(hm.passed !== false) ? 'PASS' : 'FAIL'}</Text>
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: '#fff' }}>{(hm.passed !== false) ? 'PASS' : 'FAIL'}</Text>
                   </View>
                 </View>
                 <View style={{ padding: 10, gap: 6 }}>
@@ -256,9 +260,9 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
                     { element: 'Arsenic (As)', limit: 'NMT 3.0 ppm', val: `${hm.arsenicPpm || 0.05} ppm` }
                   ].map((h, i) => (
                     <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
-                      <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: colors.text.primary }}>{h.element}</Text>
-                      <Text style={{ flex: 1.5, fontSize: 10.5, color: colors.text.muted }}>Limit: {h.limit}</Text>
-                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.success, textAlign: 'right' }}>{h.val} (PASS)</Text>
+                      <Text style={{ ...Typography.caption, flex: 1.5, fontWeight: '600', color: colors.text.primary }}>{h.element}</Text>
+                      <Text style={{ ...Typography.eyebrow, flex: 1.5, color: colors.text.muted }}>Limit: {h.limit}</Text>
+                      <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.success, textAlign: 'right' }}>{h.val} (PASS)</Text>
                     </View>
                   ))}
                 </View>
@@ -267,11 +271,11 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
               {/* Microbial Limits & Aflatoxins */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
                     IV & V. Microbial Limit Test (MLT) & Safety Parameters
                   </Text>
                   <View style={{ backgroundColor: (mb.passed !== false) ? colors.success : colors.danger, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 3 }}>
-                    <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>{(mb.passed !== false) ? 'PASS' : 'FAIL'}</Text>
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: '#fff' }}>{(mb.passed !== false) ? 'PASS' : 'FAIL'}</Text>
                   </View>
                 </View>
                 <View style={{ padding: 10, gap: 6 }}>
@@ -283,9 +287,9 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
                     { test: 'Aflatoxins & Pesticides', limit: 'Complies with API limits', result: 'Complies' }
                   ].map((row, i) => (
                     <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
-                      <Text style={{ flex: 1.8, fontSize: 11, fontWeight: '600', color: colors.text.primary }}>{row.test}</Text>
-                      <Text style={{ flex: 1.2, fontSize: 10.5, color: colors.text.muted }}>Spec: {row.limit}</Text>
-                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: colors.success, textAlign: 'right' }}>{row.result} (PASS)</Text>
+                      <Text style={{ ...Typography.caption, flex: 1.8, fontWeight: '600', color: colors.text.primary }}>{row.test}</Text>
+                      <Text style={{ ...Typography.eyebrow, flex: 1.2, color: colors.text.muted }}>Spec: {row.limit}</Text>
+                      <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.success, textAlign: 'right' }}>{row.result} (PASS)</Text>
                     </View>
                   ))}
                 </View>
@@ -293,10 +297,10 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
 
               {/* Quality Verdict Banner */}
               <View style={{ backgroundColor: colors.success + '15', padding: 12, borderRadius: 8, borderWidth: 1.5, borderColor: colors.success, alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success, letterSpacing: 0.5 }}>
-                  ✅ OFFICIAL QUALITY VERDICT: {coaData.overallResult || (coaData.status === 'rejected' ? 'REJECTED' : 'PASSED & APPROVED FOR MARKET DISTRIBUTION')}
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.success }}>
+                   OFFICIAL QUALITY VERDICT: {coaData.overallResult || (coaData.status === 'rejected' ? 'REJECTED' : 'PASSED & APPROVED FOR MARKET DISTRIBUTION')}
                 </Text>
-                <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 3 }}>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 3 }}>
                   Sample complies with Ayurvedic Pharmacopoeia of India (API) standards for all tests conducted.
                 </Text>
               </View>
@@ -304,18 +308,18 @@ export default function CoAModal({ visible, loadingCoa = false, coaData, onClose
               {/* Signatures */}
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>Statutory Signatures</Text>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>Statutory Signatures</Text>
                 </View>
                 <View style={{ padding: 12, gap: 8 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>Analytical Chemist (QC Analyst):</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Analytical Chemist (QC Analyst):</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
                       {coaData.testedBy || coaData.inspectorSignature?.name || 'QC Analyst'}
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>Quality Assurance Manager (QA Head):</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Quality Assurance Manager (QA Head):</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.success }}>
                       {coaData.approvedBy || coaData.marketReleaserSignature?.name || 'Chief Pharmacist'}
                     </Text>
                   </View>

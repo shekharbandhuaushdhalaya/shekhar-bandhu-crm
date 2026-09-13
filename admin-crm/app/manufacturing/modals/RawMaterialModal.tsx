@@ -1,5 +1,9 @@
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../../components/AppTextInput';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Pressable, Switch } from 'react-native';
+import { View, Modal, ScrollView, Pressable, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -83,28 +87,28 @@ export default function RawMaterialModal({
   const [botanicalLookupMessage, setBotanicalLookupMessage] = useState('');
 
   const PLANT_PARTS = [
-    { key: 'Root (Mool)', label: '🪵 Root' },
-    { key: 'Leaf (Patra)', label: '🍃 Leaf' },
-    { key: 'Bark (Twak)', label: '🌳 Bark' },
-    { key: 'Fruit (Phala)', label: '🫐 Fruit' },
-    { key: 'Seed (Beej)', label: '🌾 Seed' },
-    { key: 'Whole Plant (Panchang)', label: '🌿 Whole Plant' },
-    { key: 'Resin / Gum (Niryasa)', label: '🍯 Resin / Gum' },
-    { key: 'Flower (Pushpa)', label: '🌸 Flower' },
-    { key: 'Bhasma / Mineral', label: '🪨 Bhasma / Mineral' },
-    { key: 'Kashaya / Extract', label: '🧪 Extract' }
+    { key: 'Root (Mool)', label: ' Root' },
+    { key: 'Leaf (Patra)', label: ' Leaf' },
+    { key: 'Bark (Twak)', label: ' Bark' },
+    { key: 'Fruit (Phala)', label: ' Fruit' },
+    { key: 'Seed (Beej)', label: ' Seed' },
+    { key: 'Whole Plant (Panchang)', label: ' Whole Plant' },
+    { key: 'Resin / Gum (Niryasa)', label: ' Resin / Gum' },
+    { key: 'Flower (Pushpa)', label: ' Flower' },
+    { key: 'Bhasma / Mineral', label: ' Bhasma / Mineral' },
+    { key: 'Kashaya / Extract', label: ' Extract' }
   ];
 
   const CATEGORIES = [
-    { key: 'Dry Herb', label: '🌿 Dry Herb' },
-    { key: 'Fresh Herb', label: '🌱 Fresh Herb' },
-    { key: 'Metallic/Mineral', label: '🪨 Mineral / Bhasma' },
-    { key: 'Animal Source', label: '🥛 Milk / Honey / Ghee' },
-    { key: 'Plant Concentrate', label: '🧪 Plant Extract' },
-    { key: 'Volatile Oil', label: '💧 Essential Oil' },
-    { key: 'Excipient', label: '🌾 Excipient / Base' },
-    { key: 'Packaging', label: '📦 Bottle / Label / Box' },
-    { key: 'General', label: '⚙️ General Material' }
+    { key: 'Dry Herb', label: ' Dry Herb' },
+    { key: 'Fresh Herb', label: ' Fresh Herb' },
+    { key: 'Metallic/Mineral', label: ' Mineral / Bhasma' },
+    { key: 'Animal Source', label: ' Milk / Honey / Ghee' },
+    { key: 'Plant Concentrate', label: ' Plant Extract' },
+    { key: 'Volatile Oil', label: ' Essential Oil' },
+    { key: 'Excipient', label: ' Excipient / Base' },
+    { key: 'Packaging', label: ' Bottle / Label / Box' },
+    { key: 'General', label: ' General Material' }
   ];
 
   const STANDARDS = [
@@ -267,7 +271,7 @@ export default function RawMaterialModal({
               <Text style={styles.modalTitle}>
                 {editingMaterialId ? 'Edit Material / Item' : 'Define New Material / Item'}
               </Text>
-              <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>
                 Raw Materials Master • Supports Herbs, Packaging (Boxes/Bottles/Labels), Excipients (Sugar/Salt), Oils & Minerals
               </Text>
             </View>
@@ -278,7 +282,7 @@ export default function RawMaterialModal({
 
           {rmError ? (
             <View style={{ backgroundColor: colors.danger + '15', borderRadius: 6, padding: 10, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: colors.danger }}>
-              <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>{rmError}</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.danger, fontWeight: '700' }}>{rmError}</Text>
             </View>
           ) : null}
 
@@ -290,20 +294,20 @@ export default function RawMaterialModal({
                   <Ionicons name="cube-outline" size={16} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary }}>Basic material details</Text>
-                  <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Start with the few fields needed to identify this item.</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>Basic material details</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Start with the few fields needed to identify this item.</Text>
                 </View>
               </View>
 
               <Text style={styles.inputLabel}>Material Type *</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
                 {[
-                  ['raw_material', '🌿 Raw / Ingredient'], ['packaging', '📦 Packaging'], ['excipient', '🧪 Excipient'],
-                  ['consumable', '🛠 Consumable'], ['semi_finished', '⚙️ Semi-finished'], ['other', 'Other']
+                  ['raw_material', ' Raw / Ingredient'], ['packaging', ' Packaging'], ['excipient', ' Excipient'],
+                  ['consumable', ' Consumable'], ['semi_finished', ' Semi-finished'], ['other', 'Other']
                 ].map(([key, label]) => (
                   <TouchableOpacity key={key} onPress={() => { setRmMaterialType(key); if (key === 'packaging') setRmCategory('Packaging'); else if (rmCategory === 'Packaging' || rmCategory === 'Packaging Material') setRmCategory(key === 'excipient' ? 'Excipient' : 'General'); }}
                     style={{ paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: rmMaterialType === key ? colors.primary : colors.border, backgroundColor: rmMaterialType === key ? colors.primary + '14' : colors.bg.secondary }}>
-                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: rmMaterialType === key ? colors.primary : colors.text.secondary }}>{label}</Text>
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: rmMaterialType === key ? colors.primary : colors.text.secondary }}>{label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -317,7 +321,7 @@ export default function RawMaterialModal({
                 onChangeText={handleNameChange}
                 autoCapitalize="characters"
               />
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 10 }}>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: -6, marginBottom: 10 }}>
                 {isPackaging ? 'Use the commercial name or a clear size / specification.' : 'Use the commonly used ingredient or material name.'}
               </Text>
 
@@ -336,7 +340,7 @@ export default function RawMaterialModal({
             {/* Quick setup / suggestions */}
             {(isPackaging && !rmName) && (
               <View style={{ marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.primary + '08', borderWidth: 1, borderColor: colors.primary + '20' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, marginBottom: 7 }}>Quick packaging setup</Text>
+                <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary, marginBottom: 7 }}>Quick packaging setup</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {[
                     { name: 'MONO CARTON BOX 100ML', category: 'Packaging', unit: 'pcs', std: 'House Standard' },
@@ -344,43 +348,43 @@ export default function RawMaterialModal({
                     { name: '100ML PET BOTTLE (AMBER)', category: 'Packaging', unit: 'pcs', std: 'House Standard' },
                     { name: 'FRONT BOTTLE LABEL STICKER', category: 'Packaging', unit: 'pcs', std: 'House Standard' },
                     { name: 'FLIP TOP BOTTLE CAP 28MM', category: 'Packaging', unit: 'pcs', std: 'House Standard' }
-                  ].map((preset, idx) => <TouchableOpacity key={idx} onPress={() => applyNonHerbPreset(preset)} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.primary + '30' }}><Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>📦 {preset.name}</Text></TouchableOpacity>)}
+                  ].map((preset, idx) => <TouchableOpacity key={idx} onPress={() => applyNonHerbPreset(preset)} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.primary + '30' }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary }}> {preset.name}</Text></TouchableOpacity>)}
                 </View>
               </View>
             )}
 
             {(isExcipient && !rmName) && (
               <View style={{ marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.primary + '08', borderWidth: 1, borderColor: colors.primary + '20' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, marginBottom: 7 }}>Quick excipient setup</Text>
+                <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary, marginBottom: 7 }}>Quick excipient setup</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {[
                     { name: 'PHARMA GRADE SUGAR (SHARKARA)', category: 'Excipient', unit: 'kg', std: 'IP' },
                     { name: 'PURIFIED ROCK SALT (SAINDHAVA)', category: 'Excipient', unit: 'kg', std: 'API' },
                     { name: 'SODIUM BENZOATE (PRESERVATIVE)', category: 'Excipient', unit: 'kg', std: 'IP' },
                     { name: 'LIQUID GLUCOSE', category: 'Excipient', unit: 'kg', std: 'IP' }
-                  ].map((preset, idx) => <TouchableOpacity key={idx} onPress={() => applyNonHerbPreset(preset)} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.primary + '30' }}><Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>🌾 {preset.name}</Text></TouchableOpacity>)}
+                  ].map((preset, idx) => <TouchableOpacity key={idx} onPress={() => applyNonHerbPreset(preset)} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.primary + '30' }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary }}> {preset.name}</Text></TouchableOpacity>)}
                 </View>
               </View>
             )}
 
             {suggestions.length > 0 ? (
               <View style={{ marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.success + '08', borderWidth: 1, borderColor: colors.success + '25' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.success, marginBottom: 7 }}>Suggested Ayurvedic matches</Text>
+                <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.success, marginBottom: 7 }}>Suggested Ayurvedic matches</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  {suggestions.map((herb, idx) => <TouchableOpacity key={idx} onPress={() => applyHerbData(herb, herb.name)} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.success + '30' }}><Text style={{ fontSize: 10, fontWeight: '700', color: colors.success }}>🌿 {herb.name} <Text style={{ fontStyle: 'italic', fontWeight: '400', color: colors.text.secondary }}>({herb.botanicalName})</Text></Text></TouchableOpacity>)}
+                  {suggestions.map((herb, idx) => <TouchableOpacity key={idx} onPress={() => applyHerbData(herb, herb.name)} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.success + '30' }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.success }}> {herb.name} <Text style={{ fontStyle: 'italic', fontWeight: '400', color: colors.text.secondary }}>({herb.botanicalName})</Text></Text></TouchableOpacity>)}
                 </View>
               </View>
-            ) : (rmName.length >= 2 && !isPackaging ? <TouchableOpacity onPress={applyCustomHerbPreset} style={{ marginBottom: 14, padding: 10, borderRadius: 9, backgroundColor: colors.success + '10', borderWidth: 1, borderColor: colors.success + '35', flexDirection: 'row', alignItems: 'center', gap: 7 }}><Ionicons name="sparkles-outline" size={15} color={colors.success} /><Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>Quick-setup “{rmName.toUpperCase()}” as an Ayurvedic herb</Text></TouchableOpacity> : null)}
+            ) : (rmName.length >= 2 && !isPackaging ? <TouchableOpacity onPress={applyCustomHerbPreset} style={{ marginBottom: 14, padding: 10, borderRadius: 9, backgroundColor: colors.success + '10', borderWidth: 1, borderColor: colors.success + '35', flexDirection: 'row', alignItems: 'center', gap: 7 }}><Ionicons name="sparkles-outline" size={15} color={colors.success} /><Text style={{ ...Typography.caption, fontWeight: '700', color: colors.success }}>Quick-setup “{rmName.toUpperCase()}” as an Ayurvedic herb</Text></TouchableOpacity> : null)}
 
             {/* 2. MATERIAL SPECIFICATION */}
             <View style={{ marginBottom: 14, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>{isPackaging ? 'Packaging specification' : 'Material specification'}</Text>
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12 }}>{isPackaging ? 'Capture physical packaging details.' : 'Add the physical and botanical details used for purchasing and quality control.'}</Text>
+              <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>{isPackaging ? 'Packaging specification' : 'Material specification'}</Text>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 12 }}>{isPackaging ? 'Capture physical packaging details.' : 'Add the physical and botanical details used for purchasing and quality control.'}</Text>
 
               {isPackaging && <>
                 <Text style={styles.inputLabel}>Packaging Sub-type</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
-                  {['bottle','cap','label','carton','corrugated_box','pouch','sachet','foil','shrink_wrap','insert','tape','other'].map(type => <TouchableOpacity key={type} onPress={() => setRmPackagingType(type)} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 7, borderWidth: 1, borderColor: rmPackagingType === type ? colors.primary : colors.border, backgroundColor: rmPackagingType === type ? colors.primary + '12' : colors.bg.secondary }}><Text style={{ fontSize: 9.5, fontWeight: '700', color: rmPackagingType === type ? colors.primary : colors.text.secondary }}>{type.replace('_',' ')}</Text></TouchableOpacity>)}
+                  {['bottle','cap','label','carton','corrugated_box','pouch','sachet','foil','shrink_wrap','insert','tape','other'].map(type => <TouchableOpacity key={type} onPress={() => setRmPackagingType(type)} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 7, borderWidth: 1, borderColor: rmPackagingType === type ? colors.primary : colors.border, backgroundColor: rmPackagingType === type ? colors.primary + '12' : colors.bg.secondary }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: rmPackagingType === type ? colors.primary : colors.text.secondary }}>{type.replace('_',' ')}</Text></TouchableOpacity>)}
                 </View>
                 <Text style={styles.inputLabel}>Grade / Specification</Text>
                 <TextInput style={styles.input} placeholder="e.g. Amber PET, 300 GSM Duplex Board, Food Grade HDPE" placeholderTextColor={colors.text.muted} value={rmMaterialGrade} onChangeText={setRmMaterialGrade} />
@@ -389,58 +393,58 @@ export default function RawMaterialModal({
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={styles.inputLabel}>{isPackaging ? 'Material grade / spec code' : 'Botanical / Scientific Name'}</Text>
-                {autoFilledBadge && <View style={{ backgroundColor: colors.success + '12', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 }}><Text style={{ fontSize: 9, fontWeight: '700', color: colors.success }}>Auto-matched</Text></View>}
+                {autoFilledBadge && <View style={{ backgroundColor: colors.success + '12', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.success }}>Auto-matched</Text></View>}
               </View>
               <TextInput style={[styles.input, autoFilledBadge ? { borderColor: colors.success, backgroundColor: colors.success + '05' } : null]} placeholder={isPackaging ? 'e.g. 300 GSM Duplex Board / Amber PET' : 'e.g. Withania somnifera (L.) Dunal'} placeholderTextColor={colors.text.muted} value={rmBotanicalName} onChangeText={(v) => { setRmBotanicalName(v); setAutoFilledBadge(null); }} />
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: -6, marginBottom: 10 }}>{isPackaging ? 'Physical material grade or thickness specification.' : 'Latin botanical binomial or mineral / chemical identity.'}</Text>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: -6, marginBottom: 10 }}>{isPackaging ? 'Physical material grade or thickness specification.' : 'Latin botanical binomial or mineral / chemical identity.'}</Text>
 
               <Text style={styles.inputLabel}>{isPackaging ? 'Form Factor / Part' : 'Plant Part Used'}</Text>
-              {isHerb && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>{PLANT_PARTS.map(part => { const selected = rmPartUsed === part.key; return <TouchableOpacity key={part.key} onPress={() => setRmPartUsed(part.key)} style={{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1, backgroundColor: selected ? colors.primary : colors.bg.secondary, borderColor: selected ? colors.primary : colors.border }}><Text style={{ fontSize: 10.5, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>{part.label}</Text></TouchableOpacity>; })}</View>}
+              {isHerb && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>{PLANT_PARTS.map(part => { const selected = rmPartUsed === part.key; return <TouchableOpacity key={part.key} onPress={() => setRmPartUsed(part.key)} style={{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1, backgroundColor: selected ? colors.primary : colors.bg.secondary, borderColor: selected ? colors.primary : colors.border }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>{part.label}</Text></TouchableOpacity>; })}</View>}
               <TextInput style={styles.input} placeholder={isPackaging ? 'e.g. Outer Box, Bottle Cap, Sticker Label...' : 'Or enter plant part (e.g. Bark & Leaves)...'} placeholderTextColor={colors.text.muted} value={rmPartUsed} onChangeText={setRmPartUsed} />
             </View>
 
             {/* 3. QUALITY & AYUSH */}
             <View style={{ marginBottom: 14, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>Quality & AYUSH compliance</Text>
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12 }}>Standards and safety information used during procurement and quality review.</Text>
+              <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>Quality & AYUSH compliance</Text>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 12 }}>Standards and safety information used during procurement and quality review.</Text>
               <Text style={styles.inputLabel}>Material Category / AYUSH Type</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>{CATEGORIES.map(c => { const selected = rmCategory === c.key; return <TouchableOpacity key={c.key} onPress={() => setRmCategory(c.key)} style={{ paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1, backgroundColor: selected ? colors.primary : colors.bg.secondary, borderColor: selected ? colors.primary : colors.border }}><Text style={{ fontSize: 10.5, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>{c.label}</Text></TouchableOpacity>; })}</View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>{CATEGORIES.map(c => { const selected = rmCategory === c.key; return <TouchableOpacity key={c.key} onPress={() => setRmCategory(c.key)} style={{ paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1, backgroundColor: selected ? colors.primary : colors.bg.secondary, borderColor: selected ? colors.primary : colors.border }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>{c.label}</Text></TouchableOpacity>; })}</View>
               <Text style={styles.inputLabel}>Pharmacopoeial Standard</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{STANDARDS.map(s => { const selected = rmPharmacopoeialStandard === s.key; return <TouchableOpacity key={s.key} onPress={() => setRmPharmacopoeialStandard(s.key)} style={{ paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1, backgroundColor: selected ? colors.primary + '14' : colors.bg.secondary, borderColor: selected ? colors.primary : colors.border }}><Text style={{ fontSize: 10.5, fontWeight: '700', color: selected ? colors.primary : colors.text.secondary }}>{s.label}</Text></TouchableOpacity>; })}</View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{STANDARDS.map(s => { const selected = rmPharmacopoeialStandard === s.key; return <TouchableOpacity key={s.key} onPress={() => setRmPharmacopoeialStandard(s.key)} style={{ paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1, backgroundColor: selected ? colors.primary + '14' : colors.bg.secondary, borderColor: selected ? colors.primary : colors.border }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: selected ? colors.primary : colors.text.secondary }}>{s.label}</Text></TouchableOpacity>; })}</View>
               <Text style={styles.inputLabel}>Monograph Reference / Page</Text>
               <TextInput style={styles.input} placeholder="e.g. API Part I, Vol II, Page 45" placeholderTextColor={colors.text.muted} value={rmMonographRef} onChangeText={setRmMonographRef} />
-              {!isPackaging && <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, padding: 11, borderRadius: 9, backgroundColor: rmIsScheduleE1 ? colors.danger + '12' : colors.bg.secondary, borderWidth: 1, borderColor: rmIsScheduleE1 ? colors.danger : colors.border }}><View style={{ flex: 1, paddingRight: 10 }}><Text style={{ fontSize: 11.5, fontWeight: '700', color: rmIsScheduleE1 ? colors.danger : colors.text.primary }}>Schedule E1 controlled / toxic flag</Text><Text style={{ fontSize: 9.5, color: colors.text.muted, marginTop: 2 }}>Use only when the ingredient is listed under Schedule E1.</Text></View><Switch value={rmIsScheduleE1} onValueChange={setRmIsScheduleE1} trackColor={{ false: colors.border, true: colors.danger }} thumbColor="#fff" /></View>}
+              {!isPackaging && <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, padding: 11, borderRadius: 9, backgroundColor: rmIsScheduleE1 ? colors.danger + '12' : colors.bg.secondary, borderWidth: 1, borderColor: rmIsScheduleE1 ? colors.danger : colors.border }}><View style={{ flex: 1, paddingRight: 10 }}><Text style={{ ...Typography.caption, fontWeight: '700', color: rmIsScheduleE1 ? colors.danger : colors.text.primary }}>Schedule E1 controlled / toxic flag</Text><Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Use only when the ingredient is listed under Schedule E1.</Text></View><Switch value={rmIsScheduleE1} onValueChange={setRmIsScheduleE1} trackColor={{ false: colors.border, true: colors.danger }} thumbColor="#fff" /></View>}
             </View>
 
             {/* 4. INVENTORY */}
             <View style={{ marginBottom: 14, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>Inventory settings</Text>
-              <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12 }}>Define the unit and stock controls used by inventory.</Text>
+              <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>Inventory settings</Text>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 12 }}>Define the unit and stock controls used by inventory.</Text>
               <Text style={styles.inputLabel}>Unit of Measurement *</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>{UNITS.map(u => { const selected = rmUnit === u; return <TouchableOpacity key={u} onPress={() => setRmUnit(u)} style={{ paddingHorizontal: 11, paddingVertical: 6, borderRadius: 7, borderWidth: 1, backgroundColor: selected ? colors.primary : colors.bg.secondary, borderColor: selected ? colors.primary : colors.border }}><Text style={{ fontSize: 10.5, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>{u}</Text></TouchableOpacity>; })}</View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>{UNITS.map(u => { const selected = rmUnit === u; return <TouchableOpacity key={u} onPress={() => setRmUnit(u)} style={{ paddingHorizontal: 11, paddingVertical: 6, borderRadius: 7, borderWidth: 1, backgroundColor: selected ? colors.primary : colors.bg.secondary, borderColor: selected ? colors.primary : colors.border }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: selected ? '#fff' : colors.text.secondary }}>{u}</Text></TouchableOpacity>; })}</View>
               <View style={{ flexDirection: 'row', gap: 10 }}><View style={{ flex: 1 }}><Text style={styles.inputLabel}>Min reorder level ({rmUnit})</Text><TextInput style={styles.input} placeholder="e.g. 10" placeholderTextColor={colors.text.muted} value={rmMinReorder} onChangeText={setRmMinReorder} keyboardType="numeric" /></View><View style={{ flex: 1 }}><Text style={styles.inputLabel}>Cleaning loss %</Text><TextInput style={styles.input} placeholder="e.g. 5" placeholderTextColor={colors.text.muted} value={rmCleaningLossPercent} onChangeText={setRmCleaningLossPercent} keyboardType="numeric" /></View></View>
-              <Text style={{ fontSize: 9.5, color: colors.text.muted, marginTop: -4 }}>Cleaning loss covers dirt, sorting, sifting, drying, and moisture loss during processing.</Text>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: -4 }}>Cleaning loss covers dirt, sorting, sifting, drying, and moisture loss during processing.</Text>
             </View>
 
             {/* Advanced botanical information is secondary; keep it available without dominating the form. */}
             {!isPackaging && (rmFamily || rmGenus || rmSpecies || rmBotanicalSynonyms.length || rmTherapeuticUses.length || rmAcceptedScientificName || rmBotanicalDescription) && (
               <View style={{ marginBottom: 14, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, marginBottom: 10 }}>Botanical / pharmacognostic details</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>{[['Accepted name', rmAcceptedScientificName], ['Family', rmFamily], ['Genus', rmGenus], ['Species', rmSpecies], ['Authority', rmBotanicalAuthority], ['Rank', rmTaxonomicRank], ['Taxonomic status', rmTaxonomicStatus]].map(([label,value]) => value ? <View key={label as string} style={{ width: '47%', marginBottom: 2 }}><Text style={{ fontSize: 9, color: colors.text.muted }}>{label}</Text><Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.text.primary, fontStyle: label === 'Accepted name' ? 'italic' : 'normal' }}>{value}</Text></View> : null)}</View>
-                {rmBotanicalSynonyms.length ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 6 }}><Text style={{ fontWeight: '800' }}>Synonyms: </Text>{rmBotanicalSynonyms.join(', ')}</Text> : null}
-                {rmCommonNames.length ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 4 }}><Text style={{ fontWeight: '800' }}>Common names: </Text>{rmCommonNames.join(', ')}</Text> : null}
-                {rmTherapeuticUses.length ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 4 }}><Text style={{ fontWeight: '800' }}>Traditional uses: </Text>{rmTherapeuticUses.join(', ')}</Text> : null}
-                {(rmRasa.length || rmVirya || rmVipaka || rmGuna.length || rmDosage) ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 4 }}><Text style={{ fontWeight: '800' }}>Ayurvedic profile: </Text>{[rmRasa.length ? `Rasa: ${rmRasa.join(', ')}` : '', rmVirya ? `Virya: ${rmVirya}` : '', rmVipaka ? `Vipaka: ${rmVipaka}` : '', rmGuna.length ? `Guna: ${rmGuna.join(', ')}` : '', rmDosage ? `Dosage: ${rmDosage}` : ''].filter(Boolean).join(' • ')}</Text> : null}
-                {rmBotanicalDescription ? <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 4 }}>{rmBotanicalDescription}</Text> : null}
-                {rmTaxonomySource ? <Text style={{ fontSize: 9, color: colors.text.muted, marginTop: 7 }}>Source: {rmTaxonomySource}</Text> : null}
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 10 }}>Botanical / pharmacognostic details</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>{[['Accepted name', rmAcceptedScientificName], ['Family', rmFamily], ['Genus', rmGenus], ['Species', rmSpecies], ['Authority', rmBotanicalAuthority], ['Rank', rmTaxonomicRank], ['Taxonomic status', rmTaxonomicStatus]].map(([label,value]) => value ? <View key={label as string} style={{ width: '47%', marginBottom: 2 }}><Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{label}</Text><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.primary, fontStyle: label === 'Accepted name' ? 'italic' : 'normal' }}>{value}</Text></View> : null)}</View>
+                {rmBotanicalSynonyms.length ? <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 6 }}><Text style={{ fontWeight: '800' }}>Synonyms: </Text>{rmBotanicalSynonyms.join(', ')}</Text> : null}
+                {rmCommonNames.length ? <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 4 }}><Text style={{ fontWeight: '800' }}>Common names: </Text>{rmCommonNames.join(', ')}</Text> : null}
+                {rmTherapeuticUses.length ? <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 4 }}><Text style={{ fontWeight: '800' }}>Traditional uses: </Text>{rmTherapeuticUses.join(', ')}</Text> : null}
+                {(rmRasa.length || rmVirya || rmVipaka || rmGuna.length || rmDosage) ? <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 4 }}><Text style={{ fontWeight: '800' }}>Ayurvedic profile: </Text>{[rmRasa.length ? `Rasa: ${rmRasa.join(', ')}` : '', rmVirya ? `Virya: ${rmVirya}` : '', rmVipaka ? `Vipaka: ${rmVipaka}` : '', rmGuna.length ? `Guna: ${rmGuna.join(', ')}` : '', rmDosage ? `Dosage: ${rmDosage}` : ''].filter(Boolean).join(' • ')}</Text> : null}
+                {rmBotanicalDescription ? <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 4 }}>{rmBotanicalDescription}</Text> : null}
+                {rmTaxonomySource ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 7 }}>Source: {rmTaxonomySource}</Text> : null}
               </View>
             )}
 
             {/* Existing stock is only relevant while editing. Keep it at the end so it doesn't distract from definition. */}
             {editingMaterialId !== null && (
               <View style={{ marginBottom: 4, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>Current stock adjustment</Text>
-                <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 12 }}>Only change physical stock here when it differs from the recorded quantity.</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>Current stock adjustment</Text>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 12 }}>Only change physical stock here when it differs from the recorded quantity.</Text>
                 <Text style={styles.inputLabel}>SKU / System Code</Text>
                 <TextInput style={[styles.input, { backgroundColor: colors.bg.secondary, color: colors.text.muted }]} value={rmSku} editable={false} />
                 <Text style={styles.inputLabel}>Current Physical Stock ({rmUnit})</Text>

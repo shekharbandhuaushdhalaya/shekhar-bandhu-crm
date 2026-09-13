@@ -1,19 +1,8 @@
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  ActivityIndicator,
-  useWindowDimensions,
-  RefreshControl,
-  Pressable,
-  Platform,
-  Alert,
-  DeviceEventEmitter
-} from 'react-native';
+import { View, ScrollView, Modal, ActivityIndicator, useWindowDimensions, RefreshControl, Pressable, Platform, Alert, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useRouter } from 'expo-router';
@@ -32,7 +21,7 @@ import {
   ManufacturingUnit,
   MrpResponse
 } from '../utils/api';
-import { Spacing, Radius, LightColors } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { FIRM_DETAILS } from '../constants/firm';
 
 // ── Extracted Modal Components ─────────────────────────────────────────────
@@ -1863,7 +1852,7 @@ export default function ManufacturingScreen() {
       <View style={[styles.card, { margin: Spacing.lg, marginBottom: 0, padding: 10, flexDirection: 'row', gap: 8, alignItems: 'center' }]}>
         <Ionicons name="git-network-outline" size={16} color={colors.text.secondary} />
         <TextInput
-          style={{ flex: 1, fontSize: 13, color: colors.text.primary, paddingVertical: 6 }}
+          style={{ ...Typography.bodySm, flex: 1, color: colors.text.primary, paddingVertical: 6 }}
           placeholder="Trace batch no. (raw or finished)..."
           placeholderTextColor={colors.text.muted}
           value={traceBatchNo}
@@ -1890,7 +1879,7 @@ export default function ManufacturingScreen() {
           onPress={() => setMaterialModalVisible(true)}
         >
           <Ionicons name="add-circle-outline" size={15} color={colors.primary} style={{ marginRight: 4 }} />
-          <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Define Material</Text>
+          <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Define Material</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1907,7 +1896,7 @@ export default function ManufacturingScreen() {
           onPress={() => setPharmacopoeiaModalVisible(true)}
         >
           <Ionicons name="book-outline" size={15} color={colors.success} style={{ marginRight: 4 }} />
-          <Text style={{ color: colors.success, fontSize: 12, fontWeight: '700' }}>📖 Ayurvedic Library</Text>
+          <Text style={{ ...Typography.bodySm, color: colors.success, fontWeight: '700' }}> Ayurvedic Library</Text>
         </TouchableOpacity>
       </View>
 
@@ -2017,7 +2006,7 @@ export default function ManufacturingScreen() {
 
         {activeTab === 'batches' && batchesPage < batchesTotalPages && (
           <View style={{ padding: 20, alignItems: 'center' }}>
-            <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Loading more batches...</Text>
+            <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Loading more batches...</Text>
           </View>
         )}
 
@@ -2256,7 +2245,7 @@ export default function ManufacturingScreen() {
             </View>
             {stageError ? <Text style={styles.modalError}>{stageError}</Text> : null}
             <ScrollView style={styles.modalForm}>
-              <Text style={{ fontSize: 13, color: colors.text.secondary, marginBottom: 12 }}>
+              <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginBottom: 12 }}>
                 {stageAction === 'advance'
                   ? 'Confirm that this production stage has been successfully processed and completed.'
                   : 'Specify the justification reason for bypassing this manufacturing step.'}
@@ -2294,7 +2283,7 @@ export default function ManufacturingScreen() {
                 return (
                   <View style={{ marginTop: 12, marginBottom: 12 }}>
                     <Text style={[styles.inputLabel, { color: colors.primary }]}>Production Yields (Bottle Split) *</Text>
-                    <Text style={{ fontSize: 10, color: colors.text.muted, marginBottom: 8 }}>
+                    <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 8 }}>
                       Set the actual bottle sizes and quantities filled. Packaging material requirements auto-update.
                     </Text>
                     {stageYields.map((y, yIdx) => {
@@ -2302,11 +2291,11 @@ export default function ManufacturingScreen() {
                       return (
                         <View key={y.productId + yIdx} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, backgroundColor: colors.bg.card, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: colors.border }}>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>{prod?.name || 'Unknown'}</Text>
-                            <Text style={{ fontSize: 10, color: colors.text.muted }}>{y.size || prod?.size || ''}</Text>
+                            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{prod?.name || 'Unknown'}</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{y.size || prod?.size || ''}</Text>
                           </View>
                           <TextInput
-                            style={{ width: 80, height: 36, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, fontSize: 14, fontWeight: '700', color: colors.text.primary, textAlign: 'center', backgroundColor: colors.bg.primary }}
+                            style={{ ...Typography.body, width: 80, height: 36, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, fontWeight: '700', color: colors.text.primary, textAlign: 'center', backgroundColor: colors.bg.primary }}
                             keyboardType="numeric"
                             value={y.actualYieldQty > 0 ? String(y.actualYieldQty) : ''}
                             onChangeText={v => handleYieldQtyChange(yIdx, v)}
@@ -2321,7 +2310,7 @@ export default function ManufacturingScreen() {
                     })}
                     <TouchableOpacity onPress={addYieldRow} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, marginBottom: 4 }}>
                       <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Add Product / Size</Text>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>Add Product / Size</Text>
                     </TouchableOpacity>
                     {stageYields.length > 0 && (() => {
                       const totalUnits = stageYields.reduce((s, y) => s + (y.actualYieldQty || 0), 0);
@@ -2350,20 +2339,20 @@ export default function ManufacturingScreen() {
                       return (
                         <View style={{ marginBottom: 4 }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-                            <Text style={{ fontSize: 12, color: colors.text.secondary }}>
+                            <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>
                               Total: <Text style={{ fontWeight: '800', color: colors.primary }}>{totalUnits} units</Text>
                             </Text>
                           </View>
                           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 4 }}>
-                            <Text style={{ fontSize: 11, color: colors.text.muted }}>
+                            <Text style={{ ...Typography.caption, color: colors.text.muted }}>
                               Volume: <Text style={{ fontWeight: '700', color: overVolume ? colors.danger : colors.success }}>{totalVolumeMl} ml</Text>
                             </Text>
-                            <Text style={{ fontSize: 11, color: colors.text.muted }}>
+                            <Text style={{ ...Typography.caption, color: colors.text.muted }}>
                               / {availableMl} ml available
                             </Text>
                             {overVolume && (
-                              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.danger }}>
-                                ⚠ Over by {(totalVolumeMl - availableMl).toFixed(0)} ml
+                              <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.danger }}>
+                                 Over by {(totalVolumeMl - availableMl).toFixed(0)} ml
                               </Text>
                             )}
                           </View>
@@ -2386,7 +2375,7 @@ export default function ManufacturingScreen() {
                 const availableVariants = productsForYield.filter(p => variantIds.has(p._id) && !stageYields.some(y => y.productId === p._id));
                 return (
                   <View style={{ marginTop: 8, marginBottom: 12, backgroundColor: colors.bg.card, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>Select Product / Size</Text>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>Select Product / Size</Text>
                     <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                       {availableVariants.map(prod => (
                         <TouchableOpacity
@@ -2395,18 +2384,18 @@ export default function ManufacturingScreen() {
                           style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border + '60' }}
                         >
                           <View>
-                            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text.primary }}>{prod.name}</Text>
-                            <Text style={{ fontSize: 10, color: colors.text.muted }}>{prod.size || ''}</Text>
+                            <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>{prod.name}</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{prod.size || ''}</Text>
                           </View>
                           <Ionicons name="add" size={18} color={colors.primary} />
                         </TouchableOpacity>
                       ))}
                       {availableVariants.length === 0 && (
-                        <Text style={{ fontSize: 12, color: colors.text.muted, padding: 8 }}>All sizes added</Text>
+                        <Text style={{ ...Typography.bodySm, color: colors.text.muted, padding: 8 }}>All sizes added</Text>
                       )}
                     </ScrollView>
                     <TouchableOpacity onPress={() => setShowYieldProductPicker(false)} style={{ alignSelf: 'flex-end', padding: 4, marginTop: 4 }}>
-                      <Text style={{ fontSize: 12, color: colors.text.muted }}>Close</Text>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.muted }}>Close</Text>
                     </TouchableOpacity>
                   </View>
                 );
@@ -2416,11 +2405,11 @@ export default function ManufacturingScreen() {
                 <View style={{ marginTop: 16 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <Ionicons name="flask-outline" size={16} color={colors.primary} />
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text.primary }}>
+                    <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>
                       Raw Materials Added at This Stage
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 12 }}>
+                  <Text style={{ ...Typography.caption, color: colors.text.secondary, marginBottom: 12 }}>
                     Theoretical qty is auto-calculated from your formula. Enter the actual qty used — wastage is computed automatically.
                   </Text>
                   {stageIngredients.map((si, siIdx) => {
@@ -2447,29 +2436,29 @@ export default function ManufacturingScreen() {
                         {/* Header */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontWeight: '800', fontSize: 14, color: colors.text.primary }}>{si.name}</Text>
-                            <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>
+                            <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>{si.name}</Text>
+                            <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 1 }}>
                               Formula standard: <Text style={{ fontWeight: '700', color: colors.primary }}>{theoretical.toFixed(3)} {si.unit}</Text>
                             </Text>
                             {si.stockAvailable !== undefined && (
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                                <Text style={{ fontSize: 10, color: colors.text.muted }}>In stock:</Text>
-                                <Text style={{ fontSize: 11, fontWeight: '800', color: (si.stockAvailable || 0) >= theoretical ? colors.success : colors.danger }}>
+                                <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>In stock:</Text>
+                                <Text style={{ ...Typography.caption, fontWeight: '800', color: (si.stockAvailable || 0) >= theoretical ? colors.success : colors.danger }}>
                                   {si.stockAvailable} {si.unit}
                                 </Text>
                                 {(si.stockAvailable || 0) < theoretical && (
-                                  <Text style={{ fontSize: 10, color: colors.danger }}>⚠ Short by {(theoretical - (si.stockAvailable || 0)).toFixed(2)}</Text>
+                                  <Text style={{ ...Typography.eyebrow, color: colors.danger }}> Short by {(theoretical - (si.stockAvailable || 0)).toFixed(2)}</Text>
                                 )}
                               </View>
                             )}
                           </View>
                           {isLoss ? (
                             <View style={{ backgroundColor: colors.warning + '20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.warning }}>{wastePct}% process loss</Text>
+                              <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.warning }}>{wastePct}% process loss</Text>
                             </View>
                           ) : (
                             <View style={{ backgroundColor: colors.success + '20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.success }}>No loss</Text>
+                              <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.success }}>No loss</Text>
                             </View>
                           )}
                         </View>
@@ -2477,8 +2466,8 @@ export default function ManufacturingScreen() {
                         {/* Two input fields side by side */}
                         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 11, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>
-                              📦 Taken from Stock ({si.unit})
+                            <Text style={{ ...Typography.caption, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>
+                               Taken from Stock ({si.unit})
                             </Text>
                             <TextInput
                               style={[styles.input, { height: 44, marginBottom: 0, borderColor: isOverUsed ? colors.danger : colors.border, fontWeight: '700' }]}
@@ -2488,14 +2477,14 @@ export default function ManufacturingScreen() {
                               placeholderTextColor={colors.text.muted}
                               placeholder={theoretical.toFixed(3)}
                             />
-                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Deducted from inventory</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Deducted from inventory</Text>
                             {isOverUsed && (
-                              <Text style={{ fontSize: 10, color: colors.danger, marginTop: 2 }}>⚠ More than formula qty</Text>
+                              <Text style={{ ...Typography.eyebrow, color: colors.danger, marginTop: 2 }}> More than formula qty</Text>
                             )}
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 11, color: colors.warning, marginBottom: 4, fontWeight: '700' }}>
-                              🔥 Process Loss ({si.unit})
+                            <Text style={{ ...Typography.caption, color: colors.warning, marginBottom: 4, fontWeight: '700' }}>
+                               Process Loss ({si.unit})
                             </Text>
                             <TextInput
                               style={[styles.input, { height: 44, marginBottom: 0, borderColor: isLoss ? colors.warning + '80' : colors.border }]}
@@ -2505,18 +2494,18 @@ export default function ManufacturingScreen() {
                               placeholderTextColor={colors.text.muted}
                               placeholder="0"
                             />
-                            <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Evaporation / spill / cleaning</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Evaporation / spill / cleaning</Text>
                           </View>
                         </View>
 
                         {/* Output preview bar */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: colors.border, flexWrap: 'wrap' }}>
-                          <Text style={{ fontSize: 11, color: colors.text.muted }}>Deducted:</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>{parseFloat(si.actualQty) || 0} {si.unit}</Text>
-                          <Text style={{ fontSize: 11, color: colors.text.muted }}>  −  Lost:</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.warning }}>{parseFloat(si.wastage) || 0} {si.unit}</Text>
-                          <Text style={{ fontSize: 11, color: colors.text.muted }}>  =  Into product:</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>
+                          <Text style={{ ...Typography.caption, color: colors.text.muted }}>Deducted:</Text>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary }}>{parseFloat(si.actualQty) || 0} {si.unit}</Text>
+                          <Text style={{ ...Typography.caption, color: colors.text.muted }}>  −  Lost:</Text>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.warning }}>{parseFloat(si.wastage) || 0} {si.unit}</Text>
+                          <Text style={{ ...Typography.caption, color: colors.text.muted }}>  =  Into product:</Text>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.success }}>
                             {Math.max(0, (parseFloat(si.actualQty) || 0) - (parseFloat(si.wastage) || 0)).toFixed(3)} {si.unit}
                           </Text>
                         </View>
@@ -2542,7 +2531,7 @@ export default function ManufacturingScreen() {
               {stageAction === 'advance' && stageIngredients.length === 0 && (
                 <View style={{ marginTop: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                   <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
-                  <Text style={{ fontSize: 12, color: colors.text.secondary, flex: 1 }}>
+                  <Text style={{ ...Typography.bodySm, color: colors.text.secondary, flex: 1 }}>
                     No specific ingredients assigned to this stage. Proceed to complete it.
                   </Text>
                 </View>

@@ -1,5 +1,9 @@
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../../components/AppTextInput';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Pressable, Platform } from 'react-native';
+import { View, Modal, ScrollView, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -75,7 +79,7 @@ export default function BOMModal({
                 <select
                   value={selectedProdId}
                   onChange={(e: any) => setSelectedProdId(e.target.value)}
-                  style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                  style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                 >
                   <option value="">-- Choose Product --</option>
                   {products.map(p => <option key={p._id} value={p._id}>{p.name} ({p.size || 'Standard'})</option>)}
@@ -106,7 +110,7 @@ export default function BOMModal({
                     setBomDefaultProductionType(e.target.value);
                     if (e.target.value === 'in_house') setBomDefaultJobWorkMode('none');
                   }}
-                  style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                  style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                 >
                   <option value="in_house">In-House Manufacturing</option>
                   <option value="job_work">Third-Party Job Work (Outsourced)</option>
@@ -124,7 +128,7 @@ export default function BOMModal({
                     <select
                       value={bomDefaultJobWorkMode}
                       onChange={(e: any) => setBomDefaultJobWorkMode(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                      style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                     >
                       <option value="raw_materials_supplied">Raw Materials Supplied</option>
                       <option value="direct_purchase">Direct Purchase of Finished Bulk</option>
@@ -140,7 +144,7 @@ export default function BOMModal({
                     <select
                       value={bomDefaultJobWorkerId}
                       onChange={(e: any) => setBomDefaultJobWorkerId(e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                      style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                     >
                       <option value="">-- No Preferred Vendor --</option>
                       {vendors.map(v => (
@@ -155,14 +159,14 @@ export default function BOMModal({
             )}
 
             {/* ── STEP 1: Manufacturing Stages (define these FIRST) ── */}
-            <Text style={styles.formIngredientsTitle}>📋 Step 1: Define Manufacturing Process Stages</Text>
-            <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
+            <Text style={styles.formIngredientsTitle}> Step 1: Define Manufacturing Process Stages</Text>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
               Define each production stage (e.g. Kwath, Fermentation, Filtration). You can then assign each ingredient to the stage where it is added.
             </Text>
             {/* Column headers for stages */}
             <View style={{ flexDirection: 'row', paddingHorizontal: 4, marginBottom: 4, gap: 8 }}>
-              <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>STAGE NAME</Text>
-              <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>DAYS</Text>
+              <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.muted }}>STAGE NAME</Text>
+              <Text style={{ ...Typography.eyebrow, flex: 1, fontWeight: '700', color: colors.text.muted }}>DAYS</Text>
               <View style={{ width: 32 }} />
             </View>
             {bomStages.map((stage, idx) => (
@@ -193,24 +197,24 @@ export default function BOMModal({
             </TouchableOpacity>
 
             {/* ── STEP 2: Ingredients mapped to stages ── */}
-            <Text style={[styles.formIngredientsTitle, { marginTop: 16 }]}>🌿 Step 2: Formulation Ingredients *</Text>
-            <Text style={{ fontSize: 10.5, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
+            <Text style={[styles.formIngredientsTitle, { marginTop: 16 }]}> Step 2: Formulation Ingredients *</Text>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: -4, marginBottom: 8 }}>
               Enter each ingredient and the quantity per 100 output units. Then select which process stage it is added in. Unassigned ingredients are deducted at batch start.
             </Text>
             {bomStages.filter(s => s.name.trim()).length === 0 && (
               <View style={{ backgroundColor: colors.warning + '18', borderWidth: 1, borderColor: colors.warning + '40', borderRadius: 6, padding: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="information-circle-outline" size={16} color={colors.warning} />
-                <Text style={{ fontSize: 11, color: colors.warning, flex: 1 }}>
+                <Text style={{ ...Typography.caption, color: colors.warning, flex: 1 }}>
                   Add your process stages above first — then you can assign each ingredient to its stage.
                 </Text>
               </View>
             )}
             {/* Column headers for ingredients */}
             <View style={{ flexDirection: 'row', paddingHorizontal: 4, marginBottom: 4, gap: 8 }}>
-              <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>INGREDIENT</Text>
-              <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>QTY/100</Text>
-              <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>TYPE</Text>
-              <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '700', color: colors.text.muted }}>USED IN STAGE</Text>
+              <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.muted }}>INGREDIENT</Text>
+              <Text style={{ ...Typography.eyebrow, flex: 1, fontWeight: '700', color: colors.text.muted }}>QTY/100</Text>
+              <Text style={{ ...Typography.eyebrow, flex: 1, fontWeight: '700', color: colors.text.muted }}>TYPE</Text>
+              <Text style={{ ...Typography.eyebrow, flex: 1.5, fontWeight: '700', color: colors.text.muted }}>USED IN STAGE</Text>
               <View style={{ width: 32 }} />
             </View>
             {bomIngredients.map((ing, idx) => (
@@ -220,7 +224,7 @@ export default function BOMModal({
                     <select
                       value={ing.rawMaterialId}
                       onChange={(e: any) => onIngredientChange(idx, 'rawMaterialId', e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 13, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                      style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                     >
                       <option value="">-- Choose Ingredient --</option>
                       {materials.map(m => <option key={m._id} value={m._id}>{m.name} ({m.unit})</option>)}
@@ -239,9 +243,9 @@ export default function BOMModal({
                 />
                 <View style={[styles.pickerWrapper, { flex: 1, marginBottom: 0 }]}>
                   {Platform.OS === 'web' ? (
-                    <select value={ing.itemType || 'formulation'} onChange={(e: any) => onIngredientChange(idx, 'itemType', e.target.value)} style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
-                      <option value="formulation">🌿 Ingredient</option>
-                      <option value="packaging">📦 Packaging</option>
+                    <select value={ing.itemType || 'formulation'} onChange={(e: any) => onIngredientChange(idx, 'itemType', e.target.value)} style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}>
+                      <option value="formulation"> Ingredient</option>
+                      <option value="packaging"> Packaging</option>
                     </select>
                   ) : (
                     <TextInput style={styles.input} placeholder="ingredient/packaging" value={ing.itemType || 'formulation'} onChangeText={(v) => onIngredientChange(idx, 'itemType', v as any)} />
@@ -252,7 +256,7 @@ export default function BOMModal({
                     <select
                       value={ing.stageName || ''}
                       onChange={(e: any) => onIngredientChange(idx, 'stageName', e.target.value)}
-                      style={{ flex: 1, padding: 8, fontSize: 12, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
+                      style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
                     >
                       <option value="">-- At batch start --</option>
                       {bomStages.filter(s => s.name.trim()).map((s, si) => (
@@ -294,7 +298,7 @@ export default function BOMModal({
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, backgroundColor: bomIsActive ? colors.success : colors.bg.secondary, borderColor: bomIsActive ? colors.success : colors.border }}
               >
                 <Ionicons name={bomIsActive ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={bomIsActive ? '#fff' : colors.text.muted} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: bomIsActive ? '#fff' : colors.text.secondary }}>{bomIsActive ? 'Active' : 'Inactive'}</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: bomIsActive ? '#fff' : colors.text.secondary }}>{bomIsActive ? 'Active' : 'Inactive'}</Text>
               </TouchableOpacity>
             </View>
 
@@ -305,7 +309,7 @@ export default function BOMModal({
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, backgroundColor: bomIsDefault ? colors.primary : colors.bg.secondary, borderColor: bomIsDefault ? colors.primary : colors.border }}
               >
                 <Ionicons name={bomIsDefault ? 'star' : 'star-outline'} size={16} color={bomIsDefault ? '#fff' : colors.text.muted} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: bomIsDefault ? '#fff' : colors.text.secondary }}>{bomIsDefault ? 'Default' : 'Not Default'}</Text>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: bomIsDefault ? '#fff' : colors.text.secondary }}>{bomIsDefault ? 'Default' : 'Not Default'}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

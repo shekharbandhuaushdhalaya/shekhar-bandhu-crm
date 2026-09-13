@@ -1,7 +1,12 @@
+import ScreenHeader from '../components/ScreenHeader';
+import { DataTable } from '../components/DataTable';
+import { WorkspaceLoading, StatusPill } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList, Modal, ActivityIndicator, Alert, Platform, useWindowDimensions } from 'react-native';
+import { View, ScrollView, StyleSheet, FlatList, Modal, ActivityIndicator, Alert, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Shadows } from '../constants/theme';
+import { Spacing, Radius, LightColors, Shadows, Typography } from '../constants/theme';
 import { api } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 
@@ -122,7 +127,7 @@ export default function AgeingScreen() {
   if (loading && data.customers.length === 0) {
     return (
       <View style={styles.loadingBox}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <WorkspaceLoading />
         <Text style={{ marginTop: 8, color: colors.text.muted }}>Calculating Brackets...</Text>
       </View>
     );
@@ -133,16 +138,7 @@ export default function AgeingScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: Spacing.lg }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <View>
-          <Text style={styles.title}>Receivable Ageing Analysis</Text>
-          <Text style={{ fontSize: 13, color: colors.text.muted }}>Outstanding sales invoices grouped by age brackets</Text>
-        </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={loadData}>
-          <Ionicons name="refresh-outline" size={16} color={colors.primary} />
-          <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Refresh</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader title="Receivable ageing" subtitle="Outstanding sales invoices grouped by age." style={{ paddingHorizontal: 0, paddingTop: 0 }} actions={[{ key: 'refresh', label: 'Refresh', icon: 'refresh-outline', onPress: loadData }]} />
 
       {/* Summary Widget */}
       <View style={[styles.grid, { flexDirection: isDesktop ? 'row' : 'column', gap: 12, marginBottom: 20 }]}>
@@ -187,50 +183,32 @@ export default function AgeingScreen() {
           <View style={styles.customerHeader}>
             <View>
               <Text style={styles.customerName}>{cust.customerName}</Text>
-              <Text style={{ fontSize: 11, color: colors.text.muted }}>{cust.invoices.length} outstanding invoices</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.muted }}>{cust.invoices.length} outstanding invoices</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Text style={styles.customerOutstanding}>DR. {Math.round(cust.totalOutstanding).toLocaleString('en-IN')}</Text>
               <TouchableOpacity style={styles.allocateBtn} onPress={() => openAllocationModal(cust)}>
                 <Ionicons name="link-outline" size={12} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Match Bill</Text>
+                <Text style={{ ...Typography.caption, color: '#fff', fontWeight: '700' }}>Match Bill</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Invoices List */}
-          <View style={styles.invoiceTable}>
-            {cust.invoices.map((inv: any) => (
-              <View key={inv._id} style={styles.invoiceRow}>
-                <View style={{ flex: 2 }}>
-                  <Text style={styles.invoiceNo}>{inv.invoiceNo || 'Draft Invoice'}</Text>
-                  <Text style={{ fontSize: 10.5, color: colors.text.muted }}>Date: {new Date(inv.date).toLocaleDateString('en-IN')}</Text>
-                </View>
-                <View style={{ flex: 1.5, alignItems: 'center' }}>
-                  <View style={[styles.badge, { 
-                    backgroundColor: inv.bracket.includes('90+') ? colors.danger + '18' : inv.bracket.includes('61-90') ? colors.warning + '18' : colors.success + '18',
-                    borderColor: inv.bracket.includes('90+') ? colors.danger : inv.bracket.includes('61-90') ? colors.warning : colors.success,
-                  }]}>
-                    <Text style={{ fontSize: 9.5, fontWeight: '700', color: inv.bracket.includes('90+') ? colors.danger : inv.bracket.includes('61-90') ? colors.warning : colors.success }}>
-                      {inv.daysOld} Days Old
-                    </Text>
-                  </View>
-                </View>
-                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
-                  <Text style={styles.invoiceOut}>₹{Math.round(inv.outstanding).toLocaleString('en-IN')}</Text>
-                  <Text style={{ fontSize: 9.5, color: colors.text.muted }}>of ₹{Math.round(inv.amount).toLocaleString('en-IN')}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+          <DataTable data={cust.invoices} embedded minWidth={640} containerStyle={{ height: Math.min(360, 58 + cust.invoices.length * 70), borderWidth: 0, borderRadius: 0 }} keyExtractor={(inv: any) => inv._id}
+            columns={[
+              { key: 'invoiceNo', title: 'Invoice', flex: 2, render: (inv: any) => <View><Text style={styles.invoiceNo}>{inv.invoiceNo || 'Draft Invoice'}</Text><Text style={{ ...Typography.caption, color: colors.text.muted }}>Date: {new Date(inv.date).toLocaleDateString('en-IN')}</Text></View> },
+              { key: 'age', title: 'Age', flex: 1.5, render: (inv: any) => <StatusPill label={`${inv.daysOld} days old`} color={inv.bracket.includes('90+') ? colors.danger : inv.bracket.includes('61-90') ? colors.warning : colors.success} /> },
+              { key: 'outstanding', title: 'Outstanding', flex: 1.5, align: 'right', render: (inv: any) => <View><Text style={styles.invoiceOut}>₹{Math.round(inv.outstanding).toLocaleString('en-IN')}</Text><Text style={{ ...Typography.caption, color: colors.text.muted }}>of ₹{Math.round(inv.amount).toLocaleString('en-IN')}</Text></View> }
+            ]} />
         </View>
       ))}
 
       {data.customers.length === 0 && (
         <View style={{ padding: 30, alignItems: 'center', backgroundColor: colors.bg.secondary, borderRadius: 12 }}>
           <Ionicons name="checkmark-done-circle" size={42} color={colors.success} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary, marginTop: 8 }}>All Receivables Settled!</Text>
-          <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>No outstanding invoices found.</Text>
+          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginTop: 8 }}>All Receivables Settled!</Text>
+          <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>No outstanding invoices found.</Text>
         </View>
       )}
 
@@ -248,10 +226,10 @@ export default function AgeingScreen() {
           </View>
 
           <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
-            <Text style={{ fontSize: 11, color: colors.text.muted, textTransform: 'uppercase', fontWeight: '800' }}>Customer</Text>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text.primary, marginBottom: 14 }}>{selectedCustomer?.customerName}</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.muted, textTransform: 'uppercase', fontWeight: '800' }}>Customer</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: 14 }}>{selectedCustomer?.customerName}</Text>
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, marginBottom: 6 }}>1. Select Customer Payment Receipt Record</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 6 }}>1. Select Customer Payment Receipt Record</Text>
             {availablePayments.length > 0 ? (
               <View style={{ gap: 6, marginBottom: 16 }}>
                 {availablePayments.map((p) => (
@@ -261,24 +239,24 @@ export default function AgeingScreen() {
                     onPress={() => setSelectedPayment(p)}
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>Receipt No: {p.referenceNo || p._id.slice(-6).toUpperCase()}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.success }}>₹{p.amount.toLocaleString('en-IN')}</Text>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>Receipt No: {p.referenceNo || p._id.slice(-6).toUpperCase()}</Text>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.success }}>₹{p.amount.toLocaleString('en-IN')}</Text>
                     </View>
-                    <Text style={{ fontSize: 10, color: colors.text.muted, marginTop: 2 }}>Received Date: {new Date(p.date).toLocaleDateString('en-IN')}</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Received Date: {new Date(p.date).toLocaleDateString('en-IN')}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             ) : (
-              <Text style={{ fontSize: 11, color: colors.text.muted, fontStyle: 'italic', marginBottom: 16 }}>No unallocated payment receipt logs available for this customer.</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, fontStyle: 'italic', marginBottom: 16 }}>No unallocated payment receipt logs available for this customer.</Text>
             )}
 
             {selectedPayment && (
               <>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>2. Distribute Receipt Amount</Text>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>2. Distribute Receipt Amount</Text>
                   <TouchableOpacity style={styles.autoBtn} onPress={autoDistributePayment}>
                     <Ionicons name="flash-outline" size={12} color={colors.primary} />
-                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: colors.primary }}>Auto-Distribute (FIFO)</Text>
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary }}>Auto-Distribute (FIFO)</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -287,19 +265,19 @@ export default function AgeingScreen() {
                   return (
                     <View key={inv._id} style={styles.allocRow}>
                       <View style={{ flex: 2 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary }}>{inv.invoiceNo}</Text>
-                        <Text style={{ fontSize: 10, color: colors.text.muted }}>Outstanding: ₹{Math.round(inv.outstanding).toLocaleString('en-IN')}</Text>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{inv.invoiceNo}</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Outstanding: ₹{Math.round(inv.outstanding).toLocaleString('en-IN')}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <TouchableOpacity 
                           style={styles.fullMatchBtn} 
                           onPress={() => setAllocationAmounts(prev => ({ ...prev, [inv._id]: inv.outstanding.toString() }))}
                         >
-                          <Text style={{ fontSize: 10, color: colors.primary, fontWeight: '700' }}>Match Full</Text>
+                          <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700' }}>Match Full</Text>
                         </TouchableOpacity>
                       </View>
                       <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 12, color: colors.success, fontWeight: '700' }}>₹{allocatedVal.toFixed(2)}</Text>
+                        <Text style={{ ...Typography.bodySm, color: colors.success, fontWeight: '700' }}>₹{allocatedVal.toFixed(2)}</Text>
                       </View>
                     </View>
                   );
@@ -324,11 +302,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.bg.primary
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text.primary
-  },
+  title: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
   refreshBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -356,18 +330,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     shadowRadius: 2,
     elevation: 1
   },
-  cardLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text.muted,
-    textTransform: 'uppercase'
-  },
-  cardValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    marginTop: 4,
-    marginBottom: 8
-  },
+  cardLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' },
+  cardValue: { ...Typography.h2, fontWeight: '800', marginTop: 4, marginBottom: 8 },
   progressBg: {
     height: 4,
     backgroundColor: colors.border,
@@ -378,14 +342,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: '100%',
     borderRadius: 2
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.text.primary,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
+  sectionTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary, marginBottom: 10, textTransform: 'uppercase' },
   customerBlock: {
     backgroundColor: colors.bg.secondary,
     borderRadius: Radius.md,
@@ -403,16 +360,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border
   },
-  customerName: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: colors.text.primary
-  },
-  customerOutstanding: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: colors.primary
-  },
+  customerName: { ...Typography.body, fontWeight: '700', color: colors.text.primary },
+  customerOutstanding: { ...Typography.body, fontWeight: '800', color: colors.primary },
   allocateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -434,16 +383,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border + '40'
   },
-  invoiceNo: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.text.primary
-  },
-  invoiceOut: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.text.primary
-  },
+  invoiceNo: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  invoiceOut: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
   badge: {
     borderWidth: 1,
     borderRadius: 4,
@@ -464,11 +405,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.bg.secondary
   },
-  modalTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.text.primary
-  },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   paymentSelectCard: {
     backgroundColor: colors.bg.secondary,
     borderWidth: 1,

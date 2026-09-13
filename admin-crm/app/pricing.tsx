@@ -1,12 +1,13 @@
+import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Switch, ActivityIndicator, Alert, RefreshControl
-} from 'react-native';
+import { View, StyleSheet, ScrollView, Switch, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { api, Product } from '../utils/api';
-import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
+import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useToast } from '../utils/ToastContext';
@@ -153,13 +154,9 @@ export default function PricingScreen() {
         <View>
           <Text style={styles.productName} numberOfLines={1}>{row.name}</Text>
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
-            <View style={[styles.catBadge, { backgroundColor: colors.primary + '15' }]}>
-              <Text style={[styles.catBadgeText, { color: colors.primary }]}>{row.category}</Text>
-            </View>
+            <StatusPill  label={<>{row.category}</>} textStyle={[styles.catBadgeText, { color: colors.primary }]} />
             {row.size ? (
-              <View style={[styles.catBadge, { backgroundColor: colors.info + '15' }]}>
-                <Text style={[styles.catBadgeText, { color: colors.info }]}>{row.size}</Text>
-              </View>
+              <StatusPill  label={<>{row.size}</>} textStyle={[styles.catBadgeText, { color: colors.info }]} />
             ) : null}
           </View>
         </View>
@@ -317,10 +314,7 @@ export default function PricingScreen() {
           onRefresh={onRefresh}
           rowStyle={(item) => item.dirty ? { borderLeftWidth: 3, borderLeftColor: colors.warning } : {}}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="pricetag-outline" size={40} color={colors.text.muted} />
-              <Text style={styles.emptyText}>No products match your search.</Text>
-            </View>
+            <EmptyState title={<>No products match your search.</>}  />
           }
         />
       </View>
@@ -338,7 +332,7 @@ export default function PricingScreen() {
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg.primary },
-  loadingText: { marginTop: 12, color: colors.text.muted, fontSize: 14 },
+  loadingText: { ...Typography.body, marginTop: 12, color: colors.text.muted },
 
   pageHeader: {
     flexDirection: 'row',
@@ -351,17 +345,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.bg.secondary,
   },
-  pageTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text.primary,
-    letterSpacing: -0.3,
-  },
-  pageSubtitle: {
-    fontSize: 12,
-    color: colors.text.muted,
-    marginTop: 2,
-  },
+  pageTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  pageSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   saveAllBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -372,7 +357,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.md,
     ...Shadows.header,
   },
-  saveAllBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  saveAllBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
 
   statsStrip: {
     flexDirection: 'row',
@@ -395,8 +380,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  statValue: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
-  statLabel: { fontSize: 10, color: colors.text.muted, flex: 1 },
+  statValue: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  statLabel: { ...Typography.eyebrow, color: colors.text.muted, flex: 1 },
 
   searchRow: {
     flexDirection: 'row',
@@ -410,12 +395,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  searchInput: {
-    flex: 1,
-    color: colors.text.primary,
-    fontSize: 14,
-    paddingVertical: 0,
-  },
+  searchInput: { ...Typography.body, flex: 1, color: colors.text.primary, paddingVertical: 0 },
 
   tableHeader: {
     flexDirection: 'row',
@@ -427,13 +407,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.border,
   },
-  thCell: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  thCell: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' },
 
   tableRow: {
     flexDirection: 'row',
@@ -450,54 +424,22 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderLeftColor: colors.warning,
   },
 
-  productName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  skuText: {
-    fontSize: 10,
-    color: colors.text.muted,
-    fontFamily: 'monospace',
-  },
+  productName: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  skuText: { ...Typography.eyebrow, color: colors.text.muted },
   catBadge: {
     borderRadius: 4,
     paddingHorizontal: 5,
     paddingVertical: 1,
   },
-  catBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
+  catBadgeText: { ...Typography.eyebrow, fontWeight: '700', textTransform: 'uppercase' },
 
-  numInput: {
-    backgroundColor: colors.bg.secondary,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.primary,
-    textAlign: 'center',
-  },
+  numInput: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 6, fontWeight: '700', color: colors.text.primary, textAlign: 'center' },
   discountActive: {
     borderColor: colors.warning,
     backgroundColor: colors.warning + '10',
     color: colors.warning,
   },
-  labelInput: {
-    backgroundColor: colors.bg.secondary,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: 12,
-    color: colors.text.primary,
-  },
+  labelInput: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 6, color: colors.text.primary },
   inputDisabled: {
     opacity: 0.5,
   },
@@ -511,7 +453,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 60,
     gap: 12,
   },
-  emptyText: { color: colors.text.muted, fontSize: 14 },
+  emptyText: { ...Typography.body, color: colors.text.muted },
 
   readOnlyBanner: {
     flexDirection: 'row',
@@ -522,5 +464,5 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.warning + '40',
   },
-  readOnlyText: { fontSize: 12, color: colors.warning, fontWeight: '600' },
+  readOnlyText: { ...Typography.bodySm, color: colors.warning, fontWeight: '600' },
 });

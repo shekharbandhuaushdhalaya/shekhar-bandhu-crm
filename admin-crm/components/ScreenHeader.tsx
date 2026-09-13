@@ -1,7 +1,10 @@
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
+import { AppText as Text } from './AppText';
+import { WorkspaceButton } from './WorkspaceButton';
+import { View, StyleSheet, ViewStyle, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
+import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
 
 type Action = {
   key: string;
@@ -9,6 +12,7 @@ type Action = {
   icon?: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   color?: string;
+  variant?: 'primary' | 'secondary' | 'ghost';
 };
 
 type Props = {
@@ -33,19 +37,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flex: 1,
     maxWidth: 760,
   },
-  title: {
-    fontSize: 23,
-    lineHeight: 29,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-    color: colors.text.primary,
-  },
-  subtitle: {
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: colors.text.secondary,
-    marginTop: 4,
-  },
+  title: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  subtitle: { ...Typography.bodySm, color: colors.text.secondary, marginTop: 4 },
   actions: {
     flexDirection: 'row',
     gap: 8,
@@ -53,7 +46,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   actionBtn: {
-    minHeight: 38,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -65,31 +58,23 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderColor: colors.border,
     ...Shadows.card,
   },
-  actionText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: colors.primary,
-  },
+  actionText: { ...Typography.bodySm, fontWeight: '700', color: colors.primary },
 });
 
 export default function ScreenHeader({ title, subtitle, actions, style }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { width } = useWindowDimensions();
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, width < 600 && { flexDirection: 'column', alignItems: 'stretch', paddingHorizontal: Spacing.md }, style]}>
       <View style={styles.titleArea}>
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
       {actions?.length ? (
         <View style={styles.actions}>
-          {actions.map((action) => (
-            <TouchableOpacity key={action.key} style={styles.actionBtn} onPress={action.onPress} activeOpacity={0.72}>
-              {action.icon ? <Ionicons name={action.icon} size={16} color={action.color || colors.primary} /> : null}
-              <Text style={[styles.actionText, action.color ? { color: action.color } : undefined]}>{action.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {actions.map(({ key, ...action }) => <WorkspaceButton key={key} {...action} variant={action.variant || 'secondary'} />)}
         </View>
       ) : null}
     </View>

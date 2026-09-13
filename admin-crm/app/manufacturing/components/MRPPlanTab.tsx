@@ -1,15 +1,11 @@
+import { WorkspaceLoading, StatusPill } from './../../../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppText as Text } from './../../../components/AppText';
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  StyleSheet
-} from 'react-native';
+import { View, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../utils/themeContext';
-import { Spacing, Radius } from '../../../constants/theme';
+import { Spacing, Radius, Typography } from '../../../constants/theme';
 import { MrpResponse, MrpSuggestion } from '../../../utils/api/types';
 
 interface MRPPlanTabProps {
@@ -112,14 +108,14 @@ export default function MRPPlanTab({
       {/* Main Content Table */}
       {loading ? (
         <View style={[styles.card, { padding: 40, alignItems: 'center', backgroundColor: colors.bg.card, borderColor: colors.border }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ marginTop: 12, color: colors.text.secondary, fontSize: 13 }}>Calculating Material Requirements Plan...</Text>
+          <WorkspaceLoading />
+          <Text style={{ ...Typography.bodySm, marginTop: 12, color: colors.text.secondary }}>Calculating Material Requirements Plan...</Text>
         </View>
       ) : suggestions.length === 0 ? (
         <View style={[styles.card, { padding: 40, alignItems: 'center', backgroundColor: colors.bg.card, borderColor: colors.border }]}>
           <Ionicons name="checkmark-circle-outline" size={48} color={colors.success} />
-          <Text style={{ marginTop: 12, fontSize: 16, fontWeight: '700', color: colors.text.primary }}>Raw Material Stock Sufficient</Text>
-          <Text style={{ marginTop: 4, color: colors.text.muted, fontSize: 13, textAlign: 'center' }}>
+          <Text style={{ ...Typography.h3, marginTop: 12, fontWeight: '700', color: colors.text.primary }}>Raw Material Stock Sufficient</Text>
+          <Text style={{ ...Typography.bodySm, marginTop: 4, color: colors.text.muted, textAlign: 'center' }}>
             No raw material purchase recommendations found. All current stocks satisfy projected production demand and safety stock thresholds.
           </Text>
         </View>
@@ -148,45 +144,43 @@ export default function MRPPlanTab({
                     <View style={[styles.tableRow, idx % 2 === 1 && { backgroundColor: colors.bg.primary + '40' }]}>
                       {/* Raw Material Name & Details */}
                       <View style={{ flex: 2.2, paddingRight: 8 }}>
-                        <Text style={{ fontWeight: '700', fontSize: 13, color: colors.text.primary }}>{item.rawMaterialName}</Text>
-                        <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 2 }}>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{item.rawMaterialName}</Text>
+                        <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>
                           Unit: {item.unit} • Category: {item.category || 'General'}
                         </Text>
                       </View>
 
                       {/* Required for Production */}
                       <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.warning }}>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.warning }}>
                           {item.requiredForProduction.toFixed(2)} {item.unit}
                         </Text>
                       </View>
 
                       {/* Current Available Stock */}
                       <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: item.currentAvailableStock > 0 ? colors.text.primary : colors.danger || '#dc3545' }}>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '600', color: item.currentAvailableStock > 0 ? colors.text.primary : colors.danger || '#dc3545' }}>
                           {item.currentAvailableStock.toFixed(2)} {item.unit}
                         </Text>
                       </View>
 
                       {/* Min Reorder Threshold */}
                       <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 13, color: colors.text.secondary }}>
+                        <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>
                           {item.minReorderThreshold.toFixed(2)} {item.unit}
                         </Text>
                       </View>
 
                       {/* Suggested Purchase Qty */}
                       <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
-                        <View style={[styles.badge, { backgroundColor: item.suggestedPurchaseQty > 0 ? colors.success + '18' : colors.bg.primary }]}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: item.suggestedPurchaseQty > 0 ? colors.success : colors.text.muted }}>
+                        <StatusPill  label={<>
                             {item.suggestedPurchaseQty.toFixed(2)} {item.unit}
-                          </Text>
-                        </View>
+                          </>} textStyle={{ ...Typography.bodySm, fontWeight: '700', color: item.suggestedPurchaseQty > 0 ? colors.success : colors.text.muted }} />
                       </View>
 
                       {/* Preferred Vendor */}
                       <View style={{ flex: 2, paddingHorizontal: 8 }}>
-                        <Text style={{ fontSize: 12, color: colors.text.primary, fontWeight: '500' }}>
+                        <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' }}>
                           {item.preferredVendor.vendorName || 'Not Assigned'}
                         </Text>
                       </View>
@@ -198,7 +192,7 @@ export default function MRPPlanTab({
                             style={[styles.btnAction, { borderColor: colors.primary }]}
                             onPress={() => toggleExpand(item.rawMaterialId)}
                           >
-                            <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>
+                            <Text style={{ ...Typography.caption, color: colors.primary, fontWeight: '600' }}>
                               {isExpanded ? 'Hide Products' : `Products (${item.drivenByProducts.length})`}
                             </Text>
                             <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={12} color={colors.primary} />
@@ -211,7 +205,7 @@ export default function MRPPlanTab({
                             onPress={() => onCreateProductionPlans(productIds)}
                             disabled={creatingPlan}
                           >
-                            <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700' }}>Plan Production</Text>
+                            <Text style={{ ...Typography.caption, color: '#fff', fontWeight: '700' }}>Plan Production</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -220,7 +214,7 @@ export default function MRPPlanTab({
                     {/* Expandable Accordion: Driven-By Products */}
                     {isExpanded && item.drivenByProducts.length > 0 && (
                       <View style={[styles.expandPanel, { backgroundColor: colors.bg.primary + '80', borderColor: colors.border }]}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 }}>
+                        <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 }}>
                           PRODUCTS DRIVING THIS RAW MATERIAL SHORTFALL:
                         </Text>
 
@@ -228,13 +222,13 @@ export default function MRPPlanTab({
                           <View key={pIdx} style={styles.drivenRow}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                               <Ionicons name="cube-outline" size={14} color={colors.primary} />
-                              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }}>{p.productName}</Text>
+                              <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>{p.productName}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', gap: 16 }}>
-                              <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                              <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                                 Shortfall: <Text style={{ fontWeight: '700', color: colors.warning }}>{p.shortfallUnits} units</Text>
                               </Text>
-                              <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+                              <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
                                 Material Needed: <Text style={{ fontWeight: '700', color: colors.primary }}>{p.requiredQtyForProduct} {item.unit}</Text>
                               </Text>
                             </View>
@@ -266,14 +260,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
+  title: { ...Typography.h2, fontWeight: '700' },
+  subtitle: { ...Typography.bodySm, marginTop: 2 },
   btnOutline: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -283,10 +271,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     borderWidth: 1,
   },
-  btnOutlineText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  btnOutlineText: { ...Typography.bodySm, fontWeight: '600' },
   btnPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -295,39 +280,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: Radius.sm,
   },
-  btnPrimaryText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#fff',
-  },
+  btnPrimaryText: { ...Typography.bodySm, fontWeight: '700', color: '#fff' },
   metricCard: {
     padding: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
   },
-  metricLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  metricValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    marginVertical: 4,
-  },
-  metricSub: {
-    fontSize: 11,
-  },
+  metricLabel: { ...Typography.bodySm, fontWeight: '600' },
+  metricValue: { ...Typography.h1, fontWeight: '800', marginVertical: 4 },
+  metricSub: { ...Typography.caption },
   tableHeader: {
     flexDirection: 'row',
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
   },
-  th: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6b7280',
-  },
+  th: { ...Typography.caption, fontWeight: '700', color: '#6b7280' },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',

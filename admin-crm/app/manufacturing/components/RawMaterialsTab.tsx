@@ -1,5 +1,9 @@
+import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../../../components/AppTextInput';
+import { AppText as Text } from './../../../components/AppText';
+import { Typography } from './../../../constants/theme';
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, Platform } from 'react-native';
+import { View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -42,16 +46,16 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
         <View style={[styles.card, { borderColor: colors.danger, backgroundColor: colors.danger + '08', marginBottom: 16 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
             <Ionicons name="warning" size={18} color={colors.danger} />
-            <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '800' }}>
+            <Text style={{ ...Typography.bodySm, color: colors.danger, fontWeight: '800' }}>
               Near Expiry Warning ({expiryAlerts.length} Batches)
             </Text>
           </View>
           {expiryAlerts.map(alert => (
             <View key={alert._id} style={{ paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.text.primary }}>
-                🌿 {alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId.name : 'Unknown Material'}
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
+                 {alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId.name : 'Unknown Material'}
               </Text>
-              <Text style={{ fontSize: 11, color: colors.text.secondary, marginTop: 2 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 2 }}>
                 Batch: <Text style={{ fontWeight: '700' }}>{alert.batchNo}</Text> • Stock: {(() => {
                   const r = alert.rawMaterialId && typeof alert.rawMaterialId === 'object' ? alert.rawMaterialId : null;
                   return r && isIntegerQty(r.unit, r.category) ? alert.qty.toFixed(0) : alert.qty.toFixed(2);
@@ -75,15 +79,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                 <select
                   value={mfgUnitFilter}
                   onChange={(e: any) => setMfgUnitFilter(e.target.value)}
-                  style={{
-                    borderWidth: 0,
-                    backgroundColor: 'transparent',
-                    color: colors.text.primary,
-                    fontSize: 11,
-                    fontWeight: '600',
-                    outlineWidth: 0,
-                    cursor: 'pointer'
-                  }}
+                  style={{ ...Typography.caption, borderWidth: 0, backgroundColor: 'transparent', color: colors.text.primary, fontWeight: '600', outlineWidth: 0, cursor: 'pointer' }}
                 >
                   <option value="all">All Units</option>
                   {manufacturingUnits.map(unit => (
@@ -99,7 +95,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                     setMfgUnitFilter(options[nextIdx]);
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.primary }}>
                     {mfgUnitFilter === 'all' ? 'All Units' : (manufacturingUnits.find(u => u._id === mfgUnitFilter)?.name || 'Unit')}
                   </Text>
                 </TouchableOpacity>
@@ -110,7 +106,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, width: isDesktop ? 220 : undefined }}>
               <Ionicons name="search-outline" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
               <TextInput
-                style={{ flex: 1, fontSize: 12, color: colors.text.primary, padding: 0 }}
+                style={{ ...Typography.bodySm, flex: 1, color: colors.text.primary, padding: 0 }}
                 placeholder="Search stocks..."
                 placeholderTextColor={colors.text.muted}
                 value={materialSearch}
@@ -130,15 +126,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                 <select
                   value={stockFilter}
                   onChange={(e: any) => setStockFilter(e.target.value)}
-                  style={{
-                    borderWidth: 0,
-                    backgroundColor: 'transparent',
-                    color: colors.text.primary,
-                    fontSize: 11,
-                    fontWeight: '600',
-                    outlineWidth: 0,
-                    cursor: 'pointer'
-                  }}
+                  style={{ ...Typography.caption, borderWidth: 0, backgroundColor: 'transparent', color: colors.text.primary, fontWeight: '600', outlineWidth: 0, cursor: 'pointer' }}
                 >
                   <option value="all">All Stocks</option>
                   <option value="low">Low Stock</option>
@@ -151,7 +139,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                     setStockFilter(nextFilter);
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.primary }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.primary }}>
                     {stockFilter === 'all' ? 'All Stocks' : (stockFilter === 'low' ? 'Low Stock' : 'In Stock')}
                   </Text>
                 </TouchableOpacity>
@@ -163,10 +151,10 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
         <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
-            <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
-            <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
-            <Text style={{ flex: 1.2, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
-            <Text style={{ width: 210, fontSize: 10, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
+            <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
+            <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
+            <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
+            <Text style={{ ...Typography.eyebrow, width: 210, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
           </View>
           {/* Body */}
           {filteredMaterials.map((rm, idx) => {
@@ -178,41 +166,41 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                 <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8 }}>
                   <View style={{ flex: 2, paddingLeft: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{rm.name}</Text>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{rm.name}</Text>
                       <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
-                        <Text style={{ fontSize: 9, fontWeight: '700', color: colors.text.secondary }}>
-                          {(rm as any).materialType === 'packaging' || rm.category === 'Packaging' || rm.category === 'Packaging Material' ? '📦 Pkg' : (rm.category === 'Excipient' ? '💧 Base' : (rm.category === 'General' ? '⚙️ Gen' : '🌿 ' + (rm.category || 'Herb')))}
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary }}>
+                          {(rm as any).materialType === 'packaging' || rm.category === 'Packaging' || rm.category === 'Packaging Material' ? ' Pkg' : (rm.category === 'Excipient' ? ' Base' : (rm.category === 'General' ? ' Gen' : ' ' + (rm.category || 'Herb')))}
                         </Text>
                       </View>
                       {rm.pharmacopoeialStandard ? (
                         <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, borderWidth: 0.5, borderColor: colors.primary + '40' }}>
-                          <Text style={{ fontSize: 8.5, fontWeight: '800', color: colors.primary }}>{rm.pharmacopoeialStandard}</Text>
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>{rm.pharmacopoeialStandard}</Text>
                         </View>
                       ) : null}
                       {rm.isScheduleE1 ? (
                         <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, borderWidth: 0.5, borderColor: colors.danger }}>
-                          <Text style={{ fontSize: 8.5, fontWeight: '800', color: colors.danger }}>⚠️ Schedule E1 Poison</Text>
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.danger }}> Schedule E1 Poison</Text>
                         </View>
                       ) : null}
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
                       {rm.botanicalName ? (
-                        <Text style={{ fontSize: 10.5, fontStyle: 'italic', color: colors.text.secondary }}>
+                        <Text style={{ ...Typography.eyebrow, fontStyle: 'italic', color: colors.text.secondary }}>
                           {rm.botanicalName}
                         </Text>
                       ) : null}
                       {rm.partUsed ? (
-                        <Text style={{ fontSize: 9.5, fontWeight: '600', color: colors.primary }}>
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '600', color: colors.primary }}>
                           Part: {rm.partUsed}
                         </Text>
                       ) : null}
-                      {rm.sku ? <Text style={{ fontSize: 9.5, color: colors.text.muted }}>SKU: {rm.sku}</Text> : null}
+                      {rm.sku ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>SKU: {rm.sku}</Text> : null}
                     </View>
                   </View>
-                  <Text style={{ flex: 1.2, fontSize: 13, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
+                  <Text style={{ ...Typography.bodySm, flex: 1.2, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
                     {rm.stockLevel !== undefined ? (isIntegerQty(rm.unit, rm.category) ? rm.stockLevel.toFixed(0) : rm.stockLevel.toFixed(1)) : (isIntegerQty(rm.unit, rm.category) ? '0' : '0.0')} {rm.unit}
                   </Text>
-                  <Text style={{ flex: 1.2, fontSize: 11, color: colors.text.secondary, textAlign: 'right' }}>
+                  <Text style={{ ...Typography.caption, flex: 1.2, color: colors.text.secondary, textAlign: 'right' }}>
                     {rm.minReorder} {rm.unit}
                   </Text>
                   <View style={{ width: 210, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
@@ -221,21 +209,21 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: colors.primary + '10', borderWidth: 0.5, borderColor: colors.primary + '30' }}
                     >
                       <Ionicons name="pencil-outline" size={13} color={colors.primary} />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Edit</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>Edit</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => onTraceMaterial(rm)}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: colors.success + '10', borderWidth: 0.5, borderColor: colors.success + '30' }}
                     >
                       <Ionicons name="list-outline" size={13} color={colors.success} />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.success }}>Ledger</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.success }}>Ledger</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => onDeleteMaterial(rm)}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: hasStock ? colors.border + '30' : colors.danger + '10', borderWidth: 0.5, borderColor: hasStock ? colors.border : colors.danger + '30' }}
                     >
                       <Ionicons name="trash-outline" size={13} color={hasStock ? colors.text.muted : colors.danger} />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: hasStock ? colors.text.muted : colors.danger }}>Delete</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: hasStock ? colors.text.muted : colors.danger }}>Delete</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -253,7 +241,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
             disabled={loadingMore}
             onPress={onLoadMore}
           >
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
               {loadingMore ? 'Loading More Materials...' : `Load More Materials (Page ${(materialsPage || 1) + 1} of ${materialsTotalPages || 1})`}
             </Text>
           </TouchableOpacity>

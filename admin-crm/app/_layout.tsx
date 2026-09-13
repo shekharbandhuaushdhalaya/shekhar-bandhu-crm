@@ -1,8 +1,13 @@
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusPill } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { LightColors, Spacing, Radius, Shadows } from '../constants/theme';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, useWindowDimensions, Modal, Pressable, ScrollView, Image, DeviceEventEmitter, Platform } from 'react-native';
+import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
+import { View, StyleSheet, ActivityIndicator, useWindowDimensions, Modal, Pressable, ScrollView, Image, DeviceEventEmitter, Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { api, API_BASE } from '../utils/api';
@@ -16,6 +21,8 @@ import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar';
 import AyurvedicLoader from '../components/AyurvedicLoader';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { getSocket } from '../utils/socket';
+
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnline: boolean; logout: () => void; toggleSidebar?: () => void }) {
   const { themeMode, toggleTheme, colors } = useTheme();
@@ -108,12 +115,17 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
               style={{ width: 36, height: 36, borderRadius: 4 }}
               resizeMode="contain"
             />
+            {!isDesktop && pageName ? (
+              <Text style={{ ...Typography.h3, color: colors.text.primary, maxWidth: 150 }} numberOfLines={1}>
+                {pageName}
+              </Text>
+            ) : null}
             {isDesktop && (
               <View style={{ flexDirection: 'column', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text.primary, letterSpacing: 0.5, lineHeight: 15 }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>
                   SHEKHAR BANDHU
                 </Text>
-                <Text style={{ fontSize: 9.5, fontWeight: '700', color: colors.primary, letterSpacing: 0.8, marginTop: 1 }}>
+                <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary, marginTop: 1 }}>
                   AUSHADHALAYA
                 </Text>
               </View>
@@ -123,7 +135,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
 
         {isDesktop && pageName ? (
           <View style={{ paddingHorizontal: 20 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text.primary }}>
+            <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary }}>
               {pageName}
             </Text>
           </View>
@@ -142,11 +154,9 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
           {isDesktop && (
             <View style={styles.headerUserInfo}>
               <Text style={styles.headerUserName} numberOfLines={1}>{user.name}</Text>
-              <View style={[styles.roleBadge, { borderColor: roleColors[user.role] || colors.text.muted }]}>
-                <Text style={[styles.roleText, { color: roleColors[user.role] || colors.text.muted }]}>
+              <StatusPill  label={<>
                   {user.role.toUpperCase()}
-                </Text>
-              </View>
+                </>} textStyle={[styles.roleText, { color: roleColors[user.role] || colors.text.muted }]} />
             </View>
           )}
         </TouchableOpacity>
@@ -177,6 +187,7 @@ function MainLayout() {
     const sub = DeviceEventEmitter.addListener('global_loader', (data) => {
       setGlobalLoading(data.isLoading);
     });
+    const subOpenDrawer = DeviceEventEmitter.addListener('open_sidebar', () => setIsSidebarOpen(true));
 
     // Initialize Socket.io real-time connection
     const socket = getSocket();
@@ -256,6 +267,7 @@ function MainLayout() {
     return () => {
       unsubscribeNetInfo();
       sub.remove();
+      subOpenDrawer.remove();
       socketEvents.forEach(eventName => {
         socket.off(eventName);
       });
@@ -326,10 +338,10 @@ function MainLayout() {
           <Tabs
             screenOptions={{
               headerShown: false,
-              tabBarStyle: { display: 'none' },
+              tabBarStyle: isDesktop ? { display: 'none' } : styles.mobileTabBar,
               tabBarActiveTintColor: colors.primary,
               tabBarInactiveTintColor: colors.text.muted,
-              tabBarLabelStyle: { fontWeight: '600', fontSize: 11 },
+              tabBarLabelStyle: { ...Typography.caption, fontWeight: '600' },
               lazy: true,
             }}
           >
@@ -337,48 +349,57 @@ function MainLayout() {
               name="index"
               options={{
                 title: 'Dashboard',
-                tabBarIcon: ({ color, size }) => <Ionicons name="grid" size={size} color={color} />,
+                tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'grid' : 'grid-outline'} size={size} color={color} />,
               }}
             />
             <Tabs.Screen
               name="leads"
               options={{
                 title: 'Leads',
-                tabBarIcon: ({ color, size }) => <Ionicons name="git-branch" size={size} color={color} />,
+                href: null,
+                tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'git-branch' : 'git-branch-outline'} size={size} color={color} />,
               }}
             />
             <Tabs.Screen
               name="reports"
               options={{
                 title: 'Reports',
-                tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" size={size} color={color} />,
-                href: (user && user.role === 'agent') ? null : undefined,
+                tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={size} color={color} />,
+                href: null,
               }}
             />
             <Tabs.Screen name="parties/customers" options={{ href: null }} />
             <Tabs.Screen name="parties/vendors" options={{ href: null }} />
             <Tabs.Screen name="products" options={{ href: null }} />
+            <Tabs.Screen name="compliance" options={{ href: null }} />
             <Tabs.Screen name="payments" options={{ href: null }} />
             <Tabs.Screen name="ageing" options={{ href: null }} />
+            <Tabs.Screen name="credit-notes" options={{ href: null }} />
+            <Tabs.Screen name="gst-returns" options={{ href: null }} />
             <Tabs.Screen name="inventories" options={{ href: null }} />
+            <Tabs.Screen name="inventorydispatch" options={{ href: null }} />
             <Tabs.Screen name="invoices/sale" options={{ href: null }} />
             <Tabs.Screen name="invoices/purchase" options={{ href: null }} />
             <Tabs.Screen name="contacts" options={{ href: null }} />
             <Tabs.Screen name="pipeline" options={{ href: null }} />
+            <Tabs.Screen name="quotations" options={{ href: null }} />
             <Tabs.Screen name="login" options={{ href: null }} />
             <Tabs.Screen name="rbac" options={{ href: null }} />
             <Tabs.Screen name="audit" options={{ href: null }} />
             <Tabs.Screen name="queries" options={{ href: null }} />
-            <Tabs.Screen name="orders" options={{ href: null }} />
-            <Tabs.Screen name="sales-workspace" options={{ href: null }} />
+            <Tabs.Screen name="orders" options={{ title: 'Orders', tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'cart' : 'cart-outline'} size={size} color={color} /> }} />
+            <Tabs.Screen name="sales-workspace" options={{ title: 'Sales', tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'options' : 'options-outline'} size={size} color={color} /> }} />
             <Tabs.Screen name="sales-intelligence" options={{ href: null }} />
+            <Tabs.Screen name="salescrm" options={{ href: null }} />
             <Tabs.Screen name="pricing" options={{ href: null }} />
             <Tabs.Screen name="manufacturing" options={{ href: null }} />
+            <Tabs.Screen name="stockmovements" options={{ href: null }} />
             <Tabs.Screen name="medicalreps" options={{ href: null }} />
-            <Tabs.Screen name="mr-my-day" options={{ href: null }} />
+            <Tabs.Screen name="mr-my-day" options={{ title: 'My Day', tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'today' : 'today-outline'} size={size} color={color} /> }} />
             <Tabs.Screen name="doctors" options={{ href: null }} />
             <Tabs.Screen name="profile" options={{ href: null }} />
             <Tabs.Screen name="campaigns" options={{ href: null }} />
+            <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'ellipsis-horizontal' : 'ellipsis-horizontal-outline'} size={size} color={color} /> }} />
           </Tabs>
           </ErrorBoundary>
         </View>
@@ -388,6 +409,20 @@ function MainLayout() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Manrope_500: require('../assets/fonts/Manrope_500.ttf'),
+    Manrope_600: require('../assets/fonts/Manrope_600.ttf'),
+    Manrope_700: require('../assets/fonts/Manrope_700.ttf'),
+    Manrope_800: require('../assets/fonts/Manrope_800.ttf'),
+    Inter_500: require('../assets/fonts/Inter_500.ttf'),
+    Inter_600: require('../assets/fonts/Inter_600.ttf'),
+    Inter_700: require('../assets/fonts/Inter_700.ttf'),
+    Inter_800: require('../assets/fonts/Inter_800.ttf'),
+  });
+  useEffect(() => {
+    if (fontsLoaded || fontError) void SplashScreen.hideAsync();
+  }, [fontsLoaded, fontError]);
+  if (!fontsLoaded && !fontError) return null;
   return (
     <SafeAreaProvider>
       <ThemeProvider>
@@ -444,12 +479,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     width: 60,
     height: 28,
   },
-  headerBrandText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text.primary,
-    letterSpacing: 1.2,
-  },
+  headerBrandText: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   headerControls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -474,20 +504,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  headerAvatarText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
+  headerAvatarText: { ...Typography.body, fontWeight: '800', color: colors.text.primary },
   headerUserInfo: {
     justifyContent: 'center',
   },
-  headerUserName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
+  headerUserName: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 2 },
   roleBadge: {
     borderWidth: 1,
     borderRadius: 4,
@@ -496,10 +517,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 1,
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
-  roleText: {
-    fontSize: 8,
-    fontWeight: '800',
-  },
+  roleText: { ...Typography.eyebrow, fontWeight: '800' },
   headerBtn: {
     width: 34,
     height: 34,
@@ -523,11 +541,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    marginLeft: 6,
-  },
+  badgeText: { ...Typography.eyebrow, fontWeight: '700', marginLeft: 6 },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -539,14 +553,23 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.danger + '25',
   },
-  logoutBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.danger,
-  },
+  logoutBtnText: { ...Typography.caption, fontWeight: '700', color: colors.danger },
   hamburgerBtn: {
+    minWidth: 44,
+    minHeight: 44,
     padding: 4,
     marginRight: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mobileTabBar: {
+    backgroundColor: colors.bg.secondary,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    height: 68,
+    paddingTop: 6,
+    paddingBottom: 6,
+    ...Shadows.header,
   },
 
   // Submenu Styles
@@ -569,12 +592,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   submenuItemActive: {
     backgroundColor: colors.primaryLight,
   },
-  submenuText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: colors.text.secondary,
-    marginLeft: 10,
-  },
+  submenuText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginLeft: 10 },
   submenuTextActive: {
     color: colors.primary,
     fontWeight: '700',
@@ -611,12 +629,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  drawerTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
+  drawerTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   drawerCloseBtn: {
+    minWidth: 44,
+    minHeight: 44,
     padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -1,7 +1,12 @@
+import { DataTable } from '../components/DataTable';
+import { StatusPill } from './../components/WorkspacePrimitives';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, STAGES, Stage, getStageColors, LightColors } from '../constants/theme';
+import { Spacing, Radius, STAGES, Stage, getStageColors, LightColors, Typography } from '../constants/theme';
 import { api, Contact } from '../utils/api';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
@@ -72,9 +77,7 @@ export function ContactDetailModal({ contact, visible, onClose, onDeleted }: { c
             </View>
             <Text style={styles.profileName}>{currentContact.name}</Text>
             <Text style={styles.profileCompany}>{currentContact.company}</Text>
-            <View style={[styles.statusBadge, { borderColor: stageColor, backgroundColor: stageColor + '18', marginTop: 8 }]}>
-              <Text style={[styles.statusText, { color: stageColor }]}>{currentContact.stage.toUpperCase()}</Text>
-            </View>
+            <StatusPill  label={<>{currentContact.stage.toUpperCase()}</>} textStyle={[styles.statusText, { color: stageColor }]} />
           </View>
 
           {/* Info Grid */}
@@ -428,10 +431,7 @@ export default function ContactsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           contentContainerStyle={{ flexGrow: 1 }}
         >
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md }}>
-            <View style={styles.table}>
-              {/* Table Header Row */}
-              <View style={styles.tableHeaderRow}>
+          <DataTable data={contacts || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={900} embedded renderTableHeader={() => (<View style={styles.tableHeaderRow}>
                 <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Name</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>Company</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Stage</Text></View>
@@ -439,10 +439,7 @@ export default function ContactsScreen() {
                 <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Lead Source</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { width: 180 }]}><Text style={styles.tableHeaderCell}>Phone / Email</Text></View>
                 <View style={[styles.tableHeaderCellContainer, { width: 80, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
-              </View>
-
-              {/* Table Body Rows */}
-              {contacts.map((item) => {
+              </View>)} renderTableRow={(item) => {
                 const stageColor = stageColors[item.stage as Stage] || colors.text.muted;
                 return (
                   <View key={item._id} style={styles.tableBodyRow}>
@@ -454,9 +451,7 @@ export default function ContactsScreen() {
                       <Text style={styles.tableCell} numberOfLines={1}>{item.company || 'N/A'}</Text>
                     </View>
                     <View style={[styles.tableCellContainer, { width: 120 }]}>
-                      <View style={[styles.statusBadge, { borderColor: stageColor, backgroundColor: stageColor + '12' }]}>
-                        <Text style={[styles.statusText, { color: stageColor }]}>{item.stage.toUpperCase()}</Text>
-                      </View>
+                      <StatusPill  label={<>{item.stage.toUpperCase()}</>} textStyle={[styles.statusText, { color: stageColor }]} />
                     </View>
                     <View style={[styles.tableCellContainer, { width: 120 }]}>
                       <Text style={[styles.tableCell, { fontWeight: '700' }]}>₹{item.dealValue.toLocaleString('en-IN')}</Text>
@@ -465,7 +460,7 @@ export default function ContactsScreen() {
                       <Text style={styles.tableCell} numberOfLines={1}>{item.leadSource}</Text>
                     </View>
                     <View style={[styles.tableCellContainer, { width: 180 }]}>
-                      <Text style={{ fontSize: 12, color: colors.text.primary }} numberOfLines={1}>{item.phone || 'N/A'}</Text>
+                      <Text style={{ ...Typography.bodySm, color: colors.text.primary }} numberOfLines={1}>{item.phone || 'N/A'}</Text>
                       {item.email ? <Text style={styles.secondaryText} numberOfLines={1}>{item.email}</Text> : null}
                     </View>
                     <View style={[styles.tableCellContainer, { width: 80, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
@@ -475,16 +470,7 @@ export default function ContactsScreen() {
                     </View>
                   </View>
                 );
-              })}
-
-              {contacts.length === 0 && (
-                <View style={styles.emptyTableContainer}>
-                  <Ionicons name="folder-open-outline" size={28} color={colors.text.muted} />
-                  <Text style={styles.emptyText}>No contacts found</Text>
-                </View>
-              )}
-            </View>
-          </ScrollView>
+              }}  />
 
           {hasMore && (
             <TouchableOpacity
@@ -492,7 +478,7 @@ export default function ContactsScreen() {
               disabled={loadingMore}
               onPress={handleLoadMore}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
                 {loadingMore ? 'Loading More...' : `Load More Contacts (Page ${page + 1} of ${totalPages})`}
               </Text>
             </TouchableOpacity>
@@ -510,74 +496,74 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, marginBottom: 0, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
-  searchInput: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+  searchInput: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: colors.text.muted, textAlign: 'center', marginTop: 40, fontSize: 13 },
+  emptyText: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', marginTop: 40 },
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
-  filterDropdownButtonText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
   filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 220, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
-  filterDropdownItemText: { fontSize: 13, color: colors.text.primary },
+  filterDropdownItemText: { ...Typography.bodySm, color: colors.text.primary },
 
   table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { fontSize: 11, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
-  tableCell: { fontSize: 13, color: colors.text.primary },
+  tableCell: { ...Typography.bodySm, color: colors.text.primary },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
-  primaryText: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  secondaryText: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
-  outstandingText: { fontSize: 13, fontWeight: '800' },
+  primaryText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  secondaryText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
+  outstandingText: { ...Typography.bodySm, fontWeight: '800' },
   actionIconButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' },
   emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
 
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, alignSelf: 'flex-start' },
-  statusText: { fontSize: 10, fontWeight: '800' },
+  statusText: { ...Typography.eyebrow, fontWeight: '800' },
 
   // Modal Styles
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20 },
   profileAvatar: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)', marginBottom: 10 },
-  profileAvatarText: { fontSize: 28, fontWeight: '800', color: colors.text.primary },
-  profileName: { fontSize: 22, fontWeight: '800', color: colors.text.primary },
-  profileCompany: { fontSize: 14, color: colors.text.secondary },
+  profileAvatarText: { ...Typography.display, fontWeight: '800', color: colors.text.primary },
+  profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  profileCompany: { ...Typography.body, color: colors.text.secondary },
   infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 16 },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  infoLabel: { fontSize: 11, color: colors.text.muted, fontWeight: '600' },
-  infoValue: { fontSize: 14, color: colors.text.primary, fontWeight: '500' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary, marginBottom: 12 },
+  infoLabel: { ...Typography.caption, color: colors.text.muted, fontWeight: '600' },
+  infoValue: { ...Typography.body, color: colors.text.primary, fontWeight: '500' },
+  sectionTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: 12 },
   timelineItem: { flexDirection: 'row', gap: 12, marginBottom: 16, paddingLeft: 4 },
   timelineDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  timelineType: { fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: 2 },
-  timelineNote: { fontSize: 13, color: colors.text.secondary },
-  timelineTime: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  timelineType: { ...Typography.bodySm, fontWeight: '700', color: colors.primary, marginBottom: 2 },
+  timelineNote: { ...Typography.bodySm, color: colors.text.secondary },
+  timelineTime: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
 
   // Log interaction
   logOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end', height: '100%' },
   logSheet: { backgroundColor: colors.bg.secondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: Spacing.lg, paddingBottom: 32 },
-  logTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary, marginBottom: 14 },
+  logTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary, marginBottom: 14 },
   logTypes: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   logTypeBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.border },
-  logTypeBtnText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
-  logInput: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, padding: 14, color: colors.text.primary, fontSize: 14, minHeight: 80, textAlignVertical: 'top' },
+  logTypeBtnText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
+  logInput: { ...Typography.body, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, padding: 14, color: colors.text.primary, minHeight: 80, textAlignVertical: 'top' },
   logActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 14 },
   logCancel: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
   logSave: { paddingHorizontal: 22, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.primary },
 
   // Add Contact Form
   formGroup: { marginBottom: 16 },
-  formLabel: { fontSize: 12, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
+  formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
-  formInputText: { flex: 1, height: 46, color: colors.text.primary, fontSize: 14 },
+  formInputText: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
   stageSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   stageSelectorBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
-  stageSelectorText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
+  stageSelectorText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   deleteContactBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -589,9 +575,5 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     marginTop: 24,
     marginBottom: 16,
   },
-  deleteContactBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  deleteContactBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
 });

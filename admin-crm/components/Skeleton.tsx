@@ -1,46 +1,23 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, ViewStyle, StyleProp, StyleSheet, DimensionValue } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, ViewStyle, StyleProp, DimensionValue } from 'react-native';
+import Animated, { cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming, Easing } from 'react-native-reanimated';
 import { useTheme } from '../utils/themeContext';
+import { Radius } from '../constants/theme';
 
-interface SkeletonProps {
-  width?: DimensionValue;
-  height?: DimensionValue;
-  borderRadius?: number;
-  style?: StyleProp<ViewStyle>;
-}
+interface SkeletonProps { width?: DimensionValue; height?: DimensionValue; borderRadius?: number; style?: StyleProp<ViewStyle> }
 
-export function Skeleton({ width = '100%', height = 20, borderRadius = 4, style }: SkeletonProps) {
+export function Skeleton({ width = '100%', height = 20, borderRadius = Radius.sm, style }: SkeletonProps) {
   const { colors } = useTheme();
-  const animatedValue = useRef(new Animated.Value(0)).current;
-
+  const [measuredWidth, setMeasuredWidth] = useState(240);
+  const progress = useSharedValue(-1);
+  const reducedMotion = useReducedMotion();
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: false,
-        }),
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: false,
-        })
-      ])
-    ).start();
-  }, []);
-
-  const backgroundColor = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.border, colors.bg.secondary]
-  });
-
-  return (
-    <Animated.View 
-      style={[
-        { width, height, borderRadius, backgroundColor },
-        style
-      ]} 
-    />
-  );
+    if (!reducedMotion) progress.value = withRepeat(withTiming(1.8, { duration: 1400, easing: Easing.linear }), -1, false);
+    return () => cancelAnimation(progress);
+  }, [reducedMotion, progress]);
+  const shimmer = useAnimatedStyle(() => ({ transform: [{ translateX: progress.value * measuredWidth }] }));
+  return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" onLayout={event => setMeasuredWidth(event.nativeEvent.layout.width)}
+    style={[{ width, height, borderRadius, backgroundColor: colors.border, overflow: 'hidden' }, style]}>
+    {!reducedMotion ? <Animated.View style={[{ position: 'absolute', top: 0, bottom: 0, width: '45%', opacity: 0.6, backgroundColor: colors.bg.card, borderRadius }, shimmer]} /> : null}
+  </View>;
 }
