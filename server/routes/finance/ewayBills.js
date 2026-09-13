@@ -1,5 +1,6 @@
 const express = require('express');
 const Invoice = require('../../models/Invoice');
+const SystemSettings = require('../../models/SystemSettings');
 const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
@@ -13,30 +14,49 @@ router.post('/generate', authorize('invoice:create'), async (req, res) => {
     const invoice = await Invoice.findById(invoiceId).lean();
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
 
+    const settings = await SystemSettings.findOne({ key: 'company_config' }).lean() || {};
+    const firm = {
+      name: settings.firmName,
+      address: settings.firmAddress,
+      gstin: settings.firmGstin,
+      ...(invoice.firmDetails || {}),
+    };
+    const resolvedVehicleNo = vehicleNo || invoice.vehicleNo || '';
+    const resolvedTransporterName = transporterName || '';
+    if (!String(firm.gstin || '').trim() || !String(firm.address || '').trim()) {
+      return res.status(409).json({ error: 'Firm GSTIN and address are required before preparing an E-Way Bill payload', code: 'EWAY_FIRM_DETAILS_REQUIRED' });
+    }
+    if (!String(invoice.partyAddress || '').trim()) {
+      return res.status(409).json({ error: 'Customer address is required before preparing an E-Way Bill payload', code: 'EWAY_CUSTOMER_ADDRESS_REQUIRED' });
+    }
+    if (!resolvedVehicleNo || !resolvedTransporterName) {
+      return res.status(409).json({ error: 'Vehicle number and transporter name are required before preparing an E-Way Bill payload', code: 'EWAY_TRANSPORT_DETAILS_REQUIRED' });
+    }
+
     const ewayBillPayload = {
       supplyType: 'Outward',
       subSupplyType: 'Supply',
       docType: 'INV',
       docNo: invoice.invoiceNo,
       docDate: new Date(invoice.date).toLocaleDateString('en-IN'),
-      fromGstin: invoice.firmDetails ? invoice.firmDetails.gstin : '09AAAAA0000A1Z5',
-      fromTrdName: invoice.firmDetails ? invoice.firmDetails.name : 'Shekhar Bandhu Aushadhalaya',
-      fromAddr1: 'Varanasi Factory Unit',
-      fromPlace: 'Varanasi',
-      fromPincode: 221001,
+      fromGstin: firm.gstin,
+      fromTrdName: firm.name || settings.firmName,
+      fromAddr1: firm.address,
+      fromPlace: settings.firmAddress || '',
+      fromPincode: settings.firmPincode || '',
       toGstin: invoice.gstin || 'URP',
       toTrdName: invoice.customerName || 'Customer',
-      toAddr1: invoice.partyAddress || 'Destination Address',
-      toPlace: invoice.stateOfSupply || 'Uttar Pradesh',
+      toAddr1: invoice.partyAddress,
+      toPlace: invoice.stateOfSupply || '',
       totalValue: invoice.baseAmount || invoice.amount,
       cgstValue: invoice.cgst || 0,
       sgstValue: invoice.sgst || 0,
       igstValue: invoice.igst || 0,
       totInvValue: invoice.amount,
       transporterId: transporterId || '',
-      transporterName: transporterName || 'Express Logistics',
+      transporterName: resolvedTransporterName,
       transMode: 'Road',
-      vehicleNo: vehicleNo || invoice.vehicleNo || 'UP65AB1234'
+      vehicleNo: resolvedVehicleNo
     };
 
     res.status(501).json({

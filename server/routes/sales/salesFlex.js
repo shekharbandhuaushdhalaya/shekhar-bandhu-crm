@@ -15,6 +15,7 @@ const { money, getSalesPolicy } = require('../../services/salesPricingService');
 const { createSalesOrder, createDraftFulfillment } = require('../../services/salesOrderService');
 const { createSplitPayments } = require('../../services/paymentPostingService');
 const { createSalesReturn, postSalesReturn, reverseSalesReturn } = require('../../services/salesReturnService');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 const nonExpiredFilter = () => ({ $or: [{ expiryDate: null }, { expiryDate: { $exists: false } }, { expiryDate: { $gt: new Date() } }] });
@@ -39,14 +40,14 @@ router.get('/dashboard', authorize('report:view'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/orders', authorize('order:create'), async (req, res) => {
+router.post('/orders', idempotency, authorize('order:create'), async (req, res) => {
   try {
     const result = await createSalesOrder({ ...req.body, orderChannel: req.body.orderChannel || 'crm' });
     res.status(201).json(result);
   } catch (error) { res.status(error.status || 400).json({ error: error.message, code: error.code || 'ORDER_CREATE_FAILED' }); }
 });
 
-router.post('/orders/:id/fulfill', authorize('order:fulfill'), async (req, res) => {
+router.post('/orders/:id/fulfill', idempotency, authorize('order:fulfill'), async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found', code: 'ORDER_NOT_FOUND' });
@@ -155,7 +156,7 @@ router.get('/availability/:productId', authorize('inventory:view'), async (req, 
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/quick-sale', authorize('order:create'), async (req, res) => {
+router.post('/quick-sale', idempotency, authorize('order:create'), async (req, res) => {
   try {
     const { order, credit, policy } = await createSalesOrder({ ...req.body, orderChannel: 'crm' });
     if (order.approvalRequired) {

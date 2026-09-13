@@ -82,6 +82,7 @@ async function createPaymentInSession({ paymentData, allocations = [], session }
 
   const [payment] = await Payment.create([{
     ...paymentData,
+    status: 'active',
     amount,
     partyName: paymentData.partyName || party.company || party.name,
     unallocatedAmount: money(amount - allocated),
@@ -111,6 +112,7 @@ async function allocateExistingPayment({ paymentId, allocations = [] }) {
   return withTransaction(async session => {
     const payment = await Payment.findById(paymentId).session(session);
     if (!payment) throw paymentError('PAYMENT_NOT_FOUND', 'Payment receipt record not found');
+    if (payment.status === 'reversed') throw paymentError('PAYMENT_REVERSED', 'A reversed payment cannot be allocated');
     let remaining = money(payment.unallocatedAmount != null ? payment.unallocatedAmount : payment.amount);
     for (const row of allocations) {
       const amount = money(row.amountApplied ?? row.amountAllocated ?? row.amount);
@@ -136,10 +138,11 @@ async function allocateExistingPayment({ paymentId, allocations = [] }) {
   });
 }
 
-async function reversePayment(paymentId) {
+async function reversePayment(paymentId, actorId = null) {
   return withTransaction(async session => {
     const payment = await Payment.findById(paymentId).session(session);
     if (!payment) throw paymentError('PAYMENT_NOT_FOUND', 'Payment not found');
+    if (payment.status === 'reversed') throw paymentError('PAYMENT_ALREADY_REVERSED', 'Payment has already been reversed');
     for (const alloc of payment.allocations || []) {
       const invoice = await Invoice.findById(alloc.invoiceId).session(session);
       if (!invoice) continue;
@@ -152,7 +155,12 @@ async function reversePayment(paymentId) {
     const party = await loadParty({ partyType: payment.partyType, partyId: payment.partyId, session });
     adjustPartyBalance(party, { partyType: payment.partyType, type: payment.type, mode: payment.mode, amount: Number(payment.amount), reverse: true });
     await party.save({ session });
-    await Payment.deleteOne({ _id: payment._id }).session(session);
+    // Preserve the original receipt as an immutable audit record. Reversal is
+    // represented as a state transition rather than destructive deletion.
+    payment.status = 'reversed';
+    payment.reversedAt = new Date();
+    payment.reversedBy = actorId || null;
+    await payment.save({ session });
     return payment;
   });
 }

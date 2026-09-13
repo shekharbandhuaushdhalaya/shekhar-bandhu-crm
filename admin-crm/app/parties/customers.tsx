@@ -1049,17 +1049,17 @@ function CustomerLedgerModal({
     setLoading(true);
     try {
       const name = customer.company || customer.name || '';
-      const [allInvoices, allPayments, allMovements] = await Promise.all([
+      const [allInvoices, allPayments, allChallans] = await Promise.all([
         api.getSaleInvoices(name),
         api.getPayments(customer._id, 'all', 'Customer'),
-        api.getStockMovements({ search: name })
+        api.getChallans('', activeLedgerMode, customer._id)
       ]);
 
       const filteredInvoices = activeLedgerMode === 'regular'
         ? allInvoices.filter((i: any) => {
           if (!i.isFinalized) return false;
           const matchesName = (i.customerName || '').toLowerCase().includes(name.toLowerCase());
-          return i.mode === 'regular' && matchesName;
+          return ['regular', 'pakka'].includes(i.mode) && matchesName;
         })
         : [];
 
@@ -1069,16 +1069,14 @@ function CustomerLedgerModal({
         return p.mode === activeLedgerMode && matchesParty;
       });
 
-      const filteredMovements = allMovements.filter((m: any) => {
-        const matchesParty = (m.partyName || '').toLowerCase().includes(name.toLowerCase());
-        if (!matchesParty) return false;
-        if (m.type !== 'sale' || m.status !== 'dispatched') return false;
-
-        if (activeLedgerMode === 'regular') {
-          return m.billingMode === 'regular' && !m.convertedToInvoice;
-        } else {
-          return m.billingMode === 'cash';
-        }
+      // Posted Sale Challans are the authoritative physical-sale records. Do not
+      // read the retired StockMovement archive for current customer ledgers.
+      const filteredChallans = allChallans.filter((challan: any) => {
+        return challan.challanType === 'sale'
+          && challan.status === 'finalized'
+          && challan.inventoryPostingStatus === 'posted'
+          && challan.mode === activeLedgerMode
+          && (activeLedgerMode === 'cash' || !challan.invoiceId);
       });
 
       type Row = { _id: string; date: string; no: string; mode: string; status: string; amount: number; isInvoice: boolean; isMovement?: boolean; dueDate?: string };
@@ -1097,14 +1095,14 @@ function CustomerLedgerModal({
         });
       });
 
-      filteredMovements.forEach(m => {
+      filteredChallans.forEach((m: any) => {
         items.push({
           _id: m._id,
           date: m.date,
-          no: m.docNo,
-          mode: m.billingMode || 'regular',
+          no: m.challanNo,
+          mode: m.mode || 'regular',
           status: m.status,
-          amount: m.totalAmount || 0, // Customer owes us more
+          amount: m.nettTotal || 0, // Customer owes us more until invoiced
           isInvoice: false,
           isMovement: true
         });

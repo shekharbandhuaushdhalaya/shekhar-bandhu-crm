@@ -156,8 +156,11 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ error: 'Invalid authentication code. Please try again.' });
     }
 
-    // Issue short-lived access token plus a rotating refresh token.
-    const membership = await UserFirm.findOne({ userId: user._id, active: true }).sort({ isDefault: -1, createdAt: 1 }).lean();
+    // Issue short-lived access token plus a rotating refresh token. If the
+    // login request selected a firm, keep that firm through MFA verification.
+    const membershipQuery = { userId: user._id, active: true };
+    if (decoded.firmId) membershipQuery.firmId = decoded.firmId;
+    const membership = await UserFirm.findOne(membershipQuery).sort({ isDefault: -1, createdAt: 1 }).lean();
     if (!membership) return res.status(403).json({ error: 'No active firm membership' });
     const fullToken = jwt.sign({ id: user._id, name: user.name, email: user.email, role: membership.role, firmRole: membership.role, firmId: membership.firmId, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword }, JWT_SECRET, { expiresIn: config.accessTokenTtl });
     const refreshRaw = crypto.randomBytes(48).toString('base64url');

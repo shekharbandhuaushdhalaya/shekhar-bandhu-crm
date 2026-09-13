@@ -168,21 +168,24 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
 
 // Sidebar extracted to components/Sidebar.tsx
 
-const MOBILE_TAB_CONFIG = [
+type MobileTabConfig = { name: string; label: string; outline: string; filled: string; permission?: string };
+const MOBILE_TAB_CONFIG: readonly MobileTabConfig[] = [
   { name: 'index', label: 'Dashboard', outline: 'grid-outline', filled: 'grid' },
   { name: 'orders', label: 'Orders', outline: 'cart-outline', filled: 'cart' },
   { name: 'sales-workspace', label: 'Sales', outline: 'options-outline', filled: 'options' },
-  { name: 'mr-my-day', label: 'My Day', outline: 'today-outline', filled: 'today' },
+  { name: 'mr-my-day', label: 'My Day', outline: 'today-outline', filled: 'today', permission: 'mr:view' },
 ] as const;
 
-function MobileTabBar({ state, navigation, onMore }: any) {
+function MobileTabBar({ state, navigation, onMore, permissions }: any) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
+  const can = (permission?: string) => !permission || (permissions && (permissions.includes('*') || permissions.includes(permission)));
+  const visibleTabs = MOBILE_TAB_CONFIG.filter((tab) => can(tab.permission));
 
   return (
-    <View style={[styles.mobileTabBar, { height: 56 + insets.bottom, paddingBottom: insets.bottom }]}>
-      {MOBILE_TAB_CONFIG.map((tab) => {
+    <View style={[styles.mobileTabBar, { height: 56 + insets.bottom, paddingBottom: insets.bottom }]}> 
+      {visibleTabs.map((tab) => {
         const routeIndex = state.routes.findIndex((route: any) => route.name === tab.name);
         if (routeIndex < 0) return null;
         const route = state.routes[routeIndex];
@@ -226,6 +229,7 @@ function MainLayout() {
   const [isDrawerMounted, setIsDrawerMounted] = useState(false);
   const drawerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { themeMode, colors } = useTheme();
+  const { permissions } = usePermission();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
   const styles = useStyles(createStyles);
@@ -415,7 +419,7 @@ function MainLayout() {
         <View style={{ flex: 1 }}>
           <ErrorBoundary>
           <Tabs
-            tabBar={(props) => isDesktop ? null : <MobileTabBar {...props} onMore={openSidebar} />}
+            tabBar={(props) => isDesktop ? null : <MobileTabBar {...props} permissions={permissions} onMore={openSidebar} />}
             screenOptions={{
               headerShown: false,
               tabBarStyle: isDesktop ? { display: 'none' } : styles.mobileTabBar,

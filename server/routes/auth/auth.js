@@ -148,11 +148,19 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    // If MFA is enabled, issue a short-lived mfaToken instead of full session
+    const requestedFirmId = req.body.firmId || null;
+
+    // If MFA is enabled, issue a short-lived mfaToken instead of full session.
+    // Preserve the firm selected on the login form so MFA cannot silently fall
+    // back to a different default firm for multi-tenant users.
     const fullUser = await User.findById(user._id).select('+mfaSecret');
     if (fullUser.mfaEnabled) {
+      if (requestedFirmId) {
+        const requestedMembership = await UserFirm.findOne({ userId: user._id, firmId: requestedFirmId, active: true }).lean();
+        if (!requestedMembership) return res.status(403).json({ error: 'You do not have access to the selected firm' });
+      }
       const mfaToken = jwt.sign(
-        { id: user._id, mfaPending: true },
+        { id: user._id, firmId: requestedFirmId, mfaPending: true },
         JWT_SECRET,
         { expiresIn: '5m' }
       );
@@ -165,7 +173,6 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
 
     await User.updateOne({ _id: user._id }, { $set: { failedLoginAttempts: 0, lockedUntil: null } });
 
-    const requestedFirmId = req.body.firmId || null;
     let membership = requestedFirmId ? await UserFirm.findOne({ userId: user._id, firmId: requestedFirmId, active: true }).lean() : null;
     if (!membership) membership = await UserFirm.findOne({ userId: user._id, isDefault: true, active: true }).lean();
     if (!membership) membership = await UserFirm.findOne({ userId: user._id, active: true }).sort({ createdAt: 1 }).lean();
@@ -322,7 +329,7 @@ router.post('/whatsapp/send-otp', async (req, res) => {
 
     const code = allowMock && process.env.NODE_ENV === 'test'
       ? '123456'
-      : Math.floor(100000 + Math.random() * 900000).toString();
+      : String(crypto.randomInt(100000, 1000000));
     const delivery = await sendWhatsAppNotification(cleanPhone, `Your Shekhar Bandhu Aushadhalaya verification code is ${code}. It expires in 5 minutes.`);
     if (!delivery?.success || (config.isProduction && delivery.simulated)) {
       return res.status(503).json({ error: 'Unable to deliver verification code', code: 'OTP_DELIVERY_FAILED' });
@@ -330,7 +337,7 @@ router.post('/whatsapp/send-otp', async (req, res) => {
 
     await Otp.findOneAndUpdate(
       { phone: cleanPhone },
-      { code, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
+      { code, attempts: 0, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
       { upsert: true, new: true }
     );
 
@@ -363,8 +370,14 @@ router.post('/whatsapp/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Code expired. Please request a new one.' });
     }
 
+    if (record.attempts >= 5) {
+      await Otp.deleteOne({ phone: cleanPhone });
+      return res.status(429).json({ error: 'Too many invalid verification attempts. Please request a new code.' });
+    }
+
     // Verify matching code
     if (record.code !== cleanCode) {
+      await Otp.updateOne({ _id: record._id }, { $inc: { attempts: 1 } });
       return res.status(400).json({ error: 'Invalid verification code.' });
     }
 
@@ -460,12 +473,12 @@ router.post('/forgot-password', async (req, res) => {
       return res.json({ message: 'If that email address is registered, a password reset code has been issued.' });
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = String(crypto.randomInt(100000, 1000000));
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     await Otp.findOneAndUpdate(
       { phone: `email:${user.email}` },
-      { code, expiresAt },
+      { code, attempts: 0, expiresAt },
       { upsert: true, new: true }
     );
 
@@ -490,7 +503,15 @@ router.post('/reset-password', async (req, res) => {
 
     const cleanEmail = email.trim().toLowerCase();
     const otpRecord = await Otp.findOne({ phone: `email:${cleanEmail}` });
-    if (!otpRecord || otpRecord.code !== code.trim() || otpRecord.expiresAt < new Date()) {
+    if (!otpRecord || otpRecord.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Invalid or expired reset code' });
+    }
+    if (otpRecord.attempts >= 5) {
+      await Otp.deleteOne({ _id: otpRecord._id });
+      return res.status(429).json({ error: 'Too many invalid reset-code attempts. Please request a new code.' });
+    }
+    if (otpRecord.code !== code.trim()) {
+      await Otp.updateOne({ _id: otpRecord._id }, { $inc: { attempts: 1 } });
       return res.status(400).json({ error: 'Invalid or expired reset code' });
     }
 
@@ -523,9 +544,12 @@ router.post('/reset-password', async (req, res) => {
 // GET /api/auth/sessions — View active logged-in device sessions
 router.get('/sessions', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('activeSessions').lean();
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user.activeSessions || []);
+    const sessions = await RefreshSession.find({
+      userId: req.user.id,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    }).select('-tokenHash').sort({ lastUsedAt: -1, createdAt: -1 }).lean();
+    res.json(sessions);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -534,11 +558,12 @@ router.get('/sessions', authenticateToken, async (req, res) => {
 // DELETE /api/auth/sessions/:sessionId — Revoke a logged-in device session
 router.delete('/sessions/:sessionId', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    user.activeSessions = (user.activeSessions || []).filter(s => s.sessionId !== req.params.sessionId);
-    await user.save();
+    const session = await RefreshSession.findOneAndUpdate(
+      { userId: req.user.id, sessionId: req.params.sessionId, revokedAt: null },
+      { $set: { revokedAt: new Date() } },
+      { new: true }
+    ).select('-tokenHash');
+    if (!session) return res.status(404).json({ error: 'Active session not found' });
 
     res.json({ message: 'Device session revoked successfully', sessionId: req.params.sessionId });
   } catch (err) {

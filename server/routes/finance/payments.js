@@ -13,7 +13,7 @@ const router = express.Router();
 // GET /api/payments — List payments with optional filters
 router.get('/', authorize('payment:view'), async (req, res) => {
   try {
-    const { search, type, partyType, partyId, mode } = req.query;
+    const { search, type, partyType, partyId, mode, includeReversed } = req.query;
     const filter = {};
 
     if (search) {
@@ -24,6 +24,7 @@ router.get('/', authorize('payment:view'), async (req, res) => {
     }
     if (type && type !== 'all') filter.type = type;
     if (partyType && partyType !== 'all') filter.partyType = partyType;
+    if (includeReversed !== 'true') filter.status = { $ne: 'reversed' };
     
     if (partyId) {
       if (mongoose.Types.ObjectId.isValid(partyId)) {
@@ -83,11 +84,13 @@ router.delete('/:id', authorize('payment:create'), async (req, res) => {
     if (payment.mode === 'cash' && (!req.user || !req.user.canAccessCash)) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to reverse cash transactions.' });
     }
-    const reversed = await reversePayment(req.params.id);
+    const reversed = await reversePayment(req.params.id, req.user?.id || null);
     if (req.io) {
-      req.io.emit('payment_updated', { id: req.params.id, deleted: true });
+      req.io.emit('payment_updated', { id: req.params.id, type: 'reversed' });
       if (reversed.allocations?.length) req.io.emit('invoice_updated', { type: 'payment_reversed', paymentId: req.params.id });
     }
+    const { logAction } = require('../../utils/auditLogger');
+    await logAction({ action: 'REVERSE_PAYMENT', description: `Reversed payment ${req.params.id}`, details: { id: req.params.id }, req });
     res.json({ message: 'Payment reversed and balances restored' });
   } catch (err) {
     res.status(err.code === 'PAYMENT_NOT_FOUND' ? 404 : 400).json({ error: err.message, code: err.code || 'PAYMENT_REVERSAL_FAILED' });
@@ -268,6 +271,8 @@ router.post('/allocate', authorize('payment:create'), validate(schemas.paymentAl
       req.io.emit('payment_updated', { type: 'allocated', id: payment._id });
       req.io.emit('invoice_updated', { type: 'allocate', paymentId: payment._id });
     }
+    const { logAction } = require('../../utils/auditLogger');
+    await logAction({ action: 'ALLOCATE_PAYMENT', description: `Allocated payment ${req.body.paymentId} against invoices`, details: { id: req.body.paymentId }, req });
     res.json({ message: 'Payment successfully allocated bill-wise', payment });
   } catch (err) {
     const status = ['PAYMENT_NOT_FOUND','INVOICE_NOT_FOUND'].includes(err.code) ? 404 : 400;

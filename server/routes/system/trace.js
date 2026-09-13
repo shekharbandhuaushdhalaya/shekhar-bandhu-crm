@@ -4,6 +4,7 @@ const RawMaterialEntry = require('../../models/RawMaterialEntry');
 const InventoryEntry = require('../../models/InventoryEntry');
 const Invoice = require('../../models/Invoice');
 const Dispatch = require('../../models/Dispatch');
+const Challan = require('../../models/Challan');
 const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
@@ -216,19 +217,20 @@ router.get('/:batchNo', authorize('manufacturing:view'), async (req, res) => {
       expiryDate: e.expiryDate,
     }));
 
-    // 5. Search Challans (items with this batchNo)
-    const StockMovement = require('../../models/StockMovement');
-    const challans = await StockMovement.find({
+    // 5. Search current authoritative Challans (items with this batchNo).
+    // StockMovement is a retired compatibility archive and must not be used
+    // for current batch traceability.
+    const challans = await Challan.find({
       items: { $elemMatch: { batchNo: { $regex: new RegExp(safeRegex, 'i') } } }
     }).lean();
     result.challans = challans.map(c => ({
       _id: c._id,
-      challanNo: c.docNo,
+      challanNo: c.challanNo,
       partyName: c.partyName,
       status: c.status,
       date: c.date,
       items: c.items.filter(i => i.batchNo && new RegExp(safeRegex, 'i').test(i.batchNo)).map(i => ({
-        name: i.productName,
+        name: i.name,
         qty: i.qty,
         packing: i.packing,
       })),

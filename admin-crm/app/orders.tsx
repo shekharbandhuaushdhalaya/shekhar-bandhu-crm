@@ -46,8 +46,9 @@ export default function OrdersScreen() {
 
   const handleCreateChallan = (order: Order) => {
     setSelectedOrder(null);
-    DeviceEventEmitter.emit('prefill_challan', order);
-    router.push('/stockmovements');
+    // Website orders are fulfilled from the Sales Workspace. The old
+    // StockMovement screen is a read-only archive and cannot create Challans.
+    router.push(`/sales-workspace?tab=orders&orderId=${encodeURIComponent(order._id)}`);
   };
 
   // Lazy loading state
@@ -98,7 +99,7 @@ export default function OrdersScreen() {
     setRefreshing(false);
   }, [load]);
 
-  const handleUpdateStatus = async (id: string, newStatus: 'pending' | 'processing' | 'shipped' | 'delivered') => {
+  const handleUpdateStatus = async (id: string, newStatus: 'pending' | 'processing') => {
     setActionLoading(id);
     try {
       await api.updateOrderStatus(id, newStatus);
@@ -109,19 +110,6 @@ export default function OrdersScreen() {
       showToast(`Order status updated to ${newStatus.toUpperCase()}`, 'success');
     } catch (err: any) {
       showToast('Failed to update order status: ' + err.message, 'error');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleGenerateInvoice = async (id: string) => {
-    setActionLoading(id);
-    try {
-      await (api as any).generateInvoiceFromOrder(id);
-      showToast('Draft Sale Invoice created successfully!', 'success');
-      await load();
-    } catch (err: any) {
-      showToast('Failed to generate invoice: ' + err.message, 'error');
     } finally {
       setActionLoading(null);
     }
@@ -492,10 +480,10 @@ export default function OrdersScreen() {
                   ) : (
                     <TouchableOpacity
                       style={[styles.primaryActionBtn, { backgroundColor: colors.info, flex: 1 }]}
-                      onPress={() => handleGenerateInvoice(selectedOrder._id)}
+                      onPress={() => { setSelectedOrder(null); router.push('/sales-workspace?tab=challans'); }}
                     >
                       <Ionicons name="document-text-outline" size={14} color="#fff" />
-                      <Text style={styles.primaryActionBtnText}>Generate Invoice</Text>
+                      <Text style={styles.primaryActionBtnText}>{selectedOrder.hasChallan ? 'Create Invoice from Challan' : 'Invoice follows Challan'}</Text>
                     </TouchableOpacity>
                   )}
 
@@ -508,30 +496,17 @@ export default function OrdersScreen() {
                       <Text style={styles.primaryActionBtnText}>Start Processing</Text>
                     </TouchableOpacity>
                   )}
-                   {selectedOrder.status === 'processing' && (
-                    selectedOrder.hasDispatch ? (
-                      <TouchableOpacity
-                        style={[styles.primaryActionBtn, { backgroundColor: colors.primary, flex: 1 }]}
-                        onPress={() => handleUpdateStatus(selectedOrder._id, 'shipped')}
-                      >
-                        <Ionicons name="airplane-outline" size={14} color="#fff" />
-                        <Text style={styles.primaryActionBtnText}>Mark Shipped</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={[styles.primaryActionBtn, { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, flex: 1 }]}>
-                        <Ionicons name="airplane-outline" size={14} color={colors.text.muted} />
-                        <Text style={[styles.primaryActionBtnText, { color: colors.text.muted }]}>Shipped (Create Dispatch First)</Text>
-                      </View>
-                    )
+                  {selectedOrder.status === 'processing' && (
+                    <View style={[styles.primaryActionBtn, { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, flex: 1 }]}> 
+                      <Ionicons name="airplane-outline" size={14} color={colors.text.muted} />
+                      <Text style={[styles.primaryActionBtnText, { color: colors.text.muted }]}>Shipment status is controlled by Dispatch</Text>
+                    </View>
                   )}
                   {selectedOrder.status === 'shipped' && (
-                    <TouchableOpacity
-                      style={[styles.primaryActionBtn, { backgroundColor: colors.success, flex: 1 }]}
-                      onPress={() => handleUpdateStatus(selectedOrder._id, 'delivered')}
-                    >
-                      <Ionicons name="checkmark-done-circle" size={14} color="#fff" />
-                      <Text style={styles.primaryActionBtnText}>Mark Delivered</Text>
-                    </TouchableOpacity>
+                    <View style={[styles.primaryActionBtn, { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, flex: 1 }]}> 
+                      <Ionicons name="checkmark-done-circle-outline" size={14} color={colors.text.muted} />
+                      <Text style={[styles.primaryActionBtnText, { color: colors.text.muted }]}>Delivery status is controlled by Dispatch</Text>
+                    </View>
                   )}
                 </View>
               </ScrollView>

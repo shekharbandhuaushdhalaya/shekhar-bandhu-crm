@@ -63,6 +63,14 @@ const paymentSchema = new mongoose.Schema({
     type: Date, 
     default: Date.now 
   },
+  status: {
+    type: String,
+    enum: ['active', 'reversed'],
+    default: 'active',
+    index: true,
+  },
+  reversedAt: { type: Date, default: null },
+  reversedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   allocations: [paymentAllocationSchema]
 }, { timestamps: true });
 

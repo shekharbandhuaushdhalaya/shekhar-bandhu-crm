@@ -5,6 +5,12 @@ const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
 
+function configuredFirmGstin(settings) {
+  // `firmGstin` is the current SystemSettings field; accept the old alias
+  // only for backward-compatible migrated settings, never a fabricated value.
+  return String(settings?.firmGstin || settings?.gstin || '').trim().toUpperCase();
+}
+
 // GET /api/gst/gstr1 — GSTR-1 sales & Credit/Debit Notes summary (monthly)
 router.get('/gstr1', authorize('report:view'), async (req, res) => {
   try {
@@ -317,7 +323,8 @@ router.get('/gstr1/export-json', authorize('report:view'), async (req, res) => {
 
     const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
-    const gstin = settings.gstin || '09AAAAA0000A1Z5';
+    const gstin = configuredFirmGstin(settings);
+    if (!gstin) return res.status(409).json({ error: 'Configure the firm GSTIN before generating GSTR-1 export', code: 'FIRM_GSTIN_REQUIRED' });
 
     const invoices = await Invoice.find({
       type: 'sale',
@@ -364,7 +371,9 @@ router.get('/gstr1/export-json', authorize('report:view'), async (req, res) => {
       gstin,
       fp: fpStr,
       version: 'GST3.0.4',
-      hash: 'hash',
+      // Do not emit a fake portal hash. The authorised filing provider must
+      // calculate the final portal-specific hash during submission.
+      hash: '',
       b2b: Object.values(b2bMap)
     };
 
@@ -388,7 +397,8 @@ router.get('/gstr3b/export-json', authorize('report:view'), async (req, res) => 
 
     const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
-    const gstin = settings.gstin || '09AAAAA0000A1Z5';
+    const gstin = configuredFirmGstin(settings);
+    if (!gstin) return res.status(409).json({ error: 'Configure the firm GSTIN before generating GSTR-3B export', code: 'FIRM_GSTIN_REQUIRED' });
 
     const [sales, purchases] = await Promise.all([
       Invoice.find({ type: 'sale', isFinalized: true, date: { $gte: start, $lt: end } }).lean(),

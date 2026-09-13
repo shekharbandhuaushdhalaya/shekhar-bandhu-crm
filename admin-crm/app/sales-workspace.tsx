@@ -1,7 +1,7 @@
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { View, ScrollView, StyleSheet, RefreshControl, Alert, Platform, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +18,7 @@ const formatMoney = (value: unknown) => `₹${Number(value || 0).toLocaleString(
 
 export default function SalesWorkspace() {
   const { colors } = useTheme();
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; orderId?: string }>();
   const styles = useStyles(createStyles);
   const [tab, setTab] = useState<Tab>('dashboard');
   const [refreshing, setRefreshing] = useState(false);
@@ -34,6 +34,7 @@ export default function SalesWorkspace() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [busyAction, setBusyAction] = useState('');
+  const autoFulfillOrderRef = useRef<string | null>(null);
 
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -139,12 +140,16 @@ export default function SalesWorkspace() {
   };
 
   const createQuickSale = async () => {
+    if (busyAction) return;
+    const idempotencyKey = `ui-quick-sale-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setBusyAction('quick-sale');
     try {
       if (!qsCustomer || !qsProduct || !qsWarehouse) {
         return Alert.alert('Quick Sale', 'Select customer, product and warehouse.');
       }
       const out = await request('/sales-workflow/quick-sale', {
         method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({
           customerId: qsCustomer,
           warehouseId: qsWarehouse,
@@ -163,6 +168,8 @@ export default function SalesWorkspace() {
   };
 
   const prepareRemainingChallan = async (order: any) => {
+    if (busyAction) return;
+    setBusyAction(`fulfill:${order._id}`);
     try {
       const items = (order.items || [])
         .map((item: any) => ({
@@ -174,6 +181,7 @@ export default function SalesWorkspace() {
       if (!items.length) return Alert.alert('Fulfillment', 'This order is already fully fulfilled.');
       const out = await request(`/sales-workflow/orders/${order._id}/fulfill`, {
         method: 'POST',
+        headers: { 'Idempotency-Key': `ui-fulfill-${order._id}-${Date.now()}` },
         body: JSON.stringify({ warehouseId: order.warehouseId || qsWarehouse, items }),
       });
       await load();
@@ -182,6 +190,18 @@ export default function SalesWorkspace() {
       Alert.alert('Fulfillment', e.message);
     } finally { setBusyAction(''); }
   };
+
+  // Deep links from Website Orders land here instead of the retired
+  // StockMovement archive. Prepare the draft Challan once the order list is
+  // available, then leave finalization as an explicit user action.
+  useEffect(() => {
+    const orderId = String(params.orderId || '');
+    if (!orderId || !orders.length || autoFulfillOrderRef.current === orderId) return;
+    const order = orders.find((row) => String(row._id) === orderId);
+    if (!order) return;
+    autoFulfillOrderRef.current = orderId;
+    prepareRemainingChallan(order);
+  }, [params.orderId, orders]);
 
   const renderOrderCard = ({ item: order }: { item: any }) => {
     const fulfilled = (order.items || []).reduce((sum: number, item: any) => sum + Number(item.fulfilledQty || 0), 0);
@@ -218,7 +238,10 @@ export default function SalesWorkspace() {
     setBusyAction(key);
     try {
       if (action === 'finalize') await request(`/challans/${challan._id}/finalize`, { method: 'PATCH', headers: { 'Idempotency-Key': `ui-finalize-${challan._id}` } });
-      if (action === 'convert') await request(`/challans/${challan._id}/convert`, { method: 'POST' });
+      if (action === 'convert') await request(`/challans/${challan._id}/convert`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': `ui-convert-${challan._id}` },
+      });
       if (action === 'reverse') {
         const run = async () => { await request(`/challans/${challan._id}/reverse`, { method: 'POST', headers: { 'Idempotency-Key': `ui-reverse-${challan._id}-${Date.now()}` } }); await load(); };
         if (Platform.OS === 'web') { if (typeof window !== 'undefined' && window.confirm(`Reverse ${challan.challanNo}? This creates compensating inventory entries.`)) await run(); }

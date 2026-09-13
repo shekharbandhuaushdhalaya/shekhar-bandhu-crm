@@ -9,6 +9,7 @@ const { validate } = require('../../middleware/validate');
 const { authorize } = require('../../middleware/authorize');
 const schemas = require('../../validation/schemas');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+const idempotency = require('../../middleware/idempotency');
 
 const TRANSITIONS = {
   pending: new Set(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned']),
@@ -68,7 +69,7 @@ router.get('/', authorize('dispatch:view'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/', authorize('dispatch:create'), validate(schemas.dispatchSchema), async (req, res) => {
+router.post('/', idempotency, authorize('dispatch:create'), validate(schemas.dispatchSchema), async (req, res) => {
   try {
     if (!req.body.challanId) return res.status(400).json({ error: 'challanId is required', code: 'CHALLAN_REQUIRED' });
     const { challan, order, invoice } = await hydrateDispatchSource(req.body.challanId);

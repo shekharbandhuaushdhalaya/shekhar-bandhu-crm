@@ -763,8 +763,10 @@ class ApiClient {
 
 
   // --- Challans ---
-  async getChallans(search = "", modeFilter = "all"): Promise<Challan[]> {
-    const res = await this.request(`${API_BASE}/challans?search=${encodeURIComponent(search)}&mode=${encodeURIComponent(modeFilter)}&page=1&limit=200`);
+  async getChallans(search = "", modeFilter = "all", customerId?: string): Promise<Challan[]> {
+    const params = new URLSearchParams({ search, mode: modeFilter, page: '1', limit: '200' });
+    if (customerId) params.set('customerId', customerId);
+    const res = await this.request(`${API_BASE}/challans?${params.toString()}`);
     const body = await res.json();
     return Array.isArray(body) ? body : (body.data || []);
   }
@@ -788,8 +790,11 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/challans/${id}/reverse`, { method: 'POST', headers: { 'Idempotency-Key': `challan-reverse-${id}` } });
     return res.json();
   }
-  async convertChallanToInvoice(id: string): Promise<{ message: string; invoice: Invoice; challan: Challan }> {
-    const res = await this.request(`${API_BASE}/challans/${id}/convert`, { method: 'POST' });
+  async convertChallanToInvoice(id: string, idempotencyKey?: string): Promise<{ message: string; invoice: Invoice; challan: Challan }> {
+    const res = await this.request(`${API_BASE}/challans/${id}/convert`, {
+      method: 'POST',
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+    });
     return res.json();
   }
   async deleteChallan(id: string): Promise<boolean> {
@@ -1072,13 +1077,6 @@ class ApiClient {
     });
     return res.json();
   }
-  async generateInvoiceFromOrder(id: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/orders/${id}/invoice`, {
-      method: 'POST'
-    });
-    return res.json();
-  }
-
   // --- Leads ---
   async getLeads(search = '', stage = 'all', page?: number, limit?: number): Promise<any> {
     const params = new URLSearchParams();
@@ -1568,35 +1566,6 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/stock-movements/${id}`);
     return res.json();
   }
-  async createStockMovement(data: any): Promise<StockMovement> {
-    const res = await this.request(`${API_BASE}/stock-movements`, { method: 'POST', body: JSON.stringify(data) });
-    return res.json();
-  }
-  async updateStockMovement(id: string, data: any): Promise<StockMovement> {
-    const res = await this.request(`${API_BASE}/stock-movements/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-    return res.json();
-  }
-  async dispatchStockMovement(id: string): Promise<StockMovement> {
-    const res = await this.request(`${API_BASE}/stock-movements/${id}/dispatch`, { method: 'PATCH' });
-    return res.json();
-  }
-  async receiveStockMovement(id: string): Promise<StockMovement> {
-    const res = await this.request(`${API_BASE}/stock-movements/${id}/receive`, { method: 'PATCH' });
-    return res.json();
-  }
-  async cancelStockMovement(id: string): Promise<StockMovement> {
-    const res = await this.request(`${API_BASE}/stock-movements/${id}/cancel`, { method: 'PATCH' });
-    return res.json();
-  }
-  async deleteStockMovement(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/stock-movements/${id}`, { method: 'DELETE' });
-    return res.ok;
-  }
-  async convertStockMovementToInvoice(id: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/stock-movements/${id}/convert-to-invoice`, { method: 'POST' });
-    return res.json();
-  }
-
   // --- Sales Targets & Commission ---
   async getSalesTargets(month?: number, year?: number): Promise<SalesTarget[]> {
     let url = `${API_BASE}/sales-targets?`;

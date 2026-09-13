@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Challan = require('../../models/Challan');
 const Warehouse = require('../../models/Warehouse');
 const { postChallanInventory, reverseChallanInventory } = require('../../services/challanInventoryService');
@@ -18,7 +19,7 @@ const router = express.Router();
 // GET /api/challans — List challans with search and mode filters
 router.get('/', authorize('challan:view'), async (req, res) => {
   try {
-    const { search, page = 1, limit = 50 } = req.query;
+    const { search, customerId, mode, page = 1, limit = 50 } = req.query;
     const filter = {};
 
     if (search) {
@@ -29,7 +30,20 @@ router.get('/', authorize('challan:view'), async (req, res) => {
       ];
     }
 
-    filter.mode = { $in: ['pakka', 'regular'] };
+    if (customerId) {
+      if (!mongoose.Types.ObjectId.isValid(customerId)) {
+        return res.status(400).json({ error: 'Invalid customerId', code: 'INVALID_CUSTOMER_ID' });
+      }
+      filter.customerId = customerId;
+    }
+    if (mode && mode !== 'all') {
+      if (!['regular', 'pakka', 'cash'].includes(mode)) {
+        return res.status(400).json({ error: 'Invalid Challan mode', code: 'INVALID_CHALLAN_MODE' });
+      }
+      filter.mode = mode;
+    }
+
+    if (!filter.mode) filter.mode = { $in: ['regular', 'pakka', 'cash'] };
     const pageNum = Math.max(1, Number(page) || 1);
     const limitNum = Math.min(200, Math.max(1, Number(limit) || 50));
     const [challans, total] = await Promise.all([
@@ -299,7 +313,7 @@ function getFinancialYearString(date = new Date()) {
 }
 
 // POST /api/challans/:id/convert — Create the financial invoice derived from a posted Sale Challan.
-router.post('/:id/convert', authorize('invoice:create'), async (req, res) => {
+router.post('/:id/convert', idempotency, authorize('invoice:create'), async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found', code: 'CHALLAN_NOT_FOUND' });
@@ -373,6 +387,17 @@ router.post('/:id/convert', authorize('invoice:create'), async (req, res) => {
         invoiceNo,
         customerId: customer._id,
         customerName: customer.company || customer.name || locked.partyName,
+        firmDetails: {
+          name: settings.firmName || '',
+          address: settings.firmAddress || '',
+          email: settings.firmEmail || '',
+          phone: settings.firmPhone || '',
+          gstin: settings.firmGstin || '',
+          bankName: settings.bankName || '',
+          bankAccountNo: settings.bankAccountNo || '',
+          bankIfsc: settings.bankIfsc || '',
+          bankBranch: settings.bankBranch || '',
+        },
         partyAddress: locked.partyAddress,
         shippingAddress: locked.shippingAddress,
         date: new Date(),

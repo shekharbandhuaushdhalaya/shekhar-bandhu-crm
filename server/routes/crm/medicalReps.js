@@ -914,7 +914,7 @@ router.post('/sample-otp/send', authorize('mr:visits'), async (req, res) => {
       return res.status(503).json({ error: 'Production sample OTP requires a configured WhatsApp provider and doctor phone number' });
     }
 
-    const otp = isMock ? '1234' : String(Math.floor(100000 + Math.random() * 900000));
+    const otp = isMock ? '1234' : String(crypto.randomInt(100000, 1000000));
     const codeHash = crypto.createHash('sha256').update(otp).digest('hex');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -1911,17 +1911,24 @@ router.post('/visits/:visitId/send-summary-whatsapp', authorize('mr:visits'), as
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const doctorPhone = req.body.doctorPhone || '9876543210';
+    const doctor = visit.doctorId ? await Doctor.findById(visit.doctorId).select('phone mobile').lean() : null;
+    const doctorPhone = req.body.doctorPhone || doctor?.phone || doctor?.mobile || '';
+    if (!doctorPhone) return res.status(400).json({ error: 'A verified doctor phone number is required before sending a visit summary', code: 'DOCTOR_PHONE_REQUIRED' });
     const sampleItems = (visit.samplesGiven || []).map(s => `${s.qty}x ${s.productName}`).join(', ') || 'No physical samples handed over';
 
     const messageText = `Respected Dr. ${visit.doctorName}, Thank you for taking the time to meet our Medical Representative (${visit.mrName}) today. Sample Handover Acknowledgment: [${sampleItems}]. e-Brochure & Monograph Link: https://shekharbandhuaushdhalaya.com/catalog?doctorRef=${visit._id}`;
+
+    const { sendMultiChannelNotification } = require('../../services/smsFallbackService');
+    const delivery = await sendMultiChannelNotification(doctorPhone, messageText);
+    if (!delivery?.success) return res.status(503).json({ error: delivery.reason || 'Unable to deliver visit summary', code: 'MESSAGE_DELIVERY_FAILED' });
 
     res.json({
       success: true,
       visitId: visit._id,
       recipient: doctorPhone,
       status: 'dispatched',
-      channel: 'WhatsApp & SMS',
+      channel: delivery.channel,
+      simulated: !!delivery.simulated,
       messageText,
       dispatchedAt: new Date()
     });
@@ -1936,20 +1943,25 @@ router.post('/visits/:visitId/send-sample-ack-whatsapp', authorize('mr:visits'),
     const visit = await MrVisit.findById(req.params.visitId);
     if (!visit) return res.status(404).json({ error: 'Visit record not found' });
 
-    const doctorPhone = req.body.doctorPhone || visit.phone || '9876543210';
+    const doctor = visit.doctorId ? await Doctor.findById(visit.doctorId).select('phone mobile').lean() : null;
+    const doctorPhone = req.body.doctorPhone || doctor?.phone || doctor?.mobile || '';
+    if (!doctorPhone) return res.status(400).json({ error: 'A verified doctor phone number is required before sending a sample acknowledgement', code: 'DOCTOR_PHONE_REQUIRED' });
     const sampleItemsStr = (visit.sampleDetails || []).map(s => `${s.qty}x ${s.name}`).join(', ') || 'AYUSH Promotional Samples';
     const ackUrl = `https://shekharbandhuaushdhalaya.com/ack-sample?visitId=${visit._id}`;
     const messageText = `Respected Dr. ${visit.doctorName}, please tap the link to digitally confirm sample receipt (${sampleItemsStr}): ${ackUrl}`;
 
     const { sendMultiChannelNotification } = require('../../services/smsFallbackService');
-    await sendMultiChannelNotification(doctorPhone, messageText);
+    const delivery = await sendMultiChannelNotification(doctorPhone, messageText);
+    if (!delivery?.success) return res.status(503).json({ error: delivery.reason || 'Unable to deliver sample acknowledgement', code: 'MESSAGE_DELIVERY_FAILED' });
 
     res.json({
       success: true,
       visitId: visit._id,
       recipient: doctorPhone,
       ackUrl,
-      status: 'dispatched'
+      status: 'dispatched',
+      channel: delivery.channel,
+      simulated: !!delivery.simulated,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2019,4 +2031,3 @@ router.get('/:mrId/sales-performance', authorize('mr:view'), async (req, res) =>
 });
 
 module.exports = router;
-
