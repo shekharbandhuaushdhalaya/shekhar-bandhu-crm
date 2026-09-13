@@ -289,20 +289,8 @@ export default function OrdersScreen() {
       </View>
 
       {/* Orders Table Container */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        scrollEventThrottle={400}
-        onScroll={({ nativeEvent }) => {
-          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
-          if (isCloseToBottom && page < totalPages) {
-            setPage(p => p + 1);
-          }
-        }}
-      >
-        <DataTable data={filteredOrders || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={1100} embedded renderTableHeader={() => (<View style={styles.tableHeaderRow}>
+      <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: 40 }}>
+        <DataTable data={filteredOrders || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={1100} embedded containerStyle={{ flex: 1, height: '100%' }} renderTableHeader={() => (<View style={styles.tableHeaderRow}>
               <View style={[styles.tableHeaderCellContainer, { width: 140 }]}>
                 <Text style={styles.tableHeaderCell}>Order &amp; Date</Text>
               </View>
@@ -397,22 +385,8 @@ export default function OrdersScreen() {
                 </View>
               </TouchableOpacity>
             );
-          }} isRefreshing={refreshing} onRefresh={onRefresh} onLoadMore={() => { if (page < totalPages) setPage(p => p + 1); }} />
-
-        {filteredOrders.length === 0 && (
-          <EmptyState title={<>No Orders Found</>} message={<>
-              {activeTab === 'all'
-                ? 'No B2B orders have been placed yet.'
-                : `No orders with status "${activeTab}" found.`}
-            </>} />
-        )}
-        
-        {page < totalPages && (
-          <View style={{ padding: 20, alignItems: 'center' }}>
-            <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>Loading more...</Text>
-          </View>
-        )}
-      </ScrollView>
+          }} isRefreshing={refreshing} onRefresh={onRefresh} onLoadMore={() => { if (page < totalPages) setPage(p => p + 1); }} ListEmptyComponent={<EmptyState title={<>No Orders Found</>} message={<>{activeTab === 'all' ? 'No B2B orders have been placed yet.' : `No orders with status "${activeTab}" found.`}</>} />} />
+      </View>
 
       {/* Order Detail Modal Drawer */}
       {selectedOrder && (
@@ -441,9 +415,12 @@ export default function OrdersScreen() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
                   <View>
                     <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>ORDER STATUS</Text>
-                    <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
-                      Routed to: {(selectedOrder as any).paymentMethod === 'COD' ? 'Courier COD Clearing' : 'Razorpay Online Clearing'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                      <Ionicons name="business-outline" size={13} color={colors.primary} />
+                      <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700' }}>
+                        Routed to: {(selectedOrder as any).paymentMethod === 'COD' ? 'Courier COD Clearing' : 'Razorpay Online Clearing'}
+                      </Text>
+                    </View>
                   </View>
                   <StatusPill  label={<>
                       {selectedOrder.status.toUpperCase()}
@@ -758,7 +735,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
   modalOverlayMobile: { justifyContent: 'flex-end', alignItems: 'stretch', padding: 0 },
   modalContent: { backgroundColor: colors.bg.card, width: '100%', maxWidth: 500, maxHeight: '90%', borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.hover },
-  modalContentMobile: { maxWidth: '100%', maxHeight: '92%', borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 },
+  modalContentMobile: { maxWidth: '100%', maxHeight: '85%', borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
   modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalBody: { padding: Spacing.lg, gap: Spacing.md },

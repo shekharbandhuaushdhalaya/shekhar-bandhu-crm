@@ -4,7 +4,7 @@ import { WorkspaceButton } from './WorkspaceButton';
 import { View, StyleSheet, ViewStyle, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
+import { LightColors, Spacing, Radius, Shadows, Typography, ControlHeight } from '../constants/theme';
 
 type Action = {
   key: string;
@@ -46,7 +46,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   actionBtn: {
-    minHeight: 44,
+    minHeight: ControlHeight.buttonMd,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

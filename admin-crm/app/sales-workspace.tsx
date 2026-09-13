@@ -328,7 +328,22 @@ export default function SalesWorkspace() {
 
       {initialLoading ? <WorkspaceLoading title="Loading Sales Workspace…" message="Fetching orders, schemes, returns, commissions and stock choices." /> : null}
       {!initialLoading && loadError ? <WorkspaceError message={loadError} onRetry={load} /> : null}
-      {!initialLoading && !loadError ? <ScrollView
+      {!initialLoading && !loadError ? (tab === 'orders' ? (
+        <FlatList
+          data={orders}
+          keyExtractor={(order) => order._id}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.content}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+          ListHeaderComponent={<View style={styles.orderListHeader}><Text style={styles.panelListTitle}>Order pipeline</Text><Text style={styles.panelListSubtitle}>Review fulfillment, approvals and remaining quantities from one place.</Text></View>}
+          renderItem={renderOrderCard}
+          ListEmptyComponent={<EmptyState icon="cart-outline" title="No sales orders" message="New and website orders will appear here." />}
+          initialNumToRender={12}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+        />
+      ) : (
+      <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
@@ -365,20 +380,6 @@ export default function SalesWorkspace() {
               </Panel>
             </View>
           </>
-        ) : null}
-
-        {tab === 'orders' ? (
-          <Panel title="Order pipeline" subtitle="Review fulfillment, approvals and remaining quantities from one place.">
-            <FlatList
-              data={orders}
-              keyExtractor={(order) => order._id}
-              renderItem={renderOrderCard}
-              scrollEnabled={false}
-              ListEmptyComponent={<EmptyState icon="cart-outline" title="No sales orders" message="New and website orders will appear here." />}
-              initialNumToRender={12}
-              windowSize={5}
-            />
-          </Panel>
         ) : null}
 
         {tab === 'challans' ? (
@@ -471,7 +472,8 @@ export default function SalesWorkspace() {
             <View style={styles.totalRow}><Text style={styles.totalLabel}>Total commission</Text><Text style={styles.totalValue}>{formatMoney(commissions?.total)}</Text></View>
           </Panel>
         ) : null}
-      </WorkspaceTransition></ScrollView> : null}
+      </WorkspaceTransition></ScrollView>
+      )) : null}
     </View>
   );
 }
@@ -490,6 +492,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   searchChipType: { ...Typography.eyebrow, fontWeight: '800', color: colors.primary },
   searchChipText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginTop: 2 },
   content: { padding: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 64, gap: Spacing.md, maxWidth: 1240, width: '100%', alignSelf: 'center' },
+  orderListHeader: { paddingBottom: Spacing.sm },
+  panelListTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  panelListSubtitle: { ...Typography.bodySm, color: colors.text.secondary, marginTop: 3 },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   twoColumn: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, alignItems: 'flex-start' },
   columnPanel: { flexGrow: 1, flexShrink: 1, flexBasis: 420, minWidth: 290 },

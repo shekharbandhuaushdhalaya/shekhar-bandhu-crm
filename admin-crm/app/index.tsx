@@ -1343,7 +1343,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   metricTrend: { ...Typography.bodySm, fontWeight: '600' },
   metricFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.xs },
   metricSubtext: { ...Typography.caption, color: colors.text.muted },
-  summaryCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
+  summaryCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, maxWidth: 340, backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
   summaryCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   summaryCardTitle: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted },
   summaryCardValue: { ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },

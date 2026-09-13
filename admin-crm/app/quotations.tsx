@@ -456,7 +456,7 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
 
   return (
     <Modal animationType="slide" presentationStyle={Platform.OS === 'ios' && !isDesktop ? 'pageSheet' : 'overFullScreen'} visible={visible} onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
+      <View style={[styles.modalBackdrop, isDesktop && styles.modalBackdropDesktop]}>
       <View style={[styles.modalContainer, !isDesktop && styles.modalContainerMobile]}>
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={onClose}>
@@ -1045,7 +1045,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
 
   return (
     <Modal animationType="slide" presentationStyle={Platform.OS === 'ios' && !isDesktop ? 'pageSheet' : 'overFullScreen'} visible={visible} onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
+      <View style={[styles.modalBackdrop, isDesktop && styles.modalBackdropDesktop]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.modalContainer, !isDesktop && styles.modalContainerMobile]}>
 
         <View style={styles.modalHeader}>
@@ -1693,8 +1693,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   statusText: { ...Typography.eyebrow, fontWeight: '800' },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center' },
+  modalBackdropDesktop: { backgroundColor: colors.bg.primary },
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  modalContainerMobile: { flex: 0, maxHeight: '92%', maxWidth: '100%', alignSelf: 'stretch', marginTop: 'auto', borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderWidth: 1, borderBottomWidth: 0 },
+  modalContainerMobile: { flex: 0, maxHeight: '85%', maxWidth: '100%', alignSelf: 'stretch', marginTop: 'auto', borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderWidth: 1, borderBottomWidth: 0 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },

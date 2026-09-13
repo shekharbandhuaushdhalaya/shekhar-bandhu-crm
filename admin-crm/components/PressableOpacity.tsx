@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { TouchableOpacity, TouchableOpacityProps, StyleSheet, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, useReducedMotion } from 'react-native-reanimated';
+import { ControlHeight } from '../constants/theme';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -15,7 +16,7 @@ export const PressableOpacity = forwardRef<React.ElementRef<typeof TouchableOpac
       transform: [...(Array.isArray(originalTransform) ? originalTransform : []), { scale: 1 - 0.03 * pressed.value }],
     }), [originalTransform]);
     return <AnimatedTouchable ref={ref} {...props} disabled={disabled} accessibilityRole={accessibilityRole}
-      activeOpacity={activeOpacity} style={[{ minHeight: 44, justifyContent: 'center' }, style, { minHeight: Math.max(44, Number(flat?.minHeight) || 0), minWidth: Math.max(44, Number(flat?.minWidth) || 0) }, animatedStyle]}
+      activeOpacity={activeOpacity} style={[{ minHeight: ControlHeight.buttonMd, justifyContent: 'center' }, style, { minHeight: Math.max(ControlHeight.buttonMd, Number(flat?.minHeight) || 0), minWidth: Math.max(ControlHeight.buttonMd, Number(flat?.minWidth) || 0) }, animatedStyle]}
       onPressIn={event => { if (!disabled && !reducedMotion) pressed.value = withTiming(1, { duration: 100 }); onPressIn?.(event); }}
       onPressOut={event => { pressed.value = withTiming(0, { duration: reducedMotion ? 0 : 150 }); onPressOut?.(event); }}
     />;

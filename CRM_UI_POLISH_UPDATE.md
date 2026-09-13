@@ -80,11 +80,11 @@ This release is a UI/UX refinement pass on top of the latest Sales + MR + custom
 
 The follow-up audit is now applied without changing business logic or route names.
 
-- Restored a mobile bottom tab bar for Dashboard, Orders, Sales, MR My Day and More. The More route opens the existing full drawer through a device event; desktop keeps the sidebar layout and legacy destinations remain drawer-only.
+- Restored a mobile bottom tab bar for Dashboard, Orders, Sales, MR My Day and More. More is a custom tab button that opens the existing full drawer without adding a route; desktop keeps the sidebar layout and legacy destinations remain drawer-only.
 - Raised drawer, sidebar, header, modal and form controls to a 44px minimum touch target and added the current page label beside the mobile brand mark.
 - Orders detail and edit dialogs use the same responsive treatment: centered constrained surfaces on desktop and bottom sheets on mobile. Quotation detail and edit/create surfaces use the same backdrop and mobile sheet sizing.
 - Dashboard KPI cards now have a capped width so cards settle into predictable one, two or four-column layouts as the viewport grows.
-- Shared DataTable embedded mode now uses FlatList virtualization. The Sales Workspace order pipeline and Medical Representatives directory use FlatList renderers instead of mapping their primary cards inside ScrollViews.
+- Shared DataTable embedded mode now uses FlatList virtualization. Orders, the Sales Workspace order pipeline, and the Medical Representatives directory keep their primary record lists out of outer ScrollViews. The mobile drawer uses a reduced-motion-safe Reanimated slide-in/out with a coordinated backdrop fade.
 - Removed decorative emoji and symbol glyphs from operational UI copy, including order contact/payment labels, reports, inventory, manufacturing and MR surfaces. The Ayurvedic loader retains its Hindi phrases with a neutral typographic marker.
 
 ## Second-pass validation
@@ -92,3 +92,16 @@ The follow-up audit is now applied without changing business logic or route name
 - TypeScript: passed (`tsc --noEmit`, zero diagnostics).
 - Expo web export: passed with Expo SDK 54 after the responsive navigation and modal changes.
 - Operational UI emoji grep across `admin-crm/app`, `admin-crm/components` and `admin-crm/constants`: zero matches.
+
+# Mobile Fix Prompt Completion — 2026-09-13
+
+- Added the shared `ControlHeight` token and routed shared text inputs, buttons, pressables, headers and sidebar rows through the 44px minimum control rule.
+- Replaced the temporary More route with a custom fifth mobile tab button. It opens the existing drawer directly, leaving the route tree and permission-controlled drawer destinations unchanged.
+- Reworked the Orders screen so its primary table is no longer wrapped in a vertical ScrollView; the Sales Workspace orders branch and Medical Representatives directory now own their FlatList scroll surfaces directly.
+- Added a 220ms Reanimated drawer slide with a coordinated backdrop fade and a delayed unmount so closing reverses the motion.
+- Added the missing order payment-routing icon treatment and capped both dashboard KPI and summary cards at 340px.
+
+## Latest validation
+
+- TypeScript: passed (`tsc --noEmit`, zero diagnostics).
+- Expo web export: passed after removing the temporary More route and adding the custom mobile tab bar.

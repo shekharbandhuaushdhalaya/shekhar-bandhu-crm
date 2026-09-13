@@ -6,7 +6,7 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { useEffect, useState, useRef } from 'react';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { usePermission } from '../utils/permissions';
-import { LightColors, Spacing, Radius, Typography } from '../constants/theme';
+import { LightColors, Spacing, Radius, Typography, ControlHeight } from '../constants/theme';
 import { authStorage } from '../utils/storage';
 
 const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded_v2';
@@ -254,8 +254,8 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     dashboardItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: 44,
-      paddingVertical: 9,
+      minHeight: ControlHeight.buttonMd,
+      paddingVertical: 10,
       paddingHorizontal: Spacing.sm,
       marginHorizontal: Spacing.xs,
       borderRadius: Radius.md,
@@ -283,9 +283,9 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     groupHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: 44,
+      minHeight: ControlHeight.buttonMd,
       justifyContent: 'space-between',
-      paddingVertical: 8,
+      paddingVertical: 10,
       paddingHorizontal: Spacing.sm,
       marginHorizontal: Spacing.xs,
       borderRadius: Radius.md,
@@ -333,8 +333,8 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     navItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: 44,
-      paddingVertical: 8,
+      minHeight: ControlHeight.buttonMd,
+      paddingVertical: 10,
       paddingHorizontal: 8,
       borderRadius: Radius.md,
       position: 'relative',
@@ -368,7 +368,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     },
     footerIconBtn: {
       flex: 1,
-      minHeight: 44,
+      minHeight: ControlHeight.buttonMd,
       borderRadius: 6,
       borderWidth: 1,
       borderColor: colors.border,
@@ -378,7 +378,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     },
     footerLogoutIconBtn: {
       flex: 1,
-      minHeight: 44,
+      minHeight: ControlHeight.buttonMd,
       borderRadius: 6,
       borderWidth: 1,
       borderColor: colors.danger + '30',

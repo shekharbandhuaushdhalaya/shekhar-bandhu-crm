@@ -6,9 +6,9 @@ import { AppText as Text } from './../components/AppText';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
+import { LightColors, Spacing, Radius, Shadows, Typography, ControlHeight } from '../constants/theme';
 import { View, StyleSheet, ActivityIndicator, useWindowDimensions, Modal, Pressable, ScrollView, Image, DeviceEventEmitter, Platform } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { api, API_BASE } from '../utils/api';
 import { AuthProvider, useAuth } from '../utils/auth';
@@ -21,6 +21,7 @@ import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar';
 import AyurvedicLoader from '../components/AyurvedicLoader';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { getSocket } from '../utils/socket';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -167,10 +168,63 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
 
 // Sidebar extracted to components/Sidebar.tsx
 
+const MOBILE_TAB_CONFIG = [
+  { name: 'index', label: 'Dashboard', outline: 'grid-outline', filled: 'grid' },
+  { name: 'orders', label: 'Orders', outline: 'cart-outline', filled: 'cart' },
+  { name: 'sales-workspace', label: 'Sales', outline: 'options-outline', filled: 'options' },
+  { name: 'mr-my-day', label: 'My Day', outline: 'today-outline', filled: 'today' },
+] as const;
+
+function MobileTabBar({ state, navigation, onMore }: any) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={[styles.mobileTabBar, { height: 56 + insets.bottom, paddingBottom: insets.bottom }]}>
+      {MOBILE_TAB_CONFIG.map((tab) => {
+        const routeIndex = state.routes.findIndex((route: any) => route.name === tab.name);
+        if (routeIndex < 0) return null;
+        const route = state.routes[routeIndex];
+        const focused = state.index === routeIndex;
+        const descriptor = state.routes[routeIndex] ? state.routes[routeIndex].key : route.key;
+        const onPress = () => {
+          const event = navigation.emit({ type: 'tabPress', target: descriptor, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+        };
+        return (
+          <TouchableOpacity
+            key={tab.name}
+            style={styles.mobileTabItem}
+            onPress={onPress}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: focused }}
+          >
+            <Ionicons name={(focused ? tab.filled : tab.outline) as any} size={21} color={focused ? colors.primary : colors.text.secondary} />
+            <Text style={[styles.mobileTabLabel, { color: focused ? colors.primary : colors.text.secondary }]}>{tab.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+      <TouchableOpacity
+        style={styles.mobileTabItem}
+        onPress={onMore}
+        accessibilityRole="button"
+        accessibilityLabel="More navigation"
+      >
+        <Ionicons name="ellipsis-horizontal-outline" size={21} color={colors.text.secondary} />
+        <Text style={[styles.mobileTabLabel, { color: colors.text.secondary }]}>More</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function MainLayout() {
   const { user, loading, logout } = useAuth();
   const [isOnline, setIsOnline] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDrawerMounted, setIsDrawerMounted] = useState(false);
+  const drawerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { themeMode, colors } = useTheme();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
@@ -187,7 +241,6 @@ function MainLayout() {
     const sub = DeviceEventEmitter.addListener('global_loader', (data) => {
       setGlobalLoading(data.isLoading);
     });
-    const subOpenDrawer = DeviceEventEmitter.addListener('open_sidebar', () => setIsSidebarOpen(true));
 
     // Initialize Socket.io real-time connection
     const socket = getSocket();
@@ -267,12 +320,36 @@ function MainLayout() {
     return () => {
       unsubscribeNetInfo();
       sub.remove();
-      subOpenDrawer.remove();
+      if (drawerCloseTimer.current) clearTimeout(drawerCloseTimer.current);
       socketEvents.forEach(eventName => {
         socket.off(eventName);
       });
     };
   }, []);
+
+  const openSidebar = () => {
+    if (drawerCloseTimer.current) clearTimeout(drawerCloseTimer.current);
+    setIsDrawerMounted(true);
+    setIsSidebarOpen(true);
+  };
+
+  const closeSidebar = () => {
+    setIsSidebarOpen(false);
+    if (drawerCloseTimer.current) clearTimeout(drawerCloseTimer.current);
+    drawerCloseTimer.current = setTimeout(() => setIsDrawerMounted(false), 220);
+  };
+
+  const drawerProgress = useSharedValue(0);
+  useEffect(() => {
+    drawerProgress.value = withTiming(isSidebarOpen ? 1 : 0, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [drawerProgress, isSidebarOpen]);
+  const drawerPanelStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: (1 - drawerProgress.value) * -SIDEBAR_WIDTH }],
+  }));
+  const drawerBackdropStyle = useAnimatedStyle(() => ({ opacity: drawerProgress.value }));
 
   if (loading) {
     return <AyurvedicLoader message="शेखर बंधु औषधालय में आपका स्वागत है" />;
@@ -299,7 +376,7 @@ function MainLayout() {
       )}
 
       {/* Dynamic Top Header */}
-      <TopHeader user={user} isOnline={isOnline} logout={logout} toggleSidebar={() => setIsSidebarOpen(true)} />
+      <TopHeader user={user} isOnline={isOnline} logout={logout} toggleSidebar={openSidebar} />
       
       <View style={[styles.mainContainer, { flexDirection: isDesktop ? 'row' : 'column' }]}>
         {isDesktop && (
@@ -312,23 +389,25 @@ function MainLayout() {
         {!isDesktop && (
           <Modal
             transparent
-            visible={isSidebarOpen}
-            animationType="fade"
-            onRequestClose={() => setIsSidebarOpen(false)}
+            visible={isDrawerMounted}
+            animationType="none"
+            onRequestClose={closeSidebar}
           >
             <View style={styles.drawerOverlay}>
-              <Pressable style={styles.drawerBackdrop} onPress={() => setIsSidebarOpen(false)} />
-              <View style={[styles.drawerContent, { paddingTop: insets.top }]}>
+              <Animated.View style={[styles.drawerBackdrop, drawerBackdropStyle]}>
+                <Pressable style={StyleSheet.absoluteFill} onPress={closeSidebar} />
+              </Animated.View>
+              <Animated.View style={[styles.drawerContent, { paddingTop: insets.top }, drawerPanelStyle]}>
                 <View style={styles.drawerHeader}>
                   <Text style={styles.drawerTitle} numberOfLines={1}>SHEKHAR BANDHU AUSHADHALAYA</Text>
-                  <TouchableOpacity onPress={() => setIsSidebarOpen(false)} style={styles.drawerCloseBtn}>
+                  <TouchableOpacity onPress={closeSidebar} style={styles.drawerCloseBtn}>
                     <Ionicons name="close" size={24} color={colors.text.primary} />
                   </TouchableOpacity>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Sidebar onNavigate={() => setIsSidebarOpen(false)} isOnline={isOnline} logout={logout} />
+                  <Sidebar onNavigate={closeSidebar} isOnline={isOnline} logout={logout} />
                 </View>
-              </View>
+              </Animated.View>
             </View>
           </Modal>
         )}
@@ -336,11 +415,13 @@ function MainLayout() {
         <View style={{ flex: 1 }}>
           <ErrorBoundary>
           <Tabs
+            tabBar={(props) => isDesktop ? null : <MobileTabBar {...props} onMore={openSidebar} />}
             screenOptions={{
               headerShown: false,
               tabBarStyle: isDesktop ? { display: 'none' } : styles.mobileTabBar,
+              tabBarShowLabel: true,
               tabBarActiveTintColor: colors.primary,
-              tabBarInactiveTintColor: colors.text.muted,
+              tabBarInactiveTintColor: colors.text.secondary,
               tabBarLabelStyle: { ...Typography.caption, fontWeight: '600' },
               lazy: true,
             }}
@@ -399,7 +480,6 @@ function MainLayout() {
             <Tabs.Screen name="doctors" options={{ href: null }} />
             <Tabs.Screen name="profile" options={{ href: null }} />
             <Tabs.Screen name="campaigns" options={{ href: null }} />
-            <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'ellipsis-horizontal' : 'ellipsis-horizontal-outline'} size={size} color={color} /> }} />
           </Tabs>
           </ErrorBoundary>
         </View>
@@ -556,8 +636,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   logoutBtnText: { ...Typography.caption, fontWeight: '700', color: colors.danger },
   hamburgerBtn: {
     minWidth: 44,
-    minHeight: 44,
-    padding: 4,
+    minHeight: ControlHeight.buttonMd,
+    padding: 10,
     marginRight: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -566,11 +646,19 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.bg.secondary,
     borderTopColor: colors.border,
     borderTopWidth: 1,
-    height: 68,
     paddingTop: 6,
-    paddingBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'stretch',
     ...Shadows.header,
   },
+  mobileTabItem: {
+    flex: 1,
+    minHeight: ControlHeight.buttonMd,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  mobileTabLabel: { ...Typography.eyebrow, textTransform: 'none', letterSpacing: 0.1 },
 
   // Submenu Styles
   submenuContainer: {
@@ -632,8 +720,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   drawerTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   drawerCloseBtn: {
     minWidth: 44,
-    minHeight: 44,
-    padding: 4,
+    minHeight: ControlHeight.buttonMd,
+    padding: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
