@@ -1828,7 +1828,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
-  searchInput: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   emptyText: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', marginTop: 10 },
 
@@ -1892,7 +1892,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   formGroup: { marginBottom: 16 },
   formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
-  formInputText: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
+  formInputText: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
 
   // Cash selector additions
   typeSelectorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },

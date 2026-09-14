@@ -321,7 +321,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   topBar: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.sm },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 44 },
-  searchInput: { ...Typography.body, flex: 1, height: '100%', color: colors.text.primary, marginLeft: 8 },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: '100%', color: colors.text.primary, marginLeft: 8 },
   tabsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border },
   tabBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },

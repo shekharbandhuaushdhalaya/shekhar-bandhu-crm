@@ -961,7 +961,7 @@ const createStyles = (colors: typeof LightColors) =>
     statLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600', marginTop: 2 },
     searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: Spacing.lg, paddingBottom: 0 },
     searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, height: 40 },
-    searchInput: { ...Typography.bodySm, flex: 1, color: colors.text.primary, marginLeft: 6 },
+    searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.bodySm, flex: 1, color: colors.text.primary, marginLeft: 6 },
     filterGroup: { flexDirection: 'row', gap: 4 },
     filterChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
     filterChipText: { ...Typography.eyebrow, fontWeight: '600', color: colors.text.secondary, textTransform: 'capitalize' },

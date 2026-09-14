@@ -784,7 +784,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: 38,
     gap: 6,
   },
-  searchInput: { ...Typography.bodySm, flex: 1, color: colors.text.primary },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.bodySm, flex: 1, color: colors.text.primary },
   filterChips: {
     flexDirection: 'row',
     gap: 6,

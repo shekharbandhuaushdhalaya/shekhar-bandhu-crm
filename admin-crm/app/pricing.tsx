@@ -395,7 +395,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  searchInput: { ...Typography.body, flex: 1, color: colors.text.primary, paddingVertical: 0 },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, color: colors.text.primary, paddingVertical: 0 },
 
   tableHeader: {
     flexDirection: 'row',

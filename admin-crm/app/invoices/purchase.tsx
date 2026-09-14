@@ -1973,7 +1973,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   innerContainer: { flex: 1, width: '100%' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs, paddingHorizontal: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, minHeight: 46 },
-  searchInput: { ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary },
   addBtn: { width: 34, height: 34, borderRadius: Radius.sm, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
 
   table: { flex: 1, width: '100%', minWidth: 950, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden' },
@@ -2011,7 +2011,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   formGroup: { marginBottom: 16 },
   formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, height: 40 },
-  formInputText: { ...Typography.bodySm, flex: 1, height: 40, color: colors.text.primary },
+  formInputText: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.bodySm, flex: 1, height: 40, color: colors.text.primary },
   statusSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   statusBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
   statusBtnText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },

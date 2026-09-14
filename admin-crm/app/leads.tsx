@@ -199,7 +199,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, marginBottom: Spacing.md },
   searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, marginRight: Spacing.md },
-  searchInput: { ...Typography.body, flex: 1, height: 40, color: colors.text.primary, marginLeft: 8 },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: 40, color: colors.text.primary, marginLeft: 8 },
   addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 16, height: 40, borderRadius: Radius.md },
   addBtnText: { ...Typography.body, color: '#fff', fontWeight: '700', marginLeft: 6 }
 });

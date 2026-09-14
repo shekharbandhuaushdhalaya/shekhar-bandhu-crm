@@ -1808,7 +1808,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.bg.card,
   },
-  searchInput: { ...Typography.bodySm, flex: 1, minHeight: 44, height: 44, color: colors.text.primary },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.bodySm, flex: 1, minHeight: 44, height: 44, color: colors.text.primary },
 
   loadingBox: {
     alignItems: 'center',

@@ -2667,7 +2667,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   summaryDivider: { width: 1, height: 26, backgroundColor: colors.border },
   
   controlsBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', backgroundColor: colors.bg.card, marginHorizontal: Spacing.lg, marginVertical: Spacing.md, paddingHorizontal: 14, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, zIndex: 1100 },
-  searchInput: { ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },

@@ -420,7 +420,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: 12,
   },
-  searchInput: { ...Typography.bodySm, flex: 1, height: 40, color: colors.text.primary },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.bodySm, flex: 1, height: 40, color: colors.text.primary },
   searchBtn: {
     backgroundColor: colors.primary,
     borderRadius: Radius.md,

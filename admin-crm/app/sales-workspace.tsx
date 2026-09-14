@@ -506,7 +506,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   inlinePanelWrap: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
   searchWrap: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
   searchBar: { minHeight: 44, maxWidth: 760, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingLeft: 13, paddingRight: 5, flexDirection: 'row', alignItems: 'center', gap: 9, ...Shadows.card },
-  searchInput: { ...Typography.bodySm, flex: 1, minHeight: 42, color: colors.text.primary },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.bodySm, flex: 1, minHeight: 42, color: colors.text.primary },
   iconButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   searchButton: { minHeight: 34, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: colors.primaryLight },
   searchButtonText: { ...Typography.caption, color: colors.primary, fontWeight: '800' },

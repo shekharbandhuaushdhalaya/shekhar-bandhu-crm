@@ -753,7 +753,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   innerContainer: { flex: 1, width: '100%' },
   header: { marginBottom: Spacing.md, gap: 10 },
   searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, height: 44, gap: 8 },
-  searchInput: { ...Typography.body, flex: 1, height: '100%', color: colors.text.primary },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: '100%', color: colors.text.primary },
   filterRow: { flexDirection: 'row', gap: 8 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border },
   filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
