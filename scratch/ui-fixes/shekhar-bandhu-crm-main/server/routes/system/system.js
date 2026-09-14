@@ -1,0 +1,271 @@
+const express = require('express');
+const { authenticateToken } = require('../auth/auth');
+const SystemSettings = require('../../models/SystemSettings');
+const AuditLog = require('../../models/AuditLog');
+const { authorize } = require('../../middleware/authorize');
+const { validate } = require('../../middleware/validate');
+const { publicTenant } = require('../../middleware/publicTenant');
+const schemas = require('../../validation/schemas');
+
+const router = express.Router();
+
+// GET /api/system/settings — Authenticated endpoint for system settings (excludes raw base64 blobs by default)
+router.get('/settings', authenticateToken, authorize('settings:view'), async (req, res) => {
+  try {
+    const { includeAssets } = req.query;
+    const projection = includeAssets === 'true' ? null : '-signatureBase64 -qrImageBase64';
+    
+    let settings;
+    try {
+      settings = await SystemSettings.findOneAndUpdate(
+        { key: 'company_config' },
+        { $setOnInsert: { key: 'company_config' } },
+        { upsert: true, new: true, setDefaultsOnInsert: true, select: projection }
+      ).lean();
+    } catch (upsertErr) {
+      if (upsertErr.code === 11000) {
+        settings = await SystemSettings.findOne({ key: 'company_config' })
+          .select(projection)
+          .lean();
+      } else {
+        throw upsertErr;
+      }
+    }
+
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/system/settings/public — Unauthenticated public-safe company details (strictly no secrets)
+router.get('/settings/public', publicTenant, async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    const publicFields = 'firmName firmAddress firmEmail firmPhone firmGstin invoicePrefix quotationPrefix challanPrefix dispatchPrefix defaultTerms defaultGstRate signatureUrl dscSignatoryName dscCertificateName manufacturingLicenseNo gmpCertificateNo licenseValidTill gmpValidTill licenceValidityType stateUtCode licenceSerial qrImageUrl';
+    
+    let settings;
+    try {
+      settings = await SystemSettings.findOneAndUpdate(
+        { key: 'company_config' },
+        { $setOnInsert: { key: 'company_config' } },
+        { upsert: true, new: true, setDefaultsOnInsert: true, select: publicFields }
+      ).lean();
+    } catch (upsertErr) {
+      if (upsertErr.code === 11000) {
+        settings = await SystemSettings.findOne({ key: 'company_config' })
+          .select(publicFields)
+          .lean();
+      } else {
+        throw upsertErr;
+      }
+    }
+
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/system/settings
+router.put('/settings', authenticateToken, authorize('settings:edit'), validate(schemas.systemSettingsSchema), async (req, res) => {
+  try {
+    let settings = await SystemSettings.findOne({ key: 'company_config' });
+    if (!settings) {
+      try {
+        settings = await SystemSettings.create({ key: 'company_config' });
+      } catch (createErr) {
+        if (createErr.code === 11000) {
+          settings = await SystemSettings.findOne({ key: 'company_config' });
+        } else {
+          throw createErr;
+        }
+      }
+    }
+
+    // Update fields
+    if (process.env.NODE_ENV === 'production' && ['razorpayKeySecret','razorpayWebhookSecret','geminiApiKey'].some(k => Object.prototype.hasOwnProperty.call(req.body, k))) {
+      return res.status(400).json({ error: 'Integration secrets must be configured through the deployment secret manager/environment, not stored in the database.' });
+    }
+
+    const fields = [
+      'firmName', 'firmAddress', 'firmEmail', 'firmPhone', 'firmGstin',
+      'bankName', 'bankAccountNo', 'bankIfsc', 'bankBranch', 'bankUpi',
+      'invoicePrefix', 'quotationPrefix', 'challanPrefix', 'dispatchPrefix',
+      'defaultTerms', 'defaultGstRate',
+      'signatureBase64', 'signatureUrl', 'dscSignatoryName', 'dscCertificateName',
+      'paymentGatewayEnabled', 'razorpayKeyId', 'razorpayKeySecret', 'razorpayWebhookSecret',
+      'geminiApiKey', 'manufacturingLicenseNo',
+      'gmpCertificateNo', 'licenseValidTill', 'gmpValidTill',
+      'qrImageBase64', 'qrImageUrl'
+    ];
+
+    fields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        settings[field] = req.body[field];
+      }
+    });
+
+    await settings.save();
+    if (req.io) {
+      req.io.emit('settings_updated', { type: 'updated' });
+    }
+    res.json(settings);
+
+    const { logAction } = require('../../utils/auditLogger');
+    await logAction({
+      action: 'UPDATE_SYSTEM_SETTINGS',
+      description: `Updated global company settings: ${settings.firmName} (by ${req.user.name})`,
+      req
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/system/audit-logs
+router.get('/audit-logs', authenticateToken, authorize('audit:view'), async (req, res) => {
+  try {
+
+    const { search, dateFrom, dateTo, limit = 50, page = 1 } = req.query;
+    const filter = {};
+
+    if (search) {
+      const escaped = String(search).slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or = [
+        { userName: { $regex: escaped, $options: 'i' } },
+        { userEmail: { $regex: escaped, $options: 'i' } },
+        { action: { $regex: escaped, $options: 'i' } },
+        { description: { $regex: escaped, $options: 'i' } }
+      ];
+    }
+
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) {
+        const parsed = new Date(dateFrom);
+        if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: 'Invalid dateFrom' });
+        filter.createdAt.$gte = parsed;
+      }
+      if (dateTo) {
+        const parsed = new Date(dateTo);
+        if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: 'Invalid dateTo' });
+        filter.createdAt.$lte = parsed;
+      }
+    }
+
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+    const parsedPage = Math.min(Math.max(parseInt(page, 10) || 1, 1), 10000);
+
+    const logs = await AuditLog.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((parsedPage - 1) * parsedLimit)
+      .limit(parsedLimit)
+      .lean();
+
+    const total = await AuditLog.countDocuments(filter);
+
+    res.json({
+      logs,
+      total,
+      pages: Math.ceil(total / parsedLimit),
+      currentPage: parsedPage
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+// POST /api/system/reset-db — Reset entire database (keeps User collection untouched)
+router.post('/reset-db', authenticateToken, authorize('settings:edit'), async (req, res) => {
+  if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DB_RESET !== 'true') return res.status(403).json({ error: 'Database reset is disabled. Set ALLOW_DB_RESET=true only in a controlled non-production environment.' });
+  try {
+    const models = [
+      'Account', 'Activity', 'AuditLog', 'BankStatement', 'BatchProduction',
+      'BillOfMaterials', 'Campaign', 'Challan', 'Complaint', 'Contact',
+      'CreditNote', 'Customer', 'CustomerPricing', 'Dispatch', 'GstFiling',
+      'Inventory', 'InventoryEntry', 'Invoice', 'LedgerEntry',
+      'MedicalRepresentative', 'MrDailyLog', 'MrExpense', 'MrVisit',
+      'Order', 'Otp', 'Payment', 'Product', 'ProductQuery', 'Quotation',
+      'RawMaterial', 'RawMaterialEntry', 'RolePermission', 'SalesTarget',
+      'Sample', 'StockLedger', 'StockMovement', 'SystemSettings',
+      'Task', 'Vendor', 'Warehouse'
+    ];
+
+    for (const m of models) {
+      const ModelClass = require(`../../models/${m}`);
+      await ModelClass.deleteMany({});
+    }
+
+    if (req.io) {
+      req.io.emit('settings_updated', { type: 'database_reset' });
+    }
+    res.json({ message: 'Database reset successfully. Only users are retained.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const multer = require('multer');
+const path = require('path');
+const { Readable } = require('stream');
+const cloudinary = require('cloudinary').v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter: (req, file, cb) => { const allowed = ['image/jpeg','image/png','image/webp','application/pdf']; cb(allowed.includes(file.mimetype) ? null : new Error('Unsupported file type. Allowed: JPEG, PNG, WebP, PDF'), allowed.includes(file.mimetype)); } });
+
+function uploadFileToCloudinary(buffer, filename, folder = 'shekhar-bandhu/supporting-docs') {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'auto', public_id: path.parse(filename).name + '-' + Date.now() },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    Readable.from(buffer).pipe(stream);
+  });
+}
+
+// POST /api/system/upload — Upload a supporting document/image/pdf to Cloudinary
+router.post('/upload', authenticateToken, authorize('settings:edit'), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+    const secureUrl = await uploadFileToCloudinary(req.file.buffer, req.file.originalname);
+    res.json({
+      name: req.file.originalname,
+      url: secureUrl
+    });
+  } catch (err) {
+    console.error('File Upload Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Database backup/restore is deliberately kept out of the HTTP request path.
+// A JSON response containing counts is NOT a recoverable database backup and must
+// never be presented as one. Use the controlled mongodump/mongorestore scripts.
+router.get('/backup', authenticateToken, authorize('settings:edit'), async (req, res) => {
+  return res.status(410).json({
+    error: 'HTTP database snapshots are disabled',
+    message: 'Use the controlled backup:database script and store backups outside the application host.'
+  });
+});
+
+router.post('/restore', authenticateToken, authorize('settings:edit'), async (req, res) => {
+  return res.status(410).json({
+    error: 'HTTP database restore is disabled',
+    message: 'Database restores must be executed as a controlled operational release with an explicit restore confirmation.'
+  });
+});
+
+module.exports = router;

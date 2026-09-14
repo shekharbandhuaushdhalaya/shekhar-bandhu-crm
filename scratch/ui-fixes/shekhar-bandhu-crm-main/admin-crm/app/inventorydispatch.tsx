@@ -1,0 +1,353 @@
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
+import { useEffect, useState, useCallback } from 'react';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, Pressable, useWindowDimensions, Platform, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { api, Dispatch, DeadStockItem, Challan } from '../utils/api';
+import { useTheme, useStyles } from '../utils/themeContext';
+import { WorkspaceLoading, WorkspaceError, StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+
+export default function InventoryDispatchScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const { width: winWidth } = useWindowDimensions();
+  const isDesktop = winWidth > 768;
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  // ── Dispatches ──
+  const [dispatches, setDispatches] = useState<Dispatch[]>([]);
+  const [challans, setChallans] = useState<Challan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [dispStatusFilter, setDispStatusFilter] = useState('all');
+  const [dispSearch, setDispSearch] = useState('');
+  const [showDispModal, setShowDispModal] = useState(false);
+  const [selectedChallan, setSelectedChallan] = useState<Challan | null>(null);
+  const [transporter, setTransporter] = useState('');
+  const [lrNo, setLrNo] = useState('');
+  const [vehicleNo, setVehicleNo] = useState('');
+  const [courierName, setCourierName] = useState('');
+  const [trackingId, setTrackingId] = useState('');
+  const [trackingUrl, setTrackingUrl] = useState('');
+  const [totalBoxes, setTotalBoxes] = useState('1');
+  const [totalWeight, setTotalWeight] = useState('');
+  const [freightCharge, setFreightCharge] = useState('0');
+  const [dispNotes, setDispNotes] = useState('');
+  const [dispError, setDispError] = useState('');
+
+  // Status update
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [updatingDisp, setUpdatingDisp] = useState<Dispatch | null>(null);
+  const [statusVal, setStatusVal] = useState<Dispatch['status']>('dispatched');
+
+  // ── Dead Stock ──
+  const [deadStock, setDeadStock] = useState<DeadStockItem[]>([]);
+
+  const load = useCallback(async () => {
+    setLoadError('');
+    try {
+      const [disps, dead, allChallans] = await Promise.all([
+        api.getDispatches(dispStatusFilter, dispSearch),
+        api.getDeadStock(),
+        api.getChallans('', 'all'),
+      ]);
+      setDispatches(disps);
+      setDeadStock(dead);
+      const dispatchedChallanIds = new Set(disps.map(d => d.challanId).filter(Boolean));
+      setChallans(allChallans.filter(c => c.challanType === 'sale' && c.status === 'finalized' && c.inventoryPostingStatus === 'posted' && !dispatchedChallanIds.has(c._id)));
+    } catch (e: any) {
+      setLoadError(e.message || 'Unable to load dispatch workspace');
+    } finally { setLoading(false); }
+  }, [dispStatusFilter, dispSearch]);
+
+  useEffect(() => { load(); }, [load]);
+  const onRefresh = useCallback(async () => { api.clearCache(); setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+
+  // Dispatch creation
+  const handleCreateDispatch = async () => {
+    if (!selectedChallan) { setDispError('Please select a posted Sale Challan.'); return; }
+    if (submitting) return;
+    setSubmitting(true); setDispError('');
+    try {
+      await api.createDispatch({
+        challanId: selectedChallan._id,
+        transporter, lrNo, vehicleNo, courierName, trackingId, trackingUrl,
+        totalBoxes: parseInt(totalBoxes) || 0, totalWeight, freightCharge: parseFloat(freightCharge) || 0,
+        notes: dispNotes, status: 'dispatched'
+      });
+      setShowDispModal(false);
+      setSelectedChallan(null); setTransporter(''); setLrNo(''); setVehicleNo('');
+      setCourierName(''); setTrackingId(''); setTrackingUrl(''); setTotalBoxes('1');
+      setTotalWeight(''); setFreightCharge('0'); setDispNotes('');
+      await load();
+    } catch (e: any) { setDispError(e.message); }
+    finally { setSubmitting(false); }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!updatingDisp) return;
+    try {
+      await api.updateDispatch(updatingDisp._id, { status: statusVal });
+      setShowStatusModal(false); setUpdatingDisp(null); load();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleDeleteDispatch = async (id: string) => {
+    const ok = Platform.OS === 'web' ? window.confirm('Delete this dispatch record?') : await new Promise(r => Alert.alert('Delete', 'Delete this dispatch record?', [{ text: 'Cancel', onPress: () => r(false) }, { text: 'Delete', style: 'destructive', onPress: () => r(true) }]));
+    if (ok) { await api.deleteDispatch(id); load(); }
+  };
+
+  const dispatchStatusColors: Record<string, string> = {
+    pending: colors.warning,
+    dispatched: colors.primary,
+    in_transit: colors.info,
+    out_for_delivery: colors.purple || '#8e44ad',
+    delivered: colors.success,
+    returned: colors.danger,
+  };
+
+  return (
+    <View style={styles.screen}>
+
+      {loading ? <WorkspaceLoading title="Loading Dispatch…" message="Fetching posted Challans, logistics records and dead stock." /> : null}
+      {!loading && loadError ? <WorkspaceError message={loadError} onRetry={load} /> : null}
+      {!loading && !loadError ? <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
+
+          <View>
+            {/* Stats Row */}
+            <View style={styles.statsRow}>
+              {[
+                { label: 'Dispatched', val: dispatches.filter(d => d.status === 'dispatched').length, color: colors.primary },
+                { label: 'In Transit', val: dispatches.filter(d => d.status === 'in_transit').length, color: colors.info },
+                { label: 'Delivered', val: dispatches.filter(d => d.status === 'delivered').length, color: colors.success },
+                { label: 'Returned', val: dispatches.filter(d => d.status === 'returned').length, color: colors.danger },
+              ].map(s => (
+                <View key={s.label} style={styles.statCard}>
+                  <Text style={[styles.statValue, { color: s.color }]}>{s.val}</Text>
+                  <Text style={styles.statLabel}>{s.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Actions/Filters */}
+            <View style={styles.card}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                  {(['all', 'dispatched', 'in_transit', 'delivered', 'returned'] as const).map(s => (
+                    <TouchableOpacity key={s} style={[styles.filterChip, dispStatusFilter === s && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => setDispStatusFilter(s)}>
+                      <Text style={[styles.filterChipText, dispStatusFilter === s && { color: '#fff' }]}>{s.replace('_',' ').toUpperCase()}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedChallan(null); setShowDispModal(true); }}>
+                  <Ionicons name="add" size={16} color="#fff" />
+                  <Text style={styles.addBtnText}>Create Dispatch</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* List */}
+            {dispatches.length === 0 ? (
+              <EmptyState title={<>No dispatch records found.</>}  />
+            ) : dispatches.map(disp => (
+              <View key={disp._id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: dispatchStatusColors[disp.status] || colors.primary }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+                      <Text style={styles.cardTitle}>{disp.dispatchNo}</Text>
+                      <StatusPill  label={<>{disp.status.toUpperCase()}</>} textStyle={[styles.badgeText, { color: dispatchStatusColors[disp.status] }]} />
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>
+                        {disp.invoiceNo ? `Invoice: ${disp.invoiceNo}` : `Challan: ${disp.challanNo}`}
+                      </Text>
+                    </View>
+                    <Text style={styles.cardSubTitle}>Party: {disp.customerName}</Text>
+                    <Text style={styles.metaText}> Address: {disp.shippingAddress}</Text>
+
+                    {/* Dispatch Details */}
+                    <View style={styles.detailsGrid}>
+                      {disp.transporter ? <Text style={styles.detailsItem}>Transporter: <Text style={{ fontWeight: '700' }}>{disp.transporter}</Text></Text> : null}
+                      {disp.lrNo ? <Text style={styles.detailsItem}>LR/GR No: <Text style={{ fontWeight: '700' }}>{disp.lrNo}</Text></Text> : null}
+                      {disp.vehicleNo ? <Text style={styles.detailsItem}>Vehicle No: <Text style={{ fontWeight: '700' }}>{disp.vehicleNo}</Text></Text> : null}
+                      {disp.courierName ? <Text style={styles.detailsItem}>Courier: <Text style={{ fontWeight: '700' }}>{disp.courierName}</Text></Text> : null}
+                      {disp.trackingId ? <Text style={styles.detailsItem}>Tracking ID: <Text style={{ fontWeight: '700' }}>{disp.trackingId}</Text></Text> : null}
+                      <Text style={styles.detailsItem}>Boxes: <Text style={{ fontWeight: '700' }}>{disp.totalBoxes}</Text></Text>
+                      {disp.totalWeight ? <Text style={styles.detailsItem}>Weight: <Text style={{ fontWeight: '700' }}>{disp.totalWeight}</Text></Text> : null}
+                      {disp.freightCharge ? <Text style={styles.detailsItem}>Freight Charge: <Text style={{ fontWeight: '700', color: colors.success }}>₹{disp.freightCharge.toLocaleString()}</Text></Text> : null}
+                    </View>
+
+                    {disp.notes ? <Text style={[styles.metaText, { marginTop: 6, fontStyle: 'italic' }]}>Note: {disp.notes}</Text> : null}
+                  </View>
+
+                  {/* Actions */}
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.primary + '15' }]} onPress={() => { setUpdatingDisp(disp); setStatusVal(disp.status); setShowStatusModal(true); }}>
+                      <Ionicons name="create-outline" size={16} color={colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.danger + '15' }]} onPress={() => handleDeleteDispatch(disp._id)}>
+                      <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <Text style={styles.dateText}>Shipped Date: {new Date(disp.dispatchDate).toLocaleDateString('en-IN')}</Text>
+              </View>
+            ))}
+          </View>
+
+        <View style={{ height: 40 }} />
+      </ScrollView> : null}
+
+      {/* ===== MODAL: CREATE DISPATCH ===== */}
+      <Modal visible={showDispModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowDispModal(false)} />
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Create Dispatch Record</Text>
+              <TouchableOpacity onPress={() => setShowDispModal(false)}><Ionicons name="close" size={20} color={colors.text.primary} /></TouchableOpacity>
+            </View>
+            {dispError ? <Text style={styles.modalError}>{dispError}</Text> : null}
+            <ScrollView style={styles.modalForm}>
+              <Text style={styles.inputLabel}>Posted Sale Challan *</Text>
+              <Text style={[styles.metaText, { marginBottom: 8 }]}>Dispatch can only be created from an authoritative posted Sale Challan.</Text>
+              {Platform.OS === 'web' ? (
+                <select value={selectedChallan?._id || ''} onChange={(e: any) => setSelectedChallan(challans.find(c => c._id === e.target.value) || null)} style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, marginBottom: 12, width: '100%' }}>
+                  <option value="">-- Select posted Sale Challan --</option>
+                  {challans.map(c => <option key={c._id} value={c._id}>{c.challanNo} - {c.partyName} ({c.items?.reduce((n, x) => n + Number(x.qty || 0), 0) || 0} boxes)</option>)}
+                </select>
+              ) : (
+                <TextInput style={styles.input} value={selectedChallan?.challanNo || ''} placeholder="Select posted Sale Challan" placeholderTextColor={colors.text.muted} />
+              )}
+
+              <Text style={styles.inputLabel}>Transporter Name</Text>
+              <TextInput style={styles.input} value={transporter} onChangeText={setTransporter} placeholder="e.g. VRL Logistics, TCI" placeholderTextColor={colors.text.muted} />
+
+              <Text style={styles.inputLabel}>LR / GR Number (Lorry Receipt)</Text>
+              <TextInput style={styles.input} value={lrNo} onChangeText={setLrNo} placeholder="e.g. LR-98765" placeholderTextColor={colors.text.muted} />
+
+              <Text style={styles.inputLabel}>Vehicle Number</Text>
+              <TextInput style={styles.input} value={vehicleNo} onChangeText={setVehicleNo} placeholder="e.g. MH-12-PQ-4567" placeholderTextColor={colors.text.muted} />
+
+              <Text style={styles.inputLabel}>Courier Service Name</Text>
+              <TextInput style={styles.input} value={courierName} onChangeText={setCourierName} placeholder="e.g. Delhivery, BlueDart" placeholderTextColor={colors.text.muted} />
+
+              <Text style={styles.inputLabel}>Courier Tracking ID</Text>
+              <TextInput style={styles.input} value={trackingId} onChangeText={setTrackingId} placeholder="Tracking Number" placeholderTextColor={colors.text.muted} />
+
+              <Text style={styles.inputLabel}>Courier Tracking Link</Text>
+              <TextInput style={styles.input} value={trackingUrl} onChangeText={setTrackingUrl} placeholder="https://..." placeholderTextColor={colors.text.muted} />
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Total Boxes</Text>
+                  <TextInput style={styles.input} value={totalBoxes} onChangeText={setTotalBoxes} keyboardType="numeric" placeholder="1" placeholderTextColor={colors.text.muted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Total Weight</Text>
+                  <TextInput style={styles.input} value={totalWeight} onChangeText={setTotalWeight} placeholder="e.g. 15 kg" placeholderTextColor={colors.text.muted} />
+                </View>
+              </View>
+
+              <Text style={styles.inputLabel}>Freight Charge (₹)</Text>
+              <TextInput style={styles.input} value={freightCharge} onChangeText={setFreightCharge} keyboardType="numeric" placeholder="0" placeholderTextColor={colors.text.muted} />
+
+              <Text style={styles.inputLabel}>Dispatch Notes</Text>
+              <TextInput style={[styles.input, { height: 60, textAlignVertical: 'top' }]} value={dispNotes} onChangeText={setDispNotes} placeholder="Any delivery instructions..." placeholderTextColor={colors.text.muted} multiline />
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowDispModal(false)}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.55 }]} disabled={submitting} onPress={handleCreateDispatch}><Text style={styles.submitBtnText}>{submitting ? 'Creating…' : 'Dispatch Out'}</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===== MODAL: UPDATE DISPATCH STATUS ===== */}
+      <Modal visible={showStatusModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowStatusModal(false)} />
+          <View style={[styles.modalContainer, { maxHeight: 350 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Status: {updatingDisp?.dispatchNo}</Text>
+              <TouchableOpacity onPress={() => setShowStatusModal(false)}><Ionicons name="close" size={20} color={colors.text.primary} /></TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalForm}>
+              <Text style={styles.inputLabel}>Status *</Text>
+              {Platform.OS === 'web' ? (
+                <select value={statusVal} onChange={(e: any) => setStatusVal(e.target.value)} style={{ ...Typography.bodySm, padding: '8px 10px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, width: '100%' }}>
+                  {(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned'] as const).map(s => (
+                    <option key={s} value={s}>{s.replace('_',' ').toUpperCase()}</option>
+                  ))}
+                </select>
+              ) : (
+                <TextInput style={styles.input} value={statusVal} onChangeText={(v: any) => setStatusVal(v)} placeholder="Status" />
+              )}
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowStatusModal(false)}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.submitBtn} onPress={handleUpdateStatus}><Text style={styles.submitBtnText}>Update</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const createStyles = (colors: typeof LightColors) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg.primary },
+  pageHeader: { paddingHorizontal: Spacing.lg, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  pageTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  pageSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
+  tabBarScroll: { backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabBarContent: { paddingHorizontal: Spacing.lg, paddingVertical: 10, gap: 8, flexDirection: 'row' },
+  tabPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border },
+  tabPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tabPillText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
+  tabPillTextActive: { color: '#fff', fontWeight: '700' },
+  content: { padding: Spacing.lg, maxWidth: 1200, alignSelf: 'center', width: '100%' },
+  card: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: 12 },
+  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
+  statCard: { flex: 1, minWidth: 80, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+  statValue: { ...Typography.h1, fontWeight: '800' },
+  statLabel: { ...Typography.eyebrow, color: colors.text.muted, textTransform: 'uppercase', marginTop: 4, textAlign: 'center' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.md },
+  addBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
+  filterChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary },
+  filterChipText: { ...Typography.caption, fontWeight: '600', color: colors.text.secondary },
+  cardTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary },
+  cardSubTitle: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
+  metaText: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
+  dateText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 8 },
+  detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm },
+  detailsItem: { ...Typography.bodySm, color: colors.text.secondary, width: '45%' },
+  iconBtn: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  emptyBox: { alignItems: 'center', padding: 40, gap: 8 },
+  emptyText: { ...Typography.bodySm, color: colors.text.muted },
+  sectionTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 8 },
+  tableHeader: { flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 4, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, marginBottom: 4 },
+  th: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  tableRow: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderRadius: Radius.sm },
+  td: { ...Typography.bodySm, color: colors.text.secondary },
+  // Modal styles
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalContainer: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, width: '90%', maxWidth: 520, maxHeight: '85%', zIndex: 10, borderWidth: 1, borderColor: colors.border },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  modalForm: { padding: 16, maxHeight: 420 },
+  modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: colors.border },
+  modalError: { ...Typography.bodySm, margin: 12, padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontWeight: '600' },
+  inputLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
+  input: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 12 },
+  badge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
+  badgeText: { ...Typography.eyebrow, fontWeight: '800' },
+  cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+  cancelBtnText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
+  submitBtn: { flex: 2, paddingVertical: 12, borderRadius: Radius.md, backgroundColor: colors.primary, alignItems: 'center' },
+  submitBtnText: { ...Typography.bodySm, fontWeight: '700', color: '#fff' },
+});

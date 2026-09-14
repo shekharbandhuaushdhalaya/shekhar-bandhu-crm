@@ -1,0 +1,1383 @@
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
+import { useEffect, useState, useCallback } from 'react';
+import { View, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Pressable, FlatList, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Spacing, Radius, LightColors, Shadows, Typography } from '../constants/theme';
+import { api, DashboardStats, Activity, Contact, Product, Invoice, Challan, ConsolidatedInventory, MrDashboardSummary, ExpiryAlert, Campaign } from '../utils/api';
+import { useTheme, useStyles } from '../utils/themeContext';
+import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
+import Svg, { Path, Circle, Text as SvgText, Line, Defs, LinearGradient, Stop, Rect, G } from 'react-native-svg';
+import { MetricTile, Panel, WorkspaceHeader, WorkspaceTabs, WorkspaceLoading, WorkspaceTransition } from './../components/WorkspacePrimitives';
+
+function MetricCard({ title, value, icon, color, colorLight, trend }: { title: string; value: string; icon: string; color: string; colorLight: string; trend: string }) {
+  const styles = useStyles(createStyles);
+  return (
+    <Pressable 
+      style={({ pressed }) => [
+        styles.metricCard, 
+        { borderTopColor: color, borderTopWidth: 3 },
+        pressed && { transform: [{ scale: 0.98 }] }
+      ]}
+    >
+      <View style={styles.metricHeader}>
+        <Text style={styles.metricTitle}>{title}</Text>
+        <View style={[styles.iconCircle, { backgroundColor: colorLight }]}>
+          <Ionicons name={icon as any} size={15} color={color} />
+        </View>
+      </View>
+      <Text style={styles.metricValue}>{value}</Text>
+      <View style={styles.metricFooter}>
+        <Text style={[styles.metricTrend, { color }]}>{trend}</Text>
+        <Text style={styles.metricSubtext}>vs last month</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function PipelineChart({ contacts }: { contacts: Contact[] }) {
+  const { themeMode, colors } = useTheme();
+  const { width: winWidth } = useWindowDimensions();
+  const styles = useStyles(createStyles);
+
+  // If desktop (side-by-side view), width is roughly 60% of container. If mobile, full width.
+  const width = winWidth > 900 ? (Math.min(winWidth, 1200) * 0.6) - 48 : winWidth - 64;
+  const height = 220;
+  const padX = 36;
+  const padY = 28;
+  const stages = ['lead', 'contacted', 'proposal', 'negotiation', 'won'];
+
+  const values = stages.map(stage =>
+    contacts.filter(c => c.stage === stage).reduce((s, c) => s + c.dealValue, 0)
+  );
+
+  const maxVal = Math.max(...values, 10000);
+  const gW = width - padX * 2;
+  const gH = height - padY * 2;
+
+  const points = values.map((val, idx) => ({
+    x: padX + (idx / (stages.length - 1)) * gW,
+    y: padY + gH - (val / maxVal) * gH,
+    val,
+    label: stages[idx].toUpperCase().slice(0, 4),
+  }));
+
+  let pathD = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    const cpX = points[i - 1].x + (points[i].x - points[i - 1].x) / 2;
+    pathD += ` C ${cpX} ${points[i - 1].y}, ${cpX} ${points[i].y}, ${points[i].x} ${points[i].y}`;
+  }
+  const fillD = `${pathD} L ${points[points.length - 1].x} ${padY + gH} L ${points[0].x} ${padY + gH} Z`;
+
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.sectionTitle}>Sales Pipeline Curve</Text>
+      <Svg width={width} height={height}>
+        <Defs>
+          <LinearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor={colors.primary} stopOpacity="0.4" />
+            <Stop offset="100%" stopColor={colors.primary} stopOpacity="0" />
+          </LinearGradient>
+          <LinearGradient id="lineG" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0%" stopColor={colors.primary} />
+            <Stop offset="50%" stopColor={colors.purple} />
+            <Stop offset="100%" stopColor={colors.success} />
+          </LinearGradient>
+        </Defs>
+        <Line x1={padX} y1={padY + gH} x2={width - padX} y2={padY + gH} stroke={themeMode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'} />
+        <Path d={fillD} fill="url(#glow)" />
+        <Path d={pathD} fill="none" stroke="url(#lineG)" strokeWidth={3.5} strokeLinecap="round" />
+        {points.map((pt, i) => (
+          <Circle key={i} cx={pt.x} cy={pt.y} r={5} fill={colors.bg.primary} stroke={colors.purple} strokeWidth={2.5} />
+        ))}
+        {points.map((pt, i) => (
+          <SvgText key={`l-${i}`} x={pt.x} y={padY + gH + 16} fill={colors.text.muted} fontSize={9} fontWeight="700" textAnchor="middle">{pt.label}</SvgText>
+        ))}
+        {points.map((pt, i) => (
+          <SvgText key={`v-${i}`} x={pt.x} y={pt.y - 10} fill={colors.text.primary} fontSize={10} fontWeight="700" textAnchor="middle">₹{(pt.val / 1000).toFixed(0)}k</SvgText>
+        ))}
+      </Svg>
+    </View>
+  );
+}
+
+function ActivityFeed({ activities }: { activities: Activity[] }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  
+  const dotColor = (type: string) => type === 'call' ? colors.info : type === 'email' ? colors.warning : type === 'meeting' ? colors.success : colors.primary;
+  const timeAgo = (d: string) => {
+    const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
+
+  return (
+    <View style={[styles.chartCard, { marginBottom: 0 }]}>
+      <Text style={styles.sectionTitle}>Audit Activities</Text>
+      {activities.slice(0, 5).map((a, i) => (
+        <View key={i} style={styles.activityItem}>
+          <View style={[styles.activityDot, { backgroundColor: dotColor(a.type) }]} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.activityText}>{a.text}</Text>
+            <Text style={styles.activityTime}>{timeAgo(a.date)}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function FinancialSummaryCard({ 
+  title, 
+  value, 
+  label, 
+  icon, 
+  color,
+  breakdown1Label,
+  breakdown1Value,
+  breakdown2Label,
+  breakdown2Value
+}: { 
+  title: string; 
+  value: string; 
+  label: string; 
+  icon: string; 
+  color: string;
+  breakdown1Label?: string;
+  breakdown1Value?: string;
+  breakdown2Label?: string;
+  breakdown2Value?: string;
+}) {
+  const styles = useStyles(createStyles);
+  const bgLight = color + '08';
+  return (
+    <Pressable 
+      style={({ pressed }) => [
+        styles.summaryCard, 
+        { borderLeftColor: color, borderLeftWidth: 4 },
+        pressed && { transform: [{ scale: 0.98 }] }
+      ]}
+    >
+      <View style={styles.summaryCardHeader}>
+        <Text style={styles.summaryCardTitle}>{title}</Text>
+        <View style={[styles.iconCircle, { backgroundColor: bgLight }]}>
+          <Ionicons name={icon as any} size={15} color={color} />
+        </View>
+      </View>
+      <Text style={styles.summaryCardValue}>{value}</Text>
+      
+      {breakdown1Value || breakdown2Value ? (
+        <View style={styles.breakdownRow}>
+          {breakdown1Value ? (
+            <View style={styles.breakdownItem}>
+              {breakdown1Label ? <Text style={styles.breakdownLabel}>{breakdown1Label}</Text> : null}
+              <Text style={styles.breakdownValue}>{breakdown1Value}</Text>
+            </View>
+          ) : null}
+          {breakdown1Value && breakdown2Value ? <View style={styles.breakdownSeparator} /> : null}
+          {breakdown2Value ? (
+            <View style={styles.breakdownItem}>
+              {breakdown2Label ? <Text style={styles.breakdownLabel}>{breakdown2Label}</Text> : null}
+              <Text style={styles.breakdownValue}>{breakdown2Value}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      <Text style={styles.summaryCardLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function LowStockAlerts({ products }: { products: Product[] }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  
+  return (
+    <View style={styles.chartCard}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+        <Ionicons name="warning" size={18} color={colors.warning} style={{ marginRight: 8 }} />
+        <Text style={styles.sectionTitle}>Reorder Level Alerts</Text>
+      </View>
+      {products.length === 0 ? (
+        <Text style={{ color: colors.text.muted }}>All products are optimally stocked.</Text>
+      ) : (
+        <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+          {products.map((p, i) => (
+            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: i === products.length - 1 ? 0 : 1, borderBottomColor: colors.border }}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{p.name}</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>SKU: {p.sku}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ ...Typography.bodySm, color: colors.danger, fontWeight: '700' }}>{p.stockLevel} in stock</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>Min required: {p.minReorder || 0}</Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+function ExpiryAlerts({ alerts, loading }: { alerts: ExpiryAlert[]; loading: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const router = useRouter();
+
+  if (loading) {
+    return (
+      <View style={styles.chartCard}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <Ionicons name="alarm-outline" size={18} color={colors.danger} style={{ marginRight: 8 }} />
+          <Text style={styles.sectionTitle}>Finished Goods Expiry Alerts</Text>
+        </View>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.chartCard}>
+      <TouchableOpacity onPress={() => router.push('/inventories')} activeOpacity={0.7}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <Ionicons name="alarm-outline" size={18} color={colors.danger} style={{ marginRight: 8 }} />
+          <Text style={styles.sectionTitle}>Finished Goods Expiry Alerts</Text>
+        </View>
+      </TouchableOpacity>
+      {alerts.length === 0 ? (
+        <Text style={{ color: colors.text.muted }}>No near-expiry or expired finished goods.</Text>
+      ) : (
+        <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+          {alerts.map((a, i) => {
+            const isExpired = a.status === 'expired';
+            const expDate = new Date(a.expiryDate).toLocaleDateString('en-IN');
+            return (
+              <View key={a._id} style={{ paddingVertical: 8, borderBottomWidth: i === alerts.length - 1 ? 0 : 1, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{a.productType} {a.size ? `(${a.size})` : ''}</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted }}>Batch: {a.batchNo} • {a.warehouseName}</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted }}>Exp: {expDate} • {a.qtyBoxes} boxes</Text>
+                  </View>
+                  <View style={{ backgroundColor: isExpired ? colors.danger + '20' : colors.warning + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                    <Text style={{ ...Typography.caption, fontWeight: '800', color: isExpired ? colors.danger : colors.warning }}>
+                      {isExpired ? `EXPIRED` : `${a.daysToExpiry}d left`}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+function MonthlySalesWidget({ width, sales }: { width: number; sales: Invoice[] }) {
+  const { colors, themeMode } = useTheme();
+  const styles = useStyles(createStyles);
+
+  const [selectedFY, setSelectedFY] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Helper to get Financial Year
+  const getFinancialYear = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = date.getMonth(); // 0-11
+    const startYear = month >= 3 ? year : year - 1;
+    return `FY ${startYear}-${(startYear + 1).toString().slice(2)}`;
+  };
+
+  // Default current financial year
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentFYStart = currentMonth >= 3 ? currentYear : currentYear - 1;
+  const currentFY = `FY ${currentFYStart}-${(currentFYStart + 1).toString().slice(2)}`;
+
+  const availableYears = (() => {
+    const yearsSet = new Set<string>();
+    
+    // Always include the current year and the past 2 years as standard options
+    yearsSet.add(`FY ${currentFYStart - 2}-${(currentFYStart - 1).toString().slice(2)}`);
+    yearsSet.add(`FY ${currentFYStart - 1}-${currentFYStart.toString().slice(2)}`);
+    yearsSet.add(currentFY);
+
+    sales.forEach(s => {
+      if (s.isFinalized && s.date) {
+        const fy = getFinancialYear(s.date);
+        if (fy) yearsSet.add(fy);
+      }
+    });
+    const arr = Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
+    return arr;
+  })();
+
+  useEffect(() => {
+    if (!selectedFY && availableYears.length > 0) {
+      setSelectedFY(availableYears[0]);
+    }
+  }, [availableYears, selectedFY]);
+
+  const activeFY = selectedFY || currentFY;
+
+  const FY_MONTHS = [
+    { name: 'Apr', index: 3 },
+    { name: 'May', index: 4 },
+    { name: 'Jun', index: 5 },
+    { name: 'Jul', index: 6 },
+    { name: 'Aug', index: 7 },
+    { name: 'Sep', index: 8 },
+    { name: 'Oct', index: 9 },
+    { name: 'Nov', index: 10 },
+    { name: 'Dec', index: 11 },
+    { name: 'Jan', index: 0 },
+    { name: 'Feb', index: 1 },
+    { name: 'Mar', index: 2 },
+  ];
+
+  const invoiceSales = Array(12).fill(0);
+
+  const match = activeFY.match(/FY (\d{4})/);
+  const startYear = match ? parseInt(match[1]) : currentFYStart;
+
+  sales.forEach(s => {
+    if (s.isFinalized && s.date) {
+      const d = new Date(s.date);
+      const y = d.getFullYear();
+      const m = d.getMonth();
+      
+      const isWithinFY = (m >= 3 && y === startYear) || (m < 3 && y === startYear + 1);
+      if (isWithinFY) {
+        const monthIdx = m >= 3 ? m - 3 : m + 9;
+        invoiceSales[monthIdx] += s.amount || 0;
+      }
+    }
+  });
+
+  const height = 250;
+  const padX = 45;
+  const padY = 30;
+  const chartWidth = Math.max(width, 500);
+  const gW = chartWidth - padX - 20;
+  const gH = height - padY * 2 - 10;
+
+  const maxVal = Math.max(...invoiceSales, 10000);
+  const barWidth = Math.max(4, (gW / 12) * 0.4);
+
+  return (
+    <View style={[styles.chartCard, { zIndex: 10 }]}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md, flexWrap: 'wrap', gap: 8, zIndex: 100 }}>
+        <Text style={styles.chartTitle}>Monthly Sales Breakdown</Text>
+        
+        {/* Dropdown Selector for Financial Year */}
+        <View style={{ position: 'relative', zIndex: 200 }}>
+          <Pressable
+            onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 6,
+              backgroundColor: themeMode === 'dark' ? '#161b22' : '#f4f5f7',
+              borderWidth: 1,
+              borderColor: colors.border,
+              gap: 6,
+            }}
+          >
+            <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary }}>
+              {activeFY}
+            </Text>
+            <Ionicons name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={14} color={colors.text.secondary} />
+          </Pressable>
+
+          {isDropdownOpen && (
+            <View style={{
+              position: 'absolute',
+              top: 36,
+              right: 0,
+              backgroundColor: colors.bg.card,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 6,
+              width: 110,
+              zIndex: 9999,
+              boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
+              elevation: 8,
+              overflow: 'hidden',
+            }}>
+              {availableYears.map(fy => (
+                <Pressable
+                  key={fy}
+                  onPress={() => {
+                    setSelectedFY(fy);
+                    setIsDropdownOpen(false);
+                  }}
+                  style={({ pressed }) => ({
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    backgroundColor: activeFY === fy 
+                      ? colors.primaryLight 
+                      : (pressed ? (themeMode === 'dark' ? '#21262d' : '#ebecf0') : colors.bg.card),
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                  })}
+                >
+                  <Text style={{ ...Typography.caption, fontWeight: activeFY === fy ? '700' : '600', color: activeFY === fy ? colors.primary : colors.text.secondary }}>
+                    {fy}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
+        <Svg width={chartWidth} height={height}>
+        <Defs>
+          <LinearGradient id="invoiceGrad" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor={colors.primary} />
+            <Stop offset="100%" stopColor={colors.primary + '40'} />
+          </LinearGradient>
+        </Defs>
+
+        {/* Y Axis Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+          const y = padY + gH - (ratio * gH);
+          return (
+            <G key={i}>
+              <SvgText x={padX - 8} y={y + 4} fill={colors.text.muted} fontSize={9} textAnchor="end">
+                {`₹${((ratio * maxVal) / 1000).toFixed(0)}k`}
+              </SvgText>
+              <Line x1={padX} y1={y} x2={chartWidth - 20} y2={y} stroke={colors.border} strokeWidth={1} strokeDasharray="4 4" />
+            </G>
+          );
+        })}
+
+        {/* Draw Bars */}
+        {FY_MONTHS.map((m, idx) => {
+          const centerX = padX + (idx / 12) * gW + (gW / 12) / 2;
+          
+          // Invoice Bar (Pakka)
+          const invVal = invoiceSales[idx];
+          const invH = (Math.max(invVal, 0) / maxVal) * gH;
+          const invX = centerX - barWidth / 2;
+          const invY = padY + gH - invH;
+
+          return (
+            <G key={idx}>
+              {/* Invoice Rect */}
+              {invVal > 0 && (
+                <Rect
+                  x={invX}
+                  y={invY}
+                  width={barWidth}
+                  height={invH}
+                  fill="url(#invoiceGrad)"
+                  rx={2}
+                />
+              )}
+
+              {/* Month label at bottom */}
+              <SvgText x={centerX} y={padY + gH + 16} fill={colors.text.secondary} fontSize={9} fontWeight="700" textAnchor="middle">
+                {m.name}
+              </SvgText>
+            </G>
+          );
+        })}
+      </Svg>
+      </ScrollView>
+
+      {/* Legend */}
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: Spacing.xs }}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+          <Text style={styles.legendText}>Sales Revenue</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+
+
+function RadialOverviewChart({ width, recInvoice, recCash, payInvoice, payCash }: { width: number; recInvoice: number; recCash: number; payInvoice: number; payCash: number }) {
+  const { colors, themeMode } = useTheme();
+  const styles = useStyles(createStyles);
+
+  const size = 180;
+  const radius = 60;
+  const strokeWidth = 14;
+  const circ = 2 * Math.PI * radius;
+
+  const totalInvoice = recInvoice + payInvoice;
+  const totalCash = recCash + payCash;
+  const grandTotal = totalInvoice + totalCash || 1;
+
+  const invRatio = totalInvoice / grandTotal;
+  const cashRatio = totalCash / grandTotal;
+
+  const invOffset = circ * (1 - invRatio);
+  const cashOffset = circ * (1 - cashRatio);
+
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.chartTitle}>Outstanding Ledger Division (Invoice vs Cash)</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.lg, justifyContent: 'center' }}>
+        <Svg width={size} height={size} style={{ alignSelf: 'center' }}>
+          <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
+            {/* Background ring */}
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={themeMode === 'dark' ? '#161b22' : '#dfe1e6'}
+              strokeWidth={strokeWidth}
+              fill="none"
+            />
+            {/* Invoice ring */}
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={colors.primary}
+              strokeWidth={strokeWidth}
+              strokeDasharray={circ}
+              strokeDashoffset={invOffset}
+              strokeLinecap="round"
+              fill="none"
+            />
+            {/* Inner cash ring */}
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius - strokeWidth - 4}
+              stroke={themeMode === 'dark' ? '#161b22' : '#dfe1e6'}
+              strokeWidth={strokeWidth}
+              fill="none"
+            />
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius - strokeWidth - 4}
+              stroke={colors.warning}
+              strokeWidth={strokeWidth}
+              strokeDasharray={circ}
+              strokeDashoffset={cashOffset}
+              strokeLinecap="round"
+              fill="none"
+            />
+          </G>
+          {/* Inner labels */}
+          <SvgText x={size / 2} y={size / 2 - 4} fill={colors.text.primary} fontSize={11} fontWeight="800" textAnchor="middle">
+            {(invRatio * 100).toFixed(0)}% Invoice
+          </SvgText>
+          <SvgText x={size / 2} y={size / 2 + 12} fill={colors.text.secondary} fontSize={10} fontWeight="700" textAnchor="middle">
+            {(cashRatio * 100).toFixed(0)}% Cash
+          </SvgText>
+        </Svg>
+
+        <View style={{ gap: Spacing.sm }}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+            <View>
+              <Text style={styles.legendText}>Invoice Ledger</Text>
+              <Text style={styles.legendVal}>₹{totalInvoice.toLocaleString()}</Text>
+            </View>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
+            <View>
+              <Text style={styles.legendText}>Cash Ledger</Text>
+              <Text style={styles.legendVal}>₹{totalCash.toLocaleString()}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function getItemTotalPieces(item: any): number {
+  const qty = item.qty || 0;
+  const boxes = item.boxes || 0;
+  const packing = item.packing || 1;
+  return qty === boxes * packing ? qty : qty * packing;
+}
+
+function FullMrAnalyticsTab() {
+  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const [mrDashboard, setMrDashboard] = useState<MrDashboardSummary | null>(null);
+  const [dateRange, setDateRange] = useState('thisMonth');
+
+  const loadData = useCallback(async () => {
+    try {
+      const now = new Date();
+      let from: string | undefined;
+      let to: string | undefined;
+      if (dateRange === 'thisMonth') {
+        from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        to = now.toISOString();
+      } else if (dateRange === 'lastMonth') {
+        from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+        to = new Date(now.getFullYear(), now.getMonth(), 0).toISOString();
+      } else if (dateRange === 'thisQuarter') {
+        const q = Math.floor(now.getMonth() / 3);
+        from = new Date(now.getFullYear(), q * 3, 1).toISOString();
+        to = now.toISOString();
+      }
+      const data = await api.getMrDashboard(from, to);
+      setMrDashboard(data);
+    } catch (_) {}
+  }, [dateRange]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  if (!mrDashboard) {
+    return (
+      <View style={{ padding: 24, alignItems: 'center' }}>
+        <Text style={{ ...Typography.bodySm, color: colors.text.muted }}>Loading MR Field Analytics...</Text>
+      </View>
+    );
+  }
+
+  const { mrs: mrData, totals } = mrDashboard;
+
+  return (
+    <View style={{ gap: 16 }}>
+      {/* Quick Navigation Banner to MR Attendance & Field Logs */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.primary + '10', padding: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.primary + '30', flexWrap: 'wrap', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 240 }}>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="location" size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>MR Daily Attendance & GPS Logs</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Inspect live check-ins, check-outs, odometer distance & map coordinates</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={{
+            backgroundColor: colors.primary,
+            paddingHorizontal: 14,
+            paddingVertical: 9,
+            borderRadius: Radius.md,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6
+          }}
+          onPress={() => router.push('/medicalreps')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="footsteps-outline" size={16} color="#fff" />
+          <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '800' }}>View GPS Attendance</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Date Window Controls */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.card, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>Performance Window:</Text>
+        </View>
+        <View style={{ flexDirection: 'row', backgroundColor: colors.bg.primary, padding: 2, borderRadius: Radius.sm, gap: 4 }}>
+          {[
+            { id: 'thisMonth', label: 'This Month' },
+            { id: 'lastMonth', label: 'Last Month' },
+            { id: 'thisQuarter', label: 'This Quarter' }
+          ].map(d => (
+            <Pressable
+              key={d.id}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: Radius.sm,
+                backgroundColor: dateRange === d.id ? colors.primary : 'transparent'
+              }}
+              onPress={() => setDateRange(d.id)}
+            >
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: dateRange === d.id ? '#fff' : colors.text.secondary }}>
+                {d.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* KPI Cards */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.primary + '30' }}>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>DOCTOR VISITS</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.primary, marginTop: 4 }}>{totals.visits}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.success + '30' }}>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>BOOKED ORDERS</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.success, marginTop: 4 }}>{totals.orders}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.warning + '30' }}>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>TOTAL ORDER VALUE</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.warning, marginTop: 4 }}>₹{(totals.orderValue || 0).toLocaleString('en-IN')}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.danger + '30' }}>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>EXPENSES SUBMITTED</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.danger, marginTop: 4 }}>₹{(totals.expenses || 0).toLocaleString('en-IN')}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.info + '30' }}>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>DISTANCE COVERED</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.info, marginTop: 4 }}>{(totals.distance || 0).toFixed(0)} <Text style={{ ...Typography.body }}>km</Text></Text>
+        </View>
+      </View>
+
+      {/* Individual MR Performance Cards */}
+      <View style={{ gap: 12 }}>
+        <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>
+          MR INDIVIDUAL PERFORMANCE & ROI ({mrData.length} ACTIVE REPS)
+        </Text>
+
+        {mrData.map(m => {
+          const roi = m.expenses > 0 ? (((m.orderValue - m.expenses) / m.expenses) * 100).toFixed(0) : '100+';
+          const targetAchievement = m.monthlyTarget > 0 ? Math.min(100, Math.round((m.orderValue / m.monthlyTarget) * 100)) : 0;
+
+          return (
+            <View key={m._id} style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ ...Typography.body, fontWeight: '800', color: colors.primary }}>{m.name.charAt(0)}</Text>
+                  </View>
+                  <View>
+                    <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>{m.name}</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary }}>{m.territory || 'Headquarters'} • Target: ₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
+                  </View>
+                </View>
+                <View style={{ backgroundColor: Number(roi) > 0 ? colors.success + '18' : colors.warning + '18', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '800', color: Number(roi) > 0 ? colors.success : colors.warning }}>
+                    ROI: {roi}%
+                  </Text>
+                </View>
+              </View>
+
+              {/* Progress Bar */}
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>MONTHLY TARGET PROGRESS</Text>
+                  <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>{targetAchievement}% Achieved</Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{ width: `${targetAchievement}%`, height: '100%', backgroundColor: targetAchievement >= 100 ? colors.success : colors.primary }} />
+                </View>
+              </View>
+
+              {/* Metrics Grid */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.bg.primary, padding: 10, borderRadius: Radius.md }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>{m.visits}</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Visits</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>{m.orders}</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Orders</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.success }}>₹{(m.orderValue || 0).toLocaleString('en-IN')}</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Sales</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.danger }}>₹{(m.expenses || 0).toLocaleString('en-IN')}</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Expenses</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.info }}>{m.totalDistance.toFixed(0)} km</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Distance</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) {
+  const { width: winWidth } = useWindowDimensions();
+  const isDesktop = winWidth > 768;
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+
+  if (!mfgAnalytics) {
+    return (
+      <View style={{ padding: 24, alignItems: 'center' }}>
+        <WorkspaceLoading />
+        <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 12 }}>Loading Manufacturing Analytics...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 16 }}>
+      <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' }}>
+         Manufacturing Facility Financial & Asset Valuation
+      </Text>
+
+      <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16 }}>
+        {/* Raw Materials Valuation */}
+        <View style={[styles.chartCard, { flex: 1, padding: 16, marginBottom: 0 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.success + '15', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="leaf-outline" size={20} color={colors.success} />
+            </View>
+            <View>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>Raw Stock Valuation</Text>
+              <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
+                ₹{(mfgAnalytics?.netRawMaterialValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Finished Goods Valuation */}
+        <View style={[styles.chartCard, { flex: 1, padding: 16, marginBottom: 0 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="cube-outline" size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>Finished Goods Value</Text>
+              <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
+                ₹{(mfgAnalytics?.netFinishedGoodsValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Facility Total Value */}
+        <View style={[styles.chartCard, { flex: 1, padding: 16, backgroundColor: colors.primary + '05', marginBottom: 0 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '25', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="wallet-outline" size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={{ ...Typography.caption, color: colors.primary, fontWeight: '700', textTransform: 'uppercase' }}>Total Facility Assets</Text>
+              <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
+                ₹{((mfgAnalytics?.netRawMaterialValue || 0) + (mfgAnalytics?.netFinishedGoodsValue || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Yield Efficiencies */}
+      <View style={[styles.chartCard, { padding: 16 }]}>
+        <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: 16 }}>Yield Performance & Recipe Efficiency</Text>
+        
+        {mfgAnalytics?.yieldPerformance && mfgAnalytics.yieldPerformance.length > 0 ? (
+          <View style={{ gap: 16 }}>
+            {mfgAnalytics.yieldPerformance.map((item: any, idx: number) => {
+              const isLow = item.efficiency < 95;
+              const barColor = isLow ? colors.warning : colors.success;
+              return (
+                <View key={idx}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' }}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>Batch: {item.batchNo} · {item.productName}</Text>
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 2 }}>Yielded {item.actualYieldQty} / {item.plannedQty} planned units</Text>
+                    </View>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: barColor }}>{item.efficiency}%</Text>
+                  </View>
+                  {/* Progress bar */}
+                  <View style={{ height: 8, width: '100%', backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' }}>
+                    <View style={{ height: '100%', width: `${Math.min(100, item.efficiency)}%`, backgroundColor: barColor }} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={{ alignItems: 'center', padding: 24 }}>
+            <Ionicons name="bar-chart-outline" size={32} color={colors.text.secondary} />
+            <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginTop: 8 }}>No completed yield batches to analyze.</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  social_media: 'Social Media',
+  google: 'Google Ads',
+  email: 'Email Blast',
+  sms: 'Bulk SMS',
+  whatsapp: 'WhatsApp',
+  other: 'Other Channel',
+};
+
+function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }) {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  
+  const formatCurrency = (v: number) => `₹${(v || 0).toLocaleString('en-IN')}`;
+
+  const totalBudget = campaigns.reduce((acc, c) => acc + c.budget, 0);
+  const totalSpent = campaigns.reduce((acc, c) => acc + c.spent, 0);
+  const totalRevenue = campaigns.reduce((acc, c) => acc + c.analytics.revenue, 0);
+  const netProfit = totalRevenue - totalSpent;
+  const overallRoi = totalSpent > 0 ? (netProfit / totalSpent) * 100 : 0;
+  const totalLeads = campaigns.reduce((acc, c) => acc + c.analytics.leads, 0);
+  const averageCac = totalLeads > 0 ? totalSpent / totalLeads : 0;
+
+  return (
+    <View style={{ gap: 16 }}>
+      {/* Marketing ROI Summary Header */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.primary + '10', padding: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.primary + '30' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="pie-chart" size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>Marketing Financial ROI Analysis</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Compare campaign spends, yields, and net profits across channels</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ROI Cards */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.primary }}>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Budget</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>{formatCurrency(totalBudget)}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.warning }}>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Spent</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.warning, marginTop: 4 }}>{formatCurrency(totalSpent)}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.success }}>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Revenue Yield</Text>
+          <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.success, marginTop: 4 }}>{formatCurrency(totalRevenue)}</Text>
+        </View>
+      </View>
+
+      {/* ROI Metric Blocks */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
+          <Ionicons name="trending-up" size={24} color={netProfit >= 0 ? colors.success : colors.danger} />
+          <View style={{ marginLeft: 10 }}>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Net Yield Profit</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '800', color: netProfit >= 0 ? colors.success : colors.danger, marginTop: 2 }}>{formatCurrency(netProfit)}</Text>
+          </View>
+        </View>
+
+        <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
+          <Ionicons name="speedometer-outline" size={24} color={colors.primary} />
+          <View style={{ marginLeft: 10 }}>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Return on Spend (ROI)</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary, marginTop: 2 }}>{overallRoi.toFixed(1)}%</Text>
+          </View>
+        </View>
+
+        <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
+          <Ionicons name="people" size={24} color="#6366f1" />
+          <View style={{ marginLeft: 10 }}>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Cost Per Lead (CAC)</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '800', color: '#6366f1', marginTop: 2 }}>{formatCurrency(averageCac)}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Yield Analysis by Channel */}
+      <View style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md }}>
+        <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>Yield Analysis by Channel</Text>
+        <View style={{ flexDirection: 'row', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border + '50', marginBottom: 8 }}>
+          <Text style={{ ...Typography.caption, flex: 1.5, fontWeight: '700', color: colors.text.secondary }}>Channel</Text>
+          <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Spent</Text>
+          <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Revenue</Text>
+          <Text style={{ ...Typography.caption, flex: 1, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>ROI %</Text>
+        </View>
+
+        {['social_media', 'google', 'email', 'sms', 'whatsapp', 'other'].map(platform => {
+          const platformCampaigns = campaigns.filter(c => c.platform === platform);
+          if (platformCampaigns.length === 0) return null;
+
+          const spent = platformCampaigns.reduce((acc, c) => acc + c.spent, 0);
+          const revenue = platformCampaigns.reduce((acc, c) => acc + c.analytics.revenue, 0);
+          const profit = revenue - spent;
+          const roi = spent > 0 ? (profit / spent) * 100 : 0;
+          const platformColor = platform === 'social_media' ? '#1877f2' :
+                                platform === 'google' ? '#ea4335' :
+                                platform === 'email' ? '#8a2be2' :
+                                platform === 'whatsapp' ? '#25d366' : colors.primary;
+
+          return (
+            <View key={platform} style={{ flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border + '30', alignItems: 'center' }}>
+              <View style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: platformColor }} />
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
+                  {PLATFORM_LABELS[platform] || platform}
+                </Text>
+              </View>
+              <Text style={{ ...Typography.caption, flex: 1, textAlign: 'right', color: colors.text.secondary }}>{formatCurrency(spent)}</Text>
+              <Text style={{ ...Typography.caption, flex: 1, textAlign: 'right', color: colors.success, fontWeight: '700' }}>{formatCurrency(revenue)}</Text>
+              <Text style={{ ...Typography.caption, flex: 1, textAlign: 'right', fontWeight: '700', color: profit >= 0 ? colors.success : colors.danger }}>
+                {roi.toFixed(0)}%
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Campaign Financial Efficiency Table */}
+      <View style={{ gap: 10 }}>
+        <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>Campaign Financial Efficiency</Text>
+        {campaigns.map(c => {
+          const profit = c.analytics.revenue - c.spent;
+          const roi = c.spent > 0 ? (profit / c.spent) * 100 : 0;
+          const platformColor = c.platform === 'social_media' ? '#1877f2' :
+                                c.platform === 'google' ? '#ea4335' :
+                                c.platform === 'email' ? '#8a2be2' :
+                                c.platform === 'whatsapp' ? '#25d366' : colors.primary;
+
+          return (
+            <View key={c._id} style={{ flexDirection: 'row', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: platformColor, padding: 12, justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }} numberOfLines={1}>{c.name}</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>Spent: {formatCurrency(c.spent)}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.success }}>+{formatCurrency(c.analytics.revenue)}</Text>
+                <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: profit >= 0 ? colors.success : colors.danger, marginTop: 2 }}>
+                  ROI: {roi.toFixed(0)}%
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+export default function DashboardScreen() {
+  const { width: winWidth } = useWindowDimensions();
+  const isDesktop = winWidth > 768;
+  const chartWidth = isDesktop ? (Math.min(winWidth, 1200) - 240 - 64) * 0.5 - 20 : winWidth - 64;
+  const [activeTab, setActiveTab] = useState<'overview' | 'mr_analytics' | 'manufacturing_analytics' | 'marketing_analytics'>('overview');
+  const [mfgAnalytics, setMfgAnalytics] = useState<any>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({ totalPipeline: 0, closedWon: 0, activeLeadsCount: 0, pendingTasksCount: 0 });
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [recInvoice, setRecInvoice] = useState(0);
+  const [payInvoice, setPayInvoice] = useState(0);
+  const [assetValue, setAssetValue] = useState(0);
+  const [salesVolume, setSalesVolume] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [totalCOGS, setTotalCOGS] = useState(0);
+  const [lowStockProds, setLowStockProds] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [consolidatedInv, setConsolidatedInv] = useState<ConsolidatedInventory[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [allSales, setAllSales] = useState<Invoice[]>([]);
+  const [allChallans, setAllChallans] = useState<Challan[]>([]);
+  const [expiryAlerts, setExpiryAlerts] = useState<ExpiryAlert[]>([]);
+  const [expiryAlertsLoading, setExpiryAlertsLoading] = useState(true);
+  const [deferredLoaded, setDeferredLoaded] = useState({ mfg: false, marketing: false, expiry: false });
+  
+  const { user } = useAuth();
+  const perm = usePermission();
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const router = useRouter();
+
+  const load = useCallback(async () => {
+    const [s, a, c, custs, vends, invs, prods, purchs, sales, challans, mfgData, camps] = await Promise.all([
+      api.getStats(), 
+      api.getActivities(), 
+      api.getContacts(),
+      api.getCustomers(),
+      api.getVendors(),
+      api.getConsolidatedInventory(),
+      api.getProducts(),
+      api.getPurchaseInvoices('', 'all'),
+      api.getSaleInvoices('', 'all'),
+      api.getChallans('', 'all'),
+      Promise.resolve(null),
+      Promise.resolve([])
+    ]);
+    if (mfgData) setMfgAnalytics(mfgData);
+    if (camps) setCampaigns(camps);
+
+    const recInvoiceSum = custs.reduce((sum: number, cust: any) => sum + (cust.pakkaBalance || 0), 0);
+    const payInvoiceSum = vends.reduce((sum: number, vend: any) => sum + (vend.pakkaBalance || 0), 0);
+    
+    // Calculate the asset value: purchases minus sales at purchase price
+    let purchaseInvoiceSum = 0;
+    const purchaseRatesMap: Record<string, number> = {};
+    
+    purchs.forEach((p: any) => {
+      if (p.isFinalized) {
+        (p.items || []).forEach((item: any) => {
+          const pcs = getItemTotalPieces(item);
+          const rate = item.rate || 0;
+          const val = pcs * rate;
+          purchaseInvoiceSum += val;
+          
+          if (item.productId) {
+            purchaseRatesMap[item.productId] = rate;
+          }
+        });
+      }
+    });
+
+    let saleInvoiceSub = 0;
+    sales.forEach((s: any) => {
+      if (s.isFinalized) {
+        (s.items || []).forEach((item: any) => {
+          const pcs = getItemTotalPieces(item);
+          
+          let purchasePrice = 0;
+          if (item.productId && purchaseRatesMap[item.productId] !== undefined) {
+            purchasePrice = purchaseRatesMap[item.productId];
+          } else {
+            const product = prods.find((p: any) => p._id === item.productId);
+            purchasePrice = product ? (product.price || 0) : 0;
+          }
+          
+          const val = pcs * purchasePrice;
+          saleInvoiceSub += val;
+        });
+      }
+    });
+
+    const assetInvoiceSum = Math.max(0, purchaseInvoiceSum - saleInvoiceSub);
+    const volSum = custs.reduce((sum: number, cust: any) => sum + (cust.salesVolume || 0), 0);
+    const revenueSum = sales.reduce((sum: number, s: any) => sum + (s.isFinalized ? s.amount || 0 : 0), 0);
+    const cogsSum = saleInvoiceSub;
+    const lowStock = prods.filter((p: any) => typeof p.minReorder === 'number' && p.stockLevel <= p.minReorder);
+
+    setRecInvoice(recInvoiceSum);
+    setPayInvoice(payInvoiceSum);
+    setAssetValue(assetInvoiceSum);
+    setSalesVolume(volSum);
+    setTotalRevenue(revenueSum);
+    setTotalCOGS(cogsSum);
+    setLowStockProds(lowStock);
+    setProducts(prods);
+    setConsolidatedInv(invs);
+    setAllSales(sales);
+    setAllChallans(challans);
+
+    setStats(s);
+    setActivities(a);
+    setContacts(c);
+  }, []);
+
+  // Load expensive dashboard sections only when their tab is opened. This
+  // keeps the first paint focused on the operational overview.
+  useEffect(() => {
+    let cancelled = false;
+    const loadDeferred = async () => {
+      if (activeTab === 'manufacturing_analytics' && !deferredLoaded.mfg) {
+        const data = await api.getManufacturingAnalytics().catch(() => null);
+        if (!cancelled && data) setMfgAnalytics(data);
+        if (!cancelled) setDeferredLoaded((v) => ({ ...v, mfg: true }));
+      } else if (activeTab === 'marketing_analytics' && !deferredLoaded.marketing) {
+        const data = await api.getCampaigns().catch(() => []);
+        if (!cancelled) setCampaigns(data);
+        if (!cancelled) setDeferredLoaded((v) => ({ ...v, marketing: true }));
+      }
+      if (!cancelled && !deferredLoaded.expiry && activeTab === 'overview') {
+        const result = await api.getFinishedGoodsExpiryAlerts(60).catch(() => null);
+        if (result) setExpiryAlerts(result.alerts || []);
+        if (!cancelled) {
+          setExpiryAlertsLoading(false);
+          setDeferredLoaded((v) => ({ ...v, expiry: true }));
+        }
+      }
+    };
+    loadDeferred();
+    return () => { cancelled = true; };
+  }, [activeTab, deferredLoaded]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
+    const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => load());
+    const sub3 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => load());
+    const sub4 = DeviceEventEmitter.addListener('new_web_order_event', () => load());
+
+    return () => {
+      sub1.remove();
+      sub2.remove();
+      sub3.remove();
+      sub4.remove();
+    };
+  }, [load]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    api.clearCache();
+    await api.checkConnection();
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
+  const overviewTabs = [
+    { id: 'overview' as const, label: 'Overview', icon: 'grid-outline' as const },
+    { id: 'mr_analytics' as const, label: 'MR & Field', icon: 'people-outline' as const },
+    { id: 'manufacturing_analytics' as const, label: 'Manufacturing', icon: 'construct-outline' as const },
+    { id: 'marketing_analytics' as const, label: 'Marketing ROI', icon: 'megaphone-outline' as const },
+  ];
+
+  const grossProfit = totalRevenue - totalCOGS;
+  const greetingName = user?.name?.split(' ')[0] || 'Team';
+  const todayLabel = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  return (
+    <View style={styles.container}>
+      <WorkspaceHeader
+        eyebrow={todayLabel}
+        title={`Welcome back, ${greetingName}`}
+        subtitle="A focused view of sales, collections and inventory attention — without the clutter."
+        actions={[
+          { label: 'New sale', icon: 'add', onPress: () => router.push('/sales-workspace') },
+          { label: 'Record payment', icon: 'wallet-outline', onPress: () => router.push('/payments'), variant: 'secondary' },
+        ]}
+      />
+      <WorkspaceTabs tabs={overviewTabs} value={activeTab} onChange={setActiveTab} />
+
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      ><WorkspaceTransition value={activeTab}>
+        {activeTab === 'overview' ? (
+          <>
+            <View style={styles.metricsGrid}>
+              <MetricTile label="Sales revenue" value={`₹${totalRevenue.toLocaleString('en-IN')}`} icon="trending-up-outline" tone="success" helper="Finalized sales invoices" />
+              <MetricTile label="Receivables" value={`₹${recInvoice.toLocaleString('en-IN')}`} icon="wallet-outline" tone={recInvoice > 0 ? 'warning' : 'success'} helper="Outstanding from customers" />
+              <MetricTile label="Active web orders" value={String(stats.activeWebOrdersCount || 0)} icon="cart-outline" tone={stats.activeWebOrdersCount ? 'info' : 'success'} helper="Awaiting sales processing" />
+              <MetricTile label="Stock alerts" value={String(lowStockProds.length)} icon="alert-circle-outline" tone={lowStockProds.length ? 'danger' : 'success'} helper="At or below reorder level" />
+            </View>
+
+            <Panel title="Business pulse" subtitle="Secondary signals kept compact so the dashboard stays easy to scan.">
+              <View style={styles.pulseRow}>
+                <View style={styles.pulseItem}><Text style={styles.pulseValue}>₹{Number(stats.totalWebSales || 0).toLocaleString('en-IN')}</Text><Text style={styles.pulseLabel}>Website sales</Text></View>
+                <View style={styles.pulseDivider} />
+                <View style={styles.pulseItem}><Text style={styles.pulseValue}>{stats.completedWebOrdersCount || 0}</Text><Text style={styles.pulseLabel}>Completed deliveries</Text></View>
+                <View style={styles.pulseDivider} />
+                <View style={styles.pulseItem}><Text style={styles.pulseValue}>{stats.webQueriesCount || 0}</Text><Text style={styles.pulseLabel}>Website enquiries</Text></View>
+                {perm.can('report:view') ? <><View style={styles.pulseDivider} /><View style={styles.pulseItem}><Text style={styles.pulseValue}>₹{grossProfit.toLocaleString('en-IN')}</Text><Text style={styles.pulseLabel}>Gross profit</Text></View></> : null}
+                {perm.can('report:view') ? <><View style={styles.pulseDivider} /><View style={styles.pulseItem}><Text style={styles.pulseValue}>₹{assetValue.toLocaleString('en-IN')}</Text><Text style={styles.pulseLabel}>Stock value</Text></View></> : null}
+              </View>
+            </Panel>
+
+            <View style={styles.quickActionsRow}>
+              {[
+                { label: 'Sales workspace', sub: 'Orders and fulfillment', icon: 'cart-outline', route: '/sales-workspace' },
+                { label: 'Challans', sub: 'Finalize physical movement', icon: 'document-text-outline', route: '/sales-workspace?tab=challans' },
+                { label: 'MR My Day', sub: 'Field priorities', icon: 'today-outline', route: '/mr-my-day' },
+                { label: 'Sales intelligence', sub: 'Collections and customer health', icon: 'flash-outline', route: '/sales-intelligence' },
+              ].map((item) => (
+                <Pressable key={item.label} style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]} onPress={() => router.push(item.route as any)}>
+                  <View style={styles.quickActionIcon}><Ionicons name={item.icon as any} size={18} color={colors.primary} /></View>
+                  <View style={{ flex: 1 }}><Text style={styles.quickActionLabel}>{item.label}</Text><Text style={styles.quickActionSub}>{item.sub}</Text></View>
+                  <Ionicons name="chevron-forward" size={15} color={colors.text.muted} />
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.chartsFeedRow}>
+              {perm.can('report:view') ? (
+                <View style={styles.chartWrapper}>
+                  <MonthlySalesWidget width={chartWidth} sales={allSales} />
+                </View>
+              ) : null}
+              <View style={styles.feedWrapper}>
+                <LowStockAlerts products={lowStockProds} />
+                <ExpiryAlerts alerts={expiryAlerts} loading={expiryAlertsLoading} />
+              </View>
+            </View>
+          </>
+        ) : activeTab === 'mr_analytics' ? (
+          <FullMrAnalyticsTab />
+        ) : activeTab === 'manufacturing_analytics' ? (
+          <FullManufacturingAnalyticsTab mfgAnalytics={mfgAnalytics} />
+        ) : (
+          <DashboardMarketingAnalyticsTab campaigns={campaigns} />
+        )}
+      </WorkspaceTransition></ScrollView>
+    </View>
+  );
+}
+
+const createStyles = (colors: typeof LightColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg.primary },
+  content: { padding: Spacing.lg, width: '100%', maxWidth: 1200, alignSelf: 'center' },
+  heading: { ...Typography.display, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  subheading: { ...Typography.body, color: colors.text.secondary, marginBottom: Spacing.lg },
+  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginBottom: Spacing.md },
+  metricCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, maxWidth: 340, backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
+  metricHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
+  metricTitle: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
+  metricValue: { ...Typography.display, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  metricTrend: { ...Typography.bodySm, fontWeight: '600' },
+  metricFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.xs },
+  metricSubtext: { ...Typography.caption, color: colors.text.muted },
+  summaryCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, maxWidth: 340, backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
+  summaryCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
+  summaryCardTitle: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted },
+  summaryCardValue: { ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  summaryCardLabel: { ...Typography.caption, color: colors.text.secondary },
+  breakdownRow: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 8, alignItems: 'center' },
+  breakdownItem: { flex: 1 },
+  breakdownLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' },
+  breakdownValue: { ...Typography.body, fontWeight: '700', color: colors.text.primary, marginTop: 2 },
+  breakdownSeparator: { width: 1, backgroundColor: colors.border, alignSelf: 'stretch', marginVertical: 2 },
+  chartLegend: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: Spacing.md },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { ...Typography.caption, color: colors.text.secondary, fontWeight: '600' },
+  legendVal: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '700', marginTop: 2 },
+  chartCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: Spacing.lg, ...Shadows.card },
+  chartTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: Spacing.lg },
+  sectionTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: Spacing.md },
+  activityItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 14 },
+  activityDot: { width: 9, height: 9, borderRadius: 5, marginTop: 4 },
+  activityText: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' },
+  activityTime: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
+  pulseRow: { flexDirection: 'row', alignItems: 'stretch', flexWrap: 'wrap', gap: 0 },
+  pulseItem: { minWidth: 135, flexGrow: 1, flexShrink: 1, paddingVertical: 4, paddingHorizontal: 12 },
+  pulseValue: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  pulseLabel: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 3 },
+  pulseDivider: { width: 1, minHeight: 38, backgroundColor: colors.border, alignSelf: 'center' },
+  quickActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  quickAction: { flexGrow: 1, flexShrink: 1, flexBasis: 245, minWidth: 220, minHeight: 64, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, ...Shadows.card },
+  quickActionPressed: { backgroundColor: colors.bg.cardHover },
+  quickActionIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  quickActionLabel: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
+  quickActionSub: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
+  chartsFeedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, width: '100%' },
+  chartWrapper: { flexGrow: 2, flexShrink: 1, flexBasis: 500 },
+  feedWrapper: { flexGrow: 1, flexShrink: 1, flexBasis: 350 },
+  iconCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+});

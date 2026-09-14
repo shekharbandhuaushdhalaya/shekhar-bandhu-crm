@@ -1,0 +1,22 @@
+const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
+
+const warehouseSchema = new mongoose.Schema({
+  name:          { type: String, required: true, trim: true },
+  addressLine1:  { type: String, default: '', trim: true },
+  addressLine2:  { type: String, default: '', trim: true },
+  city:          { type: String, default: '', trim: true },
+  state:         { type: String, default: '', trim: true },
+  pincode:       { type: String, default: '', trim: true },
+  contactPerson: { type: String, default: '', trim: true },
+  phone:         { type: String, default: '', trim: true },
+  isDefault:     { type: Boolean, default: false },
+  type:          { type: String, enum: ['main', 'manufacturing', 'dealer_consignment'], default: 'main' },
+  manufacturingUnitId: { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit', default: null },
+  customerId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
+  dealerName:    { type: String, default: '', trim: true },
+}, { timestamps: true });
+
+warehouseSchema.index({ manufacturingUnitId: 1 }, { unique: true, sparse: true });
+warehouseSchema.plugin(tenantPlugin);
+module.exports = mongoose.model('Warehouse', warehouseSchema);

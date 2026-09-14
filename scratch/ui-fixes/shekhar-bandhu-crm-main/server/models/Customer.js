@@ -1,0 +1,55 @@
+const mongoose = require('mongoose');
+const tenantPlugin = require('../utils/tenantPlugin');
+
+const customerSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  company: { type: String, default: '', trim: true },
+  email: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
+  passwordHash: { type: String, default: null },
+  portalEnabled: { type: Boolean, default: false },
+  phone: { type: String, default: '' },
+  regularBalance: { type: Number, default: 0 },
+  cashBalance: { type: Number, default: 0 },
+  outstandingInvoices: { type: Number, default: 0 },
+  salesVolume: { type: Number, default: 0 },
+  gstin: { type: String, default: '', trim: true },
+  state: { type: String, default: 'Maharashtra', trim: true },
+  contactPerson: { type: String, default: '', trim: true },
+  pan: { type: String, default: '', trim: true },
+  placeOfSupply: { type: String, default: '', trim: true },
+  paymentTerms: { type: String, default: 'Net 30', trim: true },
+  billingAddress: {
+    street: { type: String, default: '', trim: true },
+    pin: { type: String, default: '', trim: true },
+    city: { type: String, default: '', trim: true },
+    state: { type: String, default: '', trim: true }
+  },
+  shippingAddress: {
+    street: { type: String, default: '', trim: true },
+    pin: { type: String, default: '', trim: true },
+    city: { type: String, default: '', trim: true },
+    state: { type: String, default: '', trim: true }
+  },
+  shippingSameAsBilling: { type: Boolean, default: false },
+  customerType: { type: String, enum: ['gst', 'cash'], default: 'gst' },
+  recordTracking: { type: String, enum: ['invoice_ledger', 'cash_ledger'], default: 'invoice_ledger' },
+  discountPercent: { type: Number, default: 0, min: 0, max: 100 },
+  tradeCategory: {
+    type: String,
+    enum: ['super_stockist', 'distributor', 'wholesaler', 'retailer', 'hospital', 'clinic', 'institution', 'pharmacy', 'direct', 'other'],
+    default: 'distributor'
+  },
+  tradeDiscountOverride: { type: Number, default: null, min: 0, max: 100 },
+  drugLicenseNo: { type: String, default: '', trim: true },
+  drugLicenseExpiry: { type: Date, default: null },
+  areaName: { type: String, default: '', trim: true },
+  creditLimit: { type: Number, default: 0 },  // 0 = unlimited
+  tags: [{ type: String, trim: true }],
+  volumeTier: { type: String, enum: ['tier_1', 'tier_2', 'tier_3', 'none'], default: 'none' },
+}, { timestamps: true });
+
+customerSchema.index({ name: 'text', company: 'text', email: 'text' });
+customerSchema.index({ createdAt: -1 });
+
+customerSchema.plugin(tenantPlugin);
+module.exports = mongoose.model('Customer', customerSchema);

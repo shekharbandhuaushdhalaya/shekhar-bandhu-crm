@@ -1,0 +1,468 @@
+import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
+import { AppText as Text } from './../components/AppText';
+import { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, Switch, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme, useStyles } from '../utils/themeContext';
+import { api, Product } from '../utils/api';
+import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
+import { useAuth } from '../utils/auth';
+import { usePermission } from '../utils/permissions';
+import { useToast } from '../utils/ToastContext';
+import { DataTable, Column } from '../components/DataTable';
+
+type PricingRow = {
+  _id: string;
+  name: string;
+  sku: string;
+  size: string;
+  category: string;
+  price: number;
+  discount: number;
+  discountLabel: string;
+  websitePromoActive: boolean;
+  // local edit state
+  editPrice: string;
+  editDiscount: string;
+  editLabel: string;
+  editPromo: boolean;
+  dirty: boolean;
+  saving: boolean;
+};
+
+export default function PricingScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles(createStyles);
+  const { user } = useAuth();
+  const perm = usePermission();
+  const { showToast } = useToast();
+
+  const [rows, setRows] = useState<PricingRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
+  const [saveAllLoading, setSaveAllLoading] = useState(false);
+
+  const canEdit = perm.can('product:editPricing');
+
+  const fetchProducts = useCallback(async () => {
+    try {
+      const products: any[] = await api.getProducts();
+      setRows(products.map(p => ({
+        _id: p._id,
+        name: p.name,
+        sku: p.sku,
+        size: p.size || '',
+        category: p.category || 'General',
+        price: p.price ?? 0,
+        discount: p.discount ?? 0,
+        discountLabel: p.discountLabel ?? '',
+        websitePromoActive: p.websitePromoActive ?? false,
+        editPrice: String(p.price ?? 0),
+        editDiscount: String(p.discount ?? 0),
+        editLabel: p.discountLabel ?? '',
+        editPromo: p.websitePromoActive ?? false,
+        dirty: false,
+        saving: false,
+      })));
+    } catch (e: any) {
+      showToast(e.message || 'Failed to load products', 'error');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  const onRefresh = () => { api.clearCache(); setRefreshing(true); fetchProducts(); };
+
+  const updateRow = (id: string, fields: Partial<PricingRow>) => {
+    setRows(prev => prev.map(r => r._id === id ? { ...r, ...fields, dirty: true } : r));
+  };
+
+  const saveRow = async (row: PricingRow) => {
+    if (!canEdit) return;
+    const priceVal = parseFloat(row.editPrice);
+    const discVal = parseFloat(row.editDiscount);
+    if (isNaN(priceVal) || priceVal < 0) {
+      showToast('Please enter a valid price (≥ 0).', 'error');
+      return;
+    }
+    if (isNaN(discVal) || discVal < 0 || discVal > 100) {
+      showToast('Discount must be between 0 and 100.', 'error');
+      return;
+    }
+
+    setRows(prev => prev.map(r => r._id === row._id ? { ...r, saving: true } : r));
+    try {
+      const updated = await (api as any).updateProductPricing(row._id, {
+        price: priceVal,
+        discount: discVal,
+        discountLabel: row.editLabel,
+        websitePromoActive: row.editPromo,
+      });
+      setRows(prev => prev.map(r => r._id === row._id ? {
+        ...r,
+        price: updated.price,
+        discount: updated.discount ?? 0,
+        discountLabel: updated.discountLabel ?? '',
+        websitePromoActive: updated.websitePromoActive ?? false,
+        editPrice: String(updated.price),
+        editDiscount: String(updated.discount ?? 0),
+        editLabel: updated.discountLabel ?? '',
+        editPromo: updated.websitePromoActive ?? false,
+        dirty: false,
+        saving: false,
+      } : r));
+    } catch (e: any) {
+      showToast(e.message || 'Could not update pricing.', 'error');
+      setRows(prev => prev.map(r => r._id === row._id ? { ...r, saving: false } : r));
+    }
+  };
+
+  const saveAll = async () => {
+    const dirtyRows = rows.filter(r => r.dirty);
+    if (!dirtyRows.length) {
+      showToast('No unsaved changes detected.', 'info');
+      return;
+    }
+    setSaveAllLoading(true);
+    for (const row of dirtyRows) await saveRow(row);
+    setSaveAllLoading(false);
+    showToast(`${dirtyRows.length} product(s) updated successfully.`, 'success');
+  };
+
+  const filteredRows = rows.filter(r =>
+    r.name.toLowerCase().includes(search.toLowerCase()) ||
+    r.sku.toLowerCase().includes(search.toLowerCase()) ||
+    r.category.toLowerCase().includes(search.toLowerCase()) ||
+    r.size.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const dirtyCount = rows.filter(r => r.dirty).length;
+  const activePromoCount = rows.filter(r => r.websitePromoActive).length;
+
+  const columns: Column<PricingRow>[] = [
+    {
+      key: 'product',
+      title: 'Product',
+      flex: 2.5,
+      render: (row) => (
+        <View>
+          <Text style={styles.productName} numberOfLines={1}>{row.name}</Text>
+          <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+            <StatusPill  label={<>{row.category}</>} textStyle={[styles.catBadgeText, { color: colors.primary }]} />
+            {row.size ? (
+              <StatusPill  label={<>{row.size}</>} textStyle={[styles.catBadgeText, { color: colors.info }]} />
+            ) : null}
+          </View>
+        </View>
+      )
+    },
+    {
+      key: 'price',
+      title: 'Price (₹)',
+      flex: 1.2,
+      align: 'center',
+      render: (row) => (
+        <TextInput
+          style={[styles.numInput, !canEdit && styles.inputDisabled, { width: '100%', maxWidth: 100 }]}
+          value={row.editPrice}
+          onChangeText={v => updateRow(row._id, { editPrice: v })}
+          keyboardType="decimal-pad"
+          editable={canEdit}
+          selectTextOnFocus
+        />
+      )
+    },
+    {
+      key: 'discount',
+      title: 'Disc %',
+      flex: 1,
+      align: 'center',
+      render: (row) => (
+        <TextInput
+          style={[styles.numInput, !canEdit && styles.inputDisabled, row.editDiscount !== '0' && parseFloat(row.editDiscount) > 0 && styles.discountActive, { width: '100%', maxWidth: 80 }]}
+          value={row.editDiscount}
+          onChangeText={v => updateRow(row._id, { editDiscount: v })}
+          keyboardType="decimal-pad"
+          editable={canEdit}
+          selectTextOnFocus
+        />
+      )
+    },
+    {
+      key: 'promoLabel',
+      title: 'Promo Label',
+      flex: 1.8,
+      render: (row) => (
+        <TextInput
+          style={[styles.labelInput, !canEdit && styles.inputDisabled, { width: '100%' }]}
+          value={row.editLabel}
+          onChangeText={v => updateRow(row._id, { editLabel: v })}
+          placeholder="e.g. Festive Sale"
+          placeholderTextColor={colors.text.muted}
+          editable={canEdit}
+        />
+      )
+    },
+    {
+      key: 'promoActive',
+      title: 'Live',
+      flex: 0.9,
+      align: 'center',
+      render: (row) => (
+        <Switch
+          value={row.editPromo}
+          onValueChange={v => { if (canEdit) updateRow(row._id, { editPromo: v }); }}
+          trackColor={{ false: colors.border, true: colors.success + '80' }}
+          thumbColor={row.editPromo ? colors.success : colors.text.muted}
+          disabled={!canEdit}
+        />
+      )
+    },
+    {
+      key: 'save',
+      title: 'Save',
+      flex: 0.8,
+      align: 'center',
+      render: (row) => (
+        row.saving ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <TouchableOpacity
+            style={[styles.saveRowBtn, !row.dirty && styles.saveRowBtnDisabled]}
+            onPress={() => saveRow(row)}
+            disabled={!row.dirty || !canEdit}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={row.dirty ? 'checkmark-circle' : 'checkmark-circle-outline'}
+              size={22}
+              color={row.dirty && canEdit ? colors.success : colors.text.muted}
+            />
+          </TouchableOpacity>
+        )
+      )
+    }
+  ];
+
+  return (
+    <View style={styles.container}>
+      {/* Stats Strip with Integrated Save All Button */}
+      <View style={styles.statsStrip}>
+        <View style={styles.statCard}>
+          <Ionicons name="cube-outline" size={18} color={colors.primary} />
+          <Text style={styles.statValue}>{rows.length}</Text>
+          <Text style={styles.statLabel}>Total Products</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Ionicons name="pricetag-outline" size={18} color={colors.warning} />
+          <Text style={styles.statValue}>{activePromoCount}</Text>
+          <Text style={styles.statLabel}>Active Promos</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Ionicons name="pencil-outline" size={18} color={colors.success} />
+          <Text style={styles.statValue}>{dirtyCount}</Text>
+          <Text style={styles.statLabel}>Unsaved Changes</Text>
+        </View>
+
+        {canEdit && (
+          <TouchableOpacity
+            style={[styles.saveAllBtn, saveAllLoading && { opacity: 0.7 }]}
+            onPress={saveAll}
+            disabled={saveAllLoading}
+            activeOpacity={0.8}
+          >
+            {saveAllLoading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="save-outline" size={16} color="#fff" />}
+            <Text style={styles.saveAllBtnText}>
+              {saveAllLoading ? 'Saving...' : `Save All${dirtyCount > 0 ? ` (${dirtyCount})` : ''}`}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchRow}>
+        <Ionicons name="search-outline" size={16} color={colors.text.muted} style={{ marginRight: 8 }} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by name, SKU or category..."
+          placeholderTextColor={colors.text.muted}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+        <DataTable 
+          data={filteredRows}
+          columns={columns}
+          keyExtractor={item => item._id}
+          isLoading={loading}
+          isRefreshing={refreshing}
+          onRefresh={onRefresh}
+          rowStyle={(item) => item.dirty ? { borderLeftWidth: 3, borderLeftColor: colors.warning } : {}}
+          ListEmptyComponent={
+            <EmptyState title={<>No products match your search.</>}  />
+          }
+        />
+      </View>
+
+      {!canEdit && (
+        <View style={styles.readOnlyBanner}>
+          <Ionicons name="lock-closed-outline" size={14} color={colors.warning} />
+          <Text style={styles.readOnlyText}>View-only mode. Only Admins and Managers can edit pricing.</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const createStyles = (colors: typeof LightColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg.primary },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg.primary },
+  loadingText: { ...Typography.body, marginTop: 12, color: colors.text.muted },
+
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.bg.secondary,
+  },
+  pageTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  pageSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
+  saveAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: Radius.md,
+    ...Shadows.header,
+  },
+  saveAllBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
+
+  statsStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.md,
+    gap: Spacing.md,
+    flexWrap: 'wrap',
+  },
+  statCard: {
+    flex: 1,
+    minWidth: 110,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.bg.primary,
+    borderRadius: Radius.md,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statValue: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  statLabel: { ...Typography.eyebrow, color: colors.text.muted, flex: 1 },
+
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.lg,
+    marginVertical: Spacing.md,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: Radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: { ...Typography.body, flex: 1, color: colors.text.primary, paddingVertical: 0 },
+
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 8,
+    backgroundColor: colors.bg.primary,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+  },
+  thCell: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' },
+
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    minHeight: 64,
+    gap: 8,
+  },
+  tableRowDirty: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+  },
+
+  productName: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
+  skuText: { ...Typography.eyebrow, color: colors.text.muted },
+  catBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  catBadgeText: { ...Typography.eyebrow, fontWeight: '700', textTransform: 'uppercase' },
+
+  numInput: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 6, fontWeight: '700', color: colors.text.primary, textAlign: 'center' },
+  discountActive: {
+    borderColor: colors.warning,
+    backgroundColor: colors.warning + '10',
+    color: colors.warning,
+  },
+  labelInput: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 6, color: colors.text.primary },
+  inputDisabled: {
+    opacity: 0.5,
+  },
+
+  saveRowBtn: { padding: 4 },
+  saveRowBtnDisabled: { opacity: 0.3 },
+
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: 12,
+  },
+  emptyText: { ...Typography.body, color: colors.text.muted },
+
+  readOnlyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: colors.warning + '15',
+    borderTopWidth: 1,
+    borderTopColor: colors.warning + '40',
+  },
+  readOnlyText: { ...Typography.bodySm, color: colors.warning, fontWeight: '600' },
+});
