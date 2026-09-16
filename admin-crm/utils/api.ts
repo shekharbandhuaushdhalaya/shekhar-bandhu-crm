@@ -245,13 +245,14 @@ class ApiClient {
         } finally {
           clearTimeout(timeout);
         }
-        if (!res.ok && res.status === 401 && !url.includes('/auth/refresh') && this.authToken) {
-          const nextToken = await this.refreshAccessToken();
+        if (!res.ok && res.status === 401 && !url.includes('/auth/refresh') && !url.includes('/auth/login')) {
+          const nextToken = this.authToken ? await this.refreshAccessToken() : null;
           if (nextToken) {
             headers['Authorization'] = `Bearer ${nextToken}`;
             const retry = await fetch(fetchUrl, { ...options, headers });
             if (retry.ok) return retry;
           }
+          DeviceEventEmitter.emit('auth_error');
         }
         if (!res.ok) {
           let errMsg = 'API Error';

@@ -247,6 +247,10 @@ function MainLayout() {
       setGlobalLoading(data.isLoading);
     });
 
+    const authSub = DeviceEventEmitter.addListener('auth_error', () => {
+      logout();
+    });
+
     // Initialize Socket.io real-time connection
     const socket = getSocket();
 
@@ -325,6 +329,7 @@ function MainLayout() {
     return () => {
       unsubscribeNetInfo();
       sub.remove();
+      authSub.remove();
       if (drawerCloseTimer.current) clearTimeout(drawerCloseTimer.current);
       socketEvents.forEach(eventName => {
         socket.off(eventName);
