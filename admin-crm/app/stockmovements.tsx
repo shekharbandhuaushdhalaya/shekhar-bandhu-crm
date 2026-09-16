@@ -101,7 +101,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, flexWrap: 'wrap' },
   searchBox: { flex: 1, minWidth: 260, maxWidth: 620, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, backgroundColor: colors.bg.card },
-  input: { ...Typography.bodySm, flex: 1, minHeight: 40, color: colors.text.primary },
+  // borderWidth:0 + transparent bg opts this out of AppTextInput's own border/fill,
+  // which would otherwise draw a second border inside the bordered `searchBox` wrapper.
+  input: { ...Typography.bodySm, flex: 1, minHeight: 40, color: colors.text.primary, borderWidth: 0, backgroundColor: 'transparent' },
   notice: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary },
   noticeText: { ...Typography.caption, color: colors.text.secondary, fontWeight: '700' },
   tableWrap: { flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.lg },

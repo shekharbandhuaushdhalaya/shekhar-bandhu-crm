@@ -1707,6 +1707,8 @@ export default function SaleInvoicesScreen() {
   const debouncedSearch = useDebouncedValue(search, 300);
   const [fyFilter, setFyFilter] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
+  // Initial-load flag so DataTable shows its skeleton instead of an empty table.
+  const [loading, setLoading] = useState(true);
   const [selectedInv, setSelectedInv] = useState<Invoice | null>(null);
   const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -1750,6 +1752,7 @@ export default function SaleInvoicesScreen() {
     if (page === 1) {
       setCustomers(resCustomers);
     }
+    setLoading(false);
   }, [debouncedSearch, modeFilter, page]);
 
   useEffect(() => { setPage(1); }, [debouncedSearch]);
@@ -1947,6 +1950,7 @@ export default function SaleInvoicesScreen() {
             data={filteredInvoices}
             columns={columns}
             keyExtractor={item => item._id}
+            isLoading={loading}
             isRefreshing={refreshing}
             onRefresh={onRefresh}
             onLoadMore={() => {

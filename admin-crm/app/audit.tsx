@@ -237,8 +237,7 @@ export default function AuditLogsScreen() {
       {/* Log Feed */}
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <WorkspaceLoading />
-          <Text style={{ marginTop: 12, color: colors.text.secondary }}>Loading audit records...</Text>
+          <WorkspaceLoading title="Loading audit records…" message="Fetching the latest activity log." />
         </View>
       ) : (
         <ScrollView

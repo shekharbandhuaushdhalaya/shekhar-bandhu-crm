@@ -1685,6 +1685,8 @@ export default function PurchaseInvoicesScreen() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
+  // Initial-load flag so DataTable shows its skeleton instead of an empty table.
+  const [loading, setLoading] = useState(true);
   const [selectedInv, setSelectedInv] = useState<Invoice | null>(null);
   const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -1731,6 +1733,7 @@ export default function PurchaseInvoicesScreen() {
       setVendors(vends);
       setRawMaterials(rms);
     }
+    setLoading(false);
   }, [debouncedSearch, modeFilter, page]);
 
   useEffect(() => { setPage(1); }, [debouncedSearch, modeFilter]);
@@ -1926,6 +1929,7 @@ export default function PurchaseInvoicesScreen() {
             data={invoices}
             columns={columns}
             keyExtractor={item => item._id}
+            isLoading={loading}
             isRefreshing={refreshing}
             onRefresh={onRefresh}
             onLoadMore={() => {

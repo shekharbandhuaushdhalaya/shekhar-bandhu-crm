@@ -576,6 +576,8 @@ export default function PaymentsScreen() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
+  // Initial-load flag so DataTable can show its skeleton instead of an empty table.
+  const [loading, setLoading] = useState(true);
   const [addVisible, setAddVisible] = useState(false);
   const [addType, setAddType] = useState<'receive' | 'make'>('receive');
   const [settleVisible, setSettleVisible] = useState(false);
@@ -595,6 +597,8 @@ export default function PaymentsScreen() {
       setPayments(filtered);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -809,6 +813,7 @@ export default function PaymentsScreen() {
             data={sortedPayments}
             columns={columns}
             keyExtractor={item => item._id}
+            isLoading={loading}
             isRefreshing={refreshing}
             onRefresh={onRefresh}
             onRowPress={(p) => { setSelectedPayment(p); setDetailVisible(true); }}

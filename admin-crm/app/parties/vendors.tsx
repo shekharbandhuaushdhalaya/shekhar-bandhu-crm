@@ -1271,6 +1271,8 @@ export default function VendorsScreen() {
     const [search, setSearch] = useState('');
     const debouncedSearch = useDebouncedValue(search, 300);
     const [refreshing, setRefreshing] = useState(false);
+    // Initial-load flag so DataTable shows its skeleton instead of an empty table.
+    const [listLoading, setListLoading] = useState(true);
     const [selectedVend, setSelectedVend] = useState<Vendor | null>(null);
     const [detailVisible, setDetailVisible] = useState(false);
     const [ledgerVisible, setLedgerVisible] = useState(false);
@@ -1305,6 +1307,7 @@ export default function VendorsScreen() {
         setVendors(Array.isArray(res) ? res : []);
         setTotalPages(1);
       }
+      setListLoading(false);
     }, [debouncedSearch, page]);
 
     useEffect(() => { setPage(1); }, [debouncedSearch]);
@@ -1464,6 +1467,7 @@ export default function VendorsScreen() {
               data={vendors}
               columns={columns}
               keyExtractor={item => item._id}
+              isLoading={listLoading}
               isRefreshing={refreshing}
               onRefresh={onRefresh}
               onLoadMore={() => {

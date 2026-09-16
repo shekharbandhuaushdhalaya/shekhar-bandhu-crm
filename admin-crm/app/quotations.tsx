@@ -1505,6 +1505,8 @@ export default function QuotationsScreen() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
+  // Initial-load flag so DataTable shows its skeleton instead of an empty table.
+  const [loading, setLoading] = useState(true);
   const [selectedInv, setSelectedInv] = useState<Quotation | null>(null);
   const [invoiceToEdit, setQuotationToEdit] = useState<Quotation | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -1515,8 +1517,12 @@ export default function QuotationsScreen() {
   const styles = useStyles(createStyles);
 
   const load = useCallback(async () => {
-    const res = await api.getQuotations(debouncedSearch, modeFilter);
-    setQuotations(res);
+    try {
+      const res = await api.getQuotations(debouncedSearch, modeFilter);
+      setQuotations(res);
+    } finally {
+      setLoading(false);
+    }
   }, [debouncedSearch, modeFilter]);
 
   useEffect(() => { load(); }, [load]);
@@ -1632,6 +1638,7 @@ export default function QuotationsScreen() {
             data={invoices}
             columns={columns}
             keyExtractor={item => item._id}
+            isLoading={loading}
             isRefreshing={refreshing}
             onRefresh={onRefresh}
             onRowPress={(item) => { setSelectedInv(item); setDetailVisible(true); }}

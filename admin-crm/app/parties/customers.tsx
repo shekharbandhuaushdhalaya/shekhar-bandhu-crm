@@ -1540,6 +1540,8 @@ export default function CustomersScreen() {
   const [activeTab, setActiveTab] = useState<'gst' | 'cash'>('gst');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Initial-load flag so DataTable shows its skeleton instead of an empty table.
+  const [listLoading, setListLoading] = useState(true);
   const [selectedCust, setSelectedCust] = useState<Customer | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [ledgerVisible, setLedgerVisible] = useState(false);
@@ -1575,6 +1577,7 @@ export default function CustomersScreen() {
       setCustomers(Array.isArray(res) ? res : []);
       setTotalPages(1);
     }
+    setListLoading(false);
   }, [debouncedSearch, activeTab, page]);
 
   useEffect(() => { setPage(1); }, [debouncedSearch, activeTab]);
@@ -1780,6 +1783,7 @@ export default function CustomersScreen() {
             data={customers}
             columns={columns}
             keyExtractor={item => item._id}
+            isLoading={listLoading}
             isRefreshing={refreshing}
             onRefresh={onRefresh}
             onLoadMore={() => {

@@ -456,7 +456,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   inputIcon: {
     marginRight: 10,
   },
-  input: { ...Typography.bodySm, flex: 1, color: colors.text.primary, height: '100%' },
+  // borderWidth:0 + transparent bg opts this out of AppTextInput's own border/fill,
+  // which would otherwise draw a second border inside the bordered `inputContainer`.
+  input: { ...Typography.bodySm, flex: 1, color: colors.text.primary, height: '100%', borderWidth: 0, backgroundColor: 'transparent' },
   passwordToggle: {
     padding: Spacing.sm,
   },
