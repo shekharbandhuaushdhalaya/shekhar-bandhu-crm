@@ -1,9 +1,8 @@
 import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
-import { AppTextInput as TextInput } from './../../../components/AppTextInput';
 import { AppText as Text } from './../../../components/AppText';
 import { Typography } from './../../../constants/theme';
 import React from 'react';
-import { View, Platform } from 'react-native';
+import { View, Platform, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
@@ -73,7 +72,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {/* Manufacturing Unit Filter Dropdown */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 10, height: 38 }}>
               <Ionicons name="business" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
               {Platform.OS === 'web' ? (
                 <select
@@ -103,10 +102,10 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
             </View>
 
             {/* Search Stocks Box */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, width: isDesktop ? 220 : undefined }}>
-              <Ionicons name="search-outline" size={14} color={colors.text.muted} style={{ marginRight: 4 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 10, height: 38, width: isDesktop ? 220 : undefined }}>
+              <Ionicons name="search-outline" size={14} color={colors.text.muted} style={{ marginRight: 6 }} />
               <TextInput
-                style={{ ...Typography.bodySm, flex: 1, color: colors.text.primary, padding: 0 }}
+                style={[{ ...Typography.bodySm, flex: 1, color: colors.text.primary, padding: 0, height: '100%' }, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}]}
                 placeholder="Search stocks..."
                 placeholderTextColor={colors.text.muted}
                 value={materialSearch}
@@ -120,7 +119,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
             </View>
 
             {/* Stock Status Filter Dropdown */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 10, height: 38 }}>
               <Ionicons name="funnel-outline" size={12} color={colors.text.muted} style={{ marginRight: 4 }} />
               {Platform.OS === 'web' ? (
                 <select
