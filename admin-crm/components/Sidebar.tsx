@@ -376,8 +376,6 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.bg.primary,
-      // @ts-ignore
-      outlineStyle: 'none',
     },
     footerLogoutIconBtn: {
       flex: 1,
@@ -388,8 +386,6 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.danger + '10',
-      // @ts-ignore
-      outlineStyle: 'none',
     },
     statusBadge: {
       flex: 1.5,
