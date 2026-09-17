@@ -71,6 +71,8 @@ orderSchema.index({ createdAt: -1 });
 orderSchema.index({ firmId: 1, orderNo: 1 }, { unique: true, sparse: true });
 orderSchema.index({ firmId: 1, customerId: 1, status: 1, createdAt: -1 });
 orderSchema.index({ firmId: 1, clientOrderRef: 1 }, { unique: true, sparse: true, partialFilterExpression: { clientOrderRef: { $type: 'string', $ne: '' } } });
+orderSchema.index({ firmId: 1, status: 1 });
+orderSchema.index({ firmId: 1, totalAmount: 1 });
 
 orderSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Order', orderSchema);

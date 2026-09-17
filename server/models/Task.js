@@ -35,6 +35,7 @@ const taskSchema = new mongoose.Schema({
 
 taskSchema.index({ dueDate: 1 });
 taskSchema.index({ assignedTo: 1, completed: 1 });
+taskSchema.index({ firmId: 1, completed: 1 });
 
 taskSchema.virtual('isOverdue').get(function () {
   return !this.completed && Boolean(this.dueDate) && new Date(this.dueDate) < new Date();

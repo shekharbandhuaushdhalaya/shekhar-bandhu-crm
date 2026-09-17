@@ -364,39 +364,42 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     footer: {
       borderTopWidth: 1,
       borderTopColor: colors.border,
-      paddingVertical: Spacing.sm,
-      paddingHorizontal: Spacing.sm,
-      gap: 6,
+      paddingVertical: Spacing.md,
+      paddingHorizontal: Spacing.md,
     },
     footerIconBtn: {
       flex: 1,
-      minHeight: ControlHeight.buttonMd,
-      borderRadius: 6,
+      height: 40,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.bg.primary,
+      // @ts-ignore
+      outlineStyle: 'none',
     },
     footerLogoutIconBtn: {
       flex: 1,
-      minHeight: ControlHeight.buttonMd,
-      borderRadius: 6,
+      height: 40,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: colors.danger + '30',
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.danger + '10',
+      // @ts-ignore
+      outlineStyle: 'none',
     },
     statusBadge: {
-      flex: 1,
-      height: 34,
+      flex: 1.5,
+      height: 40,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
       paddingHorizontal: 6,
-      borderRadius: 6,
+      borderRadius: 8,
     },
     dot: {
       width: 6,
@@ -520,7 +523,7 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
 
       {/* Footer Controls */}
       <View style={styles.footer}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, width: '100%' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' }}>
           {/* 1. Connection status */}
           <View style={[styles.statusBadge, { backgroundColor: isOnline ? colors.successLight : colors.warningLight, borderColor: isOnline ? colors.success : colors.warning }]}>
             <View style={[styles.dot, { backgroundColor: isOnline ? colors.success : colors.warning }]} />

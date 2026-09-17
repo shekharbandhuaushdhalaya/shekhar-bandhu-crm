@@ -1108,86 +1108,92 @@ export default function DashboardScreen() {
   const router = useRouter();
 
   const load = useCallback(async () => {
-    const [s, a, c, custs, vends, invs, prods, purchs, sales, challans, mfgData, camps] = await Promise.all([
+    // 1. Phase 1: Fast Loading (Critical Path)
+    const [s, a, c, prods] = await Promise.all([
       api.getStats(), 
       api.getActivities(), 
       api.getContacts(),
-      api.getCustomers(),
-      api.getVendors(),
-      api.getConsolidatedInventory(),
       api.getProducts(),
-      api.getPurchaseInvoices('', 'all'),
-      api.getSaleInvoices('', 'all'),
-      api.getChallans('', 'all'),
-      Promise.resolve(null),
-      Promise.resolve([])
     ]);
-    if (mfgData) setMfgAnalytics(mfgData);
-    if (camps) setCampaigns(camps);
-
-    const recInvoiceSum = custs.reduce((sum: number, cust: any) => sum + (cust.pakkaBalance || 0), 0);
-    const payInvoiceSum = vends.reduce((sum: number, vend: any) => sum + (vend.pakkaBalance || 0), 0);
-    
-    // Calculate the asset value: purchases minus sales at purchase price
-    let purchaseInvoiceSum = 0;
-    const purchaseRatesMap: Record<string, number> = {};
-    
-    purchs.forEach((p: any) => {
-      if (p.isFinalized) {
-        (p.items || []).forEach((item: any) => {
-          const pcs = getItemTotalPieces(item);
-          const rate = item.rate || 0;
-          const val = pcs * rate;
-          purchaseInvoiceSum += val;
-          
-          if (item.productId) {
-            purchaseRatesMap[item.productId] = rate;
-          }
-        });
-      }
-    });
-
-    let saleInvoiceSub = 0;
-    sales.forEach((s: any) => {
-      if (s.isFinalized) {
-        (s.items || []).forEach((item: any) => {
-          const pcs = getItemTotalPieces(item);
-          
-          let purchasePrice = 0;
-          if (item.productId && purchaseRatesMap[item.productId] !== undefined) {
-            purchasePrice = purchaseRatesMap[item.productId];
-          } else {
-            const product = prods.find((p: any) => p._id === item.productId);
-            purchasePrice = product ? (product.price || 0) : 0;
-          }
-          
-          const val = pcs * purchasePrice;
-          saleInvoiceSub += val;
-        });
-      }
-    });
-
-    const assetInvoiceSum = Math.max(0, purchaseInvoiceSum - saleInvoiceSub);
-    const volSum = custs.reduce((sum: number, cust: any) => sum + (cust.salesVolume || 0), 0);
-    const revenueSum = sales.reduce((sum: number, s: any) => sum + (s.isFinalized ? s.amount || 0 : 0), 0);
-    const cogsSum = saleInvoiceSub;
-    const lowStock = prods.filter((p: any) => typeof p.minReorder === 'number' && p.stockLevel <= p.minReorder);
-
-    setRecInvoice(recInvoiceSum);
-    setPayInvoice(payInvoiceSum);
-    setAssetValue(assetInvoiceSum);
-    setSalesVolume(volSum);
-    setTotalRevenue(revenueSum);
-    setTotalCOGS(cogsSum);
-    setLowStockProds(lowStock);
-    setProducts(prods);
-    setConsolidatedInv(invs);
-    setAllSales(sales);
-    setAllChallans(challans);
 
     setStats(s);
     setActivities(a);
     setContacts(c);
+    setProducts(prods);
+    setLowStockProds(prods.filter((p: any) => typeof p.minReorder === 'number' && p.stockLevel <= p.minReorder));
+
+    // 2. Phase 2: Deferred Heavy Background Loading
+    setTimeout(async () => {
+      try {
+        const [custs, vends, invs, purchs, sales, challans] = await Promise.all([
+          api.getCustomers(),
+          api.getVendors(),
+          api.getConsolidatedInventory(),
+          api.getPurchaseInvoices('', 'all'),
+          api.getSaleInvoices('', 'all'),
+          api.getChallans('', 'all'),
+        ]);
+
+        const recInvoiceSum = custs.reduce((sum: number, cust: any) => sum + (cust.pakkaBalance || 0), 0);
+        const payInvoiceSum = vends.reduce((sum: number, vend: any) => sum + (vend.pakkaBalance || 0), 0);
+        
+        // Calculate the asset value: purchases minus sales at purchase price
+        let purchaseInvoiceSum = 0;
+        const purchaseRatesMap: Record<string, number> = {};
+        
+        purchs.forEach((p: any) => {
+          if (p.isFinalized) {
+            (p.items || []).forEach((item: any) => {
+              const pcs = getItemTotalPieces(item);
+              const rate = item.rate || 0;
+              const val = pcs * rate;
+              purchaseInvoiceSum += val;
+              
+              if (item.productId) {
+                purchaseRatesMap[item.productId] = rate;
+              }
+            });
+          }
+        });
+
+        let saleInvoiceSub = 0;
+        sales.forEach((s: any) => {
+          if (s.isFinalized) {
+            (s.items || []).forEach((item: any) => {
+              const pcs = getItemTotalPieces(item);
+              
+              let purchasePrice = 0;
+              if (item.productId && purchaseRatesMap[item.productId] !== undefined) {
+                purchasePrice = purchaseRatesMap[item.productId];
+              } else {
+                const product = prods.find((p: any) => p._id === item.productId);
+                purchasePrice = product ? (product.price || 0) : 0;
+              }
+              
+              const val = pcs * purchasePrice;
+              saleInvoiceSub += val;
+            });
+          }
+        });
+
+        const assetInvoiceSum = Math.max(0, purchaseInvoiceSum - saleInvoiceSub);
+        const volSum = custs.reduce((sum: number, cust: any) => sum + (cust.salesVolume || 0), 0);
+        const revenueSum = sales.reduce((sum: number, s: any) => sum + (s.isFinalized ? s.amount || 0 : 0), 0);
+        const cogsSum = saleInvoiceSub;
+
+        setRecInvoice(recInvoiceSum);
+        setPayInvoice(payInvoiceSum);
+        setAssetValue(assetInvoiceSum);
+        setSalesVolume(volSum);
+        setTotalRevenue(revenueSum);
+        setTotalCOGS(cogsSum);
+        setConsolidatedInv(invs);
+        setAllSales(sales);
+        setAllChallans(challans);
+      } catch (err) {
+        console.error('Error in deferred dashboard load:', err);
+      }
+    }, 150);
   }, []);
 
   // Load expensive dashboard sections only when their tab is opened. This
@@ -1271,8 +1277,8 @@ export default function DashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       ><WorkspaceTransition value={activeTab}>
         {activeTab === 'overview' ? (
-          <>
-            <View style={styles.metricsGrid}>
+          <View style={{ gap: 28, paddingBottom: 40 }}>
+            <View style={[styles.metricsGrid, { marginBottom: 0 }]}>
               <MetricTile label="Sales revenue" value={`₹${totalRevenue.toLocaleString('en-IN')}`} icon="trending-up-outline" tone="success" helper="Finalized sales invoices" />
               <MetricTile label="Receivables" value={`₹${recInvoice.toLocaleString('en-IN')}`} icon="wallet-outline" tone={recInvoice > 0 ? 'warning' : 'success'} helper="Outstanding from customers" />
               <MetricTile label="Active web orders" value={String(stats.activeWebOrdersCount || 0)} icon="cart-outline" tone={stats.activeWebOrdersCount ? 'info' : 'success'} helper="Awaiting sales processing" />
@@ -1317,7 +1323,7 @@ export default function DashboardScreen() {
                 <ExpiryAlerts alerts={expiryAlerts} loading={expiryAlertsLoading} />
               </View>
             </View>
-          </>
+          </View>
         ) : activeTab === 'mr_analytics' ? (
           <FullMrAnalyticsTab />
         ) : activeTab === 'manufacturing_analytics' ? (

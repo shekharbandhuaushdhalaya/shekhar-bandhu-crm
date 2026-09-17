@@ -33,6 +33,7 @@ const contactSchema = new mongoose.Schema({
 
 contactSchema.index({ name: 'text', company: 'text', email: 'text' });
 contactSchema.index({ createdAt: -1 });
+contactSchema.index({ firmId: 1, stage: 1, dealValue: 1 });
 
 contactSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('Contact', contactSchema);
