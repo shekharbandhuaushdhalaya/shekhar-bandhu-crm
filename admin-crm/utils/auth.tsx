@@ -44,17 +44,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Restore last-known firm details immediately (fast, works offline)
         await loadFirmDetailsFromStorage();
 
-        // Then refresh from the live API in the background so QR/signature/
-        // bank details are current even if the user never opens Profile
-        // and the local cache is empty or stale.
-        api.getSystemSettings()
-          .then((config) => {
-            if (config) updateActiveFirmDetails(config);
-          })
-          .catch((err) => {
-            console.error('Failed to refresh firm details on boot:', err);
-          });
-
         const storedToken = await authStorage.getItem('vp_crm_token');
         const storedUser = await authStorage.getItem('vp_crm_user');
 
@@ -63,6 +52,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(storedToken);
           setUser(parsedUser);
           api.setToken(storedToken, parsedUser);
+          
+          api.getSystemSettings()
+            .then((config) => {
+              if (config) updateActiveFirmDetails(config);
+            })
+            .catch((err) => {
+              console.error('Failed to refresh firm details on boot:', err);
+            });
         }
       } catch (err) {
         console.error('Failed to load auth state:', err);
@@ -93,6 +90,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(response.token);
       setUser(response.user);
       api.setToken(response.token, response.user);
+      
+      api.getSystemSettings().then(config => {
+        if (config) updateActiveFirmDetails(config);
+      }).catch(console.error);
 
       return { user: response.user as UserProfile };
     } catch (err: any) {
@@ -111,6 +112,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(response.token);
     setUser(response.user);
     api.setToken(response.token, response.user);
+    api.getSystemSettings().then(config => {
+      if (config) updateActiveFirmDetails(config);
+    }).catch(console.error);
     return response.user;
   };
 
