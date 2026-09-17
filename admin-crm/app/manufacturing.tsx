@@ -1789,7 +1789,7 @@ export default function ManufacturingScreen() {
     }
   }
   if (loading) {
-    return <AyurvedicLoader />;
+    return <View style={styles.screen} />;
   }
 
   const filteredMaterials = materials.filter(rm => {
