@@ -870,7 +870,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
               </Text>
 
               {variantsList.map((variant, index) => (
-                <View key={index} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: Platform.OS === 'web' ? 'nowrap' : 'wrap' }}>
+                <View key={index} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
                   <View style={[styles.formInput, { flex: 1, minWidth: 90 }]}>
                     <Text style={{ ...Typography.caption, color: colors.text.muted, marginRight: 4 }}>Size:</Text>
                     <TextInput
@@ -1348,9 +1348,9 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 <Text style={{ ...Typography.caption, color: colors.text.secondary, marginBottom: 10 }}>
                   Enter ingredient quantities for this batch size. The system scales automatically to the actual production quantity.
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>1 Batch =</Text>
-                  <View style={[styles.formInput, { flex: 1, height: 42, flexDirection: 'row', alignItems: 'center', maxWidth: 140 }]}>
+                  <View style={[styles.formInput, { width: 140, height: 42, flexDirection: 'row', alignItems: 'center' }]}>
                     <TextInput
                       style={[styles.formInputText, { ...Typography.h3, flex: 1, fontWeight: '700' }]}
                       value={formulationBasis}
@@ -1364,11 +1364,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                     </Text>
                   </View>
                   {formulationBasis ? (
-                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, flex: 1 }}>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, flexShrink: 1 }}>
                       → Formula per {formulationBasis} {formulaStd.unit}
                     </Text>
                   ) : (
-                    <Text style={{ ...Typography.bodySm, color: colors.text.muted, flex: 1 }}>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.muted, flexShrink: 1 }}>
                       ← Enter batch size
                     </Text>
                   )}
@@ -1404,9 +1404,9 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
 
               <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 2, marginBottom: 4 }}>
                 <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.muted }}>INGREDIENT</Text>
-                <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.muted }}>QTY ({formulaStd.unit}) / {formulationBasis}{formulaStd.unit}</Text>
+                <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.muted }}>QTY / {formulationBasis || 1}</Text>
                 {bomStages.filter(s => s.name.trim()).length > 0 && (
-                  <Text style={{ ...Typography.eyebrow, flex: 1.5, fontWeight: '700', color: colors.text.muted }}>ADDED IN STAGE</Text>
+                  <Text style={{ ...Typography.eyebrow, flex: 1.5, fontWeight: '700', color: colors.text.muted }}>STAGE</Text>
                 )}
               </View>
               {bomIngredients.map((item, idx) => {
@@ -1415,7 +1415,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 const selectedRM = materials.find(rm => rm._id === item.rawMaterialId);
                 const rmUnit = selectedRM?.unit || '';
                 return (
-                  <View key={`ing-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <View key={`ing-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
                     <View style={[styles.formInput, { flex: 2, height: 42 }]}>
                       {Platform.OS === 'web' ? (
                         <select
@@ -1518,7 +1518,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                     </Text>
 
                     {pkgList.map((pkg, pIdx) => (
-                      <View key={`pkg-${vIdx}-${pIdx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                      <View key={`pkg-${vIdx}-${pIdx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
                         <View style={[styles.formInput, { flex: 2, height: 42 }]}>
                           {Platform.OS === 'web' ? (
                             <select
