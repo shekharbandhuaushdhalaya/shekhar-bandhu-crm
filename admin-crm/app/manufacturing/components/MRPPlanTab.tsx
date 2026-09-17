@@ -125,13 +125,13 @@ export default function MRPPlanTab({
             <View style={{ minWidth: 960, flex: 1 }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.bg.primary, borderBottomColor: colors.border }]}>
-                <Text style={[styles.th, { flex: 2.2 }]}>RAW MATERIAL</Text>
-                <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>PROD NEED</Text>
-                <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>AVAIL STOCK</Text>
-                <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>SAFETY STOCK</Text>
-                <Text style={[styles.th, { flex: 1.5, textAlign: 'right' }]}>SUGGESTED PURCHASE</Text>
-                <Text style={[styles.th, { flex: 2 }]}>PREFERRED VENDOR</Text>
-                <Text style={[styles.th, { flex: 2, textAlign: 'center' }]}>ACTIONS</Text>
+                <Text style={[styles.th, { flex: 2.5, paddingRight: 8 }]}>RAW MATERIAL</Text>
+                <Text style={[styles.th, { flex: 1.3, textAlign: 'right', paddingHorizontal: 8 }]}>PROD NEED</Text>
+                <Text style={[styles.th, { flex: 1.3, textAlign: 'right', paddingHorizontal: 8 }]}>AVAIL STOCK</Text>
+                <Text style={[styles.th, { flex: 1.3, textAlign: 'right', paddingHorizontal: 8 }]}>SAFETY STOCK</Text>
+                <Text style={[styles.th, { flex: 1.8, textAlign: 'right', paddingHorizontal: 8 }]}>SUGGESTED PURCHASE</Text>
+                <Text style={[styles.th, { flex: 1.5, paddingLeft: 20, paddingRight: 8 }]}>PREFERRED VENDOR</Text>
+                <Text style={[styles.th, { flex: 2.3, textAlign: 'center' }]}>ACTIONS</Text>
               </View>
 
               {/* Table Rows */}
@@ -143,7 +143,7 @@ export default function MRPPlanTab({
                   <View key={item.rawMaterialId} style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
                     <View style={[styles.tableRow, idx % 2 === 1 && { backgroundColor: colors.bg.primary + '40' }]}>
                       {/* Raw Material Name & Details */}
-                      <View style={{ flex: 2.2, paddingRight: 8 }}>
+                      <View style={{ flex: 2.5, paddingRight: 8 }}>
                         <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{item.rawMaterialName}</Text>
                         <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 2 }}>
                           Unit: {item.unit} • Category: {item.category || 'General'}
@@ -151,42 +151,42 @@ export default function MRPPlanTab({
                       </View>
 
                       {/* Required for Production */}
-                      <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                      <View style={{ flex: 1.3, alignItems: 'flex-end', paddingHorizontal: 8 }}>
                         <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.warning }}>
                           {item.requiredForProduction.toFixed(2)} {item.unit}
                         </Text>
                       </View>
 
                       {/* Current Available Stock */}
-                      <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                      <View style={{ flex: 1.3, alignItems: 'flex-end', paddingHorizontal: 8 }}>
                         <Text style={{ ...Typography.bodySm, fontWeight: '600', color: item.currentAvailableStock > 0 ? colors.text.primary : colors.danger || '#dc3545' }}>
                           {item.currentAvailableStock.toFixed(2)} {item.unit}
                         </Text>
                       </View>
 
                       {/* Min Reorder Threshold */}
-                      <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                      <View style={{ flex: 1.3, alignItems: 'flex-end', paddingHorizontal: 8 }}>
                         <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>
                           {item.minReorderThreshold.toFixed(2)} {item.unit}
                         </Text>
                       </View>
 
                       {/* Suggested Purchase Qty */}
-                      <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                      <View style={{ flex: 1.8, alignItems: 'flex-end', paddingHorizontal: 8 }}>
                         <StatusPill  label={<>
                             {item.suggestedPurchaseQty.toFixed(2)} {item.unit}
                           </>} textStyle={{ ...Typography.bodySm, fontWeight: '700', color: item.suggestedPurchaseQty > 0 ? colors.success : colors.text.muted }} />
                       </View>
 
                       {/* Preferred Vendor */}
-                      <View style={{ flex: 2, paddingHorizontal: 8 }}>
+                      <View style={{ flex: 1.5, paddingLeft: 20, paddingRight: 8 }}>
                         <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' }}>
                           {item.preferredVendor.vendorName || 'Not Assigned'}
                         </Text>
                       </View>
 
                       {/* Actions */}
-                      <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                      <View style={{ flex: 2.3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                         {item.drivenByProducts.length > 0 && (
                           <TouchableOpacity
                             style={[styles.btnAction, { borderColor: colors.primary }]}
