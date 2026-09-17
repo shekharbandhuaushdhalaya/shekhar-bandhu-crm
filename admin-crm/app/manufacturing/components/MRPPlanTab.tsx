@@ -121,8 +121,8 @@ export default function MRPPlanTab({
         </View>
       ) : (
         <View style={[styles.card, { padding: 0, overflow: 'hidden', backgroundColor: colors.bg.card, borderColor: colors.border }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flexGrow: 0, flexShrink: 0 }}>
-            <View style={{ minWidth: 960 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ minWidth: '100%' }}>
+            <View style={{ minWidth: 960, flex: 1 }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.bg.primary, borderBottomColor: colors.border }]}>
                 <Text style={[styles.th, { flex: 2.2 }]}>RAW MATERIAL</Text>
