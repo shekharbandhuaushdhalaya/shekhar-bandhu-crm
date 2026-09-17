@@ -1761,7 +1761,11 @@ export default function ProfileScreen() {
   };
 
   if (initialLoading) {
-    return <AyurvedicLoader />;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
 
   return (
