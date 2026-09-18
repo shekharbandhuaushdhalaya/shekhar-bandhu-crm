@@ -143,6 +143,8 @@ export default function LeadsScreen() {
       <ListToolbar
         searchValue={search}
         onSearchChange={setSearch}
+        itemCount={filteredContacts ? filteredContacts.length : 0}
+        totalCount={contacts ? contacts.length : 0}
         searchPlaceholder="Search leads..."
         primaryAction={{
           label: 'Add Lead',

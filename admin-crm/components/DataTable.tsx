@@ -16,6 +16,7 @@ export interface Column<T> {
   width?: DimensionValue;
   align?: 'left' | 'center' | 'right';
   render?: (item: T) => React.ReactNode;
+  hideOnMobile?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -72,7 +73,13 @@ function DataTableInner<T>({
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const useCardLayout = isMobile && (!!renderMobileCard || (columns && columns.length > 0));
+  
+  const visibleColumns = React.useMemo(() => {
+    if (!isMobile) return columns;
+    return columns.filter(col => !col.hideOnMobile);
+  }, [columns, isMobile]);
+
+  const useCardLayout = isMobile && (!!renderMobileCard || (visibleColumns && visibleColumns.length > 0));
 
   const renderHeader = useCallback(() => {
     if (useCardLayout) return null;
@@ -80,7 +87,7 @@ function DataTableInner<T>({
     <View style={{ backgroundColor: colors.bg.cardHover, borderBottomWidth: 1, borderBottomColor: colors.border }}>{renderTableHeader()}</View>
   ) : (
     <View style={[styles.headerRow, { backgroundColor: colors.bg.secondary, borderBottomColor: colors.border }, headerStyle]}>
-      {columns.map((col) => (
+      {visibleColumns.map((col) => (
         <View
           key={col.key}
           style={[
@@ -96,7 +103,7 @@ function DataTableInner<T>({
       ))}
     </View>
   );
-  }, [columns, colors, headerStyle, headerTextStyle, renderTableHeader, useCardLayout]);
+  }, [visibleColumns, colors, headerStyle, headerTextStyle, renderTableHeader, useCardLayout]);
 
   const renderRow = useCallback(({ item, index }: { item: T; index: number }) => {
     if (renderTableRow && !useCardLayout) {
@@ -133,7 +140,7 @@ function DataTableInner<T>({
 
       const cardContent = (
         <View style={{ padding: 12, gap: 10 }}>
-          {columns.map((col) => {
+          {visibleColumns.map((col) => {
             const val = col.render ? col.render(item) : (
               <Text style={{ ...Typography.bodySm, color: colors.text.primary, textAlign: 'right' }}>
                 {String((item as any)[col.key] ?? '')}
@@ -177,7 +184,7 @@ function DataTableInner<T>({
 
     const rowContent = (
       <>
-        {columns.map((col) => (
+        {visibleColumns.map((col) => (
           <View
             key={`${keyExtractor(item, index)}-${col.key}`}
             style={[
@@ -221,7 +228,7 @@ function DataTableInner<T>({
         {rowContent}
       </View>
     );
-  }, [columns, colors, keyExtractor, rowStyle, renderTableRow, onRowPress, useCardLayout]);
+  }, [visibleColumns, colors, keyExtractor, rowStyle, renderTableRow, onRowPress, useCardLayout]);
 
   const renderFooter = useCallback(() => {
     if (!isLoadingMore) return null;
@@ -233,7 +240,7 @@ function DataTableInner<T>({
   }, [isLoadingMore, colors]);
 
   if (isLoading && !isRefreshing) {
-    return <TableSkeleton columns={columns.length} rows={8} />;
+    return <TableSkeleton columns={visibleColumns.length} rows={8} />;
   }
 
   const listProps = {

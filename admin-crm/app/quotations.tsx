@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react';
 import * as Print from 'expo-print';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography, getStatusTone } from '../constants/theme';
 import { api, Quotation, Product, Customer, Warehouse, InventoryEntry, QuotationItem } from '../utils/api';
 import { getStateStrWithCode } from '../utils/gst';
 import { useAuth } from '../utils/auth';
@@ -16,7 +16,11 @@ import * as Sharing from 'expo-sharing';
 import { LOGO_BASE64 } from '../utils/logo';
 import { FIRM_DETAILS } from '../constants/firm';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { ListToolbar } from '../components/ListToolbar';
+import { PageHeader } from '../components/PageHeader';
 import { DataTable, Column } from '../components/DataTable';
+import { useListState } from '../utils/useListState';
+import { useLocalSearchParams } from 'expo-router';
 
 // ── Print Quotation ──────────────────────────────────────────────────────────────
 const numberToWords = (num: number): string => {
@@ -548,7 +552,7 @@ function QuotationDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: 
               <View>
                 <Text style={styles.infoLabel}>Payment Status</Text>
                 <Text style={[styles.infoValue, { color: isOutstanding ? colors.warning : colors.success }]}>
-                  {invoice.status.toUpperCase()}
+                  {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                 </Text>
               </View>
             </View>
@@ -1502,9 +1506,19 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
 
 export default function QuotationsScreen() {
   const [invoices, setQuotations] = useState<Quotation[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useListState('quotations_search', '');
+  
+  const params = useLocalSearchParams<{ search?: string }>();
+  useEffect(() => {
+    if (params.search && params.search !== search) {
+      setSearch(params.search);
+    }
+  }, [params.search]);
+
   const debouncedSearch = useDebouncedValue(search, 300);
+  const [fyFilter, setFyFilter] = useListState('quotations_fyFilter', 'All');
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useListState('quotations_page', 1);
   // Initial-load flag so DataTable shows its skeleton instead of an empty table.
   const [loading, setLoading] = useState(true);
   const [selectedInv, setSelectedInv] = useState<Quotation | null>(null);
@@ -1556,6 +1570,7 @@ export default function QuotationsScreen() {
       key: 'date',
       title: 'Date',
       width: 120,
+      hideOnMobile: true,
       render: (item) => (
         <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
       )
@@ -1572,10 +1587,9 @@ export default function QuotationsScreen() {
       key: 'docStatus',
       title: 'Doc Status',
       width: 130,
+      hideOnMobile: true,
       render: (item) => (
-        <StatusPill  label={<>{item.isFinalized ? 'FINALIZED' : 'DRAFT'}</>} textStyle={[styles.statusText, {
-            color: item.isFinalized ? colors.success : colors.warning
-          }]} />
+        <StatusPill  label={<>{item.isFinalized ? 'FINALIZED' : 'DRAFT'}</>} tone={item.isFinalized ? 'success' : 'warning'} />
       )
     },
     {
@@ -1583,9 +1597,7 @@ export default function QuotationsScreen() {
       title: 'Status',
       width: 130,
       render: (item) => (
-        <StatusPill  label={<>{item.status.toUpperCase()}</>} textStyle={[styles.statusText, {
-            color: item.status === 'paid' ? colors.success : item.status === 'partially paid' ? colors.info : colors.warning
-          }]} />
+        <StatusPill  label={<>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</>} tone={getStatusTone(item.status)} />
       )
     },
     {
@@ -1603,35 +1615,22 @@ export default function QuotationsScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader
+        title="Quotations"
+        subtitle="Create and manage draft quotations and convert them to orders."
+      />
       <View style={styles.innerContainer}>
-        {/* Standardized Search Bar */}
-        <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: colors.bg.card,
-            paddingHorizontal: 12,
-            paddingRight: 8,
-            borderRadius: Radius.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            gap: 10,
-            minHeight: 46
-          }}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput
-              style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 100 }}
-              placeholder="Search quotations by number, customer..."
-              placeholderTextColor={colors.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
-            <TouchableOpacity style={{ height: 34, paddingHorizontal: 14, borderRadius: Radius.sm, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }} onPress={() => { setQuotationToEdit(null); setAddVisible(true); }}>
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>New Quotation</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ListToolbar
+          searchPlaceholder="Search quotations by number, customer..."
+          searchValue={search}
+          itemCount={invoices ? invoices.length : 0}
+          onSearchChange={setSearch}
+          primaryAction={{
+            label: 'New Quotation',
+            icon: 'add',
+            onPress: () => { setQuotationToEdit(null); setAddVisible(true); }
+          }}
+        />
 
         <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
           <DataTable

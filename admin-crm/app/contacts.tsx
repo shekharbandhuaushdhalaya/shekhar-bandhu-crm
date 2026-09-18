@@ -78,7 +78,7 @@ export function ContactDetailModal({ contact, visible, onClose, onDeleted }: { c
             </View>
             <Text style={styles.profileName}>{currentContact.name}</Text>
             <Text style={styles.profileCompany}>{currentContact.company}</Text>
-            <StatusPill label={<>{currentContact.stage.toUpperCase()}</>} textStyle={[styles.statusText, { color: stageColor }]} />
+            <StatusPill label={<>{currentContact.stage.charAt(0).toUpperCase() + currentContact.stage.slice(1)}</>} textStyle={[styles.statusText, { color: stageColor }]} />
           </View>
 
           {/* Info Grid */}
@@ -389,6 +389,7 @@ export default function ContactsScreen() {
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search contacts..."
+            itemCount={contacts ? contacts.length : 0}
             primaryAction={{
               label: 'Add Contact',
               icon: 'add',
@@ -463,7 +464,7 @@ export default function ContactsScreen() {
                 flex: 1,
                 render: (item: any) => {
                   const stageColor = stageColors[item.stage as Stage] || colors.text.muted;
-                  return <StatusPill label={<>{item.stage.toUpperCase()}</>} textStyle={[styles.statusText, { color: stageColor }]} />;
+                  return <StatusPill label={<>{item.stage.charAt(0).toUpperCase() + item.stage.slice(1)}</>} textStyle={[styles.statusText, { color: stageColor }]} />;
                 }
               },
               {
@@ -540,7 +541,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 220, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 220, zIndex: 9999, ...Shadows.floating },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { ...Typography.bodySm, color: colors.text.primary },

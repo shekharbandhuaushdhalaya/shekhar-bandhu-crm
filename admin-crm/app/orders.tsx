@@ -1,5 +1,7 @@
 import { PageHeader as ScreenHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
+import { useListState } from '../utils/useListState';
+import { useLocalSearchParams } from 'expo-router';
 import { PageHeader } from '../components/PageHeader';
 import { DataTable, Column } from '../components/DataTable';
 import { ResponsiveSelect } from '../components/ResponsiveSelect';
@@ -11,7 +13,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, DeviceEventEmitter, Platform, useWindowDimensions, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Spacing, Radius, LightColors, Shadows, Typography } from '../constants/theme';
+import { Spacing, Radius, LightColors, Shadows, Typography, getStatusTone } from '../constants/theme';
 import { api, Order } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
@@ -19,10 +21,21 @@ import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useListState('orders_search', '');
+
+  const params = useLocalSearchParams<{ search?: string }>();
+  useEffect(() => {
+    if (params.search && params.search !== search) {
+      setSearch(params.search);
+    }
+  }, [params.search]);
+
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'processing' | 'shipped' | 'delivered'>('all');
+  const [activeTab, setActiveTab] = useListState<'all' | 'pending' | 'processing' | 'shipped' | 'delivered'>('orders_statusFilter', 'all');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [page, setPage] = useListState('orders_page', 1);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Detail Modal State
@@ -55,7 +68,7 @@ export default function OrdersScreen() {
   };
 
   // Lazy loading state
-  const [page, setPage] = useState(1);
+
   const [totalPages, setTotalPages] = useState(1);
   const limit = 50;
 
@@ -188,15 +201,6 @@ export default function OrdersScreen() {
     );
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return colors.danger;
-      case 'processing': return colors.warning;
-      case 'shipped': return colors.primary;
-      case 'delivered': return colors.success;
-      default: return colors.primary;
-    }
-  };
 
   const columns: Column<Order>[] = [
     {
@@ -225,6 +229,7 @@ export default function OrdersScreen() {
       key: 'items',
       title: 'Items',
       flex: 1.2,
+      hideOnMobile: true,
       render: (o) => (
         <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center' }}>
           <Text style={styles.primaryText}>{o.items.length} {o.items.length === 1 ? 'Item' : 'Items'}</Text>
@@ -248,7 +253,7 @@ export default function OrdersScreen() {
       width: 130,
       render: (o) => (
         <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center', alignItems: 'flex-start' }}>
-          <StatusPill label={<>{o.status.toUpperCase()}</>} textStyle={[styles.statusBadgeText, { color: getStatusColor(o.status) }]} />
+          <StatusPill label={<>{o.status.charAt(0).toUpperCase() + o.status.slice(1)}</>} tone={getStatusTone(o.status)} />
         </View>
       )
     },
@@ -302,6 +307,8 @@ export default function OrdersScreen() {
       <ListToolbar
         searchValue={search}
         onSearchChange={setSearch}
+        itemCount={filteredOrders ? filteredOrders.length : 0}
+        totalCount={orders ? orders.length : 0}
         searchPlaceholder="Search orders by customer, tracking, address..."
         renderFilters={() => (
           <>
@@ -352,18 +359,24 @@ export default function OrdersScreen() {
           embedded
           containerStyle={{ flex: 1, height: '100%' }}
           onRowPress={(o: any) => setSelectedOrder(o)}
-          rowStyle={(o: any) => ({
-            backgroundColor: getStatusColor(o.status) + '0A',
-            borderLeftWidth: 4,
-            borderLeftColor: getStatusColor(o.status),
-          })}
+          rowStyle={(o: any) => {
+            const tone = getStatusTone(o.status);
+            const color = tone === 'neutral' ? colors.text.secondary : colors[tone];
+            return {
+              backgroundColor: color + '0A',
+              borderLeftWidth: 4,
+              borderLeftColor: color,
+            };
+          }}
           isRefreshing={refreshing}
           onRefresh={onRefresh}
           onLoadMore={() => { if (page < totalPages) setPage(p => p + 1); }}
           ListEmptyComponent={
             <EmptyState 
-              title={<>No Orders Found</>} 
-              message={<>{activeTab === 'all' ? 'No B2B orders have been placed yet.' : `No orders with status "${activeTab}" found.`}</>} 
+              title={search ? <>No orders found for "{search}"</> : <>No orders found</>} 
+              message={!search ? <>{activeTab === 'all' ? 'No B2B orders have been placed yet.' : `No orders with status "${activeTab}" found.`}</> : undefined}
+              actionLabel={search ? 'Clear Search' : undefined}
+              onAction={search ? () => setSearch('') : undefined}
             />
           }
         />
@@ -404,8 +417,8 @@ export default function OrdersScreen() {
                     </View>
                   </View>
                   <StatusPill  label={<>
-                      {selectedOrder.status.toUpperCase()}
-                    </>} textStyle={[styles.statusBadgeText, { color: getStatusColor(selectedOrder.status) }]} />
+                      {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
+                    </>} tone={getStatusTone(selectedOrder.status)} />
                 </View>
 
                 {/* Customer Details Card */}

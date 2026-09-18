@@ -2,6 +2,8 @@ import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from '../components/AppTextInput';
 import { ListToolbar } from '../components/ListToolbar';
+import { useListState } from '../utils/useListState';
+import { useLocalSearchParams } from 'expo-router';
 import { useConfirm } from '../utils/ConfirmContext';
 import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
@@ -576,8 +578,6 @@ export default function PaymentsScreen() {
   const canAccessCash = user?.canAccessCash ?? false;
   
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
   // Initial-load flag so DataTable can show its skeleton instead of an empty table.
   const [loading, setLoading] = useState(true);
@@ -587,8 +587,21 @@ export default function PaymentsScreen() {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   
-  const [filterType, setFilterType] = useState<'all' | 'receive' | 'make'>('all');
+  const [search, setSearch] = useListState('payments_search', '');
+  
+  const params = useLocalSearchParams<{ search?: string }>();
+  useEffect(() => {
+    if (params.search && params.search !== search) {
+      setSearch(params.search);
+    }
+  }, [params.search]);
+
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const [activeTab, setActiveTab] = useListState<'all' | 'receive' | 'pay' | 'gateway'>('payments_tab', 'all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  
+  const [page, setPage] = useListState('payments_page', 1);
+  const [filterType, setFilterType] = useState<'all' | 'receive' | 'make'>('all');
 
   const load = async () => {
     try {
@@ -642,6 +655,7 @@ export default function PaymentsScreen() {
       key: 'date',
       title: 'Date',
       width: 120,
+      hideOnMobile: true,
       render: (p) => <Text style={{ ...Typography.bodySm, color: colors.text.primary }}>{new Date(p.date).toLocaleDateString('en-IN')}</Text>
     },
     {
@@ -663,13 +677,14 @@ export default function PaymentsScreen() {
       render: (p) => (
         <StatusPill  label={<>
             {p.type === 'receive' ? 'RECEIVED' : 'PAID'}
-          </>} textStyle={[styles.badgeText, { color: p.type === 'receive' ? colors.success : colors.danger }]} />
+          </>} tone={p.type === 'receive' ? 'success' : 'danger'} />
       )
     },
     {
       key: 'mode',
       title: 'Mode',
       width: 100,
+      hideOnMobile: true,
       render: (p) => (
         <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>{p.mode === 'regular' ? 'GST' : 'Cash'} ({p.paymentMethod})</Text>
       )
@@ -706,6 +721,7 @@ export default function PaymentsScreen() {
           <ListToolbar
             searchValue={search}
             onSearchChange={setSearch}
+            itemCount={sortedPayments ? sortedPayments.length : 0}
             searchPlaceholder="Search by party or reference..."
             renderFilters={() => (
               <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
@@ -809,7 +825,12 @@ export default function PaymentsScreen() {
             onRefresh={onRefresh}
             onRowPress={(p) => { setSelectedPayment(p); setDetailVisible(true); }}
             ListEmptyComponent={
-              <EmptyState title={<>No payments recorded.</>}  />
+              <EmptyState 
+                title={search ? <>No payments found for "{search}"</> : <>No payments recorded</>} 
+                message={!search ? <>Record your first payment to track cash flow.</> : undefined}
+                actionLabel={!search ? 'Record Payment' : 'Clear Search'}
+                onAction={!search ? () => setAddVisible(true) : () => setSearch('')}
+              />
             }
           />
         </View>
@@ -831,7 +852,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 160, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 160, zIndex: 9999, ...Shadows.floating },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { ...Typography.bodySm, color: colors.text.primary },

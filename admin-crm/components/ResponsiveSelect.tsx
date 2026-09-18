@@ -12,7 +12,8 @@ export interface SelectOption {
 }
 
 export interface ResponsiveSelectProps {
-  options: SelectOption[];
+  options?: SelectOption[]; // Optional if groups are provided
+  groups?: { title: string; options: SelectOption[] }[];
   value: string | null;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -24,7 +25,8 @@ export interface ResponsiveSelectProps {
 }
 
 export const ResponsiveSelect: React.FC<ResponsiveSelectProps> = ({
-  options,
+  options = [],
+  groups,
   value,
   onChange,
   placeholder = 'Select an option',
@@ -38,16 +40,20 @@ export const ResponsiveSelect: React.FC<ResponsiveSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const selectedOption = options.find(o => o.value === value);
+  const flatOptions = groups ? groups.flatMap(g => g.options) : options;
+  const selectedOption = flatOptions.find(o => o.value === value);
 
   const handleClose = () => {
     setSearchQuery('');
     setIsOpen(false);
   };
 
-  const filteredOptions = searchable && searchQuery 
-    ? options.filter(opt => opt.label.toLowerCase().includes(searchQuery.toLowerCase()) || opt.description?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : options;
+  const isSearchMatch = (opt: SelectOption) => opt.label.toLowerCase().includes(searchQuery.toLowerCase()) || opt.description?.toLowerCase().includes(searchQuery.toLowerCase());
+
+  const filteredOptions = searchable && searchQuery ? flatOptions.filter(isSearchMatch) : flatOptions;
+  const filteredGroups = groups && searchable && searchQuery 
+    ? groups.map(g => ({ ...g, options: g.options.filter(isSearchMatch) })).filter(g => g.options.length > 0)
+    : groups;
 
   if (Platform.OS === 'web' && !searchable) {
     // Keep the native select for simple, non-searchable choices on Web
@@ -72,7 +78,13 @@ export const ResponsiveSelect: React.FC<ResponsiveSelectProps> = ({
           }}
         >
           <option value="" disabled>{placeholder}</option>
-          {options.map(opt => (
+          {groups ? groups.map(g => (
+            <optgroup key={g.title} label={g.title}>
+              {g.options.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </optgroup>
+          )) : options.map(opt => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -123,7 +135,7 @@ export const ResponsiveSelect: React.FC<ResponsiveSelectProps> = ({
           <View style={[styles.modalContent, { backgroundColor: colors.bg.primary }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{placeholder}</Text>
-              <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+              <TouchableOpacity onPress={handleClose} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close dialog">
                 <Ionicons name="close" size={24} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
@@ -138,6 +150,7 @@ export const ResponsiveSelect: React.FC<ResponsiveSelectProps> = ({
                     placeholderTextColor={colors.text.muted}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
+                    autoFocus={true}
                   />
                   {searchQuery ? (
                     <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="Clear">
@@ -148,42 +161,85 @@ export const ResponsiveSelect: React.FC<ResponsiveSelectProps> = ({
               </View>
             )}
 
-            <FlatList
-              data={filteredOptions}
-              keyExtractor={item => item.value}
-              contentContainerStyle={{ padding: Spacing.md, gap: 4 }}
-              renderItem={({ item }) => {
-                const isSelected = item.value === value;
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.optionItem,
-                      isSelected && { backgroundColor: colors.primary + '15' }
-                    ]}
-                    onPress={() => {
-                      onChange(item.value);
-                      setIsOpen(false);
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      {item.icon && (
-                        <Ionicons name={item.icon} size={20} color={isSelected ? colors.primary : colors.text.muted} />
+            {filteredGroups ? (
+              <FlatList
+                data={filteredGroups.flatMap(g => [{ _type: 'header' as const, title: g.title }, ...g.options.map(o => ({ _type: 'item' as const, ...o }))])}
+                keyExtractor={(item, index) => item._type === 'header' ? `header-${item.title}` : (item as SelectOption).value}
+                contentContainerStyle={{ padding: Spacing.md, gap: 4 }}
+                renderItem={({ item }) => {
+                  if (item._type === 'header') {
+                    return <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.muted, marginTop: Spacing.sm, marginBottom: 2 }}>{item.title.toUpperCase()}</Text>;
+                  }
+                  const opt = item as any;
+                  const isSelected = opt.value === value;
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.optionItem,
+                        isSelected && { backgroundColor: colors.primary + '15' }
+                      ]}
+                      onPress={() => {
+                        onChange(opt.value);
+                        setIsOpen(false);
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        {opt.icon && (
+                          <Ionicons name={opt.icon} size={20} color={isSelected ? colors.primary : colors.text.muted} />
+                        )}
+                        <Text style={[
+                          styles.optionText,
+                          { color: isSelected ? colors.primary : colors.text.primary },
+                          isSelected && { fontWeight: '700' }
+                        ]}>
+                          {opt.label}
+                        </Text>
+                      </View>
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={20} color={colors.primary} />
                       )}
-                      <Text style={[
-                        styles.optionText,
-                        { color: isSelected ? colors.primary : colors.text.primary },
-                        isSelected && { fontWeight: '700' }
-                      ]}>
-                        {item.label}
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
-            />
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            ) : (
+              <FlatList
+                data={filteredOptions}
+                keyExtractor={item => item.value}
+                contentContainerStyle={{ padding: Spacing.md, gap: 4 }}
+                renderItem={({ item }) => {
+                  const isSelected = item.value === value;
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.optionItem,
+                        isSelected && { backgroundColor: colors.primary + '15' }
+                      ]}
+                      onPress={() => {
+                        onChange(item.value);
+                        setIsOpen(false);
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        {item.icon && (
+                          <Ionicons name={item.icon} size={20} color={isSelected ? colors.primary : colors.text.muted} />
+                        )}
+                        <Text style={[
+                          styles.optionText,
+                          { color: isSelected ? colors.primary : colors.text.primary },
+                          isSelected && { fontWeight: '700' }
+                        ]}>
+                          {item.label}
+                        </Text>
+                      </View>
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={20} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
           </View>
         </View>
       </Modal>

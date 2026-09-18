@@ -103,6 +103,8 @@ export default function QueriesScreen() {
       <ListToolbar
         searchValue={search}
         onSearchChange={setSearch}
+        itemCount={filteredQueries ? filteredQueries.length : 0}
+        totalCount={queries ? queries.length : 0}
         searchPlaceholder="Search queries by name, product, text..."
         renderFilters={() => (
           Platform.OS === 'web' ? (

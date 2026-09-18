@@ -12,6 +12,7 @@ import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useToast } from '../utils/ToastContext';
 import { DataTable, Column } from '../components/DataTable';
+import { PageHeader } from '../components/PageHeader';
 
 type PricingRow = {
   _id: string;
@@ -198,6 +199,7 @@ export default function PricingScreen() {
       key: 'promoLabel',
       title: 'Promo Label',
       flex: 1.8,
+      hideOnMobile: true,
       render: (row) => (
         <TextInput
           style={[styles.labelInput, !canEdit && styles.inputDisabled, { width: '100%' }]}
@@ -214,6 +216,7 @@ export default function PricingScreen() {
       title: 'Live',
       flex: 0.9,
       align: 'center',
+      hideOnMobile: true,
       render: (row) => (
         <Switch
           value={row.editPromo}
@@ -252,6 +255,10 @@ export default function PricingScreen() {
 
   return (
     <View style={styles.container}>
+      <PageHeader
+        title="Pricing & Discounts"
+        subtitle="Manage product pricing, discount logic, and promos."
+      />
       {/* Stats Strip with Integrated Save All Button */}
       <View style={styles.statsStrip}>
         <View style={styles.statCard}>

@@ -11,6 +11,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { useToast } from '../utils/ToastContext';
 import { useConfirm } from '../utils/ConfirmContext';
+import { PageHeader } from '../components/PageHeader';
 
 type CRMTab = 'complaints' | 'samples' | 'targets';
 
@@ -192,6 +193,10 @@ export default function SalesCRMScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader
+        title="Sales CRM"
+        subtitle="Manage customer complaints, sample distributions, and agent targets."
+      />
       {/* Standardized Search & Title Topbar */}
       <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
         <View style={{

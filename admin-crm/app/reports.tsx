@@ -1,4 +1,5 @@
-import { StatusPill } from './../components/WorkspacePrimitives';
+import { EmptyState, MetricTile, StatusPill } from '../components/WorkspacePrimitives';
+import { PageHeader } from '../components/PageHeader';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
@@ -391,7 +392,7 @@ export default function ReportsScreen() {
           <td>${rm.unit}</td>
           <td class="right">${rm.minReorder}</td>
           <td class="right">₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-          <td style="text-align:center; color:${isLow ? '#dc3545' : '#198754'}; font-weight:700">${isLow ? ' LOW' : ' OK'}</td>
+          <td style="text-align:center; color:${isLow ? colors.danger : colors.success}; font-weight:700">${isLow ? ' LOW' : ' OK'}</td>
         </tr>
       `;
     });
@@ -419,7 +420,7 @@ export default function ReportsScreen() {
           <td class="right">₹${(e.purchaseRate || 0).toFixed(2)}</td>
           <td class="right">₹${batchValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
           <td>${e.vendorName || '-'}</td>
-          <td style="${isNearExpiry ? 'color:#dc3545;font-weight:700' : ''}">${expiry}</td>
+          <td style="${isNearExpiry ? `color:${colors.danger};font-weight:700` : ''}">${expiry}</td>
         </tr>
       `;
     });
@@ -553,6 +554,10 @@ export default function ReportsScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader
+        title="Business Reports"
+        subtitle="Accounting, tax filings, ledgers, stock audits, and analytics."
+      />
       {/* Content Area */}
       <ScrollView
         style={{ flex: 1 }}

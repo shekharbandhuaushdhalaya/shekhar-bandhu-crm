@@ -1320,8 +1320,10 @@ export default function DashboardScreen() {
                 </View>
               ) : null}
               <View style={styles.feedWrapper}>
-                <LowStockAlerts products={lowStockProds} />
-                <ExpiryAlerts alerts={expiryAlerts} loading={expiryAlertsLoading} />
+                <Panel title="Needs Attention" subtitle="Critical operational alerts requiring action." style={{ padding: 0 }}>
+                  <LowStockAlerts products={lowStockProds} />
+                  <ExpiryAlerts alerts={expiryAlerts} loading={expiryAlertsLoading} />
+                </Panel>
               </View>
             </View>
           </View>

@@ -7,7 +7,7 @@ import { View, ScrollView, StyleSheet, RefreshControl, Alert, Platform, FlatList
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { api } from '../utils/api';
-import { LightColors, Radius, Shadows, Spacing, Typography } from '../constants/theme';
+import { LightColors, Radius, Shadows, Spacing, Typography, getStatusTone } from '../constants/theme';
 import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceTransition, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 import { PageHeader as WorkspaceHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
@@ -217,7 +217,7 @@ export default function SalesWorkspace() {
           <View style={{ flex: 1, minWidth: 220 }}>
             <View style={styles.orderTitleRow}>
               <Text style={styles.rowMain}>{order.orderNo || `#${order._id.slice(-6)}`}</Text>
-              <StatusPill label={(order.status || 'draft').replaceAll('_', ' ')} tone={order.status === 'fulfilled' ? 'success' : order.status === 'cancelled' ? 'danger' : pendingApproval ? 'warning' : 'info'} />
+              <StatusPill label={(order.status || 'draft').replaceAll('_', ' ')} tone={pendingApproval ? 'warning' : getStatusTone(order.status)} />
             </View>
             <Text style={styles.customerName}>{order.name || order.customerName || 'Customer'}</Text>
             <Text style={styles.rowSub}>{order.items?.length || 0} items • {order.sourcePersonName || order.mrName || order.sourceType || 'Direct'}</Text>
@@ -333,6 +333,7 @@ export default function SalesWorkspace() {
         onSearchChange={setSearch}
         onSubmitEditing={doSearch}
         searchPlaceholder="Search customer, order, challan, invoice or product"
+        itemCount={orders ? orders.length : 0}
         primaryAction={{
           label: 'Search',
           onPress: doSearch
@@ -420,7 +421,7 @@ export default function SalesWorkspace() {
                     <View style={{ flex: 1, minWidth: 220 }}>
                       <View style={styles.orderTitleRow}>
                         <Text style={styles.rowMain}>{ch.challanNo}</Text>
-                        <StatusPill label={posted ? 'Posted' : (ch.status || 'draft')} tone={posted ? 'success' : ch.status === 'cancelled' ? 'danger' : 'warning'} />
+                        <StatusPill label={posted ? 'Posted' : (ch.status || 'draft')} tone={posted ? 'success' : getStatusTone(ch.status)} />
                         <StatusPill label={(ch.challanType || 'sale').replaceAll('_', ' ')} tone="neutral" />
                       </View>
                       <Text style={styles.customerName}>{ch.partyName || 'Internal transfer'}</Text>
@@ -476,7 +477,7 @@ export default function SalesWorkspace() {
             {!returns.length ? <EmptyState icon="return-down-back-outline" title="No sales returns" message="Posted returns and credit-note resolutions will appear here." /> : returns.map((r) => (
               <View style={styles.dataRow} key={r._id}>
                 <View style={{ flex: 1 }}>
-                  <View style={styles.orderTitleRow}><Text style={styles.rowMain}>{r.returnNo}</Text><StatusPill label={r.status || 'draft'} tone={r.status === 'posted' || r.status === 'completed' ? 'success' : 'info'} /></View>
+                  <View style={styles.orderTitleRow}><Text style={styles.rowMain}>{r.returnNo}</Text><StatusPill label={r.status || 'draft'} tone={getStatusTone(r.status)} /></View>
                   <Text style={styles.rowSub}>{r.customerName} • {r.resolution} • {r.items?.length || 0} items</Text>
                 </View>
                 <Text style={styles.money}>{formatMoney(r.totalAmount)}</Text>

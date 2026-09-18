@@ -9,6 +9,7 @@ import { api, Dispatch, DeadStockItem, Challan } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useConfirm } from '../utils/ConfirmContext';
 import { WorkspaceLoading, WorkspaceError, StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { PageHeader } from '../components/PageHeader';
 
 export default function InventoryDispatchScreen() {
   const { colors } = useTheme();
@@ -122,7 +123,10 @@ export default function InventoryDispatchScreen() {
 
   return (
     <View style={styles.screen}>
-
+      <PageHeader
+        title="Inventory Dispatch"
+        subtitle="Manage stock dispatches, transporter details, and deliveries."
+      />
       {loading ? <WorkspaceLoading title="Loading Dispatch…" message="Fetching posted Challans, logistics records and dead stock." /> : null}
       {!loading && loadError ? <WorkspaceError message={loadError} onRetry={load} /> : null}
       {!loading && !loadError ? <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}

@@ -16,7 +16,10 @@ import { useToast } from '../../utils/ToastContext';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
+import { PageHeader } from '../../components/PageHeader';
 import { useConfirm } from '../../utils/ConfirmContext';
+import { useListState } from '../../utils/useListState';
+import { useLocalSearchParams } from 'expo-router';
 
 const toTitleCase = (str?: string) => {
   if (!str) return '';
@@ -165,13 +168,13 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
       <View style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={26} color={colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>Purchase Invoice</Text>
-          <View style={{ width: 26 }} />
-        </View>
+        <PageHeader 
+          title="Purchase Invoice"
+          subtitle={invoice.invoiceNo}
+          breadcrumbs={[{ label: 'Purchase Invoices', onPress: onClose }, { label: invoice.invoiceNo || 'Details' }]}
+          backButton={onClose}
+          style={{ paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}
+        />
 
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
           <View style={styles.profileHeader}>
@@ -1693,15 +1696,27 @@ const getOverdueText = (item: Invoice, vendors: Vendor[], colors: any) => {
 
 export default function PurchaseInvoicesScreen() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [search, setSearch] = useState('');
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [search, setSearch] = useListState('purchases_search', '');
+
+  const params = useLocalSearchParams<{ search?: string }>();
+  useEffect(() => {
+    if (params.search && params.search !== search) {
+      setSearch(params.search);
+    }
+  }, [params.search]);
+
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [refreshing, setRefreshing] = useState(false);
-  // Initial-load flag so DataTable shows its skeleton instead of an empty table.
+  const [fyFilter, setFyFilter] = useListState('purchases_fyFilter', 'All');
   const [loading, setLoading] = useState(true);
+  
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedInv, setSelectedInv] = useState<Invoice | null>(null);
   const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
+  
+  const [page, setPage] = useListState('purchases_page', 1);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   const { colors } = useTheme();
@@ -1711,11 +1726,7 @@ export default function PurchaseInvoicesScreen() {
   const canAccessCash = user?.canAccessCash ?? false;
 
   const [modeFilter, setModeFilter] = useState<'regular' | 'cash' | 'all'>('all');
-  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
-
-  // Pagination states
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 50;
 
@@ -1794,6 +1805,7 @@ export default function PurchaseInvoicesScreen() {
       key: 'date',
       title: 'Date',
       width: 120,
+      hideOnMobile: true,
       render: (item) => (
         <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
       )
@@ -1810,6 +1822,7 @@ export default function PurchaseInvoicesScreen() {
       key: 'status',
       title: 'Doc Status',
       width: 120,
+      hideOnMobile: true,
       render: (item) => (
         <StatusPill  label={<>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</>} textStyle={[styles.statusText, {
             color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
@@ -1820,6 +1833,7 @@ export default function PurchaseInvoicesScreen() {
       key: 'overdue',
       title: 'Overdue Status',
       width: 130,
+      hideOnMobile: true,
       render: (item) => {
         const overdueInfo = getOverdueText(item, vendors, colors);
         return (
@@ -1852,6 +1866,7 @@ export default function PurchaseInvoicesScreen() {
           <ListToolbar
             searchValue={search}
             onSearchChange={setSearch}
+            itemCount={invoices ? invoices.length : 0}
             searchPlaceholder="Search purchase bills..."
             primaryAction={{
               label: 'New Bill',
@@ -1944,7 +1959,12 @@ export default function PurchaseInvoicesScreen() {
             isLoadingMore={page < totalPages}
             onRowPress={(item) => { setSelectedInv(item); setDetailVisible(true); }}
             ListEmptyComponent={
-              <EmptyState title={<>No invoices found</>}  />
+              <EmptyState 
+                title={search ? <>No invoices found for "{search}"</> : <>No purchase invoices found</>} 
+                message={!search ? <>Record your first purchase invoice to manage vendor bills.</> : undefined}
+                actionLabel={!search ? 'New Purchase Invoice' : 'Clear Search'}
+                onAction={!search ? () => setAddVisible(true) : () => setSearch('')}
+              />
             }
           />
         </View>

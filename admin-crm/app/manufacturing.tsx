@@ -41,6 +41,9 @@ import BatchProductionsTab from './manufacturing/components/BatchProductionsTab'
 import ProductionSchedulerTab from './manufacturing/components/ProductionSchedulerTab';
 import ManufacturingUnitsTab from './manufacturing/components/ManufacturingUnitsTab';
 import MRPPlanTab from './manufacturing/components/MRPPlanTab';
+import { PageHeader as WorkspaceHeader } from '../components/PageHeader';
+import { FormField } from '../components/FormField';
+import { HelpTooltip } from '../components/HelpTooltip';
 import StockTraceModal from './manufacturing/modals/StockTraceModal';
 import ConfirmDeleteModal from './manufacturing/modals/ConfirmDeleteModal';
 
@@ -1824,6 +1827,10 @@ export default function ManufacturingScreen() {
 
   return (
     <View style={styles.screen}>
+      <WorkspaceHeader
+        title="Manufacturing"
+        subtitle="Manage BOMs, production batches, MRP, and manufacturing units."
+      />
       {/* Sub tabs Row */}
       <View style={styles.tabRow}>
         {[

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Modal, StyleSheet, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Modal, StyleSheet, SectionList, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { AppText as Text } from './AppText';
@@ -49,13 +49,13 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounceValue(query, 500);
-  const [results, setResults] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setQuery('');
-      setResults([]);
+      setSections([]);
     }
     
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -72,25 +72,51 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
   useEffect(() => {
     async function searchAll() {
       if (!debouncedQuery.trim()) {
-        setResults([]);
+        setSections([]);
         return;
       }
       setLoading(true);
       try {
-        const [customers, products] = await Promise.all([
+        const [customers, products, salesInvoices, purchaseInvoices, payments, vendors, mrs] = await Promise.all([
           api.getCustomers(debouncedQuery).catch(() => ({ data: [] })),
-          api.getProducts(debouncedQuery).catch(() => ({ data: [] }))
+          api.getProducts(debouncedQuery).catch(() => ({ data: [] })),
+          api.getSaleInvoices(debouncedQuery).catch(() => ({ data: [] })),
+          api.getPurchaseInvoices(debouncedQuery).catch(() => ({ data: [] })),
+          api.getPayments(undefined, undefined, undefined, undefined, debouncedQuery).catch(() => []),
+          api.getVendors(debouncedQuery).catch(() => ({ data: [] })),
+          api.getMRs(debouncedQuery).catch(() => [])
         ]);
+        
+        const extract = (res: any) => (Array.isArray(res) ? res : res?.data || []);
         
         const routes = ROUTE_TITLE_MAP.filter(r => r.title.toLowerCase().includes(debouncedQuery.toLowerCase()))
           .map(r => ({ ...r, _type: 'route', name: r.title }));
-        const combined = [
-          ...routes,
-          ...(customers?.data || customers || []).map((c: any) => ({ ...c, _type: 'customer' })),
-          ...(products?.data || products || []).map((p: any) => ({ ...p, _type: 'product' }))
-        ];
+          
+        const newSections = [];
+        if (routes.length > 0) newSections.push({ title: 'NAVIGATION', data: routes });
         
-        setResults(combined);
+        const cList = extract(customers).map((c: any) => ({ ...c, _type: 'customer' }));
+        if (cList.length > 0) newSections.push({ title: 'CUSTOMERS', data: cList });
+        
+        const vList = extract(vendors).map((v: any) => ({ ...v, _type: 'vendor' }));
+        if (vList.length > 0) newSections.push({ title: 'VENDORS', data: vList });
+        
+        const pList = extract(products).map((p: any) => ({ ...p, _type: 'product' }));
+        if (pList.length > 0) newSections.push({ title: 'PRODUCTS', data: pList });
+        
+        const siList = extract(salesInvoices).map((si: any) => ({ ...si, _type: 'sale_invoice' }));
+        if (siList.length > 0) newSections.push({ title: 'SALES INVOICES', data: siList });
+        
+        const piList = extract(purchaseInvoices).map((pi: any) => ({ ...pi, _type: 'purchase_invoice' }));
+        if (piList.length > 0) newSections.push({ title: 'PURCHASE INVOICES', data: piList });
+        
+        const payList = extract(payments).map((pay: any) => ({ ...pay, _type: 'payment' }));
+        if (payList.length > 0) newSections.push({ title: 'PAYMENTS', data: payList });
+        
+        const mrList = extract(mrs).map((mr: any) => ({ ...mr, _type: 'mr' }));
+        if (mrList.length > 0) newSections.push({ title: 'MEDICAL REPRESENTATIVES', data: mrList });
+        
+        setSections(newSections);
       } catch (err) {
         console.error('Global search error:', err);
       } finally {
@@ -103,13 +129,14 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
 
   const handleSelect = (item: any) => {
     onClose();
-    if (item._type === 'route') {
-      router.push(item.path as any);
-    } else if (item._type === 'customer') {
-      router.push('/parties/customers');
-    } else if (item._type === 'product') {
-      router.push('/products');
-    }
+    if (item._type === 'route') router.push(item.path as any);
+    else if (item._type === 'customer') router.push({ pathname: '/parties/customers', params: { search: item.name || item.companyName } });
+    else if (item._type === 'vendor') router.push({ pathname: '/parties/vendors', params: { search: item.name || item.companyName } });
+    else if (item._type === 'product') router.push({ pathname: '/products', params: { search: item.name } });
+    else if (item._type === 'sale_invoice') router.push({ pathname: '/invoices/sale', params: { search: item.invoiceNumber || item.invoiceNo } });
+    else if (item._type === 'purchase_invoice') router.push({ pathname: '/invoices/purchase', params: { search: item.invoiceNumber || item.invoiceNo } });
+    else if (item._type === 'payment') router.push({ pathname: '/payments', params: { search: item.receiptNo || item.receiptNumber } });
+    else if (item._type === 'mr') router.push({ pathname: '/medicalreps', params: { search: item.name } });
   };
 
   return (
@@ -142,33 +169,54 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
               <ActivityIndicator color={colors.primary} />
             </View>
           ) : (
-            <FlatList
-              data={results}
+            <SectionList
+              sections={sections}
               keyExtractor={(item, index) => item._id || String(index)}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ padding: Spacing.md }}
               ListEmptyComponent={
                 query.trim() ? (
                   <View style={{ padding: Spacing.xl, alignItems: 'center' }}>
-                    <Text style={{ color: colors.text.muted }}>No results found</Text>
+                    <Text style={{ ...Typography.body, color: colors.text.primary, fontWeight: '600' }}>No results found for "{query}"</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 4 }}>Try a customer name, product, invoice number, payment, or page name.</Text>
                   </View>
                 ) : null
               }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.bg.secondary }}
-                  onPress={() => handleSelect(item)}
-                >
-                  <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md }}>
-                    <Ionicons name={item._type === 'route' ? (item.icon as any) : item._type === 'customer' ? 'business' : 'cube'} size={16} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>{item.name || item.companyName}</Text>
-                    <Text style={{ ...Typography.caption, color: colors.text.muted }}>{item._type === 'route' ? 'Navigation' : item._type === 'customer' ? 'Customer' : 'Product'}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.border} />
-                </TouchableOpacity>
+              renderSectionHeader={({ section: { title } }) => (
+                <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, marginTop: Spacing.sm, borderRadius: Radius.sm }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase' }}>{title}</Text>
+                </View>
               )}
+              renderItem={({ item }) => {
+                let icon = 'cube';
+                let label = 'Result';
+                let title = item.name || item.companyName || item.invoiceNumber || item.invoiceNo || item.receiptNo;
+                
+                if (item._type === 'route') { icon = item.icon; label = 'Navigation'; title = item.name; }
+                else if (item._type === 'customer') { icon = 'people'; label = 'Customer'; }
+                else if (item._type === 'vendor') { icon = 'business'; label = 'Vendor'; }
+                else if (item._type === 'product') { icon = 'cube'; label = 'Product'; }
+                else if (item._type === 'sale_invoice') { icon = 'document-text'; label = 'Sales Invoice'; }
+                else if (item._type === 'purchase_invoice') { icon = 'document-text'; label = 'Purchase Invoice'; }
+                else if (item._type === 'payment') { icon = 'cash'; label = 'Payment'; }
+                else if (item._type === 'mr') { icon = 'people-circle'; label = 'Medical Rep'; }
+                
+                return (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.bg.secondary }}
+                    onPress={() => handleSelect(item)}
+                  >
+                    <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md }}>
+                      <Ionicons name={icon as any} size={16} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>{title}</Text>
+                      <Text style={{ ...Typography.caption, color: colors.text.muted }}>{label}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={colors.border} />
+                  </TouchableOpacity>
+                );
+              }}
             />
           )}
         </View>

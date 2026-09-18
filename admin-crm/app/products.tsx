@@ -14,7 +14,9 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { useListState } from '../utils/useListState';
 import { DataTable, Column } from '../components/DataTable';
+import { useLocalSearchParams } from 'expo-router';
 import { ListToolbar } from '../components/ListToolbar';
+import { PageHeader } from '../components/PageHeader';
 import PricingScreen from './pricing';
 import { createStyles } from './products/productsStyles';
 import ProductDetailModal from './products/modals/ProductDetailModal';
@@ -43,6 +45,14 @@ export default function ProductsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useListState('products_search', '');
+  const params = useLocalSearchParams<{ search?: string }>();
+  
+  useEffect(() => {
+    if (params.search && params.search !== search) {
+      setSearch(params.search);
+      setTopTab('products');
+    }
+  }, [params.search]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedProd, setSelectedProd] = useState<Product | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -193,6 +203,7 @@ export default function ProductsScreen() {
       key: 'size',
       title: 'Size Variants',
       flex: 2,
+      hideOnMobile: true,
       render: (item) => {
         const children = products.filter(p => p.parentId === item._id);
         const allVariants = [item, ...children];
@@ -213,6 +224,7 @@ export default function ProductsScreen() {
       key: 'type',
       title: 'Type',
       flex: 1.5,
+      hideOnMobile: true,
       render: (item) => <Text style={[styles.tableCell, { color: colors.primary, fontWeight: '600' }]} numberOfLines={1}>{toTitleCase(item.productType)}</Text>
     },
     {
@@ -230,6 +242,10 @@ export default function ProductsScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader
+        title="Products & Pricing"
+        subtitle="Manage product catalog, variants, and pricing rules."
+      />
       {/* Top Sub-tab pills */}
       <View style={{ flexDirection: 'row', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 4, marginHorizontal: Spacing.lg, marginTop: Spacing.md }}>
         <TouchableOpacity
@@ -274,6 +290,8 @@ export default function ProductsScreen() {
                 searchValue={search}
                 onSearchChange={setSearch}
                 searchPlaceholder="Search products..."
+                itemCount={filteredProducts.filter(p => !p.parentId).length}
+                totalCount={products.filter(p => !p.parentId).length}
                 primaryAction={perm.can('product:create') ? {
                   label: 'New Product',
                   icon: 'add',

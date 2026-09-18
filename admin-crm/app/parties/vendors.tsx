@@ -19,6 +19,8 @@ import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { FormField } from '../../components/FormField';
+import { useListState } from '../../utils/useListState';
+import { useLocalSearchParams } from 'expo-router';
 
 
 const getAvatarColor = (name: string, colors: any) => {
@@ -1274,8 +1276,18 @@ function VendorLedgerModal({
 export default function VendorsScreen() {
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useListState('vendors_search', '');
+
+  const params = useLocalSearchParams<{ search?: string }>();
+  useEffect(() => {
+    if (params.search && params.search !== search) {
+      setSearch(params.search);
+    }
+  }, [params.search]);
+
   const debouncedSearch = useDebouncedValue(search, 300);
+  const [activeTab, setActiveTab] = useListState<'gst' | 'cash'>('vendors_tab', 'gst');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // Initial-load flag so DataTable shows its skeleton instead of an empty table.
   const [listLoading, setListLoading] = useState(true);
@@ -1365,6 +1377,7 @@ export default function VendorsScreen() {
       key: 'gstin',
       title: 'GSTIN',
       width: 160,
+      hideOnMobile: true,
       render: (v) => {
         const isUnregistered = !v.gstin || !v.gstin.trim();
         return isUnregistered ? (
@@ -1384,6 +1397,7 @@ export default function VendorsScreen() {
       key: 'contactPerson',
       title: 'Contact Person',
       width: 150,
+      hideOnMobile: true,
       render: (v) => (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="person-outline" size={12} color={colors.text.muted} />
@@ -1408,6 +1422,7 @@ export default function VendorsScreen() {
       key: 'city',
       title: 'City',
       width: 140,
+      hideOnMobile: true,
       render: (v) => (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="location-outline" size={13} color={colors.danger} />
@@ -1456,6 +1471,7 @@ export default function VendorsScreen() {
       <View style={styles.innerContainer}>
         <ListToolbar
           searchValue={search}
+          itemCount={vendors ? vendors.length : 0}
           onSearchChange={setSearch}
           searchPlaceholder="Search vendors..."
           primaryAction={{
@@ -1479,7 +1495,12 @@ export default function VendorsScreen() {
             isLoadingMore={page < totalPages}
             onRowPress={(v) => { setSelectedVend(v); setLedgerVisible(true); }}
             ListEmptyComponent={
-              <EmptyState title={<>No vendors registered</>} actionLabel="Create Vendor" onAction={() => { setSelectedVend(null); setIsEditing(false); setAddVisible(true); }} />
+              <EmptyState 
+                title={search ? <>No vendors found for "{search}"</> : <>No vendors registered</>} 
+                message={!search ? <>Add your first vendor to manage purchases and accounts.</> : undefined}
+                actionLabel={!search ? 'Create Vendor' : 'Clear Search'}
+                onAction={!search ? () => { setSelectedVend(null); setIsEditing(false); setAddVisible(true); } : () => setSearch('')}
+              />
             }
           />
         </View>

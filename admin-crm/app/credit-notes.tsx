@@ -5,7 +5,7 @@ import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, ActivityIndicator, Pressable, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography, getStatusTone } from '../constants/theme';
 import { api, CreditNote, Customer, Vendor } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { ResponsiveSelect } from '../components/ResponsiveSelect';
@@ -286,15 +286,12 @@ export default function CreditNotesPage() {
                     <Text style={styles.cardTitle}>{note.noteNo}</Text>
                     <StatusPill  label={<>
                         {isCredit ? 'CREDIT NOTE' : 'DEBIT NOTE'}
-                      </>} textStyle={[styles.badgeText, { color: isCredit ? colors.success : colors.danger }]} />
+                      </>} tone={isCredit ? 'success' : 'danger'} />
                   </View>
 
                   <StatusPill  label={<>
                       {note.status.toUpperCase()}
-                    </>} textStyle={[
-                      styles.badgeText,
-                      { color: note.status === 'finalized' ? colors.success : note.status === 'draft' ? colors.warning : colors.danger }
-                    ]} />
+                    </>} tone={getStatusTone(note.status)} />
                 </View>
 
                 <Text style={styles.cardSub}>

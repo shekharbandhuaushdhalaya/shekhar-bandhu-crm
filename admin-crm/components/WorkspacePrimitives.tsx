@@ -4,7 +4,7 @@ import { WorkspaceButton } from './WorkspaceButton';
 import { Skeleton } from './Skeleton';
 export { WorkspaceButton } from './WorkspaceButton';
 export { WorkspaceTransition } from './WorkspaceTransition';
-import { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import { View, StyleSheet, ScrollView, ViewStyle, useWindowDimensions, StyleProp, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
@@ -136,7 +136,7 @@ export function WorkspaceError({ message, onRetry }: { message: string; onRetry?
   );
 }
 
-export function StatusPill({ label, tone = 'neutral', color, style, textStyle }: { textStyle?: StyleProp<TextStyle>; label: ReactNode; tone?: 'neutral'|'success'|'warning'|'danger'|'info'|'purple'; color?: string; style?: StyleProp<ViewStyle> }) {
+export function StatusPill({ label, tone = 'neutral', color, style, textStyle }: { textStyle?: StyleProp<TextStyle>; label: ReactNode; tone?: 'neutral'|'success'|'warning'|'danger'|'info'|'purple'|'primary'; color?: string; style?: StyleProp<ViewStyle> }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const fg = color || StyleSheet.flatten(textStyle)?.color || (tone === 'neutral' ? colors.text.secondary : colors[tone]);

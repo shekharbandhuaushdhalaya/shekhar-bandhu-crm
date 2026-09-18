@@ -40,11 +40,11 @@ export default function StockMovementsArchive() {
 
   const columns = useMemo<Column<StockMovement>[]>(() => [
     { key: 'docNo', title: 'Document', width: 150, render: (r) => <Text style={styles.strong}>{r.docNo}</Text> },
-    { key: 'date', title: 'Date', width: 120, render: (r) => <Text style={styles.text}>{new Date(r.date).toLocaleDateString('en-IN')}</Text> },
+    { key: 'date', title: 'Date', width: 120, hideOnMobile: true, render: (r) => <Text style={styles.text}>{new Date(r.date).toLocaleDateString('en-IN')}</Text> },
     { key: 'type', title: 'Legacy type', width: 170, render: (r) => <Text style={styles.text}>{typeLabel(r.type)}</Text> },
     { key: 'partyName', title: 'Party / reference', flex: 1, render: (r) => <Text style={styles.text} numberOfLines={1}>{r.partyName || r.sourceDocType || '—'}</Text> },
-    { key: 'warehouseName', title: 'Warehouse', width: 170 },
-    { key: 'status', title: 'Status', width: 110, render: (r) => <StatusPill  label={<>{r.status}</>} textStyle={styles.statusText} /> },
+    { key: 'warehouseName', title: 'Warehouse', width: 170, hideOnMobile: true },
+    { key: 'status', title: 'Status', width: 110, hideOnMobile: true, render: (r) => <StatusPill  label={<>{r.status}</>} textStyle={styles.statusText} /> },
     { key: 'items', title: 'Items', width: 80, align: 'right', render: (r) => <Text style={styles.strong}>{r.items?.length || 0}</Text> },
   ], [styles]);
 

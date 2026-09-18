@@ -20,7 +20,11 @@ import { useToast } from '../../utils/ToastContext';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
+
+import { PageHeader } from '../../components/PageHeader';
 import { useConfirm } from '../../utils/ConfirmContext';
+import { useListState } from '../../utils/useListState';
+import { useLocalSearchParams } from 'expo-router';
 
 const getFinancialYearString = (date: Date): string => {
   const startYear = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
@@ -203,13 +207,13 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
       <View style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={26} color={colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>Sale Invoice</Text>
-          <View style={{ width: 26 }} />
-        </View>
+        <PageHeader 
+          title="Sale Invoice"
+          subtitle={invoice.invoiceNo}
+          breadcrumbs={[{ label: 'Sales Invoices', onPress: onClose }, { label: invoice.invoiceNo || 'Details' }]}
+          backButton={onClose}
+          style={{ paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}
+        />
 
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
           <View style={styles.profileHeader}>
@@ -1714,9 +1718,17 @@ const getOverdueText = (item: Invoice, customers: Customer[], colors: any) => {
 export default function SaleInvoicesScreen() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useListState('sales_search', '');
+  
+  const params = useLocalSearchParams<{ search?: string }>();
+  useEffect(() => {
+    if (params.search && params.search !== search) {
+      setSearch(params.search);
+    }
+  }, [params.search]);
+
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [fyFilter, setFyFilter] = useState('All');
+  const [fyFilter, setFyFilter] = useListState('sales_fyFilter', 'All');
   const [refreshing, setRefreshing] = useState(false);
   // Initial-load flag so DataTable shows its skeleton instead of an empty table.
   const [loading, setLoading] = useState(true);
@@ -1727,7 +1739,7 @@ export default function SaleInvoicesScreen() {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   // Pagination states
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useListState('sales_page', 1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 50;
 
@@ -1813,6 +1825,7 @@ export default function SaleInvoicesScreen() {
       key: 'date',
       title: 'Date',
       width: 120,
+      hideOnMobile: true,
       render: (item) => (
         <Text style={styles.tableCell}>{new Date(item.date).toLocaleDateString('en-IN')}</Text>
       )
@@ -1829,6 +1842,7 @@ export default function SaleInvoicesScreen() {
       key: 'status',
       title: 'Doc Status',
       width: 120,
+      hideOnMobile: true,
       render: (item) => (
         <StatusPill  label={<>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</>} textStyle={[styles.statusText, {
             color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
@@ -1839,6 +1853,7 @@ export default function SaleInvoicesScreen() {
       key: 'overdue',
       title: 'Overdue Status',
       width: 130,
+      hideOnMobile: true,
       render: (item) => {
         const overdueInfo = getOverdueText(item, customers, colors);
         return (
@@ -1909,6 +1924,8 @@ export default function SaleInvoicesScreen() {
           <ListToolbar
             searchValue={search}
             onSearchChange={setSearch}
+            itemCount={filteredInvoices ? filteredInvoices.length : 0}
+            totalCount={invoices ? invoices.length : 0}
             searchPlaceholder="Search sale invoices..."
             primaryAction={{
               label: 'From Challan',
@@ -1966,7 +1983,12 @@ export default function SaleInvoicesScreen() {
             isLoadingMore={page < totalPages}
             onRowPress={(item) => { setSelectedInv(item); setDetailVisible(true); }}
             ListEmptyComponent={
-              <EmptyState title={<>No invoices found</>}  />
+              <EmptyState 
+                title={search ? <>No invoices found for "{search}"</> : <>No sales invoices found</>} 
+                message={!search ? <>Record your first sale invoice to start tracking revenue.</> : undefined}
+                actionLabel={!search ? 'New Sale Invoice' : 'Clear Search'}
+                onAction={!search ? () => setAddVisible(true) : () => setSearch('')}
+              />
             }
           />
         </View>
@@ -2007,7 +2029,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 34, gap: 6 },
   filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 200, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 200, zIndex: 9999, ...Shadows.floating },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { ...Typography.bodySm, color: colors.text.primary },

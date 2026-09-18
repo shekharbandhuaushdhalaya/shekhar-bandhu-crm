@@ -1,4 +1,8 @@
-import { DataTable, Column } from './../components/DataTable';
+import { ListToolbar } from '../components/ListToolbar';
+import { PageHeader } from '../components/PageHeader';
+import { DataTable, Column } from '../components/DataTable';
+import { useListState } from '../utils/useListState';
+import { useLocalSearchParams } from 'expo-router';
 import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
@@ -6,7 +10,7 @@ import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, DeviceEventEmitter, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography, getStatusTone } from '../constants/theme';
 import { useToast } from '../utils/ToastContext';
 import { useConfirm } from '../utils/ConfirmContext';
 import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product, DeadStockItem } from '../utils/api';
@@ -14,6 +18,7 @@ import { useAuth } from '../utils/auth';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
+
 
 // Helper to format strings to Upper Camel Case (Title Case)
 const toTitleCase = (str?: string) => {
@@ -1168,10 +1173,20 @@ export default function InventoriesScreen() {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('all');
   const [consolidatedItems, setConsolidatedItems] = useState<ConsolidatedInventory[]>([]);
   const [warehouseEntries, setWarehouseEntries] = useState<InventoryEntry[]>([]);
+  const [search, setSearch] = useListState('inventory_search', '');
   
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'stock' | 'transfers' | 'warehouses' | 'ledger'>('stock');
+  const params = useLocalSearchParams<{ search?: string }>();
+  useEffect(() => {
+    if (params.search && params.search !== search) {
+      setSearch(params.search);
+    }
+  }, [params.search]);
+
   const debouncedSearch = useDebouncedValue(search, 300);
+  const [activeTab, setActiveTab] = useListState<'stock' | 'transfers' | 'warehouses' | 'ledger' | 'raw_material_ledger' | 'packing_material_ledger' | 'stock_movements'>('inventory_tab', 'stock');
+  const [loading, setLoading] = useState(true);
+  
+  const [page, setPage] = useListState('inventory_page', 1);
   const [refreshing, setRefreshing] = useState(false);
 
   // Modals Visibility
@@ -1493,6 +1508,10 @@ export default function InventoriesScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader
+        title="Inventory Management"
+        subtitle="Track stock levels, warehouse transfers, and ledgers."
+      />
       <View style={styles.innerContainer}>
         {/* Metrics Cards Bar */}
         <View style={styles.summaryBar}>
@@ -1539,7 +1558,7 @@ export default function InventoriesScreen() {
                 StyleSheet.absoluteFill,
                 { 
                   zIndex: 900,
-                  ...(Platform.OS === 'web' ? { position: 'fixed' as const } : { position: 'absolute' as const })
+                  ...(Platform.OS === 'web' ? { position: 'fixed' as any } : { position: 'absolute' as any })
                 }
               ]}
               onPress={() => {
@@ -1550,203 +1569,189 @@ export default function InventoriesScreen() {
           )}
 
           {activeTab === 'stock' && (
-            <View style={[styles.controlsBar, { flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start', paddingHorizontal: 0 }]}>
-              {/* Search Bar */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, flex: 1, minWidth: 250, height: 40 }}>
-                <Ionicons name="search" size={16} color={colors.text.muted} />
-                <TextInput
-                  style={{ ...Typography.bodySm, flex: 1, height: '100%', color: colors.text.primary }}
-                  placeholder="Search items..."
-                  placeholderTextColor={colors.text.muted}
-                  value={search}
-                  onChangeText={setSearch}
-                />
-              </View>
+            <ListToolbar
+              containerStyle={{ paddingHorizontal: 0 }}
+              searchPlaceholder="Search items..."
+              itemCount={processedItems ? processedItems.length : 0}
+              searchValue={search}
+              onSearchChange={setSearch}
+              renderFilters={() => (
+                <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* View Toggles */}
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      style={{
+                        paddingHorizontal: 12,
+                        height: 40,
+                        borderRadius: Radius.md,
+                        backgroundColor: (!showZero && !showDeadStock) ? colors.success + '15' : colors.bg.card,
+                        borderWidth: 1,
+                        borderColor: (!showZero && !showDeadStock) ? colors.success + '40' : colors.border,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                      onPress={() => {
+                        setShowZero(false);
+                        setShowDeadStock(false);
+                      }}
+                    >
+                      <Text style={{ ...Typography.bodySm, fontWeight: (!showZero && !showDeadStock) ? '700' : '600', color: (!showZero && !showDeadStock) ? colors.success : colors.text.secondary }}>In-Stock</Text>
+                    </TouchableOpacity>
 
-              {/* View Toggles */}
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <TouchableOpacity
-                  style={{
-                    paddingHorizontal: 12,
-                    height: 40,
-                    borderRadius: Radius.md,
-                    backgroundColor: (!showZero && !showDeadStock) ? colors.success + '15' : colors.bg.card,
-                    borderWidth: 1,
-                    borderColor: (!showZero && !showDeadStock) ? colors.success + '40' : colors.border,
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}
-                  onPress={() => {
-                    setShowZero(false);
-                    setShowDeadStock(false);
-                  }}
-                >
-                  <Text style={{ ...Typography.bodySm, fontWeight: (!showZero && !showDeadStock) ? '700' : '600', color: (!showZero && !showDeadStock) ? colors.success : colors.text.secondary }}>In-Stock</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{
+                        paddingHorizontal: 12,
+                        height: 40,
+                        borderRadius: Radius.md,
+                        backgroundColor: showZero ? colors.warning + '15' : colors.bg.card,
+                        borderWidth: 1,
+                        borderColor: showZero ? colors.warning + '40' : colors.border,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                      onPress={() => {
+                        setShowZero(true);
+                        setShowDeadStock(false);
+                      }}
+                    >
+                      <Text style={{ ...Typography.bodySm, fontWeight: showZero ? '700' : '600', color: showZero ? colors.warning : colors.text.secondary }}>Zero Stock</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={{
-                    paddingHorizontal: 12,
-                    height: 40,
-                    borderRadius: Radius.md,
-                    backgroundColor: showZero ? colors.warning + '15' : colors.bg.card,
-                    borderWidth: 1,
-                    borderColor: showZero ? colors.warning + '40' : colors.border,
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}
-                  onPress={() => {
-                    setShowZero(true);
-                    setShowDeadStock(false);
-                  }}
-                >
-                  <Text style={{ ...Typography.bodySm, fontWeight: showZero ? '700' : '600', color: showZero ? colors.warning : colors.text.secondary }}>Zero Stock</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={{
-                    paddingHorizontal: 12,
-                    height: 40,
-                    borderRadius: Radius.md,
-                    backgroundColor: showDeadStock ? colors.danger + '15' : colors.bg.card,
-                    borderWidth: 1,
-                    borderColor: showDeadStock ? colors.danger + '40' : colors.border,
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}
-                  onPress={() => {
-                    setShowDeadStock(true);
-                    setShowZero(false);
-                  }}
-                >
-                  <Text style={{ ...Typography.bodySm, fontWeight: showDeadStock ? '700' : '600', color: showDeadStock ? colors.danger : colors.text.secondary }}>Dead Stock</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Vendor Filter Button */}
-              <View style={{ position: 'relative', zIndex: showVendorFilterDropdown ? 1000 : 1 }}>
-                <TouchableOpacity
-                  style={styles.filterDropdownButton}
-                  onPress={() => {
-                    setShowVendorFilterDropdown(!showVendorFilterDropdown);
-                    setShowWarehouseFilterDropdown(false);
-                  }}
-                >
-                  <Ionicons name="business-outline" size={14} color={colors.success} />
-                  <Text style={styles.filterDropdownButtonText}>
-                    {currentVendorName}
-                  </Text>
-                  <Ionicons name={showVendorFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
-                </TouchableOpacity>
-
-                {showVendorFilterDropdown && (
-                  <View style={[styles.vendorDropdownPanel, { top: 42, right: 0 }]}>
-                    <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
-                      <TouchableOpacity
-                        style={[styles.filterDropdownItem, selectedVendorId === 'all' && styles.filterDropdownItemActive]}
-                        onPress={() => {
-                          setSelectedVendorId('all');
-                          setShowVendorFilterDropdown(false);
-                        }}
-                      >
-                        <Text style={[styles.filterDropdownItemText, selectedVendorId === 'all' && { fontWeight: '700', color: colors.primary }]}>
-                          All Vendors
-                        </Text>
-                      </TouchableOpacity>
-
-                      {vendors.map(v => (
-                        <TouchableOpacity
-                          key={v._id}
-                          style={[styles.filterDropdownItem, selectedVendorId === v._id && styles.filterDropdownItemActive]}
-                          onPress={() => {
-                            setSelectedVendorId(v._id);
-                            setShowVendorFilterDropdown(false);
-                          }}
-                        >
-                          <Text style={[styles.filterDropdownItemText, selectedVendorId === v._id && { fontWeight: '700', color: colors.primary }]}>
-                            {toTitleCase(v.displayName || v.name)}
-                          </Text>
-                          {v.company ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{v.company}</Text> : null}
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
+                    <TouchableOpacity
+                      style={{
+                        paddingHorizontal: 12,
+                        height: 40,
+                        borderRadius: Radius.md,
+                        backgroundColor: showDeadStock ? colors.danger + '15' : colors.bg.card,
+                        borderWidth: 1,
+                        borderColor: showDeadStock ? colors.danger + '40' : colors.border,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                      onPress={() => {
+                        setShowDeadStock(true);
+                        setShowZero(false);
+                      }}
+                    >
+                      <Text style={{ ...Typography.bodySm, fontWeight: showDeadStock ? '700' : '600', color: showDeadStock ? colors.danger : colors.text.secondary }}>Dead Stock</Text>
+                    </TouchableOpacity>
                   </View>
-                )}
-              </View>
 
-              {/* Warehouse Filter Button */}
-              <View style={{ position: 'relative', zIndex: showWarehouseFilterDropdown ? 1000 : 1 }}>
-                <TouchableOpacity
-                  style={styles.filterDropdownButton}
-                  onPress={() => {
-                    setShowWarehouseFilterDropdown(!showWarehouseFilterDropdown);
-                    setShowVendorFilterDropdown(false);
-                  }}
-                >
-                  <Ionicons name="location" size={14} color={colors.primary} />
-                  <Text style={styles.filterDropdownButtonText}>
-                    {currentWarehouseName}
-                  </Text>
-                  <Ionicons name={showWarehouseFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
-                </TouchableOpacity>
+                  {/* Vendor Filter Button */}
+                  <View style={{ position: 'relative', zIndex: showVendorFilterDropdown ? 1000 : 1 }}>
+                    <TouchableOpacity
+                      style={styles.filterDropdownButton}
+                      onPress={() => {
+                        setShowVendorFilterDropdown(!showVendorFilterDropdown);
+                        setShowWarehouseFilterDropdown(false);
+                      }}
+                    >
+                      <Ionicons name="business-outline" size={14} color={colors.success} />
+                      <Text style={styles.filterDropdownButtonText}>
+                        {currentVendorName}
+                      </Text>
+                      <Ionicons name={showVendorFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
+                    </TouchableOpacity>
 
-                {showWarehouseFilterDropdown && (
-                  <View style={[styles.filterDropdownPanel, { top: 42, right: 0 }]}>
-                    <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
-                      <TouchableOpacity
-                        style={[styles.filterDropdownItem, selectedWarehouseId === 'all' && styles.filterDropdownItemActive]}
-                        onPress={() => {
-                          setSelectedWarehouseId('all');
-                          setShowWarehouseFilterDropdown(false);
-                        }}
-                      >
-                        <Text style={[styles.filterDropdownItemText, selectedWarehouseId === 'all' && { fontWeight: '700', color: colors.primary }]}>
-                          All Warehouses (Consolidated)
-                        </Text>
-                      </TouchableOpacity>
-
-                      {warehouses.map(w => (
-                        <View key={w._id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {showVendorFilterDropdown && (
+                      <View style={[styles.vendorDropdownPanel, { top: 42, right: 0 }]}>
+                        <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
                           <TouchableOpacity
-                            style={[styles.filterDropdownItem, { flex: 1, borderBottomWidth: 0 }, selectedWarehouseId === w._id && styles.filterDropdownItemActive]}
+                            style={[styles.filterDropdownItem, selectedVendorId === 'all' && styles.filterDropdownItemActive]}
                             onPress={() => {
-                              setSelectedWarehouseId(w._id);
+                              setSelectedVendorId('all');
+                              setShowVendorFilterDropdown(false);
+                            }}
+                          >
+                            <Text style={[styles.filterDropdownItemText, selectedVendorId === 'all' && { fontWeight: '700', color: colors.primary }]}>
+                              All Vendors
+                            </Text>
+                          </TouchableOpacity>
+
+                          {vendors.map(v => (
+                            <TouchableOpacity
+                              key={v._id}
+                              style={[styles.filterDropdownItem, selectedVendorId === v._id && styles.filterDropdownItemActive]}
+                              onPress={() => {
+                                setSelectedVendorId(v._id);
+                                setShowVendorFilterDropdown(false);
+                              }}
+                            >
+                              <Text style={[styles.filterDropdownItemText, selectedVendorId === v._id && { fontWeight: '700', color: colors.primary }]}>
+                                {toTitleCase(v.displayName || v.name)}
+                              </Text>
+                              {v.company ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{v.company}</Text> : null}
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Warehouse Filter Button */}
+                  <View style={{ position: 'relative', zIndex: showWarehouseFilterDropdown ? 1000 : 1 }}>
+                    <TouchableOpacity
+                      style={styles.filterDropdownButton}
+                      onPress={() => {
+                        setShowWarehouseFilterDropdown(!showWarehouseFilterDropdown);
+                        setShowVendorFilterDropdown(false);
+                      }}
+                    >
+                      <Ionicons name="location" size={14} color={colors.primary} />
+                      <Text style={styles.filterDropdownButtonText}>
+                        {currentWarehouseName}
+                      </Text>
+                      <Ionicons name={showWarehouseFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
+                    </TouchableOpacity>
+
+                    {showWarehouseFilterDropdown && (
+                      <View style={[styles.filterDropdownPanel, { top: 42, right: 0 }]}>
+                        <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
+                          <TouchableOpacity
+                            style={[styles.filterDropdownItem, selectedWarehouseId === 'all' && styles.filterDropdownItemActive]}
+                            onPress={() => {
+                              setSelectedWarehouseId('all');
                               setShowWarehouseFilterDropdown(false);
                             }}
                           >
-                            <Text style={[styles.filterDropdownItemText, selectedWarehouseId === w._id && { fontWeight: '700', color: colors.primary }]}>
-                              {w.name}
+                            <Text style={[styles.filterDropdownItemText, selectedWarehouseId === 'all' && { fontWeight: '700', color: colors.primary }]}>
+                              All Warehouses (Consolidated)
                             </Text>
-                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{w.city}, {w.state}</Text>
                           </TouchableOpacity>
-                        </View>
-                      ))}
-                    </ScrollView>
+
+                          {warehouses.map(w => (
+                            <View key={w._id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <TouchableOpacity
+                                style={[styles.filterDropdownItem, { flex: 1, borderBottomWidth: 0 }, selectedWarehouseId === w._id && styles.filterDropdownItemActive]}
+                                onPress={() => {
+                                  setSelectedWarehouseId(w._id);
+                                  setShowWarehouseFilterDropdown(false);
+                                }}
+                              >
+                                <Text style={[styles.filterDropdownItemText, selectedWarehouseId === w._id && { fontWeight: '700', color: colors.primary }]}>
+                                  {w.name}
+                                </Text>
+                                <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{w.city}, {w.state}</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
-              
-              {perm.can('inventory:edit') && (
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: colors.primary,
-                    paddingHorizontal: 14,
-                    height: 40,
-                    borderRadius: Radius.md,
-                    gap: 6,
-                  }}
-                  onPress={() => {
+                </View>
+              )}
+              {...(perm.can('inventory:edit') ? {
+                primaryAction: {
+                  label: 'Add Stock',
+                  icon: 'add-circle' as any,
+                  onPress: () => {
                     setAddStockInitialProductId('');
                     setAddStockVisible(true);
-                  }}
-                >
-                  <Ionicons name="add-circle" size={16} color="#fff" />
-                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: '#fff' }}>Add Stock</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+                  }
+                }
+              } : {})}
+            />
           )}
 
           {activeTab === 'transfers' && (
@@ -1848,7 +1853,7 @@ export default function InventoriesScreen() {
                     render: (item: any) => (
                       <StatusPill  label={<>
                           {item.status.toUpperCase()}
-                        </>} textStyle={{ ...Typography.eyebrow, fontWeight: '700', color: item.status === 'completed' ? colors.success : item.status === 'in_transit' ? colors.primary : item.status === 'cancelled' ? colors.danger : colors.warning }} />
+                        </>} tone={getStatusTone(item.status)} />
                     )
                   },
                   {
@@ -2023,7 +2028,7 @@ export default function InventoriesScreen() {
                           {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : ''}
                         </Text>
                       </View>
-                      <StatusPill  label={<>{item.status.toUpperCase()}</>} textStyle={{ ...Typography.eyebrow, fontWeight: '700', color: item.status === 'completed' ? colors.success : item.status === 'in_transit' ? colors.primary : item.status === 'cancelled' ? colors.danger : colors.warning }} />
+                      <StatusPill  label={<>{item.status.toUpperCase()}</>} tone={getStatusTone(item.status)} />
                     </View>
                     <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderRadius: Radius.sm, gap: 4 }}>
                       <Text style={[styles.tableCell, { ...Typography.caption, fontWeight: '700', paddingLeft: 0 }]}>{item.fromWarehouseName} → {item.toWarehouseName}</Text>
@@ -2044,7 +2049,7 @@ export default function InventoriesScreen() {
                               title: 'Mark as In-Transit',
                               description: 'Move stock out of the source warehouse?',
                               confirmLabel: 'Mark In-Transit',
-                              iconName: 'truck-outline',
+                              iconName: 'cube-outline',
                               onConfirm: async () => {
                                 try {
                                   await api.shipStockTransfer(item._id);
@@ -2986,14 +2991,14 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', top: 52, right: Spacing.lg, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 280, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', top: 52, right: Spacing.lg, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 280, zIndex: 9999, ...Shadows.floating },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { ...Typography.bodySm, color: colors.text.primary },
 
   // Control sub bar & vendor filter
   controlSubBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: Spacing.lg, marginBottom: Spacing.md, gap: 12, zIndex: 1050 },
-  vendorDropdownPanel: { position: 'absolute', top: 52, right: 180, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
+  vendorDropdownPanel: { position: 'absolute', top: 52, right: 180, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, ...Shadows.floating },
 
   table: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden', flex: 1 },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: 'transparent' },
@@ -3023,7 +3028,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Modals Styling
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  dialogSheet: { width: '90%', maxWidth: 500, maxHeight: '90%', flexDirection: 'column', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
+  dialogSheet: { width: '90%', maxWidth: 500, maxHeight: '90%', flexDirection: 'column', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, ...Shadows.modal },
   dialogContainer: { width: '100%', flex: 1 },
   dialogHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, marginBottom: 8 },
   dialogTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
@@ -3053,7 +3058,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   adjustmentTypeBtnText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
 
   // Ledger sheets (Wider modal for ledger logs)
-  ledgerSheet: { width: '98%', maxWidth: 1200, height: '88%', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
+  ledgerSheet: { width: '98%', maxWidth: 1200, height: '88%', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, ...Shadows.modal },
   ledgerTable: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
   ledgerHeaderCell: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },

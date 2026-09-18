@@ -21,6 +21,8 @@ import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { FormField } from '../../components/FormField';
+import { PageHeader } from '../../components/PageHeader';
+import { useLocalSearchParams } from 'expo-router';
 
 
 const GST_STATE_CODES: { [key: string]: string } = {
@@ -138,13 +140,12 @@ function CustomerDetailModal({
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
       <View style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={26} color={colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>Customer Details</Text>
-          <View style={{ width: 26 }} />
-        </View>
+        <PageHeader 
+          title="Customer Details" 
+          breadcrumbs={[{ label: 'Customers', onPress: onClose }, { label: customer.company || customer.name || 'Details' }]}
+          backButton={onClose}
+          style={{ paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}
+        />
 
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
           <View style={styles.profileHeader}>
@@ -668,17 +669,19 @@ function AddEditCustomerModal({
 
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={26} color={colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>{customer ? 'Edit Customer' : 'New Customer'}</Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Ionicons name="checkmark-circle" size={26} color={colors.success} />
-          </TouchableOpacity>
-        </View>
-
+      <View style={styles.modalContainer}>
+        <PageHeader 
+          title={customer ? 'Edit Customer' : 'Add Customer Entity'} 
+          breadcrumbs={[{ label: 'Customers', onPress: onClose }, { label: customer ? 'Edit Customer' : 'New Customer' }]}
+          backButton={onClose}
+          renderActions={() => (
+            <TouchableOpacity onPress={handleSave}>
+              <Ionicons name="checkmark-circle" size={26} color={colors.success} />
+            </TouchableOpacity>
+          )}
+          style={{ paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}
+        />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
           {canAccessCash && (
             <>
@@ -1021,6 +1024,7 @@ function AddEditCustomerModal({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -1332,29 +1336,17 @@ function CustomerLedgerModal({
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.ledgerOverlay} onPress={onClose}>
         <Pressable style={styles.ledgerSheet} onPress={() => { }}>
-          <View style={styles.ledgerHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.ledgerTitle}>Customer Ledger</Text>
-              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, marginTop: 2 }}>
-                {customer.company || customer.name}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-              <TouchableOpacity onPress={() => setShowPaymentModal(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success + '1A', paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.success }}>
-                <Ionicons name="card-outline" size={16} color={colors.success} />
-                <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.success }}>Receive</Text>
-              </TouchableOpacity>
-              {Platform.OS === 'web' && (
-                <TouchableOpacity onPress={printLedger} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.bg.card, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border }}>
-                  <Ionicons name="print-outline" size={16} color={colors.text.primary} />
-                  <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>Print</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={onClose}>
-                <Ionicons name="close" size={24} color={colors.text.muted} />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <PageHeader 
+            title="Customer Ledger" 
+            subtitle={customer.company || customer.name}
+            breadcrumbs={[{ label: 'Customers', onPress: onClose }, { label: 'Ledger' }]}
+            backButton={onClose}
+            actions={[
+              { key: 'receive', label: 'Receive', icon: 'card-outline', color: colors.success, onPress: () => setShowPaymentModal(true) },
+              ...(Platform.OS === 'web' ? [{ key: 'print', label: 'Print', icon: 'print-outline' as any, variant: 'secondary' as any, onPress: printLedger }] : [])
+            ]}
+            style={{ borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: Spacing.lg, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary }}
+          />
 
           {canAccessCash && (
             <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, paddingHorizontal: Spacing.lg }}>
@@ -1543,6 +1535,13 @@ function CustomerLedgerModal({
 export default function CustomersScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useListState('customers_search', '');
+  const params = useLocalSearchParams<{ search?: string }>();
+  
+  useEffect(() => {
+    if (params.search && params.search !== search) {
+      setSearch(params.search);
+    }
+  }, [params.search]);
   const debouncedSearch = useDebouncedValue(search, 300);
   const [activeTab, setActiveTab] = useListState<'gst' | 'cash'>('customers_tab', 'gst');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -1630,6 +1629,7 @@ export default function CustomersScreen() {
       key: 'gstin',
       title: 'GSTIN',
       width: 150,
+      hideOnMobile: true,
       render: (c) => {
         const isCash = !c.gstin || !c.gstin.trim();
         return isCash ? (
@@ -1651,6 +1651,7 @@ export default function CustomersScreen() {
       key: 'contactPerson',
       title: 'Contact Person',
       width: 160,
+      hideOnMobile: true,
       render: (c) => (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="person-outline" size={12} color={colors.text.muted} />
@@ -1675,6 +1676,7 @@ export default function CustomersScreen() {
       key: 'city',
       title: 'City',
       width: 140,
+      hideOnMobile: true,
       render: (c) => {
         const billing = c.billingAddress || { city: '', state: '', street: '' };
         return (
@@ -1702,7 +1704,7 @@ export default function CustomersScreen() {
         return (
           <StatusPill label={<>
             {label} {Math.abs(amount).toLocaleString('en-IN')}
-          </>} textStyle={[styles.balanceText, { ...Typography.bodySm, color, fontWeight: '800' }]} />
+          </>} tone={amount > 0 ? (isCash ? 'warning' : 'success') : amount < 0 ? 'danger' : 'neutral'} textStyle={[styles.balanceText, { ...Typography.bodySm, fontWeight: '800' }]} />
         );
       }
     },
@@ -1727,6 +1729,7 @@ export default function CustomersScreen() {
           <ListToolbar
             searchValue={search}
             onSearchChange={setSearch}
+            itemCount={customers ? customers.length : 0}
             searchPlaceholder={isDesktop ? "Search customers..." : "Search..."}
             primaryAction={{
               label: 'New Customer',
@@ -1913,7 +1916,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Dropdown filter styles
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
-  filterDropdownPanel: { position: 'absolute', top: 52, right: 50, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
+  filterDropdownPanel: { position: 'absolute', top: 52, right: 50, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, width: 250, zIndex: 9999, ...Shadows.floating },
   filterDropdownItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownItemActive: { backgroundColor: colors.primary + '08' },
   filterDropdownItemText: { ...Typography.bodySm, color: colors.text.primary },

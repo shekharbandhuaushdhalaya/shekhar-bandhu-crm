@@ -100,7 +100,7 @@ export default function MRPPlanTab({
 
         <View style={[styles.metricCard, { flex: 1, backgroundColor: colors.bg.card, borderColor: colors.border }]}>
           <Text style={[styles.metricLabel, { color: colors.text.muted }]}>Safety Stock Shortfalls</Text>
-          <Text style={[styles.metricValue, { color: colors.danger || '#dc3545' }]}>{totalSafetyStockItems}</Text>
+          <Text style={[styles.metricValue, { color: colors.danger }]}>{totalSafetyStockItems}</Text>
           <Text style={[styles.metricSub, { color: colors.text.secondary }]}>Current stock &lt; Standing min reorder</Text>
         </View>
       </View>
@@ -159,7 +159,7 @@ export default function MRPPlanTab({
 
                       {/* Current Available Stock */}
                       <View style={{ flex: 1.3, alignItems: 'flex-end', paddingHorizontal: 8 }}>
-                        <Text style={{ ...Typography.bodySm, fontWeight: '600', color: item.currentAvailableStock > 0 ? colors.text.primary : colors.danger || '#dc3545' }}>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '600', color: item.currentAvailableStock > 0 ? colors.text.primary : colors.danger }}>
                           {item.currentAvailableStock.toFixed(2)} {item.unit}
                         </Text>
                       </View>

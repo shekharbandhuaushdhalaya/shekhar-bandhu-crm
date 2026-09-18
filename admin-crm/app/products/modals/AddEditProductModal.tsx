@@ -2,7 +2,7 @@ import { PressableOpacity as TouchableOpacity } from './../../../components/Pres
 import { AppTextInput as TextInput } from './../../../components/AppTextInput';
 import { AppText as Text } from './../../../components/AppText';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, ScrollView, Modal, KeyboardAvoidingView, Platform, Image, Pressable, Alert, useWindowDimensions } from 'react-native';
+import { View, ScrollView, Modal, KeyboardAvoidingView, Platform, Image, Pressable, Alert, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Spacing, Radius, Typography } from '../../../constants/theme';
@@ -12,6 +12,7 @@ import { useToast } from '../../../utils/ToastContext';
 import { useConfirm } from '../../../utils/ConfirmContext';
 import { createStyles } from '../productsStyles';
 import { FormField } from '../../../components/FormField';
+import { HelpTooltip } from '../../../components/HelpTooltip';
 
 const normalizeTitleCase = (str?: string) => {
   if (!str) return '';
@@ -51,8 +52,10 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
   const [minReorder, setMinReorder] = useState('5');
   const [hsnCode, setHsnCode] = useState('');
   const [gstRate, setGstRate] = useState('18');
+  const [isSaving, setIsSaving] = useState(false);
 
   const fileInputRef = React.useRef<any>(null);
+  const scrollRef = React.useRef<ScrollView>(null);
 
   const handleFileChange = async (e: any) => {
     const file = e.target.files?.[0];
@@ -546,23 +549,39 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
     let finalCategory = productType || 'General';
     let finalMinReorder = minReorder.trim() !== '' ? parseInt(minReorder) : 5;
 
+    setShowErrors(true);
+
     if (!finalName) {
+      setActiveStep('step1');
+      setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 100);
       showToast('Ayurvedic Formulation Name is required!', 'error');
       return;
     }
 
     const activeVariants = variantsList.filter(v => v.size.trim() && v.price.trim());
     if (activeVariants.length === 0) {
+      setActiveStep('step2');
+      setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 100);
       showToast('At least one size and B2B price must be specified!', 'error');
       return;
     }
 
     if (!hsnCode.trim()) {
+      setActiveStep('step2');
+      setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 100);
       showToast('HSN Code is mandatory!', 'error');
       return;
     }
 
+    if (!gstRate.trim()) {
+      setActiveStep('step2');
+      setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 100);
+      showToast('Tax Slab is required!', 'error');
+      return;
+    }
+
     const sizeUnit = getSizeUnit();
+    setIsSaving(true);
 
     try {
       // Save Parent (First Variant in list)
@@ -745,10 +764,12 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
       }
 
       setInitialFormState(null);
+      setIsSaving(false);
       onSaved();
       onClose();
       showToast('Product and Formulation saved successfully!', 'success');
     } catch (err: any) {
+      setIsSaving(false);
       showToast(err.message || 'Failed to save product specification', 'error');
     }
   };
@@ -773,13 +794,12 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
     <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={handleCloseAttempt}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={handleCloseAttempt}>
+          <TouchableOpacity onPress={handleCloseAttempt} accessibilityRole="button" accessibilityLabel="Close dialog">
             <Ionicons name="close" size={26} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>{product ? 'Edit Product Specification' : 'New Product Specification'}</Text>
-          <View style={{ width: 26 }} />
         </View>
-        <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
+        <ScrollView ref={scrollRef} contentContainerStyle={{ padding: Spacing.lg }}>
 
           <View style={{ marginBottom: Spacing.lg }}>
             <Text style={styles.formLabel}>Product Gallery</Text>
@@ -886,6 +906,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                   placeholderTextColor={colors.text.muted}
                   value={name}
                   onChangeText={setName}
+                  autoFocus={true}
                 />
               </FormField>
 
@@ -968,7 +989,10 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                   </View>
 
                   <View style={[styles.formInput, { flex: 1.2, minWidth: 100 }]}>
-                    <Text style={{ ...Typography.caption, color: colors.text.muted, marginRight: 4 }}>MRP ₹:</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.muted }}>MRP ₹:</Text>
+                      <HelpTooltip title="Maximum Retail Price (MRP)" description="The highest price at which this product can be sold to the end consumer, inclusive of all taxes." />
+                    </View>
                     <TextInput
                       style={styles.formInputText}
                       placeholder="MRP"
@@ -1013,8 +1037,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 </View>
               </FormField>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Tax Slab (GST Rate) <Text style={{ color: 'red' }}>*</Text></Text>
+              <FormField label="Tax Slab (GST Rate)" required error={showErrors && !gstRate ? 'Tax Slab is required' : undefined}>
                 <View style={styles.formInput}>
                   <Ionicons name="cash-outline" size={16} color={colors.text.muted} />
                   {Platform.OS === 'web' ? (
@@ -1040,7 +1063,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                     />
                   )}
                 </View>
-              </View>
+              </FormField>
 
             </>
           )}
@@ -1275,8 +1298,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 </View>
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Default Production Execution Route *</Text>
+              <FormField label="Default Production Execution Route" required error={showErrors && !bomDefaultProductionType ? 'Production Route is required' : undefined}>
                 <View style={styles.formInput}>
                   {Platform.OS === 'web' ? (
                     <select
@@ -1291,12 +1313,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                     <TextInput style={styles.formInputText} value={bomDefaultProductionType} onChangeText={(val: any) => setBomDefaultProductionType(val)} />
                   )}
                 </View>
-              </View>
+              </FormField>
 
               {bomDefaultProductionType === 'job_work' && (
                 <>
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Default Job Worker Vendor *</Text>
+                  <FormField label="Default Job Worker Vendor" required error={showErrors && !bomDefaultJobWorkerId ? 'Job Worker Vendor is required' : undefined}>
                     <View style={styles.formInput}>
                       {Platform.OS === 'web' ? (
                         <select
@@ -1313,10 +1334,9 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                         <TextInput style={styles.formInputText} value={bomDefaultJobWorkerId} onChangeText={setBomDefaultJobWorkerId} />
                       )}
                     </View>
-                  </View>
+                  </FormField>
 
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Default Job Work Mode *</Text>
+                  <FormField label="Default Job Work Mode" required error={showErrors && !bomDefaultJobWorkMode ? 'Job Work Mode is required' : undefined}>
                     <View style={styles.formInput}>
                       {Platform.OS === 'web' ? (
                         <select
@@ -1331,10 +1351,9 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                         <TextInput style={styles.formInputText} value={bomDefaultJobWorkMode} onChangeText={(val: any) => setBomDefaultJobWorkMode(val)} />
                       )}
                     </View>
-                  </View>
+                  </FormField>
 
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Default Packaging & Labeling *</Text>
+                  <FormField label="Default Packaging & Labeling" required error={showErrors && !bomDefaultPackagingMode ? 'Packaging Mode is required' : undefined}>
                     <View style={styles.formInput}>
                       {Platform.OS === 'web' ? (
                         <select
@@ -1349,7 +1368,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                         <TextInput style={styles.formInputText} value={bomDefaultPackagingMode} onChangeText={(val: any) => setBomDefaultPackagingMode(val)} />
                       )}
                     </View>
-                  </View>
+                  </FormField>
                 </>
               )}
 
@@ -1674,7 +1693,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center' }}
+            disabled={isSaving}
+            style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', opacity: isSaving ? 0.7 : 1 }}
             onPress={() => {
               if (activeStep === 'step1') {
                 if (!name.trim()) { setShowErrors(true); return; }
@@ -1691,9 +1711,13 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
               } else handleSave();
             }}
           >
-            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: '#fff' }}>
-              {activeStep === 'step4' ? 'Save Product' : 'Next Step'}
-            </Text>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: '#fff' }}>
+                {activeStep === 'step4' ? 'Save Product' : 'Next Step'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

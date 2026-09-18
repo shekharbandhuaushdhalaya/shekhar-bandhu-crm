@@ -15,6 +15,9 @@ import { WorkspaceTabs, WorkspaceLoading, StatusPill, EmptyState, WorkspaceTrans
 import { PageHeader as WorkspaceHeader } from './../components/PageHeader';
 import { ResponsiveSelect } from './../components/ResponsiveSelect';
 import { FormField } from './../components/FormField';
+import { ListToolbar } from '../components/ListToolbar';
+import { useListState } from '../utils/useListState';
+import { useLocalSearchParams } from 'expo-router';
 
 type Tab = 'dashboard' | 'mrs' | 'portfolio' | 'attendance' | 'visits' | 'expenses';
 
@@ -28,12 +31,20 @@ export default function MedicalRepsScreen() {
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
-  const [activeTab, setActiveTab] = useState<Tab>('mrs');
+  const [activeTab, setActiveTab] = useListState<Tab>('mr_tab', 'mrs');
   const [refreshing, setRefreshing] = useState(false);
 
   // MR Master
   const [mrs, setMrs] = useState<MedicalRepresentative[]>([]);
-  const [mrSearch, setMrSearch] = useState('');
+  const [mrSearch, setMrSearch] = useListState('mr_search', '');
+  
+  const params = useLocalSearchParams<{ search?: string }>();
+  useEffect(() => {
+    if (params.search && params.search !== mrSearch) {
+      setMrSearch(params.search);
+    }
+  }, [params.search]);
+
   const [mrModal, setMrModal] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [mrSaving, setMrSaving] = useState(false);
@@ -47,6 +58,7 @@ export default function MedicalRepsScreen() {
 
   // Selected MR ID (consolidated from attendance/visits)
   const [selectedMrId, setSelectedMrId] = useState<string>('');
+  const selectedMr = React.useMemo(() => mrs.find(m => m._id === selectedMrId), [mrs, selectedMrId]);
 
   // Attendance
   const [attendanceLogs, setAttendanceLogs] = useState<MrDailyLog[]>([]);
@@ -407,7 +419,6 @@ export default function MedicalRepsScreen() {
           latitude: coords.latitude,
           longitude: coords.longitude
         }));
-        showToast('Location logged successfully.', 'success');
       } else {
         showToast('Unable to capture location. Please grant location permissions.', 'error');
       }
@@ -541,16 +552,26 @@ export default function MedicalRepsScreen() {
         <EmptyState title={<>No active Medical Representatives found.</>} actionLabel="Add Representative" onAction={handleOpenNewMrModal} />
       );
     }
-    const options = activeMRs.map(m => ({
-      value: m._id,
-      label: `${m.name} (${m.territory || 'HQ'})`
+    const groupedMRs = activeMRs.reduce((acc, m) => {
+      const territory = m.territory || 'Headquarters';
+      if (!acc[territory]) acc[territory] = [];
+      acc[territory].push({
+        value: m._id,
+        label: m.name
+      });
+      return acc;
+    }, {} as Record<string, { value: string, label: string }[]>);
+
+    const groups = Object.keys(groupedMRs).sort().map(title => ({
+      title,
+      options: groupedMRs[title]
     }));
 
     return (
       <View style={[styles.selectorWrapper, { marginBottom: Spacing.md, zIndex: 1000 }]}>
         <ResponsiveSelect
           label="Select medical representative"
-          options={options}
+          groups={groups}
           value={selectedId || ''}
           onChange={onSelect}
           placeholder="Search and select an MR..."
@@ -732,22 +753,18 @@ export default function MedicalRepsScreen() {
   // ── 2. MR LIST RENDER ───────────────────────────────────────────────────────
   const renderMrList = () => (
     <View style={{ flex: 1 }}>
-      <View style={styles.rosterToolbar}>
-        <View style={{ flex: 1 }}>
+      <View style={{ marginBottom: Spacing.md }}>
+        <View style={{ marginBottom: Spacing.sm }}>
           <Text style={styles.pageSectionTitle}>Medical Representatives</Text>
           <Text style={styles.pageSectionSubtitle}>Manage your field team and sales targets.</Text>
         </View>
-        <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={17} color={colors.text.muted} />
-          <TextInput
-            value={mrSearch}
-            onChangeText={setMrSearch}
-            placeholder="Search name, phone or territory"
-            placeholderTextColor={colors.text.muted}
-            style={styles.searchInput}
-            returnKeyType="search"
-          />
-        </View>
+        <ListToolbar
+          containerStyle={{ paddingHorizontal: 0, paddingBottom: 0 }}
+          searchPlaceholder="Search name, phone or territory"
+          itemCount={mrs ? mrs.length : 0}
+          searchValue={mrSearch}
+          onSearchChange={setMrSearch}
+        />
       </View>
       <FlatList
         data={mrs}
@@ -1499,6 +1516,7 @@ export default function MedicalRepsScreen() {
   // ── 5. EXPENSES RENDER ──────────────────────────────────────────────────────
   const renderPortfolio = () => {
     const selectedMr = mrs.find(m => m._id === selectedMrId);
+    if (!selectedMrId || !selectedMr) return <EmptyState title="No MR Selected" />;
     const grouped = assignments.reduce<Record<string, MrAssignment[]>>((acc, a) => { (acc[a.entityType] ||= []).push(a); return acc; }, {});
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>

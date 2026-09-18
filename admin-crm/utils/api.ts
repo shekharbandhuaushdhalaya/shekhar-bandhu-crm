@@ -1041,12 +1041,13 @@ class ApiClient {
   }
 
   // --- Payments ---
-  async getPayments(partyId?: string, mode?: string, partyType?: string, type?: string): Promise<Payment[]> {
+  async getPayments(partyId?: string, mode?: string, partyType?: string, type?: string, search?: string): Promise<Payment[]> {
     let url = `${API_BASE}/payments?`;
     if (partyId) url += `partyId=${encodeURIComponent(partyId)}&`;
     if (mode) url += `mode=${encodeURIComponent(mode)}&`;
     if (partyType) url += `partyType=${encodeURIComponent(partyType)}&`;
-    if (type) url += `type=${encodeURIComponent(type)}`;
+    if (type) url += `type=${encodeURIComponent(type)}&`;
+    if (search) url += `search=${encodeURIComponent(search)}`;
     const res = await this.request(url);
     return res.json();
   }

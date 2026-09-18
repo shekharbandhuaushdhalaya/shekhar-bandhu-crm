@@ -20,6 +20,7 @@ export interface ListToolbarProps {
   };
   renderActions?: () => ReactNode;
   itemCount?: number;
+  totalCount?: number;
   containerStyle?: StyleProp<ViewStyle>;
 }
 
@@ -32,6 +33,7 @@ export function ListToolbar({
   primaryAction,
   renderActions,
   itemCount,
+  totalCount,
   containerStyle,
 }: ListToolbarProps) {
   const { colors } = useTheme();
@@ -67,7 +69,9 @@ export function ListToolbar({
 
         {itemCount !== undefined && (
           <View style={styles.countBadge}>
-            <Text style={styles.countText}>{itemCount} Items</Text>
+            <Text style={styles.countText}>
+              {totalCount !== undefined ? `${itemCount} of ${totalCount} results` : `${itemCount} results`}
+            </Text>
           </View>
         )}
 

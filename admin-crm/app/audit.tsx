@@ -208,6 +208,7 @@ export default function AuditLogsScreen() {
       <ListToolbar
         searchValue={searchText}
         onSearchChange={setSearchText}
+        itemCount={totalItems}
         onSubmitEditing={handleSearchSubmit}
         searchPlaceholder="Search email, action, details..."
         renderFilters={() => (

@@ -12,14 +12,14 @@ export const LightColors = {
   text: {
     primary: '#2B1A18',
     secondary: '#695552',
-    muted: '#93817E',
+    muted: '#816F6D',
   },
   primary: '#AB3323', // rgba(171, 51, 35, 1)
   primaryLight: 'rgba(171, 51, 35, 0.08)',
   success: '#2B7A4B',
   successLight: 'rgba(43, 122, 75, 0.10)',
-  warning: '#B58A4A',
-  warningLight: 'rgba(181, 138, 74, 0.10)',
+  warning: '#9C753A',
+  warningLight: 'rgba(156, 117, 58, 0.10)',
   danger: '#D32F2F',
   dangerLight: 'rgba(211, 47, 47, 0.10)',
   info: '#3B7E8C',
@@ -46,7 +46,7 @@ export const DarkColors = {
   text: {
     primary: '#F4EDED',
     secondary: '#B8AAA7',
-    muted: '#80716E',
+    muted: '#9E908D',
   },
   primary: '#D45443',
   primaryLight: 'rgba(171, 51, 35, 0.18)',
@@ -79,6 +79,8 @@ export const Shadows = {
   card: { boxShadow: '0px 1px 2px rgba(43,26,24,0.06), 0px 8px 20px rgba(43,26,24,0.05)', elevation: 2 },
   header: { boxShadow: '0px 1px 6px rgba(39, 56, 47, 0.03)', elevation: 1 },
   hover: { boxShadow: '0px 2px 4px rgba(43,26,24,0.08), 0px 10px 24px rgba(43,26,24,0.09)', elevation: 3 },
+  floating: { boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
+  modal: { boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
 };
 
 export type Stage = 'lead' | 'contacted' | 'proposal' | 'negotiation' | 'won' | 'lost';
@@ -92,16 +94,48 @@ export const getStageColors = (colors: typeof LightColors) => ({
   lost: colors.pipeline.lost,
 });
 
+export const getStatusTone = (status: string): 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral' => {
+  const s = (status || '').toLowerCase();
+  switch (s) {
+    case 'delivered':
+    case 'completed':
+    case 'fulfilled':
+    case 'paid':
+    case 'posted':
+    case 'won':
+    case 'active':
+      return 'success';
+    case 'processing':
+    case 'pending':
+    case 'draft':
+      return 'warning';
+    case 'cancelled':
+    case 'lost':
+    case 'rejected':
+      return 'danger';
+    case 'shipped':
+    case 'in_transit':
+    case 'dispatched':
+      return 'primary';
+    case 'new':
+    case 'open':
+      return 'info';
+    default:
+      return 'neutral';
+  }
+};
+
+
 // Named font weights are bundled locally, so offline and native rendering match web.
 export const Typography = {
   display: { fontFamily: 'Manrope_800', fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.4 },
   h1: { fontFamily: 'Manrope_800', fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.3 },
   h2: { fontFamily: 'Manrope_800', fontSize: 17, lineHeight: 22, fontWeight: '800' },
   h3: { fontFamily: 'Manrope_700', fontSize: 15, lineHeight: 20, fontWeight: '700' },
-  body: { fontFamily: 'Inter_500', fontSize: 14, lineHeight: 20, fontWeight: '500' },
-  bodySm: { fontFamily: 'Inter_500', fontSize: 12.5, lineHeight: 18, fontWeight: '500' },
-  caption: { fontFamily: 'Inter_600', fontSize: 11, lineHeight: 15, fontWeight: '600' },
-  eyebrow: { fontFamily: 'Inter_800', fontSize: 10, lineHeight: 13, fontWeight: '800', letterSpacing: 0.9, textTransform: 'uppercase' },
+  body: { fontFamily: 'Inter_500', fontSize: 16, lineHeight: 24, fontWeight: '500' },
+  bodySm: { fontFamily: 'Inter_500', fontSize: 14, lineHeight: 20, fontWeight: '500' },
+  caption: { fontFamily: 'Inter_600', fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  eyebrow: { fontFamily: 'Inter_800', fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
 } satisfies Record<string, TextStyle>;
 
 export function withAlpha(color: string, alpha = 0.1): string {
