@@ -495,8 +495,8 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
         />
 
         {/* Frequent Items */}
-        <View style={{ marginTop: 8, marginBottom: 4 }}>
-          <Text style={[styles.groupLabel, { marginBottom: 6 }]}>FREQUENT</Text>
+        <View style={{ marginBottom: 12 }}>
+          <Text style={[styles.groupLabel, { marginBottom: 6 }]}>QUICK ACCESS</Text>
           {FREQUENT_ITEMS.map((item) => {
             if (item.permission && !perm.can(item.permission)) return null;
             return (

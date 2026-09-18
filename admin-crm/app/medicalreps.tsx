@@ -8,10 +8,12 @@ import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
+import { useConfirm } from '../utils/ConfirmContext';
 import { api, MedicalRepresentative, MrDailyLog, MrVisit, MrAssignment, Doctor, MrExpense, MrDashboardSummary, Product } from '../utils/api';
 import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
 import { WorkspaceTabs, WorkspaceLoading, StatusPill, EmptyState, WorkspaceTransition } from './../components/WorkspacePrimitives';
 import { PageHeader as WorkspaceHeader } from './../components/PageHeader';
+import { ResponsiveSelect } from './../components/ResponsiveSelect';
 
 type Tab = 'dashboard' | 'mrs' | 'portfolio' | 'attendance' | 'visits' | 'expenses';
 
@@ -20,6 +22,7 @@ export default function MedicalRepsScreen() {
   const styles = useStyles(createStyles);
   const perm = usePermission();
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const { user } = useAuth();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
@@ -40,8 +43,10 @@ export default function MedicalRepsScreen() {
   const [assignmentModal, setAssignmentModal] = useState(false);
   const [assignmentForm, setAssignmentForm] = useState<Partial<MrAssignment>>({ entityType: 'doctor', entityName: '', area: '', territory: '', role: 'primary', priority: 'normal', preferredVisitDays: [], notes: '' });
 
+  // Selected MR ID (consolidated from attendance/visits)
+  const [selectedMrId, setSelectedMrId] = useState<string>('');
+
   // Attendance
-  const [selectedMrForAttendance, setSelectedMrForAttendance] = useState<string>('');
   const [attendanceLogs, setAttendanceLogs] = useState<MrDailyLog[]>([]);
   const [checkInModal, setCheckInModal] = useState(false);
   const [checkInForm, setCheckInForm] = useState<{
@@ -60,7 +65,6 @@ export default function MedicalRepsScreen() {
 
   // Visits & Products
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedMrForVisits, setSelectedMrForVisits] = useState<string>('');
   const [visits, setVisits] = useState<MrVisit[]>([]);
   const [visitModal, setVisitModal] = useState(false);
   const [visitForm, setVisitForm] = useState<{
@@ -120,8 +124,7 @@ export default function MedicalRepsScreen() {
       if (active.length > 0) {
         const loggedInMr = user?.email ? active.find(m => m.email?.toLowerCase() === user.email.toLowerCase()) : null;
         const defaultMrId = loggedInMr ? loggedInMr._id : active[0]._id;
-        setSelectedMrForAttendance(prev => prev || defaultMrId);
-        setSelectedMrForVisits(prev => prev || defaultMrId);
+        setSelectedMrId(prev => prev || defaultMrId);
       }
     } catch { }
   }, [mrSearch, user]);
@@ -173,24 +176,24 @@ export default function MedicalRepsScreen() {
 
   useEffect(() => {
     if (activeTab === 'mrs') loadMrs();
-    else if (activeTab === 'portfolio' && selectedMrForVisits) loadAssignments(selectedMrForVisits);
-    else if (activeTab === 'attendance' && selectedMrForAttendance) loadAttendance(selectedMrForAttendance);
-    else if (activeTab === 'visits' && selectedMrForVisits) loadVisits(selectedMrForVisits);
-    else if (activeTab === 'expenses' && selectedMrForVisits) loadExpenses(selectedMrForVisits);
+    else if (activeTab === 'portfolio' && selectedMrId) loadAssignments(selectedMrId);
+    else if (activeTab === 'attendance' && selectedMrId) loadAttendance(selectedMrId);
+    else if (activeTab === 'visits' && selectedMrId) loadVisits(selectedMrId);
+    else if (activeTab === 'expenses' && selectedMrId) loadExpenses(selectedMrId);
     else if (activeTab === 'dashboard') loadDashboard();
-  }, [activeTab, selectedMrForAttendance, selectedMrForVisits, loadMrs, loadAssignments, loadAttendance, loadVisits, loadExpenses, loadDashboard]);
+  }, [activeTab, selectedMrId, loadMrs, loadAssignments, loadAttendance, loadVisits, loadExpenses, loadDashboard]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
     if (activeTab === 'mrs') await loadMrs();
     else if (activeTab === 'dashboard') await loadDashboard();
-    else if (activeTab === 'portfolio' && selectedMrForVisits) await loadAssignments(selectedMrForVisits);
-    else if (activeTab === 'attendance' && selectedMrForAttendance) await loadAttendance(selectedMrForAttendance);
-    else if (activeTab === 'visits' && selectedMrForVisits) await loadVisits(selectedMrForVisits);
-    else if (activeTab === 'expenses' && selectedMrForVisits) await loadExpenses(selectedMrForVisits);
+    else if (activeTab === 'portfolio' && selectedMrId) await loadAssignments(selectedMrId);
+    else if (activeTab === 'attendance' && selectedMrId) await loadAttendance(selectedMrId);
+    else if (activeTab === 'visits' && selectedMrId) await loadVisits(selectedMrId);
+    else if (activeTab === 'expenses' && selectedMrId) await loadExpenses(selectedMrId);
     setRefreshing(false);
-  }, [activeTab, selectedMrForAttendance, selectedMrForVisits, loadMrs, loadDashboard, loadAssignments, loadAttendance, loadVisits, loadExpenses]);
+  }, [activeTab, selectedMrId, loadMrs, loadDashboard, loadAssignments, loadAttendance, loadVisits, loadExpenses]);
 
   const fetchGpsLocation = (): Promise<{ latitude?: number; longitude?: number }> => {
     return new Promise((resolve) => {
@@ -246,7 +249,7 @@ export default function MedicalRepsScreen() {
   };
 
   const handleCheckInSubmit = async () => {
-    if (!selectedMrForAttendance) return;
+    if (!selectedMrId) return;
     try {
       let coords: { latitude?: number; longitude?: number } = { latitude: checkInForm.latitude, longitude: checkInForm.longitude };
       if (!coords.latitude || !coords.longitude) {
@@ -258,18 +261,18 @@ export default function MedicalRepsScreen() {
         latitude: coords.latitude,
         longitude: coords.longitude
       };
-      await api.mrCheckIn(selectedMrForAttendance, payload);
+      await api.mrCheckIn(selectedMrId, payload);
       showToast('Field check-in recorded with live GPS coordinates!', 'success');
       setCheckInModal(false);
       setCheckInForm({ location: '', startKmReading: 0 });
-      loadAttendance(selectedMrForAttendance);
+      loadAttendance(selectedMrId);
     } catch (err: any) {
       showToast(err.message || 'Check-in failed', 'error');
     }
   };
 
   const handleCheckOutSubmit = async () => {
-    if (!selectedMrForAttendance) return;
+    if (!selectedMrId) return;
     try {
       let coords: { latitude?: number; longitude?: number } = { latitude: checkOutForm.latitude, longitude: checkOutForm.longitude };
       if (!coords.latitude || !coords.longitude) {
@@ -281,11 +284,11 @@ export default function MedicalRepsScreen() {
         latitude: coords.latitude,
         longitude: coords.longitude
       };
-      await api.mrCheckOut(selectedMrForAttendance, payload);
+      await api.mrCheckOut(selectedMrId, payload);
       showToast('Field check-out recorded with live GPS coordinates!', 'success');
       setCheckOutModal(false);
       setCheckOutForm({ location: '', endKmReading: 0 });
-      loadAttendance(selectedMrForAttendance);
+      loadAttendance(selectedMrId);
     } catch (err: any) {
       showToast(err.message || 'Check-out failed', 'error');
     }
@@ -360,8 +363,7 @@ export default function MedicalRepsScreen() {
       setMrForm({ name: '', phone: '', email: '', code: '', territory: '', monthlyTarget: 0, address: '', notes: '' });
       await loadMrs();
       if (!editMr && saved?._id) {
-        setSelectedMrForAttendance(saved._id);
-        setSelectedMrForVisits(saved._id);
+        setSelectedMrId(saved._id);
       }
     } catch (err: any) {
       showToast(err?.message || 'Unable to save Medical Representative. Please check the highlighted data and try again.', 'error');
@@ -371,19 +373,19 @@ export default function MedicalRepsScreen() {
   };
 
   const handleDeleteMr = (id: string) => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to delete this Medical Representative?')) {
+    confirm({
+      title: 'Delete Medical Representative?',
+      description: 'This will permanently delete this representative and their associated assignments. This action cannot be undone.',
+      destructive: true,
+      confirmLabel: 'Delete Representative',
+      iconName: 'trash-outline',
+      onConfirm: () => {
         api.deleteMR(id).then(() => {
           showToast('MR deleted successfully', 'success');
           loadMrs();
         }).catch(err => showToast(err.message, 'error'));
       }
-    } else {
-      api.deleteMR(id).then(() => {
-        showToast('MR deleted successfully', 'success');
-        loadMrs();
-      }).catch(err => showToast(err.message, 'error'));
-    }
+    });
   };
 
   const handleLogVisitLocation = async () => {
@@ -446,7 +448,7 @@ export default function MedicalRepsScreen() {
       return;
     }
     try {
-      await api.createMrVisit(selectedMrForVisits, visitForm);
+      await api.createMrVisit(selectedMrId, visitForm);
       showToast('Doctor visit recorded with verified GPS location', 'success');
       setVisitModal(false);
       setShowDoctorSuggestions(false);
@@ -456,7 +458,7 @@ export default function MedicalRepsScreen() {
         purpose: 'promotion', orderTaken: false, orderAmount: 0, sampleDetails: [],
         feedback: '', notes: '', latitude: undefined, longitude: undefined
       });
-      loadVisits(selectedMrForVisits);
+      loadVisits(selectedMrId);
     } catch (err: any) {
       showToast(err.message || 'Failed to save visit', 'error');
     }
@@ -468,11 +470,11 @@ export default function MedicalRepsScreen() {
       return;
     }
     try {
-      await api.createMrExpense(selectedMrForVisits, expenseForm);
+      await api.createMrExpense(selectedMrId, expenseForm);
       showToast('Expense claim submitted', 'success');
       setExpenseModal(false);
       setExpenseForm({ category: 'travel', amount: 0, description: '' });
-      loadExpenses(selectedMrForVisits);
+      loadExpenses(selectedMrId);
     } catch (err: any) {
       showToast(err.message || 'Failed to save expense', 'error');
     }
@@ -482,7 +484,7 @@ export default function MedicalRepsScreen() {
     try {
       await api.approveMrExpense(id, status);
       showToast(`Expense ${status}`, 'success');
-      loadExpenses(selectedMrForVisits);
+      loadExpenses(selectedMrId);
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -530,30 +532,20 @@ export default function MedicalRepsScreen() {
         <EmptyState title={<>No active Medical Representatives found.</>}  />
       );
     }
+    const options = activeMRs.map(m => ({
+      value: m._id,
+      label: `${m.name} (${m.territory || 'HQ'})`
+    }));
+
     return (
-      <View style={styles.selectorWrapper}>
-        <Text style={styles.selectorLabel}>Select medical representative</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 8 }}>
-          {activeMRs.map(m => {
-            const isSelected = selectedId === m._id;
-            return (
-              <TouchableOpacity
-                key={m._id}
-                style={[styles.mrSelectorChip, isSelected && styles.mrSelectorChipActive]}
-                onPress={() => onSelect(m._id)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.mrSelectorAvatar, isSelected && { backgroundColor: '#fff' }]}>
-                  <Text style={[styles.mrSelectorAvatarText, isSelected && { color: colors.primary }]}>{m.name.charAt(0)}</Text>
-                </View>
-                <View>
-                  <Text style={[styles.mrSelectorChipText, isSelected && styles.mrSelectorChipTextActive]}>{m.name}</Text>
-                  <Text style={[styles.mrSelectorChipSub, isSelected && { color: 'rgba(255,255,255,0.8)' }]}>{m.territory || 'HQ'}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+      <View style={[styles.selectorWrapper, { marginBottom: Spacing.md, zIndex: 1000 }]}>
+        <ResponsiveSelect
+          label="Select medical representative"
+          options={options}
+          selectedValue={selectedId || ''}
+          onSelect={onSelect}
+          placeholder="Search and select an MR..."
+        />
       </View>
     );
   };
@@ -898,8 +890,8 @@ export default function MedicalRepsScreen() {
   // ── 3. ATTENDANCE RENDER ────────────────────────────────────────────────────
   const renderAttendance = () => (
     <View style={{ flex: 1 }}>
-      {mrSelector(id => { setSelectedMrForAttendance(id); loadAttendance(id); }, selectedMrForAttendance)}
-      {selectedMrForAttendance ? (
+      {mrSelector(id => { setSelectedMrId(id); loadAttendance(id); }, selectedMrId)}
+      {selectedMrId ? (
         <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
           {/* Action Header for Field Attendance */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, backgroundColor: colors.bg.card, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
@@ -1185,11 +1177,11 @@ export default function MedicalRepsScreen() {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <View style={{ flex: 1 }}>
-          {mrSelector(id => { setSelectedMrForVisits(id); loadVisits(id); loadExpenses(id); }, selectedMrForVisits)}
+          {mrSelector(id => { setSelectedMrId(id); loadVisits(id); loadExpenses(id); }, selectedMrId)}
         </View>
       </View>
 
-      {selectedMrForVisits ? (
+      {selectedMrId ? (
         <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
           <View style={{ gap: 10 }}>
             {visits.map(v => (
@@ -1499,7 +1491,7 @@ export default function MedicalRepsScreen() {
 
   // ── 5. EXPENSES RENDER ──────────────────────────────────────────────────────
   const renderPortfolio = () => {
-    const selectedMr = mrs.find(m => m._id === selectedMrForVisits);
+    const selectedMr = mrs.find(m => m._id === selectedMrId);
     const grouped = assignments.reduce<Record<string, MrAssignment[]>>((acc, a) => { (acc[a.entityType] ||= []).push(a); return acc; }, {});
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
@@ -1522,7 +1514,7 @@ export default function MedicalRepsScreen() {
               {list.map(a => <View key={a._id} style={styles.assignmentRow}>
                 <View style={styles.assignmentIcon}><Ionicons name={type === 'doctor' ? 'medkit-outline' : 'business-outline'} size={18} color={colors.primary} /></View>
                 <View style={{ flex: 1 }}><Text style={styles.assignmentName}>{a.entityName}</Text><Text style={styles.assignmentMeta}>{[a.area, a.territory, a.role, `Priority ${a.priority}`].filter(Boolean).join(' • ')}</Text>{a.preferredVisitDays?.length ? <Text style={styles.assignmentMeta}>Visits: {a.preferredVisitDays.join(', ')}</Text> : null}</View>
-                {perm.can('mr:edit') ? <TouchableOpacity style={styles.circleActionBtn} onPress={async () => { try { await api.endMrAssignment(a._id); showToast('Assignment ended', 'success'); loadAssignments(selectedMrForVisits); } catch (e:any) { showToast(e.message || 'Could not end assignment', 'error'); } }}><Ionicons name="close-circle-outline" size={18} color={colors.danger} /></TouchableOpacity> : null}
+                {perm.can('mr:edit') ? <TouchableOpacity style={styles.circleActionBtn} onPress={async () => { try { await api.endMrAssignment(a._id); showToast('Assignment ended', 'success'); loadAssignments(selectedMrId); } catch (e:any) { showToast(e.message || 'Could not end assignment', 'error'); } }}><Ionicons name="close-circle-outline" size={18} color={colors.danger} /></TouchableOpacity> : null}
               </View>)}
             </View>
           ))}
@@ -1533,7 +1525,7 @@ export default function MedicalRepsScreen() {
             {([['entityName','Name *','Doctor / chemist / institution name'],['entityId','Linked ID','Optional record ID'],['area','Area','e.g. Civil Lines'],['territory','Territory','e.g. Prayagraj North'],['preferredVisitTime','Preferred time','e.g. 11:00 AM'],['notes','Notes','Optional notes']] as const).map(([k,label,ph]) => <View key={k} style={styles.formField}><Text style={styles.fieldLabelText}>{label}</Text><TextInput style={styles.fieldInput} value={(assignmentForm as any)[k] || ''} onChangeText={v=>setAssignmentForm({...assignmentForm,[k]:v})} placeholder={ph} placeholderTextColor={colors.text.muted}/></View>)}
             <Text style={styles.fieldLabelText}>Assignment role</Text><View style={styles.choiceRow}>{['primary','secondary','temporary'].map(t=><TouchableOpacity key={t} style={[styles.choicePill,assignmentForm.role===t&&styles.choicePillActive]} onPress={()=>setAssignmentForm({...assignmentForm,role:t as any})}><Text style={[styles.choicePillText,assignmentForm.role===t&&styles.choicePillTextActive]}>{t}</Text></TouchableOpacity>)}</View>
             <Text style={styles.fieldLabelText}>Priority</Text><View style={styles.choiceRow}>{['A','B','C','normal'].map(t=><TouchableOpacity key={t} style={[styles.choicePill,assignmentForm.priority===t&&styles.choicePillActive]} onPress={()=>setAssignmentForm({...assignmentForm,priority:t as any})}><Text style={[styles.choicePillText,assignmentForm.priority===t&&styles.choicePillTextActive]}>{t}</Text></TouchableOpacity>)}</View>
-            <TouchableOpacity style={styles.modalSubmitBtn} onPress={async()=>{if(!selectedMrForVisits || !assignmentForm.entityName?.trim()){showToast('Enter an account name','error');return;} try{await api.createMrAssignment(selectedMrForVisits,assignmentForm);showToast('Assignment added','success');setAssignmentModal(false);loadAssignments(selectedMrForVisits);}catch(e:any){showToast(e.message||'Could not add assignment','error');}}}><Text style={styles.modalSubmitBtnText}>Save Assignment</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.modalSubmitBtn} onPress={async()=>{if(!selectedMrId || !assignmentForm.entityName?.trim()){showToast('Enter an account name','error');return;} try{await api.createMrAssignment(selectedMrId,assignmentForm);showToast('Assignment added','success');setAssignmentModal(false);loadAssignments(selectedMrId);}catch(e:any){showToast(e.message||'Could not add assignment','error');}}}><Text style={styles.modalSubmitBtnText}>Save Assignment</Text></TouchableOpacity>
           </ScrollView></View></View>
         </Modal>
       </ScrollView>
@@ -1708,8 +1700,8 @@ export default function MedicalRepsScreen() {
         subtitle="Manage the field team, account portfolio, attendance, visits and expenses from one consistent workspace."
         actions={[
           ...(activeTab === 'mrs' && perm.can('mr:create') ? [{ label: 'New MR', icon: 'add' as const, onPress: handleOpenNewMrModal }] : []),
-          ...(activeTab === 'visits' && selectedMrForVisits && perm.can('mr:visits') ? [{ label: 'Record visit', icon: 'add' as const, onPress: () => setVisitModal(true) }] : []),
-          ...(activeTab === 'expenses' && selectedMrForVisits && perm.can('mr:expenses') ? [{ label: 'Claim expense', icon: 'add' as const, onPress: () => setExpenseModal(true) }] : []),
+          ...(activeTab === 'visits' && selectedMrId && perm.can('mr:visits') ? [{ label: 'Record visit', icon: 'add' as const, onPress: () => setVisitModal(true) }] : []),
+          ...(activeTab === 'expenses' && selectedMrId && perm.can('mr:expenses') ? [{ label: 'Claim expense', icon: 'add' as const, onPress: () => setExpenseModal(true) }] : []),
         ]}
       />
       <WorkspaceTabs

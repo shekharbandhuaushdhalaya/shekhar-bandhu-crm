@@ -10,6 +10,7 @@ import { api, Product, getImageUrl } from '../../../utils/api';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { useToast } from '../../../utils/ToastContext';
 import { createStyles } from '../productsStyles';
+import { FormField } from '../../../components/FormField';
 
 const normalizeTitleCase = (str?: string) => {
   if (!str) return '';
@@ -146,18 +147,16 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
   // Dirty state tracking
   const currentFormState = JSON.stringify([name, sku, minReorder, variantsList, hsnCode, gstRate, description, benefits, suggestedDosage, disease, productType, shape, colour, weight, bomYield, bomOverhead, bomIsActive, bomIngredients, bomStages]);
   const [initialFormState, setInitialFormState] = useState<string | null>(null);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   useEffect(() => {
-    if (visible && initialFormState === null) {
-      const timeout = setTimeout(() => {
-        setInitialFormState(currentFormState);
-      }, 600);
-      return () => clearTimeout(timeout);
-    }
     if (!visible) {
       setInitialFormState(null);
+      setIsDataLoaded(false);
+    } else if (isDataLoaded && initialFormState === null) {
+      setInitialFormState(currentFormState);
     }
-  }, [visible, initialFormState, currentFormState]);
+  }, [visible, isDataLoaded, currentFormState, initialFormState]);
 
   const isDirty = initialFormState !== null && currentFormState !== initialFormState;
 
@@ -381,7 +380,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
         setShowShapeInput(false);
         setNewShapeName('');
         setActiveStep('step1');
-        setInitialFormState(currentFormState);
+        // Let the state updates apply, then set isDataLoaded
+        setTimeout(() => setIsDataLoaded(true), 100);
       } catch (err) {
         console.error('Failed to load raw materials, BOM, or product data in AddEditProductModal:', err);
       }
@@ -816,16 +816,20 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
             </ScrollView>
           </View>
 
-          <View style={{ flexDirection: 'row', marginBottom: 20, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+          <View style={{ flexDirection: 'row', marginBottom: 35, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 }}>
             {['step1', 'step2', 'step3', 'step4'].map((s, i) => {
               const isActive = activeStep === s;
               const isPast = parseInt(activeStep.replace('step', '')) > i + 1;
+              const labels = ['Basics', 'Pricing', 'Classify', 'BOM'];
               return (
-                <View key={s} style={{ flexDirection: 'row', alignItems: 'center', flex: i < 3 ? 1 : 0 }}>
-                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: isActive || isPast ? colors.primary : colors.bg.secondary, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: isActive || isPast ? colors.primary : colors.border }}>
-                    {isPast ? <Ionicons name="checkmark" size={16} color="#fff" /> : <Text style={{ color: isActive ? '#fff' : colors.text.muted, fontSize: 12, fontWeight: 'bold' }}>{i + 1}</Text>}
+                <View key={s} style={{ flexDirection: 'row', alignItems: 'flex-start', flex: i < 3 ? 1 : 0, height: 28 }}>
+                  <View style={{ alignItems: 'center' }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: isActive || isPast ? colors.primary : colors.bg.secondary, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: isActive || isPast ? colors.primary : colors.border }}>
+                      {isPast ? <Ionicons name="checkmark" size={16} color="#fff" /> : <Text style={{ color: isActive ? '#fff' : colors.text.muted, fontSize: 12, fontWeight: 'bold' }}>{i + 1}</Text>}
+                    </View>
+                    <Text style={{ position: 'absolute', top: 32, ...Typography.eyebrow, fontSize: 10, color: isActive ? colors.text.primary : colors.text.muted, fontWeight: isActive ? '700' : '500', width: 60, textAlign: 'center', marginLeft: -16 }}>{labels[i]}</Text>
                   </View>
-                  {i < 3 && <View style={{ flex: 1, height: 2, backgroundColor: isPast ? colors.primary : colors.border, marginHorizontal: 8 }} />}
+                  {i < 3 && <View style={{ flex: 1, height: 2, backgroundColor: isPast ? colors.primary : colors.border, marginHorizontal: 8, marginTop: 13 }} />}
                 </View>
               );
             })}
@@ -835,35 +839,26 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
             <>
               <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Core Product Specifications</Text></View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Ayurvedic Formulation Name <Text style={{ color: 'red' }}>*</Text></Text>
-                <View style={styles.formInput}>
-                  <Ionicons name="leaf-outline" size={16} color={colors.text.muted} />
+              <FormField label="Ayurvedic Formulation Name" required>
+                <TextInput
+                  style={styles.formInputText}
+                  placeholder="e.g. Ashwagandha Churna"
+                  placeholderTextColor={colors.text.muted}
+                  value={name}
+                  onChangeText={setName}
+                />
+              </FormField>
+
+              <FormField label="Product SKU / Code (Auto-Generated)">
+                <View style={styles.inputWithAddon}>
+                  <View style={styles.inputAddon}><Text style={styles.inputAddonText}>SKU</Text></View>
                   <TextInput
-                    style={styles.formInputText}
-                    placeholder="e.g. ABHAYARISHTA"
-                    placeholderTextColor={colors.text.muted}
-                    value={name}
-                    onChangeText={setName}
+                    style={[styles.formInputText, { flex: 1, backgroundColor: colors.bg.primary, color: colors.text.muted }]}
+                    value={sku}
+                    editable={false}
                   />
                 </View>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Product SKU / Code (Auto-Generated)</Text>
-                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                  <View style={[styles.formInput, { flex: 1, backgroundColor: colors.bg.secondary }]}>
-                    <Ionicons name="barcode-outline" size={16} color={colors.text.muted} />
-                    <TextInput
-                      style={[styles.formInputText, { color: colors.text.muted }]}
-                      placeholder="Auto-generated on save"
-                      placeholderTextColor={colors.text.muted}
-                      value={sku}
-                      editable={false}
-                    />
-                  </View>
-                </View>
-              </View>
+              </FormField>
 
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={[styles.formGroup, { flex: 1 }]}>
@@ -1637,10 +1632,17 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
           <TouchableOpacity
             style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center' }}
             onPress={() => {
-              if (activeStep === 'step1') setActiveStep('step2');
-              else if (activeStep === 'step2') setActiveStep('step3');
-              else if (activeStep === 'step3') setActiveStep('step4');
-              else handleSave();
+              if (activeStep === 'step1') {
+                if (!name.trim()) { showToast('Ayurvedic Formulation Name is required!', 'error'); return; }
+                setActiveStep('step2');
+              } else if (activeStep === 'step2') {
+                const activeVariants = variantsList.filter(v => v.size.trim() && v.price.trim());
+                if (activeVariants.length === 0) { showToast('At least one size and B2B price must be specified!', 'error'); return; }
+                setActiveStep('step3');
+              } else if (activeStep === 'step3') {
+                if (!hsnCode.trim()) { showToast('HSN Code is mandatory!', 'error'); return; }
+                setActiveStep('step4');
+              } else handleSave();
             }}
           >
             <Text style={{ ...Typography.bodySm, fontWeight: '700', color: '#fff' }}>

@@ -253,13 +253,18 @@ class ApiClient {
             if (retry.ok) {
               return retry;
             } else {
-              // If retry fails even with a fresh token, do not emit auth_error
-              // It might be a 401 caused by incorrect permissions, not an expired token.
               res = retry; 
+              if (retry.status === 401) {
+                DeviceEventEmitter.emit('auth_error');
+              } else if (retry.status === 403) {
+                DeviceEventEmitter.emit('auth_forbidden');
+              }
             }
           } else {
             DeviceEventEmitter.emit('auth_error');
           }
+        } else if (!res.ok && res.status === 403) {
+          DeviceEventEmitter.emit('auth_forbidden');
         }
         if (!res.ok) {
           let errMsg = 'API Error';

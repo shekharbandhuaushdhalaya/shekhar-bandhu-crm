@@ -9,6 +9,7 @@ import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
+import { useConfirm } from '../utils/ConfirmContext';
 import { api, Doctor, MedicalRepresentative } from '../utils/api';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
@@ -20,6 +21,7 @@ export default function DoctorsScreen() {
   const styles = useStyles(createStyles);
   const perm = usePermission();
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const { user } = useAuth();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
@@ -232,20 +234,21 @@ export default function DoctorsScreen() {
   };
 
   const handleDeleteDoctor = (id: string) => {
-    const action = () => {
-      api.deleteDoctor(id)
-        .then(() => {
-          showToast('Doctor deleted successfully', 'success');
-          loadDoctors(1, false);
-        })
-        .catch(err => showToast(err.message, 'error'));
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to delete this Doctor record?')) action();
-    } else {
-      action();
-    }
+    confirm({
+      title: 'Delete Doctor Record?',
+      description: 'This will permanently remove this doctor from the directory and delete all associated assignments and events. This action cannot be undone.',
+      destructive: true,
+      confirmLabel: 'Delete Doctor',
+      iconName: 'trash-outline',
+      onConfirm: () => {
+        api.deleteDoctor(id)
+          .then(() => {
+            showToast('Doctor deleted successfully', 'success');
+            loadDoctors(1, false);
+          })
+          .catch(err => showToast(err.message, 'error'));
+      }
+    });
   };
 
   const categoryBadgeColors: Record<string, { bg: string; text: string }> = {

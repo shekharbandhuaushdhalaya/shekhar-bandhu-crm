@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { ThemeProvider, useTheme, useStyles } from '../utils/themeContext';
 import { ToastProvider } from '../utils/ToastContext';
+import { ConfirmProvider } from '../utils/ConfirmContext';
 import LoginScreen from './login';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar';
@@ -22,6 +23,7 @@ import AyurvedicLoader from '../components/AyurvedicLoader';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { getSocket } from '../utils/socket';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { GlobalSearchModal } from '../components/GlobalSearchModal';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -147,7 +149,9 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
 
       {/* Right Controls */}
       <View style={styles.headerControls}>
-
+        <TouchableOpacity style={styles.headerBtn} onPress={() => DeviceEventEmitter.emit('open_global_search')} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Global search">
+          <Ionicons name="search" size={18} color={colors.text.secondary} />
+        </TouchableOpacity>
 
         {/* User Card */}
         <TouchableOpacity style={styles.headerUser} onPress={() => router.push('/profile')} activeOpacity={0.7}>
@@ -238,6 +242,7 @@ function MainLayout() {
   const insets = useSafeAreaInsets();
 
   const [globalLoading, setGlobalLoading] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
     const unsubscribeNetInfo = NetInfo.addEventListener(state => {
@@ -250,6 +255,14 @@ function MainLayout() {
 
     const authSub = DeviceEventEmitter.addListener('auth_error', () => {
       logout();
+    });
+
+    const forbiddenSub = DeviceEventEmitter.addListener('auth_forbidden', () => {
+      alert('You do not have permission to perform this action.');
+    });
+
+    const searchSub = DeviceEventEmitter.addListener('open_global_search', () => {
+      setIsSearchVisible(true);
     });
 
     // Initialize Socket.io real-time connection
@@ -331,6 +344,8 @@ function MainLayout() {
       unsubscribeNetInfo();
       sub.remove();
       authSub.remove();
+      forbiddenSub.remove();
+      searchSub.remove();
       if (drawerCloseTimer.current) clearTimeout(drawerCloseTimer.current);
       socketEvents.forEach(eventName => {
         socket.off(eventName);
@@ -388,6 +403,8 @@ function MainLayout() {
 
       {/* Dynamic Top Header */}
       <TopHeader user={user} isOnline={isOnline} logout={logout} toggleSidebar={openSidebar} />
+      
+      <GlobalSearchModal visible={isSearchVisible} onClose={() => setIsSearchVisible(false)} />
       
       <View style={[styles.mainContainer, { flexDirection: isDesktop ? 'row' : 'column' }]}>
         {isDesktop && (
@@ -520,7 +537,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <ToastProvider>
-            <MainLayout />
+            <ConfirmProvider>
+              <MainLayout />
+            </ConfirmProvider>
           </ToastProvider>
         </AuthProvider>
       </ThemeProvider>

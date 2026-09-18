@@ -21,6 +21,7 @@ export type PageHeaderProps = {
   title: string;
   subtitle?: string;
   eyebrow?: string;
+  breadcrumbs?: { label: string; onPress?: () => void }[];
   actions?: Action[];
   renderActions?: () => React.ReactNode;
   backButton?: boolean | (() => void);
@@ -67,6 +68,21 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     fontWeight: '800',
     marginBottom: 4,
   },
+  breadcrumbsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  breadcrumbText: {
+    ...Typography.bodySm,
+    color: colors.text.muted,
+  },
+  breadcrumbActive: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
   title: {
     ...Typography.h1,
     fontWeight: '800',
@@ -87,7 +103,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
 });
 
-export function PageHeader({ title, subtitle, eyebrow, actions, renderActions, backButton, style }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, eyebrow, breadcrumbs, actions, renderActions, backButton, style }: PageHeaderProps) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { width } = useWindowDimensions();
@@ -105,12 +121,27 @@ export function PageHeader({ title, subtitle, eyebrow, actions, renderActions, b
     <View style={[styles.container, width < 768 && { flexDirection: 'column', alignItems: 'stretch', paddingHorizontal: Spacing.md }, style]}>
       <View style={styles.leftGroup}>
         {backButton ? (
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack} accessibilityRole="button" accessibilityLabel="Go back">
             <Ionicons name="arrow-back" size={20} color={colors.text.secondary} />
           </TouchableOpacity>
         ) : null}
         <View style={styles.titleArea}>
-          {eyebrow ? <Text style={styles.eyebrow}>{eyebrow.toUpperCase()}</Text> : null}
+          {breadcrumbs && breadcrumbs.length > 0 ? (
+            <View style={styles.breadcrumbsRow}>
+              {breadcrumbs.map((bc, i) => (
+                <React.Fragment key={i}>
+                  <TouchableOpacity disabled={!bc.onPress} onPress={bc.onPress}>
+                    <Text style={[styles.breadcrumbText, bc.onPress && styles.breadcrumbActive]}>{bc.label}</Text>
+                  </TouchableOpacity>
+                  {i < breadcrumbs.length - 1 && (
+                    <Ionicons name="chevron-forward" size={12} color={colors.border} />
+                  )}
+                </React.Fragment>
+              ))}
+            </View>
+          ) : eyebrow ? (
+            <Text style={styles.eyebrow}>{eyebrow.toUpperCase()}</Text>
+          ) : null}
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>

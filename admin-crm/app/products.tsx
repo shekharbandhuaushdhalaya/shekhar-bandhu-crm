@@ -12,6 +12,7 @@ import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
+import { useListState } from '../utils/useListState';
 import { DataTable, Column } from '../components/DataTable';
 import { ListToolbar } from '../components/ListToolbar';
 import PricingScreen from './pricing';
@@ -38,10 +39,10 @@ const toTitleCase = (str?: string | null): string => {
 };
 
 export default function ProductsScreen() {
-  const [topTab, setTopTab] = useState<'products' | 'pricing'>('products');
+  const [topTab, setTopTab] = useListState<'products' | 'pricing'>('products_topTab', 'products');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useListState('products_search', '');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedProd, setSelectedProd] = useState<Product | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -49,7 +50,7 @@ export default function ProductsScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [parentProductId, setParentProductId] = useState<string | null>(null);
 
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState('');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useListState('products_typeFilter', '');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [availableTypes, setAvailableTypes] = useState(['Asava & Arishta', 'Syrups', 'Medicated Oils', 'Vati & Guggulu', 'Avaleha', 'Churn']);
 
@@ -58,7 +59,7 @@ export default function ProductsScreen() {
   const perm = usePermission();
   const styles = useStyles(createStyles);
 
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useListState('products_page', 1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);

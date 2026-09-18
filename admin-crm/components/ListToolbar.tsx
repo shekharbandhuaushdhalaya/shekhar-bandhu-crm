@@ -19,6 +19,7 @@ export interface ListToolbarProps {
     onPress: () => void;
   };
   renderActions?: () => ReactNode;
+  itemCount?: number;
   containerStyle?: StyleProp<ViewStyle>;
 }
 
@@ -30,6 +31,7 @@ export function ListToolbar({
   renderFilters,
   primaryAction,
   renderActions,
+  itemCount,
   containerStyle,
 }: ListToolbarProps) {
   const { colors } = useTheme();
@@ -50,7 +52,7 @@ export function ListToolbar({
         />
         
         {searchValue ? (
-          <TouchableOpacity onPress={() => onSearchChange('')} style={styles.clearBtn}>
+          <TouchableOpacity onPress={() => onSearchChange('')} style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Clear search">
             <Ionicons name="close-circle" size={18} color={colors.text.muted} />
           </TouchableOpacity>
         ) : null}
@@ -62,6 +64,12 @@ export function ListToolbar({
         {renderFilters && renderFilters()}
 
         <View style={{ flexGrow: 1 }} />
+
+        {itemCount !== undefined && (
+          <View style={styles.countBadge}>
+            <Text style={styles.countText}>{itemCount} Items</Text>
+          </View>
+        )}
 
         {renderActions ? renderActions() : primaryAction && (
           <TouchableOpacity
@@ -123,5 +131,19 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     ...Typography.bodySm,
     color: '#fff',
     fontWeight: '700',
+  },
+  countBadge: {
+    backgroundColor: colors.bg.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginRight: 8,
+  },
+  countText: {
+    ...Typography.caption,
+    color: colors.text.secondary,
+    fontWeight: '600',
   },
 });

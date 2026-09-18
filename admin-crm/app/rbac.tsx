@@ -2,6 +2,7 @@ import { WorkspaceLoading, StatusPill, EmptyState } from './../components/Worksp
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
+import { FormField } from './../components/FormField';
 import { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Switch, Modal, ActivityIndicator, useWindowDimensions, RefreshControl, Pressable, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -723,14 +724,20 @@ export default function RbacScreen() {
             ) : null}
 
             <ScrollView style={styles.modalForm}>
-              <Text style={styles.inputLabel}>Full Name</Text>
-              <TextInput style={styles.input} placeholder="Enter user name" placeholderTextColor={colors.text.muted} value={newName} onChangeText={setNewName} />
-              <Text style={styles.inputLabel}>Email Address</Text>
-              <TextInput style={styles.input} placeholder="Enter email address" placeholderTextColor={colors.text.muted} keyboardType="email-address" autoCapitalize="none" value={newEmail} onChangeText={setNewEmail} />
-              <Text style={styles.inputLabel}>Initial Password</Text>
-              <TextInput style={styles.input} placeholder="Enter account password" placeholderTextColor={colors.text.muted} secureTextEntry value={newPassword} onChangeText={setNewPassword} />
-              <Text style={styles.inputLabel}>Assign System Role</Text>
-              <View style={styles.modalRoleGroup}>
+              <FormField label="Full Name" required>
+                <TextInput style={styles.input} placeholder="Enter user name" placeholderTextColor={colors.text.muted} value={newName} onChangeText={setNewName} />
+              </FormField>
+              
+              <FormField label="Email Address" required>
+                <TextInput style={styles.input} placeholder="Enter email address" placeholderTextColor={colors.text.muted} keyboardType="email-address" autoCapitalize="none" value={newEmail} onChangeText={setNewEmail} />
+              </FormField>
+              
+              <FormField label="Initial Password" required>
+                <TextInput style={styles.input} placeholder="Enter account password" placeholderTextColor={colors.text.muted} secureTextEntry value={newPassword} onChangeText={setNewPassword} />
+              </FormField>
+              
+              <FormField label="Assign System Role" required>
+                <View style={styles.modalRoleGroup}>
                 {availableRoles.map(role => {
                   const isSel = newUserRole === role;
                   return (
@@ -745,6 +752,8 @@ export default function RbacScreen() {
                   );
                 })}
               </View>
+              </FormField>
+              
               <View style={styles.modalCashAccessRow}>
                 <View style={{ flex: 1, paddingRight: 10 }}>
                   <Text style={styles.modalCashLabel}>Grant Cash Access</Text>
@@ -787,13 +796,21 @@ export default function RbacScreen() {
             ) : null}
 
             <ScrollView style={styles.modalForm}>
-              <Text style={styles.inputLabel}>Role Name</Text>
-              <TextInput style={styles.input} placeholder="e.g. supervisor, accountant" placeholderTextColor={colors.text.muted} value={newRoleName} onChangeText={setNewRoleName} autoCapitalize="none" />
-              <Text style={styles.helpText}>Will be normalized to lowercase with underscores (e.g. "Sales Manager" → "sales_manager")</Text>
-              <Text style={styles.inputLabel}>Display Label (optional)</Text>
-              <TextInput style={styles.input} placeholder="e.g. Sales Manager" placeholderTextColor={colors.text.muted} value={newRoleLabel} onChangeText={setNewRoleLabel} />
-              <Text style={styles.inputLabel}>Description (optional)</Text>
-              <TextInput style={styles.input} placeholder="Describe what this role can do..." placeholderTextColor={colors.text.muted} value={newRoleDesc} onChangeText={setNewRoleDesc} />
+              <FormField 
+                label="Role Name" 
+                required 
+                description='Will be normalized to lowercase with underscores (e.g. "Sales Manager" → "sales_manager")'
+              >
+                <TextInput style={styles.input} placeholder="e.g. supervisor, accountant" placeholderTextColor={colors.text.muted} value={newRoleName} onChangeText={setNewRoleName} autoCapitalize="none" />
+              </FormField>
+              
+              <FormField label="Display Label" description="Optional display name">
+                <TextInput style={styles.input} placeholder="e.g. Sales Manager" placeholderTextColor={colors.text.muted} value={newRoleLabel} onChangeText={setNewRoleLabel} />
+              </FormField>
+              
+              <FormField label="Description" description="Optional role description">
+                <TextInput style={styles.input} placeholder="Describe what this role can do..." placeholderTextColor={colors.text.muted} value={newRoleDesc} onChangeText={setNewRoleDesc} />
+              </FormField>
             </ScrollView>
 
             <View style={styles.modalFooter}>

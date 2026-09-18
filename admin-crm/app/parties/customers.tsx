@@ -15,6 +15,8 @@ import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
 import { validateGstinWithState, formatPhoneWithCountryCode, toTitleCase } from '../../utils/gst';
 import { useToast } from '../../utils/ToastContext';
+import { useConfirm } from '../../utils/ConfirmContext';
+import { useListState } from '../../utils/useListState';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
@@ -1540,9 +1542,9 @@ function CustomerLedgerModal({
 
 export default function CustomersScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useListState('customers_search', '');
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [activeTab, setActiveTab] = useState<'gst' | 'cash'>('gst');
+  const [activeTab, setActiveTab] = useListState<'gst' | 'cash'>('customers_tab', 'gst');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // Initial-load flag so DataTable shows its skeleton instead of an empty table.
@@ -1561,7 +1563,7 @@ export default function CustomersScreen() {
   const isDesktop = winWidth > 768;
 
   // Lazy loading state
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useListState('customers_page', 1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 50;
 

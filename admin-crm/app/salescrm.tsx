@@ -9,6 +9,8 @@ import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, Complaint, Sample, SampleItem, SalesTarget, CommissionReport, Product } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
+import { useToast } from '../utils/ToastContext';
+import { useConfirm } from '../utils/ConfirmContext';
 
 type CRMTab = 'complaints' | 'samples' | 'targets';
 
@@ -19,6 +21,8 @@ export default function SalesCRMScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
@@ -124,8 +128,22 @@ export default function SalesCRMScreen() {
   };
 
   const handleDeleteComplaint = async (id: string) => {
-    const ok = Platform.OS === 'web' ? window.confirm('Delete this complaint?') : await new Promise(r => Alert.alert('Delete', 'Delete this complaint?', [{ text: 'Cancel', onPress: () => r(false) }, { text: 'Delete', style: 'destructive', onPress: () => r(true) }]));
-    if (ok) { await api.deleteComplaint(id); load(); }
+    confirm({
+      title: 'Delete Complaint?',
+      description: 'Are you sure you want to delete this complaint? This cannot be undone.',
+      destructive: true,
+      confirmLabel: 'Delete',
+      iconName: 'trash-outline',
+      onConfirm: async () => {
+        try {
+          await api.deleteComplaint(id);
+          showToast('Complaint deleted', 'success');
+          load();
+        } catch (e: any) {
+          showToast(e.message, 'error');
+        }
+      }
+    });
   };
 
   // ── Sample handlers ──
@@ -336,7 +354,22 @@ export default function SalesCRMScreen() {
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     <Text style={[styles.cardTitle, { color: colors.success }]}>₹{smp.totalMrpValue.toLocaleString()}</Text>
-                    <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.danger + '15' }]} onPress={async () => { if (Platform.OS === 'web' ? window.confirm('Delete sample?') : true) { await api.deleteSample(smp._id); load(); } }}>
+                    <TouchableOpacity 
+                      style={[styles.iconBtn, { backgroundColor: colors.danger + '15' }]} 
+                      onPress={() => {
+                        confirm({
+                          title: 'Delete Sample Record?',
+                          description: 'Are you sure you want to delete this sample record?',
+                          destructive: true,
+                          confirmLabel: 'Delete',
+                          iconName: 'trash-outline',
+                          onConfirm: async () => {
+                            await api.deleteSample(smp._id);
+                            load();
+                          }
+                        });
+                      }}
+                    >
                       <Ionicons name="trash-outline" size={14} color={colors.danger} />
                     </TouchableOpacity>
                   </View>

@@ -7,6 +7,8 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { useToast } from '../utils/ToastContext';
+import { useConfirm } from '../utils/ConfirmContext';
 import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product, DeadStockItem } from '../utils/api';
 import { useAuth } from '../utils/auth';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
@@ -145,6 +147,8 @@ const StockDisplay = ({ qtyBoxes, packing = 1, showSign = false, textStyle = {} 
 function AddWarehouseModal({ visible, onClose, onSaved, warehouse }: { visible: boolean; onClose: () => void; onSaved: () => void; warehouse?: Warehouse | null }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [name, setName] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
@@ -228,19 +232,28 @@ function AddWarehouseModal({ visible, onClose, onSaved, warehouse }: { visible: 
 
   const handleDelete = async () => {
     if (!warehouse || !warehouse._id) return;
-    if (!window.confirm(`Are you sure you want to delete ${warehouse.name}?`)) return;
-    
-    setLoading(true);
-    setError('');
-    try {
-      await api.deleteWarehouse(warehouse._id);
-      onSaved();
-      onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete warehouse');
-    } finally {
-      setLoading(false);
-    }
+    confirm({
+      title: 'Delete Warehouse?',
+      description: `Are you sure you want to delete ${warehouse.name}?`,
+      destructive: true,
+      confirmLabel: 'Delete',
+      iconName: 'trash-outline',
+      onConfirm: async () => {
+        setLoading(true);
+        setError('');
+        try {
+          await api.deleteWarehouse(warehouse._id);
+          showToast('Warehouse deleted', 'success');
+          onSaved();
+          onClose();
+        } catch (err: any) {
+          setError(err.message || 'Failed to delete warehouse');
+          showToast(err.message || 'Failed to delete warehouse', 'error');
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   return (
@@ -1122,6 +1135,8 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
 // MAIN INVENTORIES SCREEN COMPONENT
 export default function InventoriesScreen() {
   const { colors } = useTheme();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const { user } = useAuth();
   const perm = usePermission();
   const styles = useStyles(createStyles);
@@ -1868,57 +1883,85 @@ export default function InventoriesScreen() {
             <View style={{ flex: 1, marginTop: Spacing.md }}>
               <DataTable 
                 data={transfers} 
-                columns={[]} 
                 keyExtractor={(item: any, index: number) => item._id || String(index)} 
                 minWidth={900} 
-                embedded 
                 isRefreshing={refreshing}
                 onRefresh={onRefresh}
-                renderTableHeader={() => (
-                  <View style={styles.tableHeaderRow}>
-                    <View style={[styles.tableHeaderCellContainer, styles.col12]}><Text style={styles.tableHeaderCell}>Transfer No</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, styles.col15]}><Text style={styles.tableHeaderCell}>From  To</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, styles.col20]}><Text style={styles.tableHeaderCell}>Items</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, styles.col10]}><Text style={styles.tableHeaderCell}>Status</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, styles.col18, styles.colNoBorder]}><Text style={styles.tableHeaderCell}>Actions</Text></View>
-                  </View>
-                )}
-                renderTableRow={(item: any, idx: number) => (
-                  <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
-                    <View style={[styles.tableCellContainer, styles.col12]}>
-                      <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.transferNo}</Text>
-                      <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>
-                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : ''}
-                      </Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, styles.col15]}>
-                      <Text style={[styles.tableCell, { ...Typography.caption, fontWeight: '700' }]}>{item.fromWarehouseName}</Text>
-                      <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}> {item.toWarehouseName}</Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, styles.col20]}>
-                      {(item.items || []).map((it: any, i: number) => (
-                        <Text key={i} style={{ ...Typography.eyebrow, color: colors.text.primary }} numberOfLines={1}>
-                          • {it.productName} ({it.qtyBoxes} Box{it.qtyBoxes !== 1 ? 'es' : ''})
+                columns={[
+                  {
+                    key: 'transferNo',
+                    title: 'Transfer No',
+                    flex: 1.2,
+                    render: (item: any) => (
+                      <View>
+                        <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.transferNo}</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>
+                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : ''}
                         </Text>
-                      ))}
-                    </View>
-                    <View style={[styles.tableCellContainer, styles.col10]}>
+                      </View>
+                    )
+                  },
+                  {
+                    key: 'warehouses',
+                    title: 'From  To',
+                    flex: 1.5,
+                    render: (item: any) => (
+                      <View>
+                        <Text style={[styles.tableCell, { ...Typography.caption, fontWeight: '700' }]}>{item.fromWarehouseName}</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}> {item.toWarehouseName}</Text>
+                      </View>
+                    )
+                  },
+                  {
+                    key: 'items',
+                    title: 'Items',
+                    flex: 2.0,
+                    render: (item: any) => (
+                      <View>
+                        {(item.items || []).map((it: any, i: number) => (
+                          <Text key={i} style={{ ...Typography.eyebrow, color: colors.text.primary }} numberOfLines={1}>
+                            • {it.productName} ({it.qtyBoxes} Box{it.qtyBoxes !== 1 ? 'es' : ''})
+                          </Text>
+                        ))}
+                      </View>
+                    )
+                  },
+                  {
+                    key: 'status',
+                    title: 'Status',
+                    flex: 1.0,
+                    render: (item: any) => (
                       <StatusPill  label={<>
                           {item.status.toUpperCase()}
                         </>} textStyle={{ ...Typography.eyebrow, fontWeight: '700', color: item.status === 'completed' ? colors.success : item.status === 'in_transit' ? colors.primary : item.status === 'cancelled' ? colors.danger : colors.warning }} />
-                    </View>
-                    <View style={[styles.tableCellContainer, styles.col18, styles.colNoBorder, styles.actionsCell]}>
+                    )
+                  },
+                  {
+                    key: 'actions',
+                    title: 'Actions',
+                    flex: 1.8,
+                    align: 'right',
+                    render: (item: any) => (
+                      <View style={[styles.actionsCell, { justifyContent: 'flex-end', width: '100%' }]}>
                         {item.status === 'pending' && perm.can('inventory:edit') && (
                           <TouchableOpacity
                             style={[styles.btnSmall, { backgroundColor: colors.primary }]}
-                            onPress={async () => {
-                              if (!window.confirm('Ship this transfer? Stock will be deducted from source warehouse.')) return;
-                              try {
-                                await api.shipStockTransfer(item._id);
-                                loadData();
-                              } catch (err: any) {
-                                alert(err.message);
-                              }
+                            onPress={() => {
+                              confirm({
+                                title: 'Ship Transfer?',
+                                description: 'Stock will be deducted from source warehouse.',
+                                confirmLabel: 'Ship',
+                                iconName: 'boat-outline',
+                                onConfirm: async () => {
+                                  try {
+                                    await api.shipStockTransfer(item._id);
+                                    showToast('Transfer shipped successfully', 'success');
+                                    loadData();
+                                  } catch (err: any) {
+                                    showToast(err.message || 'Failed to ship transfer', 'error');
+                                  }
+                                }
+                              });
                             }}
                           >
                             <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Ship</Text>
@@ -1927,14 +1970,22 @@ export default function InventoriesScreen() {
                         {item.status === 'in_transit' && perm.can('inventory:edit') && (
                           <TouchableOpacity
                             style={[styles.btnSmall, { backgroundColor: colors.success }]}
-                            onPress={async () => {
-                              if (!window.confirm('Receive this transfer? Stock will be added to target warehouse.')) return;
-                              try {
-                                await api.receiveStockTransfer(item._id);
-                                loadData();
-                              } catch (err: any) {
-                                alert(err.message);
-                              }
+                            onPress={() => {
+                              confirm({
+                                title: 'Receive Transfer?',
+                                description: 'Stock will be added to target warehouse.',
+                                confirmLabel: 'Receive',
+                                iconName: 'download-outline',
+                                onConfirm: async () => {
+                                  try {
+                                    await api.receiveStockTransfer(item._id);
+                                    showToast('Transfer received successfully', 'success');
+                                    loadData();
+                                  } catch (err: any) {
+                                    showToast(err.message || 'Failed to receive transfer', 'error');
+                                  }
+                                }
+                              });
                             }}
                           >
                             <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Receive</Text>
@@ -2022,22 +2073,32 @@ export default function InventoriesScreen() {
                         {['pending', 'in_transit'].includes(item.status) && perm.can('inventory:edit') && (
                           <TouchableOpacity
                             style={[styles.btnSmall, { backgroundColor: colors.danger }]}
-                            onPress={async () => {
-                              if (!window.confirm('Cancel this transfer? Shipped stock will be returned to source warehouse.')) return;
-                              try {
-                                await api.cancelStockTransfer(item._id);
-                                loadData();
-                              } catch (err: any) {
-                                alert(err.message);
-                              }
+                            onPress={() => {
+                              confirm({
+                                title: 'Cancel Transfer?',
+                                description: 'Shipped stock will be returned to source warehouse.',
+                                destructive: true,
+                                confirmLabel: 'Cancel Transfer',
+                                iconName: 'close-circle-outline',
+                                onConfirm: async () => {
+                                  try {
+                                    await api.cancelStockTransfer(item._id);
+                                    showToast('Transfer cancelled successfully', 'success');
+                                    loadData();
+                                  } catch (err: any) {
+                                    showToast(err.message || 'Failed to cancel transfer', 'error');
+                                  }
+                                }
+                              });
                             }}
                           >
                             <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Cancel</Text>
                           </TouchableOpacity>
                         )}
                       </View>
-                    </View>
-                )}
+                    )
+                  }
+                ]}
               />
 
                   {transfers.length === 0 && (
@@ -2062,41 +2123,58 @@ export default function InventoriesScreen() {
             <View style={{ flex: 1, marginTop: Spacing.md }}>
               <DataTable 
                 data={deadStockItems} 
-                columns={[]} 
                 keyExtractor={(item: any, index: number) => String(index)} 
                 minWidth={900} 
-                embedded 
                 isRefreshing={refreshing}
                 onRefresh={onRefresh}
-                renderTableHeader={() => (
-                  <View style={styles.tableHeaderRow}>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 2.5 }]}><Text style={styles.tableHeaderCell}>Product</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.8 }]}><Text style={styles.tableHeaderCell}>Warehouse</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Qty (Boxes)</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.5 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Stock Value (₹)</Text></View>
-                    <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Inactive Days</Text></View>
-                  </View>
-                )}
-                renderTableRow={(item: any, idx: number) => (
-                  <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
-                      <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
+                columns={[
+                  {
+                    key: 'product',
+                    title: 'Product',
+                    flex: 2.5,
+                    render: (item: any) => (
+                      <View>
                         <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.productName}</Text>
                         <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>SKU: {item.productSku} · Size: {item.size}</Text>
                       </View>
-                      <View style={[styles.tableCellContainer, { flex: 1.8 }]}>
-                        <Text style={styles.tableCell}>{item.warehouseName}</Text>
-                      </View>
-                      <View style={[styles.tableCellContainer, { flex: 1.2 }]}>
-                        <Text style={[styles.tableCell, { textAlign: 'right', fontWeight: '700' }]}>{item.qtyBoxes}</Text>
-                      </View>
-                      <View style={[styles.tableCellContainer, { flex: 1.5 }]}>
-                        <Text style={[styles.tableCell, { textAlign: 'right', color: colors.success, fontWeight: '700' }]}>₹{item.stockValue.toLocaleString('en-IN')}</Text>
-                      </View>
-                      <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]}>
-                        <Text style={[styles.tableCell, { textAlign: 'right', color: colors.danger, fontWeight: '700' }]}>{item.daysSinceMovement} Days</Text>
-                      </View>
-                    </View>
-                )}
+                    )
+                  },
+                  {
+                    key: 'warehouse',
+                    title: 'Warehouse',
+                    flex: 1.8,
+                    render: (item: any) => (
+                      <Text style={styles.tableCell}>{item.warehouseName}</Text>
+                    )
+                  },
+                  {
+                    key: 'qty',
+                    title: 'Qty (Boxes)',
+                    flex: 1.2,
+                    align: 'right',
+                    render: (item: any) => (
+                      <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.qtyBoxes}</Text>
+                    )
+                  },
+                  {
+                    key: 'stockValue',
+                    title: 'Stock Value (₹)',
+                    flex: 1.5,
+                    align: 'right',
+                    render: (item: any) => (
+                      <Text style={[styles.tableCell, { color: colors.success, fontWeight: '700' }]}>₹{item.stockValue.toLocaleString('en-IN')}</Text>
+                    )
+                  },
+                  {
+                    key: 'inactiveDays',
+                    title: 'Inactive Days',
+                    flex: 1.2,
+                    align: 'right',
+                    render: (item: any) => (
+                      <Text style={[styles.tableCell, { color: colors.danger, fontWeight: '700' }]}>{item.daysSinceMovement} Days</Text>
+                    )
+                  }
+                ]}
               />
 
                   {deadStockItems.length === 0 ? (
@@ -2132,7 +2210,6 @@ export default function InventoriesScreen() {
                 columns={[]} 
                 keyExtractor={(item: any) => item.productId} 
                 minWidth={900} 
-                embedded 
                 isRefreshing={refreshing}
                 onRefresh={onRefresh}
                 renderTableHeader={() => (
@@ -2173,7 +2250,6 @@ export default function InventoriesScreen() {
                 columns={[]} 
                 keyExtractor={(item: any) => item.productId} 
                 minWidth={900} 
-                embedded 
                 isRefreshing={refreshing}
                 onRefresh={onRefresh}
                 renderTableHeader={() => (
@@ -2454,10 +2530,90 @@ function AddTransferModal({ visible, onClose, onSaved, warehouses, products }: {
 
 // ── Memoized Inventory Row Component for Performance ──
 const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolidated, products, colors, styles, perm, onAddStock, onAdjustStock, onShowLedger, formatVendorDisplay, getDisplayName, currentWarehouseName }: any) => {
+  const { width } = useWindowDimensions();
   const uniqueVendors = Array.from(new Set(item.vendorDetails.map((v: any) => v.vendorName))) as string[];
   const prodMatch = products.find((p: any) => p._id === item.productId);
   const minReorderVal = prodMatch ? (prodMatch.minReorder || 0) : 0;
   const isLowStock = minReorderVal > 0 ? item.totalBoxes <= minReorderVal : item.totalBoxes <= 0;
+
+  if (width < 768) {
+    return (
+      <View style={[styles.expandableGroupContainer, { marginHorizontal: Spacing.md, marginTop: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }]}>
+        <Pressable
+          style={({ pressed }) => [
+            { padding: Spacing.md, backgroundColor: isLowStock ? colors.warning + '12' : (pressed ? colors.bg.secondary : colors.bg.card) }
+          ]}
+          onPress={onToggleExpand}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+              <Text style={styles.primaryText}>{getDisplayName(item)}</Text>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 4 }}>HSN: {item.hsnCode}</Text>
+            </View>
+            <Ionicons 
+              name={isExpanded ? 'chevron-down-circle' : 'chevron-forward-circle'} 
+              size={20} 
+              color={colors.primary} 
+            />
+          </View>
+          
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.sm, flexWrap: 'wrap', gap: Spacing.sm }}>
+            <View>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>STOCK</Text>
+              <StockDisplay qtyBoxes={item.totalBoxes} packing={item.vendorDetails[0]?.packing || 1} textStyle={{ ...Typography.bodySm, fontWeight: '700' }} />
+            </View>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>VENDORS</Text>
+              <Text style={{ ...Typography.bodySm, textAlign: 'right' }} numberOfLines={2}>
+                {uniqueVendors.map(v => formatVendorDisplay(v)).join(', ')}
+              </Text>
+            </View>
+          </View>
+
+          {isLowStock && (
+            <View style={{ backgroundColor: colors.warning + '20', borderColor: colors.warning + '60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4, marginTop: Spacing.sm, alignSelf: 'flex-start' }}>
+              <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.warning }}>
+                 LOW STOCK ({item.totalBoxes}/{minReorderVal})
+              </Text>
+            </View>
+          )}
+        </Pressable>
+        {isExpanded && (
+          <View style={[styles.expandedContent, { borderTopWidth: 1, borderTopColor: colors.border, padding: Spacing.md }]}>
+            {/* Same expanded content but customized for mobile */}
+            {item.vendorDetails.map((vd: any, idx: number) => (
+              <View key={idx} style={{ marginBottom: Spacing.md, paddingBottom: Spacing.md, borderBottomWidth: idx === item.vendorDetails.length - 1 ? 0 : 1, borderBottomColor: colors.border }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700' }}>{formatVendorDisplay(vd.vendorName)}</Text>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 2 }}>
+                  Batch: {vd.batchNo || 'N/A'} • Exp: {vd.expiryDate ? new Date(vd.expiryDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'N/A'}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                  <Text style={{ ...Typography.caption, color: colors.success }}>MRP: ₹{vd.mrp}</Text>
+                  <Text style={{ ...Typography.caption }}>Stock: {vd.qtyBoxes} Box</Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: Spacing.sm }}>
+                  <TouchableOpacity style={[styles.btnSmall, { backgroundColor: colors.primary, flex: 1 }]} onPress={() => onAdjustStock(vd)}>
+                    <Ionicons name="create-outline" size={14} color="#fff" />
+                    <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700', textAlign: 'center' }}>Adjust</Text>
+                  </TouchableOpacity>
+                  {isConsolidated && perm.can('inventory:edit') && idx === 0 && (
+                    <TouchableOpacity style={[styles.btnSmall, { backgroundColor: colors.success, flex: 1 }]} onPress={() => onAddStock(item.productId)}>
+                      <Ionicons name="add-circle" size={14} color="#fff" />
+                      <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700', textAlign: 'center' }}>Restock</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            ))}
+            <TouchableOpacity style={[styles.btnSmall, { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, justifyContent: 'center' }]} onPress={() => onShowLedger({ id: item.productId, name: getDisplayName(item), packing: item.vendorDetails[0]?.packing, vendorId: item.vendorDetails[0]?.vendorId })}>
+              <Ionicons name="list" size={14} color={colors.text.primary} />
+              <Text style={{ ...Typography.eyebrow, color: colors.text.primary, fontWeight: '700' }}>View Ledger</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.expandableGroupContainer, { borderLeftWidth: 4, borderLeftColor: isLowStock ? colors.warning : 'transparent' }]}>

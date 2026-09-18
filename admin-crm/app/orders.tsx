@@ -1,6 +1,8 @@
 import { PageHeader as ScreenHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
+import { PageHeader } from '../components/PageHeader';
 import { DataTable, Column } from '../components/DataTable';
+import { ResponsiveSelect } from '../components/ResponsiveSelect';
 import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
@@ -316,38 +318,26 @@ export default function OrdersScreen() {
                 <option value="delivered">Delivered ({orders.filter(o => o.status === 'delivered').length})</option>
               </select>
             ) : (
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: colors.bg.secondary,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 6,
-                  paddingHorizontal: 10,
-                  minHeight: 38,
-                  height: 38,
-                  gap: 6
-                }}
-                onPress={() => {
-                  const opts = [
-                    { label: `All Statuses (${orders.length})`, val: 'all' },
-                    { label: `Pending (${orders.filter(o => o.status === 'pending').length})`, val: 'pending' },
-                    { label: `Processing (${orders.filter(o => o.status === 'processing').length})`, val: 'processing' },
-                    { label: `Shipped (${orders.filter(o => o.status === 'shipped').length})`, val: 'shipped' },
-                    { label: `Delivered (${orders.filter(o => o.status === 'delivered').length})`, val: 'delivered' },
-                  ];
-                  Alert.alert('Filter Status', '', opts.map(o => ({
-                    text: o.label,
-                    onPress: () => setActiveTab(o.val as any)
-                  })));
-                }}
-              >
-                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
-                  {activeTab.toUpperCase()} ({activeTab === 'all' ? orders.length : orders.filter(o => o.status === activeTab).length})
-                </Text>
-                <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
-              </TouchableOpacity>
+              <View style={{ width: 160 }}>
+                <ResponsiveSelect
+                  value={activeTab}
+                  onChange={(val) => setActiveTab(val as any)}
+                  options={[
+                    { label: `All Statuses (${orders.length})`, value: 'all' },
+                    { label: `Pending (${orders.filter(o => o.status === 'pending').length})`, value: 'pending' },
+                    { label: `Processing (${orders.filter(o => o.status === 'processing').length})`, value: 'processing' },
+                    { label: `Shipped (${orders.filter(o => o.status === 'shipped').length})`, value: 'shipped' },
+                    { label: `Delivered (${orders.filter(o => o.status === 'delivered').length})`, value: 'delivered' },
+                  ]}
+                  style={{
+                    backgroundColor: colors.bg.secondary,
+                    borderColor: colors.border,
+                    borderRadius: 6,
+                    height: 38,
+                    paddingHorizontal: 10,
+                  }}
+                />
+              </View>
             )}
           </>
         )}

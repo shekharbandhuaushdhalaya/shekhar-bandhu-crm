@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, CreditNote, Customer, Vendor } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { ResponsiveSelect } from '../components/ResponsiveSelect';
 import { FIRM_DETAILS } from '../constants/firm';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 
@@ -237,43 +238,24 @@ export default function CreditNotesPage() {
               onChangeText={setSearch}
             />
 
-            {Platform.OS === 'web' ? (
-              <select
+            <View style={{ width: 140 }}>
+              <ResponsiveSelect
                 value={filterType}
-                onChange={(e: any) => setFilterType(e.target.value)}
-                style={{ ...Typography.bodySm, padding: '6px 12px', borderRadius: 6, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontWeight: '600', outline: 'none', height: 34, cursor: 'pointer' }}
-              >
-                <option value="all">All Notes</option>
-                <option value="credit_note">Credit Notes</option>
-                <option value="debit_note">Debit Notes</option>
-              </select>
-            ) : (
-              <TouchableOpacity
+                onChange={(val) => setFilterType(val)}
+                options={[
+                  { label: 'All Notes', value: 'all' },
+                  { label: 'Credit Notes', value: 'credit_note' },
+                  { label: 'Debit Notes', value: 'debit_note' }
+                ]}
                 style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
                   backgroundColor: colors.bg.secondary,
-                  borderWidth: 1,
                   borderColor: colors.border,
                   borderRadius: 6,
-                  paddingHorizontal: 10,
                   height: 34,
-                  gap: 6
+                  paddingHorizontal: 10,
                 }}
-                onPress={() => {
-                  Alert.alert('Filter Type', '', [
-                    { text: 'All Notes', onPress: () => setFilterType('all') },
-                    { text: 'Credit Notes', onPress: () => setFilterType('credit_note') },
-                    { text: 'Debit Notes', onPress: () => setFilterType('debit_note') }
-                  ]);
-                }}
-              >
-                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
-                  {filterType === 'all' ? 'All Notes' : filterType === 'credit_note' ? 'Credit Notes' : 'Debit Notes'}
-                </Text>
-                <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
-              </TouchableOpacity>
-            )}
+              />
+            </View>
 
             <TouchableOpacity
               style={{ height: 34, paddingHorizontal: 14, borderRadius: Radius.sm, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}
