@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import { View, Pressable, Modal, Platform, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/themeContext';
-import { Radius, Typography } from '../constants/theme';
+import { Radius, Typography , Shadows} from '../constants/theme';
 
 interface CustomDatePickerProps {
   value: string; // ISO date string "YYYY-MM-DD"
@@ -190,7 +190,7 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
               borderColor: colors.border,
               padding: 14,
               zIndex: 999999,
-              ...(Platform.OS === 'web' ? { boxShadow: '0px 10px 30px rgba(0,0,0,0.2)' } : { elevation: 16 }),
+              ...(Platform.OS === 'web' ? { boxShadow: '0px 10px 30px rgba(0,0,0,0.2)' } : { ...Shadows.modal }),
             }]}
             onPress={(e) => e.stopPropagation()}
           >

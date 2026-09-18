@@ -1,3 +1,5 @@
+import { DataTable, Column } from '../components/DataTable';
+import { PageHeader } from './../components/PageHeader';
 import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from '../components/AppTextInput';
@@ -9,13 +11,12 @@ import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, Alert, useWindowDimensions, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography, Shadows } from '../constants/theme';
 import { api, Payment, Customer, Vendor } from '../utils/api';
 import { shortenPartyName } from '../utils/string';
 import { useAuth } from '../utils/auth';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
-import { DataTable, Column } from '../components/DataTable';
 
 export const GATEWAY_CLEARING_ACCOUNTS = [
   { _id: 'clearing_razorpay', name: 'Razorpay Online Gateway Clearing Account', code: 'RAZORPAY', type: 'online_gateway' },
@@ -715,6 +716,10 @@ export default function PaymentsScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader 
+        title="Payments & Clearings" 
+        subtitle="Manage incoming receipts and outgoing payments."
+      />
       <View style={styles.innerContainer}>
         {/* Header Actions & Filters */}
         <View style={{ zIndex: 1100, position: 'relative', marginBottom: Spacing.xs }}>
@@ -877,8 +882,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', maxWidth: 500, backgroundColor: colors.bg.card, borderRadius: Radius.lg, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   closeBtn: { padding: 4 },
   modalBody: { padding: Spacing.lg },
   row: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.md },
@@ -890,7 +895,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   toggleText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   
   dropdownWrap: { position: 'relative' },
-  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 220, zIndex: 9999, elevation: 20, overflow: 'hidden', boxShadow: '0px 4px 12px rgba(0,0,0,0.18)' },
+  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 220, zIndex: 9999, ...Shadows.modal, overflow: 'hidden', boxShadow: '0px 4px 12px rgba(0,0,0,0.18)' },
   dropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   dropdownItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   dropdownItemSub: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },

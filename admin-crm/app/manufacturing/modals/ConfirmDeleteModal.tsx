@@ -1,6 +1,6 @@
 import { PressableOpacity as TouchableOpacity } from './../../../components/PressableOpacity';
 import { AppText as Text } from './../../../components/AppText';
-import { Typography } from './../../../constants/theme';
+import { Typography , Shadows} from './../../../constants/theme';
 import React, { useState } from 'react';
 import { View, Modal, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     borderRadius: 12,
     borderWidth: 1,
-    elevation: 8,
+    ...Shadows.floating,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,

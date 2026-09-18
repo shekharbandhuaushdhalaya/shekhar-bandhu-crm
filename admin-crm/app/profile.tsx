@@ -16,6 +16,7 @@ import { CustomDatePicker } from '../components/CustomDatePicker';
 import { useConfirm } from '../utils/ConfirmContext';
 import { updateActiveFirmDetails } from '../constants/firm';
 import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { PageHeader } from '../components/PageHeader';
 import AyurvedicLoader from '../components/AyurvedicLoader';
 
 export default function ProfileScreen() {
@@ -1772,6 +1773,10 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
     >
+      <PageHeader 
+        title="Settings & Profile" 
+        subtitle="Manage credentials, workspace preferences, and application settings."
+      />
       {/* Tab Selectors with Visual Status Badges */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
@@ -2180,15 +2185,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderColor: colors.border,
     overflow: 'hidden',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.bg.primary,
-  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   closeBtn: {
     padding: 4,

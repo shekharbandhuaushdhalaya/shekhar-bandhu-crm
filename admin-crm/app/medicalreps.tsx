@@ -33,6 +33,7 @@ export default function MedicalRepsScreen() {
 
   const [activeTab, setActiveTab] = useListState<Tab>('mr_tab', 'mrs');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // MR Master
   const [mrs, setMrs] = useState<MedicalRepresentative[]>([]);
@@ -140,7 +141,7 @@ export default function MedicalRepsScreen() {
         const defaultMrId = loggedInMr ? loggedInMr._id : active[0]._id;
         setSelectedMrId(prev => prev || defaultMrId);
       }
-    } catch { }
+    } catch { } finally { setLoading(false); }
   }, [mrSearch, user]);
 
   const loadAssignments = useCallback(async (mrId: string) => {
@@ -833,7 +834,7 @@ export default function MedicalRepsScreen() {
               ) : null}
             </View>
         )}
-        ListEmptyComponent={<EmptyState title={<>No Medical Representatives Found</>} message={<>Add your first representative to start tracking visits, targets and field activity.</>} actionLabel="Add Representative" onAction={handleOpenNewMrModal} />}
+        ListEmptyComponent={loading ? <WorkspaceLoading /> : <EmptyState title={<>No Medical Representatives Found</>} message={<>Add your first representative to start tracking visits, targets and field activity.</>} actionLabel="Add Representative" onAction={handleOpenNewMrModal} />}
       />
 
       {/* Modal: Add/Edit MR */}
@@ -2239,16 +2240,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     overflow: 'hidden',
     ...Shadows.hover,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.bg.card,
-  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitleText: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   formField: {
     marginBottom: 12,

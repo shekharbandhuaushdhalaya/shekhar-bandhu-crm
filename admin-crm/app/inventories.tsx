@@ -10,7 +10,7 @@ import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, DeviceEventEmitter, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Typography, getStatusTone } from '../constants/theme';
+import { Spacing, Radius, Shadows, LightColors, Typography, getStatusTone } from '../constants/theme';
 import { useToast } from '../utils/ToastContext';
 import { useConfirm } from '../utils/ConfirmContext';
 import { api, Warehouse, InventoryEntry, ConsolidatedInventory, StockLedger, Product, DeadStockItem } from '../utils/api';
@@ -1242,6 +1242,8 @@ export default function InventoriesScreen() {
       }
     } catch (err) {
       console.error('Error fetching inventories details:', err);
+    } finally {
+      setLoading(false);
     }
   }, [selectedWarehouseId, debouncedSearch]);
 
@@ -1269,6 +1271,61 @@ export default function InventoriesScreen() {
     await loadData();
     setRefreshing(false);
   }, [loadData]);
+
+  const handleShipTransfer = (id: string) => {
+    confirm({
+      title: 'Ship Transfer?',
+      description: 'Stock will be deducted from source warehouse.',
+      confirmLabel: 'Ship Transfer',
+      iconName: 'boat-outline',
+      onConfirm: async () => {
+        try {
+          await api.shipStockTransfer(id);
+          showToast('Transfer shipped successfully', 'success');
+          loadData();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to ship transfer', 'error');
+        }
+      }
+    });
+  };
+
+  const handleReceiveTransfer = (id: string) => {
+    confirm({
+      title: 'Receive Transfer?',
+      description: 'Stock will be added to target warehouse.',
+      confirmLabel: 'Receive Transfer',
+      iconName: 'download-outline',
+      onConfirm: async () => {
+        try {
+          await api.receiveStockTransfer(id);
+          showToast('Transfer received successfully', 'success');
+          loadData();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to receive transfer', 'error');
+        }
+      }
+    });
+  };
+
+  const handleCancelTransfer = (id: string) => {
+    confirm({
+      title: 'Cancel Transfer?',
+      description: 'Pending/Shipped stock will be reverted.',
+      destructive: true,
+      confirmLabel: 'Cancel Transfer',
+      iconName: 'close-circle-outline',
+      onConfirm: async () => {
+        try {
+          await api.cancelStockTransfer(id);
+          showToast('Transfer cancelled successfully', 'success');
+          loadData();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to cancel transfer', 'error');
+        }
+      }
+    });
+  };
 
   // Grouping consolidatedItems or warehouseEntries by product specifications (unique by size, shape, colour, weight, productType)
   const processedItems = useMemo(() => {
@@ -1806,6 +1863,7 @@ export default function InventoriesScreen() {
                 keyExtractor={(item: any, index: number) => item._id || String(index)} 
                 minWidth={900} 
                 isRefreshing={refreshing}
+                isLoading={loading}
                 onRefresh={onRefresh}
                 columns={[
                   {
@@ -1866,23 +1924,7 @@ export default function InventoriesScreen() {
                         {item.status === 'pending' && perm.can('inventory:edit') && (
                           <TouchableOpacity
                             style={[styles.btnSmall, { backgroundColor: colors.primary }]}
-                            onPress={() => {
-                              confirm({
-                                title: 'Ship Transfer?',
-                                description: 'Stock will be deducted from source warehouse.',
-                                confirmLabel: 'Ship',
-                                iconName: 'boat-outline',
-                                onConfirm: async () => {
-                                  try {
-                                    await api.shipStockTransfer(item._id);
-                                    showToast('Transfer shipped successfully', 'success');
-                                    loadData();
-                                  } catch (err: any) {
-                                    showToast(err.message || 'Failed to ship transfer', 'error');
-                                  }
-                                }
-                              });
-                            }}
+                            onPress={() => handleShipTransfer(item._id)}
                           >
                             <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Ship</Text>
                           </TouchableOpacity>
@@ -1890,23 +1932,7 @@ export default function InventoriesScreen() {
                         {item.status === 'in_transit' && perm.can('inventory:edit') && (
                           <TouchableOpacity
                             style={[styles.btnSmall, { backgroundColor: colors.success }]}
-                            onPress={() => {
-                              confirm({
-                                title: 'Receive Transfer?',
-                                description: 'Stock will be added to target warehouse.',
-                                confirmLabel: 'Receive',
-                                iconName: 'download-outline',
-                                onConfirm: async () => {
-                                  try {
-                                    await api.receiveStockTransfer(item._id);
-                                    showToast('Transfer received successfully', 'success');
-                                    loadData();
-                                  } catch (err: any) {
-                                    showToast(err.message || 'Failed to receive transfer', 'error');
-                                  }
-                                }
-                              });
-                            }}
+                            onPress={() => handleReceiveTransfer(item._id)}
                           >
                             <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Receive</Text>
                           </TouchableOpacity>
@@ -1993,24 +2019,7 @@ export default function InventoriesScreen() {
                         {['pending', 'in_transit'].includes(item.status) && perm.can('inventory:edit') && (
                           <TouchableOpacity
                             style={[styles.btnSmall, { backgroundColor: colors.danger }]}
-                            onPress={() => {
-                              confirm({
-                                title: 'Cancel Transfer?',
-                                description: 'Shipped stock will be returned to source warehouse.',
-                                destructive: true,
-                                confirmLabel: 'Cancel Transfer',
-                                iconName: 'close-circle-outline',
-                                onConfirm: async () => {
-                                  try {
-                                    await api.cancelStockTransfer(item._id);
-                                    showToast('Transfer cancelled successfully', 'success');
-                                    loadData();
-                                  } catch (err: any) {
-                                    showToast(err.message || 'Failed to cancel transfer', 'error');
-                                  }
-                                }
-                              });
-                            }}
+                            onPress={() => handleCancelTransfer(item._id)}
                           >
                             <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Cancel</Text>
                           </TouchableOpacity>
@@ -2040,50 +2049,27 @@ export default function InventoriesScreen() {
                         ))}
                       </View>
                     </View>
-                    {item.status === 'pending' && perm.can('inventory:edit') && (
+                    {['pending', 'in_transit'].includes(item.status) && perm.can('inventory:edit') && (
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, justifyContent: 'flex-end' }}>
-                        <TouchableOpacity
-                          style={[styles.btnSmall, { backgroundColor: colors.primary }]}
-                          onPress={() => {
-                            confirm({
-                              title: 'Mark as In-Transit',
-                              description: 'Move stock out of the source warehouse?',
-                              confirmLabel: 'Mark In-Transit',
-                              iconName: 'cube-outline',
-                              onConfirm: async () => {
-                                try {
-                                  await api.shipStockTransfer(item._id);
-                                  showToast('Transfer marked as in-transit', 'success');
-                                  loadData();
-                                } catch (err: any) {
-                                  showToast(err.message || 'Failed to dispatch transfer', 'error');
-                                }
-                              }
-                            });
-                          }}
-                        >
-                          <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Dispatch</Text>
-                        </TouchableOpacity>
+                        {item.status === 'pending' && (
+                          <TouchableOpacity
+                            style={[styles.btnSmall, { backgroundColor: colors.primary }]}
+                            onPress={() => handleShipTransfer(item._id)}
+                          >
+                            <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Dispatch</Text>
+                          </TouchableOpacity>
+                        )}
+                        {item.status === 'in_transit' && (
+                          <TouchableOpacity
+                            style={[styles.btnSmall, { backgroundColor: colors.success }]}
+                            onPress={() => handleReceiveTransfer(item._id)}
+                          >
+                            <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Receive</Text>
+                          </TouchableOpacity>
+                        )}
                         <TouchableOpacity
                           style={[styles.btnSmall, { backgroundColor: colors.danger }]}
-                          onPress={() => {
-                            confirm({
-                              title: 'Cancel Transfer',
-                              description: 'Are you sure you want to cancel this transfer request?',
-                              destructive: true,
-                              confirmLabel: 'Cancel Transfer',
-                              iconName: 'close-circle-outline',
-                              onConfirm: async () => {
-                                try {
-                                  await api.cancelStockTransfer(item._id);
-                                  showToast('Transfer cancelled successfully', 'success');
-                                  loadData();
-                                } catch (err: any) {
-                                  showToast(err.message || 'Failed to cancel transfer', 'error');
-                                }
-                              }
-                            });
-                          }}
+                          onPress={() => handleCancelTransfer(item._id)}
                         >
                           <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Cancel</Text>
                         </TouchableOpacity>
@@ -2118,6 +2104,7 @@ export default function InventoriesScreen() {
                 keyExtractor={(item: any, index: number) => String(index)} 
                 minWidth={900} 
                 isRefreshing={refreshing}
+                isLoading={loading}
                 onRefresh={onRefresh}
                 columns={[
                   {
@@ -2203,6 +2190,7 @@ export default function InventoriesScreen() {
                 keyExtractor={(item: any) => item.productId} 
                 minWidth={900} 
                 isRefreshing={refreshing}
+                isLoading={loading}
                 onRefresh={onRefresh}
                 renderTableHeader={() => (
                   <View style={styles.tableHeaderRow}>
@@ -2273,6 +2261,7 @@ export default function InventoriesScreen() {
                 keyExtractor={(item: any) => item.productId} 
                 minWidth={900} 
                 isRefreshing={refreshing}
+                isLoading={loading}
                 onRefresh={onRefresh}
                 renderTableHeader={() => (
                   <View style={styles.tableHeaderRow}>
@@ -2342,6 +2331,7 @@ export default function InventoriesScreen() {
                 keyExtractor={(item) => item._id} 
                 minWidth={600} 
                 isRefreshing={refreshing}
+                isLoading={loading}
                 onRefresh={onRefresh}
                 columns={[
                   {
@@ -3047,7 +3037,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   customSelectTrigger: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 42 },
   customSearchSelectContainer: { flexDirection: 'row', alignItems: 'center', position: 'relative' },
   clearProductSelection: { position: 'absolute', right: 12 },
-  customSelectPanel: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginTop: 4, overflow: 'hidden', boxShadow: '0px 4px 8px rgba(0,0,0,0.1)', elevation: 5 },
+  customSelectPanel: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, marginTop: 4, overflow: 'hidden', ...Shadows.floating },
   customSelectItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   customSelectItemText: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '700' },
   customSelectItemSubtext: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },

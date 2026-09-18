@@ -10,7 +10,9 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { api, Campaign } from '../utils/api';
 import { usePermission } from '../utils/permissions';
 import { useConfirm } from '../utils/ConfirmContext';
-import { Spacing, Radius, Shadows, LightColors, Typography } from '../constants/theme';
+import { Spacing, Radius, Shadows, LightColors, Typography, getStatusTone } from '../constants/theme';
+import { PageHeader } from '../components/PageHeader';
+import { ListToolbar } from '../components/ListToolbar';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: '#6b7280',
@@ -282,6 +284,10 @@ export default function CampaignsScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader 
+        title="Marketing Campaigns" 
+        subtitle="Manage email, social media, and Google Ads campaigns."
+      />
       {/* Stats Bar */}
       <View style={styles.statsRow}>
         {[
@@ -298,109 +304,87 @@ export default function CampaignsScreen() {
       </View>
 
       {/* Standardized Search & Title Topbar */}
-      <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs, zIndex: 50 }}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: colors.bg.card,
-          paddingHorizontal: 12,
-          paddingRight: 8,
-          borderRadius: Radius.md,
-          borderWidth: 1,
-          borderColor: colors.border,
-          gap: 10,
-          minHeight: 46,
-          zIndex: 60
-        }}>
-          <Ionicons name="megaphone-outline" size={18} color={colors.text.muted} />
+      <View style={{ zIndex: 1100, position: 'relative', marginBottom: Spacing.xs }}>
+        <ListToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          itemCount={campaigns.length}
+          searchPlaceholder="Search campaigns..."
+          primaryAction={perm.can('campaign:create') ? {
+            label: 'New Campaign',
+            icon: 'add',
+            onPress: openCreateModal
+          } : undefined}
+          renderFilters={() => (
+            <View style={{ position: 'relative', zIndex: 100 }}>
+              <Pressable
+                onPress={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: Radius.sm,
+                  backgroundColor: colors.bg.secondary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: 6,
+                }}
+              >
+                <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary }}>
+                  {statusFilter ? statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1) : 'All Statuses'}
+                </Text>
+                <Ionicons name={isStatusDropdownOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.secondary} />
+              </Pressable>
 
-          <TextInput
-            style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 120 }}
-            placeholder="Search campaigns..."
-            placeholderTextColor={colors.text.muted}
-            value={search}
-            onChangeText={setSearch}
-          />
-
-          {/* Status Dropdown */}
-          <View style={{ position: 'relative', zIndex: 100 }}>
-            <Pressable
-              onPress={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 12,
-                paddingVertical: 7,
-                borderRadius: Radius.sm,
-                backgroundColor: colors.bg.secondary,
-                borderWidth: 1,
-                borderColor: colors.border,
-                gap: 6,
-              }}
-            >
-              <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary }}>
-                {statusFilter ? statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1) : 'All Statuses'}
-              </Text>
-              <Ionicons name={isStatusDropdownOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.secondary} />
-            </Pressable>
-
-            {isStatusDropdownOpen && (
-              <View style={{
-                position: 'absolute',
-                top: 38,
-                right: 0,
-                backgroundColor: colors.bg.card,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: Radius.md,
-                width: 130,
-                zIndex: 9999,
-                elevation: 8,
-                overflow: 'hidden',
-              }}>
-                {[
-                  { label: 'All Statuses', val: '' },
-                  { label: 'Draft', val: 'draft' },
-                  { label: 'Running', val: 'running' },
-                  { label: 'Paused', val: 'paused' },
-                  { label: 'Completed', val: 'completed' },
-                  { label: 'Cancelled', val: 'cancelled' },
-                ].map(item => (
-                  <Pressable
-                    key={item.val}
-                    onPress={() => {
-                      setStatusFilter(item.val);
-                      setIsStatusDropdownOpen(false);
-                    }}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      backgroundColor: statusFilter === item.val
-                        ? colors.primaryLight
-                        : (pressed ? colors.bg.secondary : colors.bg.card),
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.border + '40',
-                    })}
-                  >
-                    <Text style={{ ...Typography.caption, fontWeight: statusFilter === item.val ? '700' : '600', color: statusFilter === item.val ? colors.primary : colors.text.secondary }}>
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {perm.can('campaign:create') && (
-            <TouchableOpacity
-              style={{ height: 34, paddingHorizontal: 14, borderRadius: Radius.sm, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-              onPress={openCreateModal}
-            >
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>New Campaign</Text>
-            </TouchableOpacity>
+              {isStatusDropdownOpen && (
+                <View style={{
+                  position: 'absolute',
+                  top: 38,
+                  right: 0,
+                  backgroundColor: colors.bg.card,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: Radius.md,
+                  width: 130,
+                  zIndex: 9999,
+                  ...Shadows.floating,
+                  overflow: 'hidden',
+                }}>
+                  {[
+                    { label: 'All Statuses', val: '' },
+                    { label: 'Draft', val: 'draft' },
+                    { label: 'Running', val: 'running' },
+                    { label: 'Paused', val: 'paused' },
+                    { label: 'Completed', val: 'completed' },
+                    { label: 'Cancelled', val: 'cancelled' },
+                  ].map(item => (
+                    <Pressable
+                      key={item.val}
+                      onPress={() => {
+                        setStatusFilter(item.val);
+                        setIsStatusDropdownOpen(false);
+                      }}
+                      style={({ pressed }) => ({
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        backgroundColor: statusFilter === item.val
+                          ? colors.primaryLight
+                          : (pressed ? colors.bg.secondary : colors.bg.card),
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.border + '40',
+                      })}
+                    >
+                      <Text style={{ ...Typography.caption, fontWeight: statusFilter === item.val ? '700' : '600', color: statusFilter === item.val ? colors.primary : colors.text.secondary }}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
           )}
-        </View>
+        />
       </View>
 
       <ScrollView
@@ -413,7 +397,7 @@ export default function CampaignsScreen() {
             <View style={styles.cardTop}>
               <View style={styles.cardTitleRow}>
                 <Text style={styles.cardTitle} numberOfLines={1}>{c.name}</Text>
-                <StatusPill  label={<>{c.status.toUpperCase()}</>} textStyle={[styles.statusText, { color: STATUS_COLORS[c.status] || '#6b7280' }]} />
+                <StatusPill  label={<>{c.status.toUpperCase()}</>} tone={getStatusTone(c.status)} />
               </View>
               <Text style={styles.cardPlatform}>{PLATFORM_LABELS[c.platform] || c.platform}</Text>
             </View>
@@ -501,7 +485,7 @@ export default function CampaignsScreen() {
                     <Text style={styles.feedCardTime}>{formatDate(post.publishedAt)}</Text>
                   </View>
                 </View>
-                <StatusPill  label={<>{post.status.toUpperCase()}</>} textStyle={[styles.statusText, post.status === 'Published' ? { color: '#10b981' } : { color: '#3b82f6' }]} />
+                <StatusPill  label={<>{post.status.toUpperCase()}</>} tone={post.status === 'Published' ? 'success' : 'primary'} />
               </View>
 
               <View style={styles.feedCardPlatforms}>
@@ -893,7 +877,7 @@ export default function CampaignsScreen() {
                   </TouchableOpacity>
                 </View>
                 <ScrollView style={styles.modalForm}>
-                  <StatusPill  label={<>{detailCampaign.status.toUpperCase()}</>} textStyle={[styles.statusText, { color: STATUS_COLORS[detailCampaign.status] || '#6b7280' }]} />
+                  <StatusPill  label={<>{detailCampaign.status.toUpperCase()}</>} tone={getStatusTone(detailCampaign.status)} />
                   <DetailRow label="Platform" value={PLATFORM_LABELS[detailCampaign.platform] || detailCampaign.platform} />
                   <DetailRow label="Period" value={`${formatDate(detailCampaign.startDate)} — ${formatDate(detailCampaign.endDate)}`} />
                   <DetailRow label="Budget" value={formatCurrency(detailCampaign.budget)} />
@@ -999,8 +983,8 @@ const createStyles = (colors: typeof LightColors) =>
     // Modal
     modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalContainer: { width: '90%', maxWidth: 520, maxHeight: '90%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', elevation: 20 },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+    modalContainer: { width: '90%', maxWidth: 520, maxHeight: '90%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.modal },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
     modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, flex: 1 },
     modalCloseBtn: { padding: 4 },
     modalForm: { padding: Spacing.lg },

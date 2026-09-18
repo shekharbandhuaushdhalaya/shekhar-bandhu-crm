@@ -7,6 +7,7 @@ import { View, ScrollView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { createStyles } from '../manufacturingStyles';
+import { HelpTooltip } from '../../../components/HelpTooltip';
 
 interface Props {
   batches: any[];
@@ -388,14 +389,24 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                       <Ionicons name="document-text-outline" size={15} color={colors.primary} />
                       <Text style={styles.outlineBtnText}>BMR Report</Text>
                     </TouchableOpacity>
+                    <HelpTooltip
+                      title="Batch Manufacturing Record (BMR)"
+                      description="A BMR is the official regulatory document that records every step of a production batch — raw materials used, quantities, in-process checks, and personnel sign-offs. It is required by Schedule M of the Drugs & Cosmetics Act for licensed pharma manufacturers."
+                    />
                     {onOpenCoA && (
-                      <TouchableOpacity
-                        style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.success }]}
-                        onPress={() => onOpenCoA(batch._id)}
-                      >
-                        <Ionicons name="ribbon-outline" size={15} color={colors.success} />
-                        <Text style={[styles.outlineBtnText, { color: colors.success }]}>AYUSH CoA</Text>
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <TouchableOpacity
+                          style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12, borderColor: colors.success }]}
+                          onPress={() => onOpenCoA(batch._id)}
+                        >
+                          <Ionicons name="ribbon-outline" size={15} color={colors.success} />
+                          <Text style={[styles.outlineBtnText, { color: colors.success }]}>AYUSH CoA</Text>
+                        </TouchableOpacity>
+                        <HelpTooltip
+                          title="Certificate of Analysis (CoA)"
+                          description="The CoA is the quality assurance document confirming that this batch was tested and meets all specified quality standards — potency, purity, physical attributes, and microbial limits. Required for AYUSH-licensed products before they can be released for sale."
+                        />
+                      </View>
                     )}
                   </>
                 )}

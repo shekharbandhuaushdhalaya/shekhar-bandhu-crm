@@ -436,7 +436,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   label: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' },
   value: { ...Typography.h2, fontWeight: '800', color: colors.text.primary, marginTop: 4 },
   sectionTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 12 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   statCard: { flex: 1, minWidth: 200, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1 },
   statLabel: { ...Typography.eyebrow, fontWeight: '700' },
   statValue: { ...Typography.h2, fontWeight: '800', marginTop: 4 },

@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Pressable, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography , Shadows} from '../constants/theme';
 import { api, Invoice, ManufacturingAnalytics, RawMaterial, RawMaterialEntry } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
@@ -1391,7 +1391,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  pageTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  pageTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   pageSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2, fontWeight: '500' },
 
   // Tab bar
@@ -1492,8 +1492,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    boxShadow: '0px 4px 8px rgba(0,0,0,0.12)',
-    elevation: 6,
+    ...Shadows.modal,
     zIndex: 9999,
   },
   dropdownItem: {

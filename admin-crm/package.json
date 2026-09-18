@@ -4,7 +4,7 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "start-expo": "PATH=/Users/pawankeshar/.nvm/versions/node/v20.20.2/bin:$PATH npx expo start",
+    "start-expo": "npx expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",

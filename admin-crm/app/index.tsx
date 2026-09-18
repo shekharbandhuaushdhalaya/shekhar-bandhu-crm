@@ -415,8 +415,7 @@ function MonthlySalesWidget({ width, sales }: { width: number; sales: Invoice[] 
               borderRadius: 6,
               width: 110,
               zIndex: 9999,
-              boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
-              elevation: 8,
+              ...Shadows.floating,
               overflow: 'hidden',
             }}>
               {availableYears.map(fy => (
@@ -1126,13 +1125,14 @@ export default function DashboardScreen() {
     // 2. Phase 2: Deferred Heavy Background Loading
     setTimeout(async () => {
       try {
-        const [custs, vends, invs, purchs, sales, challans] = await Promise.all([
+        const [custs, vends, invs, purchs, sales, challans, creditNotes] = await Promise.all([
           api.getCustomers(),
           api.getVendors(),
           api.getConsolidatedInventory(),
           api.getPurchaseInvoices('', 'all'),
           api.getSaleInvoices('', 'all'),
           api.getChallans('', 'all'),
+          api.getCreditNotes ? api.getCreditNotes() : Promise.resolve([] as any[]),
         ]);
 
         const recInvoiceSum = custs.reduce((sum: number, cust: any) => sum + (cust.pakkaBalance || 0), 0);
@@ -1167,8 +1167,7 @@ export default function DashboardScreen() {
               if (item.productId && purchaseRatesMap[item.productId] !== undefined) {
                 purchasePrice = purchaseRatesMap[item.productId];
               } else {
-                const product = prods.find((p: any) => p._id === item.productId);
-                purchasePrice = product ? (product.price || 0) : 0;
+                purchasePrice = 0; // Fixed: Do not fallback to selling price (product.price) for COGS
               }
               
               const val = pcs * purchasePrice;
@@ -1177,10 +1176,35 @@ export default function DashboardScreen() {
           }
         });
 
+        // Compute Credit Note / Debit Note adjustments
+        let custCnSum = 0;
+        let custDnSum = 0;
+        let vendCnSum = 0;
+        let vendDnSum = 0;
+
+        creditNotes.forEach((cn: any) => {
+          if (cn.status === 'finalized') {
+            const amt = cn.baseAmount || cn.totalAmount || 0;
+            if (cn.partyType === 'Customer') {
+              if (cn.type === 'credit_note') custCnSum += amt;
+              else if (cn.type === 'debit_note') custDnSum += amt;
+            } else if (cn.partyType === 'Vendor') {
+              if (cn.type === 'credit_note') vendCnSum += amt;
+              else if (cn.type === 'debit_note') vendDnSum += amt;
+            }
+          }
+        });
+
         const assetInvoiceSum = Math.max(0, purchaseInvoiceSum - saleInvoiceSub);
         const volSum = custs.reduce((sum: number, cust: any) => sum + (cust.salesVolume || 0), 0);
-        const revenueSum = sales.reduce((sum: number, s: any) => sum + (s.isFinalized ? s.amount || 0 : 0), 0);
-        const cogsSum = saleInvoiceSub;
+        
+        // Base Revenue and COGS
+        const baseRevenueSum = sales.reduce((sum: number, s: any) => sum + (s.isFinalized ? s.amount || 0 : 0), 0);
+        const baseCogsSum = saleInvoiceSub;
+
+        // Adjusted Revenue and COGS (Credit Notes reduce, Debit Notes increase)
+        const revenueSum = baseRevenueSum - custCnSum + custDnSum;
+        const cogsSum = baseCogsSum - vendCnSum + vendDnSum;
 
         setRecInvoice(recInvoiceSum);
         setPayInvoice(payInvoiceSum);

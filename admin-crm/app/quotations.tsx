@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react';
 import * as Print from 'expo-print';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Typography, getStatusTone } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography, getStatusTone , Shadows} from '../constants/theme';
 import { api, Quotation, Product, Customer, Warehouse, InventoryEntry, QuotationItem } from '../utils/api';
 import { getStateStrWithCode } from '../utils/gst';
 import { useAuth } from '../utils/auth';
@@ -1505,6 +1505,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
 }
 
 export default function QuotationsScreen() {
+  const perm = usePermission();
   const [invoices, setQuotations] = useState<Quotation[]>([]);
   const [search, setSearch] = useListState('quotations_search', '');
   
@@ -1625,11 +1626,11 @@ export default function QuotationsScreen() {
           searchValue={search}
           itemCount={invoices ? invoices.length : 0}
           onSearchChange={setSearch}
-          primaryAction={{
+          primaryAction={perm.can('quotation:create') ? {
             label: 'New Quotation',
             icon: 'add',
             onPress: () => { setQuotationToEdit(null); setAddVisible(true); }
-          }}
+          } : undefined}
         />
 
         <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
@@ -1702,8 +1703,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   modalBackdropDesktop: { backgroundColor: colors.bg.primary },
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   modalContainerMobile: { flex: 0, maxHeight: '85%', maxWidth: '100%', alignSelf: 'stretch', marginTop: 'auto', borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderWidth: 1, borderBottomWidth: 0 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
   profileAvatar: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
@@ -1741,7 +1742,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Missing from earlier migration
   customSearchSelectContainer: { position: 'relative', width: '100%' },
-  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)', elevation: 4 },
+  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, ...Shadows.floating },
   customSelectItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   customSelectItemText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   customSelectItemSubtext: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },

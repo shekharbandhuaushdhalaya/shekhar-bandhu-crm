@@ -1030,14 +1030,14 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>Add Size Variant</Text>
               </TouchableOpacity>
 
-              <FormField label="HSN Code" required error={showErrors && !hsnCode.trim() ? 'HSN Code is required' : undefined}>
+              <FormField label="HSN Code" required error={showErrors && !hsnCode.trim() ? 'HSN Code is required' : undefined} helpTooltip={{ title: 'HSN Code', description: 'Harmonized System of Nomenclature (HSN) is a 6-8 digit code that classifies goods for GST tax purposes. For pharma/ayurvedic products, this is typically 3004XXXX. It is mandatory on all GST invoices.' }}>
                 <View style={styles.formInput}>
                   <Ionicons name="finger-print" size={16} color={colors.text.muted} />
                   <TextInput style={styles.formInputText} placeholder="e.g. 30049011" placeholderTextColor={colors.text.muted} value={hsnCode} onChangeText={setHsnCode} />
                 </View>
               </FormField>
 
-              <FormField label="Tax Slab (GST Rate)" required error={showErrors && !gstRate ? 'Tax Slab is required' : undefined}>
+              <FormField label="Tax Slab (GST Rate)" required error={showErrors && !gstRate ? 'Tax Slab is required' : undefined} helpTooltip={{ title: 'GST Tax Slab', description: 'Goods and Services Tax (GST) rate applicable on this product.\n\n• 0% — Exempt items\n• 5% — Ayurvedic classical formulations & herbs\n• 12% — Ayurvedic proprietary medicines\n• 18% — Cosmetics & general health products\n\nGST is split as: CGST + SGST for intra-state sales, and IGST for inter-state sales.' }}>
                 <View style={styles.formInput}>
                   <Ionicons name="cash-outline" size={16} color={colors.text.muted} />
                   {Platform.OS === 'web' ? (

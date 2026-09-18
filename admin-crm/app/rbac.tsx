@@ -1,4 +1,5 @@
 import { WorkspaceLoading, StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { PageHeader } from './../components/PageHeader';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
@@ -399,6 +400,10 @@ export default function RbacScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader 
+        title="Role-Based Access Control" 
+        subtitle="Manage users, roles, and fine-grained permissions."
+      />
       {/* Tab Bar */}
       <View style={styles.tabRow}>
         {(['users', 'permissions'] as const).map(tab => (
@@ -884,8 +889,8 @@ const createStyles = (colors: typeof LightColors) =>
     // --- Modal Styles ---
     modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalContainer: { width: '90%', maxWidth: 480, maxHeight: '90%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', elevation: 20 },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+    modalContainer: { width: '90%', maxWidth: 480, maxHeight: '90%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.modal },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
     modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
     modalCloseBtn: { padding: 4 },
     modalForm: { padding: Spacing.lg },

@@ -1,4 +1,5 @@
-import { EmptyState } from './../components/WorkspacePrimitives';
+import { EmptyState, StatusPill } from './../components/WorkspacePrimitives';
+import { PageHeader } from './../components/PageHeader';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
@@ -106,6 +107,10 @@ export default function PipelineScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader 
+        title="Sales Pipeline" 
+        subtitle="Visual board for tracking deals across stages."
+      />
       {/* Summary Bar */}
       <View style={styles.summaryBar}>
         <View style={styles.summaryItem}>

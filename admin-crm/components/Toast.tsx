@@ -93,7 +93,7 @@ export function Toast({ message, type = 'info', visible, onDismiss }: ToastProps
       <View style={[styles.content, { backgroundColor: themeColors.bg, borderColor: themeColors.text + '30' }]}>
         <Ionicons name={themeColors.icon as any} size={20} color={themeColors.text} style={styles.icon} />
         <Text style={[styles.message, { color: themeColors.text }]}>{message}</Text>
-        <TouchableOpacity onPress={handleDismiss} style={styles.closeBtn}>
+        <TouchableOpacity onPress={handleDismiss} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close">
           <Ionicons name="close" size={16} color={themeColors.text} />
         </TouchableOpacity>
       </View>
@@ -135,8 +135,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: Radius.md,
     borderWidth: 1,
-    boxShadow: '0px 4px 12px rgba(0,0,0,0.1)',
-    elevation: 4,
+    ...Shadows.modal
   },
   icon: {
     marginRight: 10,

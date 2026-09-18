@@ -1,4 +1,5 @@
 import { WorkspaceLoading, StatusPill, EmptyState } from './../components/WorkspacePrimitives';
+import { PageHeader } from './../components/PageHeader';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
@@ -12,6 +13,7 @@ import { useToast } from '../utils/ToastContext';
 import { useConfirm } from '../utils/ConfirmContext';
 import { api, Doctor, MedicalRepresentative } from '../utils/api';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { ListToolbar } from '../components/ListToolbar';
 import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
 
 type ViewTab = 'directory' | 'matrix' | 'events';
@@ -259,25 +261,12 @@ export default function DoctorsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header Bar */}
-      <View style={styles.headerBar}>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Ionicons name="medkit" size={24} color={colors.primary} />
-            <Text style={styles.screenTitle}>Doctor Directory</Text>
-          </View>
-          <Text style={styles.screenSubtitle}>
-            {totalDoctors} Doctors Managed | Classification & Field Promotion Portfolio
-          </Text>
-        </View>
-
-        {perm.can('mr:create') && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleOpenAddModal} activeOpacity={0.8}>
-            <Ionicons name="add-circle" size={18} color="#fff" />
-            <Text style={styles.primaryBtnText}>+ New Doctor</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Page Header */}
+      <PageHeader
+        title="Doctor Directory"
+        subtitle={`${totalDoctors} Doctors Managed | Classification & Field Promotion Portfolio`}
+        actions={perm.can('mr:create') ? [{ label: 'New Doctor', icon: 'add-circle', onPress: handleOpenAddModal, variant: 'primary' }] : undefined}
+      />
 
       {/* Tabs */}
       <View style={styles.tabBar}>
@@ -302,37 +291,28 @@ export default function DoctorsScreen() {
       {activeTab === 'directory' && (
         <View style={{ flex: 1 }}>
           {/* Controls Bar: Search & Category Filter */}
-          <View style={styles.controlsBar}>
-            <View style={styles.searchBox}>
-              <Ionicons name="search-outline" size={16} color={colors.text.muted} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search Doctor by name, clinic, specialization or city..."
-                placeholderTextColor={colors.text.muted}
-                value={search}
-                onChangeText={setSearch}
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch('')}>
-                  <Ionicons name="close-circle" size={16} color={colors.text.muted} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.filterChips}>
-              {['all', 'A', 'B', 'C'].map(cat => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.chip, selectedCategory === cat && styles.chipActive]}
-                  onPress={() => setSelectedCategory(cat)}
-                >
-                  <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>
-                    {cat === 'all' ? 'All Tiers' : `Category ${cat}`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          <ListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            itemCount={doctors.length}
+            totalCount={totalDoctors}
+            searchPlaceholder="Search Doctor by name, clinic, specialization or city..."
+            renderFilters={() => (
+              <View style={styles.filterChips}>
+                {['all', 'A', 'B', 'C'].map(cat => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.chip, selectedCategory === cat && styles.chipActive]}
+                    onPress={() => setSelectedCategory(cat)}
+                  >
+                    <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>
+                      {cat === 'all' ? 'All Tiers' : `Category ${cat}`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          />
 
           {loading ? (
             <View style={styles.centerLoading}>
@@ -949,15 +929,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.lg,
     overflow: 'hidden',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitleText: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   formGroup: {
     marginBottom: 12,

@@ -422,7 +422,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 12,
-    elevation: 3,
+    ...Shadows.hover,
     width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
@@ -470,7 +470,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
-    elevation: 2,
+    ...Shadows.card
   },
   loginBtnText: { ...Typography.body, color: '#ffffff', fontWeight: '700' },
   errorAlert: {

@@ -11,6 +11,7 @@ import { LightColors, Radius, Shadows, Spacing, Typography, getStatusTone } from
 import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceTransition, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 import { PageHeader as WorkspaceHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
+import { HelpTooltip } from '../components/HelpTooltip';
 import { useConfirm } from '../utils/ConfirmContext';
 
 type Tab = 'dashboard' | 'orders' | 'challans' | 'schemes' | 'returns' | 'commissions';
@@ -411,7 +412,11 @@ export default function SalesWorkspace() {
         ) : null}
 
         {tab === 'challans' ? (
-          <Panel title="Authoritative Sale Challans" subtitle="Finalize physical movement here, then create the financial invoice. Posted Challans remain immutable except through controlled reversal.">
+          <Panel
+            title="Authoritative Sale Challans"
+            subtitle="Finalize physical movement here, then create the financial invoice. Posted Challans remain immutable except through controlled reversal."
+            action={<HelpTooltip title="What is a Challan?" description="A Sale Challan (Delivery Challan) is the document that authorizes the physical movement of goods from your warehouse to the customer. Stock is deducted from inventory only when the Challan is finalized/posted. The financial invoice is generated from the posted Challan." iconSize={15} />}
+          >
             {!challans.length ? <EmptyState icon="document-text-outline" title="No Challans" message="Draft Challans prepared from Sales Orders will appear here." /> : challans.map((ch) => {
               const posted = ch.status === 'finalized' && ch.inventoryPostingStatus === 'posted';
               const sale = (ch.challanType || 'sale') === 'sale';

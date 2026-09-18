@@ -401,16 +401,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg.primary
   },
-  modalHeader: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.bg.secondary
-  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   paymentSelectCard: {
     backgroundColor: colors.bg.secondary,

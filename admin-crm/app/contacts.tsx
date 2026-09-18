@@ -1,4 +1,5 @@
 import { DataTable } from '../components/DataTable';
+import { PageHeader } from './../components/PageHeader';
 import { StatusPill } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
@@ -6,7 +7,7 @@ import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, STAGES, Stage, getStageColors, LightColors, Typography } from '../constants/theme';
+import { Spacing, Radius, Shadows, STAGES, Stage, getStageColors, LightColors, Typography } from '../constants/theme';
 import { api, Contact } from '../utils/api';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
@@ -78,7 +79,7 @@ export function ContactDetailModal({ contact, visible, onClose, onDeleted }: { c
             </View>
             <Text style={styles.profileName}>{currentContact.name}</Text>
             <Text style={styles.profileCompany}>{currentContact.company}</Text>
-            <StatusPill label={<>{currentContact.stage.charAt(0).toUpperCase() + currentContact.stage.slice(1)}</>} textStyle={[styles.statusText, { color: stageColor }]} />
+            <StatusPill label={<>{currentContact.stage.charAt(0).toUpperCase() + currentContact.stage.slice(1)}</>} color={stageColor} />
           </View>
 
           {/* Info Grid */}
@@ -309,6 +310,7 @@ export function AddContactModal({ visible, onClose, onSaved }: { visible: boolea
 }
 
 export default function ContactsScreen() {
+  const perm = usePermission();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
   const [filterStage, setFilterStage] = useState('all');
@@ -324,6 +326,7 @@ export default function ContactsScreen() {
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
 
@@ -341,6 +344,7 @@ export default function ContactsScreen() {
     }
     setTotalPages(totalP);
     setHasMore(targetPage < totalP || list.length === 25);
+    setLoading(false);
   }, [search, filterStage, page]);
 
   useEffect(() => { load(true); }, [search, filterStage]);
@@ -371,6 +375,10 @@ export default function ContactsScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader 
+        title="Contacts" 
+        subtitle="Manage leads, prospects, and established customers."
+      />
       <View style={styles.innerContainer}>
         <View style={{ zIndex: 1100, position: 'relative' }}>
           {showFilterDropdown && (
@@ -390,11 +398,11 @@ export default function ContactsScreen() {
             onSearchChange={setSearch}
             searchPlaceholder="Search contacts..."
             itemCount={contacts ? contacts.length : 0}
-            primaryAction={{
+            primaryAction={perm.can('contact:create') ? {
               label: 'Add Contact',
               icon: 'add',
               onPress: () => setAddVisible(true)
-            }}
+            } : undefined}
             renderFilters={() => (
               <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
                 <TouchableOpacity
@@ -464,7 +472,7 @@ export default function ContactsScreen() {
                 flex: 1,
                 render: (item: any) => {
                   const stageColor = stageColors[item.stage as Stage] || colors.text.muted;
-                  return <StatusPill label={<>{item.stage.charAt(0).toUpperCase() + item.stage.slice(1)}</>} textStyle={[styles.statusText, { color: stageColor }]} />;
+                  return <StatusPill label={<>{item.stage.charAt(0).toUpperCase() + item.stage.slice(1)}</>} color={stageColor} />;
                 }
               },
               {
@@ -509,6 +517,8 @@ export default function ContactsScreen() {
             keyExtractor={(item: any, index: number) => item._id || String(index)}
             minWidth={900}
             embedded
+            isLoading={loading}
+            isLoadingMore={loadingMore}
           />
 
           {hasMore && (
@@ -564,8 +574,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Modal Styles
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20 },
   profileAvatar: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)', marginBottom: 10 },
   profileAvatarText: { ...Typography.display, fontWeight: '800', color: colors.text.primary },

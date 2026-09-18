@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { Spacing, Radius, Typography } from '../../constants/theme';
+import { Spacing, Radius, Shadows, Typography } from '../../constants/theme';
 import { LightColors } from '../../constants/theme';
 
 export const createStyles = (colors: typeof LightColors) => StyleSheet.create({
@@ -29,8 +29,8 @@ export const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   statusText: { ...Typography.eyebrow, fontWeight: '800' },
 
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
   profileAvatar: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },

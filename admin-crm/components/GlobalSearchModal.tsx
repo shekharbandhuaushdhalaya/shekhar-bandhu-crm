@@ -5,7 +5,9 @@ import { useRouter } from 'expo-router';
 import { AppText as Text } from './AppText';
 import { AppTextInput as TextInput } from './AppTextInput';
 import { useTheme } from '../utils/themeContext';
+import { usePermission } from '../utils/permissions';
 import { LightColors, Typography, Spacing, Radius, Shadows } from '../constants/theme';
+import { APP_ROUTES } from '../constants/routes';
 import { api } from '../utils/api';
 
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -26,27 +28,12 @@ interface Props {
   onClose: () => void;
 }
 
-const ROUTE_TITLE_MAP = [
-  { path: '/parties/customers', title: 'Customers', icon: 'people' },
-  { path: '/parties/vendors', title: 'Vendors', icon: 'business' },
-  { path: '/products', title: 'Products', icon: 'cube' },
-  { path: '/invoices/sale', title: 'Sales Invoices', icon: 'document-text' },
-  { path: '/invoices/purchase', title: 'Purchase Invoices', icon: 'document-text' },
-  { path: '/inventories', title: 'Inventories & Warehouses', icon: 'layers' },
-  { path: '/leads', title: 'Leads', icon: 'git-branch' },
-  { path: '/queries', title: 'Web Queries', icon: 'mail' },
-  { path: '/orders', title: 'Orders', icon: 'cart' },
-  { path: '/quotations', title: 'Quotations', icon: 'document' },
-  { path: '/payments', title: 'Payments', icon: 'cash' },
-  { path: '/reports', title: 'Reports', icon: 'bar-chart' },
-  { path: '/manufacturing', title: 'Manufacturing & BMR', icon: 'analytics' },
-  { path: '/medicalreps', title: 'Medical Representatives', icon: 'people-circle' },
-  { path: '/sales-workspace', title: 'Sales Workspace', icon: 'options' },
-];
+
 
 export function GlobalSearchModal({ visible, onClose }: Props) {
   const { colors } = useTheme();
   const router = useRouter();
+  const perm = usePermission();
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounceValue(query, 500);
   const [sections, setSections] = useState<any[]>([]);
@@ -81,16 +68,18 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
           api.getCustomers(debouncedQuery).catch(() => ({ data: [] })),
           api.getProducts(debouncedQuery).catch(() => ({ data: [] })),
           api.getSaleInvoices(debouncedQuery).catch(() => ({ data: [] })),
-          api.getPurchaseInvoices(debouncedQuery).catch(() => ({ data: [] })),
+          perm.can('invoice:view') ? api.getPurchaseInvoices(debouncedQuery).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
           api.getPayments(undefined, undefined, undefined, undefined, debouncedQuery).catch(() => []),
           api.getVendors(debouncedQuery).catch(() => ({ data: [] })),
-          api.getMRs(debouncedQuery).catch(() => [])
+          perm.can('mr:view') ? api.getMRs(debouncedQuery).catch(() => []) : Promise.resolve([])
         ]);
         
         const extract = (res: any) => (Array.isArray(res) ? res : res?.data || []);
         
-        const routes = ROUTE_TITLE_MAP.filter(r => r.title.toLowerCase().includes(debouncedQuery.toLowerCase()))
-          .map(r => ({ ...r, _type: 'route', name: r.title }));
+        const routes = APP_ROUTES.filter(r => 
+          r.title.toLowerCase().includes(debouncedQuery.toLowerCase()) && 
+          (!r.permission || perm.can(r.permission))
+        ).map(r => ({ ...r, _type: 'route', name: r.title }));
           
         const newSections = [];
         if (routes.length > 0) newSections.push({ title: 'NAVIGATION', data: routes });
@@ -142,7 +131,10 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start', alignItems: 'center', paddingTop: 60 }}>
-        <View style={{ width: '90%', maxWidth: 600, backgroundColor: colors.bg.primary, borderRadius: Radius.lg, maxHeight: '80%', ...Shadows.card, }}>
+        <View 
+          style={{ width: '90%', maxWidth: 600, backgroundColor: colors.bg.primary, borderRadius: Radius.lg, maxHeight: '80%', ...Shadows.card, }}
+          accessibilityViewIsModal={true}
+        >
           
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <Ionicons name="search" size={20} color={colors.text.muted} />

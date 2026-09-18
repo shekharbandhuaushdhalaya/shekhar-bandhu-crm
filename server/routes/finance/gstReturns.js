@@ -28,6 +28,7 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
     }).lean();
 
     const creditNotes = await CreditNote.find({
+      partyType: 'Customer',
       status: 'finalized',
       date: { $gte: start, $lt: end },
     }).lean();
@@ -181,7 +182,14 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
       date: { $gte: start, $lt: end },
     }).lean();
 
-    const creditNotes = await CreditNote.find({
+    const saleCreditNotes = await CreditNote.find({
+      partyType: 'Customer',
+      status: 'finalized',
+      date: { $gte: start, $lt: end },
+    }).lean();
+
+    const purchaseCreditNotes = await CreditNote.find({
+      partyType: 'Vendor',
       status: 'finalized',
       date: { $gte: start, $lt: end },
     }).lean();
@@ -192,9 +200,9 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
     const grossSalesSGST = saleInvoices.reduce((s, i) => s + (i.sgst || 0), 0);
     const grossSalesIGST = saleInvoices.reduce((s, i) => s + (i.igst || 0), 0);
 
-    // Credit / Debit Notes adjustments
-    const cnList = creditNotes.filter(n => n.type === 'credit_note');
-    const dnList = creditNotes.filter(n => n.type === 'debit_note');
+    // Credit / Debit Notes adjustments for Sales
+    const cnList = saleCreditNotes.filter(n => n.type === 'credit_note');
+    const dnList = saleCreditNotes.filter(n => n.type === 'debit_note');
 
     const cnBase = cnList.reduce((s, n) => s + (n.baseAmount || n.totalAmount || 0), 0);
     const cnCGST = cnList.reduce((s, n) => s + (n.cgst || 0), 0);
@@ -213,10 +221,28 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
     const outwardIGST = grossSalesIGST - cnIGST + dnIGST;
 
     // Inward supplies (purchases) for ITC
-    const inwardTaxable = purchaseInvoices.reduce((s, i) => s + (i.baseAmount || 0), 0);
-    const inwardCGST = purchaseInvoices.reduce((s, i) => s + (i.cgst || 0), 0);
-    const inwardSGST = purchaseInvoices.reduce((s, i) => s + (i.sgst || 0), 0);
-    const inwardIGST = purchaseInvoices.reduce((s, i) => s + (i.igst || 0), 0);
+    const grossInwardTaxable = purchaseInvoices.reduce((s, i) => s + (i.baseAmount || 0), 0);
+    const grossInwardCGST = purchaseInvoices.reduce((s, i) => s + (i.cgst || 0), 0);
+    const grossInwardSGST = purchaseInvoices.reduce((s, i) => s + (i.sgst || 0), 0);
+    const grossInwardIGST = purchaseInvoices.reduce((s, i) => s + (i.igst || 0), 0);
+
+    const purchCNList = purchaseCreditNotes.filter(n => n.type === 'credit_note');
+    const purchDNList = purchaseCreditNotes.filter(n => n.type === 'debit_note');
+
+    const purchCNBase = purchCNList.reduce((s, n) => s + (n.baseAmount || n.totalAmount || 0), 0);
+    const purchCNCGST = purchCNList.reduce((s, n) => s + (n.cgst || 0), 0);
+    const purchCNSGST = purchCNList.reduce((s, n) => s + (n.sgst || 0), 0);
+    const purchCNIGST = purchCNList.reduce((s, n) => s + (n.igst || 0), 0);
+
+    const purchDNBase = purchDNList.reduce((s, n) => s + (n.baseAmount || n.totalAmount || 0), 0);
+    const purchDNCGST = purchDNList.reduce((s, n) => s + (n.cgst || 0), 0);
+    const purchDNSGST = purchDNList.reduce((s, n) => s + (n.sgst || 0), 0);
+    const purchDNIGST = purchDNList.reduce((s, n) => s + (n.igst || 0), 0);
+
+    const inwardTaxable = grossInwardTaxable - purchCNBase + purchDNBase;
+    const inwardCGST = grossInwardCGST - purchCNCGST + purchDNCGST;
+    const inwardSGST = grossInwardSGST - purchCNSGST + purchDNSGST;
+    const inwardIGST = grossInwardIGST - purchCNIGST + purchDNIGST;
 
     const result = {
       month: m,

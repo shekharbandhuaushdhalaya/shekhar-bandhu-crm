@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { Spacing, Radius, LightColors, Typography } from '../../constants/theme';
+import { Spacing, Radius, LightColors, Typography , Shadows} from '../../constants/theme';
 
 export const createStyles = (colors: typeof LightColors) =>
   StyleSheet.create({
@@ -63,9 +63,9 @@ export const createStyles = (colors: typeof LightColors) =>
     completeBatchBtnText: { ...Typography.caption, color: '#fff', fontWeight: '700' },
     modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalContainer: { width: '92%', maxWidth: 720, maxHeight: '92%', backgroundColor: colors.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', elevation: 20, shadowColor: '#1E2A24', shadowOpacity: 0.14, shadowRadius: 28, shadowOffset: { width: 0, height: 14 } },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-    modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+    modalContainer: { width: '92%', maxWidth: 720, maxHeight: '92%', backgroundColor: colors.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.modal, shadowColor: '#1E2A24', shadowOpacity: 0.14, shadowRadius: 28, shadowOffset: { width: 0, height: 14 } },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+    modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
     modalError: { ...Typography.bodySm, backgroundColor: colors.danger + '10', borderColor: colors.danger + '35', borderWidth: 1, color: colors.danger, fontWeight: '600', padding: 10, marginHorizontal: Spacing.lg, marginTop: Spacing.md, borderRadius: Radius.sm },
     modalForm: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
     inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },

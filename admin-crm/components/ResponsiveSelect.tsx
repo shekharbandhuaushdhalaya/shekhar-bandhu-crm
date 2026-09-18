@@ -287,13 +287,7 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     ...Shadows.hover,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1 },
   modalTitle: {
     ...Typography.h3,
   },

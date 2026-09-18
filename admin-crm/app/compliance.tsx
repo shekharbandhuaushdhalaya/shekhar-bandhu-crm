@@ -2,19 +2,20 @@ import { StatusPill, WorkspaceLoading } from './../components/WorkspacePrimitive
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { Typography } from './../constants/theme';
+import { Typography, Spacing, Shadows } from './../constants/theme';
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
 import { PageHeader as ScreenHeader } from '../components/PageHeader';
-import { useTheme } from '../utils/themeContext';
+import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 
 type ModuleKey = 'equipment' | 'deviations' | 'stability' | 'recalls' | 'vendors' | 'specifications';
 
 export default function ComplianceScreen() {
   const { colors } = useTheme();
+  const styles = useStyles(createStyles);
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>({ eq: [], dev: [], st: [], rec: [], vq: [], spec: [] });
@@ -507,7 +508,9 @@ export default function ComplianceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => {
+  const { colors } = theme;
+  return StyleSheet.create({
   container: { padding: 20, gap: 14 },
   headerBanner: { padding: 16, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 12, alignItems: 'center' },
   bannerTitle: { ...Typography.h3, fontWeight: '700' },
@@ -525,8 +528,8 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
   modalContent: { width: '100%', maxWidth: 700, maxHeight: '85%', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column' },
   modalCard: { width: '100%', maxWidth: 500, borderRadius: 14, padding: 16 },
-  modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)' },
-  modalTitle: { ...Typography.h2, fontWeight: '800' },
+  modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h3, fontWeight: '800' },
   modalSub: { ...Typography.bodySm, marginTop: 2 },
   emptyCard: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyText: { ...Typography.body, marginTop: 10 },
@@ -550,3 +553,4 @@ const styles = StyleSheet.create({
   modalCancelBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
   modalSubmitBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
 });
+};

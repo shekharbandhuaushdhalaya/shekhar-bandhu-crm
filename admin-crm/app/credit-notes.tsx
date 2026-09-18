@@ -5,13 +5,15 @@ import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, ActivityIndicator, Pressable, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Typography, getStatusTone } from '../constants/theme';
+import { Spacing, Radius, LightColors, Typography, getStatusTone , Shadows} from '../constants/theme';
 import { api, CreditNote, Customer, Vendor } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { ResponsiveSelect } from '../components/ResponsiveSelect';
 import { FIRM_DETAILS } from '../constants/firm';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { ListToolbar } from '../components/ListToolbar';
 import { useConfirm } from '../utils/ConfirmContext';
+import { usePermission } from '../utils/permissions';
 
 // ── Print CGST Rule 53 Compliant Credit / Debit Note ──────────────────────────
 const printCreditNote = (note: CreditNote) => {
@@ -141,6 +143,7 @@ export default function CreditNotesPage() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { confirm } = useConfirm();
+  const perm = usePermission();
 
   const [notes, setNotes] = useState<CreditNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -208,55 +211,38 @@ export default function CreditNotesPage() {
     <View style={styles.screen}>
       <View style={styles.innerContainer}>
         {/* Standardized Search Bar */}
-        <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: colors.bg.card,
-            paddingHorizontal: 12,
-            paddingRight: 8,
-            borderRadius: Radius.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            gap: 10,
-            minHeight: 46
-          }}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput
-              style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 100 }}
-              placeholder="Search by Note #, Party, Invoice..."
-              placeholderTextColor={colors.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
-
-            <View style={{ width: 140 }}>
-              <ResponsiveSelect
-                value={filterType}
-                onChange={(val) => setFilterType(val)}
-                options={[
-                  { label: 'All Notes', value: 'all' },
-                  { label: 'Credit Notes', value: 'credit_note' },
-                  { label: 'Debit Notes', value: 'debit_note' }
-                ]}
-                style={{
-                  backgroundColor: colors.bg.secondary,
-                  borderColor: colors.border,
-                  borderRadius: 6,
-                  height: 34,
-                  paddingHorizontal: 10,
-                }}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={{ height: 34, paddingHorizontal: 14, borderRadius: Radius.sm, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-              onPress={() => setShowModal(true)}
-            >
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>New Note</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={{ zIndex: 1100, position: 'relative', marginBottom: Spacing.xs }}>
+          <ListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            itemCount={notes.length}
+            searchPlaceholder="Search by Note #, Party, Invoice..."
+            primaryAction={perm.can('credit-note:create') ? {
+              label: 'New Note',
+              icon: 'add',
+              onPress: () => setShowModal(true)
+            } : undefined}
+            renderFilters={() => (
+              <View style={{ width: 140 }}>
+                <ResponsiveSelect
+                  value={filterType}
+                  onChange={(val) => setFilterType(val)}
+                  options={[
+                    { label: 'All Notes', value: 'all' },
+                    { label: 'Credit Notes', value: 'credit_note' },
+                    { label: 'Debit Notes', value: 'debit_note' }
+                  ]}
+                  style={{
+                    backgroundColor: colors.bg.secondary,
+                    borderColor: colors.border,
+                    borderRadius: 6,
+                    height: 34,
+                    paddingHorizontal: 10,
+                  }}
+                />
+              </View>
+            )}
+          />
         </View>
 
         {/* Summary Stats */}
@@ -750,12 +736,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyText: { ...Typography.body, marginTop: 10, color: colors.text.muted },
 
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0px 4px 10px rgba(0,0,0,0.3)' },
+  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', ...Shadows.floating, boxShadow: '0px 4px 10px rgba(0,0,0,0.3)' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', maxWidth: 500, backgroundColor: colors.bg.card, borderRadius: Radius.lg, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   closeBtn: { padding: 4 },
   modalBody: { padding: Spacing.lg },
   modalError: { ...Typography.bodySm, padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontWeight: '600', marginBottom: Spacing.md },
@@ -765,7 +751,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   toggleBtn: { flex: 1, height: 40, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.primary, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
   toggleText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, textAlign: 'center' },
   
-  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 150, zIndex: 9999, elevation: 5, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)' },
+  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 150, zIndex: 9999, ...Shadows.floating, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)' },
   dropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   dropdownItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   dropdownItemSub: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },

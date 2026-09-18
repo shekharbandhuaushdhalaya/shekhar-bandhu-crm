@@ -6,10 +6,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { api, StockMovement } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { LightColors, Spacing, Radius, Typography } from '../constants/theme';
+import { LightColors, Spacing, Radius, Typography, getStatusTone } from '../constants/theme';
 import { PageHeader as ScreenHeader } from '../components/PageHeader';
 import { DataTable, Column } from '../components/DataTable';
-import { WorkspaceTabs, EmptyState, WorkspaceError, StatusPill, WorkspaceTransition } from './../components/WorkspacePrimitives';
+import { EmptyState, WorkspaceError, StatusPill, WorkspaceTabs, WorkspaceTransition } from './../components/WorkspacePrimitives';
+import { ListToolbar } from '../components/ListToolbar';
 import InventoryDispatchScreen from './inventorydispatch';
 
 const typeLabel = (value?: string) => ({
@@ -44,14 +45,14 @@ export default function StockMovementsArchive() {
     { key: 'type', title: 'Legacy type', width: 170, render: (r) => <Text style={styles.text}>{typeLabel(r.type)}</Text> },
     { key: 'partyName', title: 'Party / reference', flex: 1, render: (r) => <Text style={styles.text} numberOfLines={1}>{r.partyName || r.sourceDocType || '—'}</Text> },
     { key: 'warehouseName', title: 'Warehouse', width: 170, hideOnMobile: true },
-    { key: 'status', title: 'Status', width: 110, hideOnMobile: true, render: (r) => <StatusPill  label={<>{r.status}</>} textStyle={styles.statusText} /> },
+    { key: 'status', title: 'Status', width: 110, hideOnMobile: true, render: (r) => <StatusPill  label={<>{r.status}</>} tone={getStatusTone(r.status)} /> },
     { key: 'items', title: 'Items', width: 80, align: 'right', render: (r) => <Text style={styles.strong}>{r.items?.length || 0}</Text> },
   ], [styles]);
 
   if (tab === 'dispatches') return (
     <View style={styles.screen}>
       <ScreenHeader title="Logistics" subtitle="Dispatches are created only from posted authoritative Challans." />
-      <WorkspaceTabs tabs={[{ id: 'archive', label: 'Movement Archive', icon: 'archive-outline' }, { id: 'dispatches', label: 'Dispatches', icon: 'car-outline' }]} value={tab} onChange={(v) => setTab(v as any)} />
+      <WorkspaceTabs tabs={[{ id: 'archive', label: 'Movement Archive', icon: 'archive-outline' }, { id: 'dispatches', label: 'Dispatches', icon: 'car-outline' }]} value={tab} onChange={(v: string) => setTab(v as 'archive' | 'dispatches')} />
       <WorkspaceTransition value={tab} style={{ flex: 1 }}><InventoryDispatchScreen /></WorkspaceTransition>
     </View>
   );
@@ -62,19 +63,14 @@ export default function StockMovementsArchive() {
         title="Stock Movement Archive"
         subtitle="Read-only history from the retired StockMovement engine. New sales/transfers use Challans; samples, production, returns and write-offs use their dedicated workflows."
       />
-      <WorkspaceTabs tabs={[{ id: 'archive', label: 'Movement Archive', icon: 'archive-outline' }, { id: 'dispatches', label: 'Dispatches', icon: 'car-outline' }]} value={tab} onChange={(v) => setTab(v as any)} />
+      <WorkspaceTabs tabs={[{ id: 'archive', label: 'Movement Archive', icon: 'archive-outline' }, { id: 'dispatches', label: 'Dispatches', icon: 'car-outline' }]} value={tab} onChange={(v: string) => setTab(v as 'archive' | 'dispatches')} />
       <WorkspaceTransition value={tab} style={styles.toolbar}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={17} color={colors.text.muted} />
-          <TextInput
-            style={styles.input}
-            placeholder="Search historical document or party"
-            placeholderTextColor={colors.text.muted}
-            value={search}
-            onChangeText={setSearch}
-            onSubmitEditing={() => load(false)}
-          />
-        </View>
+        <ListToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          itemCount={rows.length}
+          searchPlaceholder="Search historical document or party"
+        />
         <View style={styles.notice}>
           <Ionicons name="lock-closed-outline" size={15} color={colors.primary} />
           <Text style={styles.noticeText}>Archive is read-only</Text>

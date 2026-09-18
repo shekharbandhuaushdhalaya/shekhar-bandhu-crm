@@ -13,6 +13,7 @@ import { usePermission } from '../utils/permissions';
 import { useToast } from '../utils/ToastContext';
 import { DataTable, Column } from '../components/DataTable';
 import { PageHeader } from '../components/PageHeader';
+import { ListToolbar } from '../components/ListToolbar';
 
 type PricingRow = {
   _id: string;
@@ -295,20 +296,13 @@ export default function PricingScreen() {
       </View>
 
       {/* Search */}
-      <View style={styles.searchRow}>
-        <Ionicons name="search-outline" size={16} color={colors.text.muted} style={{ marginRight: 8 }} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name, SKU or category..."
-          placeholderTextColor={colors.text.muted}
-          value={search}
-          onChangeText={setSearch}
+      <View style={{ zIndex: 1100, position: 'relative', marginBottom: Spacing.xs, marginHorizontal: Spacing.lg }}>
+        <ListToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          itemCount={filteredRows.length}
+          searchPlaceholder="Search by name, SKU or category..."
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={18} color={colors.text.muted} />
-          </TouchableOpacity>
-        )}
       </View>
 
       <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
@@ -352,7 +346,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.bg.secondary,
   },
-  pageTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  pageTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   pageSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   saveAllBtn: {
     flexDirection: 'row',

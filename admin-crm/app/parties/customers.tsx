@@ -5,7 +5,7 @@ import { AppText as Text } from './../../components/AppText';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Spacing, Radius, LightColors, Typography } from '../../constants/theme';
+import { Spacing, Radius, Shadows, LightColors, Typography } from '../../constants/theme';
 import { api, Customer, Invoice } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
@@ -1533,6 +1533,7 @@ function CustomerLedgerModal({
 }
 
 export default function CustomersScreen() {
+  const perm = usePermission();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useListState('customers_search', '');
   const params = useLocalSearchParams<{ search?: string }>();
@@ -1731,11 +1732,11 @@ export default function CustomersScreen() {
             onSearchChange={setSearch}
             itemCount={customers ? customers.length : 0}
             searchPlaceholder={isDesktop ? "Search customers..." : "Search..."}
-            primaryAction={{
+            primaryAction={perm.can('customer:create') ? {
               label: 'New Customer',
               icon: 'add',
               onPress: () => { setSelectedCust(null); setIsEditing(false); setAddVisible(true); }
-            }}
+            } : undefined}
             renderFilters={() => (
               <View style={{ position: 'relative', zIndex: 1200 }}>
                 <TouchableOpacity
@@ -1877,8 +1878,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Modals
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
   profileAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.purple + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   profileAvatarText: { ...Typography.display, fontWeight: '800', color: colors.purple },
@@ -1945,8 +1946,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     zIndex: 9999,
-    boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
-    elevation: 8
+    ...Shadows.floating
   },
   customSelectItem: {
     padding: 12,

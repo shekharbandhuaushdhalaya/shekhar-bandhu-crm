@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../utils/themeContext';
 import { Typography, Spacing, Radius } from '../constants/theme';
+import { HelpTooltip } from './HelpTooltip';
 
 export interface FormFieldProps {
   label: string;
@@ -10,6 +11,9 @@ export interface FormFieldProps {
   error?: string;
   children: React.ReactNode;
   style?: any;
+  id?: string;
+  /** Optional help tooltip shown inline next to the label */
+  helpTooltip?: { title: string; description: string };
 }
 
 export const FormField: React.FC<FormFieldProps> = ({
@@ -19,30 +23,56 @@ export const FormField: React.FC<FormFieldProps> = ({
   error,
   children,
   style,
+  id: customId,
+  helpTooltip,
 }) => {
   const { colors } = useTheme();
+  
+  const generatedId = useId();
+  const fieldId = customId || `field-${generatedId}`;
+  const labelId = `${fieldId}-label`;
+  const descriptionId = `${fieldId}-desc`;
+  const errorId = `${fieldId}-error`;
+
+  const ariaDescribedBy = [
+    description ? descriptionId : null,
+    error ? errorId : null,
+  ].filter(Boolean).join(' ') || undefined;
+
+  const enhancedChildren = React.Children.map(children, child => {
+    if (React.isValidElement(child)) {
+      return React.cloneElement(child, {
+        nativeID: fieldId,
+        accessibilityLabelledBy: labelId,
+        accessibilityDescribedBy: ariaDescribedBy,
+        accessibilityInvalid: !!error,
+      } as any);
+    }
+    return child;
+  });
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style]} accessible={false}>
       <View style={styles.labelRow}>
-        <Text style={[styles.label, { color: colors.text.primary }]}>
+        <Text nativeID={labelId} accessibilityRole="header" style={[styles.label, { color: colors.text.primary }]}>
           {label}
         </Text>
-        {required && <Text style={[styles.asterisk, { color: colors.danger }]}>*</Text>}
+        {required && <Text style={[styles.asterisk, { color: colors.danger }]} aria-hidden={true}>*</Text>}
+        {helpTooltip && <HelpTooltip title={helpTooltip.title} description={helpTooltip.description} />}
       </View>
 
       {description && (
-        <Text style={[styles.description, { color: colors.text.muted }]}>
+        <Text nativeID={descriptionId} style={[styles.description, { color: colors.text.muted }]}>
           {description}
         </Text>
       )}
 
       <View style={styles.inputWrapper}>
-        {children}
+        {enhancedChildren}
       </View>
 
       {error ? (
-        <Text style={[styles.error, { color: colors.danger }]}>
+        <Text nativeID={errorId} accessibilityLiveRegion="polite" style={[styles.error, { color: colors.danger }]}>
           {error}
         </Text>
       ) : null}

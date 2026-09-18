@@ -6,7 +6,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Linking, Pressable, DeviceEventEmitter, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { Spacing, Radius, LightColors, Typography } from '../../constants/theme';
+import { Spacing, Radius, Shadows, LightColors, Typography } from '../../constants/theme';
 import { api, Invoice, Product, Customer, Warehouse, InventoryEntry, InvoiceItem } from '../../utils/api';
 import { shortenPartyName } from '../../utils/string';
 import { getStateStrWithCode } from '../../utils/gst';
@@ -1844,9 +1844,7 @@ export default function SaleInvoicesScreen() {
       width: 120,
       hideOnMobile: true,
       render: (item) => (
-        <StatusPill  label={<>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</>} textStyle={[styles.statusText, {
-            color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
-          }]} />
+        <StatusPill  label={<>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</>} tone={item.status === 'Cancelled' ? 'danger' : (item.isFinalized ? 'success' : 'warning')} />
       )
     },
     {
@@ -1927,11 +1925,11 @@ export default function SaleInvoicesScreen() {
             itemCount={filteredInvoices ? filteredInvoices.length : 0}
             totalCount={invoices ? invoices.length : 0}
             searchPlaceholder="Search sale invoices..."
-            primaryAction={{
+            primaryAction={perm.can('invoice:create') ? {
               label: 'From Challan',
               icon: 'document-text-outline',
               onPress: () => router.push('/sales-workspace?tab=challans')
-            }}
+            } : undefined}
             renderFilters={() => (
               <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
                 <TouchableOpacity
@@ -2053,8 +2051,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   statusText: { ...Typography.eyebrow, fontWeight: '800' },
 
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
   profileAvatar: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
@@ -2092,7 +2090,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Missing from earlier migration
   customSearchSelectContainer: { position: 'relative', width: '100%' },
-  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)', elevation: 4 },
+  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, ...Shadows.floating },
   customSelectItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   customSelectItemText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   customSelectItemSubtext: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },

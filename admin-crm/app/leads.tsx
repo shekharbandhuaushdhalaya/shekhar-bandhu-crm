@@ -1,5 +1,5 @@
-import { EmptyState } from './../components/WorkspacePrimitives';
-import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { EmptyState, StatusPill } from './../components/WorkspacePrimitives';
+import { PageHeader } from './../components/PageHeader';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, STAGES, Stage, getStageColors, LightColors, Typography } from '../constants/theme';
 import { api, Contact } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { usePermission } from '../utils/permissions';
 import { AddContactModal, ContactDetailModal } from './contacts';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { ListToolbar } from '../components/ListToolbar';
@@ -86,6 +87,7 @@ export default function LeadsScreen() {
   
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const perm = usePermission();
 
   // If winWidth is large (desktop), fit all columns side by side. Otherwise horizontal scroll.
   const columnWidth = winWidth > 1100 ? (winWidth - 32 - (Spacing.md * 5)) / 6 : 280;
@@ -122,6 +124,10 @@ export default function LeadsScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader 
+        title="Lead Management" 
+        subtitle="Manage and track potential opportunities."
+      />
       {/* Summary Bar */}
       <View style={styles.summaryBar}>
         <View style={styles.summaryItem}>
@@ -146,11 +152,11 @@ export default function LeadsScreen() {
         itemCount={filteredContacts ? filteredContacts.length : 0}
         totalCount={contacts ? contacts.length : 0}
         searchPlaceholder="Search leads..."
-        primaryAction={{
+        primaryAction={perm.can('contact:create') ? {
           label: 'Add Lead',
           icon: 'add',
           onPress: () => setAddVisible(true)
-        }}
+        } : undefined}
         containerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md }}
       />
 

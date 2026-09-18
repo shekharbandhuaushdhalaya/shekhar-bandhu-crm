@@ -1,3 +1,5 @@
+import { PageHeader } from './../components/PageHeader';
+import { DataTable, Column } from '../components/DataTable';
 import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
@@ -99,6 +101,10 @@ export default function QueriesScreen() {
 
   return (
     <View style={styles.screen}>
+      <PageHeader 
+        title="Customer Queries" 
+        subtitle="Manage leads, inquiries, and customer support tickets."
+      />
       {/* Search Bar Container with Status Dropdown Inside */}
       <ListToolbar
         searchValue={search}

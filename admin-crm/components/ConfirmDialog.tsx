@@ -30,6 +30,15 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel,
 }) => {
   const { colors } = useTheme();
+  const cancelBtnRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    if (visible && cancelBtnRef.current) {
+      setTimeout(() => {
+        cancelBtnRef.current?.focus?.();
+      }, 50);
+    }
+  }, [visible]);
 
   if (!visible) return null;
 
@@ -41,7 +50,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       onRequestClose={loading ? undefined : onCancel}
     >
       <View style={styles.overlay}>
-        <View style={[styles.dialog, { backgroundColor: colors.bg.card }]}>
+        <View 
+          style={[styles.dialog, { backgroundColor: colors.bg.card }]}
+          accessibilityViewIsModal={true}
+        >
           {iconName && (
             <View style={[
               styles.iconContainer, 
@@ -65,10 +77,13 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
           <View style={styles.actions}>
             <TouchableOpacity
+              ref={cancelBtnRef}
               style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
               onPress={onCancel}
               disabled={loading}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={cancelLabel}
             >
               <Text style={[styles.buttonText, { color: colors.text.primary }]}>{cancelLabel}</Text>
             </TouchableOpacity>
@@ -82,6 +97,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               onPress={onConfirm}
               disabled={loading}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={confirmLabel}
             >
               {loading ? (
                 <ActivityIndicator size="small" color="#fff" />

@@ -36,6 +36,7 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [page, setPage] = useListState('orders_page', 1);
+  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Detail Modal State
@@ -93,6 +94,8 @@ export default function OrdersScreen() {
     } catch (err: any) {
       console.error(err);
       showToast('Failed to load orders: ' + err.message, 'error');
+    } finally {
+      setLoading(false);
     }
   }, [page]);
 
@@ -369,6 +372,7 @@ export default function OrdersScreen() {
             };
           }}
           isRefreshing={refreshing}
+          isLoading={loading}
           onRefresh={onRefresh}
           onLoadMore={() => { if (page < totalPages) setPage(p => p + 1); }}
           ListEmptyComponent={
@@ -720,7 +724,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   modalOverlayMobile: { justifyContent: 'flex-end', alignItems: 'stretch', padding: 0 },
   modalContent: { backgroundColor: colors.bg.card, width: '100%', maxWidth: 500, maxHeight: '90%', borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', ...Shadows.hover },
   modalContentMobile: { maxWidth: '100%', maxHeight: '85%', borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalBody: { padding: Spacing.lg, gap: Spacing.md },
   sectionHeaderTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 4 },

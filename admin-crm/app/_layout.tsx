@@ -24,6 +24,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { getSocket } from '../utils/socket';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { GlobalSearchModal } from '../components/GlobalSearchModal';
+import { getRouteTitle } from '../constants/routes';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -36,48 +37,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
   const router = useRouter();
   const pathname = usePathname();
 
-  const ROUTE_TITLE_MAP: [string, string][] = [
-    ['/parties/customers', 'Customers'],
-    ['/parties/vendors', 'Vendors'],
-    ['/invoices/sale', 'Sales Invoices'],
-    ['/invoices/purchase', 'Purchase Invoices'],
-    ['/products', 'Products'],
-    ['/inventories', 'Inventories & Warehouses'],
-    ['/inventory-reconciliation', 'Inventory Reconciliation'],
-    ['/leads', 'Leads'],
-    ['/queries', 'Web Queries'],
-    ['/orders', 'Orders'],
-    ['/quotations', 'Quotations'],
-    ['/payments', 'Payments'],
-    ['/ageing', 'Receivable Ageing'],
-    ['/reports', 'Reports'],
-    ['/rbac', 'Access Control'],
-    ['/audit', 'System Audit Logs'],
-    ['/manufacturing', 'Manufacturing & BMR'],
-    ['/stockmovements', 'Delivery Challans'],
-    ['/profile', 'My Details'],
-    ['/campaigns', 'Campaigns'],
-    ['/ai-analytics', 'AI Business Assistant'],
-    ['/credit-notes', 'Credit / Debit Notes'],
-    ['/gst-returns', 'GST Returns'],
-    ['/medicalreps', 'Medical Representatives'],
-    ['/doctors', 'Doctor Directory'],
-    ['/sales-workspace', 'Sales Workspace'],
-    ['/sales-intelligence', 'Sales Intelligence'],
-    ['/mr-my-day', 'MR My Day'],
-    ['/compliance', 'GMP & Compliance'],
-  ];
-
-  const getPageName = (path: string) => {
-    if (path === '/' || path === '') return 'Dashboard';
-    for (let i = 0; i < ROUTE_TITLE_MAP.length; i++) {
-      const [prefix, title] = ROUTE_TITLE_MAP[i];
-      if (path.startsWith(prefix)) return title;
-    }
-    return '';
-  };
-
-  const pageName = getPageName(pathname);
+  const pageName = getRouteTitle(pathname);
 
   const roleColors: { [key: string]: string } = {
     admin: colors.danger,
@@ -748,8 +708,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: '100%',
     flexDirection: 'column',
     backgroundColor: colors.bg.primary,
-    boxShadow: '4px 0px 10px rgba(0,0,0,0.2)',
-    elevation: 16,
+    ...Shadows.modal,
     paddingTop: 10,
   },
   drawerHeader: {

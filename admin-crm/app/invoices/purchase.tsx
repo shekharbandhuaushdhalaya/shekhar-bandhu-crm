@@ -6,7 +6,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Alert, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { Spacing, Radius, LightColors, Typography } from '../../constants/theme';
+import { Spacing, Radius, LightColors, Typography , Shadows} from '../../constants/theme';
 import { api, Invoice, Product, RawMaterial, Vendor, Warehouse, ManufacturingUnit } from '../../utils/api';
 import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
@@ -1280,8 +1280,7 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
             borderColor: colors.border,
             padding: Spacing.md,
             marginBottom: 16,
-            boxShadow: '0px 2px 6px rgba(0,0,0,0.04)',
-            elevation: 2,
+            ...Shadows.floating,
             zIndex: rows.some(r => r.showProductDropdown || r.showGstDropdown) ? 2500 : 50
           }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
@@ -1824,9 +1823,10 @@ export default function PurchaseInvoicesScreen() {
       width: 120,
       hideOnMobile: true,
       render: (item) => (
-        <StatusPill  label={<>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</>} textStyle={[styles.statusText, {
-            color: item.status === 'Cancelled' ? colors.danger : (item.isFinalized ? colors.success : colors.warning)
-          }]} />
+        <StatusPill 
+          label={<>{item.status === 'Cancelled' ? 'CANCELLED' : (item.isFinalized ? 'FINALIZED' : 'DRAFT')}</>} 
+          tone={item.status === 'Cancelled' ? 'danger' : (item.isFinalized ? 'success' : 'warning')} 
+        />
       )
     },
     {
@@ -1868,11 +1868,11 @@ export default function PurchaseInvoicesScreen() {
             onSearchChange={setSearch}
             itemCount={invoices ? invoices.length : 0}
             searchPlaceholder="Search purchase bills..."
-            primaryAction={{
+            primaryAction={perm.can('invoice:create') ? {
               label: 'New Bill',
               icon: 'add',
               onPress: () => { setInvoiceToEdit(null); setAddVisible(true); }
-            }}
+            } : undefined}
             renderFilters={() => canAccessCash ? (
               <View style={{ position: 'relative', zIndex: 2000 }}>
                 <TouchableOpacity
@@ -1911,8 +1911,7 @@ export default function PurchaseInvoicesScreen() {
                     borderWidth: 1,
                     borderColor: colors.border,
                     zIndex: 3000,
-                    boxShadow: '0px 4px 10px rgba(0,0,0,0.12)',
-                    elevation: 6
+                    ...Shadows.modal
                   }}>
                     {[
                       { id: 'all', label: ' All Bills' },
@@ -2024,8 +2023,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   statusText: { ...Typography.eyebrow, fontWeight: '800' },
 
   modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 950, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
   profileAvatar: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.purple + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
@@ -2065,7 +2064,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Dropdown search panel selector additions
   customSearchSelectContainer: { position: 'relative', width: '100%' },
-  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)', elevation: 4 },
+  customSelectPanel: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, zIndex: 2000, ...Shadows.floating },
   customSelectItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   customSelectItemText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   customSelectItemSubtext: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
@@ -2084,12 +2083,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   tableInputBtnText: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' },
   tableRowSubtotal: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   
-  rowDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, boxShadow: '0px 2px 3px rgba(0,0,0,0.1)', elevation: 5 },
+  rowDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, ...Shadows.floating },
   rowDropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   rowDropdownItemText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   rowDropdownItemSubtext: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
 
-  rowGstDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, boxShadow: '0px 2px 3px rgba(0,0,0,0.1)', elevation: 5 },
+  rowGstDropdown: { position: 'absolute', top: 40, left: 0, right: 0, backgroundColor: colors.bg.card, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, zIndex: 3000, ...Shadows.floating },
   rowGstDropdownItem: { padding: 8, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
   rowGstDropdownItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
 

@@ -268,7 +268,7 @@ function DataTableInner<T>({
     <View style={[
       styles.container, 
       { backgroundColor: useCardLayout ? 'transparent' : colors.bg.card, borderColor: useCardLayout ? 'transparent' : colors.border },
-      useCardLayout && { shadowOpacity: 0, elevation: 0 },
+      useCardLayout && { shadowOpacity: 0, ...Shadows.card },
       embedded && { flex: 0, height: 420 }, 
       containerStyle
     ]}>

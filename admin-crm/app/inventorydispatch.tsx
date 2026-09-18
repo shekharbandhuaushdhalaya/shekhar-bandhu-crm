@@ -315,7 +315,7 @@ export default function InventoryDispatchScreen() {
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.primary },
   pageHeader: { paddingHorizontal: Spacing.lg, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  pageTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  pageTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   pageSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   tabBarScroll: { backgroundColor: colors.bg.secondary, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabBarContent: { paddingHorizontal: Spacing.lg, paddingVertical: 10, gap: 8, flexDirection: 'row' },
@@ -351,7 +351,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   modalContainer: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, width: '90%', maxWidth: 520, maxHeight: '85%', zIndex: 10, borderWidth: 1, borderColor: colors.border },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalForm: { padding: 16, maxHeight: 420 },
   modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: colors.border },

@@ -552,14 +552,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     maxHeight: '80%',
     overflow: 'hidden',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalScroll: {
     padding: Spacing.lg,
