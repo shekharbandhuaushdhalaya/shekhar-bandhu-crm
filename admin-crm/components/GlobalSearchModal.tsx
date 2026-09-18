@@ -5,9 +5,8 @@ import { useRouter } from 'expo-router';
 import { AppText as Text } from './AppText';
 import { AppTextInput as TextInput } from './AppTextInput';
 import { useTheme } from '../utils/themeContext';
-import { LightColors, Typography, Spacing, Radius } from '../constants/theme';
+import { LightColors, Typography, Spacing, Radius, Shadows } from '../constants/theme';
 import { api } from '../utils/api';
-import { useDebounce } from '../utils/hooks'; // Assuming there is a hook, if not we will inline it
 
 function useDebounceValue<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -27,6 +26,24 @@ interface Props {
   onClose: () => void;
 }
 
+const ROUTE_TITLE_MAP = [
+  { path: '/parties/customers', title: 'Customers', icon: 'people' },
+  { path: '/parties/vendors', title: 'Vendors', icon: 'business' },
+  { path: '/products', title: 'Products', icon: 'cube' },
+  { path: '/invoices/sale', title: 'Sales Invoices', icon: 'document-text' },
+  { path: '/invoices/purchase', title: 'Purchase Invoices', icon: 'document-text' },
+  { path: '/inventories', title: 'Inventories & Warehouses', icon: 'layers' },
+  { path: '/leads', title: 'Leads', icon: 'git-branch' },
+  { path: '/queries', title: 'Web Queries', icon: 'mail' },
+  { path: '/orders', title: 'Orders', icon: 'cart' },
+  { path: '/quotations', title: 'Quotations', icon: 'document' },
+  { path: '/payments', title: 'Payments', icon: 'cash' },
+  { path: '/reports', title: 'Reports', icon: 'bar-chart' },
+  { path: '/manufacturing', title: 'Manufacturing & BMR', icon: 'analytics' },
+  { path: '/medicalreps', title: 'Medical Representatives', icon: 'people-circle' },
+  { path: '/sales-workspace', title: 'Sales Workspace', icon: 'options' },
+];
+
 export function GlobalSearchModal({ visible, onClose }: Props) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -40,7 +57,17 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
       setQuery('');
       setResults([]);
     }
-  }, [visible]);
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (Platform.OS === 'web' && visible) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [visible, onClose]);
 
   useEffect(() => {
     async function searchAll() {
@@ -55,7 +82,10 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
           api.getProducts(debouncedQuery).catch(() => ({ data: [] }))
         ]);
         
+        const routes = ROUTE_TITLE_MAP.filter(r => r.title.toLowerCase().includes(debouncedQuery.toLowerCase()))
+          .map(r => ({ ...r, _type: 'route', name: r.title }));
         const combined = [
+          ...routes,
           ...(customers?.data || customers || []).map((c: any) => ({ ...c, _type: 'customer' })),
           ...(products?.data || products || []).map((p: any) => ({ ...p, _type: 'product' }))
         ];
@@ -73,9 +103,9 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
 
   const handleSelect = (item: any) => {
     onClose();
-    if (item._type === 'customer') {
-      // Navigate to customer
-      // Since there's no dedicated customer details page, we navigate to parties/customers
+    if (item._type === 'route') {
+      router.push(item.path as any);
+    } else if (item._type === 'customer') {
       router.push('/parties/customers');
     } else if (item._type === 'product') {
       router.push('/products');
@@ -85,7 +115,7 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start', alignItems: 'center', paddingTop: 60 }}>
-        <View style={{ width: '90%', maxWidth: 600, backgroundColor: colors.bg.primary, borderRadius: Radius.lg, maxHeight: '80%', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
+        <View style={{ width: '90%', maxWidth: 600, backgroundColor: colors.bg.primary, borderRadius: Radius.lg, maxHeight: '80%', ...Shadows.card, }}>
           
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <Ionicons name="search" size={20} color={colors.text.muted} />
@@ -130,11 +160,11 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
                   onPress={() => handleSelect(item)}
                 >
                   <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md }}>
-                    <Ionicons name={item._type === 'customer' ? 'business' : 'cube'} size={16} color={colors.primary} />
+                    <Ionicons name={item._type === 'route' ? (item.icon as any) : item._type === 'customer' ? 'business' : 'cube'} size={16} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary }}>{item.name || item.companyName}</Text>
-                    <Text style={{ ...Typography.caption, color: colors.text.muted }}>{item._type === 'customer' ? 'Customer' : 'Product'}</Text>
+                    <Text style={{ ...Typography.caption, color: colors.text.muted }}>{item._type === 'route' ? 'Navigation' : item._type === 'customer' ? 'Customer' : 'Product'}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.border} />
                 </TouchableOpacity>

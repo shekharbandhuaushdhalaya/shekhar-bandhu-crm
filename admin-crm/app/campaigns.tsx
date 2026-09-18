@@ -3,12 +3,14 @@ import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
+import { useListState } from '../utils/useListState';
 import { View, StyleSheet, ScrollView, Modal, ActivityIndicator, RefreshControl, Pressable, Platform, Switch, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { api, Campaign } from '../utils/api';
 import { usePermission } from '../utils/permissions';
-import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { useConfirm } from '../utils/ConfirmContext';
+import { Spacing, Radius, Shadows, LightColors, Typography } from '../constants/theme';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: '#6b7280',
@@ -32,11 +34,12 @@ export default function CampaignsScreen() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const perm = usePermission();
+  const { confirm } = useConfirm();
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useListState('campSearch', '');
   const [statusFilter, setStatusFilter] = useState('');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -241,20 +244,21 @@ export default function CampaignsScreen() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm(`Delete campaign "${name}"?`)
-      : false;
-    if (!confirmed) return;
-    setActionLoading(id);
-    try {
-      await api.deleteCampaign(id);
-      setCampaigns(prev => prev.filter(c => c._id !== id));
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete campaign');
-    } finally {
-      setActionLoading(null);
-    }
+  const handleDelete = (id: string, name: string) => {
+    confirm({
+      title: 'Delete Campaign',
+      description: `Delete campaign "${name}"?`,
+      destructive: true,
+      iconName: 'trash',
+      onConfirm: async () => {
+        try {
+          await api.deleteCampaign(id);
+          setCampaigns(prev => prev.filter(c => c._id !== id));
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete campaign');
+        }
+      }
+    });
   };
 
   const formatCurrency = (v: number) => `₹${v.toLocaleString('en-IN')}`;
@@ -1000,7 +1004,7 @@ const createStyles = (colors: typeof LightColors) =>
     modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, flex: 1 },
     modalCloseBtn: { padding: 4 },
     modalForm: { padding: Spacing.lg },
-    inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase' },
+    inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
     input: { ...Typography.bodySm, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 14 },
     platformRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
     platformChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.primary },
@@ -1037,7 +1041,7 @@ const createStyles = (colors: typeof LightColors) =>
     previewTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
     previewPills: { flexDirection: 'row', gap: 6, backgroundColor: colors.bg.secondary, padding: 3, borderRadius: Radius.sm },
     previewPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm },
-    previewPillActive: { backgroundColor: colors.bg.card, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+    previewPillActive: { backgroundColor: colors.bg.card, ...Shadows.card, },
     previewPillText: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary },
 
     // Facebook mock styles

@@ -16,6 +16,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import GstReturnsPage from './gst-returns';
 import UnauthorizedScreen from '../components/UnauthorizedScreen';
+import { ResponsiveSelect } from '../components/ResponsiveSelect';
 
 const isIntegerQty = (unit?: string, category?: string) => {
   const u = (unit || '').toLowerCase().trim();
@@ -534,47 +535,19 @@ export default function ReportsScreen() {
 
   const renderReportSelector = () => (
     <View style={{ width: isDesktop ? 260 : '100%', minWidth: 190 }}>
-      {Platform.OS === 'web' ? (
-        <select
-          value={activeTab}
-          onChange={(e: any) => setActiveTab(e.target.value as ReportTab)}
-          style={{ ...Typography.bodySm, width: '100%', height: 38, padding: '0 12px', borderRadius: 8, border: `1px solid ${colors.primary}`, backgroundColor: colors.bg.card, color: colors.primary, fontWeight: '700', outline: 'none', cursor: 'pointer', boxShadow: '0px 2px 4px rgba(0,0,0,0.04)' }}
-        >
-          <option value="accounting"> Monthly Accounting Register</option>
-          <option value="gst"> GST Returns (GSTR-1 & GSTR-3B)</option>
-          <option value="aging"> Receivables Aging</option>
-          <option value="manufacturing"> Manufacturing Analytics</option>
-          <option value="rawmaterials"> Raw Materials Stock Register</option>
-        </select>
-      ) : (
-        <TouchableOpacity
-          style={{
-            height: 38,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.primary,
-            backgroundColor: colors.bg.card,
-            paddingHorizontal: 12,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-          onPress={() => {
-            Alert.alert('Select Report Section', '', [
-              { text: ' Monthly Accounting', onPress: () => setActiveTab('accounting') },
-              { text: ' GST Returns (GSTR-1 & GSTR-3B)', onPress: () => setActiveTab('gst') },
-              { text: ' Receivables Aging', onPress: () => setActiveTab('aging') },
-              { text: ' Manufacturing Analytics', onPress: () => setActiveTab('manufacturing') },
-              { text: ' Raw Materials', onPress: () => setActiveTab('rawmaterials') }
-            ]);
-          }}
-        >
-          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
-            {activeTab === 'accounting' ? ' Monthly Accounting' : activeTab === 'gst' ? ' GST Returns' : activeTab === 'aging' ? ' Receivables Aging' : activeTab === 'manufacturing' ? ' Manufacturing Analytics' : ' Raw Materials'}
-          </Text>
-          <Ionicons name="chevron-down" size={14} color={colors.primary} />
-        </TouchableOpacity>
-      )}
+      <ResponsiveSelect
+        options={[
+          { label: 'Monthly Accounting Register', value: 'accounting' },
+          { label: 'GST Returns (GSTR-1 & GSTR-3B)', value: 'gst' },
+          { label: 'Receivables Aging', value: 'aging' },
+          { label: 'Manufacturing Analytics', value: 'manufacturing' },
+          { label: 'Raw Materials Stock Register', value: 'rawmaterials' }
+        ]}
+        value={activeTab}
+        onChange={(val) => setActiveTab(val as ReportTab)}
+        placeholder="Select Report Section"
+        style={{ height: 38, borderColor: colors.primary }}
+      />
     </View>
   );
 
@@ -1552,7 +1525,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  previewCellLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', marginBottom: 6 },
+  previewCellLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginBottom: 6 },
   previewCellValue: { ...Typography.h2, fontWeight: '800' },
 
   // GST
@@ -1599,7 +1572,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'flex-end',
     minWidth: 80,
   },
-  gstMonthChipLabel: { ...Typography.eyebrow, fontWeight: '700', textTransform: 'uppercase' },
+  gstMonthChipLabel: { ...Typography.eyebrow, fontWeight: '700' },
   gstMonthChipValue: { ...Typography.bodySm, fontWeight: '700', marginTop: 2 },
 
   // Aging
@@ -1618,7 +1591,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  agingCardLabel: { ...Typography.eyebrow, fontWeight: '700', textTransform: 'uppercase', marginBottom: 8 },
+  agingCardLabel: { ...Typography.eyebrow, fontWeight: '700', marginBottom: 8 },
   agingCardValue: { ...Typography.h2, fontWeight: '800' },
   overdueAlert: {
     flexDirection: 'row',
@@ -1664,7 +1637,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 4,
   },
-  mfgValLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' },
+  mfgValLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
   mfgValValue: { ...Typography.h1, fontWeight: '800' },
   mfgValSub: { ...Typography.caption, color: colors.text.secondary },
   efficiencyBadge: {
@@ -1705,7 +1678,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   expiryMaterialName: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   expiryBatchInfo: { ...Typography.caption, color: colors.text.secondary, marginTop: 2 },
   expiryDate: { ...Typography.bodySm, fontWeight: '700' },
-  expiryDaysLeft: { ...Typography.eyebrow, fontWeight: '800', marginTop: 2, textTransform: 'uppercase' as const },
+  expiryDaysLeft: { ...Typography.eyebrow, fontWeight: '800', marginTop: 2 as const },
   toggleGroup: {
     flexDirection: 'row',
     gap: 6,
@@ -1751,7 +1724,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.sm,
     marginBottom: 4,
   },
-  rmTh: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' as const },
+  rmTh: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },
   rmSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',

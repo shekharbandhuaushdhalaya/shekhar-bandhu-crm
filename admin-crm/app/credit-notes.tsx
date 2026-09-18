@@ -11,6 +11,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { ResponsiveSelect } from '../components/ResponsiveSelect';
 import { FIRM_DETAILS } from '../constants/firm';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { useConfirm } from '../utils/ConfirmContext';
 
 // ── Print CGST Rule 53 Compliant Credit / Debit Note ──────────────────────────
 const printCreditNote = (note: CreditNote) => {
@@ -139,6 +140,7 @@ const printCreditNote = (note: CreditNote) => {
 export default function CreditNotesPage() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { confirm } = useConfirm();
 
   const [notes, setNotes] = useState<CreditNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -165,48 +167,38 @@ export default function CreditNotesPage() {
     fetchNotes();
   }, [fetchNotes]);
 
-  const handleFinalize = async (id: string) => {
-    const doFinalize = async () => {
-      try {
-        await api.finalizeCreditNote(id);
-        fetchNotes();
-      } catch (err: any) {
-        alert(err.message || 'Failed to finalize note');
+  const handleFinalize = (id: string) => {
+    confirm({
+      title: 'Finalize Note',
+      description: 'Finalize this note? This will update the party balance.',
+      destructive: false,
+      iconName: 'checkmark-circle',
+      onConfirm: async () => {
+        try {
+          await api.finalizeCreditNote(id);
+          fetchNotes();
+        } catch (err: any) {
+          alert(err.message || 'Failed to finalize note');
+        }
       }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Finalize this note? This will update the party balance.')) {
-        doFinalize();
-      }
-    } else {
-      Alert.alert('Finalize Note', 'Finalize this note? This will update the party balance.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Finalize', onPress: doFinalize }
-      ]);
-    }
+    });
   };
 
-  const handleCancel = async (id: string) => {
-    const doCancel = async () => {
-      try {
-        await api.cancelCreditNote(id);
-        fetchNotes();
-      } catch (err: any) {
-        alert(err.message || 'Failed to cancel note');
+  const handleCancel = (id: string) => {
+    confirm({
+      title: 'Cancel Note',
+      description: 'Cancel this note? Party balance adjustment will be reverted.',
+      destructive: true,
+      iconName: 'close-circle',
+      onConfirm: async () => {
+        try {
+          await api.cancelCreditNote(id);
+          fetchNotes();
+        } catch (err: any) {
+          alert(err.message || 'Failed to cancel note');
+        }
       }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Cancel this note? Party balance adjustment will be reverted.')) {
-        doCancel();
-      }
-    } else {
-      Alert.alert('Cancel Note', 'Cancel this note? Party balance adjustment will be reverted.', [
-        { text: 'No', style: 'cancel' },
-        { text: 'Yes, Cancel', style: 'destructive', onPress: doCancel }
-      ]);
-    }
+    });
   };
 
   const totalCreditAmt = notes.filter(n => n.type === 'credit_note').reduce((s, n) => s + (n.totalAmount || 0), 0);
@@ -649,7 +641,7 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
 
             {/* Amount & Tax Breakdown */}
             <View style={{ backgroundColor: colors.bg.secondary, borderRadius: Radius.md, padding: 12, marginBottom: Spacing.md, borderWidth: 1, borderColor: colors.border }}>
-              <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary, marginBottom: 8, textTransform: 'uppercase' }}>
+              <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary, marginBottom: 8 }}>
                  GST Tax & Value Adjustment (Rule 53)
               </Text>
               
@@ -770,7 +762,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   closeBtn: { padding: 4 },
   modalBody: { padding: Spacing.lg },
   modalError: { ...Typography.bodySm, padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontWeight: '600', marginBottom: Spacing.md },
-  label: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase' },
+  label: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   input: { ...Typography.body, height: 44, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, backgroundColor: colors.bg.primary, color: colors.text.primary },
   
   toggleBtn: { flex: 1, height: 40, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.primary, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },

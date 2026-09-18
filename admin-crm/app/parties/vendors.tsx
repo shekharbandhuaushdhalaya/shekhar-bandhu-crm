@@ -18,6 +18,7 @@ import { useToast } from '../../utils/ToastContext';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
+import { FormField } from '../../components/FormField';
 
 
 const getAvatarColor = (name: string, colors: any) => {
@@ -416,10 +417,15 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
   };
 
   const [saving, setSaving] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
   const handleSave = async () => {
     const finalName = displayName.trim() || registeredName.trim();
-    if (!finalName) return;
+    if (!finalName) {
+      setShowErrors(true);
+      return;
+    }
+    setShowErrors(false);
 
     if (gstin.trim()) {
       const gstCheck = validateGstinWithState(gstin.trim(), state);
@@ -492,45 +498,40 @@ function AddEditVendorModal({ visible, onClose, onSaved, vendor }: { visible: bo
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
           <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>General Profiles</Text></View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Registered Business Name</Text>
+          <FormField label="Registered Business Name" required error={showErrors && !registeredName.trim() && !displayName.trim() ? 'Registered Name or Display Name is required' : undefined}>
             <View style={styles.formInput}>
               <Ionicons name="business" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="e.g. Queen Industries Pvt Ltd" placeholderTextColor={colors.text.muted} value={registeredName} onChangeText={setRegisteredName} />
             </View>
-          </View>
+          </FormField>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Display Name</Text>
+          <FormField label="Display Name" required error={showErrors && !registeredName.trim() && !displayName.trim() ? 'Registered Name or Display Name is required' : undefined}>
             <View style={styles.formInput}>
               <Ionicons name="person" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="e.g. Queen Industries" placeholderTextColor={colors.text.muted} value={displayName} onChangeText={setDisplayName} />
             </View>
-          </View>
+          </FormField>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Contact Person</Text>
+          <FormField label="Contact Person">
             <View style={styles.formInput}>
               <Ionicons name="people" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="e.g. Oliver Queen" placeholderTextColor={colors.text.muted} value={contactPerson} onChangeText={setContactPerson} />
             </View>
-          </View>
+          </FormField>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Phone Number</Text>
+          <FormField label="Phone Number">
             <View style={styles.formInput}>
               <Ionicons name="call" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="e.g. +91 9999999999" placeholderTextColor={colors.text.muted} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
             </View>
-          </View>
+          </FormField>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Email Address</Text>
+          <FormField label="Email Address">
             <View style={styles.formInput}>
               <Ionicons name="mail" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="e.g. billing@queen.com" placeholderTextColor={colors.text.muted} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
             </View>
-          </View>
+          </FormField>
 
           <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Address Details (Lookup)</Text></View>
 
@@ -1478,7 +1479,7 @@ export default function VendorsScreen() {
             isLoadingMore={page < totalPages}
             onRowPress={(v) => { setSelectedVend(v); setLedgerVisible(true); }}
             ListEmptyComponent={
-              <EmptyState title={<>No vendors registered</>} />
+              <EmptyState title={<>No vendors registered</>} actionLabel="Create Vendor" onAction={() => { setSelectedVend(null); setIsEditing(false); setAddVisible(true); }} />
             }
           />
         </View>
@@ -1522,7 +1523,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
   tableCell: { ...Typography.bodySm, color: colors.text.primary },
@@ -1552,7 +1553,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   profileCompany: { ...Typography.body, color: colors.text.secondary },
   infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 14 },
   infoSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 10, marginBottom: 4 },
-  infoSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  infoSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.muted },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoIcon: { width: 22, textAlign: 'center' },
   infoLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' },
@@ -1564,7 +1565,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   deleteBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
 
   formSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 20, marginBottom: 12 },
-  formSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' },
+  formSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary },
   formGroup: { marginBottom: 16 },
   formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
@@ -1580,7 +1581,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   ledgerTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   ledgerTable: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
   ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, marginTop: 12 },
-  ledgerHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', paddingRight: 8 },
+  ledgerHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, paddingRight: 8 },
   ledgerRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border + '80', paddingVertical: 10, alignItems: 'center' },
   ledgerCell: { ...Typography.bodySm, color: colors.text.primary, paddingRight: 8 },
   modeBadge: { ...Typography.eyebrow, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },

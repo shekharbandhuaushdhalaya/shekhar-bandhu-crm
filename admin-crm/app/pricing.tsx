@@ -407,7 +407,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.border,
   },
-  thCell: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' },
+  thCell: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted },
 
   tableRow: {
     flexDirection: 'row',
@@ -431,7 +431,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 1,
   },
-  catBadgeText: { ...Typography.eyebrow, fontWeight: '700', textTransform: 'uppercase' },
+  catBadgeText: { ...Typography.eyebrow, fontWeight: '700' },
 
   numInput: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 6, fontWeight: '700', color: colors.text.primary, textAlign: 'center' },
   discountActive: {

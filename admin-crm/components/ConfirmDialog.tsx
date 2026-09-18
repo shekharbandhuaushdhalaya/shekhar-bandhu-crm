@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../utils/themeContext';
 import { Typography, Spacing, Radius, Shadows, ControlHeight } from '../constants/theme';
 
 export interface ConfirmDialogProps {
@@ -112,7 +112,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Shadows.hover,
     ...Platform.select({
-      web: { cursor: 'default' },
+      web: { cursor: 'default' } as any,
+      default: {},
     }),
   },
   iconContainer: {

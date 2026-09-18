@@ -6,6 +6,7 @@ import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
+import { useListState } from '../utils/useListState';
 import { View, StyleSheet, ScrollView, Modal, ActivityIndicator, useWindowDimensions, RefreshControl, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
@@ -40,16 +41,16 @@ export default function AuditLogsScreen() {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchText, setSearchText] = useState('');
+  const [searchText, setSearchText] = useListState('auditSearchText', '');
   const debouncedSearchText = useDebouncedValue(searchText, 300);
-  const [searchVal, setSearchVal] = useState('');
+  const [searchVal, setSearchVal] = useListState('auditSearchVal', '');
 
   // Date range
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useListState('auditDateFrom', '');
+  const [dateTo, setDateTo] = useListState('auditDateTo', '');
 
   // Pagination
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useListState('auditPage', 1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
@@ -259,15 +260,15 @@ export default function AuditLogsScreen() {
                 renderTableHeader={() => (
                   <View style={styles.tableHeader}>
                     <TouchableOpacity style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }} onPress={() => { setSortField('timestamp'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
-                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' }}>Timestamp</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary }}>Timestamp</Text>
                       {sortField === 'timestamp' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
                     <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }} onPress={() => { setSortField('user'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
-                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' }}>User</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary }}>User</Text>
                       {sortField === 'user' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
                     <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }} onPress={() => { setSortField('action'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
-                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' }}>Action</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary }}>Action</Text>
                       {sortField === 'action' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
                     <Text style={[styles.headerCell, { flex: 4, paddingHorizontal: 12 }]}>Description</Text>
@@ -465,7 +466,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  headerCell: { ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' },
+  headerCell: { ...Typography.caption, fontWeight: '800', color: colors.text.secondary },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -570,12 +571,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     justifyContent: 'space-between',
     gap: 20,
   },
-  detailLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', width: 120 },
+  detailLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, width: 120 },
   detailVal: { ...Typography.bodySm, flex: 1, color: colors.text.primary, textAlign: 'right' },
   jsonContainer: {
     marginTop: 20,
   },
-  jsonLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', marginBottom: 8 },
+  jsonLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 8 },
   jsonBox: {
     backgroundColor: colors.bg.primary,
     borderRadius: Radius.md,

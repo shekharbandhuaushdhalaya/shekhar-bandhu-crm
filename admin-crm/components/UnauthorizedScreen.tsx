@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useTheme } from '../utils/themeContext';
-import { Radius, Spacing, Typography } from '../constants/theme';
+import { Radius, Shadows, Spacing, Typography } from '../constants/theme';
 
 interface Props {
   title?: string;
@@ -107,11 +107,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: Spacing.xl || 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 6,
+    ...Shadows.card, 
   },
   badge: {
     flexDirection: 'row',

@@ -20,6 +20,7 @@ import { useToast } from '../../utils/ToastContext';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
+import { useConfirm } from '../../utils/ConfirmContext';
 
 const getFinancialYearString = (date: Date): string => {
   const startYear = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
@@ -101,6 +102,7 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
   const styles = useStyles(createStyles);
   const { user } = useAuth();
   const perm = usePermission();
+  const { confirm } = useConfirm();
 
   if (!invoice) return null;
 
@@ -158,35 +160,42 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit }: { 
     }
   };
 
-  const handleDeleteInvoiceDoc = async (url: string) => {
-    const confirmed = Platform.OS === 'web'
-      ? confirm('Are you sure you want to delete this document?')
-      : await new Promise(resolve => {
-        Alert.alert('Delete Document', 'Are you sure?', [
-          { text: 'No', onPress: () => resolve(false) },
-          { text: 'Yes, Delete', onPress: () => resolve(true) }
-        ]);
-      });
-    if (!confirmed) return;
-    try {
-      await api.deleteDocument('invoice', invoice._id, url);
-      onDeleted();
-      onClose();
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete document');
-    }
+  const handleDeleteInvoiceDoc = (url: string) => {
+    confirm({
+      title: 'Delete Document',
+      description: 'Are you sure you want to delete this document?',
+      destructive: true,
+      iconName: 'trash',
+      onConfirm: async () => {
+        try {
+          await api.deleteDocument('invoice', invoice._id, url);
+          onDeleted();
+          onClose();
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete document');
+        }
+      }
+    });
   };
 
-  const handleDelete = async () => {
-    try {
-      const success = await api.deleteSaleInvoice(invoice._id);
-      if (success) {
-        onDeleted();
-        onClose();
+  const handleDelete = () => {
+    confirm({
+      title: 'Delete Invoice',
+      description: 'Are you sure you want to delete this invoice?',
+      destructive: true,
+      iconName: 'trash',
+      onConfirm: async () => {
+        try {
+          const success = await api.deleteSaleInvoice(invoice._id);
+          if (success) {
+            onDeleted();
+            onClose();
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete invoice');
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete invoice');
-    }
+    });
   };
 
   const isOutstanding = invoice.status !== 'paid';
@@ -2007,7 +2016,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   table: { flex: 1, width: '100%', minWidth: 950, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
   tableCell: { ...Typography.bodySm, color: colors.text.primary },

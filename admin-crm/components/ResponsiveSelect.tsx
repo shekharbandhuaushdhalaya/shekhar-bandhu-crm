@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, FlatList, Platform, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, FlatList, Platform, Pressable, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../utils/themeContext';
 import { Typography, Spacing, Radius, Shadows, ControlHeight } from '../constants/theme';
 
 export interface SelectOption {
   value: string;
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
+  description?: string;
 }
 
 export interface ResponsiveSelectProps {
   options: SelectOption[];
-  value: string;
+  value: string | null;
   onChange: (value: string) => void;
   placeholder?: string;
+  label?: string;
   disabled?: boolean;
+  searchable?: boolean;
+  searchPlaceholder?: string;
   style?: any;
 }
 
@@ -24,20 +28,33 @@ export const ResponsiveSelect: React.FC<ResponsiveSelectProps> = ({
   value,
   onChange,
   placeholder = 'Select an option',
+  label,
   disabled = false,
+  searchable = false,
+  searchPlaceholder = 'Search...',
   style,
 }) => {
   const { colors } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const selectedOption = options.find(o => o.value === value);
 
-  if (Platform.OS === 'web') {
-    // Native select element is universally better for accessibility on Web
+  const handleClose = () => {
+    setSearchQuery('');
+    setIsOpen(false);
+  };
+
+  const filteredOptions = searchable && searchQuery 
+    ? options.filter(opt => opt.label.toLowerCase().includes(searchQuery.toLowerCase()) || opt.description?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : options;
+
+  if (Platform.OS === 'web' && !searchable) {
+    // Keep the native select for simple, non-searchable choices on Web
     return (
       <View style={[styles.webWrapper, style, { backgroundColor: colors.bg.secondary, borderColor: colors.border }]}>
         <select
-          value={value}
+          value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           style={{
@@ -66,9 +83,14 @@ export const ResponsiveSelect: React.FC<ResponsiveSelectProps> = ({
     );
   }
 
-  // Mobile Implementation (Modal Bottom Sheet / Dropdown)
+  // Searchable and mobile implementation (responsive modal selector)
   return (
     <>
+      {label ? (
+        <Text style={{ ...Typography.caption, color: colors.text.secondary, fontWeight: '600', marginBottom: 6 }}>
+          {label}
+        </Text>
+      ) : null}
       <TouchableOpacity
         style={[
           styles.mobileTrigger,
@@ -94,20 +116,40 @@ export const ResponsiveSelect: React.FC<ResponsiveSelectProps> = ({
         visible={isOpen}
         transparent
         animationType="slide"
-        onRequestClose={() => setIsOpen(false)}
+        onRequestClose={handleClose}
       >
         <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setIsOpen(false)} />
+          <Pressable style={styles.modalBackdrop} onPress={handleClose} />
           <View style={[styles.modalContent, { backgroundColor: colors.bg.primary }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{placeholder}</Text>
-              <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.closeBtn}>
+              <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
 
+            {searchable && (
+              <View style={{ padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm }}>
+                  <Ionicons name="search" size={16} color={colors.text.muted} />
+                  <TextInput
+                    style={{ flex: 1, height: 40, marginLeft: Spacing.sm, ...Typography.body, color: colors.text.primary, borderWidth: 0, outlineStyle: 'none' } as any}
+                    placeholder={searchPlaceholder}
+                    placeholderTextColor={colors.text.muted}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                  {searchQuery ? (
+                    <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="Clear">
+                      <Ionicons name="close-circle" size={16} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+            )}
+
             <FlatList
-              data={options}
+              data={filteredOptions}
               keyExtractor={item => item.value}
               contentContainerStyle={{ padding: Spacing.md, gap: 4 }}
               renderItem={({ item }) => {

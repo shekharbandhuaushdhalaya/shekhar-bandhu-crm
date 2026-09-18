@@ -237,7 +237,7 @@ export default function AgeingScreen() {
           </View>
 
           <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
-            <Text style={{ ...Typography.caption, color: colors.text.muted, textTransform: 'uppercase', fontWeight: '800' }}>Customer</Text>
+            <Text style={{ ...Typography.caption, color: colors.text.muted, fontWeight: '800' }}>Customer</Text>
             <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: 14 }}>{selectedCustomer?.customerName}</Text>
 
             <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 6 }}>1. Select Customer Payment Receipt Record</Text>
@@ -335,13 +335,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1
-  },
-  cardLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' },
+    ...Shadows.card, },
+  cardLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
   cardValue: { ...Typography.h2, fontWeight: '800', marginTop: 4, marginBottom: 8 },
   progressBg: {
     height: 4,
@@ -353,7 +348,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: '100%',
     borderRadius: 2
   },
-  sectionTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary, marginBottom: 10, textTransform: 'uppercase' },
+  sectionTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary, marginBottom: 10 },
   customerBlock: {
     backgroundColor: colors.bg.secondary,
     borderRadius: Radius.md,

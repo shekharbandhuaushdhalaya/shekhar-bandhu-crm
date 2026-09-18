@@ -2,6 +2,7 @@ import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from '../components/AppTextInput';
 import { ListToolbar } from '../components/ListToolbar';
+import { useConfirm } from '../utils/ConfirmContext';
 import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, Alert, useWindowDimensions, DeviceEventEmitter } from 'react-native';
@@ -364,16 +365,16 @@ export function PaymentDetailModal({ visible, payment, onClose }: { visible: boo
           </View>
           <View style={styles.modalBody}>
             <View style={{ marginBottom: 16 }}>
-              <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Party</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>Party</Text>
               <Text style={{ ...Typography.h3, color: colors.text.primary, fontWeight: '700' }}>{payment.partyName} <Text style={{ ...Typography.bodySm, fontWeight: '400', color: colors.text.muted }}>({payment.partyType})</Text></Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
               <View>
-                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Date</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>Date</Text>
                 <Text style={{ ...Typography.body, color: colors.text.primary }}>{new Date(payment.date).toLocaleDateString('en-IN')}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Amount</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>Amount</Text>
                 <Text style={{ ...Typography.h3, fontWeight: '800', color: payment.type === 'receive' ? colors.success : colors.danger }}>
                   {payment.type === 'receive' ? '+ ' : '- '}₹{payment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </Text>
@@ -381,16 +382,16 @@ export function PaymentDetailModal({ visible, payment, onClose }: { visible: boo
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
               <View>
-                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Mode & Method</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>Mode & Method</Text>
                 <Text style={{ ...Typography.body, color: colors.text.primary }}>{payment.mode === 'regular' ? 'GST (Regular)' : 'Cash'} - {payment.paymentMethod}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Reference No</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>Reference No</Text>
                 <Text style={{ ...Typography.body, color: colors.text.primary }}>{payment.referenceNo || 'N/A'}</Text>
               </View>
             </View>
             <View style={{ marginBottom: 16 }}>
-              <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, textTransform: 'uppercase', fontWeight: '700' }}>Notes</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>Notes</Text>
               <Text style={{ ...Typography.body, color: colors.text.primary }}>{payment.notes || 'None'}</Text>
             </View>
           </View>
@@ -516,7 +517,7 @@ export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boo
             </View>
 
             <View style={{ backgroundColor: colors.success + '12', borderRadius: Radius.md, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: colors.success + '30' }}>
-              <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.success, textTransform: 'uppercase' }}>Net Bank Deposit</Text>
+              <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.success }}>Net Bank Deposit</Text>
               <Text style={{ ...Typography.h2, fontWeight: '800', color: colors.success, marginTop: 2 }}>
                 ₹{netDeposited.toLocaleString('en-IN')}
               </Text>
@@ -570,6 +571,7 @@ export default function PaymentsScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { confirm } = useConfirm();
   const { width: winWidth } = useWindowDimensions();
   const canAccessCash = user?.canAccessCash ?? false;
   
@@ -616,30 +618,21 @@ export default function PaymentsScreen() {
     setRefreshing(false);
   };
 
-  const handleDelete = async (id: string) => {
-    const doDelete = async () => {
-      try {
-        await api.deletePayment(id);
-        load();
-      } catch (err: any) {
-        alert(err.message);
+  const handleDelete = (id: string) => {
+    confirm({
+      title: 'Delete Payment',
+      description: 'Are you sure you want to delete this payment? The balance will be reverted.',
+      destructive: true,
+      iconName: 'trash',
+      onConfirm: async () => {
+        try {
+          await api.deletePayment(id);
+          load();
+        } catch (err: any) {
+          alert(err.message);
+        }
       }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to delete this payment? The balance will be reverted.')) {
-        doDelete();
-      }
-    } else {
-      Alert.alert(
-        'Delete Payment',
-        'Are you sure you want to delete this payment? The balance will be reverted.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: doDelete }
-        ]
-      );
-    }
+    });
   };
 
   const sortedPayments = [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -868,7 +861,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   closeBtn: { padding: 4 },
   modalBody: { padding: Spacing.lg },
   row: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.md },
-  label: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase' },
+  label: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   input: { ...Typography.body, height: 44, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, backgroundColor: colors.bg.primary, color: colors.text.primary },
   
   toggleGroup: { flexDirection: 'row', height: 44, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },

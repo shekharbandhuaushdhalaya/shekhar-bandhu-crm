@@ -12,7 +12,7 @@ export const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   table: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, alignItems: 'center' },
-  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
   tableCell: { ...Typography.bodySm, color: colors.text.primary },
@@ -42,7 +42,7 @@ export const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   infoValue: { ...Typography.body, color: colors.text.primary, fontWeight: '500' },
 
   formSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 20, marginBottom: 12 },
-  formSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' },
+  formSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary },
   typeSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   typeBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
   typeBtnText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
@@ -60,6 +60,10 @@ export const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, height: 48 },
   formInputText: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
+
+  inputWithAddon: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, height: 48, overflow: 'hidden' },
+  inputAddon: { backgroundColor: colors.bg.secondary, paddingHorizontal: 14, height: '100%', justifyContent: 'center', borderRightWidth: 1, borderRightColor: colors.border },
+  inputAddonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
 
   filterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, height: 36, gap: 6 },
   filterDropdownButtonText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },

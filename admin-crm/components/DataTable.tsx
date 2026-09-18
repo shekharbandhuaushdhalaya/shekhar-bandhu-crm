@@ -23,6 +23,7 @@ interface DataTableProps<T> {
   columns?: Column<T>[];
   renderTableHeader?: () => React.ReactElement;
   renderTableRow?: (item: T, index: number) => React.ReactElement;
+  renderMobileCard?: (item: T, index: number) => React.ReactElement;
   minWidth?: number;
   embedded?: boolean;
   keyExtractor: (item: T, index: number) => string;
@@ -50,6 +51,7 @@ function DataTableInner<T>({
   columns = [],
   renderTableHeader,
   renderTableRow,
+  renderMobileCard,
   minWidth = 800,
   embedded = false,
   keyExtractor,
@@ -70,7 +72,7 @@ function DataTableInner<T>({
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const useCardLayout = isMobile && columns && columns.length > 0;
+  const useCardLayout = isMobile && (!!renderMobileCard || (columns && columns.length > 0));
 
   const renderHeader = useCallback(() => {
     if (useCardLayout) return null;
@@ -104,6 +106,31 @@ function DataTableInner<T>({
     const customRowStyle = typeof rowStyle === 'function' ? rowStyle(item) : rowStyle;
 
     if (useCardLayout) {
+      if (renderMobileCard) {
+        const cardStyles = [
+          { 
+            backgroundColor: colors.bg.card, 
+            borderRadius: Radius.md, 
+            borderWidth: 1, 
+            borderColor: colors.border, 
+            marginHorizontal: Spacing.lg, 
+            marginTop: index === 0 ? Spacing.md : Spacing.sm,
+            marginBottom: Spacing.xs,
+            ...Shadows.card
+          },
+          customRowStyle
+        ];
+        
+        if (onRowPress) {
+          return (
+            <TouchableOpacity style={cardStyles} onPress={() => onRowPress(item)} activeOpacity={0.7}>
+              {renderMobileCard(item, index)}
+            </TouchableOpacity>
+          );
+        }
+        return <View style={cardStyles}>{renderMobileCard(item, index)}</View>;
+      }
+
       const cardContent = (
         <View style={{ padding: 12, gap: 10 }}>
           {columns.map((col) => {

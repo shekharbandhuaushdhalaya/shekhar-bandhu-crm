@@ -20,6 +20,7 @@ import { useListState } from '../../utils/useListState';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
+import { FormField } from '../../components/FormField';
 
 
 const GST_STATE_CODES: { [key: string]: string } = {
@@ -335,7 +336,7 @@ function CustomerDetailModal({
                       borderWidth: 1,
                       borderColor: getOrderStatusColor(o.status)
                     }}>
-                      <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: getOrderStatusColor(o.status), textTransform: 'uppercase' }}>
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: getOrderStatusColor(o.status) }}>
                         {o.status}
                       </Text>
                     </View>
@@ -421,6 +422,7 @@ function AddEditCustomerModal({
   const [loadingBillingPin, setLoadingBillingPin] = useState(false);
   const [loadingShippingPin, setLoadingShippingPin] = useState(false);
   const [loadingGst, setLoadingGst] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
   useEffect(() => {
     if (customer) {
@@ -604,9 +606,11 @@ function AddEditCustomerModal({
     const primaryName = isCash ? contactPerson.trim() : company.trim();
 
     if (!primaryName) {
+      setShowErrors(true);
       alert(isCash ? 'Customer / Contact Name is required' : 'Company Name is required');
       return;
     }
+    setShowErrors(false);
 
     if (!isCash && gstin.trim()) {
       const targetState = placeOfSupply.trim() || billingState.trim();
@@ -753,38 +757,34 @@ function AddEditCustomerModal({
           <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>General Profile</Text></View>
 
           {customerType === 'gst' ? (
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Company / Business Name *</Text>
+            <FormField label="Company / Business Name" required error={showErrors && !company.trim() ? 'Company Name is required' : undefined}>
               <View style={styles.formInput}>
                 <Ionicons name="business" size={16} color={colors.text.muted} />
                 <TextInput style={styles.formInputText} placeholder="e.g. Acme Corp Pvt Ltd" placeholderTextColor={colors.text.muted} value={company} onChangeText={setCompany} />
               </View>
-            </View>
+            </FormField>
           ) : null}
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>{customerType === 'cash' ? 'Customer / Contact Name *' : 'Contact Person'}</Text>
+          <FormField label={customerType === 'cash' ? 'Customer / Contact Name' : 'Contact Person'} required={customerType === 'cash'} error={showErrors && customerType === 'cash' && !contactPerson.trim() ? 'Contact Name is required' : undefined}>
             <View style={styles.formInput}>
               <Ionicons name="person" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="e.g. Clark Kent" placeholderTextColor={colors.text.muted} value={contactPerson} onChangeText={setContactPerson} />
             </View>
-          </View>
+          </FormField>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Phone Number</Text>
+          <FormField label="Phone Number">
             <View style={styles.formInput}>
               <Ionicons name="call" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="e.g. +91 9876543210" placeholderTextColor={colors.text.muted} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
             </View>
-          </View>
+          </FormField>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Email Address (Optional)</Text>
+          <FormField label="Email Address (Optional)">
             <View style={styles.formInput}>
               <Ionicons name="mail" size={16} color={colors.text.muted} />
               <TextInput style={styles.formInputText} placeholder="e.g. billing@acme.com" placeholderTextColor={colors.text.muted} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
             </View>
-          </View>
+          </FormField>
 
           <View style={[styles.formGroup, { zIndex: 1010 }]}>
             <Text style={styles.formLabel}>Payment Terms</Text>
@@ -1841,7 +1841,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
   tableCell: { ...Typography.bodySm, color: colors.text.primary },
@@ -1883,7 +1883,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   profileCompany: { ...Typography.body, color: colors.text.secondary },
   infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 14 },
   infoSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 10, marginBottom: 4 },
-  infoSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  infoSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.muted },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoIcon: { width: 22, textAlign: 'center' },
   infoLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' },
@@ -1895,7 +1895,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   deleteBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
 
   formSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 20, marginBottom: 12 },
-  formSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' },
+  formSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary },
   formGroup: { marginBottom: 16 },
   formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
@@ -1925,7 +1925,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   ledgerTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
   ledgerTable: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
   ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, marginTop: 12 },
-  ledgerHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', paddingRight: 8 },
+  ledgerHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, paddingRight: 8 },
   ledgerRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border + '80', paddingVertical: 10, alignItems: 'center' },
   ledgerCell: { ...Typography.bodySm, color: colors.text.primary, paddingRight: 8 },
   modeBadge: { ...Typography.eyebrow, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },

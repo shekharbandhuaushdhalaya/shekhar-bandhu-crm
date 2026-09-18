@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../utils/themeContext';
 import { Typography, Spacing, Radius } from '../constants/theme';
 
 export interface FormFieldProps {

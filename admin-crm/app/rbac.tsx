@@ -8,7 +8,8 @@ import { View, StyleSheet, ScrollView, Switch, Modal, ActivityIndicator, useWind
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { api, RolePermissionConfig } from '../utils/api';
-import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { useConfirm } from '../utils/ConfirmContext';
+import { Spacing, Radius, Shadows, LightColors, Typography } from '../constants/theme';
 
 type UserItem = {
   _id: string;
@@ -54,6 +55,7 @@ function getRoleColor(role: string, colors: typeof LightColors): string {
 export default function RbacScreen() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { confirm } = useConfirm();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
@@ -179,25 +181,24 @@ export default function RbacScreen() {
     }
   };
 
-  const handleDeleteUser = async (userId: string, userName: string) => {
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm(`Are you sure you want to delete user "${userName}"? This cannot be undone.`)
-      : await new Promise((resolve) => {
-          Alert.alert('Delete User', `Delete user "${userName}"?`, [
-            { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
-            { text: 'Delete', onPress: () => resolve(true), style: 'destructive' }
-          ]);
-        });
-    if (!confirmed) return;
-    setActionLoading(userId);
-    try {
-      await api.deleteUser(userId);
-      setUsers(prev => prev.filter(u => u._id !== userId));
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete user');
-    } finally {
-      setActionLoading(null);
-    }
+  const handleDeleteUser = (userId: string, userName: string) => {
+    confirm({
+      title: 'Delete User',
+      description: `Are you sure you want to delete user "${userName}"? This cannot be undone.`,
+      destructive: true,
+      iconName: 'trash',
+      onConfirm: async () => {
+        setActionLoading(userId);
+        try {
+          await api.deleteUser(userId);
+          setUsers(prev => prev.filter(u => u._id !== userId));
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete user');
+        } finally {
+          setActionLoading(null);
+        }
+      }
+    });
   };
 
   const handleCreateUser = async () => {
@@ -299,27 +300,26 @@ export default function RbacScreen() {
     }
   };
 
-  const handleResetPermissions = async () => {
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm(`Reset "${selectedRole}" permissions to defaults?`)
-      : await new Promise(resolve => {
-          Alert.alert('Reset Permissions', `Reset "${selectedRole}" to defaults?`, [
-            { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
-            { text: 'Reset', onPress: () => resolve(true), style: 'destructive' }
-          ]);
-        });
-    if (!confirmed) return;
-    setPermSaving(true);
-    try {
-      const updated = await api.resetRolePermissions(selectedRole);
-      setRoleConfigs(prev => prev.map(r => r.role === selectedRole ? updated : r));
-      setEditPermissions(new Set(updated.permissions));
-      alert('Permissions reset to defaults!');
-    } catch (err: any) {
-      alert(err.message || 'Failed to reset permissions');
-    } finally {
-      setPermSaving(false);
-    }
+  const handleResetPermissions = () => {
+    confirm({
+      title: 'Reset Permissions',
+      description: `Reset "${selectedRole}" permissions to defaults?`,
+      destructive: true,
+      iconName: 'refresh',
+      onConfirm: async () => {
+        setPermSaving(true);
+        try {
+          const updated = await api.resetRolePermissions(selectedRole);
+          setRoleConfigs(prev => prev.map(r => r.role === selectedRole ? updated : r));
+          setEditPermissions(new Set(updated.permissions));
+          alert('Permissions reset to defaults!');
+        } catch (err: any) {
+          alert(err.message || 'Failed to reset permissions');
+        } finally {
+          setPermSaving(false);
+        }
+      }
+    });
   };
 
   // --- Create Role ---
@@ -350,33 +350,31 @@ export default function RbacScreen() {
     }
   };
 
-  // --- Delete Role ---
-  const handleDeleteRole = async (role: string) => {
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm(`Delete role "${role}"? Users with this role will be reassigned to "agent". This cannot be undone.`)
-      : await new Promise(resolve => {
-          Alert.alert('Delete Role', `Delete "${role}"? Users will be reassigned to agent.`, [
-            { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
-            { text: 'Delete', onPress: () => resolve(true), style: 'destructive' }
-          ]);
-        });
-    if (!confirmed) return;
-    setDeletingRole(true);
-    setDeleteConfirmRole(role);
-    try {
-      await api.deleteRole(role);
-      setRoleConfigs(prev => prev.filter(r => r.role !== role));
-      if (selectedRole === role) {
-        const next = roleConfigs.find(r => r.role !== role);
-        setSelectedRole(next ? next.role : 'agent');
-        setEditPermissions(new Set(next ? next.permissions : []));
+  const handleDeleteRole = (role: string) => {
+    confirm({
+      title: 'Delete Role',
+      description: `Delete role "${role}"? Users with this role will be reassigned to "agent". This cannot be undone.`,
+      destructive: true,
+      iconName: 'trash',
+      onConfirm: async () => {
+        setDeletingRole(true);
+        setDeleteConfirmRole(role);
+        try {
+          await api.deleteRole(role);
+          setRoleConfigs(prev => prev.filter(r => r.role !== role));
+          if (selectedRole === role) {
+            const next = roleConfigs.find(r => r.role !== role);
+            setSelectedRole(next ? next.role : 'agent');
+            setEditPermissions(new Set(next ? next.permissions : []));
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete role');
+        } finally {
+          setDeletingRole(false);
+          setDeleteConfirmRole(null);
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete role');
-    } finally {
-      setDeletingRole(false);
-      setDeleteConfirmRole(null);
-    }
+    });
   };
 
   const filteredGrouped = searchPerm.trim()
@@ -594,8 +592,7 @@ export default function RbacScreen() {
               flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bg.card, 
               borderRadius: 9999, borderWidth: 1, borderColor: colors.border, 
               paddingHorizontal: 16, paddingVertical: 4, marginTop: 20, marginBottom: 16,
-              shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1
-            }}>
+              ...Shadows.card, }}>
               <Ionicons name="search-outline" size={18} color={colors.text.muted} />
               <TextInput
                 style={{ ...Typography.body, flex: 1, color: colors.text.primary, paddingVertical: 10 }}
@@ -868,15 +865,14 @@ const createStyles = (colors: typeof LightColors) =>
     roleSelectorBtn: { 
       flexDirection: 'column', alignItems: 'flex-start', paddingVertical: 16, paddingHorizontal: 16, 
       borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, 
-      minWidth: 140, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 
-    },
+      minWidth: 140, ...Shadows.card, },
     roleSelectorText: { ...Typography.bodySm, fontWeight: '700', marginBottom: 4 },
     roleSelectorCount: { ...Typography.caption, fontWeight: '600' },
     
     // --- Table Permission Styles ---
     tableContainer: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
     tableHeaderRow: { flexDirection: 'row', backgroundColor: colors.bg.secondary, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-    thText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase' },
+    thText: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
     tableRow: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.primary },
     tdResourceLabel: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, textTransform: 'capitalize', marginBottom: 4 },
     tdCount: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' },
@@ -893,7 +889,7 @@ const createStyles = (colors: typeof LightColors) =>
     modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
     modalCloseBtn: { padding: 4 },
     modalForm: { padding: Spacing.lg },
-    inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6, textTransform: 'uppercase' },
+    inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
     input: { ...Typography.bodySm, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 16 },
     modalRoleGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
     modalRoleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: colors.border, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: 14 },

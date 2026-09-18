@@ -660,7 +660,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Table styles
   table: { flex: 1, width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, justifyContent: 'center' },
@@ -677,7 +677,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   actionPillText: { ...Typography.caption, fontWeight: '700' },
 
   customerBox: { backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.sm, marginBottom: 4 },
-  boxTitle: { ...Typography.caption, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', marginBottom: 4 },
+  boxTitle: { ...Typography.caption, fontWeight: '700', color: colors.text.muted, marginBottom: 4 },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   editBtnText: { ...Typography.caption, fontWeight: '700', color: colors.primary },
   customerName: { ...Typography.body, fontWeight: '700', color: colors.text.primary },
@@ -710,7 +710,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
   modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalBody: { padding: Spacing.lg, gap: Spacing.md },
-  sectionHeaderTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 4, textTransform: 'uppercase' },
+  sectionHeaderTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 4 },
   formGroup: { gap: 4 },
   inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
   textInput: { ...Typography.body, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, minHeight: 44, height: 44, color: colors.text.primary },

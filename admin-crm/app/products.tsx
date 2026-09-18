@@ -330,7 +330,7 @@ export default function ProductsScreen() {
                 isRefreshing={refreshing}
                 onRefresh={onRefresh}
                 ListEmptyComponent={
-                  <EmptyState title={<>No products found</>}  />
+                  <EmptyState title={<>No products found</>} actionLabel="Add Product" onAction={() => { setSelectedProd(null); setIsEditing(false); setAddVisible(true); }} />
                 }
               />
               {hasMore && (

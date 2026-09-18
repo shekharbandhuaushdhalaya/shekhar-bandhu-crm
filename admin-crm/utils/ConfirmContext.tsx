@@ -4,7 +4,7 @@ import { ConfirmDialog, ConfirmDialogProps } from '../components/ConfirmDialog';
 type ConfirmOptions = Omit<ConfirmDialogProps, 'visible' | 'onConfirm' | 'onCancel'>;
 
 interface ConfirmContextType {
-  confirm: (options: ConfirmOptions & { onConfirm: () => void; onCancel?: () => void }) => void;
+  confirm: (options: ConfirmOptions & { onConfirm: () => void | Promise<void>; onCancel?: () => void }) => void;
   closeConfirm: () => void;
 }
 
@@ -19,9 +19,9 @@ export const useConfirm = () => {
 };
 
 export const ConfirmProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [config, setConfig] = useState<(ConfirmOptions & { onConfirm: () => void; onCancel?: () => void }) | null>(null);
+  const [config, setConfig] = useState<(ConfirmOptions & { onConfirm: () => void | Promise<void>; onCancel?: () => void }) | null>(null);
 
-  const confirm = (options: ConfirmOptions & { onConfirm: () => void; onCancel?: () => void }) => {
+  const confirm = (options: ConfirmOptions & { onConfirm: () => void | Promise<void>; onCancel?: () => void }) => {
     setConfig(options);
   };
 
@@ -29,9 +29,19 @@ export const ConfirmProvider: React.FC<{ children: ReactNode }> = ({ children })
     setConfig(null);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (config?.onConfirm) {
-      config.onConfirm();
+      try {
+        const result = config.onConfirm();
+        if (result instanceof Promise) {
+          setConfig(prev => prev ? { ...prev, loading: true } : null);
+          await result;
+        }
+      } catch (err: any) {
+        // If an error is thrown by onConfirm, stop loading and keep dialog open
+        setConfig(prev => prev ? { ...prev, loading: false } : null);
+        return;
+      }
     }
     closeConfirm();
   };

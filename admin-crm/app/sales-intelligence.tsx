@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { LightColors, Radius, Spacing, Typography } from '../constants/theme';
-import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceTransition, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceTransition, WorkspaceTabs, WorkspaceLoading, WorkspaceError, WorkspaceBreadcrumbs } from '../components/WorkspacePrimitives';
 import { PageHeader as WorkspaceHeader } from '../components/PageHeader';
 
 const req = <T = any,>(path: string, init: RequestInit = {}) => api.requestJson<T>(path, init);
@@ -108,6 +108,13 @@ export default function SalesIntelligence() {
 
         {tab === 'customer' ? (
           <>
+            {customerId && c360 ? (
+              <WorkspaceBreadcrumbs items={[
+                { label: 'Sales Intelligence', onPress: () => setCustomerId('') },
+                { label: 'Customer 360', onPress: () => setCustomerId('') },
+                { label: c360?.summary?.name || 'Customer Details' }
+              ]} />
+            ) : null}
             <Panel title="Customer 360" subtitle="Choose a customer to see sales, credit health and recent activity in one place.">
               {Platform.OS === 'web' ? (
                 <select value={customerId} onChange={(e: any) => loadCustomer(e.target.value)} style={customerSelectStyle}>

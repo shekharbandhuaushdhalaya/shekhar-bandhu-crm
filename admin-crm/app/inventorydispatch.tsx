@@ -7,11 +7,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { api, Dispatch, DeadStockItem, Challan } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { useConfirm } from '../utils/ConfirmContext';
 import { WorkspaceLoading, WorkspaceError, StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 
 export default function InventoryDispatchScreen() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { confirm } = useConfirm();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
@@ -96,9 +98,17 @@ export default function InventoryDispatchScreen() {
     } catch (e: any) { alert(e.message); }
   };
 
-  const handleDeleteDispatch = async (id: string) => {
-    const ok = Platform.OS === 'web' ? window.confirm('Delete this dispatch record?') : await new Promise(r => Alert.alert('Delete', 'Delete this dispatch record?', [{ text: 'Cancel', onPress: () => r(false) }, { text: 'Delete', style: 'destructive', onPress: () => r(true) }]));
-    if (ok) { await api.deleteDispatch(id); load(); }
+  const handleDeleteDispatch = (id: string) => {
+    confirm({
+      title: 'Delete Dispatch',
+      description: 'Delete this dispatch record?',
+      destructive: true,
+      iconName: 'trash',
+      onConfirm: async () => {
+        await api.deleteDispatch(id);
+        load();
+      }
+    });
   };
 
   const dispatchStatusColors: Record<string, string> = {
@@ -314,7 +324,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
   statCard: { flex: 1, minWidth: 80, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
   statValue: { ...Typography.h1, fontWeight: '800' },
-  statLabel: { ...Typography.eyebrow, color: colors.text.muted, textTransform: 'uppercase', marginTop: 4, textAlign: 'center' },
+  statLabel: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 4, textAlign: 'center' },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.md },
   addBtnText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   filterChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary },
@@ -330,7 +340,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   emptyText: { ...Typography.bodySm, color: colors.text.muted },
   sectionTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 8 },
   tableHeader: { flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 4, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, marginBottom: 4 },
-  th: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  th: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },
   tableRow: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderRadius: Radius.sm },
   td: { ...Typography.bodySm, color: colors.text.secondary },
   // Modal styles

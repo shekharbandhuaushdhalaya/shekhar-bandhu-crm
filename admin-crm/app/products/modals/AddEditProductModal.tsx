@@ -2,13 +2,14 @@ import { PressableOpacity as TouchableOpacity } from './../../../components/Pres
 import { AppTextInput as TextInput } from './../../../components/AppTextInput';
 import { AppText as Text } from './../../../components/AppText';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, ScrollView, Modal, KeyboardAvoidingView, Platform, Image, Pressable, Alert } from 'react-native';
+import { View, ScrollView, Modal, KeyboardAvoidingView, Platform, Image, Pressable, Alert, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Spacing, Radius, Typography } from '../../../constants/theme';
 import { api, Product, getImageUrl } from '../../../utils/api';
 import { useTheme, useStyles } from '../../../utils/themeContext';
 import { useToast } from '../../../utils/ToastContext';
+import { useConfirm } from '../../../utils/ConfirmContext';
 import { createStyles } from '../productsStyles';
 import { FormField } from '../../../components/FormField';
 
@@ -28,7 +29,10 @@ interface Props {
 export default function AddEditProductModal({ visible, onClose, onSaved, product, products }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { confirm } = useConfirm();
   const { showToast } = useToast();
+  const { width: viewportWidth } = useWindowDimensions();
+  const isCompactStepper = viewportWidth < 640;
 
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
@@ -145,9 +149,15 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
   }, [bomIngredients]);
 
   // Dirty state tracking
-  const currentFormState = JSON.stringify([name, sku, minReorder, variantsList, hsnCode, gstRate, description, benefits, suggestedDosage, disease, productType, shape, colour, weight, bomYield, bomOverhead, bomIsActive, bomIngredients, bomStages]);
+  const currentFormState = JSON.stringify({
+    name, sku, minReorder, variantsList, hsnCode, gstRate, description, benefits, suggestedDosage, disease,
+    productType, shape, colour, weight, localNewImages,
+    bomYield, bomOverhead, bomNotes, bomIsActive, bomIngredients, bomStages, formulationBasis,
+    bomDefaultProductionType, bomDefaultJobWorkMode, bomDefaultPackagingMode, bomDefaultJobWorkerId,
+  });
   const [initialFormState, setInitialFormState] = useState<string | null>(null);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
   useEffect(() => {
     if (!visible) {
@@ -162,14 +172,16 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
 
   const handleCloseAttempt = () => {
     if (isDirty) {
-      Alert.alert(
-        'Discard Changes?',
-        'You have unsaved changes. Are you sure you want to discard them?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Discard', style: 'destructive', onPress: () => { setInitialFormState(null); onClose(); } }
-        ]
-      );
+      confirm({
+        title: 'Discard Changes?',
+        description: 'You have unsaved changes. Are you sure you want to discard them?',
+        destructive: true,
+        iconName: 'trash',
+        onConfirm: async () => {
+          setInitialFormState(null);
+          onClose();
+        }
+      });
     } else {
       setInitialFormState(null);
       onClose();
@@ -381,7 +393,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
         setNewShapeName('');
         setActiveStep('step1');
         // Let the state updates apply, then set isDataLoaded
-        setTimeout(() => setIsDataLoaded(true), 100);
+        setIsDataLoaded(true);
       } catch (err) {
         console.error('Failed to load raw materials, BOM, or product data in AddEditProductModal:', err);
       }
@@ -816,30 +828,58 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
             </ScrollView>
           </View>
 
-          <View style={{ flexDirection: 'row', marginBottom: 35, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 }}>
-            {['step1', 'step2', 'step3', 'step4'].map((s, i) => {
-              const isActive = activeStep === s;
-              const isPast = parseInt(activeStep.replace('step', '')) > i + 1;
-              const labels = ['Basics', 'Pricing', 'Classify', 'BOM'];
-              return (
-                <View key={s} style={{ flexDirection: 'row', alignItems: 'flex-start', flex: i < 3 ? 1 : 0, height: 28 }}>
-                  <View style={{ alignItems: 'center' }}>
-                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: isActive || isPast ? colors.primary : colors.bg.secondary, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: isActive || isPast ? colors.primary : colors.border }}>
-                      {isPast ? <Ionicons name="checkmark" size={16} color="#fff" /> : <Text style={{ color: isActive ? '#fff' : colors.text.muted, fontSize: 12, fontWeight: 'bold' }}>{i + 1}</Text>}
+          {isCompactStepper ? (
+            <View style={{ marginBottom: 20, paddingHorizontal: 4 }}>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, fontWeight: '700' }}>
+                Step {parseInt(activeStep.replace('step', ''))} of 4
+              </Text>
+              <Text style={{ ...Typography.body, color: colors.text.primary, fontWeight: '700', marginTop: 2 }}>
+                {['Product Details', 'Sizes & Pricing', 'Sales & Classification', 'Formulation & Process'][parseInt(activeStep.replace('step', '')) - 1]}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 10 }}>
+                {['step1', 'step2', 'step3', 'step4'].map((s) => {
+                  const stepNum = parseInt(s.replace('step', ''));
+                  const currentNum = parseInt(activeStep.replace('step', ''));
+                  return (
+                    <View
+                      key={s}
+                      style={{
+                        height: 4,
+                        flex: 1,
+                        borderRadius: 2,
+                        backgroundColor: stepNum <= currentNum ? colors.primary : colors.border,
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', marginBottom: 42, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+              {['step1', 'step2', 'step3', 'step4'].map((stepKey, i) => {
+                const isActive = activeStep === stepKey;
+                const isPast = parseInt(activeStep.replace('step', '')) > i + 1;
+                const labels = ['Product Details', 'Sizes & Pricing', 'Sales & Classification', 'Formulation & Process'];
+                return (
+                  <View key={stepKey} style={{ flexDirection: 'row', alignItems: 'flex-start', flex: i < 3 ? 1 : 0, height: 28 }}>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: isActive || isPast ? colors.primary : colors.bg.secondary, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: isActive || isPast ? colors.primary : colors.border }}>
+                        {isPast ? <Ionicons name="checkmark" size={16} color="#fff" /> : <Text style={{ color: isActive ? '#fff' : colors.text.muted, fontSize: 12, fontWeight: 'bold' }}>{i + 1}</Text>}
+                      </View>
+                      <Text style={{ position: 'absolute', top: 32, ...Typography.caption, color: isActive ? colors.primary : isPast ? colors.text.primary : colors.text.muted, fontWeight: isActive || isPast ? '700' : '500', width: 120, textAlign: 'center', marginLeft: -46 }}>{labels[i]}</Text>
                     </View>
-                    <Text style={{ position: 'absolute', top: 32, ...Typography.eyebrow, fontSize: 10, color: isActive ? colors.text.primary : colors.text.muted, fontWeight: isActive ? '700' : '500', width: 60, textAlign: 'center', marginLeft: -16 }}>{labels[i]}</Text>
+                    {i < 3 && <View style={{ flex: 1, height: 2, backgroundColor: isPast ? colors.primary : colors.border, marginHorizontal: 8, marginTop: 13 }} />}
                   </View>
-                  {i < 3 && <View style={{ flex: 1, height: 2, backgroundColor: isPast ? colors.primary : colors.border, marginHorizontal: 8, marginTop: 13 }} />}
-                </View>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+          )}
 
           {activeStep === 'step1' && (
             <>
               <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Core Product Specifications</Text></View>
 
-              <FormField label="Ayurvedic Formulation Name" required>
+              <FormField label="Ayurvedic Formulation Name" required error={showErrors && !name.trim() ? 'Ayurvedic Formulation Name is required' : undefined}>
                 <TextInput
                   style={styles.formInputText}
                   placeholder="e.g. Ashwagandha Churna"
@@ -886,6 +926,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
               <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
                 Define the sizes/packaging units for this formulation. At least one size is required.
               </Text>
+              {showErrors && variantsList.filter(v => v.size.trim() && v.price.trim()).length === 0 && (
+                <Text style={{ ...Typography.caption, color: colors.danger, marginTop: -6, marginBottom: 10 }}>
+                  Add at least one size with a B2B price before continuing.
+                </Text>
+              )}
 
               {variantsList.map((variant, index) => (
                 <View key={index} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
@@ -961,13 +1006,12 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>Add Size Variant</Text>
               </TouchableOpacity>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>HSN Code <Text style={{ color: 'red' }}>*</Text></Text>
+              <FormField label="HSN Code" required error={showErrors && !hsnCode.trim() ? 'HSN Code is required' : undefined}>
                 <View style={styles.formInput}>
                   <Ionicons name="finger-print" size={16} color={colors.text.muted} />
                   <TextInput style={styles.formInputText} placeholder="e.g. 30049011" placeholderTextColor={colors.text.muted} value={hsnCode} onChangeText={setHsnCode} />
                 </View>
-              </View>
+              </FormField>
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Tax Slab (GST Rate) <Text style={{ color: 'red' }}>*</Text></Text>
@@ -1633,14 +1677,16 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
             style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center' }}
             onPress={() => {
               if (activeStep === 'step1') {
-                if (!name.trim()) { showToast('Ayurvedic Formulation Name is required!', 'error'); return; }
+                if (!name.trim()) { setShowErrors(true); return; }
+                setShowErrors(false);
                 setActiveStep('step2');
               } else if (activeStep === 'step2') {
                 const activeVariants = variantsList.filter(v => v.size.trim() && v.price.trim());
-                if (activeVariants.length === 0) { showToast('At least one size and B2B price must be specified!', 'error'); return; }
+                if (activeVariants.length === 0 || !hsnCode.trim()) { setShowErrors(true); return; }
+                setShowErrors(false);
                 setActiveStep('step3');
               } else if (activeStep === 'step3') {
-                if (!hsnCode.trim()) { showToast('HSN Code is mandatory!', 'error'); return; }
+                setShowErrors(false);
                 setActiveStep('step4');
               } else handleSave();
             }}

@@ -13,8 +13,27 @@ import { LightColors, Radius, Shadows, Spacing, withAlpha, Typography } from '..
 
 
 export function selectedIcon(icon: keyof typeof Ionicons.glyphMap, active: boolean): keyof typeof Ionicons.glyphMap {
-  const filled = icon.replace(/-outline$/, '') as keyof typeof Ionicons.glyphMap;
+  const filled = icon.toString().replace(/-outline$/, '') as keyof typeof Ionicons.glyphMap;
   return active && filled in Ionicons.glyphMap ? filled : icon;
+}
+
+
+export function WorkspaceBreadcrumbs({ items }: { items: { label: string; onPress?: () => void }[] }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: Spacing.md }}>
+      {items.map((item, index) => (
+        <React.Fragment key={index}>
+          {index > 0 && <Ionicons name="chevron-forward" size={14} color={colors.text.muted} style={{ marginHorizontal: 6 }} />}
+          <TouchableOpacity onPress={item.onPress} disabled={!item.onPress}>
+            <Text style={{ ...Typography.bodySm, fontWeight: item.onPress ? '600' : '800', color: item.onPress ? colors.text.secondary : colors.text.primary }}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        </React.Fragment>
+      ))}
+    </View>
+  );
 }
 
 export function WorkspaceTabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: string; icon?: keyof typeof Ionicons.glyphMap; badge?: number }[]; value: T; onChange: (id: T) => void }) {
@@ -130,7 +149,7 @@ export function StatusPill({ label, tone = 'neutral', color, style, textStyle }:
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.md },
   headerCopy: { flex: 1, maxWidth: 760 },
-  eyebrow: { ...Typography.eyebrow, fontWeight: '800', textTransform: 'uppercase', color: colors.primary, marginBottom: 5 },
+  eyebrow: { ...Typography.eyebrow, fontWeight: '800', color: colors.primary, marginBottom: 5 },
   title: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
   subtitle: { ...Typography.bodySm, color: colors.text.secondary, marginTop: 5, maxWidth: 680 },
   headerActions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },

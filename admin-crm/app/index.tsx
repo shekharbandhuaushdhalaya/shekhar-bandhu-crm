@@ -835,7 +835,7 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
 
   return (
     <View style={{ gap: 16 }}>
-      <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' }}>
+      <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary }}>
          Manufacturing Facility Financial & Asset Valuation
       </Text>
 
@@ -847,7 +847,7 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
               <Ionicons name="leaf-outline" size={20} color={colors.success} />
             </View>
             <View>
-              <Text style={{ ...Typography.caption, color: colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>Raw Stock Valuation</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, fontWeight: '700' }}>Raw Stock Valuation</Text>
               <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
                 ₹{(mfgAnalytics?.netRawMaterialValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </Text>
@@ -862,7 +862,7 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
               <Ionicons name="cube-outline" size={20} color={colors.primary} />
             </View>
             <View>
-              <Text style={{ ...Typography.caption, color: colors.text.secondary, textTransform: 'uppercase', fontWeight: '700' }}>Finished Goods Value</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, fontWeight: '700' }}>Finished Goods Value</Text>
               <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>
                 ₹{(mfgAnalytics?.netFinishedGoodsValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </Text>
@@ -877,7 +877,7 @@ function FullManufacturingAnalyticsTab({ mfgAnalytics }: { mfgAnalytics: any }) 
               <Ionicons name="wallet-outline" size={20} color={colors.primary} />
             </View>
             <View>
-              <Text style={{ ...Typography.caption, color: colors.primary, fontWeight: '700', textTransform: 'uppercase' }}>Total Facility Assets</Text>
+              <Text style={{ ...Typography.caption, color: colors.primary, fontWeight: '700' }}>Total Facility Assets</Text>
               <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
                 ₹{((mfgAnalytics?.netRawMaterialValue || 0) + (mfgAnalytics?.netFinishedGoodsValue || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </Text>
@@ -964,15 +964,15 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
       {/* ROI Cards */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.primary }}>
-          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Budget</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Total Budget</Text>
           <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 4 }}>{formatCurrency(totalBudget)}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.warning }}>
-          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Total Spent</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Total Spent</Text>
           <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.warning, marginTop: 4 }}>{formatCurrency(totalSpent)}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.success }}>
-          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase' }}>Revenue Yield</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Revenue Yield</Text>
           <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.success, marginTop: 4 }}>{formatCurrency(totalRevenue)}</Text>
         </View>
       </View>
@@ -982,7 +982,7 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
         <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
           <Ionicons name="trending-up" size={24} color={netProfit >= 0 ? colors.success : colors.danger} />
           <View style={{ marginLeft: 10 }}>
-            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Net Yield Profit</Text>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>Net Yield Profit</Text>
             <Text style={{ ...Typography.h3, fontWeight: '800', color: netProfit >= 0 ? colors.success : colors.danger, marginTop: 2 }}>{formatCurrency(netProfit)}</Text>
           </View>
         </View>
@@ -990,7 +990,7 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
         <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
           <Ionicons name="speedometer-outline" size={24} color={colors.primary} />
           <View style={{ marginLeft: 10 }}>
-            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Return on Spend (ROI)</Text>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>Return on Spend (ROI)</Text>
             <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary, marginTop: 2 }}>{overallRoi.toFixed(1)}%</Text>
           </View>
         </View>
@@ -998,7 +998,7 @@ function DashboardMarketingAnalyticsTab({ campaigns }: { campaigns: Campaign[] }
         <View style={{ flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: 14 }}>
           <Ionicons name="people" size={24} color="#6366f1" />
           <View style={{ marginLeft: 10 }}>
-            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700', textTransform: 'uppercase' }}>Cost Per Lead (CAC)</Text>
+            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>Cost Per Lead (CAC)</Text>
             <Text style={{ ...Typography.h3, fontWeight: '800', color: '#6366f1', marginTop: 2 }}>{formatCurrency(averageCac)}</Text>
           </View>
         </View>

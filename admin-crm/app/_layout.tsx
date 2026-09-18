@@ -265,6 +265,16 @@ function MainLayout() {
       setIsSearchVisible(true);
     });
 
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        DeviceEventEmitter.emit('open_global_search');
+      }
+    };
+    if (Platform.OS === 'web') {
+      window.addEventListener('keydown', handleGlobalKeyDown);
+    }
+
     // Initialize Socket.io real-time connection
     const socket = getSocket();
 
@@ -346,6 +356,9 @@ function MainLayout() {
       authSub.remove();
       forbiddenSub.remove();
       searchSub.remove();
+      if (Platform.OS === 'web') {
+        window.removeEventListener('keydown', handleGlobalKeyDown);
+      }
       if (drawerCloseTimer.current) clearTimeout(drawerCloseTimer.current);
       socketEvents.forEach(eventName => {
         socket.off(eventName);

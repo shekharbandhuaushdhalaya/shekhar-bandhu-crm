@@ -11,6 +11,7 @@ import { LightColors, Radius, Shadows, Spacing, Typography } from '../constants/
 import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceTransition, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
 import { PageHeader as WorkspaceHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
+import { useConfirm } from '../utils/ConfirmContext';
 
 type Tab = 'dashboard' | 'orders' | 'challans' | 'schemes' | 'returns' | 'commissions';
 
@@ -20,6 +21,7 @@ const formatMoney = (value: unknown) => `₹${Number(value || 0).toLocaleString(
 
 export default function SalesWorkspace() {
   const { colors } = useTheme();
+  const { confirm } = useConfirm();
   const params = useLocalSearchParams<{ tab?: string; orderId?: string }>();
   const styles = useStyles(createStyles);
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -245,9 +247,17 @@ export default function SalesWorkspace() {
         headers: { 'Idempotency-Key': `ui-convert-${challan._id}` },
       });
       if (action === 'reverse') {
-        const run = async () => { await request(`/challans/${challan._id}/reverse`, { method: 'POST', headers: { 'Idempotency-Key': `ui-reverse-${challan._id}-${Date.now()}` } }); await load(); };
-        if (Platform.OS === 'web') { if (typeof window !== 'undefined' && window.confirm(`Reverse ${challan.challanNo}? This creates compensating inventory entries.`)) await run(); }
-        else Alert.alert('Reverse Challan', `Reverse ${challan.challanNo}?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Reverse', style: 'destructive', onPress: run }]);
+        setBusyAction('');
+        confirm({
+          title: 'Reverse Challan',
+          description: `Reverse ${challan.challanNo}? This creates compensating inventory entries.`,
+          destructive: true,
+          iconName: 'refresh',
+          onConfirm: async () => {
+            await request(`/challans/${challan._id}/reverse`, { method: 'POST', headers: { 'Idempotency-Key': `ui-reverse-${challan._id}-${Date.now()}` } });
+            await load();
+          }
+        });
         return;
       }
       await load();

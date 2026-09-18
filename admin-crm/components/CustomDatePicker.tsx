@@ -135,7 +135,7 @@ export const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
   return (
     <View style={{ width: compact ? undefined : '100%' }}>
       {label ? (
-        <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', marginBottom: 4 }}>
+        <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 4 }}>
           {label}
         </Text>
       ) : null}

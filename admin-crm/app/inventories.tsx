@@ -4,7 +4,7 @@ import { PressableOpacity as TouchableOpacity } from './../components/PressableO
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, DeviceEventEmitter } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, DeviceEventEmitter, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import { useToast } from '../utils/ToastContext';
@@ -1170,6 +1170,7 @@ export default function InventoriesScreen() {
   const [warehouseEntries, setWarehouseEntries] = useState<InventoryEntry[]>([]);
   
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'stock' | 'transfers' | 'warehouses' | 'ledger'>('stock');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -1515,39 +1516,113 @@ export default function InventoriesScreen() {
           </View>
         </View>
 
+                {/* Workspace Navigation Tabs */}
+        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: Spacing.lg, backgroundColor: colors.bg.card }}>
+          {(['stock', 'transfers', 'warehouses', 'ledger'] as const).map(tab => (
+            <TouchableOpacity 
+              key={tab}
+              style={{ paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: activeTab === tab ? colors.primary : 'transparent' }}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={{ ...Typography.bodySm, fontWeight: activeTab === tab ? '700' : '500', color: activeTab === tab ? colors.primary : colors.text.secondary }}>
+                {tab === 'stock' ? 'Stock' : tab === 'transfers' ? 'Transfers' : tab === 'warehouses' ? 'Warehouses' : 'Ledger'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Controls Action & Filter Bar */}
-        <View style={{ zIndex: 1100, position: 'relative' }}>
-          {(showWarehouseFilterDropdown || showVendorFilterDropdown || showStockActionsDropdown) && (
+        <View style={{ zIndex: 1100, position: 'relative', marginTop: 12, paddingHorizontal: Spacing.lg }}>
+          {(showWarehouseFilterDropdown || showVendorFilterDropdown) && (
             <Pressable
               style={[
                 StyleSheet.absoluteFill,
                 { 
                   zIndex: 900,
-                  ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {})
+                  ...(Platform.OS === 'web' ? { position: 'fixed' as const } : { position: 'absolute' as const })
                 }
               ]}
               onPress={() => {
                 setShowWarehouseFilterDropdown(false);
                 setShowVendorFilterDropdown(false);
-                setShowStockActionsDropdown(false);
               }}
             />
           )}
-          <View style={[styles.controlsBar, { flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' }]}>
-            
-            {/* Search Bar */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, flex: 1, minWidth: 250, height: 40 }}>
-              <Ionicons name="search" size={16} color={colors.text.muted} />
-              <TextInput
-                style={{ ...Typography.bodySm, flex: 1, height: '100%', color: colors.text.primary }}
-                placeholder="Search items..."
-                placeholderTextColor={colors.text.muted}
-                value={search}
-                onChangeText={setSearch}
-              />
-            </View>
 
-            {/* Filter Dropdowns */}
+          {activeTab === 'stock' && (
+            <View style={[styles.controlsBar, { flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start', paddingHorizontal: 0 }]}>
+              {/* Search Bar */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10, flex: 1, minWidth: 250, height: 40 }}>
+                <Ionicons name="search" size={16} color={colors.text.muted} />
+                <TextInput
+                  style={{ ...Typography.bodySm, flex: 1, height: '100%', color: colors.text.primary }}
+                  placeholder="Search items..."
+                  placeholderTextColor={colors.text.muted}
+                  value={search}
+                  onChangeText={setSearch}
+                />
+              </View>
+
+              {/* View Toggles */}
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  style={{
+                    paddingHorizontal: 12,
+                    height: 40,
+                    borderRadius: Radius.md,
+                    backgroundColor: (!showZero && !showDeadStock) ? colors.success + '15' : colors.bg.card,
+                    borderWidth: 1,
+                    borderColor: (!showZero && !showDeadStock) ? colors.success + '40' : colors.border,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                  onPress={() => {
+                    setShowZero(false);
+                    setShowDeadStock(false);
+                  }}
+                >
+                  <Text style={{ ...Typography.bodySm, fontWeight: (!showZero && !showDeadStock) ? '700' : '600', color: (!showZero && !showDeadStock) ? colors.success : colors.text.secondary }}>In-Stock</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    paddingHorizontal: 12,
+                    height: 40,
+                    borderRadius: Radius.md,
+                    backgroundColor: showZero ? colors.warning + '15' : colors.bg.card,
+                    borderWidth: 1,
+                    borderColor: showZero ? colors.warning + '40' : colors.border,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                  onPress={() => {
+                    setShowZero(true);
+                    setShowDeadStock(false);
+                  }}
+                >
+                  <Text style={{ ...Typography.bodySm, fontWeight: showZero ? '700' : '600', color: showZero ? colors.warning : colors.text.secondary }}>Zero Stock</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    paddingHorizontal: 12,
+                    height: 40,
+                    borderRadius: Radius.md,
+                    backgroundColor: showDeadStock ? colors.danger + '15' : colors.bg.card,
+                    borderWidth: 1,
+                    borderColor: showDeadStock ? colors.danger + '40' : colors.border,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                  onPress={() => {
+                    setShowDeadStock(true);
+                    setShowZero(false);
+                  }}
+                >
+                  <Text style={{ ...Typography.bodySm, fontWeight: showDeadStock ? '700' : '600', color: showDeadStock ? colors.danger : colors.text.secondary }}>Dead Stock</Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Vendor Filter Button */}
               <View style={{ position: 'relative', zIndex: showVendorFilterDropdown ? 1000 : 1 }}>
                 <TouchableOpacity
@@ -1564,7 +1639,6 @@ export default function InventoriesScreen() {
                   <Ionicons name={showVendorFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
                 </TouchableOpacity>
 
-                {/* Vendor Dropdown Panel */}
                 {showVendorFilterDropdown && (
                   <View style={[styles.vendorDropdownPanel, { top: 42, right: 0 }]}>
                     <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
@@ -1616,7 +1690,6 @@ export default function InventoriesScreen() {
                   <Ionicons name={showWarehouseFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
                 </TouchableOpacity>
 
-                {/* Warehouse Dropdown Panel */}
                 {showWarehouseFilterDropdown && (
                   <View style={[styles.filterDropdownPanel, { top: 42, right: 0 }]}>
                     <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
@@ -1646,239 +1719,81 @@ export default function InventoriesScreen() {
                             </Text>
                             <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{w.city}, {w.state}</Text>
                           </TouchableOpacity>
-                          {perm.can('inventory:viewValue') && (
-                            <TouchableOpacity
-                              style={{ padding: 10, paddingRight: 16 }}
-                              onPress={() => {
-                                setEditingWarehouse(w);
-                                setAddWarehouseVisible(true);
-                                setShowWarehouseFilterDropdown(false);
-                              }}
-                            >
-                              <Ionicons name="pencil" size={16} color={colors.primary} />
-                            </TouchableOpacity>
-                          )}
                         </View>
                       ))}
                     </ScrollView>
-
-                    {/* Add Warehouse option inside Consolidated Warehouse dropdown */}
-                    {perm.can('inventory:edit') && (
-                      <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: 10,
-                          paddingHorizontal: 12,
-                          backgroundColor: colors.primary + '10',
-                          borderTopWidth: 1,
-                          borderTopColor: colors.border,
-                        }}
-                        onPress={() => {
-                          setEditingWarehouse(null);
-                          setAddWarehouseVisible(true);
-                          setShowWarehouseFilterDropdown(false);
-                        }}
-                      >
-                        <Ionicons name="add-circle" size={16} color={colors.primary} />
-                        <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
-                          Add New Warehouse
-                        </Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
                 )}
               </View>
-
-
-
-            {/* Merged Stock Actions & Filters Dropdown */}
-            <View style={{ position: 'relative', zIndex: showStockActionsDropdown ? 1000 : 1 }}>
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: showDeadStock ? colors.danger : showZero ? colors.warning : showTransfers ? colors.primary : colors.primary,
-                  paddingHorizontal: 14,
-                  height: 40,
-                  borderRadius: Radius.md,
-                  gap: 6,
-                }}
-                onPress={() => {
-                  setShowStockActionsDropdown(!showStockActionsDropdown);
-                  setShowWarehouseFilterDropdown(false);
-                  setShowVendorFilterDropdown(false);
-                }}
-              >
-                <Ionicons name="cube-outline" size={16} color="#fff" />
-                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: '#fff' }}>
-                  {showDeadStock ? 'Dead Stock' : showZero ? 'Zero Stock' : showTransfers ? 'Transfers' : 'Stock Actions'}
-                </Text>
-                <Ionicons name={showStockActionsDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#fff" />
-              </TouchableOpacity>
-
-              {showStockActionsDropdown && (
-                <View style={{
-                  position: 'absolute',
-                  top: 44,
-                  right: 0,
-                  backgroundColor: colors.bg.card,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: Radius.md,
-                  width: 180,
-                  zIndex: 9999,
-                  elevation: 10,
-                  overflow: 'hidden',
-                  boxShadow: '0px 4px 12px rgba(0,0,0,0.15)',
-                }}>
-                  {perm.can('inventory:edit') && (
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 8,
-                        paddingVertical: 10,
-                        paddingHorizontal: 12,
-                        borderBottomWidth: 1,
-                        borderBottomColor: colors.border + '40',
-                      }}
-                      onPress={() => {
-                        setAddStockInitialProductId('');
-                        setAddStockVisible(true);
-                        setShowStockActionsDropdown(false);
-                      }}
-                    >
-                      <Ionicons name="add-circle" size={16} color={colors.primary} />
-                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>
-                        + Add Stock Entry
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Toggle In-Stock */}
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      backgroundColor: (!showZero && !showDeadStock && !showTransfers) ? colors.success + '15' : 'transparent',
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.border + '40',
-                    }}
-                    onPress={() => {
-                      setShowZero(false);
-                      setShowDeadStock(false);
-                      setShowTransfers(false);
-                      setShowStockActionsDropdown(false);
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Ionicons name="checkmark-circle-outline" size={16} color={(!showZero && !showDeadStock && !showTransfers) ? colors.success : colors.text.secondary} />
-                      <Text style={{ ...Typography.bodySm, fontWeight: (!showZero && !showDeadStock && !showTransfers) ? '700' : '600', color: (!showZero && !showDeadStock && !showTransfers) ? colors.success : colors.text.secondary }}>
-                        In-Stock View
-                      </Text>
-                    </View>
-                    {(!showZero && !showDeadStock && !showTransfers) && <Ionicons name="checkmark" size={14} color={colors.success} />}
-                  </TouchableOpacity>
-
-                  {/* Toggle Zero Stock */}
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      backgroundColor: showZero ? colors.warning + '15' : 'transparent',
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.border + '40',
-                    }}
-                    onPress={() => {
-                      setShowZero(p => !p);
-                      if (!showZero) {
-                        setShowDeadStock(false);
-                        setShowTransfers(false);
-                      }
-                      setShowStockActionsDropdown(false);
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Ionicons name={showZero ? "eye" : "eye-off-outline"} size={16} color={showZero ? colors.warning : colors.text.secondary} />
-                      <Text style={{ ...Typography.bodySm, fontWeight: showZero ? '700' : '600', color: showZero ? colors.warning : colors.text.secondary }}>
-                        Zero Stock View
-                      </Text>
-                    </View>
-                    {showZero && <Ionicons name="checkmark" size={14} color={colors.warning} />}
-                  </TouchableOpacity>
-
-                  {/* Toggle Dead Stock */}
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      backgroundColor: showDeadStock ? colors.danger + '15' : 'transparent',
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.border + '40',
-                    }}
-                    onPress={() => {
-                      setShowDeadStock(p => !p);
-                      if (!showDeadStock) {
-                        setShowZero(false);
-                        setShowTransfers(false);
-                      }
-                      setShowStockActionsDropdown(false);
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Ionicons name="skull-outline" size={16} color={showDeadStock ? colors.danger : colors.text.secondary} />
-                      <Text style={{ ...Typography.bodySm, fontWeight: showDeadStock ? '700' : '600', color: showDeadStock ? colors.danger : colors.text.secondary }}>
-                        Dead Stock (90+ Days)
-                      </Text>
-                    </View>
-                    {showDeadStock && <Ionicons name="checkmark" size={14} color={colors.danger} />}
-                  </TouchableOpacity>
-
-                  {/* Toggle Stock Transfers */}
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      backgroundColor: showTransfers ? colors.primary + '15' : 'transparent',
-                    }}
-                    onPress={() => {
-                      setShowTransfers(true);
-                      setShowZero(false);
-                      setShowDeadStock(false);
-                      setShowStockActionsDropdown(false);
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Ionicons name="swap-horizontal" size={16} color={showTransfers ? colors.primary : colors.text.secondary} />
-                      <Text style={{ ...Typography.bodySm, fontWeight: showTransfers ? '700' : '600', color: showTransfers ? colors.primary : colors.text.secondary }}>
-                        Stock Transfers
-                      </Text>
-                    </View>
-                    {showTransfers && <Ionicons name="checkmark" size={14} color={colors.primary} />}
-                  </TouchableOpacity>
-                </View>
+              
+              {perm.can('inventory:edit') && (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: colors.primary,
+                    paddingHorizontal: 14,
+                    height: 40,
+                    borderRadius: Radius.md,
+                    gap: 6,
+                  }}
+                  onPress={() => {
+                    setAddStockInitialProductId('');
+                    setAddStockVisible(true);
+                  }}
+                >
+                  <Ionicons name="add-circle" size={16} color="#fff" />
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: '#fff' }}>Add Stock</Text>
+                </TouchableOpacity>
               )}
             </View>
-          </View>
+          )}
+
+          {activeTab === 'transfers' && (
+            <View style={[styles.controlsBar, { justifyContent: 'space-between', paddingHorizontal: 0 }]}>
+              <View style={{ flex: 1 }} />
+              {perm.can('inventory:edit') && (
+                <TouchableOpacity
+                  style={[styles.btnCenter, { height: 40, marginTop: 0 }]}
+                  onPress={() => setAddTransferVisible(true)}
+                >
+                  <Ionicons name="add-circle" size={16} color="#fff" />
+                  <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Request Transfer</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          
+          {activeTab === 'warehouses' && (
+            <View style={[styles.controlsBar, { justifyContent: 'space-between', paddingHorizontal: 0 }]}>
+              <View style={{ flex: 1 }} />
+              {perm.can('inventory:edit') && (
+                <TouchableOpacity
+                  style={[styles.btnCenter, { height: 40, marginTop: 0 }]}
+                  onPress={() => {
+                    setEditingWarehouse(null);
+                    setAddWarehouseVisible(true);
+                  }}
+                >
+                  <Ionicons name="add-circle" size={16} color="#fff" />
+                  <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Add Warehouse</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {activeTab === 'ledger' && (
+            <View style={[styles.controlsBar, { justifyContent: 'space-between', paddingHorizontal: 0 }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...Typography.bodySm, color: colors.text.muted }}>Click Ledger button on any stock item to view its history here.</Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Inventory List / Table */}
         <View style={{ flex: 1, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg }}>
-          {showTransfers ? (
+          {activeTab === 'transfers' ? (
             // --- STOCK TRANSFERS VIEW ---
             <View style={{ flex: 1, marginTop: Spacing.md }}>
               <DataTable 
@@ -2099,6 +2014,78 @@ export default function InventoriesScreen() {
                     )
                   }
                 ]}
+                renderMobileCard={(item: any) => (
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.tableCell, { fontWeight: '700', paddingLeft: 0 }]}>{item.transferNo}</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>
+                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : ''}
+                        </Text>
+                      </View>
+                      <StatusPill  label={<>{item.status.toUpperCase()}</>} textStyle={{ ...Typography.eyebrow, fontWeight: '700', color: item.status === 'completed' ? colors.success : item.status === 'in_transit' ? colors.primary : item.status === 'cancelled' ? colors.danger : colors.warning }} />
+                    </View>
+                    <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderRadius: Radius.sm, gap: 4 }}>
+                      <Text style={[styles.tableCell, { ...Typography.caption, fontWeight: '700', paddingLeft: 0 }]}>{item.fromWarehouseName} → {item.toWarehouseName}</Text>
+                      <View>
+                        {(item.items || []).map((it: any, i: number) => (
+                          <Text key={i} style={{ ...Typography.eyebrow, color: colors.text.primary }} numberOfLines={1}>
+                            • {it.productName} ({it.qtyBoxes} Box{it.qtyBoxes !== 1 ? 'es' : ''})
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
+                    {item.status === 'pending' && perm.can('inventory:edit') && (
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, justifyContent: 'flex-end' }}>
+                        <TouchableOpacity
+                          style={[styles.btnSmall, { backgroundColor: colors.primary }]}
+                          onPress={() => {
+                            confirm({
+                              title: 'Mark as In-Transit',
+                              description: 'Move stock out of the source warehouse?',
+                              confirmLabel: 'Mark In-Transit',
+                              iconName: 'truck-outline',
+                              onConfirm: async () => {
+                                try {
+                                  await api.shipStockTransfer(item._id);
+                                  showToast('Transfer marked as in-transit', 'success');
+                                  loadData();
+                                } catch (err: any) {
+                                  showToast(err.message || 'Failed to dispatch transfer', 'error');
+                                }
+                              }
+                            });
+                          }}
+                        >
+                          <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Dispatch</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.btnSmall, { backgroundColor: colors.danger }]}
+                          onPress={() => {
+                            confirm({
+                              title: 'Cancel Transfer',
+                              description: 'Are you sure you want to cancel this transfer request?',
+                              destructive: true,
+                              confirmLabel: 'Cancel Transfer',
+                              iconName: 'close-circle-outline',
+                              onConfirm: async () => {
+                                try {
+                                  await api.cancelStockTransfer(item._id);
+                                  showToast('Transfer cancelled successfully', 'success');
+                                  loadData();
+                                } catch (err: any) {
+                                  showToast(err.message || 'Failed to cancel transfer', 'error');
+                                }
+                              }
+                            });
+                          }}
+                        >
+                          <Text style={{ ...Typography.eyebrow, color: '#fff', fontWeight: '700' }}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                )}
               />
 
                   {transfers.length === 0 && (
@@ -2118,7 +2105,7 @@ export default function InventoriesScreen() {
                     </TouchableOpacity>
                   )}
             </View>
-          ) : showDeadStock ? (
+          ) : activeTab === 'stock' && showDeadStock ? (
             // --- DEAD STOCK REPORT VIEW ---
             <View style={{ flex: 1, marginTop: Spacing.md }}>
               <DataTable 
@@ -2202,7 +2189,7 @@ export default function InventoriesScreen() {
                     </View>
                   )}
             </View>
-          ) : selectedWarehouseId === 'all' ? (
+          ) : activeTab === 'stock' && selectedWarehouseId === 'all' ? (
             // --- CONSOLIDATED VIEW TABLE ---
             <View style={{ flex: 1, marginTop: Spacing.md }}>
               <DataTable 
@@ -2219,6 +2206,36 @@ export default function InventoriesScreen() {
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.8 }]}><Text style={styles.tableHeaderCell}>Vendors</Text></View>
                     <View style={[styles.tableHeaderCellContainer, { flex: 2.2 }]}><Text style={styles.tableHeaderCell}>Godowns</Text></View>
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Total Stock</Text></View>
+                  </View>
+                )}
+                renderMobileCard={(item: any) => (
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, flex: 1 }} numberOfLines={1}>
+                        {getDisplayName(item)}
+                      </Text>
+                      <StockDisplay qtyBoxes={item.totalBoxes} />
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.muted }}>
+                        {item.productType} • {formatVendorDisplay(item.vendorName)}
+                      </Text>
+                      <Text style={{ ...Typography.caption, color: colors.text.muted }}>
+                        {item.warehouses.length} Godown(s)
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                       {perm.can('inventory:edit') && (
+                         <TouchableOpacity onPress={() => { setAddStockInitialProductId(item.productId); setAddStockVisible(true); }} style={{ backgroundColor: colors.primary+'10', padding: 6, borderRadius: Radius.sm }}>
+                           <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700' }}>+ Add Stock</Text>
+                         </TouchableOpacity>
+                       )}
+                       {perm.can('inventory:viewValue') && (
+                         <TouchableOpacity onPress={() => { setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item) }); setLedgerVisible(true); }} style={{ backgroundColor: colors.bg.secondary, padding: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border }}>
+                           <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, fontWeight: '700' }}>Ledger</Text>
+                         </TouchableOpacity>
+                       )}
+                    </View>
                   </View>
                 )}
                 renderTableRow={(item: any) => (
@@ -2261,6 +2278,36 @@ export default function InventoriesScreen() {
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Total Stock</Text></View>
                   </View>
                 )}
+                renderMobileCard={(item: any) => (
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, flex: 1 }} numberOfLines={1}>
+                        {getDisplayName(item)}
+                      </Text>
+                      <StockDisplay qtyBoxes={item.totalBoxes} />
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ ...Typography.caption, color: colors.text.muted }}>
+                        {item.productType} • {formatVendorDisplay(item.vendorName)}
+                      </Text>
+                      <Text style={{ ...Typography.caption, color: colors.text.muted }}>
+                        {item.warehouses.length} Godown(s)
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                       {perm.can('inventory:edit') && (
+                         <TouchableOpacity onPress={() => { setAddStockInitialProductId(item.productId); setAddStockVisible(true); }} style={{ backgroundColor: colors.primary+'10', padding: 6, borderRadius: Radius.sm }}>
+                           <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700' }}>+ Add Stock</Text>
+                         </TouchableOpacity>
+                       )}
+                       {perm.can('inventory:viewValue') && (
+                         <TouchableOpacity onPress={() => { setSelectedLedgerProduct({ id: item.productId, name: getDisplayName(item) }); setLedgerVisible(true); }} style={{ backgroundColor: colors.bg.secondary, padding: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border }}>
+                           <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, fontWeight: '700' }}>Ledger</Text>
+                         </TouchableOpacity>
+                       )}
+                    </View>
+                  </View>
+                )}
                 renderTableRow={(item: any) => (
                     <InventoryRow
                       key={item.productId}
@@ -2283,7 +2330,99 @@ export default function InventoriesScreen() {
               />
             </View>
           )}
-        </View>
+                  {activeTab === 'warehouses' && (
+            <View style={{ flex: 1, marginTop: Spacing.md }}>
+              <DataTable 
+                data={warehouses} 
+                keyExtractor={(item) => item._id} 
+                minWidth={600} 
+                isRefreshing={refreshing}
+                onRefresh={onRefresh}
+                columns={[
+                  {
+                    key: 'name',
+                    title: 'Warehouse Name',
+                    flex: 2,
+                    render: (item: any) => (
+                      <View>
+                        <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.name}</Text>
+                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{item.city}, {item.state}</Text>
+                      </View>
+                    )
+                  },
+                  {
+                    key: 'address',
+                    title: 'Address',
+                    flex: 3,
+                    render: (item: any) => (
+                      <Text style={styles.tableCell} numberOfLines={2}>
+                        {item.addressLine1} {item.addressLine2}
+                      </Text>
+                    )
+                  },
+                  {
+                    key: 'contact',
+                    title: 'Contact Person',
+                    flex: 2,
+                    render: (item: any) => (
+                      <View>
+                        <Text style={styles.tableCell}>{item.contactPerson || '-'}</Text>
+                        {item.phone ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{item.phone}</Text> : null}
+                      </View>
+                    )
+                  },
+                  {
+                    key: 'actions',
+                    title: '',
+                    width: 80,
+                    align: 'right',
+                    render: (item: any) => (
+                      perm.can('inventory:viewValue') ? (
+                        <TouchableOpacity
+                          style={{ padding: 8 }}
+                          onPress={() => {
+                            setEditingWarehouse(item);
+                            setAddWarehouseVisible(true);
+                          }}
+                        >
+                          <Ionicons name="pencil" size={16} color={colors.primary} />
+                        </TouchableOpacity>
+                      ) : null
+                    )
+                  }
+                ]}
+                renderMobileCard={(item: any) => (
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{item.name}</Text>
+                      {perm.can('inventory:viewValue') && (
+                        <TouchableOpacity onPress={() => { setEditingWarehouse(item); setAddWarehouseVisible(true); }}>
+                          <Ionicons name="pencil" size={16} color={colors.primary} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    <Text style={{ ...Typography.caption, color: colors.text.secondary }}>{item.city}, {item.state}</Text>
+                  </View>
+                )}
+              />
+            </View>
+          )}
+          {activeTab === 'ledger' && (
+            <View style={{ flex: 1, marginTop: Spacing.md, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.xl, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="list" size={48} color={colors.text.muted} />
+              <Text style={{ ...Typography.h3, color: colors.text.primary, marginTop: Spacing.md }}>Stock Ledger</Text>
+              <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginTop: Spacing.sm, textAlign: 'center', maxWidth: 400 }}>
+                To view the ledger for a specific item, go to the Stock tab and click the "Ledger" button next to it.
+              </Text>
+              <TouchableOpacity
+                style={[styles.btnCenter, { marginTop: Spacing.lg }]}
+                onPress={() => setActiveTab('stock')}
+              >
+                <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Go to Stock Tab</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+</View>
       </View>
 
       {/* MODAL WRAPPERS */}
@@ -2858,7 +2997,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   table: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: Spacing.md, overflow: 'hidden', flex: 1 },
   tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: 'transparent' },
-  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted },
   tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
   tableCell: { ...Typography.bodySm, color: colors.text.primary },
@@ -2891,7 +3030,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   
   formGroup: { marginBottom: 14 },
   formRow: { flexDirection: 'row' },
-  formLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 4, textTransform: 'uppercase' },
+  formLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 4 },
   formInput: { ...Typography.body, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, height: 42, color: colors.text.primary },
   errorText: { ...Typography.bodySm, color: colors.danger, fontWeight: '700', marginBottom: 12, backgroundColor: colors.danger + '10', padding: 8, borderRadius: Radius.sm, borderLeftWidth: 3, borderLeftColor: colors.danger },
 
@@ -2917,7 +3056,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   ledgerSheet: { width: '98%', maxWidth: 1200, height: '88%', backgroundColor: colors.bg.secondary, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
   ledgerTable: { width: '100%', backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
-  ledgerHeaderCell: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  ledgerHeaderCell: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },
   ledgerBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
   ledgerCell: { ...Typography.bodySm, color: colors.text.primary, paddingRight: 6 },
   

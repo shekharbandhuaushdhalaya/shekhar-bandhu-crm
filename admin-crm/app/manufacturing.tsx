@@ -8,6 +8,7 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useRouter } from 'expo-router';
 import AyurvedicLoader from '../components/AyurvedicLoader';
 import { useToast } from '../utils/ToastContext';
+import { useConfirm } from '../utils/ConfirmContext';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 import {
   api,
@@ -54,6 +55,7 @@ export default function ManufacturingScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { confirm } = useConfirm();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
   const { showToast } = useToast();
@@ -716,23 +718,21 @@ export default function ManufacturingScreen() {
 
 
 
-  const handleVoidInward = async (entryId: string) => {
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm('Are you sure you want to void this stock entry? This will revert the raw stock inventory.')
-      : await new Promise(resolve => {
-        Alert.alert('Void Stock Entry', 'Are you sure you want to void this stock entry?', [
-          { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
-          { text: 'Void', onPress: () => resolve(true), style: 'destructive' }
-        ]);
-      });
-
-    if (!confirmed) return;
-    try {
-      await api.deleteRawMaterialEntry(entryId);
-      loadData();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to void stock entry', 'error');
-    }
+  const handleVoidInward = (entryId: string) => {
+    confirm({
+      title: 'Void Stock Entry',
+      description: 'Are you sure you want to void this stock entry? This will revert the raw stock inventory.',
+      destructive: true,
+      iconName: 'trash',
+      onConfirm: async () => {
+        try {
+          await api.deleteRawMaterialEntry(entryId);
+          loadData();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to void stock entry', 'error');
+        }
+      }
+    });
   };
 
   // --- Handlers: BOM Formula ---
@@ -1049,23 +1049,21 @@ export default function ManufacturingScreen() {
     }
   };
 
-  const handleCancelProduction = async (batchId: string) => {
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm('Are you sure you want to cancel this batch run? Consumed raw materials will be returned to stock.')
-      : await new Promise(resolve => {
-        Alert.alert('Cancel Production Run', 'Are you sure you want to cancel this batch run?', [
-          { text: 'No', onPress: () => resolve(false), style: 'cancel' },
-          { text: 'Yes, Revert Stock', onPress: () => resolve(true), style: 'destructive' }
-        ]);
-      });
-
-    if (!confirmed) return;
-    try {
-      await api.cancelBatchProduction(batchId);
-      loadData();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to cancel production run', 'error');
-    }
+  const handleCancelProduction = (batchId: string) => {
+    confirm({
+      title: 'Cancel Production Run',
+      description: 'Are you sure you want to cancel this batch run? Consumed raw materials will be returned to stock.',
+      destructive: true,
+      iconName: 'close-circle',
+      onConfirm: async () => {
+        try {
+          await api.cancelBatchProduction(batchId);
+          loadData();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to cancel production run', 'error');
+        }
+      }
+    });
   };
 
   const handleAdvanceStage = (batchId: string, idx: number) => {
@@ -1562,22 +1560,21 @@ export default function ManufacturingScreen() {
     }
   };
 
-  const handleDeleteBatchDoc = async (batchId: string, url: string) => {
-    const confirmed = Platform.OS === 'web'
-      ? confirm('Are you sure you want to delete this document?')
-      : await new Promise(resolve => {
-        Alert.alert('Delete Document', 'Are you sure?', [
-          { text: 'No', onPress: () => resolve(false) },
-          { text: 'Yes, Delete', onPress: () => resolve(true) }
-        ]);
-      });
-    if (!confirmed) return;
-    try {
-      await api.deleteDocument('batch', batchId, url);
-      loadData();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to delete document', 'error');
-    }
+  const handleDeleteBatchDoc = (batchId: string, url: string) => {
+    confirm({
+      title: 'Delete Document',
+      description: 'Are you sure you want to delete this document?',
+      destructive: true,
+      iconName: 'trash',
+      onConfirm: async () => {
+        try {
+          await api.deleteDocument('batch', batchId, url);
+          loadData();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to delete document', 'error');
+        }
+      }
+    });
   };
 
   const handleTrace = async () => {

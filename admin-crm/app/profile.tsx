@@ -13,6 +13,7 @@ import { useToast } from '../utils/ToastContext';
 import { api, getApiBaseUrl, setApiBaseUrl } from '../utils/api';
 import { authStorage } from '../utils/storage';
 import { CustomDatePicker } from '../components/CustomDatePicker';
+import { useConfirm } from '../utils/ConfirmContext';
 import { updateActiveFirmDetails } from '../constants/firm';
 import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
 import AyurvedicLoader from '../components/AyurvedicLoader';
@@ -23,6 +24,7 @@ export default function ProfileScreen() {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
@@ -111,20 +113,24 @@ export default function ProfileScreen() {
     if (!acc) return;
 
     if (acc.connected) {
-      const confirmed = Platform.OS === 'web'
-        ? window.confirm(`Disconnect your ${acc.name} Integration?`)
-        : true;
-      if (!confirmed) return;
-
-      try {
-        if (acc.dbId) {
-          await api.disconnectSocialAccount(acc.dbId);
+      confirm({
+        title: 'Disconnect Integration',
+        description: `Disconnect your ${acc.name} Integration?`,
+        destructive: true,
+        iconName: 'trash',
+        onConfirm: async () => {
+          try {
+            if (acc.dbId) {
+              await api.disconnectSocialAccount(acc.dbId);
+            }
+            setSocialAccounts(prev => prev.map(a => a.id === id ? { ...a, connected: false, dbId: undefined } : a));
+            showToast(`${acc.name} disconnected successfully.`, 'success');
+          } catch (err: any) {
+            showToast(err.message || 'Failed to disconnect account', 'error');
+          }
         }
-        setSocialAccounts(prev => prev.map(a => a.id === id ? { ...a, connected: false, dbId: undefined } : a));
-        showToast(`${acc.name} disconnected successfully.`, 'success');
-      } catch (err: any) {
-        showToast(err.message || 'Failed to disconnect account', 'error');
-      }
+      });
+      return;
     } else {
       try {
         const { url } = await api.getSocialAuthUrl();
@@ -1135,7 +1141,7 @@ export default function ProfileScreen() {
               <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 24 }}>
                 {/* Left Side: Bank Account Details */}
                 <View style={{ flex: 1.2 }}>
-                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase' }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginBottom: 12 }}>
                      Bank Account Details
                   </Text>
 
@@ -1212,7 +1218,7 @@ export default function ProfileScreen() {
 
                 {/* Right Side: UPI & QR Code Details */}
                 <View style={{ flex: 1.2 }}>
-                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginBottom: 12, textTransform: 'uppercase' }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginBottom: 12 }}>
                      UPI & QR Code Details
                   </Text>
 
@@ -1291,7 +1297,7 @@ export default function ProfileScreen() {
                     {/* Right sub-column: QR Code Preview */}
                     {(qrImageUrl || qrImageBase64) ? (
                       <View style={{ alignItems: 'flex-start' }}>
-                        <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', marginBottom: 4 }}>
+                        <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginBottom: 4 }}>
                           Invoice QR Preview
                         </Text>
 
@@ -1328,14 +1334,17 @@ export default function ProfileScreen() {
                               alignItems: 'center',
                             }}
                             onPress={() => {
-                              Alert.alert('Clear QR Image', 'Are you sure?', [
-                                { text: 'Cancel', style: 'cancel' },
-                                { text: 'Clear', style: 'destructive', onPress: () => {
+                              confirm({
+                                title: 'Clear QR Image',
+                                description: 'Are you sure you want to clear the QR code image?',
+                                destructive: true,
+                                iconName: 'trash',
+                                onConfirm: async () => {
                                   setQrImageBase64('');
                                   setQrImageUrl('');
                                   showToast('QR code cleared.', 'info');
-                                }},
-                              ]);
+                                }
+                              });
                             }}
                           >
                             <Ionicons name="trash-outline" size={16} color={colors.danger} />
@@ -1353,7 +1362,7 @@ export default function ProfileScreen() {
               {/* Bottom Section: Payment Gateway Credentials (Razorpay) */}
               <View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary }}>
                      Online Payment Gateway Credentials (Razorpay)
                   </Text>
 
@@ -2066,7 +2075,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   cardContent: {
     gap: 12,
   },
-  label: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase', marginBottom: 2 },
+  label: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary, marginBottom: 2 },
   input: { ...Typography.bodySm, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 4 },
   rowInputs: {
     flexDirection: 'row',

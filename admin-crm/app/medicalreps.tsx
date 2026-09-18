@@ -14,6 +14,7 @@ import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/
 import { WorkspaceTabs, WorkspaceLoading, StatusPill, EmptyState, WorkspaceTransition } from './../components/WorkspacePrimitives';
 import { PageHeader as WorkspaceHeader } from './../components/PageHeader';
 import { ResponsiveSelect } from './../components/ResponsiveSelect';
+import { FormField } from './../components/FormField';
 
 type Tab = 'dashboard' | 'mrs' | 'portfolio' | 'attendance' | 'visits' | 'expenses';
 
@@ -34,6 +35,7 @@ export default function MedicalRepsScreen() {
   const [mrs, setMrs] = useState<MedicalRepresentative[]>([]);
   const [mrSearch, setMrSearch] = useState('');
   const [mrModal, setMrModal] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
   const [mrSaving, setMrSaving] = useState(false);
   const [editMr, setEditMr] = useState<MedicalRepresentative | null>(null);
   const [mrForm, setMrForm] = useState({ name: '', phone: '', email: '', code: '', territory: '', monthlyTarget: 0, address: '', notes: '' });
@@ -346,10 +348,17 @@ export default function MedicalRepsScreen() {
     const name = mrForm.name.trim();
     const phone = mrForm.phone.trim();
     const email = mrForm.email.trim();
-    if (!name) { showToast('Please enter the Medical Representative name', 'info'); return; }
-    if (!phone) { showToast('Please enter a phone number', 'info'); return; }
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) { showToast('Please enter a valid email address', 'info'); return; }
-    if (mrForm.monthlyTarget < 0 || !Number.isFinite(mrForm.monthlyTarget)) { showToast('Monthly target must be 0 or more', 'info'); return; }
+    let hasError = false;
+    if (!name) { showToast('Please enter the Medical Representative name', 'info'); hasError = true; }
+    else if (!phone) { showToast('Please enter a phone number', 'info'); hasError = true; }
+    else if (email && !/^\S+@\S+\.\S+$/.test(email)) { showToast('Please enter a valid email address', 'info'); hasError = true; }
+    else if (mrForm.monthlyTarget < 0 || !Number.isFinite(mrForm.monthlyTarget)) { showToast('Monthly target must be 0 or more', 'info'); hasError = true; }
+    
+    if (hasError) {
+      setShowErrors(true);
+      return;
+    }
+    setShowErrors(false);
 
     setMrSaving(true);
     try {
@@ -529,7 +538,7 @@ export default function MedicalRepsScreen() {
     const activeMRs = mrs.filter(m => m.isActive);
     if (activeMRs.length === 0) {
       return (
-        <EmptyState title={<>No active Medical Representatives found.</>}  />
+        <EmptyState title={<>No active Medical Representatives found.</>} actionLabel="Add Representative" onAction={handleOpenNewMrModal} />
       );
     }
     const options = activeMRs.map(m => ({
@@ -542,9 +551,10 @@ export default function MedicalRepsScreen() {
         <ResponsiveSelect
           label="Select medical representative"
           options={options}
-          selectedValue={selectedId || ''}
-          onSelect={onSelect}
+          value={selectedId || ''}
+          onChange={onSelect}
           placeholder="Search and select an MR..."
+          searchable={true}
         />
       </View>
     );
@@ -556,7 +566,6 @@ export default function MedicalRepsScreen() {
       return (
         <View style={styles.loadingBox}>
           <WorkspaceLoading />
-          <Text style={{ ...Typography.bodySm, marginTop: 12, color: colors.text.muted, fontWeight: '600' }}>Calculating Field Performance & Analytics...</Text>
         </View>
       );
     }
@@ -807,7 +816,7 @@ export default function MedicalRepsScreen() {
               ) : null}
             </View>
         )}
-        ListEmptyComponent={<EmptyState title={<>No Medical Representatives Found</>} message={<>Add your first representative to start tracking visits, targets and field activity.</>} />}
+        ListEmptyComponent={<EmptyState title={<>No Medical Representatives Found</>} message={<>Add your first representative to start tracking visits, targets and field activity.</>} actionLabel="Add Representative" onAction={handleOpenNewMrModal} />}
       />
 
       {/* Modal: Add/Edit MR */}
@@ -822,25 +831,29 @@ export default function MedicalRepsScreen() {
             </View>
             <ScrollView style={{ padding: Spacing.lg }}>
               {[
-                ['name', 'Full Name *', 'Enter name...'],
-                ['phone', 'Phone Number *', 'Enter phone...'],
-                ['email', 'Email Address', 'Enter email...'],
-                ['code', 'MR Code / Badge ID', 'e.g. MR-001'],
-                ['territory', 'Territory / Area Headquarters', 'e.g. Varanasi North'],
-              ].map(([k, label, ph]) => (
-                <View key={k} style={styles.formField}>
-                  <Text style={styles.fieldLabelText}>{label}</Text>
-                  <TextInput
-                    style={styles.fieldInput}
-                    value={(mrForm as any)[k]}
-                    onChangeText={v => setMrForm({ ...mrForm, [k]: v })}
-                    placeholder={ph}
-                    placeholderTextColor={colors.text.muted}
-                  />
-                </View>
-              ))}
-              <View style={styles.formField}>
-                <Text style={styles.fieldLabelText}>Monthly Sales Target (₹)</Text>
+                ['name', 'Full Name', 'Enter name...', true],
+                ['phone', 'Phone Number', 'Enter phone...', true],
+                ['email', 'Email Address', 'Enter email...', false],
+                ['code', 'MR Code / Badge ID', 'e.g. MR-001', false],
+                ['territory', 'Territory / Area Headquarters', 'e.g. Varanasi North', false],
+              ].map(([k, label, ph, required]) => {
+                 let errorMsg;
+                 if (showErrors && required && !(mrForm as any)[k as string].trim()) errorMsg = `${label} is required`;
+                 if (showErrors && k === 'email' && (mrForm as any)[k].trim() && !/^\S+@\S+\.\S+$/.test((mrForm as any)[k])) errorMsg = 'Invalid email address';
+                 
+                 return (
+                  <FormField key={k as string} label={label as string} required={required as boolean} error={errorMsg}>
+                    <TextInput
+                      style={styles.fieldInput}
+                      value={(mrForm as any)[k as string]}
+                      onChangeText={v => setMrForm({ ...mrForm, [k as string]: v })}
+                      placeholder={ph as string}
+                      placeholderTextColor={colors.text.muted}
+                    />
+                  </FormField>
+                 );
+              })}
+              <FormField label="Monthly Sales Target (₹)" error={showErrors && (mrForm.monthlyTarget < 0 || !Number.isFinite(mrForm.monthlyTarget)) ? 'Monthly target must be 0 or more' : undefined}>
                 <TextInput
                   style={styles.fieldInput}
                   value={mrForm.monthlyTarget.toString()}
@@ -849,9 +862,8 @@ export default function MedicalRepsScreen() {
                   placeholder="0"
                   placeholderTextColor={colors.text.muted}
                 />
-              </View>
-              <View style={styles.formField}>
-                <Text style={styles.fieldLabelText}>Address</Text>
+              </FormField>
+              <FormField label="Address">
                 <TextInput
                   style={[styles.fieldInput, { height: 60, textAlignVertical: 'top', paddingTop: 8 }]}
                   value={mrForm.address}
@@ -860,9 +872,8 @@ export default function MedicalRepsScreen() {
                   placeholderTextColor={colors.text.muted}
                   multiline
                 />
-              </View>
-              <View style={styles.formField}>
-                <Text style={styles.fieldLabelText}>Notes</Text>
+              </FormField>
+              <FormField label="Notes">
                 <TextInput
                   style={[styles.fieldInput, { height: 60, textAlignVertical: 'top', paddingTop: 8 }]}
                   value={mrForm.notes}
@@ -871,7 +882,7 @@ export default function MedicalRepsScreen() {
                   placeholderTextColor={colors.text.muted}
                   multiline
                 />
-              </View>
+              </FormField>
             </ScrollView>
             <View style={styles.modalFooterRow}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setMrModal(false)}>
@@ -890,7 +901,7 @@ export default function MedicalRepsScreen() {
   // ── 3. ATTENDANCE RENDER ────────────────────────────────────────────────────
   const renderAttendance = () => (
     <View style={{ flex: 1 }}>
-      {mrSelector(id => { setSelectedMrId(id); loadAttendance(id); }, selectedMrId)}
+      {mrSelector(setSelectedMrId, selectedMrId)}
       {selectedMrId ? (
         <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
           {/* Action Header for Field Attendance */}
@@ -1177,7 +1188,7 @@ export default function MedicalRepsScreen() {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <View style={{ flex: 1 }}>
-          {mrSelector(id => { setSelectedMrId(id); loadVisits(id); loadExpenses(id); }, selectedMrId)}
+          {mrSelector(setSelectedMrId, selectedMrId)}
         </View>
       </View>
 
@@ -1328,11 +1339,7 @@ export default function MedicalRepsScreen() {
                     borderRadius: Radius.md,
                     marginTop: 4,
                     maxHeight: 180,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 4,
-                    elevation: 4,
+                    ...Shadows.card, 
                   }}>
                     <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
                       {doctorSuggestions.map((doc) => (
@@ -1500,10 +1507,10 @@ export default function MedicalRepsScreen() {
             <Text style={styles.pageSectionTitle}>MR Portfolio & Assignments</Text>
             <Text style={styles.pageSectionSubtitle}>Assign people, accounts and territories with primary, backup or temporary ownership.</Text>
           </View>
-          {perm.can('mr:edit') && selectedMrForVisits ? <TouchableOpacity style={styles.primaryCtaBtn} onPress={() => { setAssignmentForm({ entityType: 'doctor', entityName: '', area: '', territory: selectedMr?.territory || '', role: 'primary', priority: 'normal', preferredVisitDays: [], notes: '' }); setAssignmentModal(true); }}><Ionicons name="add" size={18} color="#fff" /><Text style={styles.primaryCtaBtnText}>Add Assignment</Text></TouchableOpacity> : null}
+          {perm.can('mr:edit') && selectedMrId ? <TouchableOpacity style={styles.primaryCtaBtn} onPress={() => { setAssignmentForm({ entityType: 'doctor', entityName: '', area: '', territory: selectedMr?.territory || '', role: 'primary', priority: 'normal', preferredVisitDays: [], notes: '' }); setAssignmentModal(true); }}><Ionicons name="add" size={18} color="#fff" /><Text style={styles.primaryCtaBtnText}>Add Assignment</Text></TouchableOpacity> : null}
         </View>
-        {mrSelector(id => { setSelectedMrForVisits(id); loadAssignments(id); }, selectedMrForVisits)}
-        {selectedMrForVisits ? <>
+        {mrSelector(setSelectedMrId, selectedMrId)}
+        {selectedMrId ? <>
           <View style={styles.infoBanner}>
             <Ionicons name="options-outline" size={20} color={colors.primary} />
             <Text style={styles.infoBannerText}>One MR can have multiple doctors, chemists, stockists, institutions and distributors. Assignments can be primary, secondary or temporary and can carry their own area, priority and visit-day rules.</Text>
@@ -1536,11 +1543,11 @@ export default function MedicalRepsScreen() {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <View style={{ flex: 1 }}>
-          {mrSelector(id => { setSelectedMrForVisits(id); loadVisits(id); loadExpenses(id); }, selectedMrForVisits)}
+          {mrSelector(setSelectedMrId, selectedMrId)}
         </View>
       </View>
 
-      {selectedMrForVisits ? (
+      {selectedMrId ? (
         <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
           {/* Expense Summary Metric Cards */}
           {(() => {

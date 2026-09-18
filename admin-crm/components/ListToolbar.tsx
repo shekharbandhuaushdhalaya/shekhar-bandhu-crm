@@ -136,7 +136,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     backgroundColor: colors.bg.primary,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: Radius.full,
+    borderRadius: 9999,
     borderWidth: 1,
     borderColor: colors.border,
     marginRight: 8,

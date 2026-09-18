@@ -3,13 +3,14 @@ import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl, Image, Modal, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Image, Modal, ActivityIndicator, Alert, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Shadows, Typography } from '../constants/theme';
 import { api, ProductQuery, getImageUrl } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { ListToolbar } from '../components/ListToolbar';
+import { ResponsiveSelect } from '../components/ResponsiveSelect';
 
 export default function QueriesScreen() {
   const [queries, setQueries] = useState<ProductQuery[]>([]);
@@ -29,7 +30,7 @@ export default function QueriesScreen() {
       setQueries(data);
     } catch (err: any) {
       console.error(err);
-      Alert.alert('Error', 'Failed to load queries: ' + err.message);
+      alert('Failed to load queries: ' + err.message);
     }
   }, []);
 
@@ -50,7 +51,7 @@ export default function QueriesScreen() {
       await api.updateQueryStatus(id, newStatus);
       await load();
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to update status: ' + err.message);
+      alert('Failed to update status: ' + err.message);
     } finally {
       setActionLoading(null);
     }
@@ -66,7 +67,7 @@ export default function QueriesScreen() {
       );
       await load();
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to convert to lead: ' + err.message);
+      alert('Failed to convert to lead: ' + err.message);
     } finally {
       setActionLoading(null);
     }
@@ -117,37 +118,20 @@ export default function QueriesScreen() {
               <option value="closed">Closed ({queries.filter(q => q.status === 'closed').length})</option>
             </select>
           ) : (
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: colors.bg.secondary,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 6,
-                paddingHorizontal: 10,
-                height: 34,
-                gap: 6
-              }}
-              onPress={() => {
-                const opts = [
-                  { label: `All Statuses (${queries.length})`, val: 'all' },
-                  { label: `Pending (${queries.filter(q => q.status === 'pending').length})`, val: 'pending' },
-                  { label: `Contacted (${queries.filter(q => q.status === 'contacted').length})`, val: 'contacted' },
-                  { label: `Converted (${queries.filter(q => q.status === 'converted').length})`, val: 'converted' },
-                  { label: `Closed (${queries.filter(q => q.status === 'closed').length})`, val: 'closed' },
-                ];
-                Alert.alert('Filter Status', '', opts.map(o => ({
-                  text: o.label,
-                  onPress: () => setActiveTab(o.val as any)
-                })));
-              }}
-            >
-              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
-                {activeTab.toUpperCase()} ({activeTab === 'all' ? queries.length : queries.filter(q => q.status === activeTab).length})
-              </Text>
-              <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
-            </TouchableOpacity>
+            <View style={{ width: 180 }}>
+              <ResponsiveSelect
+                options={[
+                  { label: `All Statuses (${queries.length})`, value: 'all' },
+                  { label: `Pending (${queries.filter(q => q.status === 'pending').length})`, value: 'pending' },
+                  { label: `Contacted (${queries.filter(q => q.status === 'contacted').length})`, value: 'contacted' },
+                  { label: `Converted (${queries.filter(q => q.status === 'converted').length})`, value: 'converted' },
+                  { label: `Closed (${queries.filter(q => q.status === 'closed').length})`, value: 'closed' },
+                ]}
+                value={activeTab}
+                onChange={(val) => setActiveTab(val as any)}
+                placeholder="Filter Status"
+              />
+            </View>
           )
         )}
       />
@@ -184,14 +168,14 @@ export default function QueriesScreen() {
             <View style={styles.contactRow}>
               <TouchableOpacity 
                 style={styles.contactItem}
-                onPress={() => Alert.alert('Contact Info', `Email: ${q.email}\nPhone: ${q.phone}`)}
+                onPress={() => Linking.openURL(`mailto:${q.email}`)}
               >
                 <Ionicons name="mail-outline" size={14} color={colors.text.secondary} />
                 <Text style={styles.contactText}>{q.email}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.contactItem}
-                onPress={() => Alert.alert('Contact Info', `Email: ${q.email}\nPhone: ${q.phone}`)}
+                onPress={() => Linking.openURL(`tel:${q.phone}`)}
               >
                 <Ionicons name="call-outline" size={14} color={colors.text.secondary} />
                 <Text style={styles.contactText}>{q.phone}</Text>

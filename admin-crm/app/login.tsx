@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../utils/auth';
-import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
+import { Spacing, Radius, Shadows, LightColors, Typography } from '../constants/theme';
 import { useTheme, useStyles } from '../utils/themeContext';
 
 // Premium Ayurvedic Color Theme constants
@@ -159,11 +159,7 @@ export default function LoginScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginBottom: 30,
-                  shadowColor: '#000000',
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.15,
-                  shadowRadius: 10,
-                  elevation: 5,
+                  ...Shadows.card, 
                   borderWidth: 3,
                   borderColor: 'rgba(255, 255, 255, 0.4)'
                 }}>
@@ -438,7 +434,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   formGroup: {
     marginBottom: Spacing.lg,
   },
-  label: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary, marginBottom: Spacing.sm, textTransform: 'uppercase' },
+  label: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary, marginBottom: Spacing.sm },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',

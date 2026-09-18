@@ -188,7 +188,7 @@ function GroupHeader({
       <View style={styles.groupHeaderLeft}>
         <View style={[styles.groupIconBox, (expanded || hovered) && styles.groupIconBoxExpanded]}>
           <Ionicons
-            name={(expanded ? group.icon.replace('-outline', '') : group.icon) as any}
+            name={(expanded ? group.icon.toString().replace('-outline', '') : group.icon) as any}
             size={16}
             color={expanded || hovered ? colors.primary : colors.text.secondary}
           />
@@ -327,7 +327,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     groupIconBoxExpanded: {
       backgroundColor: colors.primaryLight,
     },
-    groupLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginLeft: 8, textTransform: 'uppercase' },
+    groupLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginLeft: 8 },
     groupLabelExpanded: {
       color: colors.primary,
     },

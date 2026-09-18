@@ -46,7 +46,7 @@ export default function AyurvedicLoader({ message, inline = false }: { message?:
     <View style={[styles.fullContainer, { backgroundColor: 'rgba(0, 0, 0, 0.45)' }]}>
       <View style={[styles.card, { backgroundColor: colors.bg.card, borderColor: colors.primary + '40' }]}>
         {message ? (
-          <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', marginBottom: 8 }}>
+          <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.muted, marginBottom: 8 }}>
             {message}
           </Text>
         ) : null}

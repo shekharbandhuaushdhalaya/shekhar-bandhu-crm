@@ -1,0 +1,12 @@
+node_modules/
+node_modules 2/
+dist/
+.expo/
+.env
+.env.*
+!.env.example
+.DS_Store
+scratch/
+scratch_*.md
+*.log
+coverage/
