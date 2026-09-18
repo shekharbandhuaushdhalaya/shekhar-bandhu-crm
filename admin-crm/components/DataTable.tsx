@@ -3,7 +3,7 @@ import { Skeleton } from './Skeleton';
 import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
 import { AppText as Text } from './AppText';
 import React, { useCallback, memo } from 'react';
-import { View, StyleSheet, FlatList, ScrollView, RefreshControl, ViewStyle, TextStyle, DimensionValue } from 'react-native';
+import { View, StyleSheet, FlatList, ScrollView, RefreshControl, ViewStyle, TextStyle, DimensionValue, useWindowDimensions } from 'react-native';
 import { useTheme } from '../utils/themeContext';
 import { Radius, Spacing, Shadows, Typography } from '../constants/theme';
 import { TableSkeleton } from './TableSkeleton';
@@ -39,6 +39,10 @@ interface DataTableProps<T> {
   // Lazy Loading Props
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
+
+  // Empty State Action
+  emptyStateActionLabel?: string;
+  onEmptyStateAction?: () => void;
 }
 
 function DataTableInner<T>({
@@ -60,10 +64,17 @@ function DataTableInner<T>({
   containerStyle,
   onLoadMore,
   isLoadingMore = false,
+  emptyStateActionLabel,
+  onEmptyStateAction,
 }: DataTableProps<T>) {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  const useCardLayout = isMobile && columns && columns.length > 0;
 
-  const renderHeader = useCallback(() => renderTableHeader ? (
+  const renderHeader = useCallback(() => {
+    if (useCardLayout) return null;
+    return renderTableHeader ? (
     <View style={{ backgroundColor: colors.bg.cardHover, borderBottomWidth: 1, borderBottomColor: colors.border }}>{renderTableHeader()}</View>
   ) : (
     <View style={[styles.headerRow, { backgroundColor: colors.bg.secondary, borderBottomColor: colors.border }, headerStyle]}>
@@ -82,14 +93,61 @@ function DataTableInner<T>({
         </View>
       ))}
     </View>
-  ), [columns, colors, headerStyle, headerTextStyle, renderTableHeader]);
+  );
+  }, [columns, colors, headerStyle, headerTextStyle, renderTableHeader, useCardLayout]);
 
   const renderRow = useCallback(({ item, index }: { item: T; index: number }) => {
-    if (renderTableRow) {
+    if (renderTableRow && !useCardLayout) {
       const row = renderTableRow(item, index);
       return React.cloneElement(row as React.ReactElement<{ style?: any }>, { style: [(row.props as any).style, { backgroundColor: index % 2 ? colors.bg.cardHover : colors.bg.card, borderBottomColor: colors.border }] });
     }
     const customRowStyle = typeof rowStyle === 'function' ? rowStyle(item) : rowStyle;
+
+    if (useCardLayout) {
+      const cardContent = (
+        <View style={{ padding: 12, gap: 10 }}>
+          {columns.map((col) => {
+            const val = col.render ? col.render(item) : (
+              <Text style={{ ...Typography.bodySm, color: colors.text.primary, textAlign: 'right' }}>
+                {String((item as any)[col.key] ?? '')}
+              </Text>
+            );
+            return (
+              <View key={`${keyExtractor(item, index)}-${col.key}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <Text style={{ ...Typography.caption, color: col.title ? colors.text.muted : 'transparent', fontWeight: '600', flexShrink: 1 }}>{col.title || ' '}</Text>
+                <View style={{ flex: 2, alignItems: 'flex-end' }}>
+                  {val}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      );
+
+      const cardStyles = [
+        { 
+          backgroundColor: colors.bg.card, 
+          borderRadius: Radius.md, 
+          borderWidth: 1, 
+          borderColor: colors.border, 
+          marginHorizontal: Spacing.lg, 
+          marginTop: index === 0 ? Spacing.md : Spacing.sm,
+          marginBottom: Spacing.xs,
+          ...Shadows.card
+        },
+        customRowStyle
+      ];
+
+      if (onRowPress) {
+        return (
+          <TouchableOpacity style={cardStyles} onPress={() => onRowPress(item)} activeOpacity={0.7}>
+            {cardContent}
+          </TouchableOpacity>
+        );
+      }
+      return <View style={cardStyles}>{cardContent}</View>;
+    }
+
     const rowContent = (
       <>
         {columns.map((col) => (
@@ -136,7 +194,7 @@ function DataTableInner<T>({
         {rowContent}
       </View>
     );
-  }, [columns, colors, keyExtractor, rowStyle, renderTableRow, onRowPress]);
+  }, [columns, colors, keyExtractor, rowStyle, renderTableRow, onRowPress, useCardLayout]);
 
   const renderFooter = useCallback(() => {
     if (!isLoadingMore) return null;
@@ -151,52 +209,42 @@ function DataTableInner<T>({
     return <TableSkeleton columns={columns.length} rows={8} />;
   }
 
+  const listProps = {
+    data,
+    keyExtractor,
+    ListHeaderComponent: renderHeader,
+    stickyHeaderIndices: useCardLayout ? undefined : [0],
+    renderItem: renderRow,
+    contentContainerStyle: data.length === 0 ? { flex: 1 } : (useCardLayout ? { paddingBottom: Spacing.xl } : undefined),
+    ListEmptyComponent: ListEmptyComponent || <EmptyState title="No records to display" message="Try adjusting your filters or add your first record." actionLabel={emptyStateActionLabel} onAction={onEmptyStateAction} />,
+    refreshControl: onRefresh ? <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined,
+    onEndReached: onLoadMore,
+    onEndReachedThreshold: 0.5,
+    initialNumToRender: 12,
+    maxToRenderPerBatch: 10,
+    updateCellsBatchingPeriod: 50,
+    windowSize: 7,
+    keyboardShouldPersistTaps: "handled" as const,
+    ListFooterComponent: renderFooter,
+  };
+
+  const listComponent = embedded ? <FlatList {...listProps} nestedScrollEnabled /> : <FlatList {...listProps} />;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg.card, borderColor: colors.border }, embedded && { flex: 0, height: 420 }, containerStyle]}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }} contentContainerStyle={{ minWidth: '100%' }}>
-        <View style={{ minWidth, flex: 1 }}>
-          {embedded ? <FlatList
-            data={data}
-            keyExtractor={keyExtractor}
-            ListHeaderComponent={renderHeader}
-            stickyHeaderIndices={[0]}
-            renderItem={renderRow}
-            nestedScrollEnabled
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={data.length === 0 ? { flex: 1 } : undefined}
-            ListEmptyComponent={ListEmptyComponent || <EmptyState title="No records to display" message="Try adjusting your filters or add your first record." />}
-            refreshControl={onRefresh ? <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}
-            onEndReached={onLoadMore}
-            onEndReachedThreshold={0.5}
-            initialNumToRender={12}
-            maxToRenderPerBatch={10}
-            updateCellsBatchingPeriod={50}
-            windowSize={7}
-            ListFooterComponent={renderFooter}
-          /> : <FlatList
-            data={data}
-            keyExtractor={keyExtractor}
-            ListHeaderComponent={renderHeader}
-            stickyHeaderIndices={[0]}
-            renderItem={renderRow}
-            contentContainerStyle={data.length === 0 ? { flex: 1 } : undefined}
-            ListEmptyComponent={ListEmptyComponent || <EmptyState title="No records to display" message="Try adjusting your filters or add your first record." />}
-            refreshControl={
-              onRefresh ? (
-                <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-              ) : undefined
-            }
-            onEndReached={onLoadMore}
-            onEndReachedThreshold={0.5}
-            initialNumToRender={12}
-            maxToRenderPerBatch={10}
-            updateCellsBatchingPeriod={50}
-            windowSize={7}
-            keyboardShouldPersistTaps="handled"
-            ListFooterComponent={renderFooter}
-          />}
-        </View>
-      </ScrollView>
+    <View style={[
+      styles.container, 
+      { backgroundColor: useCardLayout ? 'transparent' : colors.bg.card, borderColor: useCardLayout ? 'transparent' : colors.border },
+      useCardLayout && { shadowOpacity: 0, elevation: 0 },
+      embedded && { flex: 0, height: 420 }, 
+      containerStyle
+    ]}>
+      {useCardLayout ? listComponent : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }} contentContainerStyle={{ minWidth: '100%' }}>
+          <View style={{ minWidth, flex: 1 }}>
+            {listComponent}
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }

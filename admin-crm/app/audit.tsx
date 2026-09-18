@@ -1,5 +1,6 @@
-import ScreenHeader from '../components/ScreenHeader';
-import { DataTable } from '../components/DataTable';
+import { PageHeader as ScreenHeader } from '../components/PageHeader';
+import { DataTable, Column } from '../components/DataTable';
+import { ListToolbar } from '../components/ListToolbar';
 import { StatusPill, WorkspaceLoading, EmptyState } from './../components/WorkspacePrimitives';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
@@ -124,115 +125,114 @@ export default function AuditLogsScreen() {
     );
   }
 
-  const renderLogItem = (item: AuditLogItem) => {
-    const date = new Date(item.createdAt);
-    const dateStr = date.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
-    const timeStr = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    // Colour coding actions
-    let actionBg = colors.infoLight;
-    let actionColor = colors.info;
-    if (item.action.includes('ERROR') || item.action.includes('FAILED') || item.action.includes('DELETE')) {
-      actionBg = colors.dangerLight;
-      actionColor = colors.danger;
-    } else if (item.action.includes('SUCCESS') || item.action.includes('FINALIZE')) {
-      actionBg = colors.successLight;
-      actionColor = colors.success;
-    } else if (item.action.includes('UPDATE')) {
-      actionBg = colors.warningLight;
-      actionColor = colors.warning;
-    }
-
-    if (isDesktop) {
-      return (
-        <TouchableOpacity
-          key={item._id}
-          style={styles.tableRow}
-          onPress={() => setSelectedLog(item)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.cell, { flex: 1.5, color: colors.text.secondary }]}>{dateStr} {timeStr}</Text>
-          <View style={{ flex: 2 }}>
-            <Text style={styles.logUser}>{item.userName}</Text>
-            <Text style={styles.logEmail}>{item.userEmail || 'anonymous'}</Text>
+  const columns: Column<any>[] = [
+    {
+      key: 'timestamp',
+      title: 'Timestamp',
+      flex: 1.5,
+      render: (item) => {
+        const dateObj = new Date(item.createdAt || item.timestamp);
+        const dateStr = dateObj.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        return (
+          <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center' }}>
+            <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>{dateStr} {timeStr}</Text>
           </View>
-          <View style={{ flex: 2, alignItems: 'flex-start' }}>
-            <StatusPill  label={<>{item.action}</>} textStyle={[styles.actionBadgeText, { color: actionColor }]} />
-          </View>
-          <Text style={[styles.cell, { flex: 4 }]}>{item.description}</Text>
-          <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
-            <Text style={styles.logIp}>{item.ipAddress || '—'}</Text>
-            {item.details && (
-              <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
-                VIEW DETAIL
-              </Text>
-            )}
-          </View>
-        </TouchableOpacity>
-      );
-    }
-
-    return (
-      <TouchableOpacity
-        key={item._id}
-        style={styles.logCard}
-        onPress={() => setSelectedLog(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.logCardHeader}>
-          <StatusPill  label={<>{item.action}</>} textStyle={[styles.actionBadgeText, { color: actionColor }]} />
-          <Text style={styles.logCardTime}>{dateStr} {timeStr}</Text>
+        );
+      }
+    },
+    {
+      key: 'user',
+      title: 'User',
+      flex: 2,
+      render: (item) => (
+        <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center' }}>
+          <Text style={styles.logUser}>{item.userName}</Text>
+          <Text style={styles.logEmail}>{item.userEmail || 'anonymous'}</Text>
         </View>
-        
-        <Text style={styles.logCardDesc}>{item.description}</Text>
-        
-        <View style={styles.logCardFooter}>
-          <Text style={styles.logCardUser}>By: {item.userName} ({item.userEmail || 'anon'})</Text>
-          <Text style={styles.logCardIp}>IP: {item.ipAddress || '—'}</Text>
+      )
+    },
+    {
+      key: 'action',
+      title: 'Action',
+      flex: 2,
+      render: (item) => {
+        let actionColor = colors.text.muted;
+        const a = item.action.toUpperCase();
+        if (a.includes('CREATE') || a.includes('ADD')) actionColor = colors.success;
+        else if (a.includes('UPDATE') || a.includes('EDIT')) actionColor = colors.info;
+        else if (a.includes('DELETE') || a.includes('REMOVE')) actionColor = colors.danger;
+        else if (a.includes('LOGIN')) actionColor = colors.primary;
+
+        return (
+          <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center', alignItems: 'flex-start' }}>
+            <StatusPill label={<>{item.action}</>} textStyle={[styles.actionBadgeText, { color: actionColor }]} />
+          </View>
+        );
+      }
+    },
+    {
+      key: 'description',
+      title: 'Description',
+      flex: 4,
+      render: (item) => (
+        <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center' }}>
+          <Text style={{ ...Typography.bodySm, color: colors.text.primary }}>{item.description}</Text>
         </View>
-      </TouchableOpacity>
-    );
-  };
+      )
+    },
+    {
+      key: 'ip',
+      title: 'IP & Detail',
+      flex: 1.5,
+      align: 'right',
+      render: (item) => (
+        <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center', alignItems: 'flex-end' }}>
+          <Text style={styles.logIp}>{item.ipAddress || '—'}</Text>
+          {item.details && (
+            <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
+              VIEW DETAIL
+            </Text>
+          )}
+        </View>
+      )
+    }
+  ];
 
   return (
     <View style={styles.screen}>
       <ScreenHeader title="Audit log" subtitle="Review activity and changes across your workspace." />
       {/* Filter and Search Bar */}
-      <View style={styles.searchBar}>
-        <View style={styles.searchFieldContainer}>
-          <Ionicons name="search-outline" size={18} color={colors.text.muted} style={{ marginRight: 8 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search email, action, details..."
-            placeholderTextColor={colors.text.muted}
-            value={searchText}
-            onChangeText={setSearchText}
-            onSubmitEditing={handleSearchSubmit}
-          />
-          {searchText ? (
-            <TouchableOpacity onPress={handleClearSearch} style={{ padding: 4 }}>
-              <Ionicons name="close-circle" size={16} color={colors.text.muted} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        <TextInput
-          style={styles.dateInput}
-          placeholder="From date"
-          placeholderTextColor={colors.text.muted}
-          value={dateFrom}
-          onChangeText={setDateFrom}
-        />
-        <TextInput
-          style={styles.dateInput}
-          placeholder="To date"
-          placeholderTextColor={colors.text.muted}
-          value={dateTo}
-          onChangeText={setDateTo}
-        />
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearchSubmit}>
-          <Text style={styles.searchBtnText}>Search</Text>
-        </TouchableOpacity>
-      </View>
+      <ListToolbar
+        searchValue={searchText}
+        onSearchChange={setSearchText}
+        onSubmitEditing={handleSearchSubmit}
+        searchPlaceholder="Search email, action, details..."
+        renderFilters={() => (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              style={styles.dateInput}
+              placeholder="From date"
+              placeholderTextColor={colors.text.muted}
+              value={dateFrom}
+              onChangeText={setDateFrom}
+            />
+            <TextInput
+              style={styles.dateInput}
+              placeholder="To date"
+              placeholderTextColor={colors.text.muted}
+              value={dateTo}
+              onChangeText={setDateTo}
+            />
+          </View>
+        )}
+        primaryAction={{
+          label: 'Search',
+          onPress: handleSearchSubmit
+        }}
+        containerStyle={{ paddingBottom: Spacing.md }}
+      />
 
       {/* Log Feed */}
       {loading && !refreshing ? (
@@ -249,26 +249,32 @@ export default function AuditLogsScreen() {
             <EmptyState title={<>No audit log entries found</>}  />
           ) : (
             <View style={styles.logsContainer}>
-              {isDesktop ? (
-                <DataTable data={sortedLogs || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={900} embedded renderTableHeader={() => (<View style={styles.tableHeader}>
-                    <TouchableOpacity style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center' }} onPress={() => { setSortField('timestamp'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+              <DataTable 
+                data={sortedLogs || []} 
+                columns={columns} 
+                keyExtractor={(item: any, index: number) => item._id || String(index)} 
+                minWidth={900} 
+                embedded 
+                onRowPress={(item: any) => setSelectedLog(item)}
+                renderTableHeader={() => (
+                  <View style={styles.tableHeader}>
+                    <TouchableOpacity style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }} onPress={() => { setSortField('timestamp'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
                       <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' }}>Timestamp</Text>
                       {sortField === 'timestamp' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
-                    <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }} onPress={() => { setSortField('user'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                    <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }} onPress={() => { setSortField('user'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
                       <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' }}>User</Text>
                       {sortField === 'user' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
-                    <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }} onPress={() => { setSortField('action'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
+                    <TouchableOpacity style={{ flex: 2, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }} onPress={() => { setSortField('action'); setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }}>
                       <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.text.secondary, textTransform: 'uppercase' }}>Action</Text>
                       {sortField === 'action' && <Ionicons name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'} size={10} color={colors.primary} style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
-                    <Text style={[styles.headerCell, { flex: 4 }]}>Description</Text>
-                    <Text style={[styles.headerCell, { flex: 1.5, textAlign: 'right' }]}>IP & Detail</Text>
-                  </View>)} renderTableRow={renderLogItem}  />
-              ) : (
-                sortedLogs.map(renderLogItem)
-              )}
+                    <Text style={[styles.headerCell, { flex: 4, paddingHorizontal: 12 }]}>Description</Text>
+                    <Text style={[styles.headerCell, { flex: 1.5, textAlign: 'right', paddingHorizontal: 12 }]}>IP & Detail</Text>
+                  </View>
+                )} 
+              />
             </View>
           )}
 

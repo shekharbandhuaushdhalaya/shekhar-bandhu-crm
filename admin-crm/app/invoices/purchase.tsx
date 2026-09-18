@@ -12,8 +12,10 @@ import { useAuth } from '../../utils/auth';
 import { usePermission } from '../../utils/permissions';
 import { useTheme, useStyles } from '../../utils/themeContext';
 import { CustomDatePicker } from '../../components/CustomDatePicker';
+import { useToast } from '../../utils/ToastContext';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
+import { ListToolbar } from '../../components/ListToolbar';
 
 const toTitleCase = (str?: string) => {
   if (!str) return '';
@@ -1838,17 +1840,16 @@ export default function PurchaseInvoicesScreen() {
     <View style={styles.screen}>
       <View style={styles.innerContainer}>
         <View style={{ zIndex: 1100, position: 'relative' }}>
-          <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput
-              style={[styles.searchInput, { minWidth: 100 }]}
-              placeholder="Search purchase bills..."
-              placeholderTextColor={colors.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
-
-            {canAccessCash && (
+          <ListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search purchase bills..."
+            primaryAction={{
+              label: 'New Bill',
+              icon: 'add',
+              onPress: () => { setInvoiceToEdit(null); setAddVisible(true); }
+            }}
+            renderFilters={() => canAccessCash ? (
               <View style={{ position: 'relative', zIndex: 2000 }}>
                 <TouchableOpacity
                   style={{
@@ -1916,12 +1917,8 @@ export default function PurchaseInvoicesScreen() {
                   </View>
                 )}
               </View>
-            )}
-
-            <TouchableOpacity style={styles.addBtn} onPress={() => { setInvoiceToEdit(null); setAddVisible(true); }}>
-              <Ionicons name="add" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
+            ) : null}
+          />
         </View>
 
         <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>

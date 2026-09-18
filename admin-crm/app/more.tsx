@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { DeviceEventEmitter, View, StyleSheet } from 'react-native';
 import { useCallback } from 'react';
-import ScreenHeader from '../components/ScreenHeader';
+import { PageHeader as ScreenHeader } from '../components/PageHeader';
 import { WorkspaceButton } from '../components/WorkspaceButton';
 import { Panel } from '../components/WorkspacePrimitives';
 import { Spacing, Typography } from '../constants/theme';

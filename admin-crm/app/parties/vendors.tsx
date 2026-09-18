@@ -14,8 +14,11 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
 import { validateGstinWithState, formatPhoneWithCountryCode, toTitleCase } from '../../utils/gst';
+import { useToast } from '../../utils/ToastContext';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
+import { ListToolbar } from '../../components/ListToolbar';
+
 
 const getAvatarColor = (name: string, colors: any) => {
   const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -1211,10 +1214,12 @@ function VendorLedgerModal({
                           {row.mode === 'regular' ? 'GST' : 'Cash'}
                         </Text>
                       </View>
-                      <Text style={[styles.ledgerCell, { ...Typography.caption, width: 80, fontWeight: isOverdue ? 'bold' : 'normal', color: row.status === 'paid' ? colors.success
+                      <Text style={[styles.ledgerCell, {
+                        ...Typography.caption, width: 80, fontWeight: isOverdue ? 'bold' : 'normal', color: row.status === 'paid' ? colors.success
                           : isOverdue ? colors.danger
                             : row.status === 'Paid' ? colors.success
-                              : colors.text.muted }]}>
+                              : colors.text.muted
+                      }]}>
                         {displayStatus}
                       </Text>
                       <Text style={[styles.ledgerCell, { width: 120, textAlign: 'right', fontWeight: '700', color: row.amount > 0 ? colors.danger : colors.success }]}>
@@ -1267,355 +1272,352 @@ function VendorLedgerModal({
 
 export default function VendorsScreen() {
 
-    const [vendors, setVendors] = useState<Vendor[]>([]);
-    const [search, setSearch] = useState('');
-    const debouncedSearch = useDebouncedValue(search, 300);
-    const [refreshing, setRefreshing] = useState(false);
-    // Initial-load flag so DataTable shows its skeleton instead of an empty table.
-    const [listLoading, setListLoading] = useState(true);
-    const [selectedVend, setSelectedVend] = useState<Vendor | null>(null);
-    const [detailVisible, setDetailVisible] = useState(false);
-    const [ledgerVisible, setLedgerVisible] = useState(false);
-    const [addVisible, setAddVisible] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const [refreshing, setRefreshing] = useState(false);
+  // Initial-load flag so DataTable shows its skeleton instead of an empty table.
+  const [listLoading, setListLoading] = useState(true);
+  const [selectedVend, setSelectedVend] = useState<Vendor | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [ledgerVisible, setLedgerVisible] = useState(false);
+  const [addVisible, setAddVisible] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-    const { colors } = useTheme();
-    const { user } = useAuth();
-    const perm = usePermission();
-    const styles = useStyles(createStyles);
-    const canAccessCash = user?.canAccessCash ?? false;
+  const { colors } = useTheme();
+  const { user } = useAuth();
+  const perm = usePermission();
+  const styles = useStyles(createStyles);
+  const canAccessCash = user?.canAccessCash ?? false;
 
-    // Lazy loading state
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const limit = 50;
+  // Lazy loading state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 50;
 
-    const load = useCallback(async () => {
-      const res = await api.getVendors(debouncedSearch, page, limit);
-      if (res && res.data) {
-        if (page === 1) {
-          setVendors(res.data);
-        } else {
-          setVendors(prev => {
-            const existingIds = new Set(prev.map(v => v._id));
-            const newVendors = res.data.filter((v: any) => !existingIds.has(v._id));
-            return [...prev, ...newVendors];
-          });
-        }
-        setTotalPages(res.totalPages || 1);
+  const load = useCallback(async () => {
+    const res = await api.getVendors(debouncedSearch, page, limit);
+    if (res && res.data) {
+      if (page === 1) {
+        setVendors(res.data);
       } else {
-        setVendors(Array.isArray(res) ? res : []);
-        setTotalPages(1);
+        setVendors(prev => {
+          const existingIds = new Set(prev.map(v => v._id));
+          const newVendors = res.data.filter((v: any) => !existingIds.has(v._id));
+          return [...prev, ...newVendors];
+        });
       }
-      setListLoading(false);
-    }, [debouncedSearch, page]);
-
-    useEffect(() => { setPage(1); }, [debouncedSearch]);
-
-    useEffect(() => { load(); }, [load]);
-
-    const onRefresh = useCallback(async () => {
-      setRefreshing(true);
-      api.clearCache();
-      await load();
-      setRefreshing(false);
-    }, [load]);
-
-    if (perm.permissions && !perm.can('vendor:view')) {
-      return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
-          <Ionicons name="lock-closed" size={48} color={colors.danger} />
-          <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
-          <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>You do not have permission to access vendor data.</Text>
-        </View>
-      );
+      setTotalPages(res.totalPages || 1);
+    } else {
+      setVendors(Array.isArray(res) ? res : []);
+      setTotalPages(1);
     }
+    setListLoading(false);
+  }, [debouncedSearch, page]);
 
-    const columns: Column<Vendor>[] = [
-      {
-        key: 'name',
-        title: 'Registered Name',
-        width: 240,
-        render: (v) => {
-          const compName = toTitleCase(v.company || v.registeredName || v.name) || 'N/A';
-          const subName = (v.displayName && v.displayName !== compName) ? toTitleCase(v.displayName) : (v.name && v.name !== compName) ? toTitleCase(v.name) : '';
-          const avatar = getAvatarColor(compName, colors);
-          return (
-            <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }} onPress={() => { setSelectedVend(v); setLedgerVisible(true); }}>
-              <View style={[styles.avatarCircle, { backgroundColor: avatar.bg }]}>
-                <Text style={[styles.avatarCircleText, { color: avatar.text }]}>
-                  {compName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.primaryText} numberOfLines={1}>{compName}</Text>
-                {subName ? <Text style={styles.secondaryText} numberOfLines={1}>{subName}</Text> : null}
-              </View>
-            </Pressable>
-          );
-        }
-      },
-      {
-        key: 'gstin',
-        title: 'GSTIN',
-        width: 160,
-        render: (v) => {
-          const isUnregistered = !v.gstin || !v.gstin.trim();
-          return isUnregistered ? (
-            <View style={[styles.gstinBadge, { backgroundColor: colors.warning + '0c', borderColor: colors.warning + '20' }]}>
-              <Ionicons name="cash" size={10} color={colors.warning} />
-              <Text style={[styles.gstinText, { color: colors.warning }]}>UNREGISTERED</Text>
-            </View>
-          ) : (
-            <View style={styles.gstinBadge}>
-              <Ionicons name="shield-checkmark" size={10} color={colors.primary} />
-              <Text style={styles.gstinText} numberOfLines={1}>{v.gstin}</Text>
-            </View>
-          );
-        }
-      },
-      {
-        key: 'contactPerson',
-        title: 'Contact Person',
-        width: 150,
-        render: (v) => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="person-outline" size={12} color={colors.text.muted} />
-            <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
-              {toTitleCase(v.contactPerson) || '—'}
-            </Text>
-          </View>
-        )
-      },
-      {
-        key: 'phone',
-        title: 'Contact No.',
-        width: 150,
-        render: (v) => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="call-outline" size={12} color={colors.success} />
-            <Text style={styles.monoText} numberOfLines={1}>{formatPhoneWithCountryCode(v.phone)}</Text>
-          </View>
-        )
-      },
-      {
-        key: 'city',
-        title: 'City',
-        width: 140,
-        render: (v) => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="location-outline" size={13} color={colors.danger} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>{toTitleCase(v.addressCity) || '—'}</Text>
-              {v.state ? <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(v.state)}</Text> : null}
-            </View>
-          </View>
-        )
-      },
-      {
-        key: 'balance',
-        title: 'Balance',
-        width: 140,
-        align: 'right',
-        render: (v) => {
-          const isCash = (v as any).recordTracking === 'cash_ledger';
-          const amount = isCash ? (v.cashBalance || 0) : (v.regularBalance || 0);
-          const label = amount > 0 ? 'CR.' : amount < 0 ? 'DR.' : '';
-          const color = amount > 0 ? colors.danger : amount < 0 ? colors.success : colors.text.muted;
-          const bg = amount > 0 ? colors.danger + '12' : amount < 0 ? colors.success + '12' : colors.bg.secondary;
+  useEffect(() => { setPage(1); }, [debouncedSearch]);
 
-          return (
-            <StatusPill  label={<>
-                {label} {Math.abs(amount).toLocaleString('en-IN')}
-              </>} textStyle={[styles.balanceText, { ...Typography.bodySm, color, fontWeight: '800' }]} />
-          );
-        }
-      },
-      {
-        key: 'action',
-        title: 'Action',
-        width: 100,
-        align: 'center',
-        render: (v) => (
-          <TouchableOpacity style={styles.viewBtn} onPress={() => { setSelectedVend(v); setDetailVisible(true); }}>
-            <Ionicons name="eye-outline" size={13} color={colors.primary} />
-            <Text style={styles.viewBtnText}>View</Text>
-          </TouchableOpacity>
-        )
-      }
-    ];
+  useEffect(() => { load(); }, [load]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    api.clearCache();
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
+  if (perm.permissions && !perm.can('vendor:view')) {
     return (
-      <View style={styles.screen}>
-        <View style={styles.innerContainer}>
-          <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput
-              style={[styles.searchInput, { minWidth: 100 }]}
-              placeholder="Search vendors..."
-              placeholderTextColor={colors.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
-            <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedVend(null); setIsEditing(false); setAddVisible(true); }}>
-              <Ionicons name="add" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
-            <DataTable
-              data={vendors}
-              columns={columns}
-              keyExtractor={item => item._id}
-              isLoading={listLoading}
-              isRefreshing={refreshing}
-              onRefresh={onRefresh}
-              onLoadMore={() => {
-                if (page < totalPages) setPage(p => p + 1);
-              }}
-              isLoadingMore={page < totalPages}
-              onRowPress={(v) => { setSelectedVend(v); setLedgerVisible(true); }}
-              ListEmptyComponent={
-                <EmptyState title={<>No vendors registered</>}  />
-              }
-            />
-          </View>
-        </View>
-
-        <VendorLedgerModal
-          vendor={selectedVend}
-          visible={ledgerVisible}
-          onClose={() => { setLedgerVisible(false); load(); }}
-        />
-
-        <VendorDetailModal
-          vendor={selectedVend}
-          visible={detailVisible}
-          onClose={() => { setDetailVisible(false); load(); }}
-          onDeleted={load}
-          onEdit={() => {
-            setDetailVisible(false);
-            setIsEditing(true);
-            setAddVisible(true);
-          }}
-        />
-
-        <AddEditVendorModal
-          visible={addVisible}
-          onClose={() => { setAddVisible(false); setSelectedVend(null); setIsEditing(false); }}
-          onSaved={load}
-          vendor={isEditing ? selectedVend : null}
-        />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 20 }}>
+        <Ionicons name="lock-closed" size={48} color={colors.danger} />
+        <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginTop: 12 }}>Access Denied</Text>
+        <Text style={{ ...Typography.bodySm, color: colors.text.muted, marginTop: 4, textAlign: 'center' }}>You do not have permission to access vendor data.</Text>
       </View>
     );
   }
 
-  const createStyles = (colors: typeof LightColors) => StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.bg.primary },
-    innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
-    searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
-    searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
-    addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-    emptyText: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', marginTop: 10 },
-
-    table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
-    tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-    tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
-    tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
-    tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
-    tableCell: { ...Typography.bodySm, color: colors.text.primary },
-    tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
-
-    // Text styles
-    primaryText: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
-    secondaryText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
-    monoText: { ...Typography.bodySm, color: colors.text.secondary },
-    naText: { ...Typography.bodySm, color: colors.text.muted, fontStyle: 'italic' },
-    balanceText: { ...Typography.body, fontWeight: '800' },
-
-    // Action button (text + icon)
-    viewBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10' },
-    viewBtnText: { ...Typography.bodySm, fontWeight: '700', color: colors.primary },
-
-    emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-
-    // Modals
-    modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-    modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
-    profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
-    profileAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.purple + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-    profileAvatarText: { ...Typography.display, fontWeight: '800', color: colors.purple },
-    profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
-    profileCompany: { ...Typography.body, color: colors.text.secondary },
-    infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 14 },
-    infoSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 10, marginBottom: 4 },
-    infoSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
-    infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    infoIcon: { width: 22, textAlign: 'center' },
-    infoLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' },
-    infoValue: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' },
-
-    editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, flex: 1 },
-    editBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
-    deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, width: 120 },
-    deleteBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
-
-    formSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 20, marginBottom: 12 },
-    formSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' },
-    formGroup: { marginBottom: 16 },
-    formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
-    formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
-    formInputText: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
-
-    typeSelectorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-    typeSelectorText: { ...Typography.bodySm, fontWeight: '700' },
-
-    // Ledger modal
-    ledgerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center' },
-    ledgerSheet: { backgroundColor: colors.bg.primary, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', borderTopWidth: 1, borderColor: colors.border, width: '100%' },
-    ledgerHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-    ledgerTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
-    ledgerTable: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
-    ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, marginTop: 12 },
-    ledgerHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', paddingRight: 8 },
-    ledgerRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border + '80', paddingVertical: 10, alignItems: 'center' },
-    ledgerCell: { ...Typography.bodySm, color: colors.text.primary, paddingRight: 8 },
-    modeBadge: { ...Typography.eyebrow, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
-    ledgerFooter: { padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary },
-    closeBtn: { alignItems: 'center', padding: 12, borderRadius: Radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border },
-    tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
-    tabText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
-
-    // Avatar styles
-    avatarCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    avatarCircleText: { ...Typography.bodySm, fontWeight: '800' },
-
-    // GSTIN Pill Badge
-    gstinBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '0a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary + '20', alignSelf: 'flex-start' },
-    gstinText: { ...Typography.caption, color: colors.primary, fontWeight: '600' },
-
-    // Balance Pill Badge
-    balanceBadge: { flexDirection: 'row', alignItems: 'baseline', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.md },
-    balanceBadgeLabel: { ...Typography.eyebrow, fontWeight: '900' },
-
-    customSelectPanel: {
-      position: 'absolute',
-      top: 60,
-      left: 0,
-      right: 0,
-      backgroundColor: colors.bg.card,
-      borderRadius: Radius.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      zIndex: 9999,
-      boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
-      elevation: 8
+  const columns: Column<Vendor>[] = [
+    {
+      key: 'name',
+      title: 'Registered Name',
+      width: 240,
+      render: (v) => {
+        const compName = toTitleCase(v.company || v.registeredName || v.name) || 'N/A';
+        const subName = (v.displayName && v.displayName !== compName) ? toTitleCase(v.displayName) : (v.name && v.name !== compName) ? toTitleCase(v.name) : '';
+        const avatar = getAvatarColor(compName, colors);
+        return (
+          <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }} onPress={() => { setSelectedVend(v); setLedgerVisible(true); }}>
+            <View style={[styles.avatarCircle, { backgroundColor: avatar.bg }]}>
+              <Text style={[styles.avatarCircleText, { color: avatar.text }]}>
+                {compName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.primaryText} numberOfLines={1}>{compName}</Text>
+              {subName ? <Text style={styles.secondaryText} numberOfLines={1}>{subName}</Text> : null}
+            </View>
+          </Pressable>
+        );
+      }
     },
-    customSelectItem: {
-      padding: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border
+    {
+      key: 'gstin',
+      title: 'GSTIN',
+      width: 160,
+      render: (v) => {
+        const isUnregistered = !v.gstin || !v.gstin.trim();
+        return isUnregistered ? (
+          <View style={[styles.gstinBadge, { backgroundColor: colors.warning + '0c', borderColor: colors.warning + '20' }]}>
+            <Ionicons name="cash" size={10} color={colors.warning} />
+            <Text style={[styles.gstinText, { color: colors.warning }]}>UNREGISTERED</Text>
+          </View>
+        ) : (
+          <View style={styles.gstinBadge}>
+            <Ionicons name="shield-checkmark" size={10} color={colors.primary} />
+            <Text style={styles.gstinText} numberOfLines={1}>{v.gstin}</Text>
+          </View>
+        );
+      }
     },
-    customSelectItemText: { ...Typography.body, color: colors.text.primary },
-  });
+    {
+      key: 'contactPerson',
+      title: 'Contact Person',
+      width: 150,
+      render: (v) => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="person-outline" size={12} color={colors.text.muted} />
+          <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>
+            {toTitleCase(v.contactPerson) || '—'}
+          </Text>
+        </View>
+      )
+    },
+    {
+      key: 'phone',
+      title: 'Contact No.',
+      width: 150,
+      render: (v) => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="call-outline" size={12} color={colors.success} />
+          <Text style={styles.monoText} numberOfLines={1}>{formatPhoneWithCountryCode(v.phone)}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'city',
+      title: 'City',
+      width: 140,
+      render: (v) => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="location-outline" size={13} color={colors.danger} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '500' }} numberOfLines={1}>{toTitleCase(v.addressCity) || '—'}</Text>
+            {v.state ? <Text style={styles.secondaryText} numberOfLines={1}>{toTitleCase(v.state)}</Text> : null}
+          </View>
+        </View>
+      )
+    },
+    {
+      key: 'balance',
+      title: 'Balance',
+      width: 140,
+      align: 'right',
+      render: (v) => {
+        const isCash = (v as any).recordTracking === 'cash_ledger';
+        const amount = isCash ? (v.cashBalance || 0) : (v.regularBalance || 0);
+        const label = amount > 0 ? 'CR.' : amount < 0 ? 'DR.' : '';
+        const color = amount > 0 ? colors.danger : amount < 0 ? colors.success : colors.text.muted;
+        const bg = amount > 0 ? colors.danger + '12' : amount < 0 ? colors.success + '12' : colors.bg.secondary;
+
+        return (
+          <StatusPill label={<>
+            {label} {Math.abs(amount).toLocaleString('en-IN')}
+          </>} textStyle={[styles.balanceText, { ...Typography.bodySm, color, fontWeight: '800' }]} />
+        );
+      }
+    },
+    {
+      key: 'action',
+      title: 'Action',
+      width: 100,
+      align: 'center',
+      render: (v) => (
+        <TouchableOpacity style={styles.viewBtn} onPress={() => { setSelectedVend(v); setDetailVisible(true); }}>
+          <Ionicons name="eye-outline" size={13} color={colors.primary} />
+          <Text style={styles.viewBtnText}>View</Text>
+        </TouchableOpacity>
+      )
+    }
+  ];
+
+  return (
+    <View style={styles.screen}>
+      <View style={styles.innerContainer}>
+        <ListToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search vendors..."
+          primaryAction={{
+            label: 'New Vendor',
+            icon: 'add',
+            onPress: () => { setSelectedVend(null); setIsEditing(false); setAddVisible(true); }
+          }}
+        />
+
+        <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          <DataTable
+            data={vendors}
+            columns={columns}
+            keyExtractor={item => item._id}
+            isLoading={listLoading}
+            isRefreshing={refreshing}
+            onRefresh={onRefresh}
+            onLoadMore={() => {
+              if (page < totalPages) setPage(p => p + 1);
+            }}
+            isLoadingMore={page < totalPages}
+            onRowPress={(v) => { setSelectedVend(v); setLedgerVisible(true); }}
+            ListEmptyComponent={
+              <EmptyState title={<>No vendors registered</>} />
+            }
+          />
+        </View>
+      </View>
+
+      <VendorLedgerModal
+        vendor={selectedVend}
+        visible={ledgerVisible}
+        onClose={() => { setLedgerVisible(false); load(); }}
+      />
+
+      <VendorDetailModal
+        vendor={selectedVend}
+        visible={detailVisible}
+        onClose={() => { setDetailVisible(false); load(); }}
+        onDeleted={load}
+        onEdit={() => {
+          setDetailVisible(false);
+          setIsEditing(true);
+          setAddVisible(true);
+        }}
+      />
+
+      <AddEditVendorModal
+        visible={addVisible}
+        onClose={() => { setAddVisible(false); setSelectedVend(null); setIsEditing(false); }}
+        onSaved={load}
+        vendor={isEditing ? selectedVend : null}
+      />
+    </View>
+  );
+}
+
+const createStyles = (colors: typeof LightColors) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg.primary },
+  innerContainer: { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, margin: Spacing.lg, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
+  searchInput: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
+  addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center', marginTop: 10 },
+
+  table: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start', marginVertical: Spacing.md, overflow: 'hidden' },
+  tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  tableHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  tableHeaderCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
+  tableBodyRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
+  tableCell: { ...Typography.bodySm, color: colors.text.primary },
+  tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
+
+  // Text styles
+  primaryText: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
+  secondaryText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
+  monoText: { ...Typography.bodySm, color: colors.text.secondary },
+  naText: { ...Typography.bodySm, color: colors.text.muted, fontStyle: 'italic' },
+  balanceText: { ...Typography.body, fontWeight: '800' },
+
+  // Action button (text + icon)
+  viewBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+  viewBtnText: { ...Typography.bodySm, fontWeight: '700', color: colors.primary },
+
+  emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
+
+  // Modals
+  modalContainer: { flex: 1, backgroundColor: colors.bg.primary, width: '100%', maxWidth: 650, alignSelf: 'center', borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
+  modalTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
+  profileAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.purple + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  profileAvatarText: { ...Typography.display, fontWeight: '800', color: colors.purple },
+  profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  profileCompany: { ...Typography.body, color: colors.text.secondary },
+  infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 14 },
+  infoSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 10, marginBottom: 4 },
+  infoSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase' },
+  infoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  infoIcon: { width: 22, textAlign: 'center' },
+  infoLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600' },
+  infoValue: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' },
+
+  editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, flex: 1 },
+  editBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, width: 120 },
+  deleteBtnText: { ...Typography.body, color: '#fff', fontWeight: '700' },
+
+  formSectionHeader: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6, marginTop: 20, marginBottom: 12 },
+  formSectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.primary, textTransform: 'uppercase' },
+  formGroup: { marginBottom: 16 },
+  formLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
+  formInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
+  formInputText: { borderWidth: 0, backgroundColor: 'transparent', ...Typography.body, flex: 1, height: 46, color: colors.text.primary },
+
+  typeSelectorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
+  typeSelectorText: { ...Typography.bodySm, fontWeight: '700' },
+
+  // Ledger modal
+  ledgerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center' },
+  ledgerSheet: { backgroundColor: colors.bg.primary, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', borderTopWidth: 1, borderColor: colors.border, width: '100%' },
+  ledgerHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  ledgerTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  ledgerTable: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
+  ledgerHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10, marginTop: 12 },
+  ledgerHeaderCell: { ...Typography.caption, fontWeight: '800', color: colors.text.muted, textTransform: 'uppercase', paddingRight: 8 },
+  ledgerRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border + '80', paddingVertical: 10, alignItems: 'center' },
+  ledgerCell: { ...Typography.bodySm, color: colors.text.primary, paddingRight: 8 },
+  modeBadge: { ...Typography.eyebrow, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
+  ledgerFooter: { padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.secondary },
+  closeBtn: { alignItems: 'center', padding: 12, borderRadius: Radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border },
+  tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card },
+  tabText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
+
+  // Avatar styles
+  avatarCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  avatarCircleText: { ...Typography.bodySm, fontWeight: '800' },
+
+  // GSTIN Pill Badge
+  gstinBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '0a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary + '20', alignSelf: 'flex-start' },
+  gstinText: { ...Typography.caption, color: colors.primary, fontWeight: '600' },
+
+  // Balance Pill Badge
+  balanceBadge: { flexDirection: 'row', alignItems: 'baseline', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.md },
+  balanceBadgeLabel: { ...Typography.eyebrow, fontWeight: '900' },
+
+  customSelectPanel: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.bg.card,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    zIndex: 9999,
+    boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
+    elevation: 8
+  },
+  customSelectItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border
+  },
+  customSelectItemText: { ...Typography.body, color: colors.text.primary },
+});

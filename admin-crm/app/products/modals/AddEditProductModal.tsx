@@ -99,7 +99,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
   const [showShapeInput, setShowShapeInput] = useState(false);
   const [newShapeName, setNewShapeName] = useState('');
 
-  const [activeFormTab, setActiveFormTab] = useState<'basic' | 'recipe'>('basic');
+  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3' | 'step4'>('step1');
   const [materials, setMaterials] = useState<any[]>([]);
   const [bomYield, setBomYield] = useState('100');
   const [bomOverhead, setBomOverhead] = useState('0');
@@ -142,6 +142,40 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
         return acc + (isNaN(val) ? 0 : val);
       }, 0);
   }, [bomIngredients]);
+
+  // Dirty state tracking
+  const currentFormState = JSON.stringify([name, sku, minReorder, variantsList, hsnCode, gstRate, description, benefits, suggestedDosage, disease, productType, shape, colour, weight, bomYield, bomOverhead, bomIsActive, bomIngredients, bomStages]);
+  const [initialFormState, setInitialFormState] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible && initialFormState === null) {
+      const timeout = setTimeout(() => {
+        setInitialFormState(currentFormState);
+      }, 600);
+      return () => clearTimeout(timeout);
+    }
+    if (!visible) {
+      setInitialFormState(null);
+    }
+  }, [visible, initialFormState, currentFormState]);
+
+  const isDirty = initialFormState !== null && currentFormState !== initialFormState;
+
+  const handleCloseAttempt = () => {
+    if (isDirty) {
+      Alert.alert(
+        'Discard Changes?',
+        'You have unsaved changes. Are you sure you want to discard them?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Discard', style: 'destructive', onPress: () => { setInitialFormState(null); onClose(); } }
+        ]
+      );
+    } else {
+      setInitialFormState(null);
+      onClose();
+    }
+  };
 
   // Sync Key Ingredients summary text from BOM formulation ingredients ratio
   useEffect(() => {
@@ -346,7 +380,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
         setNewTypeName('');
         setShowShapeInput(false);
         setNewShapeName('');
-        setActiveFormTab('basic');
+        setActiveStep('step1');
+        setInitialFormState(currentFormState);
       } catch (err) {
         console.error('Failed to load raw materials, BOM, or product data in AddEditProductModal:', err);
       }
@@ -697,6 +732,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
         }
       }
 
+      setInitialFormState(null);
       onSaved();
       onClose();
       showToast('Product and Formulation saved successfully!', 'success');
@@ -722,16 +758,14 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
   const yieldMeta = getYieldLabelAndPlaceholder();
 
   return (
-    <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={onClose}>
+    <Modal animationType="slide" presentationStyle="pageSheet" visible={visible} onRequestClose={handleCloseAttempt}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity onPress={handleCloseAttempt}>
             <Ionicons name="close" size={26} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>{product ? 'Edit Product Specification' : 'New Product Specification'}</Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Ionicons name="checkmark-circle" size={26} color={colors.success} />
-          </TouchableOpacity>
+          <View style={{ width: 26 }} />
         </View>
         <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
 
@@ -782,38 +816,22 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
             </ScrollView>
           </View>
 
-          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border, marginBottom: 16 }}>
-            <TouchableOpacity
-              onPress={() => setActiveFormTab('basic')}
-              style={{
-                flex: 1,
-                paddingVertical: 12,
-                alignItems: 'center',
-                borderBottomWidth: 2,
-                borderColor: activeFormTab === 'basic' ? colors.primary : 'transparent'
-              }}
-            >
-              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: activeFormTab === 'basic' ? colors.primary : colors.text.secondary }}>
-                1. Basic Details
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setActiveFormTab('recipe')}
-              style={{
-                flex: 1,
-                paddingVertical: 12,
-                alignItems: 'center',
-                borderBottomWidth: 2,
-                borderColor: activeFormTab === 'recipe' ? colors.primary : 'transparent'
-              }}
-            >
-              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: activeFormTab === 'recipe' ? colors.primary : colors.text.secondary }}>
-                2. Formulation Recipe (BOM)
-              </Text>
-            </TouchableOpacity>
+          <View style={{ flexDirection: 'row', marginBottom: 20, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+            {['step1', 'step2', 'step3', 'step4'].map((s, i) => {
+              const isActive = activeStep === s;
+              const isPast = parseInt(activeStep.replace('step', '')) > i + 1;
+              return (
+                <View key={s} style={{ flexDirection: 'row', alignItems: 'center', flex: i < 3 ? 1 : 0 }}>
+                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: isActive || isPast ? colors.primary : colors.bg.secondary, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: isActive || isPast ? colors.primary : colors.border }}>
+                    {isPast ? <Ionicons name="checkmark" size={16} color="#fff" /> : <Text style={{ color: isActive ? '#fff' : colors.text.muted, fontSize: 12, fontWeight: 'bold' }}>{i + 1}</Text>}
+                  </View>
+                  {i < 3 && <View style={{ flex: 1, height: 2, backgroundColor: isPast ? colors.primary : colors.border, marginHorizontal: 8 }} />}
+                </View>
+              );
+            })}
           </View>
 
-          {activeFormTab === 'basic' && (
+          {activeStep === 'step1' && (
             <>
               <View style={styles.formSectionHeader}><Text style={styles.formSectionTitle}>Core Product Specifications</Text></View>
 
@@ -864,6 +882,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 </View>
               </View>
 
+            </>
+          )}
+
+          {activeStep === 'step2' && (
+            <>
               <View style={[styles.formSectionHeader, { marginTop: 12 }]}><Text style={styles.formSectionTitle}>Product Sizes & Pricing</Text></View>
               <Text style={{ ...Typography.bodySm, color: colors.text.secondary, marginBottom: 12, marginTop: -4 }}>
                 Define the sizes/packaging units for this formulation. At least one size is required.
@@ -980,6 +1003,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 </View>
               </View>
 
+            </>
+          )}
+
+          {activeStep === 'step3' && (
+            <>
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Description (Website Detail Popup)</Text>
                 <View style={[styles.formInput, { height: 80, alignItems: 'flex-start', paddingTop: 8 }]}>
@@ -1052,6 +1080,11 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 </View>
               </View>
 
+            </>
+          )}
+
+          {activeStep === 'step1' && (
+            <>
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Formulation Type</Text>
                 <View style={styles.typeSelector}>
@@ -1166,29 +1199,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
             </>
           )}
 
-          {activeFormTab === 'basic' && (
-            <TouchableOpacity
-              onPress={() => setActiveFormTab('recipe')}
-              style={{
-                backgroundColor: colors.primary + '15',
-                borderColor: colors.primary,
-                borderWidth: 1,
-                borderRadius: 8,
-                paddingVertical: 12,
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'row',
-                gap: 6,
-                marginTop: 20,
-                marginBottom: 10
-              }}
-            >
-              <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Next: Configure Recipe (BOM)</Text>
-              <Ionicons name="arrow-forward-outline" size={16} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-
-          {activeFormTab === 'recipe' && (
+          {activeStep === 'step4' && (
             <>
               <View style={[styles.formSectionHeader, { marginTop: 24 }]}><Text style={styles.formSectionTitle}>Recipe Formulation & Process Stages</Text></View>
 
@@ -1607,28 +1618,36 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={{
-                  backgroundColor: colors.bg.secondary,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: 8,
-                  paddingVertical: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'row',
-                  gap: 6,
-                  marginTop: 10,
-                  marginBottom: 20
-                }}
-                onPress={() => setActiveFormTab('basic')}
-              >
-                <Ionicons name="arrow-back-outline" size={16} color={colors.text.secondary} />
-                <Text style={{ ...Typography.bodySm, color: colors.text.secondary, fontWeight: '700' }}>Back to Product Details</Text>
-              </TouchableOpacity>
             </>
           )}
         </ScrollView>
+        <View style={{ flexDirection: 'row', padding: 16, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.primary }}>
+          {activeStep !== 'step1' && (
+            <TouchableOpacity
+              style={{ paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginRight: 12 }}
+              onPress={() => {
+                if (activeStep === 'step4') setActiveStep('step3');
+                else if (activeStep === 'step3') setActiveStep('step2');
+                else if (activeStep === 'step2') setActiveStep('step1');
+              }}
+            >
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>Back</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center' }}
+            onPress={() => {
+              if (activeStep === 'step1') setActiveStep('step2');
+              else if (activeStep === 'step2') setActiveStep('step3');
+              else if (activeStep === 'step3') setActiveStep('step4');
+              else handleSave();
+            }}
+          >
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: '#fff' }}>
+              {activeStep === 'step4' ? 'Save Product' : 'Next Step'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );

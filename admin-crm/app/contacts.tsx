@@ -11,12 +11,13 @@ import { api, Contact } from '../utils/api';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
+import { ListToolbar } from '@/components/ListToolbar';
 
 export function ContactDetailModal({ contact, visible, onClose, onDeleted }: { contact: Contact | null; visible: boolean; onClose: () => void; onDeleted: () => void }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const stageColors = getStageColors(colors);
-  
+
   const [logType, setLogType] = useState('Call');
   const [logNote, setLogNote] = useState('');
   const [logVisible, setLogVisible] = useState(false);
@@ -77,7 +78,7 @@ export function ContactDetailModal({ contact, visible, onClose, onDeleted }: { c
             </View>
             <Text style={styles.profileName}>{currentContact.name}</Text>
             <Text style={styles.profileCompany}>{currentContact.company}</Text>
-            <StatusPill  label={<>{currentContact.stage.toUpperCase()}</>} textStyle={[styles.statusText, { color: stageColor }]} />
+            <StatusPill label={<>{currentContact.stage.toUpperCase()}</>} textStyle={[styles.statusText, { color: stageColor }]} />
           </View>
 
           {/* Info Grid */}
@@ -220,9 +221,9 @@ export function AddContactModal({ visible, onClose, onSaved }: { visible: boolea
 
   const handleSave = async () => {
     if (!name.trim()) return;
-    await api.createContact({ 
-      name, company, email, phone, 
-      dealValue: parseInt(dealValue) || 0, 
+    await api.createContact({
+      name, company, email, phone,
+      dealValue: parseInt(dealValue) || 0,
       stage,
       city,
       estimatedVolume,
@@ -270,9 +271,9 @@ export function AddContactModal({ visible, onClose, onSaved }: { visible: boolea
             {availableInterests.map(int => {
               const isSelected = productInterests.includes(int);
               return (
-                <TouchableOpacity 
-                  key={int} 
-                  style={[styles.stageSelectorBtn, isSelected && { backgroundColor: colors.primary + '30', borderColor: colors.primary }]} 
+                <TouchableOpacity
+                  key={int}
+                  style={[styles.stageSelectorBtn, isSelected && { backgroundColor: colors.primary + '30', borderColor: colors.primary }]}
                   onPress={() => {
                     if (isSelected) setProductInterests(productInterests.filter(i => i !== int));
                     else setProductInterests([...productInterests, int]);
@@ -316,7 +317,7 @@ export default function ContactsScreen() {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
-  
+
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const stageColors = getStageColors(colors);
@@ -376,7 +377,7 @@ export default function ContactsScreen() {
             <Pressable
               style={[
                 StyleSheet.absoluteFill,
-                { 
+                {
                   zIndex: 900,
                   ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {})
                 }
@@ -384,93 +385,130 @@ export default function ContactsScreen() {
               onPress={() => setShowFilterDropdown(false)}
             />
           )}
-          <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput style={[styles.searchInput, { minWidth: 100 }]} placeholder="Search contacts..." placeholderTextColor={colors.text.muted} value={search} onChangeText={setSearch} />
-            
-            <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
-              <TouchableOpacity
-                style={[styles.filterDropdownButton, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 4 }]}
-                onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-              >
-                <Text style={styles.filterDropdownButtonText}>
-                  {filterStage === 'all' ? 'All Stages' : filterStage.charAt(0).toUpperCase() + filterStage.slice(1)}
-                </Text>
-                <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
-              </TouchableOpacity>
+          <ListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search contacts..."
+            primaryAction={{
+              label: 'Add Contact',
+              icon: 'add',
+              onPress: () => setAddVisible(true)
+            }}
+            renderFilters={() => (
+              <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
+                <TouchableOpacity
+                  style={[styles.filterDropdownButton, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 4 }]}
+                  onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+                >
+                  <Text style={styles.filterDropdownButtonText}>
+                    {filterStage === 'all' ? 'All Stages' : filterStage.charAt(0).toUpperCase() + filterStage.slice(1)}
+                  </Text>
+                  <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
+                </TouchableOpacity>
 
-              {showFilterDropdown && (
-                <View style={[styles.filterDropdownPanel, { top: 40, right: 0 }]}>
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
-                    {['all', ...STAGES].map(s => (
-                      <TouchableOpacity
-                        key={s}
-                        style={[styles.filterDropdownItem, filterStage === s && styles.filterDropdownItemActive]}
-                        onPress={() => {
-                          setFilterStage(s);
-                          setShowFilterDropdown(false);
-                        }}
-                      >
-                        <Text style={[styles.filterDropdownItemText, filterStage === s && { fontWeight: '700', color: colors.primary }]}>
-                          {s === 'all' ? 'All Stages' : s.charAt(0).toUpperCase() + s.slice(1)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
-            <TouchableOpacity style={styles.addBtn} onPress={() => setAddVisible(true)}>
-              <Ionicons name="add" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
+                {showFilterDropdown && (
+                  <View style={[styles.filterDropdownPanel, { top: 40, right: 0 }]}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 250 }}>
+                      {['all', ...STAGES].map(s => (
+                        <TouchableOpacity
+                          key={s}
+                          style={[styles.filterDropdownItem, filterStage === s && styles.filterDropdownItemActive]}
+                          onPress={() => {
+                            setFilterStage(s);
+                            setShowFilterDropdown(false);
+                          }}
+                        >
+                          <Text style={[styles.filterDropdownItemText, filterStage === s && { fontWeight: '700', color: colors.primary }]}>
+                            {s === 'all' ? 'All Stages' : s.charAt(0).toUpperCase() + s.slice(1)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+          />
         </View>
 
         <ScrollView
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           contentContainerStyle={{ flexGrow: 1 }}
         >
-          <DataTable data={contacts || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={900} embedded renderTableHeader={() => (<View style={styles.tableHeaderRow}>
-                <View style={[styles.tableHeaderCellContainer, { width: 160 }]}><Text style={styles.tableHeaderCell}>Name</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>Company</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Stage</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Deal Value</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Lead Source</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 180 }]}><Text style={styles.tableHeaderCell}>Phone / Email</Text></View>
-                <View style={[styles.tableHeaderCellContainer, { width: 80, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'center' }]}>Action</Text></View>
-              </View>)} renderTableRow={(item) => {
-                const stageColor = stageColors[item.stage as Stage] || colors.text.muted;
-                return (
-                  <View key={item._id} style={styles.tableBodyRow}>
-                    <View style={[styles.tableCellContainer, { width: 160 }]}>
-                      <Text style={styles.primaryText}>{item.name}</Text>
-                      {item.company ? <Text style={styles.secondaryText}>{item.company}</Text> : null}
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 140 }]}>
-                      <Text style={styles.tableCell} numberOfLines={1}>{item.company || 'N/A'}</Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 120 }]}>
-                      <StatusPill  label={<>{item.stage.toUpperCase()}</>} textStyle={[styles.statusText, { color: stageColor }]} />
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 120 }]}>
-                      <Text style={[styles.tableCell, { fontWeight: '700' }]}>₹{item.dealValue.toLocaleString('en-IN')}</Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 120 }]}>
-                      <Text style={styles.tableCell} numberOfLines={1}>{item.leadSource}</Text>
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 180 }]}>
-                      <Text style={{ ...Typography.bodySm, color: colors.text.primary }} numberOfLines={1}>{item.phone || 'N/A'}</Text>
-                      {item.email ? <Text style={styles.secondaryText} numberOfLines={1}>{item.email}</Text> : null}
-                    </View>
-                    <View style={[styles.tableCellContainer, { width: 80, borderRightWidth: 0, alignItems: 'center', justifyContent: 'center' }]}>
-                      <TouchableOpacity style={styles.actionIconButton} onPress={() => { setSelectedContact(item); setDetailVisible(true); }}>
-                        <Ionicons name="eye" size={16} color={colors.primary} />
-                      </TouchableOpacity>
-                    </View>
+          <DataTable
+            data={contacts || []}
+            columns={[
+              {
+                key: 'name',
+                title: 'Name',
+                flex: 1.5,
+                render: (item: any) => (
+                  <View>
+                    <Text style={styles.primaryText}>{item.name}</Text>
+                    {item.company ? <Text style={styles.secondaryText}>{item.company}</Text> : null}
                   </View>
-                );
-              }}  />
+                )
+              },
+              {
+                key: 'company',
+                title: 'Company',
+                flex: 1.2,
+                render: (item: any) => (
+                  <Text style={styles.tableCell} numberOfLines={1}>{item.company || 'N/A'}</Text>
+                )
+              },
+              {
+                key: 'stage',
+                title: 'Stage',
+                flex: 1,
+                render: (item: any) => {
+                  const stageColor = stageColors[item.stage as Stage] || colors.text.muted;
+                  return <StatusPill label={<>{item.stage.toUpperCase()}</>} textStyle={[styles.statusText, { color: stageColor }]} />;
+                }
+              },
+              {
+                key: 'dealValue',
+                title: 'Deal Value',
+                flex: 1,
+                render: (item: any) => (
+                  <Text style={[styles.tableCell, { fontWeight: '700' }]}>₹{item.dealValue.toLocaleString('en-IN')}</Text>
+                )
+              },
+              {
+                key: 'leadSource',
+                title: 'Lead Source',
+                flex: 1,
+                render: (item: any) => (
+                  <Text style={styles.tableCell} numberOfLines={1}>{item.leadSource}</Text>
+                )
+              },
+              {
+                key: 'contact',
+                title: 'Phone / Email',
+                flex: 1.5,
+                render: (item: any) => (
+                  <View>
+                    <Text style={{ ...Typography.bodySm, color: colors.text.primary }} numberOfLines={1}>{item.phone || 'N/A'}</Text>
+                    {item.email ? <Text style={styles.secondaryText} numberOfLines={1}>{item.email}</Text> : null}
+                  </View>
+                )
+              },
+              {
+                key: 'action',
+                title: 'Action',
+                width: 80,
+                align: 'center',
+                render: (item: any) => (
+                  <TouchableOpacity style={styles.actionIconButton} onPress={() => { setSelectedContact(item); setDetailVisible(true); }}>
+                    <Ionicons name="eye" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                )
+              }
+            ]}
+            keyExtractor={(item: any, index: number) => item._id || String(index)}
+            minWidth={900}
+            embedded
+          />
 
           {hasMore && (
             <TouchableOpacity

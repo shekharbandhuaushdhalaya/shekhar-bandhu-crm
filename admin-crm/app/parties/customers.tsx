@@ -14,8 +14,11 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 import { FIRM_DETAILS } from '../../constants/firm';
 import { AddPaymentModal } from '../payments';
 import { validateGstinWithState, formatPhoneWithCountryCode, toTitleCase } from '../../utils/gst';
+import { useToast } from '../../utils/ToastContext';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
+import { ListToolbar } from '../../components/ListToolbar';
+
 
 const GST_STATE_CODES: { [key: string]: string } = {
   '01': 'Jammu & Kashmir',
@@ -1481,9 +1484,11 @@ function CustomerLedgerModal({
                           {row.mode === 'regular' ? 'GST' : 'Cash'}
                         </Text>
                       </View>
-                      <Text style={[styles.ledgerCell, { ...Typography.caption, width: 80, fontWeight: isOverdue ? 'bold' : 'normal', color: (row.status === 'paid' || row.status === 'finalized' || row.status === 'Received') ? colors.success
+                      <Text style={[styles.ledgerCell, {
+                        ...Typography.caption, width: 80, fontWeight: isOverdue ? 'bold' : 'normal', color: (row.status === 'paid' || row.status === 'finalized' || row.status === 'Received') ? colors.success
                           : isOverdue ? colors.danger
-                            : colors.text.muted }]}>
+                            : colors.text.muted
+                      }]}>
                         {displayStatus}
                       </Text>
                       <Text style={[styles.ledgerCell, { width: 120, textAlign: 'right', fontWeight: '700', color: row.amount > 0 ? colors.success : colors.danger }]}>
@@ -1693,9 +1698,9 @@ export default function CustomersScreen() {
         const color = amount > 0 ? (isCash ? colors.warning : colors.success) : amount < 0 ? colors.danger : colors.text.muted;
         const bg = amount > 0 ? (isCash ? colors.warning + '12' : colors.success + '12') : amount < 0 ? colors.danger + '12' : colors.bg.secondary;
         return (
-          <StatusPill  label={<>
-              {label} {Math.abs(amount).toLocaleString('en-IN')}
-            </>} textStyle={[styles.balanceText, { ...Typography.bodySm, color, fontWeight: '800' }]} />
+          <StatusPill label={<>
+            {label} {Math.abs(amount).toLocaleString('en-IN')}
+          </>} textStyle={[styles.balanceText, { ...Typography.bodySm, color, fontWeight: '800' }]} />
         );
       }
     },
@@ -1717,65 +1722,61 @@ export default function CustomersScreen() {
     <View style={styles.screen}>
       <View style={styles.innerContainer}>
         <View style={{ zIndex: 1100, position: 'relative' }}>
-          <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput
-              style={[styles.searchInput, { minWidth: 60 }]}
-              placeholder={isDesktop ? "Search customers..." : "Search..."}
-              placeholderTextColor={colors.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
+          <ListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={isDesktop ? "Search customers..." : "Search..."}
+            primaryAction={{
+              label: 'New Customer',
+              icon: 'add',
+              onPress: () => { setSelectedCust(null); setIsEditing(false); setAddVisible(true); }
+            }}
+            renderFilters={() => (
+              <View style={{ position: 'relative', zIndex: 1200 }}>
+                <TouchableOpacity
+                  style={[styles.filterDropdownButton, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 4 }]}
+                  onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+                >
+                  <Ionicons name={activeTab === 'gst' ? "business" : "cash"} size={14} color={activeTab === 'gst' ? colors.primary : colors.warning} />
+                  <Text style={styles.filterDropdownButtonText}>
+                    {activeTab === 'gst' ? (isDesktop ? 'GST Customers' : 'GST') : (isDesktop ? 'Cash / Unreg' : 'Cash')}
+                  </Text>
+                  <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
+                </TouchableOpacity>
 
-            {/* Wrap filter button and dropdown panel in a local relative container to prevent mobile clipping */}
-            <View style={{ position: 'relative', zIndex: 1200 }}>
-              <TouchableOpacity
-                style={[styles.filterDropdownButton, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 4 }]}
-                onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-              >
-                <Ionicons name={activeTab === 'gst' ? "business" : "cash"} size={14} color={activeTab === 'gst' ? colors.primary : colors.warning} />
-                <Text style={styles.filterDropdownButtonText}>
-                  {activeTab === 'gst' ? (isDesktop ? 'GST Customers' : 'GST') : (isDesktop ? 'Cash / Unreg' : 'Cash')}
-                </Text>
-                <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {showFilterDropdown && (
-                <View style={[styles.filterDropdownPanel, { top: 40, right: 0, width: isDesktop ? 220 : 160 }]}>
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
-                    <TouchableOpacity
-                      style={[styles.filterDropdownItem, activeTab === 'gst' && { backgroundColor: colors.primary + '08' }]}
-                      onPress={() => {
-                        setActiveTab('gst');
-                        setShowFilterDropdown(false);
-                      }}
-                    >
-                      <Text style={[styles.filterDropdownItemText, activeTab === 'gst' && { fontWeight: '700', color: colors.primary }]}>
-                        GST Customers
-                      </Text>
-                    </TouchableOpacity>
-                    {canAccessCash && (
+                {showFilterDropdown && (
+                  <View style={[styles.filterDropdownPanel, { top: 40, right: 0, width: isDesktop ? 220 : 160 }]}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
                       <TouchableOpacity
-                        style={[styles.filterDropdownItem, activeTab === 'cash' && { backgroundColor: colors.primary + '08' }]}
+                        style={[styles.filterDropdownItem, activeTab === 'gst' && { backgroundColor: colors.primary + '08' }]}
                         onPress={() => {
-                          setActiveTab('cash');
+                          setActiveTab('gst');
                           setShowFilterDropdown(false);
                         }}
                       >
-                        <Text style={[styles.filterDropdownItemText, activeTab === 'cash' && { fontWeight: '700', color: colors.warning }]}>
-                          Cash / Unregistered
+                        <Text style={[styles.filterDropdownItemText, activeTab === 'gst' && { fontWeight: '700', color: colors.primary }]}>
+                          GST Customers
                         </Text>
                       </TouchableOpacity>
-                    )}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
-            <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedCust(null); setIsEditing(false); setAddVisible(true); }}>
-              <Ionicons name="add" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
+                      {canAccessCash && (
+                        <TouchableOpacity
+                          style={[styles.filterDropdownItem, activeTab === 'cash' && { backgroundColor: colors.primary + '08' }]}
+                          onPress={() => {
+                            setActiveTab('cash');
+                            setShowFilterDropdown(false);
+                          }}
+                        >
+                          <Text style={[styles.filterDropdownItemText, activeTab === 'cash' && { fontWeight: '700', color: colors.warning }]}>
+                            Cash / Unregistered
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+          />
         </View>
 
         <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
@@ -1793,8 +1794,8 @@ export default function CustomersScreen() {
             onRowPress={(c) => { setSelectedCust(c); setLedgerVisible(true); }}
             ListEmptyComponent={
               <EmptyState title={<>
-                  No {activeTab === 'gst' ? 'GST' : 'Cash / Unregistered'} customers registered
-                </>}  />
+                No {activeTab === 'gst' ? 'GST' : 'Cash / Unregistered'} customers registered
+              </>} />
             }
           />
         </View>

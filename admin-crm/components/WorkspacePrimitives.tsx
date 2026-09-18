@@ -10,32 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { LightColors, Radius, Shadows, Spacing, withAlpha, Typography } from '../constants/theme';
 
-type Action = {
-  label: string;
-  icon?: keyof typeof Ionicons.glyphMap;
-  onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost';
-};
 
-export function WorkspaceHeader({ title, subtitle, eyebrow, actions = [] }: { title: string; subtitle?: string; eyebrow?: string; actions?: Action[] }) {
-  const { colors } = useTheme();
-  const styles = useStyles(createStyles);
-  const { width } = useWindowDimensions();
-  return (
-    <View style={[styles.header, width < 600 && { flexDirection: 'column', alignItems: 'stretch', gap: Spacing.md, paddingHorizontal: Spacing.md }]}>
-      <View style={styles.headerCopy}>
-        {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-      </View>
-      {actions.length ? (
-        <View style={styles.headerActions}>
-          {actions.map(action => <WorkspaceButton key={action.label} {...action} />)}
-        </View>
-      ) : null}
-    </View>
-  );
-}
 
 export function selectedIcon(icon: keyof typeof Ionicons.glyphMap, active: boolean): keyof typeof Ionicons.glyphMap {
   const filled = icon.replace(/-outline$/, '') as keyof typeof Ionicons.glyphMap;
@@ -98,7 +73,7 @@ export function Panel({ title, subtitle, action, children, style }: { title?: st
   );
 }
 
-export function EmptyState({ icon = 'file-tray-outline', title, message }: { icon?: keyof typeof Ionicons.glyphMap; title: ReactNode; message?: ReactNode }) {
+export function EmptyState({ icon = 'file-tray-outline', title, message, actionLabel, onAction }: { icon?: keyof typeof Ionicons.glyphMap; title: ReactNode; message?: ReactNode; actionLabel?: string; onAction?: () => void }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   return (
@@ -106,6 +81,11 @@ export function EmptyState({ icon = 'file-tray-outline', title, message }: { ico
       <View style={styles.emptyIcon}><Ionicons name={icon} size={22} color={colors.text.muted} /></View>
       <Text style={styles.emptyTitle}>{title}</Text>
       {message ? <Text style={styles.emptyMessage}>{message}</Text> : null}
+      {actionLabel && onAction ? (
+        <TouchableOpacity style={{ marginTop: 16, backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6 }} onPress={onAction}>
+          <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13 }}>{actionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

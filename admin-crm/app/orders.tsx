@@ -1,5 +1,6 @@
-import ScreenHeader from '../components/ScreenHeader';
-import { DataTable } from '../components/DataTable';
+import { PageHeader as ScreenHeader } from '../components/PageHeader';
+import { ListToolbar } from '../components/ListToolbar';
+import { DataTable, Column } from '../components/DataTable';
 import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
@@ -195,185 +196,187 @@ export default function OrdersScreen() {
     }
   };
 
+  const columns: Column<Order>[] = [
+    {
+      key: 'orderId',
+      title: 'Order & Date',
+      width: 140,
+      render: (o) => (
+        <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center' }}>
+          <Text style={styles.orderIdText} numberOfLines={1}>#{o._id.slice(-6)}</Text>
+          <Text style={styles.orderDate}>{new Date(o.createdAt).toLocaleDateString('en-IN')}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'customer',
+      title: 'Customer',
+      flex: 2,
+      render: (o) => (
+        <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center' }}>
+          <Text style={styles.primaryText} numberOfLines={1}>{o.name}</Text>
+          <Text style={styles.subText} numberOfLines={1}>Phone: {o.phone}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'items',
+      title: 'Items',
+      flex: 1.2,
+      render: (o) => (
+        <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center' }}>
+          <Text style={styles.primaryText}>{o.items.length} {o.items.length === 1 ? 'Item' : 'Items'}</Text>
+          <Text style={styles.subText} numberOfLines={1}>{o.items.map(i => i.name).join(', ')}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'amount',
+      title: 'Amount',
+      width: 120,
+      render: (o) => (
+        <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center' }}>
+          <Text style={[styles.primaryText, { color: colors.success, fontWeight: '800' }]}>₹{(o.totalAmount || 0).toLocaleString('en-IN')}</Text>
+        </View>
+      )
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      width: 130,
+      render: (o) => (
+        <View style={{ flex: 1, paddingVertical: 6, justifyContent: 'center', alignItems: 'flex-start' }}>
+          <StatusPill label={<>{o.status.toUpperCase()}</>} textStyle={[styles.statusBadgeText, { color: getStatusColor(o.status) }]} />
+        </View>
+      )
+    },
+    {
+      key: 'action',
+      title: 'Action',
+      width: 200,
+      render: (o) => (
+        <View style={{ flex: 1, paddingVertical: 6, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'flex-start' }}>
+          <TouchableOpacity
+            style={[styles.actionPillBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+            onPress={() => setSelectedOrder(o)}
+          >
+            <Ionicons name="eye-outline" size={13} color={colors.primary} />
+            <Text style={[styles.actionPillText, { color: colors.primary }]}>View</Text>
+          </TouchableOpacity>
+
+          {o.status === 'pending' && (
+            <TouchableOpacity
+              style={[styles.actionPillBtn, { backgroundColor: colors.warning + '15', borderColor: colors.warning }]}
+              onPress={() => handleUpdateStatus(o._id, 'processing')}
+            >
+              <Ionicons name="cog-outline" size={13} color={colors.warning} />
+              <Text style={[styles.actionPillText, { color: colors.warning }]}>Process</Text>
+            </TouchableOpacity>
+          )}
+
+          {o.hasChallan ? (
+            <View style={[styles.actionPillBtn, { backgroundColor: colors.bg.secondary, borderColor: colors.border, maxWidth: 110 }]}>
+              <Ionicons name="checkmark-done" size={13} color={colors.text.muted} />
+              <Text style={[styles.actionPillText, { color: colors.text.muted, flexShrink: 1 }]} numberOfLines={1} ellipsizeMode="tail">{o.challanNo || 'Challan'}</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.actionPillBtn, { backgroundColor: colors.infoLight, borderColor: colors.info }]}
+              onPress={() => handleCreateChallan(o)}
+            >
+              <Ionicons name="document-attach-outline" size={13} color={colors.info} />
+              <Text style={[styles.actionPillText, { color: colors.info }]}>Challan</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )
+    }
+  ];
+
   return (
     <View style={styles.screen}>
       <ScreenHeader title="Orders" subtitle="Review customer orders, fulfillment and delivery status." />
       {/* Integrated Search & Filter Header */}
-      <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xs }}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: colors.bg.card,
-          paddingHorizontal: 12,
-          paddingRight: 8,
-          borderRadius: Radius.md,
-          borderWidth: 1,
-          borderColor: colors.border,
-          gap: 10,
-          minHeight: 46
-        }}>
-          <Ionicons name="search" size={18} color={colors.text.muted} />
-          <TextInput
-            style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 100 }}
-            placeholder="Search orders by customer, tracking, address..."
-            placeholderTextColor={colors.text.muted}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
-          ) : null}
-
-          {/* Status Dropdown inside search bar */}
-          {Platform.OS === 'web' ? (
-            <select
-              value={activeTab}
-              onChange={(e: any) => setActiveTab(e.target.value)}
-            style={{ ...Typography.bodySm, padding: '6px 12px', borderRadius: 6, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontWeight: '600', outline: 'none', minHeight: 44, height: 44, cursor: 'pointer' }}
-            >
-              <option value="all">All Statuses ({orders.length})</option>
-              <option value="pending">Pending ({orders.filter(o => o.status === 'pending').length})</option>
-              <option value="processing">Processing ({orders.filter(o => o.status === 'processing').length})</option>
-              <option value="shipped">Shipped ({orders.filter(o => o.status === 'shipped').length})</option>
-              <option value="delivered">Delivered ({orders.filter(o => o.status === 'delivered').length})</option>
-            </select>
-          ) : (
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: colors.bg.secondary,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 6,
-                paddingHorizontal: 10,
-                minHeight: 44,
-                height: 44,
-                gap: 6
-              }}
-              onPress={() => {
-                const opts = [
-                  { label: `All Statuses (${orders.length})`, val: 'all' },
-                  { label: `Pending (${orders.filter(o => o.status === 'pending').length})`, val: 'pending' },
-                  { label: `Processing (${orders.filter(o => o.status === 'processing').length})`, val: 'processing' },
-                  { label: `Shipped (${orders.filter(o => o.status === 'shipped').length})`, val: 'shipped' },
-                  { label: `Delivered (${orders.filter(o => o.status === 'delivered').length})`, val: 'delivered' },
-                ];
-                Alert.alert('Filter Status', '', opts.map(o => ({
-                  text: o.label,
-                  onPress: () => setActiveTab(o.val as any)
-                })));
-              }}
-            >
-              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
-                {activeTab.toUpperCase()} ({activeTab === 'all' ? orders.length : orders.filter(o => o.status === activeTab).length})
-              </Text>
-              <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Orders Table Container */}
-      <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: 40 }}>
-        <DataTable data={filteredOrders || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={1100} embedded containerStyle={{ flex: 1, height: '100%' }} renderTableHeader={() => (<View style={styles.tableHeaderRow}>
-              <View style={[styles.tableHeaderCellContainer, { width: 140 }]}>
-                <Text style={styles.tableHeaderCell}>Order &amp; Date</Text>
-              </View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 200 }]}>
-                <Text style={styles.tableHeaderCell}>Customer</Text>
-              </View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 1.2, minWidth: 140 }]}>
-                <Text style={styles.tableHeaderCell}>Items</Text>
-              </View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}>
-                <Text style={styles.tableHeaderCell}>Amount</Text>
-              </View>
-              <View style={[styles.tableHeaderCellContainer, { width: 130 }]}>
-                <Text style={styles.tableHeaderCell}>Status</Text>
-              </View>
-              <View style={[styles.tableHeaderCellContainer, { width: 200, borderRightWidth: 0 }]}>
-                <Text style={styles.tableHeaderCell}>Action</Text>
-              </View>
-            </View>)} renderTableRow={o => {
-              const statusColor = getStatusColor(o.status);
-              return (
-                <TouchableOpacity
-                  key={o._id}
-                  style={[
-                    styles.tableBodyRow,
-                    {
-                      backgroundColor: statusColor + '0A',
-                      borderLeftWidth: 4,
-                      borderLeftColor: statusColor
-                    }
-                  ]}
-                  onPress={() => setSelectedOrder(o)}
-                >
-                <View style={[styles.tableCellContainer, { width: 140 }]}>
-                  <Text style={styles.orderIdText} numberOfLines={1}>#{o._id.slice(-6)}</Text>
-                  <Text style={styles.orderDate}>{new Date(o.createdAt).toLocaleDateString('en-IN')}</Text>
-                </View>
-
-                <View style={[styles.tableCellContainer, { flex: 2, minWidth: 200 }]}>
-                  <Text style={styles.primaryText} numberOfLines={1}>{o.name}</Text>
-                  <Text style={styles.subText} numberOfLines={1}>Phone: {o.phone}</Text>
-                </View>
-
-                <View style={[styles.tableCellContainer, { flex: 1.2, minWidth: 140 }]}>
-                  <Text style={styles.primaryText}>{o.items.length} {o.items.length === 1 ? 'Item' : 'Items'}</Text>
-                  <Text style={styles.subText} numberOfLines={1}>{o.items.map(i => i.name).join(', ')}</Text>
-                </View>
-
-                <View style={[styles.tableCellContainer, { width: 120 }]}>
-                  <Text style={[styles.primaryText, { color: colors.success, fontWeight: '800' }]}>₹{(o.totalAmount || 0).toLocaleString('en-IN')}</Text>
-                </View>
-
-                <View style={[styles.tableCellContainer, { width: 130 }]}>
-                  <StatusPill  label={<>
-                      {o.status.toUpperCase()}
-                    </>} textStyle={[styles.statusBadgeText, { color: getStatusColor(o.status) }]} />
-                </View>
-
-                <View style={[styles.tableCellContainer, { width: 200, borderRightWidth: 0, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'flex-start' }]}>
-                  <TouchableOpacity
-                    style={[styles.actionPillBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-                    onPress={() => setSelectedOrder(o)}
-                  >
-                    <Ionicons name="eye-outline" size={13} color={colors.primary} />
-                    <Text style={[styles.actionPillText, { color: colors.primary }]}>View</Text>
-                  </TouchableOpacity>
-
-                  {o.status === 'pending' && (
-                    <TouchableOpacity
-                      style={[styles.actionPillBtn, { backgroundColor: colors.warning + '15', borderColor: colors.warning }]}
-                      onPress={() => handleUpdateStatus(o._id, 'processing')}
-                    >
-                      <Ionicons name="cog-outline" size={13} color={colors.warning} />
-                      <Text style={[styles.actionPillText, { color: colors.warning }]}>Process</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {o.hasChallan ? (
-                    <View style={[styles.actionPillBtn, { backgroundColor: colors.bg.secondary, borderColor: colors.border, maxWidth: 110 }]}>
-                      <Ionicons name="checkmark-done" size={13} color={colors.text.muted} />
-                      <Text style={[styles.actionPillText, { color: colors.text.muted, flexShrink: 1 }]} numberOfLines={1} ellipsizeMode="tail">{o.challanNo || 'Challan'}</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[styles.actionPillBtn, { backgroundColor: colors.infoLight, borderColor: colors.info }]}
-                      onPress={() => handleCreateChallan(o)}
-                    >
-                      <Ionicons name="document-attach-outline" size={13} color={colors.info} />
-                      <Text style={[styles.actionPillText, { color: colors.info }]}>Challan</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+      <ListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search orders by customer, tracking, address..."
+        renderFilters={() => (
+          <>
+            {Platform.OS === 'web' ? (
+              <select
+                value={activeTab}
+                onChange={(e: any) => setActiveTab(e.target.value)}
+                style={{ ...Typography.bodySm, padding: '6px 12px', borderRadius: 6, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontWeight: '600', outline: 'none', minHeight: 38, height: 38, cursor: 'pointer' }}
+              >
+                <option value="all">All Statuses ({orders.length})</option>
+                <option value="pending">Pending ({orders.filter(o => o.status === 'pending').length})</option>
+                <option value="processing">Processing ({orders.filter(o => o.status === 'processing').length})</option>
+                <option value="shipped">Shipped ({orders.filter(o => o.status === 'shipped').length})</option>
+                <option value="delivered">Delivered ({orders.filter(o => o.status === 'delivered').length})</option>
+              </select>
+            ) : (
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.bg.secondary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 6,
+                  paddingHorizontal: 10,
+                  minHeight: 38,
+                  height: 38,
+                  gap: 6
+                }}
+                onPress={() => {
+                  const opts = [
+                    { label: `All Statuses (${orders.length})`, val: 'all' },
+                    { label: `Pending (${orders.filter(o => o.status === 'pending').length})`, val: 'pending' },
+                    { label: `Processing (${orders.filter(o => o.status === 'processing').length})`, val: 'processing' },
+                    { label: `Shipped (${orders.filter(o => o.status === 'shipped').length})`, val: 'shipped' },
+                    { label: `Delivered (${orders.filter(o => o.status === 'delivered').length})`, val: 'delivered' },
+                  ];
+                  Alert.alert('Filter Status', '', opts.map(o => ({
+                    text: o.label,
+                    onPress: () => setActiveTab(o.val as any)
+                  })));
+                }}
+              >
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
+                  {activeTab.toUpperCase()} ({activeTab === 'all' ? orders.length : orders.filter(o => o.status === activeTab).length})
+                </Text>
+                <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
               </TouchableOpacity>
-            );
-          }} isRefreshing={refreshing} onRefresh={onRefresh} onLoadMore={() => { if (page < totalPages) setPage(p => p + 1); }} ListEmptyComponent={<EmptyState title={<>No Orders Found</>} message={<>{activeTab === 'all' ? 'No B2B orders have been placed yet.' : `No orders with status "${activeTab}" found.`}</>} />} />
+            )}
+          </>
+        )}
+      />
+
+      <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: 40 }}>
+        <DataTable
+          data={filteredOrders || []}
+          columns={columns}
+          keyExtractor={(item: any, index: number) => item._id || String(index)}
+          minWidth={1100}
+          embedded
+          containerStyle={{ flex: 1, height: '100%' }}
+          onRowPress={(o: any) => setSelectedOrder(o)}
+          rowStyle={(o: any) => ({
+            backgroundColor: getStatusColor(o.status) + '0A',
+            borderLeftWidth: 4,
+            borderLeftColor: getStatusColor(o.status),
+          })}
+          isRefreshing={refreshing}
+          onRefresh={onRefresh}
+          onLoadMore={() => { if (page < totalPages) setPage(p => p + 1); }}
+          ListEmptyComponent={
+            <EmptyState 
+              title={<>No Orders Found</>} 
+              message={<>{activeTab === 'all' ? 'No B2B orders have been placed yet.' : `No orders with status "${activeTab}" found.`}</>} 
+            />
+          }
+        />
       </View>
 
       {/* Order Detail Modal Drawer */}

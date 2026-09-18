@@ -1,5 +1,5 @@
-import ScreenHeader from '../components/ScreenHeader';
-import { DataTable } from '../components/DataTable';
+import { PageHeader as ScreenHeader } from '../components/PageHeader';
+import { DataTable, Column } from '../components/DataTable';
 import { WorkspaceLoading } from './../components/WorkspacePrimitives';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
@@ -291,6 +291,16 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
   const table9B_CN = data.table9B_CreditNotes || {};
   const table9B_DN = data.table9B_DebitNotes || {};
 
+  const columns: Column<any>[] = [
+    { key: 'invoiceNo', title: 'Invoice No', width: 140, render: inv => <View style={{ flex: 1, paddingVertical: 10, justifyContent: 'center' }}><Text style={[styles.tableCell, { fontWeight: '700' }]}>{inv.invoiceNo}</Text></View> },
+    { key: 'customerName', title: 'Customer Name', flex: 2, render: inv => <View style={{ flex: 1, paddingVertical: 10, justifyContent: 'center' }}><Text style={styles.tableCell} numberOfLines={1}>{inv.customerName}</Text></View> },
+    { key: 'gstin', title: 'GSTIN', width: 140, render: inv => <View style={{ flex: 1, paddingVertical: 10, justifyContent: 'center' }}><Text style={[styles.tableCell, { ...Typography.bodySm }]}>{inv.gstin}</Text></View> },
+    { key: 'taxable', title: 'Taxable (₹)', width: 120, render: inv => <View style={{ flex: 1, paddingVertical: 10, justifyContent: 'center' }}><Text style={styles.tableCell}>₹{(inv.taxableValue || 0).toLocaleString('en-IN')}</Text></View> },
+    { key: 'cgst', title: 'CGST (₹)', width: 100, render: inv => <View style={{ flex: 1, paddingVertical: 10, justifyContent: 'center' }}><Text style={styles.tableCell}>₹{(inv.cgst || 0).toLocaleString('en-IN')}</Text></View> },
+    { key: 'sgst', title: 'SGST (₹)', width: 100, render: inv => <View style={{ flex: 1, paddingVertical: 10, justifyContent: 'center' }}><Text style={styles.tableCell}>₹{(inv.sgst || 0).toLocaleString('en-IN')}</Text></View> },
+    { key: 'igst', title: 'IGST (₹)', width: 100, render: inv => <View style={{ flex: 1, paddingVertical: 10, justifyContent: 'center' }}><Text style={styles.tableCell}>₹{(inv.igst || 0).toLocaleString('en-IN')}</Text></View> }
+  ];
+
   return (
     <View>
       {/* Top Stat Summary Cards */}
@@ -341,39 +351,13 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
       {/* B2B Table */}
       <View style={{ marginBottom: Spacing.lg }}>
         <Text style={styles.sectionTitle}>B2B Registered Invoices ({data.b2b?.length || 0})</Text>
-        <DataTable data={data.b2b || []} columns={[]} keyExtractor={(item: any, index: number) => item._id || String(index)} minWidth={1000} embedded renderTableHeader={() => (<View style={styles.tableHeaderRow}>
-              <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>Invoice No</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { flex: 2, minWidth: 180 }]}><Text style={styles.tableHeaderCell}>Customer Name</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 140 }]}><Text style={styles.tableHeaderCell}>GSTIN</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 120 }]}><Text style={styles.tableHeaderCell}>Taxable (₹)</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>CGST (₹)</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 100 }]}><Text style={styles.tableHeaderCell}>SGST (₹)</Text></View>
-              <View style={[styles.tableHeaderCellContainer, { width: 100, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>IGST (₹)</Text></View>
-            </View>)} renderTableRow={(inv: any, i: number) => (
-              <View key={i} style={styles.tableBodyRow}>
-                <View style={[styles.tableCellContainer, { width: 140 }]}>
-                  <Text style={[styles.tableCell, { fontWeight: '700' }]}>{inv.invoiceNo}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { flex: 2, minWidth: 180 }]}>
-                  <Text style={styles.tableCell} numberOfLines={1}>{inv.customerName}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 140 }]}>
-                  <Text style={[styles.tableCell, { ...Typography.bodySm }]}>{inv.gstin}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 120 }]}>
-                  <Text style={styles.tableCell}>₹{(inv.taxableValue || 0).toLocaleString('en-IN')}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 100 }]}>
-                  <Text style={styles.tableCell}>₹{(inv.cgst || 0).toLocaleString('en-IN')}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 100 }]}>
-                  <Text style={styles.tableCell}>₹{(inv.sgst || 0).toLocaleString('en-IN')}</Text>
-                </View>
-                <View style={[styles.tableCellContainer, { width: 100, borderRightWidth: 0 }]}>
-                  <Text style={styles.tableCell}>₹{(inv.igst || 0).toLocaleString('en-IN')}</Text>
-                </View>
-              </View>
-            )}  />
+        <DataTable
+          data={data.b2b || []}
+          columns={columns}
+          keyExtractor={(item: any, index: number) => item._id || String(index)}
+          minWidth={1000}
+          embedded
+        />
       </View>
 
       {/* B2C Summary */}

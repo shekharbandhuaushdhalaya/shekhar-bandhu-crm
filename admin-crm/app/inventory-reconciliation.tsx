@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppText as Text } from '../components/AppText';
-import ScreenHeader from '../components/ScreenHeader';
+import { PageHeader as ScreenHeader } from '../components/PageHeader';
 import { EmptyState, Panel, StatusPill, WorkspaceError, WorkspaceLoading } from '../components/WorkspacePrimitives';
 import { LightColors, Spacing, Typography } from '../constants/theme';
 import { api } from '../utils/api';

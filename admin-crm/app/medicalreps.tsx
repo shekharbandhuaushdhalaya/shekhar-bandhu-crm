@@ -10,7 +10,8 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { api, MedicalRepresentative, MrDailyLog, MrVisit, MrAssignment, Doctor, MrExpense, MrDashboardSummary, Product } from '../utils/api';
 import { LightColors, Spacing, Radius, Shadows, Typography } from '../constants/theme';
-import { WorkspaceHeader, WorkspaceTabs, WorkspaceLoading, StatusPill, EmptyState, WorkspaceTransition } from './../components/WorkspacePrimitives';
+import { WorkspaceTabs, WorkspaceLoading, StatusPill, EmptyState, WorkspaceTransition } from './../components/WorkspacePrimitives';
+import { PageHeader as WorkspaceHeader } from './../components/PageHeader';
 
 type Tab = 'dashboard' | 'mrs' | 'portfolio' | 'attendance' | 'visits' | 'expenses';
 

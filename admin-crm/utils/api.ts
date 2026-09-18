@@ -250,9 +250,16 @@ class ApiClient {
           if (nextToken) {
             headers['Authorization'] = `Bearer ${nextToken}`;
             const retry = await fetch(fetchUrl, { ...options, headers });
-            if (retry.ok) return retry;
+            if (retry.ok) {
+              return retry;
+            } else {
+              // If retry fails even with a fresh token, do not emit auth_error
+              // It might be a 401 caused by incorrect permissions, not an expired token.
+              res = retry; 
+            }
+          } else {
+            DeviceEventEmitter.emit('auth_error');
           }
-          DeviceEventEmitter.emit('auth_error');
         }
         if (!res.ok) {
           let errMsg = 'API Error';

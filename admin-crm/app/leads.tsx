@@ -10,6 +10,7 @@ import { api, Contact } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { AddContactModal, ContactDetailModal } from './contacts';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { ListToolbar } from '../components/ListToolbar';
 
 function PipelineColumn({ stage, contacts, onMoveContact, onClickContact, width }: { stage: Stage; contacts: Contact[]; onMoveContact: (id: string, newStage: string) => void; onClickContact: (c: Contact) => void; width: number }) {
   const { colors } = useTheme();
@@ -139,23 +140,17 @@ export default function LeadsScreen() {
         </View>
       </View>
 
-      {/* Top Bar with Search and Add Button */}
-      <View style={styles.topBar}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={colors.text.muted} />
-          <TextInput 
-            style={styles.searchInput} 
-            placeholder="Search leads..." 
-            placeholderTextColor={colors.text.muted} 
-            value={search} 
-            onChangeText={setSearch} 
-          />
-        </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setAddVisible(true)}>
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addBtnText}>Add Lead</Text>
-        </TouchableOpacity>
-      </View>
+      <ListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search leads..."
+        primaryAction={{
+          label: 'Add Lead',
+          icon: 'add',
+          onPress: () => setAddVisible(true)
+        }}
+        containerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md }}
+      />
 
       {/* Horizontal scrollable columns */}
       <ScrollView horizontal pagingEnabled={false} showsHorizontalScrollIndicator={winWidth <= 1100} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.lg }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>

@@ -16,8 +16,10 @@ import { useTheme, useStyles } from '../../utils/themeContext';
 import { LOGO_BASE64 } from '../../utils/logo';
 import { FIRM_DETAILS } from '../../constants/firm';
 import { printInvoice } from '../../utils/printInvoiceTemplate';
+import { useToast } from '../../utils/ToastContext';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
 import { DataTable, Column } from '../../components/DataTable';
+import { ListToolbar } from '../../components/ListToolbar';
 
 const getFinancialYearString = (date: Date): string => {
   const startYear = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
@@ -1895,54 +1897,50 @@ export default function SaleInvoicesScreen() {
               onPress={() => setShowFilterDropdown(false)}
             />
           )}
-          <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput
-              style={[styles.searchInput, { minWidth: 100 }]}
-              placeholder="Search sale invoices..."
-              placeholderTextColor={colors.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
+          <ListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search sale invoices..."
+            primaryAction={{
+              label: 'From Challan',
+              icon: 'document-text-outline',
+              onPress: () => router.push('/sales-workspace?tab=challans')
+            }}
+            renderFilters={() => (
+              <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
+                <TouchableOpacity
+                  style={styles.filterDropdownButton}
+                  onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+                >
+                  <Text style={styles.filterDropdownButtonText}>
+                    {fyFilter === 'All' ? 'All FYs' : `FY ${fyFilter}`}
+                  </Text>
+                  <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
+                </TouchableOpacity>
 
-            <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
-              <TouchableOpacity
-                style={styles.filterDropdownButton}
-                onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-              >
-                <Text style={styles.filterDropdownButtonText}>
-                  {fyFilter === 'All' ? 'All FYs' : `FY ${fyFilter}`}
-                </Text>
-                <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {showFilterDropdown && (
-                <View style={[styles.filterDropdownPanel, { top: 40, right: 0 }]}>
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
-                    {availableFYs.map(fy => (
-                      <TouchableOpacity
-                        key={fy}
-                        style={[styles.filterDropdownItem, fyFilter === fy && styles.filterDropdownItemActive]}
-                        onPress={() => {
-                          setFyFilter(fy);
-                          setShowFilterDropdown(false);
-                        }}
-                      >
-                        <Text style={[styles.filterDropdownItemText, fyFilter === fy && { fontWeight: '700', color: colors.primary }]}>
-                          {fy === 'All' ? 'All Financial Years' : `FY ${fy}`}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
-            <TouchableOpacity style={[styles.addBtn, { width: 'auto', paddingHorizontal: 12, flexDirection: 'row', gap: 6 }]} onPress={() => router.push('/sales-workspace?tab=challans')}>
-              <Ionicons name="document-text-outline" size={17} color="#fff" />
-              <Text style={{ ...Typography.caption, color: '#fff', fontWeight: '800' }}>From Challan</Text>
-            </TouchableOpacity>
-          </View>
+                {showFilterDropdown && (
+                  <View style={[styles.filterDropdownPanel, { top: 40, right: 0 }]}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                      {availableFYs.map(fy => (
+                        <TouchableOpacity
+                          key={fy}
+                          style={[styles.filterDropdownItem, fyFilter === fy && styles.filterDropdownItemActive]}
+                          onPress={() => {
+                            setFyFilter(fy);
+                            setShowFilterDropdown(false);
+                          }}
+                        >
+                          <Text style={[styles.filterDropdownItemText, fyFilter === fy && { fontWeight: '700', color: colors.primary }]}>
+                            {fy === 'All' ? 'All Financial Years' : `FY ${fy}`}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+          />
         </View>
 
         <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>

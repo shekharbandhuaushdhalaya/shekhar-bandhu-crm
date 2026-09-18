@@ -10,7 +10,8 @@ import { useTheme, useStyles } from '../utils/themeContext';
 import { useAuth } from '../utils/auth';
 import { usePermission } from '../utils/permissions';
 import Svg, { Path, Circle, Text as SvgText, Line, Defs, LinearGradient, Stop, Rect, G } from 'react-native-svg';
-import { MetricTile, Panel, WorkspaceHeader, WorkspaceTabs, WorkspaceLoading, WorkspaceTransition } from './../components/WorkspacePrimitives';
+import { MetricTile, Panel, WorkspaceTabs, WorkspaceLoading, WorkspaceTransition } from './../components/WorkspacePrimitives';
+import { PageHeader as WorkspaceHeader } from './../components/PageHeader';
 
 function MetricCard({ title, value, icon, color, colorLight, trend }: { title: string; value: string; icon: string; color: string; colorLight: string; trend: string }) {
   const styles = useStyles(createStyles);

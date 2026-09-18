@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { LightColors, Radius, Spacing, Typography } from '../constants/theme';
-import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
+import { PageHeader as WorkspaceHeader } from '../components/PageHeader';
 
 const req = <T = any,>(path: string) => api.requestJson<T>(path);
 

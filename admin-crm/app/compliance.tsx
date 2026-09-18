@@ -7,7 +7,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
-import ScreenHeader from '../components/ScreenHeader';
+import { PageHeader as ScreenHeader } from '../components/PageHeader';
 import { useTheme } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 

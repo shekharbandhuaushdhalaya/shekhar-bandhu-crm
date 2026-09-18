@@ -8,7 +8,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { api } from '../utils/api';
 import { LightColors, Radius, Shadows, Spacing, Typography } from '../constants/theme';
-import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceHeader, WorkspaceTransition, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
+import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceTransition, WorkspaceTabs, WorkspaceLoading, WorkspaceError } from '../components/WorkspacePrimitives';
+import { PageHeader as WorkspaceHeader } from '../components/PageHeader';
+import { ListToolbar } from '../components/ListToolbar';
 
 type Tab = 'dashboard' | 'orders' | 'challans' | 'schemes' | 'returns' | 'commissions';
 
@@ -316,25 +318,17 @@ export default function SalesWorkspace() {
         </View>
       ) : null}
 
-      <View style={styles.searchWrap}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={colors.text.muted} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            onSubmitEditing={doSearch}
-            placeholder="Search customer, order, challan, invoice or product"
-            placeholderTextColor={colors.text.muted}
-            style={styles.searchInput}
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => { setSearch(''); setSearchResults(null); }} style={styles.iconButton}>
-              <Ionicons name="close" size={16} color={colors.text.muted} />
-            </TouchableOpacity>
-          ) : null}
-          <TouchableOpacity onPress={doSearch} style={styles.searchButton}><Text style={styles.searchButtonText}>Search</Text></TouchableOpacity>
-        </View>
-      </View>
+      <ListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        onSubmitEditing={doSearch}
+        searchPlaceholder="Search customer, order, challan, invoice or product"
+        primaryAction={{
+          label: 'Search',
+          onPress: doSearch
+        }}
+        containerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm }}
+      />
 
       {resultGroups.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.searchResults}>

@@ -7,7 +7,7 @@ import { useFocusEffect } from 'expo-router';
 import { api, StockMovement } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { LightColors, Spacing, Radius, Typography } from '../constants/theme';
-import ScreenHeader from '../components/ScreenHeader';
+import { PageHeader as ScreenHeader } from '../components/PageHeader';
 import { DataTable, Column } from '../components/DataTable';
 import { WorkspaceTabs, EmptyState, WorkspaceError, StatusPill, WorkspaceTransition } from './../components/WorkspacePrimitives';
 import InventoryDispatchScreen from './inventorydispatch';

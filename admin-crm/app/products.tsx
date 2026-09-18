@@ -13,6 +13,7 @@ import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useToast } from '../utils/ToastContext';
 import { DataTable, Column } from '../components/DataTable';
+import { ListToolbar } from '../components/ListToolbar';
 import PricingScreen from './pricing';
 import { createStyles } from './products/productsStyles';
 import ProductDetailModal from './products/modals/ProductDetailModal';
@@ -268,30 +269,27 @@ export default function ProductsScreen() {
                   onPress={() => setShowFilterDropdown(false)}
                 />
               )}
-              <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12 }]}>
-                <Ionicons name="search" size={18} color={colors.text.muted} />
-                <TextInput
-                  style={[styles.searchInput, { minWidth: 100 }]}
-                  placeholder="Search products..."
-                  placeholderTextColor={colors.text.muted}
-                  value={search}
-                  onChangeText={setSearch}
-                />
-
-                {/* Product Type Filter Dropdown */}
-                <TouchableOpacity style={[styles.filterDropdownButton, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 4 }]} onPress={() => setShowFilterDropdown(!showFilterDropdown)}>
-                  <Text style={styles.filterDropdownButtonText}>
-                    {selectedTypeFilter || 'All Types'}
-                  </Text>
-                  <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
-                </TouchableOpacity>
-
-                {perm.can('product:create') && (
-                  <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedProd(null); setIsEditing(false); setAddVisible(true); }}>
-                    <Ionicons name="add" size={22} color="#fff" />
+              <ListToolbar
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search products..."
+                primaryAction={perm.can('product:create') ? {
+                  label: 'New Product',
+                  icon: 'add',
+                  onPress: () => { setSelectedProd(null); setIsEditing(false); setAddVisible(true); }
+                } : undefined}
+                renderFilters={() => (
+                  <TouchableOpacity
+                    style={[styles.filterDropdownButton, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 4 }]}
+                    onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+                  >
+                    <Text style={styles.filterDropdownButtonText}>
+                      {selectedTypeFilter || 'All Types'}
+                    </Text>
+                    <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
                   </TouchableOpacity>
                 )}
-              </View>
+              />
 
               {showFilterDropdown && (
                 <View style={styles.filterDropdownPanel}>

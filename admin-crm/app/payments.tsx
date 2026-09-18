@@ -1,6 +1,7 @@
 import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
-import { AppTextInput as TextInput } from './../components/AppTextInput';
+import { AppTextInput as TextInput } from '../components/AppTextInput';
+import { ListToolbar } from '../components/ListToolbar';
 import { AppText as Text } from './../components/AppText';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, KeyboardAvoidingView, Platform, Pressable, Alert, useWindowDimensions, DeviceEventEmitter } from 'react-native';
@@ -708,80 +709,77 @@ export default function PaymentsScreen() {
     <View style={styles.screen}>
       <View style={styles.innerContainer}>
         {/* Header Actions & Filters */}
-        <View style={{ zIndex: 1100, position: 'relative', paddingHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
-          <View style={[styles.searchBar, { paddingRight: 8, paddingLeft: 12, marginBottom: 0 }]}>
-            <Ionicons name="search" size={18} color={colors.text.muted} />
-            <TextInput
-              style={[styles.searchInput, { minWidth: 100 }]}
-              placeholder="Search by party or reference..."
-              placeholderTextColor={colors.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
+        <View style={{ zIndex: 1100, position: 'relative', marginBottom: Spacing.xs }}>
+          <ListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search by party or reference..."
+            renderFilters={() => (
+              <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
+                <TouchableOpacity
+                  style={[styles.filterDropdownButton, { borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 4 }]}
+                  onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+                >
+                  <Text style={styles.filterDropdownButtonText}>
+                    {filterType === 'all' ? 'All Types' : filterType === 'receive' ? 'Received' : 'Made'}
+                  </Text>
+                  <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
+                </TouchableOpacity>
 
-            <View style={{ position: 'relative', zIndex: showFilterDropdown ? 1000 : 1 }}>
-              <TouchableOpacity
-                style={styles.filterDropdownButton}
-                onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-              >
-                <Text style={styles.filterDropdownButtonText}>
-                  {filterType === 'all' ? 'All Types' : filterType === 'receive' ? 'Received' : 'Made'}
-                </Text>
-                <Ionicons name={showFilterDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {showFilterDropdown && (
-                <View style={[styles.filterDropdownPanel, { top: 40, right: 0 }]}>
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
-                    {[
-                      { id: 'all', label: 'All Types' },
-                      { id: 'receive', label: 'Received' },
-                      { id: 'make', label: 'Made' }
-                    ].map(t => (
-                      <TouchableOpacity
-                        key={t.id}
-                        style={[styles.filterDropdownItem, filterType === t.id && styles.filterDropdownItemActive]}
-                        onPress={() => {
-                          setFilterType(t.id as any);
-                          setShowFilterDropdown(false);
-                        }}
-                      >
-                        <Text style={[styles.filterDropdownItemText, filterType === t.id && { fontWeight: '700', color: colors.primary }]}>
-                          {t.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-              <TouchableOpacity
-                style={{
-                  height: 34,
-                  paddingHorizontal: 10,
-                  borderRadius: Radius.sm,
-                  backgroundColor: colors.primary + '15',
-                  borderColor: colors.primary + '30',
-                  borderWidth: 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4
-                }}
-                onPress={() => setSettleVisible(true)}
-              >
-                <Ionicons name="card-outline" size={16} color={colors.primary} />
-                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>Settle Gateway Payout</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.danger }]} onPress={() => { setAddType('make'); setAddVisible(true); }}>
-                <Ionicons name="remove" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.success }]} onPress={() => { setAddType('receive'); setAddVisible(true); }}>
-                <Ionicons name="add" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
+                {showFilterDropdown && (
+                  <View style={[styles.filterDropdownPanel, { top: 40, right: 0 }]}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                      {[
+                        { id: 'all', label: 'All Types' },
+                        { id: 'receive', label: 'Received' },
+                        { id: 'make', label: 'Made' }
+                      ].map(t => (
+                        <TouchableOpacity
+                          key={t.id}
+                          style={[styles.filterDropdownItem, filterType === t.id && styles.filterDropdownItemActive]}
+                          onPress={() => {
+                            setFilterType(t.id as any);
+                            setShowFilterDropdown(false);
+                          }}
+                        >
+                          <Text style={[styles.filterDropdownItemText, filterType === t.id && { fontWeight: '700', color: colors.primary }]}>
+                            {t.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+            renderActions={() => (
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <TouchableOpacity
+                  style={{
+                    height: 34,
+                    paddingHorizontal: 10,
+                    borderRadius: Radius.sm,
+                    backgroundColor: colors.primary + '15',
+                    borderColor: colors.primary + '30',
+                    borderWidth: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4
+                  }}
+                  onPress={() => setSettleVisible(true)}
+                >
+                  <Ionicons name="card-outline" size={16} color={colors.primary} />
+                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary }}>Settle Gateway Payout</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.danger }]} onPress={() => { setAddType('make'); setAddVisible(true); }}>
+                  <Ionicons name="remove" size={20} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.success }]} onPress={() => { setAddType('receive'); setAddVisible(true); }}>
+                  <Ionicons name="add" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            )}
+          />
         </View>
 
         {/* Financial Summary Cards */}

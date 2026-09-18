@@ -1,4 +1,4 @@
-import ScreenHeader from '../components/ScreenHeader';
+import { PageHeader as ScreenHeader } from '../components/PageHeader';
 import { DataTable } from '../components/DataTable';
 import { WorkspaceLoading, StatusPill } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';

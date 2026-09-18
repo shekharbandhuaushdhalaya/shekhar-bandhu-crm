@@ -9,6 +9,7 @@ import { Spacing, Radius, LightColors, Shadows, Typography } from '../constants/
 import { api, ProductQuery, getImageUrl } from '../utils/api';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { ListToolbar } from '../components/ListToolbar';
 
 export default function QueriesScreen() {
   const [queries, setQueries] = useState<ProductQuery[]>([]);
@@ -98,39 +99,16 @@ export default function QueriesScreen() {
   return (
     <View style={styles.screen}>
       {/* Search Bar Container with Status Dropdown Inside */}
-      <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xs }}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: colors.bg.card,
-          paddingHorizontal: 12,
-          paddingRight: 8,
-          borderRadius: Radius.md,
-          borderWidth: 1,
-          borderColor: colors.border,
-          gap: 10,
-          minHeight: 46
-        }}>
-          <Ionicons name="search" size={18} color={colors.text.muted} />
-          <TextInput
-            style={{ ...Typography.bodySm, flex: 1, height: 42, color: colors.text.primary, minWidth: 100 }}
-            placeholder="Search queries by name, product, text..."
-            placeholderTextColor={colors.text.muted}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
-          ) : null}
-
-          {/* Status Dropdown inside search bar */}
-          {Platform.OS === 'web' ? (
+      <ListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search queries by name, product, text..."
+        renderFilters={() => (
+          Platform.OS === 'web' ? (
             <select
               value={activeTab}
               onChange={(e: any) => setActiveTab(e.target.value)}
-              style={{ ...Typography.bodySm, padding: '6px 12px', borderRadius: 6, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontWeight: '600', outline: 'none', height: 34, cursor: 'pointer' }}
+              style={{ ...Typography.bodySm, padding: '6px 12px', borderRadius: 6, border: `1px solid ${colors.border}`, backgroundColor: colors.bg.secondary, color: colors.text.primary, fontWeight: '600', outline: 'none', height: 34, cursor: 'pointer' } as any}
             >
               <option value="all">All Statuses ({queries.length})</option>
               <option value="pending">Pending ({queries.filter(q => q.status === 'pending').length})</option>
@@ -170,9 +148,9 @@ export default function QueriesScreen() {
               </Text>
               <Ionicons name="chevron-down" size={12} color={colors.text.muted} />
             </TouchableOpacity>
-          )}
-        </View>
-      </View>
+          )
+        )}
+      />
 
       {/* Query List */}
       <ScrollView

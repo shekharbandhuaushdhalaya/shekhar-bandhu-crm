@@ -26,7 +26,6 @@ export default function ProfileScreen() {
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth > 768;
 
-  const [initialLoading, setInitialLoading] = useState(true);
   const [firmsList, setFirmsList] = useState<any[]>([]);
   const [switchingFirmId, setSwitchingFirmId] = useState<string | null>(null);
 
@@ -353,9 +352,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     const init = async () => {
-      setInitialLoading(true);
       await Promise.all([loadSessionDetails(), loadCompanyConfig(), loadManufacturingUnits(), fetchSocialAccounts(), loadFirmsList()]);
-      setInitialLoading(false);
     };
     init();
   }, [user, fetchSocialAccounts]);
@@ -1759,14 +1756,6 @@ export default function ProfileScreen() {
     if (activeTab === 'company') return renderCompanySettings();
     return renderManufacturingUnits();
   };
-
-  if (initialLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
 
   return (
     <ScrollView

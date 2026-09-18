@@ -1,3 +1,4 @@
+import { DataTable, Column } from './../components/DataTable';
 import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
@@ -1861,21 +1862,19 @@ export default function InventoriesScreen() {
         </View>
 
         {/* Inventory List / Table */}
-        <ScrollView
-          style={{ flex: 1 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={true}
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg, flexGrow: 1 }}
-          >
-            <View style={[styles.table, { minWidth: 700 }]}>
-              {showTransfers ? (
-                // --- STOCK TRANSFERS VIEW ---
-                <>
+        <View style={{ flex: 1, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg }}>
+          {showTransfers ? (
+            // --- STOCK TRANSFERS VIEW ---
+            <View style={{ flex: 1, marginTop: Spacing.md }}>
+              <DataTable 
+                data={transfers} 
+                columns={[]} 
+                keyExtractor={(item: any, index: number) => item._id || String(index)} 
+                minWidth={900} 
+                embedded 
+                isRefreshing={refreshing}
+                onRefresh={onRefresh}
+                renderTableHeader={() => (
                   <View style={styles.tableHeaderRow}>
                     <View style={[styles.tableHeaderCellContainer, styles.col12]}><Text style={styles.tableHeaderCell}>Transfer No</Text></View>
                     <View style={[styles.tableHeaderCellContainer, styles.col15]}><Text style={styles.tableHeaderCell}>From  To</Text></View>
@@ -1883,32 +1882,32 @@ export default function InventoriesScreen() {
                     <View style={[styles.tableHeaderCellContainer, styles.col10]}><Text style={styles.tableHeaderCell}>Status</Text></View>
                     <View style={[styles.tableHeaderCellContainer, styles.col18, styles.colNoBorder]}><Text style={styles.tableHeaderCell}>Actions</Text></View>
                   </View>
-
-                  {transfers.map((item, idx) => (
-                    <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
-                      <View style={[styles.tableCellContainer, styles.col12]}>
-                        <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.transferNo}</Text>
-                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>
-                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : ''}
+                )}
+                renderTableRow={(item: any, idx: number) => (
+                  <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
+                    <View style={[styles.tableCellContainer, styles.col12]}>
+                      <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.transferNo}</Text>
+                      <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>
+                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : ''}
+                      </Text>
+                    </View>
+                    <View style={[styles.tableCellContainer, styles.col15]}>
+                      <Text style={[styles.tableCell, { ...Typography.caption, fontWeight: '700' }]}>{item.fromWarehouseName}</Text>
+                      <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}> {item.toWarehouseName}</Text>
+                    </View>
+                    <View style={[styles.tableCellContainer, styles.col20]}>
+                      {(item.items || []).map((it: any, i: number) => (
+                        <Text key={i} style={{ ...Typography.eyebrow, color: colors.text.primary }} numberOfLines={1}>
+                          • {it.productName} ({it.qtyBoxes} Box{it.qtyBoxes !== 1 ? 'es' : ''})
                         </Text>
-                      </View>
-                      <View style={[styles.tableCellContainer, styles.col15]}>
-                        <Text style={[styles.tableCell, { ...Typography.caption, fontWeight: '700' }]}>{item.fromWarehouseName}</Text>
-                        <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}> {item.toWarehouseName}</Text>
-                      </View>
-                      <View style={[styles.tableCellContainer, styles.col20]}>
-                        {(item.items || []).map((it: any, i: number) => (
-                          <Text key={i} style={{ ...Typography.eyebrow, color: colors.text.primary }} numberOfLines={1}>
-                            • {it.productName} ({it.qtyBoxes} Box{it.qtyBoxes !== 1 ? 'es' : ''})
-                          </Text>
-                        ))}
-                      </View>
-                      <View style={[styles.tableCellContainer, styles.col10]}>
-                        <StatusPill  label={<>
-                            {item.status.toUpperCase()}
-                          </>} textStyle={{ ...Typography.eyebrow, fontWeight: '700', color: item.status === 'completed' ? colors.success : item.status === 'in_transit' ? colors.primary : item.status === 'cancelled' ? colors.danger : colors.warning }} />
-                      </View>
-                      <View style={[styles.tableCellContainer, styles.col18, styles.colNoBorder, styles.actionsCell]}>
+                      ))}
+                    </View>
+                    <View style={[styles.tableCellContainer, styles.col10]}>
+                      <StatusPill  label={<>
+                          {item.status.toUpperCase()}
+                        </>} textStyle={{ ...Typography.eyebrow, fontWeight: '700', color: item.status === 'completed' ? colors.success : item.status === 'in_transit' ? colors.primary : item.status === 'cancelled' ? colors.danger : colors.warning }} />
+                    </View>
+                    <View style={[styles.tableCellContainer, styles.col18, styles.colNoBorder, styles.actionsCell]}>
                         {item.status === 'pending' && perm.can('inventory:edit') && (
                           <TouchableOpacity
                             style={[styles.btnSmall, { backgroundColor: colors.primary }]}
@@ -2038,7 +2037,8 @@ export default function InventoriesScreen() {
                         )}
                       </View>
                     </View>
-                  ))}
+                )}
+              />
 
                   {transfers.length === 0 && (
                     <View style={{ padding: 40, alignItems: 'center' }}>
@@ -2049,17 +2049,26 @@ export default function InventoriesScreen() {
 
                   {perm.can('inventory:edit') && (
                     <TouchableOpacity
-                      style={styles.btnCenter}
+                      style={[styles.btnCenter, { marginTop: 16 }]}
                       onPress={() => setAddTransferVisible(true)}
                     >
                       <Ionicons name="add-circle" size={16} color="#fff" />
                       <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>Request Stock Transfer</Text>
                     </TouchableOpacity>
                   )}
-                </>
-              ) : showDeadStock ? (
-                // --- DEAD STOCK REPORT VIEW ---
-                <>
+            </View>
+          ) : showDeadStock ? (
+            // --- DEAD STOCK REPORT VIEW ---
+            <View style={{ flex: 1, marginTop: Spacing.md }}>
+              <DataTable 
+                data={deadStockItems} 
+                columns={[]} 
+                keyExtractor={(item: any, index: number) => String(index)} 
+                minWidth={900} 
+                embedded 
+                isRefreshing={refreshing}
+                onRefresh={onRefresh}
+                renderTableHeader={() => (
                   <View style={styles.tableHeaderRow}>
                     <View style={[styles.tableHeaderCellContainer, { flex: 2.5 }]}><Text style={styles.tableHeaderCell}>Product</Text></View>
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.8 }]}><Text style={styles.tableHeaderCell}>Warehouse</Text></View>
@@ -2067,9 +2076,9 @@ export default function InventoriesScreen() {
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.5 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Stock Value (₹)</Text></View>
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Inactive Days</Text></View>
                   </View>
-
-                  {deadStockItems.map((item, idx) => (
-                    <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
+                )}
+                renderTableRow={(item: any, idx: number) => (
+                  <View key={idx} style={[styles.tableBodyRow, idx % 2 === 1 && { backgroundColor: colors.bg.secondary }]}>
                       <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
                         <Text style={[styles.tableCell, { fontWeight: '700' }]}>{item.productName}</Text>
                         <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>SKU: {item.productSku} · Size: {item.size}</Text>
@@ -2087,7 +2096,8 @@ export default function InventoriesScreen() {
                         <Text style={[styles.tableCell, { textAlign: 'right', color: colors.danger, fontWeight: '700' }]}>{item.daysSinceMovement} Days</Text>
                       </View>
                     </View>
-                  ))}
+                )}
+              />
 
                   {deadStockItems.length === 0 ? (
                     <View style={{ padding: 40, alignItems: 'center' }}>
@@ -2113,10 +2123,19 @@ export default function InventoriesScreen() {
                       <View style={[styles.tableCellContainer, { flex: 1.2, borderRightWidth: 0 }]} />
                     </View>
                   )}
-                </>
-              ) : selectedWarehouseId === 'all' ? (
-                // --- CONSOLIDATED VIEW TABLE ---
-                <>
+            </View>
+          ) : selectedWarehouseId === 'all' ? (
+            // --- CONSOLIDATED VIEW TABLE ---
+            <View style={{ flex: 1, marginTop: Spacing.md }}>
+              <DataTable 
+                data={processedItems} 
+                columns={[]} 
+                keyExtractor={(item: any) => item.productId} 
+                minWidth={900} 
+                embedded 
+                isRefreshing={refreshing}
+                onRefresh={onRefresh}
+                renderTableHeader={() => (
                   <View style={styles.tableHeaderRow}>
                     <View style={[styles.tableHeaderCellContainer, { width: 40 }]}><Text style={styles.tableHeaderCell}> </Text></View>
                     <View style={[styles.tableHeaderCellContainer, { flex: 2.5 }]}><Text style={styles.tableHeaderCell}>Item Name</Text></View>
@@ -2124,34 +2143,40 @@ export default function InventoriesScreen() {
                     <View style={[styles.tableHeaderCellContainer, { flex: 2.2 }]}><Text style={styles.tableHeaderCell}>Godowns</Text></View>
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Total Stock</Text></View>
                   </View>
-
-                  {processedItems.map((item: any) => (
-                    <InventoryRow
-                      key={item.productId}
-                      item={item}
-                      isExpanded={!!expandedProducts[item.productId]}
-                      onToggleExpand={() => setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }))}
-                      isConsolidated={true}
-                      products={products}
-                      colors={colors}
-                      styles={styles}
-                      perm={perm}
-                      onAddStock={(id: string) => { setAddStockInitialProductId(id); setAddStockVisible(true); }}
-                      onAdjustStock={(vd: any) => { setSelectedEntry(vd); setAdjustStockVisible(true); }}
-                      onShowLedger={(prodInfo: any) => { setSelectedLedgerProduct(prodInfo); setLedgerVisible(true); }}
-                      formatVendorDisplay={formatVendorDisplay}
-                      getDisplayName={getDisplayName}
-                      currentWarehouseName={currentWarehouseName}
-                    />
-                  ))}
-
-                  {processedItems.length === 0 && (
-                    <EmptyState title={<>No consolidated inventory items found</>}  />
-                  )}
-                </>
-              ) : (
-                // --- SINGLE GODOWN FILTERED TABLE ---
-                <>
+                )}
+                renderTableRow={(item: any) => (
+                  <InventoryRow
+                    key={item.productId}
+                    item={item}
+                    isExpanded={!!expandedProducts[item.productId]}
+                    onToggleExpand={() => setExpandedProducts(prev => ({ ...prev, [item.productId]: !prev[item.productId] }))}
+                    isConsolidated={true}
+                    products={products}
+                    colors={colors}
+                    styles={styles}
+                    perm={perm}
+                    onAddStock={(id: string) => { setAddStockInitialProductId(id); setAddStockVisible(true); }}
+                    onAdjustStock={(vd: any) => { setSelectedEntry(vd); setAdjustStockVisible(true); }}
+                    onShowLedger={(prodInfo: any) => { setSelectedLedgerProduct(prodInfo); setLedgerVisible(true); }}
+                    formatVendorDisplay={formatVendorDisplay}
+                    getDisplayName={getDisplayName}
+                    currentWarehouseName={currentWarehouseName}
+                  />
+                )}
+              />
+            </View>
+          ) : (
+            // --- SINGLE GODOWN FILTERED TABLE ---
+            <View style={{ flex: 1, marginTop: Spacing.md }}>
+              <DataTable 
+                data={processedItems} 
+                columns={[]} 
+                keyExtractor={(item: any) => item.productId} 
+                minWidth={900} 
+                embedded 
+                isRefreshing={refreshing}
+                onRefresh={onRefresh}
+                renderTableHeader={() => (
                   <View style={styles.tableHeaderRow}>
                     <View style={[styles.tableHeaderCellContainer, { width: 40 }]}><Text style={styles.tableHeaderCell}> </Text></View>
                     <View style={[styles.tableHeaderCellContainer, { flex: 2.5 }]}><Text style={styles.tableHeaderCell}>Item Name</Text></View>
@@ -2159,8 +2184,8 @@ export default function InventoriesScreen() {
                     <View style={[styles.tableHeaderCellContainer, { flex: 2.2 }]}><Text style={styles.tableHeaderCell}>Godowns</Text></View>
                     <View style={[styles.tableHeaderCellContainer, { flex: 1.2, borderRightWidth: 0 }]}><Text style={styles.tableHeaderCell}>Total Stock</Text></View>
                   </View>
-
-                  {processedItems.map((item: any) => (
+                )}
+                renderTableRow={(item: any) => (
                     <InventoryRow
                       key={item.productId}
                       item={item}
@@ -2178,16 +2203,11 @@ export default function InventoriesScreen() {
                       getDisplayName={getDisplayName}
                       currentWarehouseName={currentWarehouseName}
                     />
-                  ))}
-
-                  {processedItems.length === 0 && (
-                    <EmptyState title={<>No stock logs in this Godown</>}  />
-                  )}
-                </>
-              )}
+                )}
+              />
             </View>
-          </ScrollView>
-        </ScrollView>
+          )}
+        </View>
       </View>
 
       {/* MODAL WRAPPERS */}
