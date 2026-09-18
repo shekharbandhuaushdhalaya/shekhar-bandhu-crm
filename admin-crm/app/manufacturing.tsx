@@ -1834,6 +1834,7 @@ export default function ManufacturingScreen() {
           { id: 'batches', label: 'Production Runs (BMR)', icon: 'hammer-outline' },
           { id: 'scheduler', label: 'Production Timeline', icon: 'calendar-outline' },
           { id: 'mrp', label: 'Material Requirements Plan (MRP)', icon: 'cart-outline' },
+          { id: 'units', label: 'Manufacturing Units', icon: 'business-outline' },
         ].map(t => (
           <TouchableOpacity
             key={t.id}

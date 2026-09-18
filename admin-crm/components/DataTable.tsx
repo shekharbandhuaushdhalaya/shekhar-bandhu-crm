@@ -90,9 +90,8 @@ function DataTableInner<T>({
       return React.cloneElement(row as React.ReactElement<{ style?: any }>, { style: [(row.props as any).style, { backgroundColor: index % 2 ? colors.bg.cardHover : colors.bg.card, borderBottomColor: colors.border }] });
     }
     const customRowStyle = typeof rowStyle === 'function' ? rowStyle(item) : rowStyle;
-    
-    return (
-      <View style={[styles.row, { borderBottomColor: colors.border, backgroundColor: index % 2 ? colors.bg.cardHover : colors.bg.card }, customRowStyle]}>
+    const rowContent = (
+      <>
         {columns.map((col) => (
           <View
             key={`${keyExtractor(item, index)}-${col.key}`}
@@ -111,9 +110,33 @@ function DataTableInner<T>({
             )}
           </View>
         ))}
+      </>
+    );
+
+    const rowStyles = [
+      styles.row,
+      { borderBottomColor: colors.border, backgroundColor: index % 2 ? colors.bg.cardHover : colors.bg.card },
+      customRowStyle
+    ];
+
+    if (onRowPress) {
+      return (
+        <TouchableOpacity
+          style={rowStyles}
+          onPress={() => onRowPress(item)}
+          activeOpacity={0.7}
+        >
+          {rowContent}
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <View style={rowStyles}>
+        {rowContent}
       </View>
     );
-  }, [columns, colors, keyExtractor, rowStyle, renderTableRow]);
+  }, [columns, colors, keyExtractor, rowStyle, renderTableRow, onRowPress]);
 
   const renderFooter = useCallback(() => {
     if (!isLoadingMore) return null;

@@ -37,10 +37,10 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
   const ROUTE_TITLE_MAP: [string, string][] = [
     ['/parties/customers', 'Customers'],
     ['/parties/vendors', 'Vendors'],
-    ['/invoices/sale', 'Sale Invoices'],
+    ['/invoices/sale', 'Sales Invoices'],
     ['/invoices/purchase', 'Purchase Invoices'],
     ['/products', 'Products'],
-    ['/inventories', 'Inventories'],
+    ['/inventories', 'Inventories & Warehouses'],
     ['/inventory-reconciliation', 'Inventory Reconciliation'],
     ['/leads', 'Leads'],
     ['/queries', 'Web Queries'],
@@ -51,10 +51,7 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     ['/reports', 'Reports'],
     ['/rbac', 'Access Control'],
     ['/audit', 'System Audit Logs'],
-    ['/pricing', 'Pricing & Discounts'],
-    ['/manufacturing', 'Manufacturing / BMR'],
-    ['/salescrm', 'Sales & CRM'],
-    ['/inventorydispatch', 'Inventory & Dispatch'],
+    ['/manufacturing', 'Manufacturing & BMR'],
     ['/stockmovements', 'Delivery Challans'],
     ['/profile', 'My Details'],
     ['/campaigns', 'Campaigns'],
@@ -63,6 +60,10 @@ function TopHeader({ user, isOnline, logout, toggleSidebar }: { user: any; isOnl
     ['/gst-returns', 'GST Returns'],
     ['/medicalreps', 'Medical Representatives'],
     ['/doctors', 'Doctor Directory'],
+    ['/sales-workspace', 'Sales Workspace'],
+    ['/sales-intelligence', 'Sales Intelligence'],
+    ['/mr-my-day', 'MR My Day'],
+    ['/compliance', 'GMP & Compliance'],
   ];
 
   const getPageName = (path: string) => {

@@ -28,45 +28,60 @@ type NavItem = {
   permission?: string;
 };
 
+const FREQUENT_ITEMS: NavItem[] = [
+  { label: 'Customers', route: 'parties/customers', icon: 'people-outline', activeIcon: 'people' },
+  { label: 'Products', route: 'products', icon: 'cube-outline', activeIcon: 'cube' },
+  { label: 'Payments', route: 'payments', icon: 'cash-outline', activeIcon: 'cash' },
+  { label: 'Sales Invoices', route: 'invoices/sale', icon: 'receipt-outline', activeIcon: 'receipt' },
+  { label: 'MR My Day', route: 'mr-my-day', icon: 'today-outline', activeIcon: 'today', permission: 'mr:view' },
+];
+
 const NAV_GROUPS: NavGroup[] = [
   {
     key: 'sales',
-    label: 'Sales',
-    icon: 'trending-up-outline',
+    label: 'Sales & Orders',
+    icon: 'cart-outline',
+    items: [
+      { label: 'Orders', route: 'orders', icon: 'globe-outline', activeIcon: 'globe' },
+      { label: 'Quotations', route: 'quotations', icon: 'document-text-outline', activeIcon: 'document-text' },
+      { label: 'Sales Invoices', route: 'invoices/sale', icon: 'receipt-outline', activeIcon: 'receipt' },
+      { label: 'Sales Workspace', route: 'sales-workspace', icon: 'options-outline', activeIcon: 'options' },
+      { label: 'Sales Intelligence', route: 'sales-intelligence', icon: 'flash-outline', activeIcon: 'flash' },
+    ],
+  },
+  {
+    key: 'field-team',
+    label: 'Customers & Field Team',
+    icon: 'people-outline',
     items: [
       { label: 'Customers', route: 'parties/customers', icon: 'people-outline', activeIcon: 'people' },
       { label: 'Leads', route: 'leads', icon: 'git-branch-outline', activeIcon: 'git-branch' },
-      { label: 'Orders & Web Queries', route: 'orders', icon: 'cart-outline', activeIcon: 'cart' },
-      { label: 'Sales Workspace', route: 'sales-workspace', icon: 'options-outline', activeIcon: 'options' },
-      { label: 'Sales Intelligence', route: 'sales-intelligence', icon: 'flash-outline', activeIcon: 'flash' },
-      { label: 'Quotations', route: 'quotations', icon: 'document-text-outline', activeIcon: 'document-text' },
-      { label: 'Operational Stock Movements', route: 'stockmovements', icon: 'swap-horizontal-outline', activeIcon: 'swap-horizontal', permission: 'stockmovement:view' },
-      { label: 'Sales Invoices', route: 'invoices/sale', icon: 'receipt-outline', activeIcon: 'receipt' },
-      { label: 'Medical Reps & Targets', route: 'medicalreps', icon: 'briefcase-outline', activeIcon: 'briefcase', permission: 'mr:view' },
+      { label: 'Medical Representatives', route: 'medicalreps', icon: 'briefcase-outline', activeIcon: 'briefcase', permission: 'mr:view' },
       { label: 'MR My Day', route: 'mr-my-day', icon: 'today-outline', activeIcon: 'today', permission: 'mr:view' },
       { label: 'Doctor Directory', route: 'doctors', icon: 'medkit-outline', activeIcon: 'medkit', permission: 'mr:view' },
       { label: 'Campaigns', route: 'campaigns', icon: 'megaphone-outline', activeIcon: 'megaphone', permission: 'campaign:view' },
     ],
   },
   {
-    key: 'purchases',
+    key: 'inventory',
+    label: 'Inventory & Mfg.',
+    icon: 'cube-outline',
+    items: [
+      { label: 'Products', route: 'products', icon: 'pricetag-outline', activeIcon: 'pricetag' },
+      { label: 'Inventories & Warehouses', route: 'inventories', icon: 'home-outline', activeIcon: 'home' },
+      { label: 'Delivery Challans', route: 'stockmovements', icon: 'swap-horizontal-outline', activeIcon: 'swap-horizontal', permission: 'stockmovement:view' },
+      { label: 'Manufacturing & BMR', route: 'manufacturing', icon: 'hammer-outline', activeIcon: 'hammer' },
+      { label: 'Inventory Reconciliation', route: 'inventory-reconciliation', icon: 'git-compare-outline', activeIcon: 'git-compare', permission: 'inventory:view' },
+      { label: 'GMP & Compliance', route: 'compliance', icon: 'shield-checkmark-outline', activeIcon: 'shield-checkmark', permission: 'quality:view' },
+    ],
+  },
+  {
+    key: 'purchasing',
     label: 'Purchasing',
     icon: 'bag-handle-outline',
     items: [
       { label: 'Vendors', route: 'parties/vendors', icon: 'storefront-outline', activeIcon: 'storefront' },
       { label: 'Purchase Invoices', route: 'invoices/purchase', icon: 'download-outline', activeIcon: 'download', permission: 'invoice:view' },
-    ],
-  },
-  {
-    key: 'inventory',
-    label: 'Inventory',
-    icon: 'cube-outline',
-    items: [
-      { label: 'Products & Pricing', route: 'products', icon: 'cube-outline', activeIcon: 'cube' },
-      { label: 'Inventories & Warehouses', route: 'inventories', icon: 'home-outline', activeIcon: 'home' },
-      { label: 'Inventory Reconciliation', route: 'inventory-reconciliation', icon: 'git-compare-outline', activeIcon: 'git-compare', permission: 'inventory:view' },
-      { label: 'Manufacturing & BMR', route: 'manufacturing', icon: 'hammer-outline', activeIcon: 'hammer' },
-      { label: 'GMP & AYUSH Compliance', route: 'compliance', icon: 'shield-checkmark-outline', activeIcon: 'shield-checkmark', permission: 'quality:view' },
     ],
   },
   {
@@ -76,8 +91,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Payments', route: 'payments', icon: 'cash-outline', activeIcon: 'cash' },
       { label: 'Receivable Ageing', route: 'ageing', icon: 'hourglass-outline', activeIcon: 'hourglass' },
-      { label: 'GST Returns', route: 'gst-returns', icon: 'document-attach-outline', activeIcon: 'document-attach', permission: 'report:view' },
       { label: 'Credit / Debit Notes', route: 'credit-notes', icon: 'swap-horizontal-outline', activeIcon: 'swap-horizontal' },
+      { label: 'GST Returns', route: 'gst-returns', icon: 'document-attach-outline', activeIcon: 'document-attach', permission: 'report:view' },
     ],
   },
   {
@@ -85,12 +100,12 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Reports',
     icon: 'bar-chart-outline',
     items: [
-      { label: 'Reports & Audits', route: 'reports', icon: 'bar-chart-outline', activeIcon: 'bar-chart', permission: 'report:view' },
+      { label: 'Reports', route: 'reports', icon: 'bar-chart-outline', activeIcon: 'bar-chart', permission: 'report:view' },
     ],
   },
   {
     key: 'administration',
-    label: 'Admin',
+    label: 'Administration',
     icon: 'settings-outline',
     items: [
       { label: 'AI Business Assistant', route: 'ai-analytics', icon: 'sparkles-outline', activeIcon: 'sparkles' },
@@ -478,6 +493,26 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
           colors={colors}
           styles={styles}
         />
+
+        {/* Frequent Items */}
+        <View style={{ marginTop: 8, marginBottom: 4 }}>
+          <Text style={[styles.groupLabel, { marginBottom: 6 }]}>FREQUENT</Text>
+          {FREQUENT_ITEMS.map((item) => {
+            if (item.permission && !perm.can(item.permission)) return null;
+            return (
+              <NavItemRow
+                key={`freq-${item.route}`}
+                item={item}
+                isActive={isActive(item.route)}
+                onPress={() => navigate(item.route)}
+                colors={colors}
+                styles={styles}
+              />
+            );
+          })}
+        </View>
+
+        <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8, marginHorizontal: Spacing.sm }} />
 
         {/* Nav Groups */}
         {NAV_GROUPS.map((group) => {
