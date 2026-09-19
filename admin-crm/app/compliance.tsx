@@ -2,7 +2,7 @@ import { StatusPill, WorkspaceLoading } from './../components/WorkspacePrimitive
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { Typography, Spacing, Shadows } from './../constants/theme';
+import { Typography, Spacing, Shadows, Radius } from './../constants/theme';
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
