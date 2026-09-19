@@ -28,7 +28,7 @@ const getBaseUrl = () => {
   const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envApiUrl) return envApiUrl;
 
-  if (Platform.OS === 'web') { throw new Error('EXPO_PUBLIC_API_URL is required for the web build'); }
+  if (Platform.OS === 'web') { return 'https://shekhar-bandhu-crm.onrender.com/api'; }
 
   // Try to use the Expo Host URI if running in Expo Go
   const hostUri = Constants?.expoConfig?.hostUri;
