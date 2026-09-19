@@ -334,7 +334,7 @@ export default function ReportsScreen() {
             <tbody>
               ${htmlRows || `<tr><td colspan="${totalCols}" style="text-align:center">No invoices found for this month</td></tr>`}
               <tr style="font-weight:bold; background:#eee;">
-                <td colspan="5">GRAND TOTAL</td>
+                <td colspan="5">Grand total</td>
                 ${extraFootersHtml}${hsnFooters}
                 <td class="right">${totPcs}</td>
                 <td class="right">${totTaxable.toFixed(2)}</td>
@@ -468,7 +468,7 @@ export default function ReportsScreen() {
             <tbody>
               ${summaryRows || '<tr><td colspan="8" style="text-align:center">No raw materials defined.</td></tr>'}
               <tr class="total-row">
-                <td colspan="6" style="text-align:right">TOTAL STOCK VALUE</td>
+                <td colspan="6" style="text-align:right">Total stock value</td>
                 <td class="right">₹${totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                 <td></td>
               </tr>
@@ -570,7 +570,7 @@ export default function ReportsScreen() {
             <View style={styles.sectionCard}>
               <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-                  <View style={[styles.iconBadge, { backgroundColor: colors.primary + '15' }]}>
+                  <View style={styles.iconBadge}>
                     <Ionicons name="document-text" size={20} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -720,7 +720,7 @@ export default function ReportsScreen() {
             <View style={styles.sectionCard}>
               <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-                  <View style={[styles.iconBadge, { backgroundColor: colors.success + '15' }]}>
+                  <View style={styles.iconBadge}>
                     <Ionicons name="calculator" size={20} color={colors.success} />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -770,7 +770,7 @@ export default function ReportsScreen() {
             {/* Embedded Official GSTR-1 & GSTR-3B Return Generator */}
             <View style={[styles.sectionCard, { marginTop: 16 }]}>
               <View style={styles.sectionCardHeader}>
-                <View style={[styles.iconBadge, { backgroundColor: colors.primary + '15' }]}>
+                <View style={styles.iconBadge}>
                   <Ionicons name="document-attach" size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -791,7 +791,7 @@ export default function ReportsScreen() {
             <View style={styles.sectionCard}>
               <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-                  <View style={[styles.iconBadge, { backgroundColor: colors.warning + '15' }]}>
+                  <View style={styles.iconBadge}>
                     <Ionicons name="time" size={20} color={colors.warning} />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -887,7 +887,7 @@ export default function ReportsScreen() {
             <View style={styles.sectionCard}>
               <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-                  <View style={[styles.iconBadge, { backgroundColor: colors.purple + '15' }]}>
+                  <View style={styles.iconBadge}>
                     <Ionicons name="analytics" size={20} color={colors.purple || colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -901,7 +901,7 @@ export default function ReportsScreen() {
 
               <View style={[styles.mfgValGrid, { flexDirection: isDesktop ? 'row' : 'column' }]}>
                 <View style={[styles.mfgValCard, { borderColor: colors.success }]}>
-                  <View style={[styles.mfgValIcon, { backgroundColor: colors.success + '15' }]}>
+                  <View style={styles.mfgValIcon}>
                     <Ionicons name="leaf-outline" size={22} color={colors.success} />
                   </View>
                   <Text style={styles.mfgValLabel}>Raw Stock Valuation</Text>
@@ -911,7 +911,7 @@ export default function ReportsScreen() {
                   <Text style={styles.mfgValSub}>Active ingredient batches × purchase rate</Text>
                 </View>
                 <View style={[styles.mfgValCard, { borderColor: colors.primary }]}>
-                  <View style={[styles.mfgValIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <View style={styles.mfgValIcon}>
                     <Ionicons name="cube-outline" size={22} color={colors.primary} />
                   </View>
                   <Text style={styles.mfgValLabel}>Finished Goods Value</Text>
@@ -921,7 +921,7 @@ export default function ReportsScreen() {
                   <Text style={styles.mfgValSub}>Inventory boxes × product MRP</Text>
                 </View>
                 <View style={[styles.mfgValCard, { borderColor: colors.warning, backgroundColor: colors.primary + '03' }]}>
-                  <View style={[styles.mfgValIcon, { backgroundColor: colors.warning + '15' }]}>
+                  <View style={styles.mfgValIcon}>
                     <Ionicons name="wallet-outline" size={22} color={colors.warning} />
                   </View>
                   <Text style={styles.mfgValLabel}>Total Facility Assets</Text>
@@ -936,7 +936,7 @@ export default function ReportsScreen() {
             {/* Yield Performance */}
             <View style={[styles.sectionCard, { marginTop: 16 }]}>
               <View style={styles.sectionCardHeader}>
-                <View style={[styles.iconBadge, { backgroundColor: colors.success + '15' }]}>
+                <View style={styles.iconBadge}>
                   <Ionicons name="bar-chart" size={20} color={colors.success} />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -982,7 +982,7 @@ export default function ReportsScreen() {
             {/* Production Timeline Summary */}
             <View style={[styles.sectionCard, { marginTop: 16 }]}>
               <View style={styles.sectionCardHeader}>
-                <View style={[styles.iconBadge, { backgroundColor: colors.info + '15' }]}>
+                <View style={styles.iconBadge}>
                   <Ionicons name="calendar" size={20} color={colors.info || colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -1057,7 +1057,7 @@ export default function ReportsScreen() {
               <View style={styles.sectionCard}>
                 <View style={[styles.sectionCardHeader, { flexWrap: 'wrap', gap: 12 }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-                    <View style={[styles.iconBadge, { backgroundColor: colors.success + '15' }]}>
+                    <View style={styles.iconBadge}>
                       <Ionicons name="leaf" size={20} color={colors.success} />
                     </View>
                     <View style={{ flex: 1 }}>
@@ -1110,7 +1110,7 @@ export default function ReportsScreen() {
               {expiryAlerts.length > 0 && (
                 <View style={[styles.sectionCard, { marginTop: 16, borderColor: colors.danger, borderWidth: 1.5 }]}>
                   <View style={styles.sectionCardHeader}>
-                    <View style={[styles.iconBadge, { backgroundColor: colors.danger + '15' }]}>
+                    <View style={styles.iconBadge}>
                       <Ionicons name="warning" size={20} color={colors.danger} />
                     </View>
                     <View style={{ flex: 1 }}>
@@ -1202,11 +1202,11 @@ export default function ReportsScreen() {
                   <View>
                     {/* Table header */}
                     <View style={styles.rmTableHeader}>
-                      <Text style={[styles.rmTh, { flex: 2.5 }]}>MATERIAL</Text>
+                      <Text style={[styles.rmTh, { flex: 2.5 }]}>Material</Text>
                       <Text style={[styles.rmTh, { flex: 1, textAlign: 'right' }]}>STOCK</Text>
                       <Text style={[styles.rmTh, { flex: 1, textAlign: 'right' }]}>MIN</Text>
                       <Text style={[styles.rmTh, { flex: 1.3, textAlign: 'right' }]}>VALUE (₹)</Text>
-                      <Text style={[styles.rmTh, { width: 56, textAlign: 'center' }]}>STATUS</Text>
+                      <Text style={[styles.rmTh, { width: 56, textAlign: 'center' }]}>Status</Text>
                     </View>
 
                     {filteredMaterials.length === 0 ? (
@@ -1289,11 +1289,11 @@ export default function ReportsScreen() {
                     <View>
                       {/* Table header */}
                       <View style={styles.rmTableHeader}>
-                        <Text style={[styles.rmTh, { flex: 2 }]}>MATERIAL / BATCH</Text>
+                        <Text style={[styles.rmTh, { flex: 2 }]}>Material / batch</Text>
                         <Text style={[styles.rmTh, { flex: 1, textAlign: 'right' }]}>QTY</Text>
                         <Text style={[styles.rmTh, { flex: 1, textAlign: 'right' }]}>RATE</Text>
                         <Text style={[styles.rmTh, { flex: 1.2, textAlign: 'right' }]}>VALUE</Text>
-                        <Text style={[styles.rmTh, { flex: 1 }]}>EXPIRY</Text>
+                        <Text style={[styles.rmTh, { flex: 1 }]}>Expiry</Text>
                       </View>
 
                       {activeBatches.length === 0 ? (
@@ -1439,10 +1439,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Section Cards
   sectionCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.md,
     padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
   },
   sectionCardHeader: {
     flexDirection: 'row',
@@ -1450,12 +1449,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  sectionCardTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  sectionCardTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary },
   sectionCardSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   iconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 28,
+    height: 28,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1634,9 +1633,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     gap: 8,
   },
   mfgValIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 28,
+    height: 28,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,

@@ -73,11 +73,11 @@ export const Spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
 
 export const ControlHeight = { input: 44, buttonSm: 40, buttonMd: 44 };
 
-export const Radius = { sm: 8, md: 12, lg: 16, xl: 24 };
+export const Radius = { sm: 6, md: 8, lg: 12, xl: 16 };
 
 export const Shadows = {
-  card: { boxShadow: '0px 1px 2px rgba(43,26,24,0.06), 0px 8px 20px rgba(43,26,24,0.05)', elevation: 2 },
-  header: { boxShadow: '0px 1px 6px rgba(39, 56, 47, 0.03)', elevation: 1 },
+  card: { boxShadow: 'none', elevation: 0 },
+  header: { boxShadow: 'none', elevation: 0 },
   hover: { boxShadow: '0px 2px 4px rgba(43,26,24,0.08), 0px 10px 24px rgba(43,26,24,0.09)', elevation: 3 },
   floating: { boxShadow: '0px 6px 14px rgba(0,0,0,0.18)', elevation: 12 },
   modal: { boxShadow: '0px 10px 15px rgba(0,0,0,0.2)', elevation: 10 },
@@ -128,14 +128,14 @@ export const getStatusTone = (status: string): 'success' | 'warning' | 'danger' 
 
 // Named font weights are bundled locally, so offline and native rendering match web.
 export const Typography = {
-  display: { fontFamily: 'Manrope_800', fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.4 },
-  h1: { fontFamily: 'Manrope_800', fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.3 },
-  h2: { fontFamily: 'Manrope_800', fontSize: 17, lineHeight: 22, fontWeight: '800' },
+  display: { fontFamily: 'Manrope_700', fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.3 },
+  h1: { fontFamily: 'Manrope_700', fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.2 },
+  h2: { fontFamily: 'Manrope_700', fontSize: 17, lineHeight: 22, fontWeight: '700' },
   h3: { fontFamily: 'Manrope_700', fontSize: 15, lineHeight: 20, fontWeight: '700' },
   body: { fontFamily: 'Inter_500', fontSize: 16, lineHeight: 24, fontWeight: '500' },
   bodySm: { fontFamily: 'Inter_500', fontSize: 14, lineHeight: 20, fontWeight: '500' },
   caption: { fontFamily: 'Inter_600', fontSize: 12, lineHeight: 16, fontWeight: '600' },
-  eyebrow: { fontFamily: 'Inter_800', fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
+  eyebrow: { fontFamily: 'Inter_600', fontSize: 12, lineHeight: 16, fontWeight: '600', letterSpacing: 0.1 },
 } satisfies Record<string, TextStyle>;
 
 export function withAlpha(color: string, alpha = 0.1): string {

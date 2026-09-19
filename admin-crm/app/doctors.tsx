@@ -837,7 +837,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 1,
     borderRadius: 4,
   },
-  catBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
+  catBadgeText: { ...Typography.eyebrow, fontWeight: '600' },
   specText: { ...Typography.caption, color: colors.text.muted, marginTop: 1 },
   iconBtn: {
     width: 28,
@@ -845,7 +845,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary + '10',
+    backgroundColor: 'transparent',
   },
   cardDetails: {
     gap: 4,
@@ -870,14 +870,13 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   loadMoreText: { ...Typography.bodySm, fontWeight: '700', color: colors.primary },
   sectionCard: {
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: 'transparent',
     borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: Spacing.md,
+    borderWidth: 0,
+    paddingVertical: Spacing.md,
     gap: Spacing.md,
   },
-  sectionTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  sectionTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary },
   sectionSub: { ...Typography.bodySm, color: colors.text.muted },
   matrixRow: {
     flexDirection: 'row',

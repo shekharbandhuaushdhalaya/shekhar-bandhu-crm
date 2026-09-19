@@ -55,13 +55,13 @@ const ManufacturingUnitsTab = React.memo(function ManufacturingUnitsTab({
                 </View>
 
                 <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.sm }}>
-                  <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}>OPERATIONAL</Text>
+                  <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}>Operational</Text>
                 </View>
               </View>
 
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, backgroundColor: colors.bg.secondary, padding: 12, borderRadius: Radius.md, marginTop: 8 }}>
                 <View style={{ flex: 1, minWidth: 140 }}>
-                  <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>LOCATION / ADDRESS</Text>
+                  <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Location / address</Text>
                   <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
                     {[unit.addressLine1, unit.city, unit.state, unit.pincode].filter(Boolean).join(', ') || 'No address specified'}
                   </Text>
@@ -69,7 +69,7 @@ const ManufacturingUnitsTab = React.memo(function ManufacturingUnitsTab({
 
                 {unit.contactPerson ? (
                   <View style={{ flex: 1, minWidth: 120 }}>
-                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>FACILITY CONTACT</Text>
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Facility contact</Text>
                     <Text style={{ ...Typography.bodySm, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
                        {unit.contactPerson} {unit.phone ? `(${unit.phone})` : ''}
                     </Text>

@@ -330,14 +330,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flexWrap: 'wrap'
   },
   card: {
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: 'transparent',
     borderRadius: Radius.md,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...Shadows.card, },
+    padding: 12,
+    borderWidth: 0, },
   cardLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
-  cardValue: { ...Typography.h2, fontWeight: '800', marginTop: 4, marginBottom: 8 },
+  cardValue: { ...Typography.h2, fontWeight: '700', marginTop: 4, marginBottom: 8 },
   progressBg: {
     height: 4,
     backgroundColor: colors.border,
@@ -348,7 +346,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     height: '100%',
     borderRadius: 2
   },
-  sectionTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary, marginBottom: 10 },
+  sectionTitle: { ...Typography.body, fontWeight: '700', color: colors.text.primary, marginBottom: 10 },
   customerBlock: {
     backgroundColor: colors.bg.secondary,
     borderRadius: Radius.md,

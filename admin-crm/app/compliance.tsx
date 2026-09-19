@@ -323,7 +323,7 @@ export default function ComplianceScreen() {
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <StatusPill  label={<>CONNECTED</>} textStyle={[styles.badgeText, { color: colors.success }]} />
+                <StatusPill  label={<>Connected</>} textStyle={[styles.badgeText, { color: colors.success }]} />
                 <Ionicons name="chevron-forward" size={18} color={colors.text.secondary} />
               </View>
             </View>
@@ -516,13 +516,13 @@ const createStyles = (theme: any) => {
   bannerTitle: { ...Typography.h3, fontWeight: '700' },
   bannerSub: { ...Typography.bodySm, marginTop: 2 },
   loadingBox: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-  card: { padding: 18, borderWidth: 1, borderRadius: 12 },
+  card: { padding: 18, borderWidth: 0, borderRadius: Radius.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  iconBadge: { width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  iconBadge: { width: 28, height: 28, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
   title: { ...Typography.h3, fontWeight: '700' },
   count: { ...Typography.bodySm, marginTop: 2 },
   badgePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  badgeText: { ...Typography.caption, fontWeight: '800' },
+  badgeText: { ...Typography.caption, fontWeight: '600' },
   note: { ...Typography.bodySm, marginTop: 12 },
   actionBtn: { padding: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },

@@ -132,7 +132,7 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start', alignItems: 'center', paddingTop: 60 }}>
         <View 
-          style={{ width: '90%', maxWidth: 600, backgroundColor: colors.bg.primary, borderRadius: Radius.lg, maxHeight: '80%', ...Shadows.card, }}
+          style={{ width: '90%', maxWidth: 600, backgroundColor: colors.bg.card, borderRadius: Radius.lg, maxHeight: '80%', ...Shadows.modal }}
           accessibilityViewIsModal={true}
         >
           
@@ -175,8 +175,8 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
                 ) : null
               }
               renderSectionHeader={({ section: { title } }) => (
-                <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, marginTop: Spacing.sm, borderRadius: Radius.sm }}>
-                  <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.secondary, textTransform: 'uppercase' }}>{title}</Text>
+                <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.xs, marginTop: Spacing.xs }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.muted }}>{title.toLowerCase().replace(/(^|\s)\S/g, (c: string) => c.toUpperCase())}</Text>
                 </View>
               )}
               renderItem={({ item }) => {
@@ -198,7 +198,7 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
                     style={{ flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: colors.bg.secondary }}
                     onPress={() => handleSelect(item)}
                   >
-                    <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md }}>
+                    <View style={{ width: 28, height: 28, borderRadius: Radius.sm, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm }}>
                       <Ionicons name={icon as any} size={16} color={colors.primary} />
                     </View>
                     <View style={{ flex: 1 }}>

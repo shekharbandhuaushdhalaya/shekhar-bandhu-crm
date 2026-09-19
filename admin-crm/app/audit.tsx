@@ -193,7 +193,7 @@ export default function AuditLogsScreen() {
           <Text style={styles.logIp}>{item.ipAddress || '—'}</Text>
           {item.details && (
             <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
-              VIEW DETAIL
+              View detail
             </Text>
           )}
         </View>
@@ -407,7 +407,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     maxWidth: 500,
     gap: 16,
     ...Platform.select({
-      web: { boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }
+      web: {  }
     })
   },
   deniedTitle: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },

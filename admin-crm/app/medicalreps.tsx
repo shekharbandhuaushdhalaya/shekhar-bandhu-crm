@@ -620,52 +620,52 @@ export default function MedicalRepsScreen() {
 
         {/* Hero KPI Cards */}
         <View style={styles.kpiGrid}>
-          <View style={[styles.kpiCard, { borderColor: colors.primary + '30', backgroundColor: colors.bg.card }]}>
-            <View style={[styles.kpiIconBadge, { backgroundColor: colors.primary + '15' }]}>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiIconBadge}>
               <Ionicons name="medkit" size={20} color={colors.primary} />
             </View>
             <View>
-              <Text style={styles.kpiLabel}>TOTAL DOCTOR VISITS</Text>
+              <Text style={styles.kpiLabel}>Doctor visits</Text>
               <Text style={[styles.kpiValue, { color: colors.primary }]}>{totals.visits}</Text>
             </View>
           </View>
 
-          <View style={[styles.kpiCard, { borderColor: colors.success + '30', backgroundColor: colors.bg.card }]}>
-            <View style={[styles.kpiIconBadge, { backgroundColor: colors.success + '15' }]}>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiIconBadge}>
               <Ionicons name="cart" size={20} color={colors.success} />
             </View>
             <View>
-              <Text style={styles.kpiLabel}>BOOKED ORDERS</Text>
+              <Text style={styles.kpiLabel}>Booked orders</Text>
               <Text style={[styles.kpiValue, { color: colors.success }]}>{totals.orders}</Text>
             </View>
           </View>
 
-          <View style={[styles.kpiCard, { borderColor: colors.warning + '30', backgroundColor: colors.bg.card }]}>
-            <View style={[styles.kpiIconBadge, { backgroundColor: colors.warning + '15' }]}>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiIconBadge}>
               <Ionicons name="cash" size={20} color={colors.warning} />
             </View>
             <View>
-              <Text style={styles.kpiLabel}>TOTAL ORDER VALUE</Text>
+              <Text style={styles.kpiLabel}>Total order value</Text>
               <Text style={[styles.kpiValue, { color: colors.warning }]}>₹{(totals.orderValue || 0).toLocaleString('en-IN')}</Text>
             </View>
           </View>
 
-          <View style={[styles.kpiCard, { borderColor: colors.danger + '30', backgroundColor: colors.bg.card }]}>
-            <View style={[styles.kpiIconBadge, { backgroundColor: colors.danger + '15' }]}>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiIconBadge}>
               <Ionicons name="wallet-outline" size={20} color={colors.danger} />
             </View>
             <View>
-              <Text style={styles.kpiLabel}>EXPENSES SUBMITTED</Text>
+              <Text style={styles.kpiLabel}>Expenses submitted</Text>
               <Text style={[styles.kpiValue, { color: colors.danger }]}>₹{(totals.expenses || 0).toLocaleString('en-IN')}</Text>
             </View>
           </View>
 
-          <View style={[styles.kpiCard, { borderColor: colors.info + '30', backgroundColor: colors.bg.card }]}>
-            <View style={[styles.kpiIconBadge, { backgroundColor: colors.info + '15' }]}>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiIconBadge}>
               <Ionicons name="navigate-outline" size={20} color={colors.info} />
             </View>
             <View>
-              <Text style={styles.kpiLabel}>DISTANCE COVERED</Text>
+              <Text style={styles.kpiLabel}>Distance covered</Text>
               <Text style={[styles.kpiValue, { color: colors.info }]}>{(totals.distance || 0).toFixed(0)} <Text style={{ ...Typography.body }}>km</Text></Text>
             </View>
           </View>
@@ -677,7 +677,7 @@ export default function MedicalRepsScreen() {
         ) : (
           <View style={{ marginTop: Spacing.md }}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>MR FIELD PERFORMANCE & ROI</Text>
+              <Text style={styles.sectionTitle}>Field performance & ROI</Text>
               <Text style={styles.sectionSubtitle}>{mrData.length} Representatives Active</Text>
             </View>
 
@@ -707,8 +707,8 @@ export default function MedicalRepsScreen() {
                   {/* Target Achievement Progress Bar */}
                   <View style={{ marginTop: 12, marginBottom: 12 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.muted }}>MONTHLY TARGET PROGRESS</Text>
-                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>{targetAchievement}% Achieved</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.muted }}>Monthly target progress</Text>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>{targetAchievement}% Achieved</Text>
                     </View>
                     <View style={styles.progressBarTrack}>
                       <View style={[styles.progressBarFill, { width: `${targetAchievement}%`, backgroundColor: targetAchievement >= 100 ? colors.success : colors.primary }]} />
@@ -824,7 +824,7 @@ export default function MedicalRepsScreen() {
                 <View style={styles.directoryInfoRow}>
                   <Ionicons name="trophy-outline" size={14} color={colors.warning} />
                   <Text style={styles.directoryInfoText}>
-                    Target: <Text style={{ fontWeight: '800', color: colors.text.primary }}>₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
+                    Target: <Text style={{ fontWeight: '700', color: colors.text.primary }}>₹{(m.monthlyTarget || 0).toLocaleString('en-IN')}</Text>
                   </Text>
                 </View>
               </View>
@@ -925,7 +925,7 @@ export default function MedicalRepsScreen() {
           {/* Action Header for Field Attendance */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, backgroundColor: colors.bg.card, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
             <View>
-              <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>FIELD ATTENDANCE & ODOMETER</Text>
+              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>Field attendance & odometer</Text>
               <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Track daily check-in, check-out times & travel KM</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -958,7 +958,7 @@ export default function MedicalRepsScreen() {
                   <View style={styles.attendanceCardHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-                      <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>
+                      <Text style={{ ...Typography.body, fontWeight: '700', color: colors.text.primary }}>
                         {new Date(log.date).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
                       </Text>
                     </View>
@@ -974,7 +974,7 @@ export default function MedicalRepsScreen() {
                     <View style={styles.timeTimelineBox}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Ionicons name="enter-outline" size={14} color={colors.success} />
-                        <Text style={styles.timeBoxLabel}>CHECK-IN TIME</Text>
+                        <Text style={styles.timeBoxLabel}>Check-in time</Text>
                       </View>
                       <Text style={styles.timeBoxValue}>
                         {log.checkIn?.time ? new Date(log.checkIn.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
@@ -986,7 +986,7 @@ export default function MedicalRepsScreen() {
                           onPress={() => Platform.OS === 'web' && window.open(`https://www.google.com/maps?q=${log.checkIn?.latitude},${log.checkIn?.longitude}`, '_blank')}
                         >
                           <Ionicons name="location" size={12} color={colors.primary} />
-                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary }}>
                             GPS: {log.checkIn.latitude.toFixed(4)}, {log.checkIn.longitude.toFixed(4)} (Open Map)
                           </Text>
                         </TouchableOpacity>
@@ -996,7 +996,7 @@ export default function MedicalRepsScreen() {
                     <View style={styles.timeTimelineBox}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Ionicons name="exit-outline" size={14} color={colors.warning} />
-                        <Text style={styles.timeBoxLabel}>CHECK-OUT TIME</Text>
+                        <Text style={styles.timeBoxLabel}>Check-out time</Text>
                       </View>
                       <Text style={styles.timeBoxValue}>
                         {log.checkOut?.time ? new Date(log.checkOut.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
@@ -1008,7 +1008,7 @@ export default function MedicalRepsScreen() {
                           onPress={() => Platform.OS === 'web' && window.open(`https://www.google.com/maps?q=${log.checkOut?.latitude},${log.checkOut?.longitude}`, '_blank')}
                         >
                           <Ionicons name="location" size={12} color={colors.warning} />
-                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.warning }}>
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.warning }}>
                             GPS: {log.checkOut.latitude.toFixed(4)}, {log.checkOut.longitude.toFixed(4)} (Open Map)
                           </Text>
                         </TouchableOpacity>
@@ -1028,7 +1028,7 @@ export default function MedicalRepsScreen() {
                             <Text style={{ color: colors.text.muted }}> → </Text>
                             <Text style={{ color: colors.text.muted }}>{log.endKmReading || '—'} km</Text>
                             {log.totalDistance ? (
-                              <Text style={{ color: colors.info, fontWeight: '800' }}> = {log.totalDistance} km</Text>
+                              <Text style={{ color: colors.info, fontWeight: '700' }}> = {log.totalDistance} km</Text>
                             ) : null}
                           </Text>
                         </View>
@@ -1038,7 +1038,7 @@ export default function MedicalRepsScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                           <Ionicons name="navigate-outline" size={14} color={colors.success} />
                           <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
-                            GPS Distance (straight line): <Text style={{ color: colors.success, fontWeight: '800' }}>{log.gpsDistance} km</Text>
+                            GPS Distance (straight line): <Text style={{ color: colors.success, fontWeight: '700' }}>{log.gpsDistance} km</Text>
                           </Text>
                         </View>
                       ) : null}
@@ -1088,7 +1088,7 @@ export default function MedicalRepsScreen() {
               <View style={{ backgroundColor: (checkInForm.latitude && checkInForm.longitude) ? colors.success + '15' : colors.primary + '15', padding: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: (checkInForm.latitude && checkInForm.longitude) ? colors.success + '30' : colors.primary + '30', marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="location" size={16} color={(checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary} />
-                  <Text style={{ ...Typography.caption, fontWeight: '800', color: (checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: (checkInForm.latitude && checkInForm.longitude) ? colors.success : colors.primary }}>
                     {(checkInForm.latitude && checkInForm.longitude)
                       ? `GPS acquired: ${checkInForm.latitude.toFixed(4)}, ${checkInForm.longitude.toFixed(4)}`
                       : 'Acquiring device GPS location...'}
@@ -1141,7 +1141,7 @@ export default function MedicalRepsScreen() {
               <View style={{ backgroundColor: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success + '15' : colors.warning + '15', padding: 10, borderRadius: Radius.md, borderWidth: 1, borderColor: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success + '30' : colors.warning + '30', marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="location" size={16} color={(checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning} />
-                  <Text style={{ ...Typography.caption, fontWeight: '800', color: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning }}>
+                  <Text style={{ ...Typography.caption, fontWeight: '700', color: (checkOutForm.latitude && checkOutForm.longitude) ? colors.success : colors.warning }}>
                     {(checkOutForm.latitude && checkOutForm.longitude)
                       ? `GPS acquired: ${checkOutForm.latitude.toFixed(4)}, ${checkOutForm.longitude.toFixed(4)}`
                       : 'Acquiring device GPS location...'}
@@ -1220,7 +1220,7 @@ export default function MedicalRepsScreen() {
                     <Ionicons name="person-outline" size={18} color={colors.success} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>{v.doctorName}</Text>
+                    <Text style={{ ...Typography.body, fontWeight: '700', color: colors.text.primary }}>{v.doctorName}</Text>
                     <Text style={{ ...Typography.bodySm, color: colors.text.secondary }}>
                       {v.clinicName} {v.specialization ? `(${v.specialization})` : ''} {v.city ? `• ${v.city}` : ''}
                     </Text>
@@ -1249,7 +1249,7 @@ export default function MedicalRepsScreen() {
                   {v.orderTaken ? (
                     <View style={[styles.statusBadgePill, { backgroundColor: colors.successLight }]}>
                       <Ionicons name="checkmark-circle" size={12} color={colors.success} />
-                      <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.success }}>
+                      <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.success }}>
                         Order: ₹{(v.orderAmount || 0).toLocaleString('en-IN')}
                       </Text>
                     </View>
@@ -1260,8 +1260,8 @@ export default function MedicalRepsScreen() {
 
                 {v.sampleDetails && v.sampleDetails.length > 0 && (
                   <View style={{ marginTop: 8, backgroundColor: colors.bg.secondary, borderRadius: Radius.sm, padding: 8, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary, marginBottom: 4 }}>
-                      FREE SAMPLES DISTRIBUTED
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.primary, marginBottom: 4 }}>
+                      Free samples distributed
                     </Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                       {v.sampleDetails.map((s: any, idx: number) => (
@@ -1277,7 +1277,7 @@ export default function MedicalRepsScreen() {
 
                 {v.feedback ? (
                   <View style={styles.feedbackBox}>
-                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>DOCTOR FEEDBACK</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>Doctor feedback</Text>
                     <Text style={{ ...Typography.bodySm, color: colors.text.primary, marginTop: 2 }}>{v.feedback}</Text>
                   </View>
                 ) : null}
@@ -1306,7 +1306,7 @@ export default function MedicalRepsScreen() {
             <ScrollView style={{ padding: Spacing.lg }}>
               {/* Mandatory GPS Location Capture Section */}
               <View style={{ backgroundColor: (visitForm.latitude && visitForm.longitude) ? colors.success + '10' : colors.primary + '10', padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: (visitForm.latitude && visitForm.longitude) ? colors.success + '30' : colors.primary + '30', marginBottom: 16 }}>
-                <Text style={{ ...Typography.caption, fontWeight: '800', color: (visitForm.latitude && visitForm.longitude) ? colors.success : colors.primary, marginBottom: 4 }}>
+                <Text style={{ ...Typography.caption, fontWeight: '700', color: (visitForm.latitude && visitForm.longitude) ? colors.success : colors.primary, marginBottom: 4 }}>
                   CLINIC GPS LOCATION *
                 </Text>
                 <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginBottom: 10 }}>
@@ -1410,8 +1410,8 @@ export default function MedicalRepsScreen() {
 
               {/* Free Samples Distribution Dropdown Selector */}
               <View style={[styles.formField, { backgroundColor: colors.bg.secondary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }]}>
-                <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, marginBottom: 8 }}>
-                  ADD FREE SAMPLES (CREATES SAMPLE CHALLAN & DEDUCTS INVENTORY)
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, marginBottom: 8 }}>
+                  Add free samples (creates sample challan & deducts inventory)
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   {Platform.OS === 'web' ? (
@@ -1465,7 +1465,7 @@ export default function MedicalRepsScreen() {
                           <TouchableOpacity style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }} onPress={() => handleUpdateSampleQty(s.productId, -1)}>
                             <Ionicons name="remove" size={14} color={colors.text.primary} />
                           </TouchableOpacity>
-                          <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.primary, minWidth: 20, textAlign: 'center' }}>{s.qty}</Text>
+                          <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, minWidth: 20, textAlign: 'center' }}>{s.qty}</Text>
                           <TouchableOpacity style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }} onPress={() => handleUpdateSampleQty(s.productId, 1)}>
                             <Ionicons name="add" size={14} color={colors.text.primary} />
                           </TouchableOpacity>
@@ -1576,15 +1576,15 @@ export default function MedicalRepsScreen() {
             return (
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
                 <View style={[styles.kpiCard, { flex: 1, padding: 12, backgroundColor: colors.bg.card }]}>
-                  <Text style={styles.kpiLabel}>TOTAL CLAIMED</Text>
+                  <Text style={styles.kpiLabel}>Total claimed</Text>
                   <Text style={[styles.kpiValue, { ...Typography.h3, color: colors.primary }]}>₹{total.toLocaleString('en-IN')}</Text>
                 </View>
                 <View style={[styles.kpiCard, { flex: 1, padding: 12, backgroundColor: colors.bg.card }]}>
-                  <Text style={styles.kpiLabel}>APPROVED</Text>
+                  <Text style={styles.kpiLabel}>Approved</Text>
                   <Text style={[styles.kpiValue, { ...Typography.h3, color: colors.success }]}>₹{approved.toLocaleString('en-IN')}</Text>
                 </View>
                 <View style={[styles.kpiCard, { flex: 1, padding: 12, backgroundColor: colors.bg.card }]}>
-                  <Text style={styles.kpiLabel}>PENDING APPROVAL</Text>
+                  <Text style={styles.kpiLabel}>Pending approval</Text>
                   <Text style={[styles.kpiValue, { ...Typography.h3, color: colors.warning }]}>₹{pending.toLocaleString('en-IN')}</Text>
                 </View>
               </View>
@@ -1626,8 +1626,8 @@ export default function MedicalRepsScreen() {
 
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary, textTransform: 'capitalize' }}>{e.category} Claim</Text>
-                        <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.primary }}>₹{e.amount.toLocaleString('en-IN')}</Text>
+                        <Text style={{ ...Typography.body, fontWeight: '700', color: colors.text.primary, textTransform: 'capitalize' }}>{e.category} Claim</Text>
+                        <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.primary }}>₹{e.amount.toLocaleString('en-IN')}</Text>
                       </View>
                       {mrName ? (
                         <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary, marginTop: 2 }}>
@@ -1810,7 +1810,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     marginBottom: 2,
     flexWrap: 'wrap',
   },
-  pageSectionTitle: { ...Typography.h2, fontWeight: '800', color: colors.text.primary },
+  pageSectionTitle: { ...Typography.h2, fontWeight: '700', color: colors.text.primary },
   pageSectionSubtitle: { ...Typography.bodySm, color: colors.text.muted, marginTop: 2 },
   searchBox: {
     minWidth: 220,
@@ -1837,13 +1837,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
 
   // Selector
   selectorWrapper: {
-    backgroundColor: colors.bg.card,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
+    backgroundColor: 'transparent',
+    borderRadius: Radius.md,
+    borderWidth: 0,
+    paddingVertical: 8,
     marginBottom: Spacing.md,
-    ...Shadows.card,
   },
   selectorLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginBottom: 8 },
   mrSelectorChip: {
@@ -1869,7 +1867,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mrSelectorAvatarText: { ...Typography.bodySm, fontWeight: '800', color: colors.primary },
+  mrSelectorAvatarText: { ...Typography.bodySm, fontWeight: '700', color: colors.primary },
   mrSelectorChipText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   mrSelectorChipTextActive: {
     color: '#fff',
@@ -1881,11 +1879,10 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.bg.card,
-    padding: Spacing.md,
+    backgroundColor: 'transparent',
+    paddingVertical: Spacing.sm,
     borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
     marginBottom: Spacing.md,
     flexWrap: 'wrap',
     gap: 10,
@@ -1922,39 +1919,37 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   kpiCard: {
     flex: 1,
     minWidth: 150,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bg.card,
-    padding: 14,
+    borderRadius: Radius.md,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
   kpiIconBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  kpiLabel: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },
-  kpiValue: { ...Typography.h2, fontWeight: '800', marginTop: 2 },
+  kpiLabel: { ...Typography.caption, fontWeight: '600', color: colors.text.muted },
+  kpiValue: { ...Typography.h2, fontWeight: '700', marginTop: 2 },
 
   // Performance Card
   sectionHeaderRow: {
     marginBottom: Spacing.sm,
   },
-  sectionTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.muted },
+  sectionTitle: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   sectionSubtitle: { ...Typography.caption, color: colors.text.muted, marginTop: 1 },
   performanceCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: Radius.md,
+    borderWidth: 0,
     padding: Spacing.md,
     marginBottom: Spacing.md,
-    ...Shadows.card,
   },
   performanceCardHeader: {
     flexDirection: 'row',
@@ -1968,15 +1963,15 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLargeText: { ...Typography.h2, fontWeight: '800' },
-  mrNameText: { ...Typography.body, fontWeight: '800', color: colors.text.primary },
+  avatarLargeText: { ...Typography.h2, fontWeight: '700' },
+  mrNameText: { ...Typography.body, fontWeight: '700', color: colors.text.primary },
   mrSubText: { ...Typography.caption, color: colors.text.secondary, marginTop: 2 },
   roiBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
-  roiBadgeText: { ...Typography.eyebrow, fontWeight: '800' },
+  roiBadgeText: { ...Typography.eyebrow, fontWeight: '700' },
   progressBarTrack: {
     height: 6,
     borderRadius: 3,
@@ -1999,7 +1994,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     minWidth: 70,
     alignItems: 'center',
   },
-  statGridValue: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
+  statGridValue: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   statGridLabel: { ...Typography.eyebrow, color: colors.text.muted, fontWeight: '600', marginTop: 2 },
 
   // MR Directory Cards
@@ -2009,11 +2004,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   mrDirectoryCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: Radius.md,
+    borderWidth: 0,
     padding: 15,
-    ...Shadows.card,
   },
   directoryCardHeader: {
     flexDirection: 'row',
@@ -2021,7 +2014,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  mrDirectoryName: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  mrDirectoryName: { ...Typography.h3, fontWeight: '700', color: colors.text.primary },
   codePill: {
     backgroundColor: colors.bg.secondary,
     borderWidth: 1,
@@ -2030,7 +2023,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     paddingVertical: 1,
     borderRadius: 4,
   },
-  codePillText: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.secondary },
+  codePillText: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary },
   statusDot: {
     width: 6,
     height: 6,
@@ -2040,7 +2033,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: colors.primary + '10',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2061,11 +2054,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Attendance
   attendanceCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: Radius.md,
+    borderWidth: 0,
     padding: Spacing.md,
-    ...Shadows.card,
   },
   attendanceCardHeader: {
     flexDirection: 'row',
@@ -2082,7 +2073,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.sm,
     justifyContent: 'center',
   },
-  statusBadgePillText: { ...Typography.eyebrow, fontWeight: '800' },
+  statusBadgePillText: { ...Typography.eyebrow, fontWeight: '700' },
   timeTimelineGrid: {
     flexDirection: 'row',
     gap: 10,
@@ -2093,8 +2084,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderRadius: Radius.sm,
     padding: 10,
   },
-  timeBoxLabel: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },
-  timeBoxValue: { ...Typography.body, fontWeight: '800', color: colors.text.primary, marginTop: 4 },
+  timeBoxLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted },
+  timeBoxValue: { ...Typography.body, fontWeight: '700', color: colors.text.primary, marginTop: 4 },
   timeBoxSub: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
   distanceFooter: {
     flexDirection: 'row',
@@ -2109,11 +2100,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   // Visits
   visitCard: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: Radius.md,
+    borderWidth: 0,
     padding: Spacing.md,
-    ...Shadows.card,
   },
   visitCardHeader: {
     flexDirection: 'row',
@@ -2169,7 +2158,6 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: Spacing.md,
-    ...Shadows.card,
   },
   expenseCardHeader: {
     flexDirection: 'row',
@@ -2204,9 +2192,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderColor: colors.border,
     padding: 34,
     gap: 7,
-    ...Shadows.card,
   },
-  emptyCardTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  emptyCardTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary },
   emptyCardSubtitle: { ...Typography.bodySm, color: colors.text.muted, textAlign: 'center' },
   emptyInlineCard: {
     flexDirection: 'row',
@@ -2241,7 +2228,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     ...Shadows.hover,
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  modalTitleText: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  modalTitleText: { ...Typography.h3, fontWeight: '700', color: colors.text.primary },
   formField: {
     marginBottom: 12,
   },
@@ -2283,7 +2270,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  cardTitle: { ...Typography.bodySm, marginBottom: 8, fontWeight: '800', color: colors.text.primary },
+  cardTitle: { ...Typography.bodySm, marginBottom: 8, fontWeight: '700', color: colors.text.primary },
   assignmentRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2327,19 +2314,19 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   modalFooterRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 10,
-    padding: Spacing.lg,
+    gap: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: colors.bg.card,
   },
   modalCancelBtn: {
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: Radius.sm,
-    backgroundColor: colors.bg.primary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.bg.cardHover,
+    borderWidth: 0,
   },
   modalCancelBtnText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary },
   modalSubmitBtn: {

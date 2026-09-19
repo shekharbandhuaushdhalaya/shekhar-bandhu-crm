@@ -2044,7 +2044,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   primaryText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   secondaryText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
   outstandingText: { ...Typography.bodySm, fontWeight: '800' },
-  actionIconButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' },
+  actionIconButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
 
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, alignSelf: 'flex-start' },
@@ -2054,7 +2054,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   profileHeader: { alignItems: 'center', marginBottom: 20, marginTop: 10 },
-  profileAvatar: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  profileAvatar: { width: 72, height: 72, borderRadius: 20, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   profileName: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
   profileCustomer: { ...Typography.body, color: colors.text.secondary },
   infoGrid: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, gap: 16 },

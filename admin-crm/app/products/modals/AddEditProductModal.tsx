@@ -1472,7 +1472,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
               )}
 
               <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 2, marginBottom: 4 }}>
-                <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.muted }}>INGREDIENT</Text>
+                <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.muted }}>Ingredient</Text>
                 <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.muted }}>QTY / {formulationBasis || 1}</Text>
                 {bomStages.filter(s => s.name.trim()).length > 0 && (
                   <Text style={{ ...Typography.eyebrow, flex: 1.5, fontWeight: '700', color: colors.text.muted }}>STAGE</Text>
@@ -1581,7 +1581,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 const packagingMaterials = materials.filter(rm => rm.category === 'Packaging' || rm.category === 'General');
 
                 return (
-                  <View key={`var-pkg-${vIdx}`} style={{ marginBottom: 16, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary + '40' }}>
+                  <View key={`var-pkg-${vIdx}`} style={{ marginBottom: 18, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 0, backgroundColor: 'transparent' }}>
                     <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.primary, marginBottom: 8 }}>
                       Size Variant: {sizeDisplay}
                     </Text>
@@ -1679,10 +1679,10 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
             </>
           )}
         </ScrollView>
-        <View style={{ flexDirection: 'row', padding: 16, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.primary }}>
+        <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card }}>
           {activeStep !== 'step1' && (
             <TouchableOpacity
-              style={{ paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginRight: 12 }}
+              style={{ paddingVertical: 11, paddingHorizontal: 16, borderRadius: Radius.sm, borderWidth: 0, backgroundColor: colors.bg.cardHover, marginRight: 10 }}
               onPress={() => {
                 if (activeStep === 'step4') setActiveStep('step3');
                 else if (activeStep === 'step3') setActiveStep('step2');
@@ -1694,7 +1694,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
           )}
           <TouchableOpacity
             disabled={isSaving}
-            style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', opacity: isSaving ? 0.7 : 1 }}
+            style={{ flex: 1, paddingVertical: 11, borderRadius: Radius.sm, backgroundColor: colors.primary, alignItems: 'center', opacity: isSaving ? 0.7 : 1 }}
             onPress={() => {
               if (activeStep === 'step1') {
                 if (!name.trim()) { setShowErrors(true); return; }
@@ -1702,7 +1702,7 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
                 setActiveStep('step2');
               } else if (activeStep === 'step2') {
                 const activeVariants = variantsList.filter(v => v.size.trim() && v.price.trim());
-                if (activeVariants.length === 0 || !hsnCode.trim()) { setShowErrors(true); return; }
+                if (activeVariants.length === 0 || !hsnCode.trim() || !gstRate.trim()) { setShowErrors(true); return; }
                 setShowErrors(false);
                 setActiveStep('step3');
               } else if (activeStep === 'step3') {

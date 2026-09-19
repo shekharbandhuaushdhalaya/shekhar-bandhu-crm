@@ -412,7 +412,7 @@ export default function OrdersScreen() {
                 {/* Status Bar */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg.primary, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
                   <View>
-                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>ORDER STATUS</Text>
+                    <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>Order status</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
                       <Ionicons name="business-outline" size={13} color={colors.primary} />
                       <Text style={{ ...Typography.eyebrow, color: colors.primary, fontWeight: '700' }}>
@@ -731,7 +731,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   formGroup: { gap: 4 },
   inputLabel: { ...Typography.caption, fontWeight: '700', color: colors.text.secondary },
   textInput: { ...Typography.body, backgroundColor: colors.bg.primary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, paddingHorizontal: 12, minHeight: 44, height: 44, color: colors.text.primary },
-  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.primary + '30' },
+  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: Spacing.lg, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.card },
   modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border },
   cancelBtnText: { ...Typography.bodySm, color: colors.text.secondary, fontWeight: '700' },

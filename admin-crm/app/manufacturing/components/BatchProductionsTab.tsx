@@ -101,27 +101,27 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
             {/* Essential Key Metrics Bar */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, backgroundColor: colors.bg.secondary, padding: 10, borderRadius: 8, marginVertical: 8 }}>
               <View style={{ flex: 1, minWidth: 90 }}>
-                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>OUTPUT QTY</Text>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>Output qty</Text>
                 <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary }}>
                   {isFinished ? `${batch.actualYieldQty} / ${batch.plannedQty} Pcs` : `${batch.plannedQty} Pcs`}
                 </Text>
               </View>
               <View style={{ flex: 1, minWidth: 100 }}>
-                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>TOTAL COST</Text>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>Total cost</Text>
                 <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.warning }}>
                   ₹{((batch.rawMaterialCost || 0) + (batch.overheadCost || 0)).toFixed(2)}
                   {hasUnitCost ? ` (₹${batch.unitProductionCost?.toFixed(2)}/pc)` : ''}
                 </Text>
               </View>
               <View style={{ flex: 1, minWidth: 90 }}>
-                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>STARTED</Text>
+                <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>Started</Text>
                 <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary }}>
                   {batch.startDate ? new Date(batch.startDate).toLocaleDateString('en-IN') : '—'}
                 </Text>
               </View>
               {batch.qcPassedBy ? (
                 <View style={{ flex: 1, minWidth: 110 }}>
-                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>QC INSPECTOR</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>QC inspector</Text>
                   <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.success }} numberOfLines={1}>
                      {batch.qcPassedBy}
                   </Text>

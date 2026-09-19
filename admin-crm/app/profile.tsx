@@ -723,7 +723,7 @@ export default function ProfileScreen() {
                         <ActivityIndicator size="small" color={colors.primary} />
                       ) : isSelected ? (
                         <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.primary }}>
-                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: '#ffffff' }}>ACTIVE</Text>
+                          <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: '#ffffff' }}>Active</Text>
                         </View>
                       ) : null}
                     </TouchableOpacity>
@@ -961,7 +961,7 @@ export default function ProfileScreen() {
       )}
 
       {/* Company Sub-Tab Selector */}
-      <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12, backgroundColor: colors.bg.card, padding: 4, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border }}>
+      <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12, backgroundColor: 'transparent', padding: 0, borderRadius: Radius.md, borderWidth: 0 }}>
         {[
           { id: 'general', label: 'General Info', icon: 'business-outline' },
           { id: 'integrations', label: 'Integrations & AI', icon: 'logo-instagram' },
@@ -1314,7 +1314,7 @@ export default function ProfileScreen() {
                                 backgroundColor: '#ffffff',
                                 padding: 4,
                                 objectFit: 'contain',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                                
                               }} 
                             />
                           ) : (
@@ -1710,7 +1710,7 @@ export default function ProfileScreen() {
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.sm }}>
-                      <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}>OPERATIONAL</Text>
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}>Operational</Text>
                     </View>
                     {canEdit && (
                       <TouchableOpacity
@@ -1726,14 +1726,14 @@ export default function ProfileScreen() {
 
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
                   <View style={{ flex: 1, minWidth: 120 }}>
-                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>LOCATION</Text>
+                    <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Location</Text>
                     <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
                       {[unit.addressLine1, unit.city, unit.state, unit.pincode].filter(Boolean).join(', ') || 'No address specified'}
                     </Text>
                   </View>
                   {unit.contactPerson ? (
                     <View style={{ flex: 1, minWidth: 120 }}>
-                      <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>CONTACT</Text>
+                      <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Contact</Text>
                       <Text style={{ ...Typography.caption, fontWeight: '600', color: colors.text.primary, marginTop: 2 }}>
                          {unit.contactPerson} {unit.phone ? `(${unit.phone})` : ''}
                       </Text>
@@ -2061,9 +2061,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.bg.card,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: Radius.md,
+    borderWidth: 0,
     padding: Spacing.lg,
     overflow: 'hidden',
   },
@@ -2071,12 +2070,10 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingBottom: 12,
-    marginBottom: 16,
+    paddingBottom: 4,
+    marginBottom: 14,
   },
-  cardTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  cardTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary },
   cardContent: {
     gap: 12,
   },

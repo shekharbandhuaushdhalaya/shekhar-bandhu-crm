@@ -375,13 +375,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.bg.primary,
+    backgroundColor: 'transparent',
     borderRadius: Radius.md,
     padding: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
   },
-  statValue: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  statValue: { ...Typography.h3, fontWeight: '700', color: colors.text.primary },
   statLabel: { ...Typography.eyebrow, color: colors.text.muted, flex: 1 },
 
   searchRow: {

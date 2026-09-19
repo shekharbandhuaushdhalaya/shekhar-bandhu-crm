@@ -208,7 +208,7 @@ export function AddPaymentModal({ visible, onClose, onSaved, initialType, fixedP
             {partyId && (
               <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 8, padding: 10, marginBottom: Spacing.md, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View>
-                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>CURRENT DUE BALANCE</Text>
+                  <Text style={{ ...Typography.eyebrow, color: colors.text.muted, fontWeight: '700' }}>Current due balance</Text>
                   <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginTop: 2 }}>
                     GST: ₹{((parties.find(p => p._id === partyId)?.regularBalance) || 0).toLocaleString('en-IN')}
                     {canAccessCash && ` | Cash: ₹${((parties.find(p => p._id === partyId)?.cashBalance) || 0).toLocaleString('en-IN')}`}
@@ -804,15 +804,15 @@ export default function PaymentsScreen() {
           return (
             <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: Spacing.md, marginTop: 4, marginBottom: 8, flexWrap: 'wrap' }}>
               <View style={[styles.statCard, { backgroundColor: colors.success + '10', borderColor: colors.success + '30' }]}>
-                <Text style={[styles.statLabel, { color: colors.success }]}>TOTAL RECEIVED</Text>
+                <Text style={[styles.statLabel, { color: colors.success }]}>Total received</Text>
                 <Text style={[styles.statValue, { color: colors.success }]}>₹{totalReceived.toLocaleString('en-IN')}</Text>
               </View>
               <View style={[styles.statCard, { backgroundColor: colors.danger + '10', borderColor: colors.danger + '30' }]}>
-                <Text style={[styles.statLabel, { color: colors.danger }]}>TOTAL PAID OUT</Text>
+                <Text style={[styles.statLabel, { color: colors.danger }]}>Total paid out</Text>
                 <Text style={[styles.statValue, { color: colors.danger }]}>₹{totalPaid.toLocaleString('en-IN')}</Text>
               </View>
               <View style={[styles.statCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-                <Text style={[styles.statLabel, { color: colors.primary }]}>NET INFLOW</Text>
+                <Text style={[styles.statLabel, { color: colors.primary }]}>Net inflow</Text>
                 <Text style={[styles.statValue, { color: colors.primary }]}>₹{netFlow.toLocaleString('en-IN')}</Text>
               </View>
             </View>
@@ -871,7 +871,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   tableCellContainer: { borderRightWidth: 1, borderRightColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   badgeText: { ...Typography.eyebrow, fontWeight: '700' },
-  statCard: { flex: 1, minWidth: 130, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1 },
+  statCard: { flex: 1, minWidth: 130, backgroundColor: 'transparent', borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 0 },
   statLabel: { ...Typography.eyebrow, fontWeight: '700' },
   statValue: { ...Typography.h3, fontWeight: '800', marginTop: 2 },
   actionPillBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' },
@@ -895,12 +895,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   toggleText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   
   dropdownWrap: { position: 'relative' },
-  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 220, zIndex: 9999, ...Shadows.modal, overflow: 'hidden', boxShadow: '0px 4px 12px rgba(0,0,0,0.18)' },
+  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 220, zIndex: 9999, ...Shadows.modal, overflow: 'hidden' },
   dropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   dropdownItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   dropdownItemSub: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
 
-  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, gap: 10 },
+  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: Spacing.lg, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border, gap: 8, backgroundColor: colors.bg.card },
   cancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.md, backgroundColor: colors.bg.secondary },
   cancelBtnText: { ...Typography.body, fontWeight: '600', color: colors.text.primary },
   saveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: Radius.md, backgroundColor: colors.primary },

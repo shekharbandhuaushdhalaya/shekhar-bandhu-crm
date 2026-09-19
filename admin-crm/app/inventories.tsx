@@ -2164,7 +2164,7 @@ export default function InventoriesScreen() {
                   ) : (
                     <View style={[styles.tableBodyRow, { backgroundColor: colors.danger + '0d', borderTopWidth: 2, borderTopColor: colors.danger }]}>
                       <View style={[styles.tableCellContainer, { flex: 2.5 }]}>
-                        <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.danger }}>TOTAL DEAD STOCK</Text>
+                        <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.danger }}>Total dead stock</Text>
                       </View>
                       <View style={[styles.tableCellContainer, { flex: 1.8 }]} />
                       <View style={[styles.tableCellContainer, { flex: 1.2 }]}>
@@ -2697,7 +2697,7 @@ const InventoryRow = React.memo(({ item, isExpanded, onToggleExpand, isConsolida
               <StockDisplay qtyBoxes={item.totalBoxes} packing={item.vendorDetails[0]?.packing || 1} textStyle={{ ...Typography.bodySm, fontWeight: '700' }} />
             </View>
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>VENDORS</Text>
+              <Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>Vendors</Text>
               <Text style={{ ...Typography.bodySm, textAlign: 'right' }} numberOfLines={2}>
                 {uniqueVendors.map(v => formatVendorDisplay(v)).join(', ')}
               </Text>

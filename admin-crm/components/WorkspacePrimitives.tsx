@@ -8,7 +8,7 @@ import React, { ReactNode } from 'react';
 import { View, StyleSheet, ScrollView, ViewStyle, useWindowDimensions, StyleProp, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { LightColors, Radius, Shadows, Spacing, withAlpha, Typography } from '../constants/theme';
+import { LightColors, Radius, Spacing, withAlpha, Typography } from '../constants/theme';
 
 
 
@@ -26,7 +26,7 @@ export function WorkspaceBreadcrumbs({ items }: { items: { label: string; onPres
         <React.Fragment key={index}>
           {index > 0 && <Ionicons name="chevron-forward" size={14} color={colors.text.muted} style={{ marginHorizontal: 6 }} />}
           <TouchableOpacity onPress={item.onPress} disabled={!item.onPress}>
-            <Text style={{ ...Typography.bodySm, fontWeight: item.onPress ? '600' : '800', color: item.onPress ? colors.text.secondary : colors.text.primary }}>
+            <Text style={{ ...Typography.bodySm, fontWeight: item.onPress ? '500' : '600', color: item.onPress ? colors.text.secondary : colors.text.primary }}>
               {item.label}
             </Text>
           </TouchableOpacity>
@@ -61,12 +61,11 @@ export function MetricTile({ label, value, icon, tone = 'primary', helper, loadi
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const toneColor = tone === 'success' ? colors.success : tone === 'warning' ? colors.warning : tone === 'info' ? colors.info : tone === 'purple' ? colors.purple : tone === 'danger' ? colors.danger : colors.primary;
-  const toneBg = tone === 'success' ? colors.successLight : tone === 'warning' ? colors.warningLight : tone === 'info' ? colors.infoLight : tone === 'danger' ? colors.dangerLight : colors.primaryLight;
   return (
     <View style={styles.metric}>
       <View style={styles.metricTop}>
         <Text style={styles.metricLabel}>{label}</Text>
-        {icon ? <View style={[styles.metricIcon, { backgroundColor: toneBg }]}><Ionicons name={icon} size={15} color={toneColor} /></View> : null}
+        {icon ? <View style={styles.metricIcon}><Ionicons name={icon} size={16} color={toneColor} /></View> : null}
       </View>
       <View style={{ marginTop: Spacing.sm }}>{loading ? <Skeleton width="65%" height={28} /> : <Text style={styles.metricValue} numberOfLines={1}>{value}</Text>}</View>
       {helper ? <Text style={styles.metricHelper}>{helper}</Text> : null}
@@ -140,7 +139,7 @@ export function StatusPill({ label, tone = 'neutral', color, style, textStyle }:
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
   const fg = color || StyleSheet.flatten(textStyle)?.color || (tone === 'neutral' ? colors.text.secondary : colors[tone]);
-  return <View style={[styles.statusPill, style, { backgroundColor: withAlpha(String(fg)), flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+  return <View style={[styles.statusPill, style, { backgroundColor: withAlpha(String(fg), 0.06), flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
     <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: fg }} />
     <Text style={[styles.statusText, { color: fg }]}>{label}</Text>
   </View>;
@@ -149,8 +148,8 @@ export function StatusPill({ label, tone = 'neutral', color, style, textStyle }:
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.md },
   headerCopy: { flex: 1, maxWidth: 760 },
-  eyebrow: { ...Typography.eyebrow, fontWeight: '800', color: colors.primary, marginBottom: 5 },
-  title: { ...Typography.h1, fontWeight: '800', color: colors.text.primary },
+  eyebrow: { ...Typography.eyebrow, fontWeight: '600', color: colors.text.muted, marginBottom: 5 },
+  title: { ...Typography.h1, fontWeight: '700', color: colors.text.primary },
   subtitle: { ...Typography.bodySm, color: colors.text.secondary, marginTop: 5, maxWidth: 680 },
   headerActions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },
   action: { minHeight: 44, paddingHorizontal: 14, borderRadius: Radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1 },
@@ -169,30 +168,30 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   tab: { minHeight: 44, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: colors.primary },
   tabText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
-  tabTextActive: { color: colors.text.primary, fontWeight: '800' },
+  tabTextActive: { color: colors.text.primary, fontWeight: '700' },
   tabBadge: { minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg.secondary },
   tabBadgeActive: { backgroundColor: colors.primaryLight },
-  tabBadgeText: { ...Typography.eyebrow, fontWeight: '800', color: colors.text.muted },
+  tabBadgeText: { ...Typography.caption, fontWeight: '600', color: colors.text.muted },
   tabBadgeTextActive: { color: colors.primary },
-  metric: { flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 155, backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, ...Shadows.card },
+  metric: { flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 155, backgroundColor: 'transparent', borderRadius: Radius.md, borderWidth: 0, paddingVertical: 12, paddingHorizontal: 12 },
   metricTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   metricLabel: { ...Typography.caption, fontWeight: '600', color: colors.text.secondary },
-  metricIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  metricValue: { ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginTop: 8 },
+  metricIcon: { width: 24, height: 24, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  metricValue: { ...Typography.h1, fontWeight: '700', color: colors.text.primary, marginTop: 8 },
   metricHelper: { ...Typography.caption, color: colors.text.secondary, marginTop: 3 },
-  panel: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16, ...Shadows.card },
+  panel: { backgroundColor: colors.bg.card, borderRadius: Radius.md, borderWidth: 0, padding: 16 },
   panelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
-  panelTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  panelTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary },
   panelSubtitle: { ...Typography.caption, color: colors.text.secondary, marginTop: 2 },
   empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 28, paddingHorizontal: 18 },
-  emptyIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
-  emptyTitle: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, textAlign: 'center' },
+  emptyIcon: { width: 38, height: 38, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg.secondary, marginBottom: 10 },
+  emptyTitle: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, textAlign: 'center' },
   emptyMessage: { ...Typography.caption, color: colors.text.muted, textAlign: 'center', maxWidth: 360, marginTop: 4 },
-  stateCard: { margin: Spacing.lg, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.lg, padding: 28, alignItems: 'center', justifyContent: 'center', minHeight: 180, ...Shadows.card },
-  stateTitle: { ...Typography.body, fontWeight: '800', color: colors.text.primary, marginTop: 10, textAlign: 'center' },
+  stateCard: { margin: Spacing.lg, backgroundColor: colors.bg.card, borderWidth: 0, borderRadius: Radius.md, padding: 28, alignItems: 'center', justifyContent: 'center', minHeight: 180 },
+  stateTitle: { ...Typography.body, fontWeight: '700', color: colors.text.primary, marginTop: 10, textAlign: 'center' },
   stateMessage: { ...Typography.caption, color: colors.text.muted, marginTop: 4, textAlign: 'center', maxWidth: 420 },
   retryButton: { marginTop: 14, minHeight: 44, paddingHorizontal: 14, borderRadius: Radius.md, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  retryText: { ...Typography.bodySm, color: '#fff', fontWeight: '800' },
+  retryText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, alignSelf: 'flex-start' },
   statusText: { ...Typography.caption, fontWeight: '600' },
 });

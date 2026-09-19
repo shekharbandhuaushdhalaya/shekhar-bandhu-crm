@@ -306,15 +306,15 @@ function Gstr1View({ data, colors, styles }: { data: any; colors: any; styles: a
       {/* Top Stat Summary Cards */}
       <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginBottom: Spacing.lg }}>
         <View style={[styles.statCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-          <Text style={[styles.statLabel, { color: colors.primary }]}>TOTAL FINALIZED INVOICES</Text>
+          <Text style={[styles.statLabel, { color: colors.primary }]}>Total finalized invoices</Text>
           <Text style={[styles.statValue, { color: colors.text.primary }]}>{totalInvoices}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: colors.info + '10', borderColor: colors.info + '30' }]}>
-          <Text style={[styles.statLabel, { color: colors.info }]}>NET TAXABLE VALUE (AFTER NOTES)</Text>
+          <Text style={[styles.statLabel, { color: colors.info }]}>Net taxable value (after notes)</Text>
           <Text style={[styles.statValue, { color: colors.text.primary }]}>₹{totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: colors.success + '10', borderColor: colors.success + '30' }]}>
-          <Text style={[styles.statLabel, { color: colors.success }]}>NET OUTWARD GST</Text>
+          <Text style={[styles.statLabel, { color: colors.success }]}>Net outward GST</Text>
           <Text style={[styles.statValue, { color: colors.success }]}>₹{totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
         </View>
       </View>
@@ -437,7 +437,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   value: { ...Typography.h2, fontWeight: '800', color: colors.text.primary, marginTop: 4 },
   sectionTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 12 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
-  statCard: { flex: 1, minWidth: 200, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1 },
+  statCard: { flex: 1, minWidth: 200, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 0 },
   statLabel: { ...Typography.eyebrow, fontWeight: '700' },
   statValue: { ...Typography.h2, fontWeight: '800', marginTop: 4 },
   table: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },

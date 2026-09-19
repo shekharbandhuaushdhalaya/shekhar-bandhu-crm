@@ -435,7 +435,7 @@ export default function LaunchBatchModal({
                         </Text>
                         {isShortage && (
                           <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
-                            <Text style={{ ...Typography.eyebrow, color: colors.danger, fontWeight: '800' }}>SHORTAGE</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.danger, fontWeight: '800' }}>Shortage</Text>
                           </View>
                         )}
                       </View>

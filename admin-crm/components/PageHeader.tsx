@@ -3,7 +3,7 @@ import { WorkspaceButton } from './WorkspaceButton';
 import { View, StyleSheet, ViewStyle, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../utils/themeContext';
-import { LightColors, Spacing, Radius, Shadows, Typography, ControlHeight } from '../constants/theme';
+import { LightColors, Spacing, Radius, Typography } from '../constants/theme';
 import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
 import React from 'react';
 import { useRouter } from 'expo-router';
@@ -34,12 +34,10 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
     backgroundColor: colors.bg.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   leftGroup: {
     flexDirection: 'row',
@@ -48,15 +46,14 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     flex: 1,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.bg.secondary,
+    width: 34,
+    height: 34,
+    borderRadius: Radius.sm,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
+
   },
   titleArea: {
     flex: 1,
@@ -64,8 +61,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   eyebrow: {
     ...Typography.eyebrow,
-    color: colors.primary,
-    fontWeight: '800',
+    color: colors.text.muted,
+    fontWeight: '600',
     marginBottom: 4,
   },
   breadcrumbsRow: {
@@ -85,7 +82,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   title: {
     ...Typography.h1,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.text.primary,
     letterSpacing: -0.5,
   },
@@ -140,7 +137,7 @@ export function PageHeader({ title, subtitle, eyebrow, breadcrumbs, actions, ren
               ))}
             </View>
           ) : eyebrow ? (
-            <Text style={styles.eyebrow}>{eyebrow.toUpperCase()}</Text>
+            <Text style={styles.eyebrow}>{eyebrow}</Text>
           ) : null}
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

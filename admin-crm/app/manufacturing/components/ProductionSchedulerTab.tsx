@@ -44,15 +44,15 @@ const ProductionSchedulerTab = React.memo(function ProductionSchedulerTab({
 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8, padding: 12, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
                   <View>
-                    <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, fontWeight: '700' }}>PLANNED QTY</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, fontWeight: '700' }}>Planned qty</Text>
                     <Text style={{ ...Typography.body, fontWeight: '700', color: colors.text.primary, marginTop: 2 }}>{run.plannedQty} units</Text>
                   </View>
                   <View>
-                    <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, fontWeight: '700' }}>ACTUAL YIELD</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, fontWeight: '700' }}>Actual yield</Text>
                     <Text style={{ ...Typography.body, fontWeight: '700', color: colors.text.primary, marginTop: 2 }}>{run.actualYieldQty || '-'} units</Text>
                   </View>
                   <View>
-                    <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, fontWeight: '700' }}>TIMEFRAME</Text>
+                    <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, fontWeight: '700' }}>Timeframe</Text>
                     <Text style={{ ...Typography.caption, color: colors.text.primary, marginTop: 2 }}>{start}  {end}</Text>
                   </View>
                 </View>

@@ -125,13 +125,13 @@ export default function MRPPlanTab({
             <View style={{ minWidth: 960, flex: 1 }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.bg.primary, borderBottomColor: colors.border }]}>
-                <Text style={[styles.th, { flex: 2.5, paddingRight: 8 }]}>RAW MATERIAL</Text>
-                <Text style={[styles.th, { flex: 1.3, textAlign: 'right', paddingHorizontal: 8 }]}>PROD NEED</Text>
-                <Text style={[styles.th, { flex: 1.3, textAlign: 'right', paddingHorizontal: 8 }]}>AVAIL STOCK</Text>
-                <Text style={[styles.th, { flex: 1.3, textAlign: 'right', paddingHorizontal: 8 }]}>SAFETY STOCK</Text>
-                <Text style={[styles.th, { flex: 1.8, textAlign: 'right', paddingHorizontal: 8 }]}>SUGGESTED PURCHASE</Text>
-                <Text style={[styles.th, { flex: 1.5, paddingLeft: 20, paddingRight: 8 }]}>PREFERRED VENDOR</Text>
-                <Text style={[styles.th, { flex: 2.3, textAlign: 'center' }]}>ACTIONS</Text>
+                <Text style={[styles.th, { flex: 2.5, paddingRight: 8 }]}>Raw material</Text>
+                <Text style={[styles.th, { flex: 1.3, textAlign: 'right', paddingHorizontal: 8 }]}>Prod need</Text>
+                <Text style={[styles.th, { flex: 1.3, textAlign: 'right', paddingHorizontal: 8 }]}>Avail stock</Text>
+                <Text style={[styles.th, { flex: 1.3, textAlign: 'right', paddingHorizontal: 8 }]}>Safety stock</Text>
+                <Text style={[styles.th, { flex: 1.8, textAlign: 'right', paddingHorizontal: 8 }]}>Suggested purchase</Text>
+                <Text style={[styles.th, { flex: 1.5, paddingLeft: 20, paddingRight: 8 }]}>Preferred vendor</Text>
+                <Text style={[styles.th, { flex: 2.3, textAlign: 'center' }]}>Actions</Text>
               </View>
 
               {/* Table Rows */}
@@ -251,12 +251,12 @@ const styles = StyleSheet.create({
   card: {
     padding: Spacing.lg,
     borderRadius: Radius.md,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   iconBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 28,
+    height: 28,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

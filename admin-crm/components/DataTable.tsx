@@ -5,7 +5,7 @@ import { AppText as Text } from './AppText';
 import React, { useCallback, memo } from 'react';
 import { View, StyleSheet, FlatList, ScrollView, RefreshControl, ViewStyle, TextStyle, DimensionValue, useWindowDimensions } from 'react-native';
 import { useTheme } from '../utils/themeContext';
-import { Radius, Spacing, Shadows, Typography } from '../constants/theme';
+import { Radius, Spacing, Typography } from '../constants/theme';
 import { TableSkeleton } from './TableSkeleton';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -84,9 +84,9 @@ function DataTableInner<T>({
   const renderHeader = useCallback(() => {
     if (useCardLayout) return null;
     return renderTableHeader ? (
-    <View style={{ backgroundColor: colors.bg.cardHover, borderBottomWidth: 1, borderBottomColor: colors.border }}>{renderTableHeader()}</View>
+    <View style={{ backgroundColor: colors.bg.primary, borderBottomWidth: 1, borderBottomColor: colors.border }}>{renderTableHeader()}</View>
   ) : (
-    <View style={[styles.headerRow, { backgroundColor: colors.bg.secondary, borderBottomColor: colors.border }, headerStyle]}>
+    <View style={[styles.headerRow, { backgroundColor: colors.bg.primary, borderBottomColor: colors.border }, headerStyle]}>
       {visibleColumns.map((col) => (
         <View
           key={col.key}
@@ -108,7 +108,7 @@ function DataTableInner<T>({
   const renderRow = useCallback(({ item, index }: { item: T; index: number }) => {
     if (renderTableRow && !useCardLayout) {
       const row = renderTableRow(item, index);
-      return React.cloneElement(row as React.ReactElement<{ style?: any }>, { style: [(row.props as any).style, { backgroundColor: index % 2 ? colors.bg.cardHover : colors.bg.card, borderBottomColor: colors.border }] });
+      return React.cloneElement(row as React.ReactElement<{ style?: any }>, { style: [(row.props as any).style, { backgroundColor: colors.bg.card, borderBottomColor: colors.border }] });
     }
     const customRowStyle = typeof rowStyle === 'function' ? rowStyle(item) : rowStyle;
 
@@ -117,13 +117,13 @@ function DataTableInner<T>({
         const cardStyles = [
           { 
             backgroundColor: colors.bg.card, 
-            borderRadius: Radius.md, 
-            borderWidth: 1, 
-            borderColor: colors.border, 
+            borderRadius: Radius.sm, 
+            borderWidth: 0, 
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
             marginHorizontal: Spacing.lg, 
             marginTop: index === 0 ? Spacing.md : Spacing.sm,
-            marginBottom: Spacing.xs,
-            ...Shadows.card
+            marginBottom: Spacing.xs
           },
           customRowStyle
         ];
@@ -161,13 +161,13 @@ function DataTableInner<T>({
       const cardStyles = [
         { 
           backgroundColor: colors.bg.card, 
-          borderRadius: Radius.md, 
-          borderWidth: 1, 
-          borderColor: colors.border, 
+          borderRadius: Radius.sm, 
+          borderWidth: 0, 
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
           marginHorizontal: Spacing.lg, 
           marginTop: index === 0 ? Spacing.md : Spacing.sm,
           marginBottom: Spacing.xs,
-          ...Shadows.card
         },
         customRowStyle
       ];
@@ -207,7 +207,7 @@ function DataTableInner<T>({
 
     const rowStyles = [
       styles.row,
-      { borderBottomColor: colors.border, backgroundColor: index % 2 ? colors.bg.cardHover : colors.bg.card },
+      { borderBottomColor: colors.border, backgroundColor: colors.bg.card },
       customRowStyle
     ];
 
@@ -267,8 +267,7 @@ function DataTableInner<T>({
   return (
     <View style={[
       styles.container, 
-      { backgroundColor: useCardLayout ? 'transparent' : colors.bg.card, borderColor: useCardLayout ? 'transparent' : colors.border },
-      useCardLayout && { shadowOpacity: 0, ...Shadows.card },
+      { backgroundColor: useCardLayout ? 'transparent' : colors.bg.card, borderColor: 'transparent' },
       embedded && { flex: 0, height: 420 }, 
       containerStyle
     ]}>
@@ -289,10 +288,9 @@ export const DataTable = memo(DataTableInner) as typeof DataTableInner;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
+    borderRadius: Radius.md,
+    borderWidth: 0,
     overflow: 'hidden',
-    ...Shadows.card,
   },
   headerRow: {
     flexDirection: 'row',

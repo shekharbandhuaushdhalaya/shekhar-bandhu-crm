@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { View, StyleSheet, StyleProp, ViewStyle, Platform } from 'react-native';
+import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppTextInput as TextInput } from './AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './PressableOpacity';
@@ -41,41 +41,35 @@ export function ListToolbar({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <View style={[styles.toolbarInner, { backgroundColor: colors.bg.card, borderColor: colors.border }]}>
-        <Ionicons name="search" size={18} color={colors.text.muted} />
-        
-        <TextInput
-          style={[styles.searchInput, { color: colors.text.primary }]}
-          placeholder={searchPlaceholder}
-          placeholderTextColor={colors.text.muted}
-          value={searchValue}
-          onChangeText={onSearchChange}
-          onSubmitEditing={onSubmitEditing}
-        />
-        
-        {searchValue ? (
-          <TouchableOpacity onPress={() => onSearchChange('')} style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Clear search">
-            <Ionicons name="close-circle" size={18} color={colors.text.muted} />
-          </TouchableOpacity>
+      <View style={styles.toolbarInner}>
+        <View style={[styles.searchBox, { backgroundColor: colors.bg.card, borderColor: colors.border }]}>
+          <Ionicons name="search" size={17} color={colors.text.muted} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text.primary }]}
+            placeholder={searchPlaceholder}
+            placeholderTextColor={colors.text.muted}
+            value={searchValue}
+            onChangeText={onSearchChange}
+            onSubmitEditing={onSubmitEditing}
+          />
+          {searchValue ? (
+            <TouchableOpacity onPress={() => onSearchChange('')} style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Clear search">
+              <Ionicons name="close-circle" size={17} color={colors.text.muted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {renderFilters ? <View style={styles.filters}>{renderFilters()}</View> : null}
+
+        <View style={styles.toolbarSpacer} />
+
+        {itemCount !== undefined ? (
+          <Text style={styles.countText}>
+            {totalCount !== undefined ? `${itemCount} of ${totalCount} results` : `${itemCount} results`}
+          </Text>
         ) : null}
 
-        {renderFilters && (
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        )}
-        
-        {renderFilters && renderFilters()}
-
-        <View style={{ flexGrow: 1 }} />
-
-        {itemCount !== undefined && (
-          <View style={styles.countBadge}>
-            <Text style={styles.countText}>
-              {totalCount !== undefined ? `${itemCount} of ${totalCount} results` : `${itemCount} results`}
-            </Text>
-          </View>
-        )}
-
-        {renderActions ? renderActions() : primaryAction && (
+        {renderActions ? renderActions() : primaryAction ? (
           <TouchableOpacity
             style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
             onPress={primaryAction.onPress}
@@ -83,7 +77,7 @@ export function ListToolbar({
             {primaryAction.icon && <Ionicons name={primaryAction.icon} size={14} color="#fff" />}
             <Text style={styles.primaryActionText}>{primaryAction.label}</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -93,61 +87,56 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   container: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
+    paddingBottom: Spacing.sm,
   },
   toolbarInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    minHeight: 46,
+    minHeight: 44,
     gap: 10,
     flexWrap: 'wrap',
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 280,
+    minWidth: 200,
+    minHeight: 42,
+    paddingHorizontal: 10,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    gap: 8,
   },
   searchInput: {
     ...Typography.bodySm,
     flex: 1,
-    height: 40,
     minWidth: 120,
+    height: 38,
     borderWidth: 0,
     backgroundColor: 'transparent',
+    paddingHorizontal: 0,
   },
-  clearBtn: {
-    padding: 4,
-  },
-  divider: {
-    width: 1,
-    height: 24,
-    marginHorizontal: 4,
-  },
+  clearBtn: { padding: 4 },
+  filters: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  toolbarSpacer: { flexGrow: 1 },
   primaryActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    minHeight: 40,
     borderRadius: Radius.sm,
-    marginLeft: 'auto',
   },
   primaryActionText: {
     ...Typography.bodySm,
     color: '#fff',
     fontWeight: '700',
   },
-  countBadge: {
-    backgroundColor: colors.bg.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginRight: 8,
-  },
   countText: {
     ...Typography.caption,
-    color: colors.text.secondary,
-    fontWeight: '600',
+    color: colors.text.muted,
+    fontWeight: '500',
   },
 });

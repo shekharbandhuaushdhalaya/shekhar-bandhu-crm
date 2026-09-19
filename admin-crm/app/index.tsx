@@ -14,18 +14,18 @@ import { MetricTile, Panel, WorkspaceTabs, WorkspaceLoading, WorkspaceTransition
 import { PageHeader as WorkspaceHeader } from './../components/PageHeader';
 
 function MetricCard({ title, value, icon, color, colorLight, trend }: { title: string; value: string; icon: string; color: string; colorLight: string; trend: string }) {
+  const { colors } = useTheme();
   const styles = useStyles(createStyles);
   return (
     <Pressable 
       style={({ pressed }) => [
-        styles.metricCard, 
-        { borderTopColor: color, borderTopWidth: 3 },
-        pressed && { transform: [{ scale: 0.98 }] }
+        styles.metricCard,
+        pressed && { backgroundColor: colors.bg.cardHover }
       ]}
     >
       <View style={styles.metricHeader}>
         <Text style={styles.metricTitle}>{title}</Text>
-        <View style={[styles.iconCircle, { backgroundColor: colorLight }]}>
+        <View style={styles.iconCircle}>
           <Ionicons name={icon as any} size={15} color={color} />
         </View>
       </View>
@@ -155,18 +155,16 @@ function FinancialSummaryCard({
   breakdown2Value?: string;
 }) {
   const styles = useStyles(createStyles);
-  const bgLight = color + '08';
   return (
     <Pressable 
       style={({ pressed }) => [
-        styles.summaryCard, 
-        { borderLeftColor: color, borderLeftWidth: 4 },
-        pressed && { transform: [{ scale: 0.98 }] }
+        styles.summaryCard,
+        pressed && { opacity: 0.9 }
       ]}
     >
       <View style={styles.summaryCardHeader}>
         <Text style={styles.summaryCardTitle}>{title}</Text>
-        <View style={[styles.iconCircle, { backgroundColor: bgLight }]}>
+        <View style={styles.iconCircle}>
           <Ionicons name={icon as any} size={15} color={color} />
         </View>
       </View>
@@ -725,23 +723,23 @@ function FullMrAnalyticsTab() {
       {/* KPI Cards */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.primary + '30' }}>
-          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>DOCTOR VISITS</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Doctor visits</Text>
           <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.primary, marginTop: 4 }}>{totals.visits}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.success + '30' }}>
-          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>BOOKED ORDERS</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Booked orders</Text>
           <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.success, marginTop: 4 }}>{totals.orders}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.warning + '30' }}>
-          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>TOTAL ORDER VALUE</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Total order value</Text>
           <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.warning, marginTop: 4 }}>₹{(totals.orderValue || 0).toLocaleString('en-IN')}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.danger + '30' }}>
-          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>EXPENSES SUBMITTED</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Expenses submitted</Text>
           <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.danger, marginTop: 4 }}>₹{(totals.expenses || 0).toLocaleString('en-IN')}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 150, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.info + '30' }}>
-          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>DISTANCE COVERED</Text>
+          <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Distance covered</Text>
           <Text style={{ ...Typography.h1, fontWeight: '800', color: colors.info, marginTop: 4 }}>{(totals.distance || 0).toFixed(0)} <Text style={{ ...Typography.body }}>km</Text></Text>
         </View>
       </View>
@@ -778,7 +776,7 @@ function FullMrAnalyticsTab() {
               {/* Progress Bar */}
               <View style={{ marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>MONTHLY TARGET PROGRESS</Text>
+                  <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted }}>Monthly target progress</Text>
                   <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>{targetAchievement}% Achieved</Text>
                 </View>
                 <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
@@ -1303,11 +1301,22 @@ export default function DashboardScreen() {
       ><WorkspaceTransition value={activeTab}>
         {activeTab === 'overview' ? (
           <View style={{ gap: 28, paddingBottom: 40 }}>
-            <View style={[styles.metricsGrid, { marginBottom: 0 }]}>
-              <MetricTile label="Sales revenue" value={`₹${totalRevenue.toLocaleString('en-IN')}`} icon="trending-up-outline" tone="success" helper="Finalized sales invoices" />
-              <MetricTile label="Receivables" value={`₹${recInvoice.toLocaleString('en-IN')}`} icon="wallet-outline" tone={recInvoice > 0 ? 'warning' : 'success'} helper="Outstanding from customers" />
-              <MetricTile label="Active web orders" value={String(stats.activeWebOrdersCount || 0)} icon="cart-outline" tone={stats.activeWebOrdersCount ? 'info' : 'success'} helper="Awaiting sales processing" />
-              <MetricTile label="Stock alerts" value={String(lowStockProds.length)} icon="alert-circle-outline" tone={lowStockProds.length ? 'danger' : 'success'} helper="At or below reorder level" />
+            <View style={styles.dashboardKpiStrip}>
+              {[
+                { label: 'Sales revenue', value: `₹${totalRevenue.toLocaleString('en-IN')}`, helper: 'Finalized sales invoices', icon: 'trending-up-outline', color: colors.success },
+                { label: 'Receivables', value: `₹${recInvoice.toLocaleString('en-IN')}`, helper: 'Outstanding from customers', icon: 'wallet-outline', color: recInvoice > 0 ? colors.warning : colors.success },
+                { label: 'Active web orders', value: String(stats.activeWebOrdersCount || 0), helper: 'Awaiting sales processing', icon: 'cart-outline', color: stats.activeWebOrdersCount ? colors.info : colors.success },
+                { label: 'Stock alerts', value: String(lowStockProds.length), helper: 'At or below reorder level', icon: 'alert-circle-outline', color: lowStockProds.length ? colors.danger : colors.success },
+              ].map((metric, index, arr) => (
+                <View key={metric.label} style={[styles.dashboardKpiItem, index < arr.length - 1 && styles.dashboardKpiDivider]}>
+                  <View style={styles.dashboardKpiHeading}>
+                    <Text style={styles.dashboardKpiLabel}>{metric.label}</Text>
+                    <Ionicons name={metric.icon as any} size={15} color={metric.color} />
+                  </View>
+                  <Text style={styles.dashboardKpiValue}>{metric.value}</Text>
+                  <Text style={styles.dashboardKpiHelper}>{metric.helper}</Text>
+                </View>
+              ))}
             </View>
 
             <Panel title="Business pulse" subtitle="Secondary signals kept compact so the dashboard stays easy to scan.">
@@ -1322,19 +1331,21 @@ export default function DashboardScreen() {
               </View>
             </Panel>
 
-            <View style={styles.quickActionsRow}>
-              {[
-                { label: 'Sales workspace', sub: 'Orders and fulfillment', icon: 'cart-outline', route: '/sales-workspace' },
-                { label: 'Challans', sub: 'Finalize physical movement', icon: 'document-text-outline', route: '/sales-workspace?tab=challans' },
-                { label: 'MR My Day', sub: 'Field priorities', icon: 'today-outline', route: '/mr-my-day' },
-                { label: 'Sales intelligence', sub: 'Collections and customer health', icon: 'flash-outline', route: '/sales-intelligence' },
-              ].map((item) => (
-                <Pressable key={item.label} style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]} onPress={() => router.push(item.route as any)}>
-                  <View style={styles.quickActionIcon}><Ionicons name={item.icon as any} size={18} color={colors.primary} /></View>
-                  <View style={{ flex: 1 }}><Text style={styles.quickActionLabel}>{item.label}</Text><Text style={styles.quickActionSub}>{item.sub}</Text></View>
-                  <Ionicons name="chevron-forward" size={15} color={colors.text.muted} />
-                </Pressable>
-              ))}
+            <View style={styles.quickActionsBar}>
+              <Text style={styles.quickActionsLabel}>Quick actions</Text>
+              <View style={styles.quickActionsRow}>
+                {[
+                  { label: 'Sales workspace', icon: 'cart-outline', route: '/sales-workspace' },
+                  { label: 'Challans', icon: 'document-text-outline', route: '/sales-workspace?tab=challans' },
+                  { label: 'MR My Day', icon: 'today-outline', route: '/mr-my-day' },
+                  { label: 'Sales intelligence', icon: 'flash-outline', route: '/sales-intelligence' },
+                ].map((item) => (
+                  <Pressable key={item.label} style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]} onPress={() => router.push(item.route as any)}>
+                    <Ionicons name={item.icon as any} size={16} color={colors.primary} />
+                    <Text style={styles.quickActionLabel}>{item.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
 
             <View style={styles.chartsFeedRow}>
@@ -1366,20 +1377,20 @@ export default function DashboardScreen() {
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
   content: { padding: Spacing.lg, width: '100%', maxWidth: 1200, alignSelf: 'center' },
-  heading: { ...Typography.display, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  heading: { ...Typography.display, fontWeight: '700', color: colors.text.primary, marginBottom: 4 },
   subheading: { ...Typography.body, color: colors.text.secondary, marginBottom: Spacing.lg },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginBottom: Spacing.md },
-  metricCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, maxWidth: 340, backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
+  metricCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, maxWidth: 340, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: Spacing.lg, borderWidth: 0 },
   metricHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   metricTitle: { ...Typography.caption, fontWeight: '700', color: colors.text.muted },
-  metricValue: { ...Typography.display, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  metricValue: { ...Typography.display, fontWeight: '700', color: colors.text.primary, marginBottom: 4 },
   metricTrend: { ...Typography.bodySm, fontWeight: '600' },
   metricFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.xs },
   metricSubtext: { ...Typography.caption, color: colors.text.muted },
-  summaryCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, maxWidth: 340, backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, ...Shadows.card },
+  summaryCard: { flexGrow: 1, flexShrink: 1, flexBasis: 240, maxWidth: 340, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: Spacing.lg, borderWidth: 0 },
   summaryCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   summaryCardTitle: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted },
-  summaryCardValue: { ...Typography.h1, fontWeight: '800', color: colors.text.primary, marginBottom: 4 },
+  summaryCardValue: { ...Typography.h1, fontWeight: '700', color: colors.text.primary, marginBottom: 4 },
   summaryCardLabel: { ...Typography.caption, color: colors.text.secondary },
   breakdownRow: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 8, alignItems: 'center' },
   breakdownItem: { flex: 1 },
@@ -1391,7 +1402,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { ...Typography.caption, color: colors.text.secondary, fontWeight: '600' },
   legendVal: { ...Typography.bodySm, color: colors.text.primary, fontWeight: '700', marginTop: 2 },
-  chartCard: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: Spacing.lg, ...Shadows.card },
+  chartCard: { backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: Spacing.lg, borderWidth: 0, marginBottom: Spacing.lg },
   chartTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: Spacing.lg },
   sectionTitle: { ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: Spacing.md },
   activityItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 14 },
@@ -1400,17 +1411,24 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   activityTime: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
   pulseRow: { flexDirection: 'row', alignItems: 'stretch', flexWrap: 'wrap', gap: 0 },
   pulseItem: { minWidth: 135, flexGrow: 1, flexShrink: 1, paddingVertical: 4, paddingHorizontal: 12 },
-  pulseValue: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
+  pulseValue: { ...Typography.h3, fontWeight: '700', color: colors.text.primary },
   pulseLabel: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 3 },
   pulseDivider: { width: 1, minHeight: 38, backgroundColor: colors.border, alignSelf: 'center' },
-  quickActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  quickAction: { flexGrow: 1, flexShrink: 1, flexBasis: 245, minWidth: 220, minHeight: 64, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.card, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, ...Shadows.card },
+  dashboardKpiStrip: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 14, paddingHorizontal: 6 },
+  dashboardKpiItem: { flexGrow: 1, flexShrink: 1, flexBasis: 190, minWidth: 170, paddingHorizontal: 16, paddingVertical: 4 },
+  dashboardKpiDivider: { borderRightWidth: 1, borderRightColor: colors.border },
+  dashboardKpiHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  dashboardKpiLabel: { ...Typography.caption, fontWeight: '600', color: colors.text.secondary },
+  dashboardKpiValue: { ...Typography.h1, fontWeight: '700', color: colors.text.primary, marginTop: 7 },
+  dashboardKpiHelper: { ...Typography.caption, color: colors.text.muted, fontWeight: '500', marginTop: 2 },
+  quickActionsBar: { gap: 8 },
+  quickActionsLabel: { ...Typography.caption, fontWeight: '600', color: colors.text.muted },
+  quickActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  quickAction: { minHeight: 36, borderRadius: Radius.sm, backgroundColor: 'transparent', paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 7 },
   quickActionPressed: { backgroundColor: colors.bg.cardHover },
-  quickActionIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  quickActionLabel: { ...Typography.bodySm, fontWeight: '800', color: colors.text.primary },
-  quickActionSub: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 },
+  quickActionLabel: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   chartsFeedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, width: '100%' },
   chartWrapper: { flexGrow: 2, flexShrink: 1, flexBasis: 500 },
   feedWrapper: { flexGrow: 1, flexShrink: 1, flexBasis: 350 },
-  iconCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  iconCircle: { width: 24, height: 24, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
 });

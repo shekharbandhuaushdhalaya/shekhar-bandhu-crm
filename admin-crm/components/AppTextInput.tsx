@@ -11,7 +11,7 @@ export const AppTextInput = forwardRef<TextInput, TextInputProps>(function AppTe
   const resolved: TextStyle = StyleSheet.flatten([style]);
   const hasNoBorder = resolved.borderWidth === 0;
   return <TextInput ref={ref} {...props} placeholderTextColor={placeholderTextColor || colors.text.muted}
-    style={[Typography.body, { color: colors.text.primary, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm }, 
+    style={[Typography.body, { color: colors.text.primary, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm }, 
       (Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}), style,
       { minHeight: Math.max(ControlHeight.input, Number(resolved.minHeight) || 0), fontFamily: fontForStyle(resolved) },
       focused && !hasNoBorder && { borderColor: colors.primary, borderWidth: 1 }]}

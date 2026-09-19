@@ -302,7 +302,7 @@ export default function SalesCRMScreen() {
                 <Text style={styles.descriptionText}>{cmp.description}</Text>
                 {cmp.resolution ? (
                   <View style={[styles.resolutionBox, { backgroundColor: colors.success + '10', borderColor: colors.success }]}>
-                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.success }}>RESOLUTION</Text>
+                    <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.success }}>Resolution</Text>
                     <Text style={{ ...Typography.bodySm, color: colors.text.primary, marginTop: 2 }}>{cmp.resolution}</Text>
                     {cmp.resolvedBy ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>By: {cmp.resolvedBy}</Text> : null}
                   </View>
@@ -401,7 +401,7 @@ export default function SalesCRMScreen() {
           </View>
         )}
 
-        {/* ===== TAB 3: TARGETS & COMMISSION ===== */}
+        {/* ===== TAB 3: TARGETS & Commission ===== */}
         {activeTab === 'targets' && (
           <View>
             {/* Month/Year selector */}
@@ -441,9 +441,9 @@ export default function SalesCRMScreen() {
                 {/* Table header */}
                 <View style={[styles.tableHeader]}>
                   <Text style={[styles.th, { flex: 2 }]}>AGENT</Text>
-                  <Text style={[styles.th, { flex: 1, textAlign: 'right' }]}>INVOICES</Text>
-                  <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>TOTAL SALES</Text>
-                  <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>COMMISSION</Text>
+                  <Text style={[styles.th, { flex: 1, textAlign: 'right' }]}>Invoices</Text>
+                  <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>Total sales</Text>
+                  <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>Commission</Text>
                 </View>
                 {commission.agents.map((ag, i) => {
                   const target = targets.find(t => t.agentName === ag.agentName);
@@ -703,9 +703,9 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   tabPillText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
   tabPillTextActive: { color: '#fff', fontWeight: '700' },
   content: { padding: Spacing.lg, maxWidth: 1200, alignSelf: 'center', width: '100%' },
-  card: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: 12 },
+  card: { backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: Spacing.lg, borderWidth: 0, marginBottom: 12 },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
-  statCard: { flex: 1, minWidth: 80, backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+  statCard: { flex: 1, minWidth: 80, backgroundColor: 'transparent', borderRadius: Radius.md, padding: 12, borderWidth: 0, alignItems: 'center' },
   statValue: { ...Typography.h1, fontWeight: '800' },
   statLabel: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 4, textAlign: 'center' },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.md },
@@ -736,7 +736,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg.secondary },
   modalTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   modalForm: { padding: 16, maxHeight: 420 },
-  modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: colors.border },
+  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.card },
   modalError: { ...Typography.bodySm, margin: 12, padding: 10, backgroundColor: colors.danger + '15', borderRadius: Radius.sm, color: colors.danger, fontWeight: '600' },
   inputLabel: { ...Typography.bodySm, fontWeight: '700', color: colors.text.secondary, marginBottom: 6 },
   input: { ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, marginBottom: 12 },

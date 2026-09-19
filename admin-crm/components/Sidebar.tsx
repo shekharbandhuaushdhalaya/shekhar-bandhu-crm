@@ -151,7 +151,6 @@ function DashboardItem({
       <Text style={[styles.dashboardText, (isActive || hovered) && styles.dashboardTextActive]}>
         Dashboard
       </Text>
-      {isActive && <View style={styles.dashboardActiveBar} />}
     </TouchableOpacity>
   );
 }
@@ -186,7 +185,7 @@ function GroupHeader({
       onMouseLeave={() => setHovered(false)}
     >
       <View style={styles.groupHeaderLeft}>
-        <View style={[styles.groupIconBox, (expanded || hovered) && styles.groupIconBoxExpanded]}>
+        <View style={styles.groupIconBox}>
           <Ionicons
             name={(expanded ? group.icon.toString().replace('-outline', '') : group.icon) as any}
             size={16}
@@ -235,7 +234,6 @@ function NavItemRow({
       // @ts-ignore
       onMouseLeave={() => setHovered(false)}
     >
-      {isActive && <View style={styles.activeBar} />}
       <Ionicons
         name={isActive ? item.activeIcon : item.icon}
         size={16}
@@ -283,19 +281,9 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     },
     dashboardText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginLeft: 10 },
     dashboardTextActive: {
-      color: colors.primary,
+      color: colors.text.primary,
       fontWeight: '700',
     },
-    dashboardActiveBar: {
-      position: 'absolute',
-      left: 0,
-      top: 8,
-      bottom: 8,
-      width: 3,
-      borderRadius: 2,
-      backgroundColor: colors.primary,
-    },
-
     // ── Group Headers ──
     groupHeader: {
       flexDirection: 'row',
@@ -309,7 +297,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       marginTop: 2,
     },
     groupHeaderExpanded: {
-      backgroundColor: colors.primaryLight,
+      backgroundColor: 'transparent',
     },
     groupHeaderLeft: {
       flexDirection: 'row',
@@ -319,22 +307,20 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     groupIconBox: {
       width: 24,
       height: 24,
-      borderRadius: 8,
+      borderRadius: Radius.sm,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.bg.primary,
+      backgroundColor: 'transparent',
     },
-    groupIconBoxExpanded: {
-      backgroundColor: colors.primaryLight,
-    },
-    groupLabel: { ...Typography.eyebrow, fontWeight: '700', color: colors.text.muted, marginLeft: 8 },
+    groupIconBoxExpanded: { backgroundColor: 'transparent' },
+    groupLabel: { ...Typography.caption, fontWeight: '600', color: colors.text.muted, marginLeft: 8 },
     groupLabelExpanded: {
-      color: colors.primary,
+      color: colors.text.primary,
     },
 
     // Hover effect style
     itemHovered: {
-      backgroundColor: colors.primaryLight,
+      backgroundColor: colors.bg.cardHover,
     },
 
     // ── Child Items ──
@@ -362,19 +348,9 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     },
     navItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginLeft: 8, flex: 1, flexShrink: 1 },
     navItemTextActive: {
-      color: colors.primary,
+      color: colors.text.primary,
       fontWeight: '700',
     },
-    activeBar: {
-      position: 'absolute',
-      left: 0,
-      top: 6,
-      bottom: 6,
-      width: 3,
-      borderRadius: 2,
-      backgroundColor: colors.primary,
-    },
-
     // ── Footer Controls ──
     footer: {
       borderTopWidth: 1,
@@ -386,21 +362,19 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       flex: 1,
       height: 40,
       borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderWidth: 0,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.bg.primary,
+      backgroundColor: 'transparent',
     },
     footerLogoutIconBtn: {
       flex: 1,
       height: 40,
       borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.danger + '30',
+      borderWidth: 0,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.danger + '10',
+      backgroundColor: 'transparent',
     },
     statusBadge: {
       flex: 1.5,
@@ -408,7 +382,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
+      borderWidth: 0,
       paddingHorizontal: 6,
       borderRadius: 8,
     },
@@ -417,7 +391,8 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       height: 6,
       borderRadius: 3,
     },
-    badgeText: { ...Typography.eyebrow, fontWeight: '700', marginLeft: 6 },
+    badgeText: { ...Typography.caption, fontWeight: '600', marginLeft: 6 },
+    quickAccessLabel: { marginBottom: 6, marginLeft: 12 },
   });
 
 function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; isOnline?: boolean; logout?: () => void }) {
@@ -496,7 +471,7 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
 
         {/* Frequent Items */}
         <View style={{ marginBottom: 12 }}>
-          <Text style={[styles.groupLabel, { marginBottom: 6 }]}>QUICK ACCESS</Text>
+          <Text style={[styles.groupLabel, styles.quickAccessLabel]}>Quick access</Text>
           {FREQUENT_ITEMS.map((item) => {
             if (item.permission && !perm.can(item.permission)) return null;
             return (

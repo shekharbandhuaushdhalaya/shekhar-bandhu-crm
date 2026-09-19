@@ -288,9 +288,9 @@ export default function RawMaterialModal({
 
           <ScrollView style={styles.modalForm} contentContainerStyle={{ paddingBottom: 18 }} showsVerticalScrollIndicator={false}>
             {/* 1. CORE DETAILS */}
-            <View style={{ marginBottom: 14, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+            <View style={{ marginBottom: 14, backgroundColor: 'transparent', paddingVertical: 10, borderRadius: Radius.md, borderWidth: 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 9 }}>
+                <View style={{ width: 24, height: 24, borderRadius: Radius.sm, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: 7 }}>
                   <Ionicons name="cube-outline" size={16} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -339,7 +339,7 @@ export default function RawMaterialModal({
 
             {/* Quick setup / suggestions */}
             {(isPackaging && !rmName) && (
-              <View style={{ marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.primary + '08', borderWidth: 1, borderColor: colors.primary + '20' }}>
+              <View style={{ marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.primary + '08', borderWidth: 0 }}>
                 <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary, marginBottom: 7 }}>Quick packaging setup</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {[
@@ -354,7 +354,7 @@ export default function RawMaterialModal({
             )}
 
             {(isExcipient && !rmName) && (
-              <View style={{ marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.primary + '08', borderWidth: 1, borderColor: colors.primary + '20' }}>
+              <View style={{ marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.primary + '08', borderWidth: 0 }}>
                 <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary, marginBottom: 7 }}>Quick excipient setup</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {[
@@ -368,16 +368,16 @@ export default function RawMaterialModal({
             )}
 
             {suggestions.length > 0 ? (
-              <View style={{ marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.success + '08', borderWidth: 1, borderColor: colors.success + '25' }}>
+              <View style={{ marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.success + '08', borderWidth: 0 }}>
                 <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.success, marginBottom: 7 }}>Suggested Ayurvedic matches</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {suggestions.map((herb, idx) => <TouchableOpacity key={idx} onPress={() => applyHerbData(herb, herb.name)} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.success + '30' }}><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.success }}> {herb.name} <Text style={{ fontStyle: 'italic', fontWeight: '400', color: colors.text.secondary }}>({herb.botanicalName})</Text></Text></TouchableOpacity>)}
                 </View>
               </View>
-            ) : (rmName.length >= 2 && !isPackaging ? <TouchableOpacity onPress={applyCustomHerbPreset} style={{ marginBottom: 14, padding: 10, borderRadius: 9, backgroundColor: colors.success + '10', borderWidth: 1, borderColor: colors.success + '35', flexDirection: 'row', alignItems: 'center', gap: 7 }}><Ionicons name="sparkles-outline" size={15} color={colors.success} /><Text style={{ ...Typography.caption, fontWeight: '700', color: colors.success }}>Quick-setup “{rmName.toUpperCase()}” as an Ayurvedic herb</Text></TouchableOpacity> : null)}
+            ) : (rmName.length >= 2 && !isPackaging ? <TouchableOpacity onPress={applyCustomHerbPreset} style={{ marginBottom: 14, padding: 10, borderRadius: 9, backgroundColor: colors.success + '10', borderWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 7 }}><Ionicons name="sparkles-outline" size={15} color={colors.success} /><Text style={{ ...Typography.caption, fontWeight: '700', color: colors.success }}>Quick-setup “{rmName.toUpperCase()}” as an Ayurvedic herb</Text></TouchableOpacity> : null)}
 
             {/* 2. MATERIAL SPECIFICATION */}
-            <View style={{ marginBottom: 14, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+            <View style={{ marginBottom: 14, backgroundColor: 'transparent', paddingVertical: 10, borderRadius: Radius.md, borderWidth: 0 }}>
               <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>{isPackaging ? 'Packaging specification' : 'Material specification'}</Text>
               <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 12 }}>{isPackaging ? 'Capture physical packaging details.' : 'Add the physical and botanical details used for purchasing and quality control.'}</Text>
 
@@ -404,7 +404,7 @@ export default function RawMaterialModal({
             </View>
 
             {/* 3. QUALITY & AYUSH */}
-            <View style={{ marginBottom: 14, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+            <View style={{ marginBottom: 14, backgroundColor: 'transparent', paddingVertical: 10, borderRadius: Radius.md, borderWidth: 0 }}>
               <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>Quality & AYUSH compliance</Text>
               <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 12 }}>Standards and safety information used during procurement and quality review.</Text>
               <Text style={styles.inputLabel}>Material Category / AYUSH Type</Text>
@@ -417,7 +417,7 @@ export default function RawMaterialModal({
             </View>
 
             {/* 4. INVENTORY */}
-            <View style={{ marginBottom: 14, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+            <View style={{ marginBottom: 14, backgroundColor: 'transparent', paddingVertical: 10, borderRadius: Radius.md, borderWidth: 0 }}>
               <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>Inventory settings</Text>
               <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 12 }}>Define the unit and stock controls used by inventory.</Text>
               <Text style={styles.inputLabel}>Unit of Measurement *</Text>
@@ -428,7 +428,7 @@ export default function RawMaterialModal({
 
             {/* Advanced botanical information is secondary; keep it available without dominating the form. */}
             {!isPackaging && (rmFamily || rmGenus || rmSpecies || rmBotanicalSynonyms.length || rmTherapeuticUses.length || rmAcceptedScientificName || rmBotanicalDescription) && (
-              <View style={{ marginBottom: 14, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ marginBottom: 14, backgroundColor: 'transparent', paddingVertical: 10, borderRadius: Radius.md, borderWidth: 0 }}>
                 <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 10 }}>Botanical / pharmacognostic details</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>{[['Accepted name', rmAcceptedScientificName], ['Family', rmFamily], ['Genus', rmGenus], ['Species', rmSpecies], ['Authority', rmBotanicalAuthority], ['Rank', rmTaxonomicRank], ['Taxonomic status', rmTaxonomicStatus]].map(([label,value]) => value ? <View key={label as string} style={{ width: '47%', marginBottom: 2 }}><Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>{label}</Text><Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.primary, fontStyle: label === 'Accepted name' ? 'italic' : 'normal' }}>{value}</Text></View> : null)}</View>
                 {rmBotanicalSynonyms.length ? <Text style={{ ...Typography.eyebrow, color: colors.text.secondary, marginTop: 6 }}><Text style={{ fontWeight: '800' }}>Synonyms: </Text>{rmBotanicalSynonyms.join(', ')}</Text> : null}
@@ -442,7 +442,7 @@ export default function RawMaterialModal({
 
             {/* Existing stock is only relevant while editing. Keep it at the end so it doesn't distract from definition. */}
             {editingMaterialId !== null && (
-              <View style={{ marginBottom: 4, backgroundColor: colors.bg.secondary, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ marginBottom: 4, backgroundColor: 'transparent', paddingVertical: 10, borderRadius: Radius.md, borderWidth: 0 }}>
                 <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 2 }}>Current stock adjustment</Text>
                 <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginBottom: 12 }}>Only change physical stock here when it differs from the recorded quantity.</Text>
                 <Text style={styles.inputLabel}>SKU / System Code</Text>

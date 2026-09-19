@@ -983,7 +983,7 @@ function VendorLedgerModal({
     <p><strong>GSTIN: ${FIRM_DETAILS.gstin}</strong></p>
   </div>
   
-  <h2 style="text-align:center; border:none;">STATEMENT OF ACCOUNT</h2>
+  <h2 style="text-align:center; border:none;">Statement of account</h2>
   
   <div class="details">
     <div>
@@ -1383,7 +1383,7 @@ export default function VendorsScreen() {
         return isUnregistered ? (
           <View style={[styles.gstinBadge, { backgroundColor: colors.warning + '0c', borderColor: colors.warning + '20' }]}>
             <Ionicons name="cash" size={10} color={colors.warning} />
-            <Text style={[styles.gstinText, { color: colors.warning }]}>UNREGISTERED</Text>
+            <Text style={[styles.gstinText, { color: colors.warning }]}>Unregistered</Text>
           </View>
         ) : (
           <View style={styles.gstinBadge}>
@@ -1558,7 +1558,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   balanceText: { ...Typography.body, fontWeight: '800' },
 
   // Action button (text + icon)
-  viewBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+  viewBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 0, backgroundColor: 'transparent' },
   viewBtnText: { ...Typography.bodySm, fontWeight: '700', color: colors.primary },
 
   emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },

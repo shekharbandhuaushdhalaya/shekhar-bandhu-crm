@@ -248,11 +248,11 @@ export default function CreditNotesPage() {
         {/* Summary Stats */}
         <View style={styles.summaryRow}>
           <View style={[styles.statCard, { backgroundColor: colors.success + '10', borderColor: colors.success + '30' }]}>
-            <Text style={[styles.statLabel, { color: colors.success }]}>CREDIT NOTES</Text>
+            <Text style={[styles.statLabel, { color: colors.success }]}>Credit notes</Text>
             <Text style={[styles.statValue, { color: colors.success }]}>₹{totalCreditAmt.toLocaleString('en-IN')}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.danger + '10', borderColor: colors.danger + '30' }]}>
-            <Text style={[styles.statLabel, { color: colors.danger }]}>DEBIT NOTES</Text>
+            <Text style={[styles.statLabel, { color: colors.danger }]}>Debit notes</Text>
             <Text style={[styles.statValue, { color: colors.danger }]}>₹{totalDebitAmt.toLocaleString('en-IN')}</Text>
           </View>
         </View>
@@ -717,11 +717,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   filterChipText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary },
 
   summaryRow: { flexDirection: 'row', gap: 16, paddingHorizontal: Spacing.lg, marginTop: Spacing.xs, marginBottom: Spacing.md },
-  statCard: { flex: 1, backgroundColor: colors.bg.card, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1 },
+  statCard: { flex: 1, backgroundColor: 'transparent', borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 0 },
   statLabel: { ...Typography.eyebrow, fontWeight: '700' },
   statValue: { ...Typography.h2, fontWeight: '800', marginTop: 2 },
 
-  card: { backgroundColor: colors.bg.card, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4 },
+  card: { backgroundColor: colors.bg.card, borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 0 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   cardTitle: { ...Typography.h3, fontWeight: '800', color: colors.text.primary },
   cardSub: { ...Typography.bodySm, color: colors.text.secondary, marginBottom: 4 },
@@ -736,7 +736,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyText: { ...Typography.body, marginTop: 10, color: colors.text.muted },
 
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', ...Shadows.floating, boxShadow: '0px 4px 10px rgba(0,0,0,0.3)' },
+  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', ...Shadows.floating },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', maxWidth: 500, backgroundColor: colors.bg.card, borderRadius: Radius.lg, maxHeight: '90%' },
@@ -751,12 +751,12 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   toggleBtn: { flex: 1, height: 40, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.primary, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
   toggleText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, textAlign: 'center' },
   
-  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 150, zIndex: 9999, ...Shadows.floating, boxShadow: '0px 2px 4px rgba(0,0,0,0.1)' },
+  dropdownList: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, marginTop: 4, maxHeight: 150, zIndex: 9999, ...Shadows.floating },
   dropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   dropdownItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.primary },
   dropdownItemSub: { ...Typography.caption, color: colors.text.muted, marginTop: 2 },
 
-  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', padding: Spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, gap: 10 },
+  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: Spacing.lg, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border, gap: 8, backgroundColor: colors.bg.card },
   cancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.md, backgroundColor: colors.bg.secondary },
   cancelBtnText: { ...Typography.body, fontWeight: '600', color: colors.text.primary },
   saveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: Radius.md, backgroundColor: colors.primary },

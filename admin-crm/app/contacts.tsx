@@ -566,7 +566,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   primaryText: { ...Typography.bodySm, fontWeight: '700', color: colors.text.primary },
   secondaryText: { ...Typography.eyebrow, color: colors.text.muted, marginTop: 1 },
   outstandingText: { ...Typography.bodySm, fontWeight: '800' },
-  actionIconButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' },
+  actionIconButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   emptyTableContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
 
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, alignSelf: 'flex-start' },
