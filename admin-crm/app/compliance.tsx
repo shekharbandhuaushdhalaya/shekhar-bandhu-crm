@@ -2,7 +2,7 @@ import { StatusPill, WorkspaceLoading } from './../components/WorkspacePrimitive
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { Typography, Spacing, Shadows, Radius } from './../constants/theme';
+import { Typography, Spacing, Shadows, Radius, LightColors } from './../constants/theme';
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -508,9 +508,7 @@ export default function ComplianceScreen() {
   );
 }
 
-const createStyles = (theme: any) => {
-  const { colors } = theme;
-  return StyleSheet.create({
+const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   container: { padding: 20, gap: 14 },
   headerBanner: { padding: 16, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 12, alignItems: 'center' },
   bannerTitle: { ...Typography.h3, fontWeight: '700' },
@@ -553,4 +551,3 @@ const createStyles = (theme: any) => {
   modalCancelBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
   modalSubmitBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
 });
-};
