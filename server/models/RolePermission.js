@@ -27,7 +27,14 @@ rolePermissionSchema.plugin(tenantPlugin);
 
 rolePermissionSchema.statics.getEffectivePermissions = async function (role) {
   const doc = await this.findOne({ role });
-  if (doc && doc.permissions) return { permissions: doc.permissions, mfaPermissions: doc.mfaPermissions || [] };
+  if (doc && doc.permissions) {
+    const perms = doc.permissions;
+    // Admin role always gets wildcard regardless of DB state
+    if (role === 'admin' && !perms.includes('*')) {
+      return { permissions: [...perms, '*'], mfaPermissions: doc.mfaPermissions || [] };
+    }
+    return { permissions: perms, mfaPermissions: doc.mfaPermissions || [] };
+  }
   return { permissions: getDefaultPermissionsForRole(role), mfaPermissions: [] };
 };
 

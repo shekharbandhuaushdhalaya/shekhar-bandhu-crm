@@ -82,9 +82,9 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
             </View>
 
             {/* Planned Sizes (multi-size batch) */}
-            {batch.plannedYields?.length > 0 && (
+            {(batch.plannedYields || []).length > 0 && (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
-                {batch.plannedYields.map((py: any, idx: number) => {
+                {(batch.plannedYields || []).map((py: any, idx: number) => {
                   const pId = typeof py.productId === 'object' ? py.productId._id || py.productId : py.productId;
                   const prod = products.find(p => p._id === pId);
                   return (
@@ -266,7 +266,7 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
               onPress={() => toggleBatchExpanded(batch._id)}
             >
               <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.primary }}>
-                {expandedBatchIds[batch._id] ? 'Hide Materials & Operator Logs' : `View Materials Consumed (${batch.ingredientsConsumed.length}) & Logs`}
+                {expandedBatchIds[batch._id] ? 'Hide Materials & Operator Logs' : `View Materials Consumed (${(batch.ingredientsConsumed || []).length}) & Logs`}
               </Text>
               <Ionicons name={expandedBatchIds[batch._id] ? 'chevron-up' : 'chevron-down'} size={14} color={colors.primary} />
             </TouchableOpacity>
@@ -288,10 +288,10 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                   </View>
                 )}
 
-                {batch.ingredientsConsumed.length > 0 && (
+                {(batch.ingredientsConsumed || []).length > 0 && (
                   <View style={{ gap: 3 }}>
                     <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>Raw Materials Consumed (FIFO):</Text>
-                    {batch.ingredientsConsumed.map((ing: any, idx: number) => (
+                    {(batch.ingredientsConsumed || []).map((ing: any, idx: number) => (
                       <Text key={idx} style={{ ...Typography.eyebrow, color: colors.text.secondary }}>
                         • {ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId.name : 'Material'} (Batch: {ing.batchNo}) — {(() => {
                           const r = ing.rawMaterialId && typeof ing.rawMaterialId === 'object' ? ing.rawMaterialId : null;
