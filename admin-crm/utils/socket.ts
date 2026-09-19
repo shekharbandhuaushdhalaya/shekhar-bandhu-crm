@@ -7,7 +7,7 @@ const getSocketUrl = () => {
   if (baseUrl && typeof baseUrl === 'string' && baseUrl.startsWith('http')) {
     return baseUrl.replace(/\/api\/?$/, '');
   }
-  return 'http://localhost:5000';
+  return 'https://shekhar-bandhu-crm.onrender.com';
 };
 
 let socket: Socket | null = null;
