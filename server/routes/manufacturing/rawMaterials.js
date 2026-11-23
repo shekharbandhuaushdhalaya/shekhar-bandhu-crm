@@ -724,35 +724,24 @@ router.post('/:id/adjust-stock', idempotency, authorize('manufacturing:edit'), a
         let toReduce = Math.abs(diff);
         for (const entry of entries) {
           if (toReduce <= 0.0001) break;
-          if ((entry.qty || 0) <= 0) continue;
-          const reduce = Math.min(toReduce, entry.qty);
-          entry.qty = Number((entry.qty - reduce).toFixed(3));
-          entry.cleaningNotes = `${entry.cleaningNotes ? entry.cleaningNotes + '\n' : ''}Stock Adjustment: -${reduce} units on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`;
+          const unreservedQty = Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0));
+          if (unreservedQty <= 0) continue;
+          const reduce = Math.min(toReduce, unreservedQty);
+          entry.qty = Number((Number(entry.qty || 0) - reduce).toFixed(3));
+          entry.cleaningNotes = (entry.cleaningNotes ? entry.cleaningNotes + '\n' : '') + 'Stock Adjustment: -' + reduce + ' units on ' + new Date().toLocaleDateString() + ' Reason: ' + reason.trim();
           await entry.save({ session });
           toReduce -= reduce;
         }
-        if (toReduce > 0.0001) throw Object.assign(new Error('Unable to reduce the requested quantity from available batches'), { code: 'ADJUSTMENT_EXCEEDS_STOCK' });
+        if (toReduce > 0.0001) throw Object.assign(new Error('Adjustment would reduce reserved or unavailable stock; release reservations or correct the count first'), { code: 'ADJUSTMENT_EXCEEDS_STOCK' });
       } else {
-        const latestEntry = entries.length > 0 ? entries[entries.length - 1] : null;
-        if (latestEntry) {
-          latestEntry.qty = Number((latestEntry.qty + diff).toFixed(3));
-          latestEntry.initialQty = Number((latestEntry.initialQty + diff).toFixed(3));
-          latestEntry.cleaningNotes = `${latestEntry.cleaningNotes ? latestEntry.cleaningNotes + '\n' : ''}Stock Adjustment: +${diff} units on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`;
-          await latestEntry.save({ session });
-        } else {
-          await RawMaterialEntry.create([{
-            rawMaterialId: rm._id,
-            batchNo: `ADJ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
-            initialQty: diff,
-            qty: diff,
-            purchaseRate: 0,
-            vendorName: 'Stock Adjustment',
-            warehouseId: warehouse._id,
-            warehouseName: warehouse.name,
-            qcStatus: 'approved',
-            cleaningNotes: `Initial adjustment on ${new Date().toLocaleDateString()} Reason: ${reason.trim()}`
-          }], { session });
-        }
+        // Keep unverified adjustment quantities separate from any QC-released lot.
+        const adjustmentBatchNo = 'ADJ-' + new Date().toISOString().replace(/[-:.TZ]/g, '');
+        await RawMaterialEntry.create([{
+          rawMaterialId: rm._id, batchNo: adjustmentBatchNo, initialQty: diff, qty: diff,
+          purchaseRate: 0, vendorName: 'Stock Adjustment - QC Pending',
+          warehouseId: warehouse._id, warehouseName: warehouse.name, qcStatus: 'under_test',
+          cleaningNotes: 'Positive stock adjustment pending QC on ' + new Date().toLocaleDateString() + ' Reason: ' + reason.trim()
+        }], { session });
       }
       await RawMaterialLedger.create([{
         rawMaterialId: rm._id,
