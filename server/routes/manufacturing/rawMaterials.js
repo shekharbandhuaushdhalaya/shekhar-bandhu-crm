@@ -65,7 +65,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
     const { warehouseId, simple, search, page, limit } = req.query;
     // Treat search input as literal text (not a caller-supplied regular expression).
     const searchTerm = typeof search === 'string' ? search.trim().slice(0, 100) : '';
-    const escapedSearch = searchTerm.replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
+    const escapedSearch = searchTerm.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&');
     const filter = escapedSearch ? {
       $or: [
         { name: { $regex: escapedSearch, $options: 'i' } },
