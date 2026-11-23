@@ -1,7 +1,7 @@
 const express = require('express');
 const request = require('supertest');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const MedicalRepresentative = require('../models/MedicalRepresentative');
 const PermanentJourneyPlan = require('../models/PermanentJourneyPlan');
 const MrVisit = require('../models/MrVisit');
@@ -12,7 +12,8 @@ let app;
 
 describe('Task 3 — MR Field Force PJP & Performance Scorecard Suite', () => {
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    // Visit creation updates the PJP inside a MongoDB transaction.
+    mongoServer = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     await mongoose.connect(mongoServer.getUri());
 
     app = express();

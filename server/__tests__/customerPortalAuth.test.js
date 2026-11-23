@@ -149,7 +149,8 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
       .get(`/api/portal/invoices/${invB._id}/pdf`)
       .set('Authorization', `Bearer ${tokenA}`);
 
-    expect(pdfResB.status).toBe(403);
-    expect(pdfResB.body.error).toContain('Forbidden');
+    // Customer-scoped lookups deliberately return 404 to avoid disclosing another customer's invoice.
+    expect(pdfResB.status).toBe(404);
+    expect(pdfResB.body.error).toContain('Invoice not found');
   });
 });

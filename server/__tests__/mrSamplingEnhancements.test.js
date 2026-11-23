@@ -64,10 +64,9 @@ describe('Doctor Sample Management Enhancements (Expiry Warnings, Quotas, Signat
     });
 
     const warehouse = await Warehouse.create({ name: 'Main Sample Warehouse', type: 'main', isDefault: true });
-    await InventoryEntry.create({ warehouseId: warehouse._id, warehouseName: warehouse.name, productId: prod._id, qtyBoxes: 100, packing: 1, batchNo: 'BATCH-2026-X', expiryDate: new Date(Date.now() + 60 * 86400000), qcStatus: 'approved' });
-
-    // 15 days in the future (Near Expiry)
+    // Expiry is inherited from the source inventory lot when it is allocated to the MR bag.
     const futureExpiry = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
+    await InventoryEntry.create({ warehouseId: warehouse._id, warehouseName: warehouse.name, productId: prod._id, qtyBoxes: 100, packing: 1, batchNo: 'BATCH-2026-X', expiryDate: futureExpiry, qcStatus: 'approved' });
 
     const issueRes = await request(app)
       .post(`/api/medical-reps/${mr._id}/sample-bag/issue`)

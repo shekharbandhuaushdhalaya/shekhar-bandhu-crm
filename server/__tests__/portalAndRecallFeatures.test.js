@@ -29,7 +29,7 @@ jest.mock('../middleware/authenticatePortalCustomer', () => ({
   }
 }));
 jest.mock('../services/smsFallbackService', () => ({
-  sendMultiChannelNotification: jest.fn().mockResolvedValue(true)
+  sendMultiChannelNotification: jest.fn().mockResolvedValue({ success: true, channel: 'whatsapp', simulated: false })
 }));
 
 const MrVisit = require('../models/MrVisit');
