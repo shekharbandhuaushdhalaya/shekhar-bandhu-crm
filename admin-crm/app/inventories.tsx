@@ -1216,7 +1216,10 @@ export default function InventoriesScreen() {
   const [transfers, setTransfers] = useState<any[]>([]);
   const [addTransferVisible, setAddTransferVisible] = useState(false);
 
+  const loadRequestRef = useRef(0);
   const loadData = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
+    setLoading(true);
     try {
       // 1. Fetch Warehouses, Products, Vendors, Dead Stock, and Transfers
       const [ws, prods, vends, dead, trs] = await Promise.all([
@@ -1226,33 +1229,36 @@ export default function InventoriesScreen() {
         api.getDeadStock().catch(() => []),
         api.getStockTransfers().catch(() => [])
       ]);
+      if (requestId !== loadRequestRef.current) return;
       setWarehouses(ws);
       setProducts(prods);
       setVendors(vends);
       setDeadStockItems(dead);
       setTransfers(trs);
 
-      // 2. Fetch inventory based on selected godown
+      // 2. Fetch inventory based on selected godown and current search.
       if (selectedWarehouseId === 'all') {
         const cons = await api.getConsolidatedInventory(debouncedSearch);
-        setConsolidatedItems(cons);
+        if (requestId === loadRequestRef.current) setConsolidatedItems(cons);
       } else {
         const entries = await api.getInventoryEntries(selectedWarehouseId, debouncedSearch);
-        setWarehouseEntries(entries);
+        if (requestId === loadRequestRef.current) setWarehouseEntries(entries);
       }
-    } catch (err) {
-      console.error('Error fetching inventories details:', err);
+    } catch (err: any) {
+      if (requestId === loadRequestRef.current) {
+        console.error('Error fetching inventories details:', err);
+        showToast(err?.message || 'Unable to load inventory. Please retry.', 'error');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-  }, [selectedWarehouseId, debouncedSearch]);
+  }, [selectedWarehouseId, debouncedSearch, showToast]);
 
-  const loadedOnce = useRef(false);
   useEffect(() => {
-    if (!loadedOnce.current) {
-      loadedOnce.current = true;
-      loadData();
-    }
+    loadData();
+    return () => {
+      loadRequestRef.current += 1;
+    };
   }, [loadData]);
   useEffect(() => {
     const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => loadData());
@@ -1267,9 +1273,12 @@ export default function InventoriesScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    api.clearCache();
-    await loadData();
-    setRefreshing(false);
+    try {
+      api.clearCache();
+      await loadData();
+    } finally {
+      setRefreshing(false);
+    }
   }, [loadData]);
 
   const handleShipTransfer = (id: string) => {
