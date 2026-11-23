@@ -1480,7 +1480,16 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
               </View>
               {bomIngredients.map((item, idx) => {
                 if (item.itemType === 'packaging') return null;
-                const formulationMaterials = materials.filter(rm => !rm.category || rm.category === 'Herb' || rm.category === 'Excipient' || rm.category === 'General');
+                const formulationMaterials = materials.filter(rm => {
+                  // Ingredient categories include Dry Herb, Fresh Herb, Volatile Oil,
+                  // Metallic/Mineral, Plant Concentrate, etc. Do not whitelist only
+                  // the legacy "Herb" category; exclude packaging by type/category.
+                  const materialType = String(rm.materialType || '').toLowerCase();
+                  const category = String(rm.category || '').toLowerCase();
+                  return materialType !== 'packaging'
+                    && category !== 'packaging'
+                    && category !== 'packaging material';
+                });
                 const selectedRM = materials.find(rm => rm._id === item.rawMaterialId);
                 const rmUnit = selectedRM?.unit || '';
                 return (
