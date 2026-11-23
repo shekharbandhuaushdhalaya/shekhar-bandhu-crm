@@ -16,7 +16,7 @@ describe('Production release-control defaults', () => {
     expect(po.approvedByUserId).toBeNull();
   });
 
-  it('does not implicitly qualify a newly recorded supplier', () => {
+  it('does not implicitly qualify a newly recorded supplier or fabricate a compliance score', () => {
     const qualification = new VendorQualification({
       vendorId: '507f1f77bcf86cd799439011',
       vendorName: 'Test supplier',
@@ -24,6 +24,8 @@ describe('Production release-control defaults', () => {
       nextAuditDue: new Date(Date.now() + 86400000)
     });
     expect(qualification.qualificationStatus).toBe('conditional');
+    expect(qualification.gmpComplianceScore).toBeNull();
+    expect(qualification.auditedByUserId).toBeNull();
   });
 
   it('requires delivery evidence fields to be populated explicitly', () => {
@@ -55,7 +57,6 @@ describe('Production release-control defaults', () => {
     expect(coa.gmpCertificateNo).toBe('');
   });
 });
-
 
 describe('Manufacturing release-control records', () => {
   const LineClearance = require('../models/LineClearance');
