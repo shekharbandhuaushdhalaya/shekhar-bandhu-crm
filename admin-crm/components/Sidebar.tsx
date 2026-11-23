@@ -11,7 +11,7 @@ import { authStorage } from '../utils/storage';
 
 const SIDEBAR_EXPANDED_KEY = 'vp_sidebar_expanded_v2';
 
-export const SIDEBAR_WIDTH = 224;
+export const SIDEBAR_WIDTH = 232;
 
 type NavGroup = {
   key: string;
@@ -313,7 +313,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       backgroundColor: 'transparent',
     },
     groupIconBoxExpanded: { backgroundColor: 'transparent' },
-    groupLabel: { ...Typography.caption, fontWeight: '600', color: colors.text.muted, marginLeft: 8 },
+    groupLabel: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginLeft: 9 },
     groupLabelExpanded: {
       color: colors.text.primary,
     },
@@ -346,7 +346,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
     navItemActive: {
       backgroundColor: colors.primaryLight,
     },
-    navItemText: { ...Typography.bodySm, fontWeight: '600', color: colors.text.secondary, marginLeft: 8, flex: 1, flexShrink: 1 },
+    navItemText: { ...Typography.bodySm, fontWeight: '500', color: colors.text.secondary, marginLeft: 10, flex: 1, flexShrink: 1 },
     navItemTextActive: {
       color: colors.text.primary,
       fontWeight: '700',
@@ -469,25 +469,9 @@ function Sidebar({ onNavigate, isOnline, logout }: { onNavigate?: () => void; is
           styles={styles}
         />
 
-        {/* Frequent Items */}
-        <View style={{ marginBottom: 12 }}>
-          <Text style={[styles.groupLabel, styles.quickAccessLabel]}>Quick access</Text>
-          {FREQUENT_ITEMS.map((item) => {
-            if (item.permission && !perm.can(item.permission)) return null;
-            return (
-              <NavItemRow
-                key={`freq-${item.route}`}
-                item={item}
-                isActive={isActive(item.route)}
-                onPress={() => navigate(item.route)}
-                colors={colors}
-                styles={styles}
-              />
-            );
-          })}
+        <View style={{ paddingHorizontal: Spacing.md, paddingTop: 18, paddingBottom: 6 }}>
+          <Text style={styles.sectionCaption}>WORKSPACE</Text>
         </View>
-
-        <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8, marginHorizontal: Spacing.sm }} />
 
         {/* Nav Groups */}
         {NAV_GROUPS.map((group) => {

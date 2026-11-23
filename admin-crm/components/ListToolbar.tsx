@@ -86,14 +86,14 @@ export function ListToolbar({
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   container: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
   },
   toolbarInner: {
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 44,
-    gap: 10,
+    gap: Spacing.sm,
     flexWrap: 'wrap',
   },
   searchBox: {
@@ -101,11 +101,11 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
     alignItems: 'center',
     flexGrow: 1,
     flexShrink: 1,
-    flexBasis: 280,
-    minWidth: 200,
-    minHeight: 42,
+    flexBasis: 260,
+    minWidth: 180,
+    minHeight: 44,
     paddingHorizontal: 10,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     borderWidth: 1,
     gap: 8,
   },
@@ -136,7 +136,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   countText: {
     ...Typography.caption,
-    color: colors.text.muted,
-    fontWeight: '500',
+    color: colors.text.secondary,
+    fontWeight: '600',
   },
 });

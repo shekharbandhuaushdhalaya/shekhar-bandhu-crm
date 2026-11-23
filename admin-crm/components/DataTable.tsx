@@ -117,13 +117,13 @@ function DataTableInner<T>({
         const cardStyles = [
           { 
             backgroundColor: colors.bg.card, 
-            borderRadius: Radius.sm, 
-            borderWidth: 0, 
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-            marginHorizontal: Spacing.lg, 
-            marginTop: index === 0 ? Spacing.md : Spacing.sm,
-            marginBottom: Spacing.xs
+            borderRadius: Radius.md, 
+            borderWidth: 1, 
+            borderColor: colors.border,
+            marginHorizontal: Spacing.md, 
+            marginTop: index === 0 ? Spacing.sm : Spacing.xs,
+            marginBottom: Spacing.sm,
+            overflow: 'hidden'
           },
           customRowStyle
         ];
@@ -161,13 +161,13 @@ function DataTableInner<T>({
       const cardStyles = [
         { 
           backgroundColor: colors.bg.card, 
-          borderRadius: Radius.sm, 
-          borderWidth: 0, 
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-          marginHorizontal: Spacing.lg, 
-          marginTop: index === 0 ? Spacing.md : Spacing.sm,
-          marginBottom: Spacing.xs,
+          borderRadius: Radius.md, 
+          borderWidth: 1, 
+          borderColor: colors.border,
+          marginHorizontal: Spacing.md, 
+          marginTop: index === 0 ? Spacing.sm : Spacing.xs,
+          marginBottom: Spacing.sm,
+          overflow: 'hidden',
         },
         customRowStyle
       ];
@@ -289,7 +289,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     borderRadius: Radius.md,
-    borderWidth: 0,
+    borderWidth: 1,
+    borderColor: 'transparent',
     overflow: 'hidden',
   },
   headerRow: {
