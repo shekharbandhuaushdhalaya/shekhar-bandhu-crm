@@ -1,7 +1,7 @@
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, Pressable, useWindowDimensions, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
@@ -49,8 +49,10 @@ export default function InventoryDispatchScreen() {
 
   // ── Dead Stock ──
   const [deadStock, setDeadStock] = useState<DeadStockItem[]>([]);
+  const loadRequestRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
     setLoadError('');
     try {
       const [disps, dead, allChallans] = await Promise.all([
@@ -58,17 +60,24 @@ export default function InventoryDispatchScreen() {
         api.getDeadStock(),
         api.getChallans('', 'all'),
       ]);
+      if (requestId !== loadRequestRef.current) return;
       setDispatches(disps);
       setDeadStock(dead);
       const dispatchedChallanIds = new Set(disps.map(d => d.challanId).filter(Boolean));
       setChallans(allChallans.filter(c => c.challanType === 'sale' && c.status === 'finalized' && c.inventoryPostingStatus === 'posted' && !dispatchedChallanIds.has(c._id)));
     } catch (e: any) {
-      setLoadError(e.message || 'Unable to load dispatch workspace');
-    } finally { setLoading(false); }
+      if (requestId === loadRequestRef.current) setLoadError(e.message || 'Unable to load dispatch workspace');
+    } finally {
+      if (requestId === loadRequestRef.current) setLoading(false);
+    }
   }, [dispStatusFilter, dispSearch]);
 
   useEffect(() => { load(); }, [load]);
-  const onRefresh = useCallback(async () => { api.clearCache(); setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  const onRefresh = useCallback(async () => {
+    api.clearCache();
+    setRefreshing(true);
+    try { await load(); } finally { setRefreshing(false); }
+  }, [load]);
 
   // Dispatch creation
   const handleCreateDispatch = async () => {
@@ -95,7 +104,7 @@ export default function InventoryDispatchScreen() {
     if (!updatingDisp) return;
     try {
       await api.updateDispatch(updatingDisp._id, { status: statusVal });
-      setShowStatusModal(false); setUpdatingDisp(null); load();
+      setShowStatusModal(false); setUpdatingDisp(null); await load();
     } catch (e: any) { alert(e.message); }
   };
 
@@ -107,7 +116,7 @@ export default function InventoryDispatchScreen() {
       iconName: 'trash',
       onConfirm: async () => {
         await api.deleteDispatch(id);
-        load();
+        await load();
       }
     });
   };
