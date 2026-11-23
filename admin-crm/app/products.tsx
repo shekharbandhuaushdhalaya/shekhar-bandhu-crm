@@ -2,7 +2,7 @@ import { EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, FlatList, KeyboardAvoidingView, Platform, Image, Pressable, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -73,42 +73,37 @@ export default function ProductsScreen() {
   const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const loadRequestId = useRef(0);
 
-  const load = useCallback(async (resetPage = true) => {
+  const load = useCallback(async () => {
+    const requestId = ++loadRequestId.current;
     try {
-      const targetPage = resetPage ? 1 : page;
-      const res = await api.getProducts(search, '', targetPage, 50);
+      const res = await api.getProducts(search, '', 1, 50);
+      if (requestId !== loadRequestId.current) return;
       const list = Array.isArray(res) ? res : (res?.data || []);
       const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
-
-      if (resetPage) {
-        setProducts(list);
-        setPage(1);
-      } else {
-        setProducts(prev => {
-          const existingIds = new Set(prev.map(p => String(p._id)));
-          const nextItems = list.filter((p: any) => p && p._id && !existingIds.has(String(p._id)));
-          return [...prev, ...nextItems];
-        });
-      }
+      setProducts(list);
+      setPage(1);
       setTotalPages(totalP);
-      setHasMore(targetPage < totalP || list.length === 50);
+      setHasMore(totalP > 1 || list.length === 50);
     } catch (e: any) {
-      console.error(e);
+      if (requestId === loadRequestId.current) console.error(e);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestId.current) setLoading(false);
     }
-  }, [search, page]);
+  }, [search, setPage]);
 
-  useFocusEffect(useCallback(() => { load(true); }, [load]));
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) return;
+    const requestId = loadRequestId.current;
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
       const res = await api.getProducts(search, '', nextPage, 50);
       const list = Array.isArray(res) ? res : (res?.data || []);
+      if (requestId !== loadRequestId.current) return;
       const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
       setProducts(prev => {
         const existingIds = new Set(prev.map(p => String(p._id)));
@@ -118,13 +113,15 @@ export default function ProductsScreen() {
       setPage(nextPage);
       setTotalPages(totalP);
       setHasMore(nextPage < totalP || list.length === 50);
+    } catch (e) {
+      if (requestId === loadRequestId.current) console.error(e);
     } finally {
       setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => load(true));
+    const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
     const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => load(true));
     const sub3 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => load(true));
     return () => {
@@ -165,9 +162,12 @@ export default function ProductsScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    api.clearCache();
-    await load(true);
-    setRefreshing(false);
+    try {
+      api.clearCache();
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   const columns: Column<Product>[] = [
