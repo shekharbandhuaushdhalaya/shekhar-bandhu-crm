@@ -123,7 +123,7 @@ function DataTableInner<T>({
             marginHorizontal: Spacing.md, 
             marginTop: index === 0 ? Spacing.sm : Spacing.xs,
             marginBottom: Spacing.sm,
-            overflow: 'hidden'
+            overflow: 'hidden' as const
           },
           customRowStyle
         ];
@@ -167,7 +167,7 @@ function DataTableInner<T>({
           marginHorizontal: Spacing.md, 
           marginTop: index === 0 ? Spacing.sm : Spacing.xs,
           marginBottom: Spacing.sm,
-          overflow: 'hidden',
+          overflow: 'hidden' as const,
         },
         customRowStyle
       ];
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: 'transparent',
-    overflow: 'hidden',
+    overflow: 'hidden' as const,
   },
   headerRow: {
     flexDirection: 'row',
