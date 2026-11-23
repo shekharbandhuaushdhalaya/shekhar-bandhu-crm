@@ -31,12 +31,12 @@ export type PageHeaderProps = {
 const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   container: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.lg,
     backgroundColor: colors.bg.primary,
   },
   leftGroup: {
@@ -82,6 +82,8 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   title: {
     ...Typography.h1,
+    fontSize: 26,
+    lineHeight: 32,
     fontWeight: '700',
     color: colors.text.primary,
     letterSpacing: -0.5,
@@ -94,6 +96,7 @@ const createStyles = (colors: typeof LightColors) => StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.sm,
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
@@ -115,7 +118,7 @@ export function PageHeader({ title, subtitle, eyebrow, breadcrumbs, actions, ren
   };
 
   return (
-    <View style={[styles.container, width < 768 && { flexDirection: 'column', alignItems: 'stretch', paddingHorizontal: Spacing.md }, style]}>
+    <View style={[styles.container, width < 768 && { flexDirection: 'column', alignItems: 'stretch', paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.md }, style]}>
       <View style={styles.leftGroup}>
         {backButton ? (
           <TouchableOpacity style={styles.backButton} onPress={handleBack} accessibilityRole="button" accessibilityLabel="Go back">
@@ -139,7 +142,7 @@ export function PageHeader({ title, subtitle, eyebrow, breadcrumbs, actions, ren
           ) : eyebrow ? (
             <Text style={styles.eyebrow}>{eyebrow}</Text>
           ) : null}
-          <Text style={styles.title}>{title}</Text>
+          <Text accessibilityRole="header" style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
       </View>
