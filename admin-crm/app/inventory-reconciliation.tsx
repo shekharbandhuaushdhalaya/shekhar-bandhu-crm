@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,13 +24,20 @@ export default function InventoryReconciliationScreen() {
   const [report, setReport] = useState<Reconciliation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError('');
-    try { setReport(await api.getInventoryReconciliation({ limit: 500 })); }
-    catch (e: any) { setError(e.message || 'Unable to load reconciliation report'); }
-    finally { setLoading(false); }
+    try {
+      const result = await api.getInventoryReconciliation({ limit: 500 });
+      if (requestId === requestIdRef.current) setReport(result);
+    } catch (e: any) {
+      if (requestId === requestIdRef.current) setError(e.message || 'Unable to load reconciliation report');
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
