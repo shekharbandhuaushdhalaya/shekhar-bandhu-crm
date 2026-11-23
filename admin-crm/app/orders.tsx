@@ -37,6 +37,7 @@ export default function OrdersScreen() {
 
   const [page, setPage] = useListState('orders_page', 1);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const loadRequestRef = useRef(0);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -95,8 +96,10 @@ export default function OrdersScreen() {
         setOrders(Array.isArray(res) ? res : []);
         setTotalPages(1);
       }
+      setLoadError('');
     } catch (err: any) {
       if (requestId === loadRequestRef.current) {
+        setLoadError(err.message || 'Unable to load orders. Please retry.');
         console.error(err);
         showToast('Failed to load orders: ' + err.message, 'error');
       }
@@ -364,6 +367,12 @@ export default function OrdersScreen() {
       />
 
       <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: 40 }}>
+        {loadError ? (
+          <View style={{ padding: Spacing.md, marginBottom: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.danger + '10', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <Text style={{ ...Typography.bodySm, color: colors.danger, flex: 1 }}>{loadError}</Text>
+            <TouchableOpacity onPress={load}><Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Retry</Text></TouchableOpacity>
+          </View>
+        ) : null}
         <DataTable
           data={filteredOrders || []}
           columns={columns}

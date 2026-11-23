@@ -19,6 +19,8 @@ function GstReturnsPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [filingSaving, setFilingSaving] = useState(false);
   const fetchRequestRef = useRef(0);
   const [filingStatus, setFilingStatus] = useState<any>(null);
   const [arnModalVisible, setArnModalVisible] = useState(false);
@@ -31,6 +33,7 @@ function GstReturnsPage() {
     const requestId = ++fetchRequestRef.current;
     try {
       setLoading(true);
+      setLoadError('');
       api.clearCache();
       const res = await api.getGstReturn(view, month, year);
       if (requestId !== fetchRequestRef.current) return;
@@ -41,6 +44,7 @@ function GstReturnsPage() {
     } catch (err) {
       if (requestId === fetchRequestRef.current) {
         console.error(err);
+        setLoadError((err as any)?.message || 'Unable to load GST return data. Please retry.');
         setData(null);
         setFilingStatus(null);
       }
@@ -135,6 +139,13 @@ function GstReturnsPage() {
           </TouchableOpacity>
         </View>
 
+        {loadError ? (
+          <View style={{ padding: Spacing.md, marginBottom: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.danger + '10', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <Text style={{ ...Typography.bodySm, color: colors.danger, flex: 1 }}>{loadError}</Text>
+            <TouchableOpacity onPress={fetchData}><Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Retry</Text></TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Filing status card */}
         <View style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.lg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -207,15 +218,18 @@ function GstReturnsPage() {
             </TouchableOpacity>
             <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary }}>Record Return Filing ARN</Text>
             <TouchableOpacity onPress={async () => {
+              if (filingSaving) return;
               if (!arnInput.trim()) {
                 alert('Please enter the application reference number (ARN)');
                 return;
               }
+              setFilingSaving(true);
               try {
                 const periodStr = `${year}-${month.toString().padStart(2, '0')}`;
+                const returnType = view;
                 await api.recordGstFiling({
                   period: periodStr,
-                  returnType: view,
+                  returnType,
                   arn: arnInput.trim(),
                   url: acknowledgementUrl || undefined,
                   name: 'GST Filing Receipt'
@@ -224,9 +238,11 @@ function GstReturnsPage() {
                 fetchData();
               } catch (err: any) {
                 alert(err.message || 'Failed to save filing details');
+              } finally {
+                setFilingSaving(false);
               }
             }}>
-              <Ionicons name="checkmark" size={24} color={colors.success} />
+              {filingSaving ? <ActivityIndicator size="small" color={colors.success} /> : <Ionicons name="checkmark" size={24} color={colors.success} />}
             </TouchableOpacity>
           </View>
 

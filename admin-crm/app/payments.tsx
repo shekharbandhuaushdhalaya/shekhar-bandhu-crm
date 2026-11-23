@@ -420,8 +420,20 @@ export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boo
   const netDeposited = Math.max(0, (Number(grossAmount) || 0) - (Number(feeAmount) || 0));
 
   const handleSettle = async () => {
-    if (!grossAmount || Number(grossAmount) <= 0) {
-      alert('Please enter gross payout amount.');
+    if (submitting) return;
+    const gross = Number(grossAmount);
+    const fee = feeAmount.trim() ? Number(feeAmount) : 0;
+    const settlementDate = new Date(date);
+    if (!Number.isFinite(gross) || gross <= 0) {
+      alert('Please enter a valid gross payout amount.');
+      return;
+    }
+    if (!Number.isFinite(fee) || fee < 0 || fee >= gross) {
+      alert('Gateway/courier fee must be a valid amount less than the gross payout.');
+      return;
+    }
+    if (isNaN(settlementDate.getTime())) {
+      alert('Please enter a valid settlement date.');
       return;
     }
     setSubmitting(true);
@@ -431,12 +443,12 @@ export function SettleGatewayModal({ visible, onClose, onSaved }: { visible: boo
         partyType: 'Customer',
         partyId: gatewayAccount._id,
         partyName: gatewayAccount.name,
-        amount: netDeposited,
+        amount: gross - fee,
         mode: 'regular',
         paymentMethod: 'Bank Transfer',
         referenceNo: referenceNo.trim() || `SETTLE-${gatewayAccount.code}-${Date.now().toString().slice(-6)}`,
         notes: `Gateway Settlement Payout (${gatewayAccount.name}). Gross: ₹${grossAmount}, Gateway/Courier Fee Deducted: ₹${feeAmount || 0}. ${notes.trim()}`,
-        date: new Date(date).toISOString(),
+        date: settlementDate.toISOString(),
       });
 
       alert(` Gateway Payout Settled Successfully! Net ₹${netDeposited.toLocaleString('en-IN')} deposited to Bank Account.`);
@@ -582,6 +594,7 @@ export default function PaymentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // Initial-load flag so DataTable can show its skeleton instead of an empty table.
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const loadRequestRef = useRef(0);
   const [addVisible, setAddVisible] = useState(false);
   const [addType, setAddType] = useState<'receive' | 'make'>('receive');
@@ -616,8 +629,12 @@ export default function PaymentsScreen() {
         (p.referenceNo && p.referenceNo.toLowerCase().includes(debouncedSearch.toLowerCase()))
       );
       setPayments(filtered);
-    } catch (err) {
-      if (requestId === loadRequestRef.current) console.error(err);
+      setLoadError('');
+    } catch (err: any) {
+      if (requestId === loadRequestRef.current) {
+        setLoadError(err.message || 'Unable to load payments. Please retry.');
+        console.error(err);
+      }
     } finally {
       if (requestId === loadRequestRef.current) setLoading(false);
     }
@@ -831,6 +848,12 @@ export default function PaymentsScreen() {
 
         {/* DataTable */}
         <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          {loadError ? (
+            <View style={{ padding: Spacing.md, marginBottom: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.danger + '10', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <Text style={{ ...Typography.bodySm, color: colors.danger, flex: 1 }}>{loadError}</Text>
+              <TouchableOpacity onPress={load}><Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Retry</Text></TouchableOpacity>
+            </View>
+          ) : null}
           <DataTable
             data={sortedPayments}
             columns={columns}
