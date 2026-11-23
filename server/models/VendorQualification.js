@@ -12,13 +12,16 @@ const vendorQualificationSchema = new mongoose.Schema({
   auditDate: { type: Date, required: true, default: Date.now },
   nextAuditDue: { type: Date, required: true },
   auditorName: { type: String, required: true, trim: true },
-  gmpComplianceScore: { type: Number, default: 100, min: 0, max: 100 },
+  auditedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  // A score is optional evidence; never infer a perfect score when no assessment was recorded.
+  gmpComplianceScore: { type: Number, default: null, min: 0, max: 100 },
   findings: { type: String, default: '' },
   rawMaterialIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' }],
   documents: [{ name: String, url: String, uploadedAt: { type: Date, default: Date.now } }]
 }, { timestamps: true });
 
 vendorQualificationSchema.index({ vendorId: 1, qualificationStatus: 1 });
+vendorQualificationSchema.index({ vendorId: 1, rawMaterialIds: 1, nextAuditDue: 1 });
 
 vendorQualificationSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('VendorQualification', vendorQualificationSchema);
