@@ -48,6 +48,12 @@ describe('tenant isolation regression', () => {
     const crossTenantLookup = await runWithTenant({ firmId: firmA._id }, async () => await Product.findById(productB._id).lean());
     expect(crossTenantLookup).toBeNull();
 
+    const attemptedTenantOverride = await runWithTenant(
+      { firmId: firmA._id },
+      async () => await Product.find({ firmId: firmB._id }).lean()
+    );
+    expect(attemptedTenantOverride).toHaveLength(0);
+
     await expect(runWithTenant({ firmId: firmA._id }, () => Product.create({
       firmId: firmB._id,
       name: 'Illegal Cross Tenant Product',
