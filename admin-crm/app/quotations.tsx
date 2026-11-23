@@ -2,7 +2,7 @@ import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import * as Print from 'expo-print';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -1522,6 +1522,7 @@ export default function QuotationsScreen() {
   const [page, setPage] = useListState('quotations_page', 1);
   // Initial-load flag so DataTable shows its skeleton instead of an empty table.
   const [loading, setLoading] = useState(true);
+  const loadRequestRef = useRef(0);
   const [selectedInv, setSelectedInv] = useState<Quotation | null>(null);
   const [invoiceToEdit, setQuotationToEdit] = useState<Quotation | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -1532,21 +1533,31 @@ export default function QuotationsScreen() {
   const styles = useStyles(createStyles);
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
+    setLoading(true);
     try {
       const res = await api.getQuotations(debouncedSearch, modeFilter);
-      setQuotations(res);
+      if (requestId === loadRequestRef.current) setQuotations(res);
+    } catch (err) {
+      if (requestId === loadRequestRef.current) console.error('Failed to load quotations:', err);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
   }, [debouncedSearch, modeFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    return () => { loadRequestRef.current += 1; };
+  }, [load]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
-    await load();
-    setRefreshing(false);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   const columns: Column<Quotation>[] = [

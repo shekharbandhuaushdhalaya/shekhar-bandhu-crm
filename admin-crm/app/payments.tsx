@@ -582,6 +582,7 @@ export default function PaymentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // Initial-load flag so DataTable can show its skeleton instead of an empty table.
   const [loading, setLoading] = useState(true);
+  const loadRequestRef = useRef(0);
   const [addVisible, setAddVisible] = useState(false);
   const [addType, setAddType] = useState<'receive' | 'make'>('receive');
   const [settleVisible, setSettleVisible] = useState(false);
@@ -604,32 +605,41 @@ export default function PaymentsScreen() {
   const [page, setPage] = useListState('payments_page', 1);
   const [filterType, setFilterType] = useState<'all' | 'receive' | 'make'>('all');
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
+    setLoading(true);
     try {
       const res = await api.getPayments(undefined, undefined, undefined, filterType);
-      const filtered = res.filter(p => 
-        p.partyName.toLowerCase().includes(debouncedSearch.toLowerCase()) || 
+      if (requestId !== loadRequestRef.current) return;
+      const filtered = res.filter(p =>
+        p.partyName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         (p.referenceNo && p.referenceNo.toLowerCase().includes(debouncedSearch.toLowerCase()))
       );
       setPayments(filtered);
     } catch (err) {
-      console.error(err);
+      if (requestId === loadRequestRef.current) console.error(err);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-  };
+  }, [debouncedSearch, filterType]);
 
   useEffect(() => {
     load();
     const sub = DeviceEventEmitter.addListener('payment_updated_event', () => load());
-    return () => sub.remove();
-  }, [debouncedSearch, filterType]);
+    return () => {
+      loadRequestRef.current += 1;
+      sub.remove();
+    };
+  }, [load]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     api.clearCache();
-    await load();
-    setRefreshing(false);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleDelete = (id: string) => {

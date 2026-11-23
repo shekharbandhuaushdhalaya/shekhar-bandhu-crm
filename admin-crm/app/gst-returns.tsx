@@ -4,7 +4,7 @@ import { WorkspaceLoading } from './../components/WorkspacePrimitives';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
@@ -19,6 +19,7 @@ function GstReturnsPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const fetchRequestRef = useRef(0);
   const [filingStatus, setFilingStatus] = useState<any>(null);
   const [arnModalVisible, setArnModalVisible] = useState(false);
   const [arnInput, setArnInput] = useState('');
@@ -27,24 +28,30 @@ function GstReturnsPage() {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   const fetchData = useCallback(async () => {
+    const requestId = ++fetchRequestRef.current;
     try {
       setLoading(true);
       api.clearCache();
       const res = await api.getGstReturn(view, month, year);
+      if (requestId !== fetchRequestRef.current) return;
       setData(res);
       const periodStr = `${year}-${month.toString().padStart(2, '0')}`;
       const statusRes = await api.getGstFilingStatus(periodStr, view);
-      setFilingStatus(statusRes);
+      if (requestId === fetchRequestRef.current) setFilingStatus(statusRes);
     } catch (err) {
-      console.error(err);
-      setData(null);
+      if (requestId === fetchRequestRef.current) {
+        console.error(err);
+        setData(null);
+        setFilingStatus(null);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === fetchRequestRef.current) setLoading(false);
     }
   }, [view, month, year]);
 
   useEffect(() => {
     fetchData();
+    return () => { fetchRequestRef.current += 1; };
   }, [fetchData]);
 
   const handlePrevMonth = () => {

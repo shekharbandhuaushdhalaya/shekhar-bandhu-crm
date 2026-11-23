@@ -2,7 +2,7 @@ import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, ActivityIndicator, Pressable, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography, getStatusTone , Shadows} from '../constants/theme';
@@ -147,27 +147,30 @@ export default function CreditNotesPage() {
 
   const [notes, setNotes] = useState<CreditNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const fetchRequestRef = useRef(0);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [filterType, setFilterType] = useState('all');
   const [showModal, setShowModal] = useState(false);
 
   const fetchNotes = useCallback(async () => {
+    const requestId = ++fetchRequestRef.current;
     try {
       setLoading(true);
-      api.clearCache();
       const res = await api.getCreditNotes(debouncedSearch, filterType);
-      setNotes(res || []);
+      if (requestId === fetchRequestRef.current) setNotes(res || []);
     } catch (err) {
-      console.error('Error fetching credit notes:', err);
-      setNotes([]);
+      if (requestId === fetchRequestRef.current) {
+        console.error('Error fetching credit notes:', err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === fetchRequestRef.current) setLoading(false);
     }
   }, [debouncedSearch, filterType]);
 
   useEffect(() => {
     fetchNotes();
+    return () => { fetchRequestRef.current += 1; };
   }, [fetchNotes]);
 
   const handleFinalize = (id: string) => {
