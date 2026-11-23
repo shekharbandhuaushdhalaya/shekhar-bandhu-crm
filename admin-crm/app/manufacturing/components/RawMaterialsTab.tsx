@@ -148,13 +148,15 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
         </View>
 
         <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
-          {/* Header */}
-          <View style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
-            <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
-            <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
-            <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
-            <Text style={{ ...Typography.eyebrow, width: 210, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
-          </View>
+          {/* Desktop table headings; mobile rows use a stacked layout */}
+          {isDesktop && (
+            <View style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, backgroundColor: colors.bg.secondary, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
+              <Text style={{ ...Typography.eyebrow, flex: 2, fontWeight: '700', color: colors.text.secondary }}>Material (SKU)</Text>
+              <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Stock</Text>
+              <Text style={{ ...Typography.eyebrow, flex: 1.2, fontWeight: '700', color: colors.text.secondary, textAlign: 'right' }}>Min</Text>
+              <Text style={{ ...Typography.eyebrow, width: 210, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' }}>Actions</Text>
+            </View>
+          )}
           {/* Body */}
           {filteredMaterials.map((rm, idx) => {
             const lowStock = (rm.stockLevel || 0) < rm.minReorder;
@@ -162,7 +164,7 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
 
             return (
               <View key={rm._id} style={{ borderBottomWidth: idx === filteredMaterials.length - 1 ? 0 : 0.5, borderBottomColor: colors.border, paddingVertical: 4 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8 }}>
+                <View style={{ flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'stretch', gap: isDesktop ? 0 : 10, paddingVertical: 10, paddingHorizontal: 8 }}>
                   <View style={{ flex: 2, paddingLeft: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{rm.name}</Text>
@@ -196,13 +198,19 @@ const RawMaterialsTab = React.memo(function RawMaterialsTab({
                       {rm.sku ? <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>SKU: {rm.sku}</Text> : null}
                     </View>
                   </View>
-                  <Text style={{ ...Typography.bodySm, flex: 1.2, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary, textAlign: 'right' }}>
-                    {rm.stockLevel !== undefined ? (isIntegerQty(rm.unit, rm.category) ? rm.stockLevel.toFixed(0) : rm.stockLevel.toFixed(1)) : (isIntegerQty(rm.unit, rm.category) ? '0' : '0.0')} {rm.unit}
-                  </Text>
-                  <Text style={{ ...Typography.caption, flex: 1.2, color: colors.text.secondary, textAlign: 'right' }}>
-                    {rm.minReorder} {rm.unit}
-                  </Text>
-                  <View style={{ width: 210, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: isDesktop ? 'flex-end' : 'flex-start', gap: 16, paddingLeft: isDesktop ? 0 : 4 }}>
+                    <View style={{ flex: isDesktop ? 1.2 : undefined, alignItems: isDesktop ? 'flex-end' : 'flex-start' }}>
+                      {!isDesktop && <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>CURRENT STOCK</Text>}
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: lowStock ? colors.danger : colors.text.primary }}>
+                        {rm.stockLevel !== undefined ? (isIntegerQty(rm.unit, rm.category) ? rm.stockLevel.toFixed(0) : rm.stockLevel.toFixed(1)) : (isIntegerQty(rm.unit, rm.category) ? '0' : '0.0')} {rm.unit}
+                      </Text>
+                    </View>
+                    <View style={{ flex: isDesktop ? 1.2 : undefined, alignItems: isDesktop ? 'flex-end' : 'flex-start' }}>
+                      {!isDesktop && <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>REORDER LEVEL</Text>}
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary }}>{rm.minReorder} {rm.unit}</Text>
+                    </View>
+                  </View>
+                  <View style={{ width: isDesktop ? 210 : '100%', flexDirection: 'row', justifyContent: isDesktop ? 'center' : 'flex-end', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                     <TouchableOpacity
                       onPress={() => onEditMaterial(rm)}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: colors.primary + '10', borderWidth: 0.5, borderColor: colors.primary + '30' }}
