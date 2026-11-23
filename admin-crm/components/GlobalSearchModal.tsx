@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Modal, StyleSheet, SectionList, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -38,11 +38,16 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
   const debouncedQuery = useDebounceValue(query, 500);
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const requestSequence = useRef(0);
+  const canViewPurchaseInvoices = perm.can('invoice:view');
+  const canViewMedicalReps = perm.can('mr:view');
 
   useEffect(() => {
     if (visible) {
       setQuery('');
       setSections([]);
+      setSearchError('');
     }
     
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,64 +62,89 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
   }, [visible, onClose]);
 
   useEffect(() => {
-    async function searchAll() {
-      if (!debouncedQuery.trim()) {
+    const requestId = ++requestSequence.current;
+    let active = true;
+
+    const searchAll = async () => {
+      if (!visible || !debouncedQuery.trim()) {
         setSections([]);
+        setSearchError('');
+        setLoading(false);
         return;
       }
+
       setLoading(true);
+      setSearchError('');
+      let failedRequests = 0;
+      const safe = (request: Promise<any>, fallback: any) => request.catch(() => {
+        failedRequests += 1;
+        return fallback;
+      });
+
       try {
         const [customers, products, salesInvoices, purchaseInvoices, payments, vendors, mrs] = await Promise.all([
-          api.getCustomers(debouncedQuery).catch(() => ({ data: [] })),
-          api.getProducts(debouncedQuery).catch(() => ({ data: [] })),
-          api.getSaleInvoices(debouncedQuery).catch(() => ({ data: [] })),
-          perm.can('invoice:view') ? api.getPurchaseInvoices(debouncedQuery).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-          api.getPayments(undefined, undefined, undefined, undefined, debouncedQuery).catch(() => []),
-          api.getVendors(debouncedQuery).catch(() => ({ data: [] })),
-          perm.can('mr:view') ? api.getMRs(debouncedQuery).catch(() => []) : Promise.resolve([])
+          safe(api.getCustomers(debouncedQuery), { data: [] }),
+          safe(api.getProducts(debouncedQuery), { data: [] }),
+          safe(api.getSaleInvoices(debouncedQuery), { data: [] }),
+          canViewPurchaseInvoices ? safe(api.getPurchaseInvoices(debouncedQuery), { data: [] }) : Promise.resolve({ data: [] }),
+          safe(api.getPayments(undefined, undefined, undefined, undefined, debouncedQuery), []),
+          safe(api.getVendors(debouncedQuery), { data: [] }),
+          canViewMedicalReps ? safe(api.getMRs(debouncedQuery), []) : Promise.resolve([])
         ]);
-        
+
+        if (!active || requestId !== requestSequence.current) return;
+
         const extract = (res: any) => (Array.isArray(res) ? res : res?.data || []);
-        
-        const routes = APP_ROUTES.filter(r => 
-          r.title.toLowerCase().includes(debouncedQuery.toLowerCase()) && 
+        const routes = APP_ROUTES.filter(r =>
+          r.title.toLowerCase().includes(debouncedQuery.toLowerCase()) &&
           (!r.permission || perm.can(r.permission))
         ).map(r => ({ ...r, _type: 'route', name: r.title }));
-          
+
         const newSections = [];
         if (routes.length > 0) newSections.push({ title: 'NAVIGATION', data: routes });
-        
+
         const cList = extract(customers).map((c: any) => ({ ...c, _type: 'customer' }));
         if (cList.length > 0) newSections.push({ title: 'CUSTOMERS', data: cList });
-        
+
         const vList = extract(vendors).map((v: any) => ({ ...v, _type: 'vendor' }));
         if (vList.length > 0) newSections.push({ title: 'VENDORS', data: vList });
-        
+
         const pList = extract(products).map((p: any) => ({ ...p, _type: 'product' }));
         if (pList.length > 0) newSections.push({ title: 'PRODUCTS', data: pList });
-        
+
         const siList = extract(salesInvoices).map((si: any) => ({ ...si, _type: 'sale_invoice' }));
         if (siList.length > 0) newSections.push({ title: 'SALES INVOICES', data: siList });
-        
+
         const piList = extract(purchaseInvoices).map((pi: any) => ({ ...pi, _type: 'purchase_invoice' }));
         if (piList.length > 0) newSections.push({ title: 'PURCHASE INVOICES', data: piList });
-        
+
         const payList = extract(payments).map((pay: any) => ({ ...pay, _type: 'payment' }));
         if (payList.length > 0) newSections.push({ title: 'PAYMENTS', data: payList });
-        
+
         const mrList = extract(mrs).map((mr: any) => ({ ...mr, _type: 'mr' }));
         if (mrList.length > 0) newSections.push({ title: 'MEDICAL REPRESENTATIVES', data: mrList });
-        
+
         setSections(newSections);
+        if (failedRequests > 0) {
+          setSearchError('Some search categories could not be loaded. Showing the results that are available.');
+        }
       } catch (err) {
-        console.error('Global search error:', err);
+        if (active && requestId === requestSequence.current) {
+          console.error('Global search error:', err);
+          setSearchError('Search could not be completed. Please try again.');
+          setSections([]);
+        }
       } finally {
-        setLoading(false);
+        if (active && requestId === requestSequence.current) setLoading(false);
       }
-    }
-    
+    };
+
     searchAll();
-  }, [debouncedQuery]);
+    return () => {
+      active = false;
+      if (requestSequence.current === requestId) requestSequence.current += 1;
+    };
+  }, [debouncedQuery, visible, canViewPurchaseInvoices, canViewMedicalReps]);
 
   const handleSelect = (item: any) => {
     onClose();
@@ -156,9 +186,15 @@ export function GlobalSearchModal({ visible, onClose }: Props) {
             </TouchableOpacity>
           </View>
 
+          {searchError ? (
+            <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.sm }}>
+              <Text accessibilityRole="alert" style={{ ...Typography.caption, color: colors.warning }}>{searchError}</Text>
+            </View>
+          ) : null}
           {loading ? (
             <View style={{ padding: Spacing.xl, alignItems: 'center' }}>
               <ActivityIndicator color={colors.primary} />
+              <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: Spacing.sm }}>Searching across your workspace…</Text>
             </View>
           ) : (
             <SectionList
