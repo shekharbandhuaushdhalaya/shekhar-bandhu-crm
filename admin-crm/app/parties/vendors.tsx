@@ -897,9 +897,10 @@ function VendorLedgerModal({
       setRows([...finalRows].reverse());
       setInitialBalance(periodInitialBalance);
       setClosingBalance(periodClosingBalance);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error loading vendor ledger:", err);
       setRows([]);
+      alert(err.message || 'Failed to load vendor ledger. Please retry.');
     } finally {
       setLoading(false);
     }

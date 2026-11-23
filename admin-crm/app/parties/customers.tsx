@@ -1175,9 +1175,10 @@ function CustomerLedgerModal({
       setRows([...finalRows].reverse());
       setInitialBalance(periodInitialBalance);
       setClosingBalance(periodClosingBalance);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error loading customer ledger:", err);
       setRows([]);
+      alert(err.message || 'Failed to load customer ledger. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -1568,23 +1569,25 @@ export default function CustomersScreen() {
   const limit = 50;
 
   const load = useCallback(async () => {
-    const res = await api.getCustomers(debouncedSearch, activeTab, page, limit);
-    if (res && res.data) {
-      if (page === 1) {
-        setCustomers(res.data);
-      } else {
-        setCustomers(prev => {
+    try {
+      const res = await api.getCustomers(debouncedSearch, activeTab, page, limit);
+      if (res && res.data) {
+        if (page === 1) setCustomers(res.data);
+        else setCustomers(prev => {
           const existingIds = new Set(prev.map(c => c._id));
-          const newCustomers = res.data.filter((c: any) => !existingIds.has(c._id));
-          return [...prev, ...newCustomers];
+          return [...prev, ...res.data.filter((c: any) => !existingIds.has(c._id))];
         });
+        setTotalPages(res.totalPages || 1);
+      } else {
+        setCustomers(Array.isArray(res) ? res : []);
+        setTotalPages(1);
       }
-      setTotalPages(res.totalPages || 1);
-    } else {
-      setCustomers(Array.isArray(res) ? res : []);
-      setTotalPages(1);
+    } catch (err: any) {
+      alert(err.message || 'Failed to load customers. Please retry.');
+    } finally {
+      setListLoading(false);
+      setRefreshing(false);
     }
-    setListLoading(false);
   }, [debouncedSearch, activeTab, page]);
 
   useEffect(() => { setPage(1); }, [debouncedSearch, activeTab]);
@@ -1601,7 +1604,6 @@ export default function CustomersScreen() {
     setRefreshing(true);
     api.clearCache();
     await load();
-    setRefreshing(false);
   }, [load]);
   const columns: Column<Customer>[] = [
     {
