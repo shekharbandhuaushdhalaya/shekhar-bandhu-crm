@@ -1,6 +1,6 @@
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Pressable, FlatList, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -1098,6 +1098,7 @@ export default function DashboardScreen() {
   const [expiryAlerts, setExpiryAlerts] = useState<ExpiryAlert[]>([]);
   const [expiryAlertsLoading, setExpiryAlertsLoading] = useState(true);
   const [deferredLoaded, setDeferredLoaded] = useState({ mfg: false, marketing: false, expiry: false });
+  const deferredLoadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const { user } = useAuth();
   const perm = usePermission();
@@ -1121,7 +1122,10 @@ export default function DashboardScreen() {
     setLowStockProds(prods.filter((p: any) => typeof p.minReorder === 'number' && p.stockLevel <= p.minReorder));
 
     // 2. Phase 2: Deferred Heavy Background Loading
-    setTimeout(async () => {
+    // Coalesce rapid refresh/event-triggered loads and avoid scheduling work after unmount.
+    if (deferredLoadTimer.current) clearTimeout(deferredLoadTimer.current);
+    deferredLoadTimer.current = setTimeout(async () => {
+      deferredLoadTimer.current = null;
       try {
         const [custs, vends, invs, purchs, sales, challans, creditNotes] = await Promise.all([
           api.getCustomers(),
@@ -1219,6 +1223,13 @@ export default function DashboardScreen() {
     }, 150);
   }, []);
 
+  useEffect(() => () => {
+    if (deferredLoadTimer.current) {
+      clearTimeout(deferredLoadTimer.current);
+      deferredLoadTimer.current = null;
+    }
+  }, []);
+
   // Load expensive dashboard sections only when their tab is opened. This
   // keeps the first paint focused on the operational overview.
   useEffect(() => {
@@ -1264,10 +1275,13 @@ export default function DashboardScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    api.clearCache();
-    await api.checkConnection();
-    await load();
-    setRefreshing(false);
+    try {
+      api.clearCache();
+      await api.checkConnection();
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   const overviewTabs = [
