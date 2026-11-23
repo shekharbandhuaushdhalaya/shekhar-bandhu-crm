@@ -140,10 +140,41 @@ router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) =>
     const transitions = { draft: ['approved', 'cancelled'], approved: ['in_production', 'cancelled'], in_production: ['completed', 'cancelled'], completed: [], cancelled: [] };
     if (!(transitions[plan.status] || []).includes(status)) return res.status(409).json({ error: 'Invalid production plan transition: ' + plan.status + ' -> ' + status, code: 'INVALID_PLAN_TRANSITION' });
     if (status === 'approved') {
-      if (plan.rawMaterialSufficiencyStatus !== 'sufficient') return res.status(409).json({ error: 'A production plan can only be approved after an available-stock sufficiency check passes', code: 'PLAN_MATERIALS_NOT_SUFFICIENT' });
       const approverId = req.user?.id;
       if (!approverId) return res.status(403).json({ error: 'Authenticated approver identity is required' });
       if (plan.createdByUserId && String(plan.createdByUserId) === String(approverId)) return res.status(403).json({ error: 'The plan creator cannot approve their own production plan', code: 'PLAN_MAKER_CHECKER_REQUIRED' });
+      // Draft-time stock checks become stale. Recompute from live approved, unexpired stock.
+      const warehouse = await resolveManufacturingWarehouse(plan.manufacturingUnitId);
+      if (!warehouse?._id) return res.status(409).json({ error: 'Manufacturing warehouse could not be resolved', code: 'PLAN_WAREHOUSE_UNAVAILABLE' });
+      const needs = new Map();
+      for (const batch of plan.plannedBatches || []) {
+        const bom = await BillOfMaterials.findOne({ productId: batch.productId, isActive: true }).sort({ isDefault: -1, updatedAt: -1 }).lean();
+        if (!bom || !Array.isArray(bom.ingredients) || !bom.ingredients.length) return res.status(409).json({ error: 'An active, non-empty recipe is required for ' + (batch.productName || batch.productId), code: 'PLAN_RECIPE_UNAVAILABLE' });
+        const basis = Number(bom.formulationBasis) || 100;
+        if (!Number.isFinite(basis) || basis <= 0) return res.status(409).json({ error: 'Recipe formulation basis is invalid', code: 'PLAN_RECIPE_INVALID' });
+        for (const ingredient of bom.ingredients) {
+          if (!ingredient.rawMaterialId) continue;
+          const perBasis = Number(ingredient.qtyRequired);
+          if (!Number.isFinite(perBasis) || perBasis < 0) return res.status(409).json({ error: 'Recipe contains an invalid ingredient quantity', code: 'PLAN_RECIPE_INVALID' });
+          const id = String(ingredient.rawMaterialId);
+          needs.set(id, (needs.get(id) || 0) + perBasis * Number(batch.plannedQty) / basis);
+        }
+      }
+      const shortages = [];
+      for (const [rawMaterialId, requiredQty] of needs) {
+        const [material, entries] = await Promise.all([
+          RawMaterial.findById(rawMaterialId).select('name').lean(),
+          RawMaterialEntry.find({ warehouseId: warehouse._id, rawMaterialId, qcStatus: 'approved', $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }] }).select('qty reservedQty').lean()
+        ]);
+        const availableQty = entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0)), 0);
+        if (availableQty + 1e-9 < requiredQty) shortages.push({ rawMaterialName: material?.name || 'Raw Material', requiredQty: Number(requiredQty.toFixed(3)), availableQty: Number(availableQty.toFixed(3)), shortageQty: Number((requiredQty - availableQty).toFixed(3)) });
+      }
+      plan.rawMaterialSufficiencyStatus = shortages.length ? 'shortage_detected' : 'sufficient';
+      plan.shortageDetails = shortages;
+      if (shortages.length) {
+        await plan.save();
+        return res.status(409).json({ error: 'Live raw-material availability is insufficient; the plan remains unapproved', code: 'PLAN_MATERIALS_NOT_SUFFICIENT', shortageDetails: shortages });
+      }
       plan.approvedByUserId = approverId;
       plan.approvedByName = req.user?.name || req.user?.email || 'Approver';
       plan.approvedAt = new Date();
