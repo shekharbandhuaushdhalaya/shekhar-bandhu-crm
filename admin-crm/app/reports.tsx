@@ -363,12 +363,17 @@ export default function ReportsScreen() {
           w.document.close();
           w.focus();
           setTimeout(() => { w.print(); w.close(); }, 250);
+        } else {
+          Alert.alert('Pop-up blocked', 'Allow pop-ups for this site to print or export the report.');
         }
       } else {
         const { uri } = await Print.printToFileAsync({ html });
         if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
       }
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      console.error('Failed to export report:', e);
+      Alert.alert('Report export failed', e?.message || 'Unable to generate or share the report. Please retry.');
+    }
   };
 
   // ---- Print Raw Material Stock Register ----
@@ -507,12 +512,17 @@ export default function ReportsScreen() {
           w.document.close();
           w.focus();
           setTimeout(() => { w.print(); w.close(); }, 250);
+        } else {
+          Alert.alert('Pop-up blocked', 'Allow pop-ups for this site to print or export the report.');
         }
       } else {
         const { uri } = await Print.printToFileAsync({ html });
         if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
       }
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      console.error('Failed to export report:', e);
+      Alert.alert('Report export failed', e?.message || 'Unable to generate or share the report. Please retry.');
+    }
   };
 
   const netPayable = gstCollected - gstPaid;

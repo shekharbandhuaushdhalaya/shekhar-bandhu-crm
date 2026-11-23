@@ -4,7 +4,7 @@ import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import * as Print from 'expo-print';
-import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable, useWindowDimensions, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography, getStatusTone , Shadows} from '../constants/theme';
 import { api, Quotation, Product, Customer, Warehouse, InventoryEntry, QuotationItem } from '../utils/api';
@@ -812,8 +812,9 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
           if (w.length > 0 && !invoiceToEdit) {
             setWarehouseId(w[0]._id);
           }
-        } catch (err) {
-          console.log('Failed to fetch initial data in Challan modal:', err);
+        } catch (err: any) {
+          console.error('Failed to fetch initial data in Challan modal:', err);
+          Alert.alert('Unable to open Challan', err?.message || 'Products, customers, and warehouses could not be loaded. Please close and retry.');
         }
       };
       loadData();
@@ -827,8 +828,10 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
         try {
           const entries = await api.getInventoryEntries(warehouseId, "", true);
           setWarehouseInventory(entries);
-        } catch (err) {
-          console.log('Failed to fetch warehouse inventory:', err);
+        } catch (err: any) {
+          console.error('Failed to fetch warehouse inventory:', err);
+          setWarehouseInventory([]);
+          Alert.alert('Inventory unavailable', err?.message || 'Could not load stock for this warehouse. Please retry before adding items.');
         }
       };
       loadWarehouseInventory();

@@ -2,7 +2,7 @@ import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, Pressable, useWindowDimensions, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography } from '../constants/theme';
@@ -79,23 +79,44 @@ export default function SalesCRMScreen() {
   const [tgtAmount, setTgtAmount] = useState('');
   const [tgtError, setTgtError] = useState('');
 
+  const loadRequestRef = useRef(0);
   const load = useCallback(async () => {
-    const [cmps, smps, tgts, usrs, comm] = await Promise.all([
-      api.getComplaints(cmpStatusFilter, cmpTypeFilter).catch(() => []),
-      api.getSamples().catch(() => []),
-      api.getSalesTargets(targetMonth, targetYear).catch(() => []),
-      api.getUsers().catch(() => []),
-      api.getCommissionReport(targetMonth, targetYear, parseFloat(commissionRate) || 5).catch(() => null),
+    const requestId = ++loadRequestRef.current;
+    const results = await Promise.allSettled([
+      api.getComplaints(cmpStatusFilter, cmpTypeFilter),
+      api.getSamples(),
+      api.getSalesTargets(targetMonth, targetYear),
+      api.getUsers(),
+      api.getCommissionReport(targetMonth, targetYear, parseFloat(commissionRate) || 5),
     ]);
-    setComplaints(cmps);
-    setSamples(smps);
-    setTargets(tgts);
-    setUsers(usrs.filter((u: any) => u.role === 'agent' || u.role === 'manager'));
-    setCommission(comm);
-  }, [cmpStatusFilter, cmpTypeFilter, targetMonth, targetYear, commissionRate]);
+    if (requestId !== loadRequestRef.current) return;
+
+    const labels = ['complaints', 'samples', 'sales targets', 'users', 'commission report'];
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        showToast(`Unable to load ${labels[index]}: ${result.reason?.message || 'Please retry.'}`, 'error');
+      }
+    });
+
+    if (results[0].status === 'fulfilled') setComplaints(results[0].value);
+    if (results[1].status === 'fulfilled') setSamples(results[1].value);
+    if (results[2].status === 'fulfilled') setTargets(results[2].value);
+    if (results[3].status === 'fulfilled') {
+      setUsers(results[3].value.filter((u: any) => u.role === 'agent' || u.role === 'manager'));
+    }
+    if (results[4].status === 'fulfilled') setCommission(results[4].value);
+  }, [cmpStatusFilter, cmpTypeFilter, targetMonth, targetYear, commissionRate, showToast]);
 
   useEffect(() => { load(); }, [load]);
-  const onRefresh = useCallback(async () => { api.clearCache(); setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  const onRefresh = useCallback(async () => {
+    api.clearCache();
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   // ── Complaint handlers ──
   const resetCmpForm = () => {
