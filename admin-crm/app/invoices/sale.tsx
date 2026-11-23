@@ -719,8 +719,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
           if (w.length > 0 && !invoiceToEdit) {
             setWarehouseId(w[0]._id);
           }
-        } catch (err) {
-          console.log('Failed to fetch initial data in Challan modal:', err);
+        } catch (err: any) {
+          console.error('Failed to fetch initial data in Challan modal:', err);
+          alert(err.message || 'Could not load customers, products, and warehouses. Close and retry.');
         }
       };
       loadData();
@@ -734,8 +735,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
         try {
           const entries = await api.getInventoryEntries(warehouseId, "", true);
           setWarehouseInventory(entries);
-        } catch (err) {
-          console.log('Failed to fetch warehouse inventory:', err);
+        } catch (err: any) {
+          console.error('Failed to fetch warehouse inventory:', err);
+          alert(err.message || 'Could not load warehouse inventory. Please select the warehouse again.');
         }
       };
       loadWarehouseInventory();
@@ -1752,30 +1754,29 @@ export default function SaleInvoicesScreen() {
   const modeFilter = 'regular';
 
   const load = useCallback(async () => {
-    const [resInvoices, resCustomers] = await Promise.all([
-      api.getSaleInvoices(debouncedSearch, modeFilter, page, limit),
-      api.getCustomers()
-    ]);
-    if (resInvoices && resInvoices.data) {
-      if (page === 1) {
-        setInvoices(resInvoices.data);
-      } else {
-        setInvoices(prev => {
-          // Prevent duplicates by checking IDs
+    try {
+      const [resInvoices, resCustomers] = await Promise.all([
+        api.getSaleInvoices(debouncedSearch, modeFilter, page, limit),
+        api.getCustomers()
+      ]);
+      if (resInvoices && resInvoices.data) {
+        if (page === 1) setInvoices(resInvoices.data);
+        else setInvoices(prev => {
           const existingIds = new Set(prev.map(inv => inv._id));
-          const newInvoices = resInvoices.data.filter((inv: any) => !existingIds.has(inv._id));
-          return [...prev, ...newInvoices];
+          return [...prev, ...resInvoices.data.filter((inv: any) => !existingIds.has(inv._id))];
         });
+        setTotalPages(resInvoices.totalPages || 1);
+      } else {
+        setInvoices(Array.isArray(resInvoices) ? resInvoices : []);
+        setTotalPages(1);
       }
-      setTotalPages(resInvoices.totalPages || 1);
-    } else {
-      setInvoices(Array.isArray(resInvoices) ? resInvoices : []);
-      setTotalPages(1);
+      if (page === 1) setCustomers(resCustomers);
+    } catch (err: any) {
+      alert(err.message || 'Failed to load sale invoices. Please retry.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    if (page === 1) {
-      setCustomers(resCustomers);
-    }
-    setLoading(false);
   }, [debouncedSearch, modeFilter, page]);
 
   useEffect(() => { setPage(1); }, [debouncedSearch]);
@@ -1790,7 +1791,6 @@ export default function SaleInvoicesScreen() {
     setRefreshing(true);
     api.clearCache();
     await load();
-    setRefreshing(false);
   }, [load]);
 
   const availableFYs = ['All', ...Array.from(new Set(invoices.map(inv => getFinancialYearString(new Date(inv.date))))).sort().reverse()];

@@ -43,8 +43,11 @@ export default function QueriesScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
-    await load();
-    setRefreshing(false);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {

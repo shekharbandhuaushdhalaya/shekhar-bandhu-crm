@@ -106,6 +106,7 @@ export default function RbacScreen() {
       setUsers(data);
     } catch (err: any) {
       console.error('Failed to fetch users:', err);
+      alert(err.message || 'Failed to load users. Please retry.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -127,6 +128,7 @@ export default function RbacScreen() {
       }
     } catch (err: any) {
       console.error('Failed to fetch permissions:', err);
+      alert(err.message || 'Failed to load role permissions. Please retry.');
     } finally {
       setPermLoading(false);
     }

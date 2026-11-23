@@ -689,8 +689,9 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
               };
             }));
           }
-        } catch (err) {
-          console.log('Failed to load vendors/products/warehouses for purchase invoice:', err);
+        } catch (err: any) {
+          console.error('Failed to load vendors/products/warehouses for purchase invoice:', err);
+          alert(err.message || 'Could not load purchase invoice setup data. Close and retry.');
         }
       };
       loadData();
@@ -950,6 +951,18 @@ function AddInvoiceModal({ visible, onClose, onSaved, invoiceToEdit }: { visible
 
     if (mode === 'regular' && !invoiceNo.trim()) {
       alert('Invoice Number is mandatory for GST purchases.');
+      return;
+    }
+
+    const hasIncompleteRow = rows.some(r => {
+      const started = !!(r.selectedProduct || r.rawMaterialId || r.productSearch.trim() || r.boxes.trim() || r.rate.trim());
+      if (!started) return false;
+      const qty = Number(r.boxes);
+      const rate = Number(r.rate);
+      return !(r.selectedProduct || r.rawMaterialId || r.productSearch.trim()) || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(rate) || rate <= 0 || (mode === 'regular' && (!Number.isFinite(Number(r.gstRate)) || Number(r.gstRate) < 0 || Number(r.gstRate) > 100));
+    });
+    if (hasIncompleteRow) {
+      alert('Complete or remove every started item row. Quantity and rate must be positive and GST must be between 0 and 100%.');
       return;
     }
 
@@ -1730,31 +1743,33 @@ export default function PurchaseInvoicesScreen() {
   const limit = 50;
 
   const load = useCallback(async () => {
-    const [res, vends, rms] = await Promise.all([
-      api.getPurchaseInvoices(debouncedSearch, modeFilter, page, limit),
-      api.getVendors(),
-      api.getRawMaterials().catch(() => [])
-    ]);
-    if (res && res.data) {
-      if (page === 1) {
-        setInvoices(res.data);
-      } else {
-        setInvoices(prev => {
+    try {
+      const [res, vends, rms] = await Promise.all([
+        api.getPurchaseInvoices(debouncedSearch, modeFilter, page, limit),
+        api.getVendors(),
+        api.getRawMaterials().catch(() => [])
+      ]);
+      if (res && res.data) {
+        if (page === 1) setInvoices(res.data);
+        else setInvoices(prev => {
           const existingIds = new Set(prev.map(inv => inv._id));
-          const newInvoices = res.data.filter((inv: any) => !existingIds.has(inv._id));
-          return [...prev, ...newInvoices];
+          return [...prev, ...res.data.filter((inv: any) => !existingIds.has(inv._id))];
         });
+        setTotalPages(res.totalPages || 1);
+      } else {
+        setInvoices(Array.isArray(res) ? res : []);
+        setTotalPages(1);
       }
-      setTotalPages(res.totalPages || 1);
-    } else {
-      setInvoices(Array.isArray(res) ? res : []);
-      setTotalPages(1);
+      if (page === 1) {
+        setVendors(vends);
+        setRawMaterials(rms);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to load purchase invoices. Please retry.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    if (page === 1) {
-      setVendors(vends);
-      setRawMaterials(rms);
-    }
-    setLoading(false);
   }, [debouncedSearch, modeFilter, page]);
 
   useEffect(() => { setPage(1); }, [debouncedSearch, modeFilter]);
@@ -1769,7 +1784,6 @@ export default function PurchaseInvoicesScreen() {
     setRefreshing(true);
     api.clearCache();
     await load();
-    setRefreshing(false);
   }, [load]);
 
   if (perm.permissions && !perm.can('invoice:view')) {

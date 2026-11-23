@@ -122,7 +122,9 @@ export default function PricingScreen() {
     } catch (e: any) {
       showToast(e.message || 'Could not update pricing.', 'error');
       setRows(prev => prev.map(r => r._id === row._id ? { ...r, saving: false } : r));
+      return false;
     }
+    return true;
   };
 
   const saveAll = async () => {
@@ -132,9 +134,19 @@ export default function PricingScreen() {
       return;
     }
     setSaveAllLoading(true);
-    for (const row of dirtyRows) await saveRow(row);
-    setSaveAllLoading(false);
-    showToast(`${dirtyRows.length} product(s) updated successfully.`, 'success');
+    let savedCount = 0;
+    try {
+      for (const row of dirtyRows) {
+        if (await saveRow(row)) savedCount += 1;
+      }
+    } finally {
+      setSaveAllLoading(false);
+    }
+    if (savedCount === dirtyRows.length) {
+      showToast(`${savedCount} product(s) updated successfully.`, 'success');
+    } else {
+      showToast(`${savedCount} of ${dirtyRows.length} product(s) updated. Review the remaining unsaved rows.`, 'error');
+    }
   };
 
   const filteredRows = rows.filter(r =>
