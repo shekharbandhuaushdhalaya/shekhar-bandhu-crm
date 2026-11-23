@@ -24,6 +24,7 @@ const productionPlanSchema = new mongoose.Schema({
     default: 'not_checked'
   },
   shortageDetails: [{ rawMaterialName: String, requiredQty: Number, availableQty: Number, shortageQty: Number }],
+  materialReservations: [{ rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial', required: true }, rawMaterialEntryId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterialEntry', required: true }, batchNo: { type: String, default: '' }, qty: { type: Number, required: true, min: 0 } }],
   status: {
     type: String,
     enum: ['draft', 'approved', 'in_production', 'completed', 'cancelled'],
