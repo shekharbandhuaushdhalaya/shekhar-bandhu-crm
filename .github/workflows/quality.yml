@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   frontend:
+    timeout-minutes: 20
     name: Frontend typecheck and web build
     runs-on: ubuntu-latest
     defaults:
@@ -38,6 +39,7 @@ jobs:
         run: npm run build
 
   backend:
+    timeout-minutes: 30
     name: Backend lint and tests
     runs-on: ubuntu-latest
     defaults:
