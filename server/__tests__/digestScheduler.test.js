@@ -48,6 +48,7 @@ describe('Task 1 — Daily Executive Digest Scheduler Suite', () => {
       email: 'admin@shekharbandhu.com',
       password: 'Password123!',
       role: 'admin',
+      firmId: firm._id,
       phone: '+919876543210'
     });
     await UserFirm.create({ userId: adminUser._id, firmId: firm._id, role: 'admin', active: true });

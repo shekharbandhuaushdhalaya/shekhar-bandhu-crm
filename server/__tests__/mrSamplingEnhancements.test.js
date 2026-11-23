@@ -1,7 +1,7 @@
 const express = require('express');
 const request = require('supertest');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const MedicalRepresentative = require('../models/MedicalRepresentative');
 const Contact = require('../models/Contact');
 const Product = require('../models/Product');
@@ -17,7 +17,8 @@ let currentUser = { id: '507f1f77bcf86cd799439011', role: 'admin', email: 'admin
 
 describe('Doctor Sample Management Enhancements (Expiry Warnings, Quotas, Signature & OTP)', () => {
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    // Inventory allocation and sample handover use MongoDB transactions.
+    mongoServer = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     await mongoose.connect(mongoServer.getUri());
 
     app = express();
