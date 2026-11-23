@@ -119,6 +119,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
   const [bomDefaultJobWorkerId, setBomDefaultJobWorkerId] = useState('');
   const [vendors, setVendors] = useState<any[]>([]);
   const [bomIngredients, setBomIngredients] = useState<{ rawMaterialId: string; qtyRequired: string; itemType: 'formulation' | 'packaging'; stageName?: string }[]>([{ rawMaterialId: '', qtyRequired: '', itemType: 'formulation' }]);
+  const [ingredientSearch, setIngredientSearch] = useState<Record<number, string>>({});
+  const [openIngredientRow, setOpenIngredientRow] = useState<number | null>(null);
   const [bomStages, setBomStages] = useState<{ name: string; targetDurationDays: string }[]>([{ name: '', targetDurationDays: '1' }]);
   const [formulationBasis, setFormulationBasis] = useState('100');
 
@@ -140,6 +142,14 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
     return { basis: 100, unit: 'units', label: 'per 100 units' };
   };
   const formulaStd = getFormulaStandard(productType);
+  const formulationMaterials = useMemo(() => materials.filter(rm => {
+    const materialType = String(rm.materialType || '').toLowerCase();
+    const category = String(rm.category || '').toLowerCase();
+    return materialType !== 'packaging'
+      && category !== 'packaging'
+      && category !== 'packaging material';
+  }), [materials]);
+
 
   // Compute live total formula quantity (for formulation items only)
   const totalFormulaQty = useMemo(() => {
@@ -1480,43 +1490,71 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
               </View>
               {bomIngredients.map((item, idx) => {
                 if (item.itemType === 'packaging') return null;
-                const formulationMaterials = materials.filter(rm => {
-                  // Ingredient categories include Dry Herb, Fresh Herb, Volatile Oil,
-                  // Metallic/Mineral, Plant Concentrate, etc. Do not whitelist only
-                  // the legacy "Herb" category; exclude packaging by type/category.
-                  const materialType = String(rm.materialType || '').toLowerCase();
-                  const category = String(rm.category || '').toLowerCase();
-                  return materialType !== 'packaging'
-                    && category !== 'packaging'
-                    && category !== 'packaging material';
-                });
                 const selectedRM = materials.find(rm => rm._id === item.rawMaterialId);
                 const rmUnit = selectedRM?.unit || '';
+                const ingredientQuery = ingredientSearch[idx] ?? selectedRM?.name ?? '';
+                const matchingMaterials = formulationMaterials.filter(rm => {
+                  const query = ingredientQuery.trim().toLowerCase();
+                  if (!query || query === (selectedRM?.name || '').toLowerCase()) return true;
+                  return [rm.name, rm.sku, rm.category, rm.botanicalName]
+                    .some(value => String(value || '').toLowerCase().includes(query));
+                }).slice(0, 40);
                 return (
                   <View key={`ing-${idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-                    <View style={[styles.formInput, { flex: 2, height: 42 }]}>
-                      {Platform.OS === 'web' ? (
-                        <select
-                          value={item.rawMaterialId}
-                          onChange={(e: any) => handleIngredientChange(idx, 'rawMaterialId', e.target.value)}
-                          style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
-                        >
-                          <option value="">-- Select Formulation Material --</option>
-                          {formulationMaterials.map(rm => {
-                            const icon = rm.category === 'Excipient' ? '' : (rm.category === 'Packaging' ? '' : '');
-                            return (
-                              <option key={rm._id} value={rm._id}>{icon} {rm.name} ({rm.sku})</option>
-                            );
-                          })}
-                        </select>
-                      ) : (
+                    <View style={{ flex: 2, minWidth: 180, zIndex: openIngredientRow === idx ? 20 : 1 }}>
+                      <View style={[styles.formInput, { height: 42 }]}>
                         <TextInput
-                          style={styles.formInputText}
-                          placeholder="RM ID"
+                          style={[styles.formInputText, { minWidth: 0 }]}
+                          placeholder="Search and select ingredient..."
                           placeholderTextColor={colors.text.muted}
-                          value={item.rawMaterialId}
-                          onChangeText={(val) => handleIngredientChange(idx, 'rawMaterialId', val)}
+                          value={ingredientQuery}
+                          onFocus={() => setOpenIngredientRow(idx)}
+                          onChangeText={(val) => {
+                            setIngredientSearch(prev => ({ ...prev, [idx]: val }));
+                            if (item.rawMaterialId) handleIngredientChange(idx, 'rawMaterialId', '');
+                            setOpenIngredientRow(idx);
+                          }}
+                          accessibilityLabel="Search formulation ingredients"
                         />
+                        {item.rawMaterialId ? (
+                          <TouchableOpacity
+                            onPress={() => {
+                              handleIngredientChange(idx, 'rawMaterialId', '');
+                              setIngredientSearch(prev => ({ ...prev, [idx]: '' }));
+                              setOpenIngredientRow(idx);
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel="Clear selected ingredient"
+                          >
+                            <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+                          </TouchableOpacity>
+                        ) : (
+                          <Ionicons name="search" size={16} color={colors.text.muted} />
+                        )}
+                      </View>
+                      {openIngredientRow === idx && (
+                        <View style={{ position: 'absolute', top: 44, left: 0, right: 0, maxHeight: 210, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, zIndex: 30, elevation: 8, overflow: 'hidden' }}>
+                          <ScrollView keyboardShouldPersistTaps="always" nestedScrollEnabled>
+                            {matchingMaterials.length > 0 ? matchingMaterials.map(rm => (
+                              <TouchableOpacity
+                                key={rm._id}
+                                style={{ paddingHorizontal: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                                onPress={() => {
+                                  handleIngredientChange(idx, 'rawMaterialId', rm._id);
+                                  setIngredientSearch(prev => ({ ...prev, [idx]: rm.name }));
+                                  setOpenIngredientRow(null);
+                                }}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Select ${rm.name}`}
+                              >
+                                <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '600' }} numberOfLines={1}>{rm.name}</Text>
+                                <Text style={{ ...Typography.caption, color: colors.text.muted }} numberOfLines={1}>{[rm.sku, rm.category, rm.unit].filter(Boolean).join(' • ')}</Text>
+                              </TouchableOpacity>
+                            )) : (
+                              <Text style={{ ...Typography.caption, color: colors.text.muted, padding: 12 }}>No matching ingredients found.</Text>
+                            )}
+                          </ScrollView>
+                        </View>
                       )}
                     </View>
                     <View style={[styles.formInput, { flex: 1.2, height: 42, flexDirection: 'row', alignItems: 'center' }]}>
