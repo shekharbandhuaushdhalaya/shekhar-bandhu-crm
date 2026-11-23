@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const Firm = require('../models/Firm');
 const Product = require('../models/Product');
-const { runWithTenant } = require('../utils/tenantContext');
+const { runWithTenant, getFirmId } = require('../utils/tenantContext');
 
 let mongoServer;
 
@@ -41,7 +41,10 @@ describe('tenant isolation regression', () => {
       stockLevel: 7
     }));
 
-    const visibleToA = await runWithTenant({ firmId: firmA._id }, async () => await Product.find({}).lean());
+    const visibleToA = await runWithTenant({ firmId: firmA._id }, async () => {
+      expect(String(getFirmId())).toBe(String(firmA._id));
+      return Product.find({}).lean();
+    });
     expect(visibleToA).toHaveLength(1);
     expect(String(visibleToA[0]._id)).toBe(String(productA._id));
 
