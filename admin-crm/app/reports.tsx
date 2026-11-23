@@ -42,18 +42,23 @@ export default function ReportsScreen() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResponse, setAiResponse] = useState<any>(null);
+  const aiRequestIdRef = useRef(0);
 
   const handleAskAi = async () => {
-    if (!aiPrompt.trim()) return;
+    const prompt = aiPrompt.trim();
+    if (!prompt) return;
+    const requestId = ++aiRequestIdRef.current;
     try {
       setAiLoading(true);
-      const res = await api.askAiAnalytics(aiPrompt.trim());
-      setAiResponse(res);
+      const res = await api.askAiAnalytics(prompt);
+      if (requestId === aiRequestIdRef.current) setAiResponse(res);
     } catch (err: any) {
       console.error('AI Analytics Error:', err);
-      setAiResponse({ answer: err.message || 'Failed to get response from AI Analytics.' });
+      if (requestId === aiRequestIdRef.current) {
+        setAiResponse({ answer: err.message || 'Failed to get response from AI Analytics.' });
+      }
     } finally {
-      setAiLoading(false);
+      if (requestId === aiRequestIdRef.current) setAiLoading(false);
     }
   };
 
@@ -89,63 +94,63 @@ export default function ReportsScreen() {
   const [rmViewMode, setRmViewMode] = useState<'summary' | 'batches'>('summary');
 
   const loadedRef = useRef<Set<string>>(new Set());
+  const tabLoadRequestRef = useRef(0);
+  const [dataError, setDataError] = useState('');
 
   const fetchTabData = useCallback(async (tab: ReportTab) => {
-    let sInvsData: Invoice[] | null = null;
-    let pInvsData: Invoice[] | null = null;
+    const requestId = ++tabLoadRequestRef.current;
+    const failures: string[] = [];
+    const tasks: Promise<void>[] = [];
+    const loadResource = async (
+      key: string,
+      loader: () => Promise<any>,
+      setter: (data: any) => void,
+      label: string,
+    ) => {
+      if (loadedRef.current.has(key)) return;
+      try {
+        const data = await loader();
+        if (requestId !== tabLoadRequestRef.current) return;
+        setter(data);
+        loadedRef.current.add(key);
+      } catch (error: any) {
+        if (requestId === tabLoadRequestRef.current) {
+          failures.push(`${label}: ${error?.message || 'Unable to load data'}`);
+        }
+      }
+    };
 
     if (tab === 'accounting' || tab === 'gst' || tab === 'aging') {
-      if (!loadedRef.current.has('customers')) {
-        const data = await api.getCustomers().catch(() => null);
-        if (data) { loadedRef.current.add('customers'); setCustomers(data); }
-      }
-      if (!loadedRef.current.has('saleInvs')) {
-        sInvsData = await api.getSaleInvoices('', 'all').catch(() => null);
-        if (sInvsData) { loadedRef.current.add('saleInvs'); setSaleInvs(sInvsData); }
-      }
-      if (tab !== 'aging' && !loadedRef.current.has('purchInvs')) {
-        pInvsData = await api.getPurchaseInvoices('', 'all').catch(() => null);
-        if (pInvsData) { loadedRef.current.add('purchInvs'); setPurchInvs(pInvsData); }
+      tasks.push(loadResource('customers', () => api.getCustomers(), setCustomers, 'Customers'));
+      tasks.push(loadResource('saleInvs', () => api.getSaleInvoices('', 'all'), setSaleInvs, 'Sales invoices'));
+      if (tab !== 'aging') {
+        tasks.push(loadResource('purchInvs', () => api.getPurchaseInvoices('', 'all'), setPurchInvs, 'Purchase invoices'));
       }
     }
-    if (tab === 'manufacturing' && !loadedRef.current.has('mfgAnalytics')) {
-      const data = await api.getManufacturingAnalytics().catch(() => null);
-      if (data) { loadedRef.current.add('mfgAnalytics'); setMfgAnalytics(data); }
+    if (tab === 'manufacturing') {
+      tasks.push(loadResource('mfgAnalytics', () => api.getManufacturingAnalytics(), setMfgAnalytics, 'Manufacturing analytics'));
     }
     if (tab === 'rawmaterials') {
-      if (!loadedRef.current.has('rawMaterials')) {
-        const data = await api.getRawMaterials().catch(() => null);
-        if (data) { loadedRef.current.add('rawMaterials'); setRawMaterials(data); }
-      }
-      if (!loadedRef.current.has('rawEntries')) {
-        const data = await api.getRawMaterialEntries().catch(() => null);
-        if (data) { loadedRef.current.add('rawEntries'); setRawEntries(data); }
-      }
-      if (!loadedRef.current.has('expiryAlerts')) {
-        const data = await api.getRawMaterialExpiryAlerts().catch(() => null);
-        if (data) { loadedRef.current.add('expiryAlerts'); setExpiryAlerts(data); }
-      }
+      tasks.push(loadResource('rawMaterials', () => api.getRawMaterials(), setRawMaterials, 'Raw materials'));
+      tasks.push(loadResource('rawEntries', () => api.getRawMaterialEntries(), setRawEntries, 'Raw-material entries'));
+      tasks.push(loadResource('expiryAlerts', () => api.getRawMaterialExpiryAlerts(), setExpiryAlerts, 'Expiry alerts'));
     }
+
+    await Promise.all(tasks);
+    if (requestId === tabLoadRequestRef.current) setDataError(failures.join('. '));
   }, []);
 
-  // On mount: fetch only active tab
-  useEffect(() => { fetchTabData(activeTab); }, []);
-
-  // On tab switch: fetch data for new tab
-  const prevReportTabRef = useRef(activeTab);
-  useEffect(() => {
-    if (prevReportTabRef.current !== activeTab) {
-      fetchTabData(activeTab);
-      prevReportTabRef.current = activeTab;
-    }
-  }, [activeTab, fetchTabData]);
+  useEffect(() => { fetchTabData(activeTab); }, [activeTab, fetchTabData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     loadedRef.current.clear();
     api.clearCache();
-    await fetchTabData(activeTab);
-    setRefreshing(false);
+    try {
+      await fetchTabData(activeTab);
+    } finally {
+      setRefreshing(false);
+    }
   }, [activeTab, fetchTabData]);
 
   // ---- Aging Calculations ----
@@ -564,6 +569,14 @@ export default function ReportsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
+        {dataError ? (
+          <View style={{ padding: 12, borderRadius: 8, backgroundColor: colors.danger + '12', marginBottom: 12 }}>
+            <Text style={{ color: colors.danger }}>{dataError}</Text>
+            <TouchableOpacity onPress={onRefresh} style={{ marginTop: 8 }}>
+              <Text style={{ color: colors.primary, fontWeight: '700' }}>Retry loading report data</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         {/* ==================== TAB 1: Monthly Accounting ==================== */}
         {activeTab === 'accounting' && (
           <View>
