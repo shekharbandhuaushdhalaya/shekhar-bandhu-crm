@@ -230,6 +230,8 @@ export default function AddEditProductModal({ visible, onClose, onSaved, product
   // Load raw materials & existing BOM when product is set
   useEffect(() => {
     async function loadAllData() {
+      setIngredientSearch({});
+      setOpenIngredientRow(null);
       try {
         api.clearCache();
         const [rms, vends] = await Promise.all([
