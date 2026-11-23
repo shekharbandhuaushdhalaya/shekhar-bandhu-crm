@@ -12,6 +12,7 @@ import { EmptyState, MetricTile, Panel, StatusPill, WorkspaceTransition, Workspa
 import { PageHeader as WorkspaceHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
 import { HelpTooltip } from '../components/HelpTooltip';
+import { ResponsiveSelect } from '../components/ResponsiveSelect';
 import { useConfirm } from '../utils/ConfirmContext';
 
 type Tab = 'dashboard' | 'orders' | 'challans' | 'schemes' | 'returns' | 'commissions';
@@ -152,13 +153,17 @@ export default function SalesWorkspace() {
       if (!qsCustomer || !qsProduct || !qsWarehouse) {
         return Alert.alert('Quick Sale', 'Select customer, product and warehouse.');
       }
+      const quantity = Number(qsQty);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        return Alert.alert('Quick Sale', 'Enter a quantity greater than zero.');
+      }
       const out = await request('/sales-workflow/quick-sale', {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({
           customerId: qsCustomer,
           warehouseId: qsWarehouse,
-          items: [{ productId: qsProduct, qty: Number(qsQty || 1), packing: 1, batchNo: qsBatch || '' }],
+          items: [{ productId: qsProduct, qty: quantity, packing: 1, batchNo: qsBatch || '' }],
         }),
       });
       setShowQuickSale(false);
@@ -311,11 +316,35 @@ export default function SalesWorkspace() {
                 </select>
               </View>
             ) : (
-              <>
-                <TextInput style={styles.inputWide} placeholder="Customer ID" placeholderTextColor={colors.text.muted} value={qsCustomer} onChangeText={setQsCustomer} />
-                <TextInput style={styles.inputWide} placeholder="Warehouse ID" placeholderTextColor={colors.text.muted} value={qsWarehouse} onChangeText={setQsWarehouse} />
-                <TextInput style={styles.inputWide} placeholder="Product ID" placeholderTextColor={colors.text.muted} value={qsProduct} onChangeText={setQsProduct} />
-              </>
+              <View style={{ gap: Spacing.sm }}>
+                <ResponsiveSelect
+                  value={qsCustomer}
+                  onChange={setQsCustomer}
+                  options={customers.map((customer) => ({ value: customer._id, label: customer.name || customer.company || 'Unnamed customer', description: customer.phone || customer.email || '' }))}
+                  placeholder="Select customer"
+                  searchPlaceholder="Search customers..."
+                  searchable
+                  style={{ width: '100%' }}
+                />
+                <ResponsiveSelect
+                  value={qsWarehouse}
+                  onChange={setQsWarehouse}
+                  options={warehouses.map((warehouse) => ({ value: warehouse._id, label: warehouse.name || 'Unnamed warehouse', description: warehouse.city || warehouse.addressLine1 || '' }))}
+                  placeholder="Select warehouse"
+                  searchPlaceholder="Search warehouses..."
+                  searchable
+                  style={{ width: '100%' }}
+                />
+                <ResponsiveSelect
+                  value={qsProduct}
+                  onChange={setQsProduct}
+                  options={products.map((product) => ({ value: product._id, label: product.name || 'Unnamed product', description: product.productType || product.size || '' }))}
+                  placeholder="Select product"
+                  searchPlaceholder="Search products..."
+                  searchable
+                  style={{ width: '100%' }}
+                />
+              </View>
             )}
             <View style={styles.formRow}>
               <TextInput style={styles.input} placeholder="Quantity" placeholderTextColor={colors.text.muted} keyboardType="numeric" value={qsQty} onChangeText={setQsQty} />
