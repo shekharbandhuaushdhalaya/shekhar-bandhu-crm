@@ -2,6 +2,7 @@ import { PressableOpacity as TouchableOpacity } from './../../../components/Pres
 import { AppTextInput as TextInput } from './../../../components/AppTextInput';
 import { AppText as Text } from './../../../components/AppText';
 import { Typography } from './../../../constants/theme';
+import { ResponsiveSelect } from './../../../components/ResponsiveSelect';
 import React from 'react';
 import { View, Modal, ScrollView, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -122,66 +123,58 @@ export default function LaunchBatchModal({
           {prodError ? <Text style={styles.modalError}>{prodError}</Text> : null}
           <ScrollView style={styles.modalForm}>
             <Text style={styles.inputLabel}>Select Finished Goods Product *</Text>
-            <View style={styles.pickerWrapper}>
-              {Platform.OS === 'web' ? (
-                <select
-                  value={prodProductId}
-                  onChange={(e: any) => {
-                    const val = e.target.value;
-                    setProdProductId(val);
-                    // Auto-select recipe: default or first available
-                    const productBoms = boms.filter(b => {
-                      const bPid = b.productId && typeof b.productId === 'object' ? (b.productId as any)._id : b.productId;
-                      return bPid === val;
-                    });
-                    const activeBom = productBoms.find(b => b.isDefault) || productBoms[0];
-                    setProdBomId(activeBom ? activeBom._id : '');
-                    if (activeBom) {
-                      setProdProductionType((activeBom as any).defaultProductionType || 'in_house');
-                      setProdJobWorkMode((activeBom as any).defaultJobWorkMode || 'none');
-                      setProdPackagingMode((activeBom as any).defaultPackagingMode || 'self_packed');
-                      const jwId = (activeBom as any).defaultJobWorkerId ? ((activeBom as any).defaultJobWorkerId._id || (activeBom as any).defaultJobWorkerId) : '';
-                      setProdJobWorkerId(jwId);
-                      const matchV = vendors.find(v => v._id === jwId);
-                      setProdJobWorkerName(matchV ? ((matchV as any).company || matchV.name) : '');
-                    } else {
-                      setProdProductionType('in_house');
-                      setProdJobWorkMode('none');
-                      setProdPackagingMode('self_packed');
-                      setProdJobWorkerId('');
-                      setProdJobWorkerName('');
-                    }
-                  }}
-                  style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
-                >
-                  <option value="">-- Choose Product --</option>
-                  {products.filter(p => !p.parentId).map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
-                </select>
-              ) : (
-                <TextInput style={styles.input} placeholder="Product ID" value={prodProductId} onChangeText={setProdProductId} />
-              )}
-            </View>
+            <ResponsiveSelect
+              value={prodProductId}
+              placeholder="Choose finished goods product"
+              searchPlaceholder="Search products by name or SKU..."
+              searchable
+              style={styles.pickerWrapper}
+              options={products.filter(p => !p.parentId).map(p => ({
+                value: p._id,
+                label: p.sku ? `${p.name} · ${p.sku}` : p.name,
+                description: p.size || p.category || ''
+              }))}
+              onChange={(val) => {
+                setProdProductId(val);
+                const productBoms = boms.filter(b => {
+                  const bPid = b.productId && typeof b.productId === 'object' ? (b.productId as any)._id : b.productId;
+                  return bPid === val;
+                });
+                const activeBom = productBoms.find(b => b.isDefault) || productBoms[0];
+                setProdBomId(activeBom ? activeBom._id : '');
+                if (activeBom) {
+                  setProdProductionType((activeBom as any).defaultProductionType || 'in_house');
+                  setProdJobWorkMode((activeBom as any).defaultJobWorkMode || 'none');
+                  setProdPackagingMode((activeBom as any).defaultPackagingMode || 'self_packed');
+                  const jwId = (activeBom as any).defaultJobWorkerId ? ((activeBom as any).defaultJobWorkerId._id || (activeBom as any).defaultJobWorkerId) : '';
+                  setProdJobWorkerId(jwId);
+                  const matchV = vendors.find(v => v._id === jwId);
+                  setProdJobWorkerName(matchV ? ((matchV as any).company || matchV.name) : '');
+                } else {
+                  setProdProductionType('in_house');
+                  setProdJobWorkMode('none');
+                  setProdPackagingMode('self_packed');
+                  setProdJobWorkerId('');
+                  setProdJobWorkerName('');
+                }
+              }}
+            />
 
             {productRecipes.length > 1 && (
               <>
                 <Text style={styles.inputLabel}>Select Recipe *</Text>
-                <View style={styles.pickerWrapper}>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={prodBomId}
-                      onChange={(e: any) => setProdBomId(e.target.value)}
-                      style={{ ...Typography.bodySm, flex: 1, padding: 8, backgroundColor: 'transparent', border: 'none', color: colors.text.primary }}
-                    >
-                      {productRecipes.map(b => (
-                        <option key={b._id} value={b._id}>
-                          {b.recipeName || 'Standard Recipe'}{b.isDefault ? ' ⭐ (Default)' : ''}{b.isActive === false ? ' (Inactive)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <TextInput style={styles.input} placeholder="Recipe ID" value={prodBomId} onChangeText={setProdBomId} />
-                  )}
-                </View>
+                <ResponsiveSelect
+                  value={prodBomId}
+                  placeholder="Choose recipe"
+                  searchPlaceholder="Search recipes..."
+                  searchable
+                  style={styles.pickerWrapper}
+                  options={productRecipes.map(b => ({
+                    value: b._id,
+                    label: `${b.recipeName || 'Standard Recipe'}${b.isDefault ? ' · Default' : ''}${b.isActive === false ? ' · Inactive' : ''}`
+                  }))}
+                  onChange={setProdBomId}
+                />
               </>
             )}
 
