@@ -91,7 +91,8 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       const entries = await RawMaterialEntry.find({
         warehouseId: manufacturingWarehouse._id,
         rawMaterialId: rmId,
-        qcStatus: 'approved'
+        qcStatus: 'approved',
+        $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }]
       }).lean();
 
       const availableQty = entries.reduce((acc, e) => acc + Math.max(0, Number(e.qty || 0) - Number(e.reservedQty || 0)), 0);
@@ -118,6 +119,7 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       shortageDetails,
       status: 'draft',
       plannerName: req.user ? req.user.name : 'System',
+      createdByUserId: req.user?.id || null,
       notes: notes || ''
     });
 
@@ -132,19 +134,24 @@ router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) =>
   try {
     const { status } = req.body;
     const allowedStatuses = ['draft', 'approved', 'in_production', 'completed', 'cancelled'];
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid production plan status' });
-    }
-    const plan = await ProductionPlan.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true, runValidators: true }
-    );
+    if (!allowedStatuses.includes(status)) return res.status(400).json({ error: 'Invalid production plan status' });
+    const plan = await ProductionPlan.findById(req.params.id);
     if (!plan) return res.status(404).json({ error: 'Production plan not found' });
+    const transitions = { draft: ['approved', 'cancelled'], approved: ['in_production', 'cancelled'], in_production: ['completed', 'cancelled'], completed: [], cancelled: [] };
+    if (!(transitions[plan.status] || []).includes(status)) return res.status(409).json({ error: 'Invalid production plan transition: ' + plan.status + ' -> ' + status, code: 'INVALID_PLAN_TRANSITION' });
+    if (status === 'approved') {
+      if (plan.rawMaterialSufficiencyStatus !== 'sufficient') return res.status(409).json({ error: 'A production plan can only be approved after an available-stock sufficiency check passes', code: 'PLAN_MATERIALS_NOT_SUFFICIENT' });
+      const approverId = req.user?.id;
+      if (!approverId) return res.status(403).json({ error: 'Authenticated approver identity is required' });
+      if (plan.createdByUserId && String(plan.createdByUserId) === String(approverId)) return res.status(403).json({ error: 'The plan creator cannot approve their own production plan', code: 'PLAN_MAKER_CHECKER_REQUIRED' });
+      plan.approvedByUserId = approverId;
+      plan.approvedByName = req.user?.name || req.user?.email || 'Approver';
+      plan.approvedAt = new Date();
+    }
+    plan.status = status;
+    await plan.save();
     res.json(plan);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;

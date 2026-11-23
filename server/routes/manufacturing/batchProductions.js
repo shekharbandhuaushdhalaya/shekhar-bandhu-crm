@@ -102,10 +102,10 @@ router.get('/preview', authorize('manufacturing:view'), async (req, res) => {
 
       if (manufacturingUnitId) {
         const manufacturingWarehouse = await resolveManufacturingWarehouse(manufacturingUnitId);
-        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, warehouseId: manufacturingWarehouse._id, qcStatus: 'approved' });
+        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, warehouseId: manufacturingWarehouse._id, qcStatus: 'approved', $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }] });
         totalAvailable = entries.reduce((s, e) => s + Math.max(0, Number(e.qty || 0) - Number(e.reservedQty || 0)), 0);
       } else {
-        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, qcStatus: 'approved' });
+        const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, qcStatus: 'approved', $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }] });
         totalAvailable = entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0)), 0);
       }
 
@@ -306,7 +306,8 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
           const entries = await RawMaterialEntry.find({
             rawMaterialId: item.rawMaterialId,
             warehouseId: manufacturingWarehouse._id,
-            qcStatus: 'approved'
+            qcStatus: 'approved',
+            $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }]
           }).session(session);
 
           entries.sort((a, b) => {

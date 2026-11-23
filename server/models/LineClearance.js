@@ -5,6 +5,7 @@ const lineClearanceSchema = new mongoose.Schema({
   batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', required: true },
   manufacturingUnitId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: true },
   phase: { type: String, enum: ['manufacturing','filling','packing'], default: 'manufacturing', index: true },
+  cleared: { type: Boolean, default: false },
   previousBatchNo: { type: String, default: '', trim: true },
   checklist: {
     equipmentCleaned: { type: Boolean, default: false },

@@ -420,7 +420,8 @@ async function completeProductionReceiptAndCreateTransfer({ batch, challanItems,
           rawMaterialId: ingredient.rawMaterialId,
           warehouseId: backfillWarehouseId,
           qcStatus: 'approved',
-          qty: { $gt: 0 }
+          qty: { $gt: 0 },
+          $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }]
         }).sort({ expiryDate: 1, createdAt: 1 }).session(session);
         let remaining = qtyNeeded;
         for (const entry of entries) {
