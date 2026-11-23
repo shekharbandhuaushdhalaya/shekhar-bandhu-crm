@@ -30,6 +30,10 @@ const productionPlanSchema = new mongoose.Schema({
     default: 'draft'
   },
   plannerName: { type: String, default: 'System' },
+  createdByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  approvedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  approvedByName: { type: String, default: '' },
+  approvedAt: { type: Date, default: null },
   notes: { type: String, default: '' }
 }, { timestamps: true });
 

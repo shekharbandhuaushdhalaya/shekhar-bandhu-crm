@@ -55,3 +55,32 @@ describe('Production release-control defaults', () => {
     expect(coa.gmpCertificateNo).toBe('');
   });
 });
+
+
+describe('Manufacturing release-control records', () => {
+  const LineClearance = require('../models/LineClearance');
+  const ProductionPlan = require('../models/ProductionPlan');
+
+  it('does not consider a new line clearance cleared by default', () => {
+    const clearance = new LineClearance({
+      batchId: '507f1f77bcf86cd799439011',
+      manufacturingUnitId: '507f1f77bcf86cd799439022',
+      clearedBy: '507f1f77bcf86cd799439033'
+    });
+    expect(clearance.cleared).toBe(false);
+    expect(clearance.checklist.equipmentCleaned).toBe(false);
+  });
+
+  it('records production-plan maker/checker approval separately', () => {
+    const plan = new ProductionPlan({
+      planNo: 'PLAN-TEST-001', title: 'Test Plan',
+      manufacturingUnitId: '507f1f77bcf86cd799439011',
+      manufacturingUnitName: 'Test Unit',
+      startDate: new Date(), endDate: new Date(Date.now() + 86400000),
+      createdByUserId: '507f1f77bcf86cd799439022'
+    });
+    expect(plan.status).toBe('draft');
+    expect(plan.approvedByUserId).toBeNull();
+    expect(plan.approvedAt).toBeNull();
+  });
+});

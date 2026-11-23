@@ -45,7 +45,9 @@ async function consumeFromReservation(batch, rawMaterialId, qtyNeeded, session) 
       if (session) query = query.session(session);
       const entry = await query;
 
-      if (entry) {
+      if (!entry) throw new Error('Reserved raw-material lot no longer exists; resolve the reservation before continuing');
+      if (entry.qcStatus !== 'approved' || (entry.expiryDate && new Date(entry.expiryDate) <= new Date())) throw new Error('Reserved raw-material lot ' + entry.batchNo + ' is no longer eligible for use');
+      {
         entry.reservedQty = Math.max(0, Number(((entry.reservedQty || 0) - drawVal).toFixed(2)));
         entry.qty = Math.max(0, Number(((entry.qty || 0) - drawVal).toFixed(2)));
         await entry.save(session ? { session } : undefined);
@@ -80,7 +82,8 @@ async function consumeFromReservation(batch, rawMaterialId, qtyNeeded, session) 
     let query = RawMaterialEntry.find({
       rawMaterialId,
       warehouseId: manufacturingWarehouse._id,
-      qcStatus: 'approved'
+      qcStatus: 'approved',
+      $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }]
     });
     if (session) query = query.session(session);
     const entries = await query;
@@ -234,7 +237,7 @@ async function calculateAggregateMaterialSufficiency(batchIds = []) {
 
   const rmIds = Object.keys(demandMap);
   const rawMaterials = await RawMaterial.find({ _id: { $in: rmIds } }).lean();
-  const rmEntries = await RawMaterialEntry.find({ rawMaterialId: { $in: rmIds }, qcStatus: 'approved' }).lean();
+  const rmEntries = await RawMaterialEntry.find({ rawMaterialId: { $in: rmIds }, qcStatus: 'approved', $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }] }).lean();
 
   const report = [];
   let overallSufficient = true;
