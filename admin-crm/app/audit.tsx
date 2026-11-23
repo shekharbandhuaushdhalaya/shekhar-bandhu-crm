@@ -5,7 +5,7 @@ import { StatusPill, WorkspaceLoading, EmptyState } from './../components/Worksp
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useListState } from '../utils/useListState';
 import { View, StyleSheet, ScrollView, Modal, ActivityIndicator, useWindowDimensions, RefreshControl, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +41,8 @@ export default function AuditLogsScreen() {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const requestSequence = useRef(0);
   const [searchText, setSearchText] = useListState('auditSearchText', '');
   const debouncedSearchText = useDebouncedValue(searchText, 300);
   const [searchVal, setSearchVal] = useListState('auditSearchVal', '');
@@ -73,17 +75,22 @@ export default function AuditLogsScreen() {
   })();
 
   const fetchLogs = useCallback(async (pageNum: number, searchString: string) => {
+    const requestId = ++requestSequence.current;
     try {
       setLoading(true);
+      setLoadError('');
       const data = await api.getAuditLogs(searchString, pageNum, 20, dateFrom || undefined, dateTo || undefined);
+      if (requestId !== requestSequence.current) return;
       setLogs(data.logs || []);
       setTotalPages(data.pages || 1);
       setTotalItems(data.total || 0);
     } catch (err) {
-      console.error('Failed to fetch audit logs:', err);
+      if (requestId === requestSequence.current) {
+        console.error('Failed to fetch audit logs:', err);
+        setLoadError(err instanceof Error ? err.message : 'Failed to load audit records. Please retry.');
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === requestSequence.current) { setLoading(false); setRefreshing(false); }
     }
   }, [dateFrom, dateTo]);
 
@@ -237,6 +244,7 @@ export default function AuditLogsScreen() {
       />
 
       {/* Log Feed */}
+      {loadError ? <View style={{ padding: Spacing.md }}><Text accessibilityRole="alert" style={{ color: colors.danger }}>{loadError}</Text><TouchableOpacity onPress={() => fetchLogs(page, activeSearch)}><Text style={{ color: colors.primary, fontWeight: '700', marginTop: 6 }}>Retry</Text></TouchableOpacity></View> : null}
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <WorkspaceLoading title="Loading audit records…" message="Fetching the latest activity log." />

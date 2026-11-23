@@ -2,7 +2,7 @@ import { WorkspaceLoading, StatusPill, EmptyState } from './../components/Worksp
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useListState } from '../utils/useListState';
 import { View, StyleSheet, ScrollView, Modal, ActivityIndicator, RefreshControl, Pressable, Platform, Switch, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +41,8 @@ export default function CampaignsScreen() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const requestSequence = useRef(0);
   const [search, setSearch] = useListState('campSearch', '');
   const [statusFilter, setStatusFilter] = useState('');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -79,8 +81,11 @@ export default function CampaignsScreen() {
   }, []);
 
   const fetchCampaigns = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     try {
+      setLoadError('');
       const data = await api.getCampaigns(search || undefined, statusFilter || undefined);
+      if (requestId !== requestSequence.current) return;
       setCampaigns(data);
 
       // Derive active social posts from social_media campaigns dynamically
@@ -102,10 +107,12 @@ export default function CampaignsScreen() {
         setSocialPosts([]);
       }
     } catch (err) {
-      console.error('Failed to fetch campaigns:', err);
+      if (requestId === requestSequence.current) {
+        console.error('Failed to fetch campaigns:', err);
+        setLoadError(err instanceof Error ? err.message : 'Failed to load campaigns. Please retry.');
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === requestSequence.current) { setLoading(false); setRefreshing(false); }
     }
   }, [search, statusFilter]);
 
@@ -288,6 +295,7 @@ export default function CampaignsScreen() {
         title="Marketing Campaigns" 
         subtitle="Manage email, social media, and Google Ads campaigns."
       />
+      {loadError ? <View style={{ padding: Spacing.md }}><Text accessibilityRole="alert" style={{ color: colors.danger }}>{loadError}</Text><TouchableOpacity onPress={fetchCampaigns}><Text style={{ color: colors.primary, fontWeight: '700', marginTop: 4 }}>Retry</Text></TouchableOpacity></View> : null}
       {/* Stats Bar */}
       <View style={styles.statsRow}>
         {[

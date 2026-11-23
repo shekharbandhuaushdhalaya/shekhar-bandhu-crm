@@ -2,7 +2,7 @@ import { EmptyState, StatusPill } from './../components/WorkspacePrimitives';
 import { PageHeader } from './../components/PageHeader';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, STAGES, Stage, getStageColors, LightColors, Typography } from '../constants/theme';
@@ -80,6 +80,10 @@ export default function LeadsScreen() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
+  const requestSequence = useRef(0);
   const [addVisible, setAddVisible] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -93,8 +97,14 @@ export default function LeadsScreen() {
   const columnWidth = winWidth > 1100 ? (winWidth - 32 - (Spacing.md * 5)) / 6 : 280;
 
   const load = useCallback(async () => {
-    const c = await api.getContacts();
-    setContacts(c);
+    const requestId = ++requestSequence.current;
+    setLoading(true); setLoadError('');
+    try {
+      const result = await api.getContacts();
+      if (requestId === requestSequence.current) setContacts(Array.isArray(result) ? result : []);
+    } catch (err: any) {
+      if (requestId === requestSequence.current) setLoadError(err.message || 'Failed to load leads. Please retry.');
+    } finally { if (requestId === requestSequence.current) setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -102,13 +112,15 @@ export default function LeadsScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
-    await load();
-    setRefreshing(false);
+    try { await load(); } finally { setRefreshing(false); }
   }, [load]);
 
   const handleMove = async (id: string, newStage: string) => {
-    await api.updateContactStage(id, newStage);
-    await load();
+    if (movingLeadId) return;
+    setMovingLeadId(id);
+    try { await api.updateContactStage(id, newStage); await load(); }
+    catch (err: any) { setLoadError(err.message || 'Could not update the lead stage. Please retry.'); }
+    finally { setMovingLeadId(null); }
   };
 
   // Filter contacts by search query
@@ -128,6 +140,8 @@ export default function LeadsScreen() {
         title="Lead Management" 
         subtitle="Manage and track potential opportunities."
       />
+      {loadError ? <View style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}><Text accessibilityRole="alert" style={{ color: colors.danger }}>{loadError}</Text><TouchableOpacity onPress={load}><Text style={{ color: colors.primary, fontWeight: '700', marginTop: 4 }}>Retry</Text></TouchableOpacity></View> : null}
+      {loading ? <View style={{ padding: Spacing.lg }}><Text style={{ color: colors.text.secondary }}>Loading leads…</Text></View> : null}
       {/* Summary Bar */}
       <View style={styles.summaryBar}>
         <View style={styles.summaryItem}>

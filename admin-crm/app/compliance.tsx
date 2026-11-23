@@ -18,6 +18,9 @@ export default function ComplianceScreen() {
   const styles = useStyles(createStyles);
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [savingEquipment, setSavingEquipment] = useState(false);
+  const [savingCalibration, setSavingCalibration] = useState(false);
   const [data, setData] = useState<any>({ eq: [], dev: [], st: [], rec: [], vq: [], spec: [] });
   const [warehouses, setWarehouses] = useState<any[]>([]);
 
@@ -52,33 +55,24 @@ export default function ComplianceScreen() {
       if (list && list.length > 0) {
         setEqForm(prev => ({ ...prev, manufacturingUnitId: prev.manufacturingUnitId || list[0]._id }));
       }
-    } catch { }
-  }, []);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to load manufacturing units', 'error');
+    }
+  }, [showToast]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const [eq, dev, st, rec, vq, spec] = await Promise.all([
-        api.getManufacturingEquipment().catch(() => []),
-        api.getManufacturingDeviations().catch(() => []),
-        api.getStabilityStudies().catch(() => []),
-        api.getRecalls().catch(() => []),
-        api.getVendorQualifications().catch(() => []),
-        api.getQualitySpecifications().catch(() => []),
-      ]);
-      setData({
-        eq: Array.isArray(eq) ? eq : [],
-        dev: Array.isArray(dev) ? dev : [],
-        st: Array.isArray(st) ? st : [],
-        rec: Array.isArray(rec) ? rec : [],
-        vq: Array.isArray(vq) ? vq : [],
-        spec: Array.isArray(spec) ? spec : [],
-      });
-    } catch {
-      setData({ eq: [], dev: [], st: [], rec: [], vq: [], spec: [] });
-    } finally {
-      setLoading(false);
-    }
+    setLoadError('');
+    const requests = [api.getManufacturingEquipment(), api.getManufacturingDeviations(), api.getStabilityStudies(), api.getRecalls(), api.getVendorQualifications(), api.getQualitySpecifications()];
+    const results = await Promise.allSettled(requests);
+    const keys = ['eq', 'dev', 'st', 'rec', 'vq', 'spec'];
+    const nextData: Record<string, any[]> = {};
+    results.forEach((result, index) => {
+      nextData[keys[index]] = result.status === 'fulfilled' && Array.isArray(result.value) ? result.value : [];
+    });
+    setData(nextData);
+    if (results.some(result => result.status === 'rejected')) setLoadError('Some compliance records could not be loaded. Retry to fetch the missing categories.');
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -91,10 +85,14 @@ export default function ComplianceScreen() {
       showToast('Machine Code and Name are required', 'info');
       return;
     }
+    if (savingEquipment) return;
+    const frequency = Number(eqForm.calibrationFrequencyDays);
+    if (!Number.isFinite(frequency) || frequency <= 0) { showToast('Calibration frequency must be a positive number of days', 'info'); return; }
+    setSavingEquipment(true);
     try {
       await api.createManufacturingEquipment({
         ...eqForm,
-        calibrationFrequencyDays: parseInt(eqForm.calibrationFrequencyDays, 10) || 180,
+        calibrationFrequencyDays: frequency,
         manufacturingUnitId: eqForm.manufacturingUnitId || warehouses[0]?._id
       });
       showToast('Manufacturing equipment / machine registered successfully!', 'success');
@@ -110,11 +108,15 @@ export default function ComplianceScreen() {
       load();
     } catch (err: any) {
       showToast(err.message || 'Failed to register machine', 'error');
-    }
+    } finally { setSavingEquipment(false); }
   };
 
   const handleCalibrateSubmit = async () => {
-    if (!selectedEqId) return;
+    if (!selectedEqId || savingCalibration) return;
+    if (!calibForm.certificateNo.trim() || !calibForm.calibratedBy.trim()) { showToast('Certificate number and calibrated-by details are required', 'info'); return; }
+    const dueDate = new Date(calibForm.nextCalibrationDue);
+    if (!calibForm.nextCalibrationDue || Number.isNaN(dueDate.getTime())) { showToast('Enter a valid next calibration due date', 'info'); return; }
+    setSavingCalibration(true);
     try {
       await api.calibrateEquipment(selectedEqId, calibForm);
       showToast('Equipment calibration log recorded!', 'success');
@@ -124,7 +126,7 @@ export default function ComplianceScreen() {
       load();
     } catch (err: any) {
       showToast(err.message || 'Failed to record calibration', 'error');
-    }
+    } finally { setSavingCalibration(false); }
   };
 
   const cards: [string, any[], ModuleKey, string, string][] = [
@@ -297,6 +299,7 @@ export default function ComplianceScreen() {
         </View>
       </View>
 
+      {loadError ? <Text accessibilityRole="alert" style={{ color: colors.danger, marginBottom: Spacing.sm }}>{loadError}</Text> : null}
       {loading ? (
         <View style={styles.loadingBox}>
           <WorkspaceLoading />
@@ -430,8 +433,8 @@ export default function ComplianceScreen() {
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setAddEquipmentModal(false)}>
                 <Text style={{ color: colors.text.secondary, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleCreateEquipment}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Register Machine</Text>
+              <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleCreateEquipment} disabled={savingEquipment}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{savingEquipment ? 'Registering…' : 'Register Machine'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -495,8 +498,8 @@ export default function ComplianceScreen() {
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setCalibrateModal(false)}>
                 <Text style={{ color: colors.text.secondary, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleCalibrateSubmit}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Save Calibration Log</Text>
+              <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleCalibrateSubmit} disabled={savingCalibration}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{savingCalibration ? 'Saving…' : 'Save Calibration Log'}</Text>
               </TouchableOpacity>
             </View>
           </View>
