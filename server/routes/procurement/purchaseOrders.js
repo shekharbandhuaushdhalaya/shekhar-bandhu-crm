@@ -217,23 +217,84 @@ router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
     const { poId, purchaseInvoiceId } = req.body;
     if (!poId || !purchaseInvoiceId) return res.status(400).json({ error: 'poId and purchaseInvoiceId are required' });
     const [po, grns, invoice] = await Promise.all([
-      PurchaseOrder.findById(poId).lean(), GoodsReceivedNote.find({ poId }).lean(),
+      PurchaseOrder.findById(poId).lean(),
+      GoodsReceivedNote.find({ poId, status: 'verified' }).lean(),
       Invoice.findOne({ _id: purchaseInvoiceId, type: 'purchase' }).lean()
     ]);
     if (!po) return res.status(404).json({ error: 'Purchase Order not found' });
     if (!invoice) return res.status(404).json({ error: 'Purchase Invoice not found' });
-    const totalQtyOrdered = po.items.reduce((s, i) => s + Number(i.qtyOrdered || 0), 0);
-    const totalQtyReceived = grns.reduce((s, g) => s + g.items.reduce((is, item) => is + Number(item.qtyAccepted || 0), 0), 0);
-    const totalQtyBilled = invoice.items.reduce((s, i) => s + Number(i.qty || i.boxes || 0), 0);
-    const qtyMatch = totalQtyReceived >= totalQtyOrdered && totalQtyBilled === totalQtyReceived;
+
+    const sameId = (a, b) => Boolean(a && b && String(a) === String(b));
+    const itemKey = item => item.rawMaterialId ? 'raw:' + String(item.rawMaterialId)
+      : item.productId ? 'product:' + String(item.productId) : null;
+    const receivedByItem = new Map();
+    for (const grn of grns) {
+      for (const item of grn.items || []) {
+        const key = itemKey(item);
+        if (key) receivedByItem.set(key, (receivedByItem.get(key) || 0) + Number(item.qtyAccepted || 0));
+      }
+    }
+
+    const invoiceByItem = new Map();
+    const unlinkedInvoiceItems = [];
+    for (const item of invoice.items || []) {
+      const key = itemKey(item);
+      if (!key) {
+        unlinkedInvoiceItems.push(item.name || 'Unnamed invoice line');
+        continue;
+      }
+      invoiceByItem.set(key, (invoiceByItem.get(key) || 0) + Number(item.qty || item.boxes || 0));
+    }
+
+    const lineMatches = [];
+    for (const poItem of po.items || []) {
+      const key = itemKey(poItem);
+      const received = key ? (receivedByItem.get(key) || 0) : 0;
+      const billed = key ? (invoiceByItem.get(key) || 0) : 0;
+      const ordered = Number(poItem.qtyOrdered || 0);
+      const unitCompatible = (invoice.items || []).filter(item => itemKey(item) === key)
+        .every(item => !item.unit || !poItem.unit || String(item.unit).trim().toLowerCase() === String(poItem.unit).trim().toLowerCase());
+      const receivedEnough = received >= ordered;
+      const billedMatchesReceived = billed === received;
+      lineMatches.push({
+        item: poItem.name,
+        rawMaterialId: poItem.rawMaterialId || null,
+        productId: poItem.productId || null,
+        unit: poItem.unit || '',
+        ordered,
+        accepted: received,
+        billed,
+        receivedEnough,
+        billedMatchesReceived,
+        unitCompatible,
+        matched: Boolean(key) && receivedEnough && billedMatchesReceived && unitCompatible
+      });
+    }
+
+    const vendorMatches = invoice.vendorId
+      ? sameId(invoice.vendorId, po.vendorId)
+      : String(invoice.supplierName || '').trim().toLowerCase() === String(po.vendorName || '').trim().toLowerCase();
+    const qtyMatch = lineMatches.length > 0 && lineMatches.every(line => line.matched) && unlinkedInvoiceItems.length === 0;
     const amountMatch = Math.abs(Number(po.totalAmount || 0) - Number(invoice.amount || 0)) <= 10;
+    const matchStatus = qtyMatch && amountMatch && vendorMatches ? 'MATCHED' : 'DISCREPANCY_FOUND';
+    const reasons = [];
+    if (!vendorMatches) reasons.push('Supplier on invoice does not match the purchase order');
+    if (!qtyMatch) reasons.push('One or more PO lines do not reconcile to accepted GRN and billed invoice quantities');
+    if (!amountMatch) reasons.push('Purchase invoice amount differs from the PO total by more than ₹10');
+    if (unlinkedInvoiceItems.length) reasons.push('Invoice contains lines without a raw-material or product reference');
+
     res.json({
-      matchStatus: qtyMatch && amountMatch ? 'MATCHED' : 'DISCREPANCY_FOUND', poNo: po.poNo, invoiceNo: invoice.invoiceNo,
-      poAmount: po.totalAmount, invoiceAmount: invoice.amount, totalQtyOrdered, totalQtyReceived, totalQtyBilled,
-      qtyMatch, amountMatch,
-      discrepancyReason: qtyMatch && amountMatch ? null : (!qtyMatch
-        ? `Quantity Discrepancy: Received ${totalQtyReceived}, Billed ${totalQtyBilled}, Ordered ${totalQtyOrdered}`
-        : `Price Discrepancy: PO Total ₹${po.totalAmount} vs Invoice Total ₹${invoice.amount}`)
+      matchStatus,
+      poNo: po.poNo,
+      invoiceNo: invoice.invoiceNo,
+      poAmount: po.totalAmount,
+      invoiceAmount: invoice.amount,
+      vendorMatches,
+      qtyMatch,
+      amountMatch,
+      lineMatches,
+      unlinkedInvoiceItems,
+      discrepancyReason: reasons.length ? reasons.join('; ') : null
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
