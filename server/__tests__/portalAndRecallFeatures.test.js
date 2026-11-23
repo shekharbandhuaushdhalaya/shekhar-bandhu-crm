@@ -10,7 +10,7 @@ jest.mock('../models/Recall');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/RolePermission');
 jest.mock('../utils/whatsappService', () => ({
-  safeEscapeRegex: value => String(value || '').replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\jest.mock('../models/RolePermission');'),
+  safeEscapeRegex: value => String(value || ''),
   sendWhatsAppNotification: jest.fn().mockResolvedValue({ success: true, sid: 'SM-TEST' })
 }));
 // Order tracking now resolves dispatches through the authoritative Challan
