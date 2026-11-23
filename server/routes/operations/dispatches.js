@@ -25,7 +25,7 @@ async function nextDispatchNo() {
 }
 
 function logisticsFields(body = {}) {
-  const allowed = ['transporter','lrNo','vehicleNo','courierName','trackingId','trackingUrl','totalBoxes','totalWeight','freightCharge','status','notes','dispatchDate'];
+  const allowed = ['transporter','lrNo','vehicleNo','courierName','trackingId','trackingUrl','totalBoxes','totalWeight','freightCharge','status','notes','dispatchDate','proofOfDelivery'];
   return Object.fromEntries(allowed.filter(k => Object.prototype.hasOwnProperty.call(body, k)).map(k => [k, body[k]]));
 }
 
@@ -116,8 +116,15 @@ router.patch('/:id', authorize('dispatch:edit'), validate(schemas.dispatchSchema
       const allowed = TRANSITIONS[dispatch.status] || new Set([dispatch.status]);
       if (!allowed.has(req.body.status)) return res.status(409).json({ error: `Invalid dispatch status transition: ${dispatch.status} → ${req.body.status}`, code: 'INVALID_DISPATCH_TRANSITION' });
     }
+    const requestedStatus = req.body.status || dispatch.status;
+    const pod = req.body.proofOfDelivery || dispatch.proofOfDelivery || {};
+    if (requestedStatus === 'delivered') {
+      if (!String(pod.recipientName || '').trim() || !pod.receivedAt || !['accepted', 'damaged', 'shortage', 'refused'].includes(pod.condition)) return res.status(400).json({ error: 'Delivery requires recipientName, receivedAt and delivery condition', code: 'POD_REQUIRED' });
+      if (['damaged', 'shortage', 'refused'].includes(pod.condition) && !String(pod.notes || '').trim()) return res.status(400).json({ error: 'Delivery exception notes are required', code: 'POD_EXCEPTION_NOTES_REQUIRED' });
+    }
+    if (dispatch.status === 'delivered' && req.body.proofOfDelivery) return res.status(409).json({ error: 'Proof of delivery is immutable after delivery is recorded', code: 'POD_IMMUTABLE' });
     Object.assign(dispatch, logisticsFields(req.body));
-    if (dispatch.status === 'delivered' && !dispatch.deliveredAt) dispatch.deliveredAt = new Date();
+    if (requestedStatus === 'delivered' && !dispatch.deliveredAt) dispatch.deliveredAt = pod.receivedAt || new Date();
     await dispatch.save();
     await recomputeOrderLogisticsFromChallan(dispatch.challanId);
     if (req.io) req.io.emit('dispatch_updated', { type: 'updated', id: dispatch._id });

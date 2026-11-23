@@ -39,20 +39,7 @@ router.post('/', authorize('quality:create'), async (req, res) => {
     const BatchProduction = require('../../models/BatchProduction');
     const { batchNo, productName, manufacturingDate, expiryDate, testingDate, specificationId, tests, remarks, heavyMetalTests } = req.body;
     
-    if (!specificationId) {
-      const coa = await CertificateOfAnalysis.create({
-        coaNumber: req.body.coaNumber || await generateAtomicDocumentNumber('coaNumber', 'COA-', 6),
-        batchNo: (batchNo || '').trim(),
-        productName: (productName || '').trim(),
-        manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : new Date(),
-        expiryDate: expiryDate ? new Date(expiryDate) : new Date(),
-        heavyMetalTests: heavyMetalTests || { passed: true },
-        status: req.body.status || 'approved',
-        testedBy: req.user?.name || 'QC Analyst',
-        remarks: remarks || ''
-      });
-      return res.status(201).json(coa);
-    }
+    if (!specificationId) return res.status(400).json({ error: 'An approved product-specific quality specification is required before a Certificate of Analysis can be created', code: 'COA_SPECIFICATION_REQUIRED' });
 
     if (!batchNo || !productName || !manufacturingDate || !expiryDate) return res.status(400).json({ error:'batchNo, productName, manufacturingDate, expiryDate are required' });
     const spec=await ProductQualitySpecification.findById(specificationId).lean();

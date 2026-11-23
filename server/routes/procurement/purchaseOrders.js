@@ -2,6 +2,7 @@ const express = require('express');
 const PurchaseOrder = require('../../models/PurchaseOrder');
 const GoodsReceivedNote = require('../../models/GoodsReceivedNote');
 const Vendor = require('../../models/Vendor');
+const VendorQualification = require('../../models/VendorQualification');
 const Warehouse = require('../../models/Warehouse');
 const RawMaterial = require('../../models/RawMaterial');
 const RawMaterialEntry = require('../../models/RawMaterialEntry');
@@ -53,12 +54,45 @@ router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchem
     const po = await PurchaseOrder.create({
       poNo, vendorId, vendorName: resolvedVendorName, orderDate: new Date(), items: processedItems,
       subtotal: Number(subtotal.toFixed(2)), taxAmount: Number(taxAmount.toFixed(2)),
-      totalAmount: Number((subtotal + taxAmount).toFixed(2)), status: 'approved', notes,
-      createdBy: req.user?.name || 'System'
+      totalAmount: Number((subtotal + taxAmount).toFixed(2)), status: 'draft', notes,
+      createdBy: req.user?.name || 'System', createdByUserId: req.user?.id || null
     });
     req.io?.emit('po_updated', { type: 'created', id: po._id });
     res.status(201).json(po);
   } catch (err) { res.status(err.statusCode || 400).json({ error: err.message }); }
+});
+
+
+router.patch('/:id/approve', authorize('vendor:edit'), async (req, res) => {
+  try {
+    const po = await PurchaseOrder.findById(req.params.id);
+    if (!po) return res.status(404).json({ error: 'Purchase Order not found' });
+    if (po.status !== 'draft') return res.status(409).json({ error: 'Only draft purchase orders can be approved' });
+    const approverId = req.user?.id;
+    if (!approverId) return res.status(403).json({ error: 'Authenticated approver identity is required' });
+    if (po.createdByUserId && String(po.createdByUserId) === String(approverId)) {
+      return res.status(403).json({ error: 'Purchase order creator cannot approve their own purchase order', code: 'PO_MAKER_CHECKER_REQUIRED' });
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (const item of po.items.filter(line => line.rawMaterialId)) {
+      const qualified = await VendorQualification.findOne({
+        vendorId: po.vendorId, qualificationStatus: 'approved',
+        nextAuditDue: { $gte: today }, rawMaterialIds: item.rawMaterialId
+      }).lean();
+      if (!qualified) return res.status(409).json({
+        error: 'Vendor has no current approved qualification for raw material ' + item.name,
+        code: 'VENDOR_MATERIAL_NOT_QUALIFIED', rawMaterialId: item.rawMaterialId
+      });
+    }
+    po.status = 'approved';
+    po.approvedByUserId = approverId;
+    po.approvedBy = req.user?.name || req.user?.email || 'Approver';
+    po.approvedAt = new Date();
+    await po.save();
+    req.io?.emit('po_updated', { type: 'approved', id: po._id });
+    res.json(po);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Create a GRN and inward accepted goods atomically. Accepted receipts remain under_test
@@ -68,8 +102,8 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
     const result = await withTransaction(async session => {
       const po = await PurchaseOrder.findById(req.params.id).session(session);
       if (!po) throw Object.assign(new Error('Purchase Order not found'), { statusCode: 404 });
-      if (['cancelled', 'completed'].includes(po.status)) {
-        throw Object.assign(new Error(`Cannot receive goods against a ${po.status} purchase order`), { statusCode: 409 });
+      if (!['approved', 'partially_received'].includes(po.status)) {
+        throw Object.assign(new Error('Goods can only be received against an approved purchase order'), { statusCode: 409 });
       }
 
       const wh = await Warehouse.findById(req.body.warehouseId).session(session);

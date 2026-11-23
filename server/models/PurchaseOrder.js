@@ -29,7 +29,11 @@ const purchaseOrderSchema = new mongoose.Schema({
     default: 'draft' 
   },
   notes: { type: String, default: '', trim: true },
-  createdBy: { type: String, default: 'System' }
+  createdBy: { type: String, default: 'System' },
+  createdByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  approvedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  approvedBy: { type: String, default: '' },
+  approvedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 purchaseOrderSchema.index({ poNo: 'text', vendorName: 'text', status: 'text' });
