@@ -6,6 +6,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 
 const Customer = require('../models/Customer');
 const Invoice = require('../models/Invoice');
+const Firm = require('../models/Firm');
 const portalAuthRoutes = require('../routes/public/portalAuth');
 const portalRoutes = require('../routes/portal/portal');
 
@@ -32,6 +33,8 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
 
   beforeEach(async () => {
     await Customer.deleteMany({});
+    await Firm.deleteMany({});
+    global.portalTestFirm = await Firm.create({ name: 'Portal Test Firm' });
     await Invoice.deleteMany({});
   });
 
@@ -41,7 +44,8 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
       name: 'Disabled Customer',
       email: 'disabled@customer.com',
       passwordHash,
-      portalEnabled: false
+      portalEnabled: false,
+      firmId: global.portalTestFirm._id
     });
 
     const res = await request(app)
@@ -58,7 +62,8 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
       name: 'Varanasi Ayurveda Stores',
       email: 'store@varanasiayurveda.com',
       passwordHash,
-      portalEnabled: true
+      portalEnabled: true,
+      firmId: global.portalTestFirm._id
     });
 
     const res = await request(app)
@@ -78,7 +83,8 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
       name: 'Customer A Pharmacy',
       email: 'customerA@test.com',
       passwordHash,
-      portalEnabled: true
+      portalEnabled: true,
+      firmId: global.portalTestFirm._id
     });
 
     // Customer B (Other customer)
@@ -96,6 +102,7 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
       isFinalized: true,
       customerId: custA._id,
       customerName: custA.name,
+      firmId: global.portalTestFirm._id,
       amount: 12000,
       nettTotal: 12000,
       date: new Date()
@@ -107,6 +114,7 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
       isFinalized: true,
       customerId: custB._id,
       customerName: custB.name,
+      firmId: global.portalTestFirm._id,
       amount: 45000,
       nettTotal: 45000,
       date: new Date()
@@ -141,7 +149,8 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
       .get(`/api/portal/invoices/${invB._id}/pdf`)
       .set('Authorization', `Bearer ${tokenA}`);
 
-    expect(pdfResB.status).toBe(403);
-    expect(pdfResB.body.error).toContain('Forbidden');
+    // Customer-scoped lookups deliberately return 404 to avoid disclosing another customer's invoice.
+    expect(pdfResB.status).toBe(404);
+    expect(pdfResB.body.error).toContain('Invoice not found');
   });
 });

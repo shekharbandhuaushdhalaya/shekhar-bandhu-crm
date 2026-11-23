@@ -897,9 +897,10 @@ function VendorLedgerModal({
       setRows([...finalRows].reverse());
       setInitialBalance(periodInitialBalance);
       setClosingBalance(periodClosingBalance);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error loading vendor ledger:", err);
       setRows([]);
+      alert(err.message || 'Failed to load vendor ledger. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -1309,23 +1310,25 @@ export default function VendorsScreen() {
   const limit = 50;
 
   const load = useCallback(async () => {
-    const res = await api.getVendors(debouncedSearch, page, limit);
-    if (res && res.data) {
-      if (page === 1) {
-        setVendors(res.data);
-      } else {
-        setVendors(prev => {
+    try {
+      const res = await api.getVendors(debouncedSearch, page, limit);
+      if (res && res.data) {
+        if (page === 1) setVendors(res.data);
+        else setVendors(prev => {
           const existingIds = new Set(prev.map(v => v._id));
-          const newVendors = res.data.filter((v: any) => !existingIds.has(v._id));
-          return [...prev, ...newVendors];
+          return [...prev, ...res.data.filter((v: any) => !existingIds.has(v._id))];
         });
+        setTotalPages(res.totalPages || 1);
+      } else {
+        setVendors(Array.isArray(res) ? res : []);
+        setTotalPages(1);
       }
-      setTotalPages(res.totalPages || 1);
-    } else {
-      setVendors(Array.isArray(res) ? res : []);
-      setTotalPages(1);
+    } catch (err: any) {
+      alert(err.message || 'Failed to load vendors. Please retry.');
+    } finally {
+      setListLoading(false);
+      setRefreshing(false);
     }
-    setListLoading(false);
   }, [debouncedSearch, page]);
 
   useEffect(() => { setPage(1); }, [debouncedSearch]);
@@ -1336,7 +1339,6 @@ export default function VendorsScreen() {
     setRefreshing(true);
     api.clearCache();
     await load();
-    setRefreshing(false);
   }, [load]);
 
   if (perm.permissions && !perm.can('vendor:view')) {

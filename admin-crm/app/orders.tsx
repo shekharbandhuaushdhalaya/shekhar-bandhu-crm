@@ -9,7 +9,7 @@ import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, DeviceEventEmitter, Platform, useWindowDimensions, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -37,6 +37,8 @@ export default function OrdersScreen() {
 
   const [page, setPage] = useListState('orders_page', 1);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const loadRequestRef = useRef(0);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Detail Modal State
@@ -74,8 +76,11 @@ export default function OrdersScreen() {
   const limit = 50;
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
+    setLoading(true);
     try {
       const res = await api.getOrders(page, limit);
+      if (requestId !== loadRequestRef.current) return;
       if (res && res.data) {
         if (page === 1) {
           setOrders(res.data);
@@ -91,13 +96,17 @@ export default function OrdersScreen() {
         setOrders(Array.isArray(res) ? res : []);
         setTotalPages(1);
       }
+      setLoadError('');
     } catch (err: any) {
-      console.error(err);
-      showToast('Failed to load orders: ' + err.message, 'error');
+      if (requestId === loadRequestRef.current) {
+        setLoadError(err.message || 'Unable to load orders. Please retry.');
+        console.error(err);
+        showToast('Failed to load orders: ' + err.message, 'error');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-  }, [page]);
+  }, [page, showToast]);
 
   useEffect(() => {
     load();
@@ -105,6 +114,7 @@ export default function OrdersScreen() {
     const sub2 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
     const sub3 = DeviceEventEmitter.addListener('order_updated_event', () => load());
     return () => {
+      loadRequestRef.current += 1;
       sub1.remove();
       sub2.remove();
       sub3.remove();
@@ -114,8 +124,11 @@ export default function OrdersScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
-    await load();
-    setRefreshing(false);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   const handleUpdateStatus = async (id: string, newStatus: 'pending' | 'processing') => {
@@ -354,6 +367,12 @@ export default function OrdersScreen() {
       />
 
       <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: 40 }}>
+        {loadError ? (
+          <View style={{ padding: Spacing.md, marginBottom: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.danger + '10', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <Text style={{ ...Typography.bodySm, color: colors.danger, flex: 1 }}>{loadError}</Text>
+            <TouchableOpacity onPress={load}><Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Retry</Text></TouchableOpacity>
+          </View>
+        ) : null}
         <DataTable
           data={filteredOrders || []}
           columns={columns}

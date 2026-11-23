@@ -9,6 +9,10 @@ jest.mock('../models/RetentionSample');
 jest.mock('../models/Recall');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/RolePermission');
+jest.mock('../utils/whatsappService', () => ({
+  safeEscapeRegex: value => String(value || ''),
+  sendWhatsAppNotification: jest.fn().mockResolvedValue({ success: true, sid: 'SM-TEST' })
+}));
 // Order tracking now resolves dispatches through the authoritative Challan
 // (posted, finalized) instead of a direct Order->Dispatch lookup; see
 // routes/portal/portal.js. Mock Challan so Challan.find() doesn't hang
@@ -25,7 +29,7 @@ jest.mock('../middleware/authenticatePortalCustomer', () => ({
   }
 }));
 jest.mock('../services/smsFallbackService', () => ({
-  sendMultiChannelNotification: jest.fn().mockResolvedValue(true)
+  sendMultiChannelNotification: jest.fn().mockResolvedValue({ success: true, channel: 'whatsapp', simulated: false })
 }));
 
 const MrVisit = require('../models/MrVisit');

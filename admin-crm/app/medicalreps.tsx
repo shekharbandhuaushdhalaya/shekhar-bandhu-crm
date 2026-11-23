@@ -127,7 +127,7 @@ export default function MedicalRepsScreen() {
   const [dateRange, setDateRange] = useState('thisMonth');
 
   const loadProducts = useCallback(async () => {
-    try { setProducts(await api.getProducts()); } catch { }
+    try { setProducts(await api.getProducts()); } catch (err: any) { showToast(err?.message || 'Unable to load products', 'error'); }
   }, []);
 
   const loadMrs = useCallback(async () => {
@@ -141,27 +141,27 @@ export default function MedicalRepsScreen() {
         const defaultMrId = loggedInMr ? loggedInMr._id : active[0]._id;
         setSelectedMrId(prev => prev || defaultMrId);
       }
-    } catch { } finally { setLoading(false); }
+    } catch (err: any) { showToast(err?.message || 'Unable to load medical representatives', 'error'); } finally { setLoading(false); }
   }, [mrSearch, user]);
 
   const loadAssignments = useCallback(async (mrId: string) => {
     if (!mrId) return;
-    try { setAssignments(await api.getMrAssignments(mrId)); } catch { setAssignments([]); }
+    try { setAssignments(await api.getMrAssignments(mrId)); } catch (err: any) { setAssignments([]); showToast(err?.message || 'Unable to load portfolio assignments', 'error'); }
   }, []);
 
   const loadAttendance = useCallback(async (mrId: string) => {
     if (!mrId) return;
-    try { setAttendanceLogs(await api.getMrAttendance(mrId)); } catch { }
+    try { setAttendanceLogs(await api.getMrAttendance(mrId)); } catch (err: any) { showToast(err?.message || 'Unable to load attendance records', 'error'); }
   }, []);
 
   const loadVisits = useCallback(async (mrId: string) => {
     if (!mrId) return;
-    try { setVisits(await api.getMrVisits(mrId)); } catch { }
+    try { setVisits(await api.getMrVisits(mrId)); } catch (err: any) { showToast(err?.message || 'Unable to load visit records', 'error'); }
   }, []);
 
   const loadExpenses = useCallback(async (mrId: string) => {
     if (!mrId) return;
-    try { setExpenses(await api.getMrExpenses(mrId)); } catch { }
+    try { setExpenses(await api.getMrExpenses(mrId)); } catch (err: any) { showToast(err?.message || 'Unable to load expense claims', 'error'); }
   }, []);
 
   const loadDashboard = useCallback(async () => {
@@ -181,8 +181,8 @@ export default function MedicalRepsScreen() {
         to = now.toISOString();
       }
       setDashboard(await api.getMrDashboard(from, to));
-    } catch { }
-  }, [dateRange]);
+    } catch (err: any) { showToast(err?.message || 'Unable to load medical representative dashboard', 'error'); }
+  }, [dateRange, showToast]);
 
   useEffect(() => {
     loadMrs();

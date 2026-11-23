@@ -31,6 +31,21 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       return res.status(400).json({ error: 'title, manufacturingUnitId, manufacturingUnitName, and plannedBatches array are required' });
     }
 
+    const parsedStartDate = new Date(startDate || Date.now());
+    const parsedEndDate = new Date(endDate || Date.now() + 7 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(parsedStartDate.getTime()) || Number.isNaN(parsedEndDate.getTime())) {
+      return res.status(400).json({ error: 'startDate and endDate must be valid dates' });
+    }
+    if (parsedEndDate < parsedStartDate) {
+      return res.status(400).json({ error: 'endDate cannot be earlier than startDate' });
+    }
+    for (const [index, batch] of plannedBatches.entries()) {
+      const quantity = Number(batch.plannedQty);
+      if (!batch.productId || !Number.isFinite(quantity) || quantity < 1) {
+        return res.status(400).json({ error: `plannedBatches[${index}] must include a productId and plannedQty of at least 1` });
+      }
+    }
+
     const fy = `${new Date().getFullYear() % 100}-${(new Date().getFullYear() + 1) % 100}`;
     const planNo = await generateAtomicDocumentNumber(`productionPlan_${fy}`, `PLN/${fy}/`, 5);
     const manufacturingWarehouse = await resolveManufacturingWarehouse(manufacturingUnitId);
@@ -39,16 +54,29 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
     const rawMaterialNeeds = new Map(); // rawMaterialId -> totalNeeded
 
     for (const pb of plannedBatches) {
-      const bom = await BillOfMaterials.findOne({ productId: pb.productId, isActive: true }).lean();
-      if (bom && bom.ingredients) {
-        const yieldSize = bom.batchYieldQty || 100;
-        const multiplier = (pb.plannedQty || 100) / yieldSize;
-        for (const ing of bom.ingredients) {
-          const rmId = ing.rawMaterialId ? ing.rawMaterialId.toString() : null;
-          if (!rmId) continue;
-          const needed = (ing.qtyRequired || 0) * multiplier;
-          rawMaterialNeeds.set(rmId, (rawMaterialNeeds.get(rmId) || 0) + needed);
+      const bom = await BillOfMaterials.findOne({ productId: pb.productId, isActive: true })
+        .sort({ isDefault: -1, updatedAt: -1 })
+        .lean();
+      if (!bom) {
+        return res.status(400).json({ error: `No active recipe found for planned product ${pb.productName || pb.productId}` });
+      }
+      if (!Array.isArray(bom.ingredients) || bom.ingredients.length === 0) {
+        return res.status(400).json({ error: `Active recipe for ${pb.productName || pb.productId} has no ingredients` });
+      }
+      const yieldSize = Number(bom.batchYieldQty) || 100;
+      if (yieldSize <= 0) {
+        return res.status(400).json({ error: `Active recipe for ${pb.productName || pb.productId} has an invalid batch yield` });
+      }
+      const multiplier = Number(pb.plannedQty) / yieldSize;
+      for (const ing of bom.ingredients) {
+        const rmId = ing.rawMaterialId ? ing.rawMaterialId.toString() : null;
+        if (!rmId) continue;
+        const requiredPerYield = Number(ing.qtyRequired);
+        if (!Number.isFinite(requiredPerYield) || requiredPerYield < 0) {
+          return res.status(400).json({ error: `Active recipe for ${pb.productName || pb.productId} has an invalid ingredient quantity` });
         }
+        const needed = requiredPerYield * multiplier;
+        rawMaterialNeeds.set(rmId, (rawMaterialNeeds.get(rmId) || 0) + needed);
       }
     }
 
@@ -83,8 +111,8 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       title,
       manufacturingUnitId,
       manufacturingUnitName,
-      startDate: new Date(startDate || Date.now()),
-      endDate: new Date(endDate || Date.now() + 7 * 24 * 60 * 60 * 1000),
+      startDate: parsedStartDate,
+      endDate: parsedEndDate,
       plannedBatches,
       rawMaterialSufficiencyStatus: shortageDetected ? 'shortage_detected' : 'sufficient',
       shortageDetails,
@@ -103,7 +131,15 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
 router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { status } = req.body;
-    const plan = await ProductionPlan.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    const allowedStatuses = ['draft', 'approved', 'in_production', 'completed', 'cancelled'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid production plan status' });
+    }
+    const plan = await ProductionPlan.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true, runValidators: true }
+    );
     if (!plan) return res.status(404).json({ error: 'Production plan not found' });
     res.json(plan);
   } catch (err) {

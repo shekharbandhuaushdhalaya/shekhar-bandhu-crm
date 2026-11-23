@@ -7,6 +7,7 @@ const RawMaterialEntry = require('../models/RawMaterialEntry');
 
 const app = express();
 app.use(express.json());
+app.use((req, res, next) => { req.user = { id: new mongoose.Types.ObjectId().toString(), role: 'admin' }; next(); });
 app.use('/api/raw-materials', rawMaterialRoutes);
 
 const { MongoMemoryServer } = require('mongodb-memory-server');

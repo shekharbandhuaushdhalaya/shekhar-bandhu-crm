@@ -457,8 +457,9 @@ export default function ManufacturingScreen() {
           break;
         }
       }
-    } catch {
+    } catch (err: any) {
       loadedRef.current.delete(key); // allow retry on failure
+      showToast(err?.message || `Unable to load manufacturing data: ${key}`, 'error');
     }
   }, [mfgUnitFilter, materialSearch, showToast]);
 
@@ -573,7 +574,9 @@ export default function ManufacturingScreen() {
       if (data?._id) setBatches(prev => prev.map(b => b._id === data._id ? data : b));
     });
     const sub5 = DeviceEventEmitter.addListener('qc_hold_alert_event', () => {
-      api.getRawMaterialExpiryAlerts().then(setExpiryAlerts).catch(() => {});
+      api.getRawMaterialExpiryAlerts().then(setExpiryAlerts).catch((err: any) => {
+        showToast(err?.message || 'Unable to refresh raw-material expiry alerts.', 'error');
+      });
     });
     const sub6 = DeviceEventEmitter.addListener('inventory_updated_event', () => {
       if (inventoryDebounceRef.current) clearTimeout(inventoryDebounceRef.current);
@@ -586,7 +589,9 @@ export default function ManufacturingScreen() {
         ]).then(([rms, ents]) => {
           setMaterials(rms);
           setEntries(ents);
-        }).catch(() => {});
+        }).catch((err: any) => {
+          showToast(err?.message || 'Unable to refresh manufacturing inventory data.', 'error');
+        });
       }, 800);
     });
 
@@ -595,7 +600,7 @@ export default function ManufacturingScreen() {
       sub4.remove(); sub5.remove(); sub6.remove();
       if (inventoryDebounceRef.current) clearTimeout(inventoryDebounceRef.current);
     };
-  }, [mfgUnitFilter]);
+  }, [mfgUnitFilter, showToast]);
 
   const refreshCurrentTab = useCallback(() => {
     loadedRef.current.clear();
@@ -1087,7 +1092,9 @@ export default function ManufacturingScreen() {
 
       // Load products for yield editor (packaging stage)
       if (isPacking) {
-        api.getProducts().then(prods => setProductsForYield(prods || [])).catch(() => {});
+        api.getProducts().then(prods => setProductsForYield(prods || [])).catch((err: any) => {
+          showToast(err?.message || 'Unable to load products for yield calculation.', 'error');
+        });
       } else {
         setStageYields([]);
       }
@@ -1792,12 +1799,25 @@ export default function ManufacturingScreen() {
     return <View style={styles.screen} />;
   }
 
+  const materialQuery = materialSearch.trim().toLowerCase();
   const filteredMaterials = materials.filter(rm => {
-    const matchText = (rm.name || '').toLowerCase().includes(materialSearch.toLowerCase()) ||
-      (rm.sku || '').toLowerCase().includes(materialSearch.toLowerCase());
+    const searchableValues = [
+      rm.name,
+      rm.sku,
+      rm.category,
+      rm.materialType,
+      rm.botanicalName,
+      rm.acceptedScientificName,
+      rm.partUsed,
+      ...(Array.isArray(rm.commonNames) ? rm.commonNames : []),
+      ...(Array.isArray(rm.botanicalSynonyms) ? rm.botanicalSynonyms : [])
+    ];
+    const matchText = !materialQuery || searchableValues.some(value =>
+      String(value || '').toLowerCase().includes(materialQuery)
+    );
     if (!matchText) return false;
     if (stockFilter === 'low') {
-      return (rm.stockLevel || 0) < rm.minReorder;
+      return (rm.stockLevel || 0) < (Number(rm.minReorder) || 0);
     }
     if (stockFilter === 'in_stock') {
       return (rm.stockLevel || 0) > 0;

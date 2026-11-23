@@ -30,8 +30,10 @@ module.exports = function tenantPlugin(schema) {
     const firmId = getFirmId();
     if (!firmId) return;
     const query = this.getQuery ? this.getQuery() : {};
-    // Always force the active tenant. Never honor a caller-supplied different firmId.
-    this.setQuery({ ...query, firmId });
+    // Keep tenant scope as an independent predicate. Merging with object spread
+    // can replace an existing firmId condition and makes caller filters ambiguous.
+    // The $and guarantees that a caller-supplied tenant can never widen access.
+    this.setQuery({ $and: [query, { firmId }] });
   }
 
   [

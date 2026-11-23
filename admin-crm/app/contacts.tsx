@@ -329,22 +329,33 @@ export default function ContactsScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const loadRequestRef = useRef(0);
 
   const load = useCallback(async (resetPage = true) => {
+    const requestId = ++loadRequestRef.current;
     const targetPage = resetPage ? 1 : page;
-    const res = await api.getContacts(search, filterStage, targetPage, 25);
-    const list = Array.isArray(res) ? res : (res?.data || []);
-    const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
+    setLoadError('');
+    setLoading(true);
+    try {
+      const res = await api.getContacts(search, filterStage, targetPage, 25);
+      if (requestId !== loadRequestRef.current) return;
+      const list = Array.isArray(res) ? res : (res?.data || []);
+      const totalP = res && !Array.isArray(res) && res.totalPages ? res.totalPages : 1;
 
-    if (resetPage) {
-      setContacts(list);
-      setPage(1);
-    } else {
-      setContacts(prev => [...prev, ...list]);
+      if (resetPage) {
+        setContacts(list);
+        setPage(1);
+      } else {
+        setContacts(prev => [...prev, ...list]);
+      }
+      setTotalPages(totalP);
+      setHasMore(targetPage < totalP || list.length === 25);
+    } catch (err: any) {
+      if (requestId === loadRequestRef.current) setLoadError(err?.message || 'Unable to load contacts. Please try again.');
+    } finally {
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-    setTotalPages(totalP);
-    setHasMore(targetPage < totalP || list.length === 25);
-    setLoading(false);
   }, [search, filterStage, page]);
 
   useEffect(() => { load(true); }, [search, filterStage]);
@@ -361,6 +372,9 @@ export default function ContactsScreen() {
       setPage(nextPage);
       setTotalPages(totalP);
       setHasMore(nextPage < totalP || list.length === 25);
+      setLoadError('');
+    } catch (err: any) {
+      setLoadError(err?.message || 'Unable to load more contacts. Please try again.');
     } finally {
       setLoadingMore(false);
     }
@@ -369,8 +383,11 @@ export default function ContactsScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
-    await load(true);
-    setRefreshing(false);
+    try {
+      await load(true);
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   return (
@@ -380,6 +397,14 @@ export default function ContactsScreen() {
         subtitle="Manage leads, prospects, and established customers."
       />
       <View style={styles.innerContainer}>
+        {loadError ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, marginBottom: 10, borderRadius: 10, backgroundColor: colors.dangerLight }}>
+            <Text style={{ color: colors.danger, flex: 1 }}>{loadError}</Text>
+            <TouchableOpacity onPress={() => load(true)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ color: colors.danger, fontWeight: '700' }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         <View style={{ zIndex: 1100, position: 'relative' }}>
           {showFilterDropdown && (
             <Pressable

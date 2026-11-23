@@ -23,4 +23,4 @@ const path = require('path');
     process.exit(1);
   }
   console.log(JSON.stringify({ ok: true, models: mongoose.modelNames().length }));
-})().catch(async error => { console.error(error.stack || error.message); try { await mongoose.disconnect(); } catch (_) {} process.exit(1); });
+})().catch(async error => { console.error(error.stack || error.message); await mongoose.disconnect().catch(() => undefined); process.exit(1); });

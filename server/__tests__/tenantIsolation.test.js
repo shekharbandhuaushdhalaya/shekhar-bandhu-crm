@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const Firm = require('../models/Firm');
 const Product = require('../models/Product');
-const { runWithTenant } = require('../utils/tenantContext');
+const { runWithTenant, getFirmId } = require('../utils/tenantContext');
 
 let mongoServer;
 
@@ -41,12 +41,21 @@ describe('tenant isolation regression', () => {
       stockLevel: 7
     }));
 
-    const visibleToA = await runWithTenant({ firmId: firmA._id }, () => Product.find({}).lean());
+    const visibleToA = await runWithTenant({ firmId: firmA._id }, async () => {
+      expect(String(getFirmId())).toBe(String(firmA._id));
+      return Product.find({}).lean();
+    });
     expect(visibleToA).toHaveLength(1);
     expect(String(visibleToA[0]._id)).toBe(String(productA._id));
 
-    const crossTenantLookup = await runWithTenant({ firmId: firmA._id }, () => Product.findById(productB._id).lean());
+    const crossTenantLookup = await runWithTenant({ firmId: firmA._id }, async () => await Product.findById(productB._id).lean());
     expect(crossTenantLookup).toBeNull();
+
+    const attemptedTenantOverride = await runWithTenant(
+      { firmId: firmA._id },
+      async () => await Product.find({ firmId: firmB._id }).lean()
+    );
+    expect(attemptedTenantOverride).toHaveLength(0);
 
     await expect(runWithTenant({ firmId: firmA._id }, () => Product.create({
       firmId: firmB._id,

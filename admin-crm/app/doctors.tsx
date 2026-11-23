@@ -3,7 +3,7 @@ import { PageHeader } from './../components/PageHeader';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, ScrollView, ActivityIndicator, Modal, RefreshControl, useWindowDimensions, Platform, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../utils/auth';
@@ -41,6 +41,7 @@ export default function DoctorsScreen() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalDoctors, setTotalDoctors] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const requestSequence = useRef(0);
 
   // Classification Matrix & Events
   const [matrixReport, setMatrixReport] = useState<any[]>([]);
@@ -79,16 +80,20 @@ export default function DoctorsScreen() {
     try {
       const data = await api.getMRs('', 'true');
       setMrs(data);
-    } catch { }
-  }, []);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load medical representatives. Please retry.', 'error');
+    }
+  }, [showToast]);
 
   const loadDoctors = useCallback(async (targetPage = 1, isAppend = false) => {
+    const requestId = ++requestSequence.current;
     if (targetPage === 1) setLoading(true);
     else setLoadingMore(true);
 
     try {
       const catParam = selectedCategory !== 'all' ? selectedCategory : undefined;
       const res = await api.getDoctors(debouncedSearch, catParam, undefined, targetPage, 25);
+      if (requestId !== requestSequence.current) return;
       
       if (Array.isArray(res)) {
         setDoctors(res);
@@ -110,10 +115,9 @@ export default function DoctorsScreen() {
         setPage(res?.page ?? targetPage);
       }
     } catch (err: any) {
-      showToast(err.message || 'Failed to load doctors', 'error');
+      if (requestId === requestSequence.current) showToast(err.message || 'Failed to load doctors', 'error');
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (requestId === requestSequence.current) { setLoading(false); setLoadingMore(false); }
     }
   }, [debouncedSearch, selectedCategory, showToast]);
 
@@ -121,15 +125,19 @@ export default function DoctorsScreen() {
     try {
       const data = await api.getDoctorMatrix();
       setMatrixReport(data);
-    } catch { }
-  }, []);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load doctor classification. Please retry.', 'error');
+    }
+  }, [showToast]);
 
   const loadEvents = useCallback(async () => {
     try {
       const data = await api.getDoctorEvents();
       setEventsList(data);
-    } catch { }
-  }, []);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load doctor events. Please retry.', 'error');
+    }
+  }, [showToast]);
 
   useEffect(() => {
     loadMRs();

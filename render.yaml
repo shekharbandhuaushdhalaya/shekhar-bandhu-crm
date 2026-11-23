@@ -1,7 +1,12 @@
+previews:
+  generation: off
+
 services:
   - type: web
     name: shekhar-bandhu-crm-api
     env: docker
+    branch: main
+    autoDeployTrigger: checksPass
     dockerfilePath: ./server/Dockerfile
     healthCheckPath: /api/ready
     envVars:

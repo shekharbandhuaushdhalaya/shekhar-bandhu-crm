@@ -3,7 +3,7 @@ import { DataTable } from '../components/DataTable';
 import { WorkspaceLoading, StatusPill } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppText as Text } from './../components/AppText';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, ActivityIndicator, Alert, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Shadows, Typography } from '../constants/theme';
@@ -29,36 +29,51 @@ export default function AgeingScreen() {
   const [availablePayments, setAvailablePayments] = useState<any[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [allocationAmounts, setAllocationAmounts] = useState<Record<string, string>>({}); // invoiceId -> amount string
+  const [savingAllocation, setSavingAllocation] = useState(false);
+  const loadRequestRef = useRef(0);
+  const allocationRequestRef = useRef(0);
 
   const loadData = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
     try {
       const res = await api.getReceivableAgeing();
-      setData(res);
+      if (requestId === loadRequestRef.current) setData(res);
     } catch (err: any) {
-      alert(err.message || 'Failed to load ageing report');
+      if (requestId === loadRequestRef.current) {
+        alert(err.message || 'Failed to load ageing report');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     loadData();
+    return () => {
+      loadRequestRef.current += 1;
+      allocationRequestRef.current += 1;
+    };
   }, [loadData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
+    try {
+      await loadData();
+    } finally {
+      setRefreshing(false);
+    }
   }, [loadData]);
 
   const openAllocationModal = async (cust: any) => {
+    const requestId = ++allocationRequestRef.current;
     setSelectedCustomer(cust);
     setAllocationAmounts({});
     setSelectedPayment(null);
     try {
       // Fetch payments for this specific customer
       const allPayments = await api.getPayments();
+      if (requestId !== allocationRequestRef.current) return;
       // Filter out payments that are customer receipts, match the customer's name, and have unallocated amounts
       const custPayments = allPayments.filter((p: any) => 
         p.partyType === 'Customer' && 
@@ -68,7 +83,7 @@ export default function AgeingScreen() {
       setAvailablePayments(custPayments);
       setAllocationModalVisible(true);
     } catch (err: any) {
-      alert(err.message || 'Failed to fetch customer payments');
+      if (requestId === allocationRequestRef.current) alert(err.message || 'Failed to fetch customer payments');
     }
   };
 
@@ -83,7 +98,7 @@ export default function AgeingScreen() {
 
     for (const inv of sortedInvoices) {
       if (remaining <= 0) break;
-      const invOutstanding = inv.outstanding;
+      const invOutstanding = Math.max(0, Number(inv.outstanding) || 0);
       const allocAmount = Math.min(remaining, invOutstanding);
       newAllocations[inv._id] = allocAmount.toFixed(2);
       remaining -= allocAmount;
@@ -98,32 +113,52 @@ export default function AgeingScreen() {
       return;
     }
 
-    const payloadAllocations = Object.entries(allocationAmounts)
-      .map(([invoiceId, amtStr]) => ({
-        invoiceId,
-        amount: parseFloat(amtStr) || 0
-      }))
-      .filter(a => a.amount > 0);
+    if (savingAllocation) return;
+    const invoiceById = new Map((selectedCustomer?.invoices || []).map((invoice: any) => [invoice._id, invoice]));
+    const payloadAllocations: { invoiceId: string; amount: number }[] = [];
+    for (const [invoiceId, amountText] of Object.entries(allocationAmounts)) {
+      const rawAmount = amountText.trim();
+      if (!rawAmount) continue;
+      const amount = Number(rawAmount);
+      if (!Number.isFinite(amount) || amount < 0) {
+        alert('Enter a valid, non-negative amount for each invoice');
+        return;
+      }
+      if (amount === 0) continue;
+      const invoice: any = invoiceById.get(invoiceId);
+      if (!invoice) {
+        alert('One of the selected invoices is no longer available. Please reopen bill matching.');
+        return;
+      }
+      const outstanding = Number(invoice.outstanding) || 0;
+      if (amount > outstanding + 0.005) {
+        alert(`Allocation for ${invoice.invoiceNo || 'an invoice'} exceeds its outstanding balance (₹${outstanding.toFixed(2)})`);
+        return;
+      }
+      payloadAllocations.push({ invoiceId, amount: Math.round(amount * 100) / 100 });
+    }
 
     if (payloadAllocations.length === 0) {
       alert('Please allocate a non-zero amount to at least one invoice');
       return;
     }
 
-    const totalAllocated = payloadAllocations.reduce((sum, a) => sum + a.amount, 0);
-    if (totalAllocated > selectedPayment.amount) {
-      alert(`Allocated total (₹${totalAllocated}) exceeds payment receipt amount (₹${selectedPayment.amount})`);
+    const totalAllocated = payloadAllocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+    const paymentAmount = Number(selectedPayment.amount) || 0;
+    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0 || totalAllocated > paymentAmount + 0.005) {
+      alert(`Allocated total (₹${totalAllocated.toFixed(2)}) exceeds payment receipt amount (₹${paymentAmount.toFixed(2)})`);
       return;
     }
 
+    setSavingAllocation(true);
     try {
-      setLoading(true);
       await api.allocatePayment(selectedPayment._id, payloadAllocations);
       setAllocationModalVisible(false);
-      loadData();
+      await loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to allocate payment');
-      setLoading(false);
+    } finally {
+      setSavingAllocation(false);
     }
   };
 
@@ -227,11 +262,11 @@ export default function AgeingScreen() {
       <Modal animationType="slide" presentationStyle="formSheet" visible={allocationModalVisible} onRequestClose={() => setAllocationModalVisible(false)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setAllocationModalVisible(false)}>
+            <TouchableOpacity onPress={() => { allocationRequestRef.current += 1; setAllocationModalVisible(false); }}>
               <Ionicons name="close" size={24} color={colors.text.primary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Bill-Wise Matching</Text>
-            <TouchableOpacity onPress={handleSaveAllocation}>
+            <TouchableOpacity onPress={handleSaveAllocation} disabled={savingAllocation}>
               <Ionicons name="checkmark" size={24} color={colors.success} />
             </TouchableOpacity>
           </View>

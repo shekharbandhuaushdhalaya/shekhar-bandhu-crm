@@ -82,6 +82,12 @@ router.get('/preview', authorize('manufacturing:view'), async (req, res) => {
     if (!bom) return res.status(404).json({ error: `No Bill of Materials recipe found for ${prod.name}` });
 
     const valPlanned = Number(plannedQty);
+    if (!Number.isFinite(valPlanned) || valPlanned <= 0) {
+      return res.status(400).json({ error: 'plannedQty must be a positive number' });
+    }
+    if (String(bom.productId) !== String(productId)) {
+      return res.status(400).json({ error: 'Selected recipe does not belong to the selected product' });
+    }
     const FORMULATION_BASIS = bom.formulationBasis || 100;
 
     const projectedConsumption = [];
@@ -97,10 +103,10 @@ router.get('/preview', authorize('manufacturing:view'), async (req, res) => {
       if (manufacturingUnitId) {
         const manufacturingWarehouse = await resolveManufacturingWarehouse(manufacturingUnitId);
         const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, warehouseId: manufacturingWarehouse._id, qcStatus: 'approved' });
-        totalAvailable = entries.reduce((s, e) => s + (e.qty || 0), 0);
+        totalAvailable = entries.reduce((s, e) => s + Math.max(0, Number(e.qty || 0) - Number(e.reservedQty || 0)), 0);
       } else {
         const entries = await RawMaterialEntry.find({ rawMaterialId: rm._id, qcStatus: 'approved' });
-        totalAvailable = entries.reduce((sum, entry) => sum + Number(entry.qty || 0), 0);
+        totalAvailable = entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0)), 0);
       }
 
       const isSufficient = totalAvailable >= qtyNeeded;
@@ -206,6 +212,9 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
       }
       if (!bom) {
         throw new Error(`No Bill of Materials configured for product: ${prod.name}`);
+      }
+      if (String(bom.productId) !== String(productId)) {
+        throw new Error('Selected recipe does not belong to the selected product');
       }
       if (bom.isActive === false) {
         throw new Error(`The Bill of Materials recipe "${bom.recipeName}" for "${prod.name}" is currently inactive.`);

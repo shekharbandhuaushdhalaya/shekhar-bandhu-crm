@@ -392,6 +392,7 @@ const createSidebarStyles = (colors: typeof LightColors) =>
       borderRadius: 3,
     },
     badgeText: { ...Typography.caption, fontWeight: '600', marginLeft: 6 },
+    sectionCaption: { ...Typography.caption, color: colors.text.muted, fontWeight: '700', letterSpacing: 1.1 },
     quickAccessLabel: { marginBottom: 6, marginLeft: 12 },
   });
 

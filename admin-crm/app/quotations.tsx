@@ -2,9 +2,9 @@ import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import * as Print from 'expo-print';
-import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable, useWindowDimensions } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Modal, FlatList, KeyboardAvoidingView, Platform, Pressable, useWindowDimensions, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography, getStatusTone , Shadows} from '../constants/theme';
 import { api, Quotation, Product, Customer, Warehouse, InventoryEntry, QuotationItem } from '../utils/api';
@@ -749,6 +749,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
   const [itemSearchText, setItemSearchText] = useState('');
 
   const [items, setItems] = useState<ExtendedQuotationItem[]>([{ name: '', qty: 1, boxes: 1, rate: 0, packing: 1, rateText: '', mrp: 0, mrpText: '', discountPercent: 0, discountText: '', gstRate: 0 }]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -811,8 +812,9 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
           if (w.length > 0 && !invoiceToEdit) {
             setWarehouseId(w[0]._id);
           }
-        } catch (err) {
-          console.log('Failed to fetch initial data in Challan modal:', err);
+        } catch (err: any) {
+          console.error('Failed to fetch initial data in Challan modal:', err);
+          Alert.alert('Unable to open Challan', err?.message || 'Products, customers, and warehouses could not be loaded. Please close and retry.');
         }
       };
       loadData();
@@ -826,8 +828,10 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
         try {
           const entries = await api.getInventoryEntries(warehouseId, "", true);
           setWarehouseInventory(entries);
-        } catch (err) {
-          console.log('Failed to fetch warehouse inventory:', err);
+        } catch (err: any) {
+          console.error('Failed to fetch warehouse inventory:', err);
+          setWarehouseInventory([]);
+          Alert.alert('Inventory unavailable', err?.message || 'Could not load stock for this warehouse. Please retry before adding items.');
         }
       };
       loadWarehouseInventory();
@@ -954,9 +958,26 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
   };
 
   const handleSave = async () => {
+    if (saving) return;
     const validItems = items.filter(it => it.name.trim() !== '' && it.productId);
-    if (!customerName.trim() || validItems.length === 0 || !warehouseId) {
-      alert('Please fill party name, select a source warehouse, and add at least one product.');
+    const partiallyFilledItems = items.filter(it => (it.name.trim() !== '' || !!it.productId) && !(it.name.trim() !== '' && it.productId));
+    if (!customerName.trim() || validItems.length === 0 || !warehouseId || partiallyFilledItems.length > 0) {
+      alert('Please fill party name, select a source warehouse, and complete every started product row.');
+      return;
+    }
+    const invalidItem = validItems.find(it =>
+      !Number.isFinite(Number(it.qty)) || Number(it.qty) <= 0 ||
+      !Number.isFinite(Number(it.packing)) || Number(it.packing) <= 0 ||
+      !Number.isFinite(Number(it.rate)) || Number(it.rate) < 0 ||
+      !Number.isFinite(Number(it.gstRate)) || Number(it.gstRate) < 0 || Number(it.gstRate) > 100
+    );
+    if (invalidItem) {
+      alert('Each product must have a positive quantity and packing, a non-negative rate, and a GST rate between 0 and 100%.');
+      return;
+    }
+    const freight = freightAmount.trim() ? Number(freightAmount) : 0;
+    if (!Number.isFinite(freight) || freight < 0) {
+      alert('Enter a valid non-negative freight amount.');
       return;
     }
 
@@ -967,6 +988,7 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
     // Strip UI-only fields before saving
     const finalItems = validItems.map(({ maxQty, rateText, mrpText, discountText, ...rest }) => rest);
 
+    setSaving(true);
     try {
       const selectedWarehouse = warehouses.find(w => w._id === warehouseId);
       const targetCust = customers.find(c => (c.company || c.name) === customerName.trim());
@@ -1001,7 +1023,9 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
       onSaved();
       onClose();
     } catch (err: any) {
-      alert(err.message || 'Failed to create sale invoice');
+      alert(err.message || 'Failed to save quotation.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1057,8 +1081,8 @@ function AddQuotationModal({ visible, onClose, onSaved, invoiceToEdit }: { visib
             <Ionicons name="close" size={26} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>{invoiceToEdit ? 'Edit Sale Quotation' : 'New Sale Quotation'}</Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Ionicons name="checkmark-circle" size={26} color={colors.success} />
+          <TouchableOpacity onPress={handleSave} disabled={saving} style={{ opacity: saving ? 0.5 : 1 }}>
+            {saving ? <ActivityIndicator size={24} color={colors.success} /> : <Ionicons name="checkmark-circle" size={26} color={colors.success} />}
           </TouchableOpacity>
         </View>
 
@@ -1522,6 +1546,8 @@ export default function QuotationsScreen() {
   const [page, setPage] = useListState('quotations_page', 1);
   // Initial-load flag so DataTable shows its skeleton instead of an empty table.
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const loadRequestRef = useRef(0);
   const [selectedInv, setSelectedInv] = useState<Quotation | null>(null);
   const [invoiceToEdit, setQuotationToEdit] = useState<Quotation | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -1532,21 +1558,37 @@ export default function QuotationsScreen() {
   const styles = useStyles(createStyles);
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
+    setLoading(true);
     try {
       const res = await api.getQuotations(debouncedSearch, modeFilter);
-      setQuotations(res);
+      if (requestId === loadRequestRef.current) {
+        setQuotations(res);
+        setLoadError('');
+      }
+    } catch (err: any) {
+      if (requestId === loadRequestRef.current) {
+        setLoadError(err.message || 'Unable to load quotations. Please retry.');
+        console.error('Failed to load quotations:', err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
   }, [debouncedSearch, modeFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    return () => { loadRequestRef.current += 1; };
+  }, [load]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     api.clearCache();
-    await load();
-    setRefreshing(false);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   const columns: Column<Quotation>[] = [
@@ -1634,6 +1676,12 @@ export default function QuotationsScreen() {
         />
 
         <View style={{ flex: 1, marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          {loadError ? (
+            <View style={{ padding: Spacing.md, marginBottom: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.danger + '10', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <Text style={{ ...Typography.bodySm, color: colors.danger, flex: 1 }}>{loadError}</Text>
+              <TouchableOpacity onPress={load}><Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Retry</Text></TouchableOpacity>
+            </View>
+          ) : null}
           <DataTable
             data={invoices}
             columns={columns}

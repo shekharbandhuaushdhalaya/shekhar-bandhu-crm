@@ -2,7 +2,7 @@ import { StatusPill, EmptyState } from './../components/WorkspacePrimitives';
 import { PressableOpacity as TouchableOpacity } from './../components/PressableOpacity';
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Modal, ActivityIndicator, Pressable, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, LightColors, Typography, getStatusTone , Shadows} from '../constants/theme';
@@ -147,27 +147,35 @@ export default function CreditNotesPage() {
 
   const [notes, setNotes] = useState<CreditNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const fetchRequestRef = useRef(0);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [filterType, setFilterType] = useState('all');
   const [showModal, setShowModal] = useState(false);
 
   const fetchNotes = useCallback(async () => {
+    const requestId = ++fetchRequestRef.current;
     try {
       setLoading(true);
-      api.clearCache();
       const res = await api.getCreditNotes(debouncedSearch, filterType);
-      setNotes(res || []);
-    } catch (err) {
-      console.error('Error fetching credit notes:', err);
-      setNotes([]);
+      if (requestId === fetchRequestRef.current) {
+        setNotes(res || []);
+        setLoadError('');
+      }
+    } catch (err: any) {
+      if (requestId === fetchRequestRef.current) {
+        setLoadError(err.message || 'Unable to load credit/debit notes. Please retry.');
+        console.error('Error fetching credit notes:', err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === fetchRequestRef.current) setLoading(false);
     }
   }, [debouncedSearch, filterType]);
 
   useEffect(() => {
     fetchNotes();
+    return () => { fetchRequestRef.current += 1; };
   }, [fetchNotes]);
 
   const handleFinalize = (id: string) => {
@@ -257,6 +265,13 @@ export default function CreditNotesPage() {
           </View>
         </View>
 
+        {loadError ? (
+          <View style={{ marginHorizontal: Spacing.lg, marginBottom: Spacing.sm, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.danger + '10', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <Text style={{ ...Typography.bodySm, color: colors.danger, flex: 1 }}>{loadError}</Text>
+            <TouchableOpacity onPress={fetchNotes}><Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>Retry</Text></TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Notes List */}
         <ScrollView
           style={{ flex: 1 }}
@@ -344,6 +359,8 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
   const [showPartyDropdown, setShowPartyDropdown] = useState(false);
   const [customerInvoices, setCustomerInvoices] = useState<any[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const invoiceRequestRef = useRef(0);
+  const partyRequestRef = useRef(0);
   const [invoiceNo, setInvoiceNo] = useState('');
   const [reason, setReason] = useState('01 - Sales Return / Goods Rejection');
   const [totalAmount, setTotalAmount] = useState('');
@@ -353,6 +370,8 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
 
   useEffect(() => {
     if (visible) {
+      invoiceRequestRef.current += 1;
+      setLoadingInvoices(false);
       setType('credit_note');
       setPartyType('Customer');
       setPartyId('');
@@ -368,22 +387,18 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
   }, [visible]);
 
   useEffect(() => {
-    if (visible) {
-      const loadParties = async () => {
-        try {
-          if (partyType === 'Customer') {
-            const res = await api.getCustomers();
-            setParties(res);
-          } else {
-            const res = await api.getVendors();
-            setParties(res);
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      };
-      loadParties();
-    }
+    const requestId = ++partyRequestRef.current;
+    if (!visible) return () => { partyRequestRef.current += 1; };
+    const loadParties = async () => {
+      try {
+        const res = partyType === 'Customer' ? await api.getCustomers() : await api.getVendors();
+        if (requestId === partyRequestRef.current) setParties(res || []);
+      } catch (err) {
+        if (requestId === partyRequestRef.current) console.error(err);
+      }
+    };
+    loadParties();
+    return () => { partyRequestRef.current += 1; };
   }, [visible, partyType]);
 
   const filteredParties = partyName
@@ -396,14 +411,19 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
 
   const handleSelectParty = async (p: any) => {
     const selectedName = p.company || p.displayName || p.name;
+    const requestId = ++invoiceRequestRef.current;
     setPartyId(p._id);
     setPartyName(selectedName);
     setShowPartyDropdown(false);
+    setCustomerInvoices([]);
+    setInvoiceNo('');
+    setTotalAmount('');
 
     if (partyType === 'Customer') {
+      setLoadingInvoices(true);
       try {
-        setLoadingInvoices(true);
         const invs = await api.getSaleInvoices(selectedName);
+        if (requestId !== invoiceRequestRef.current) return;
         const matched = (invs || []).filter((inv: any) =>
           (inv.customerName || '').toLowerCase().includes(selectedName.toLowerCase()) ||
           (p.company && (inv.customerName || '').toLowerCase().includes(p.company.toLowerCase())) ||
@@ -415,25 +435,33 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
           setTotalAmount((matched[0].baseAmount || matched[0].amount || 0).toString());
         }
       } catch (err) {
-        console.error('Failed to load customer invoices:', err);
+        if (requestId === invoiceRequestRef.current) console.error('Failed to load customer invoices:', err);
       } finally {
-        setLoadingInvoices(false);
+        if (requestId === invoiceRequestRef.current) setLoadingInvoices(false);
       }
     }
   };
 
   const handleSave = async () => {
-    if (!partyName.trim() || !totalAmount || isNaN(Number(totalAmount)) || Number(totalAmount) <= 0) {
+    if (saving) return;
+    const base = Number(totalAmount);
+    const rate = Number(gstRate);
+    if (!partyName.trim() || !Number.isFinite(base) || base <= 0) {
       setError('Please select a party and enter a valid base amount.');
+      return;
+    }
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+      setError('Enter a valid GST rate between 0 and 100%.');
+      return;
+    }
+    if (!reason.trim()) {
+      setError('Please provide a reason for this note.');
       return;
     }
 
     try {
       setSaving(true);
       setError('');
-
-      const base = parseFloat(totalAmount) || 0;
-      const rate = parseFloat(gstRate) || 0;
       const tax = (base * rate) / 100;
       const total = Math.round(base + tax);
 
@@ -512,7 +540,7 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
                   styles.toggleBtn,
                   partyType === 'Customer' && { backgroundColor: colors.primary, borderColor: colors.primary }
                 ]}
-                onPress={() => { setPartyType('Customer'); setPartyId(''); setPartyName(''); }}
+                onPress={() => { invoiceRequestRef.current += 1; setLoadingInvoices(false); setCustomerInvoices([]); setInvoiceNo(''); setTotalAmount(''); setPartyType('Customer'); setPartyId(''); setPartyName(''); }}
               >
                 <Text style={[styles.toggleText, partyType === 'Customer' && { color: '#fff' }]}>Customer</Text>
               </TouchableOpacity>
@@ -521,7 +549,7 @@ function CreateCreditNoteModal({ visible, onClose }: { visible: boolean; onClose
                   styles.toggleBtn,
                   partyType === 'Vendor' && { backgroundColor: colors.primary, borderColor: colors.primary }
                 ]}
-                onPress={() => { setPartyType('Vendor'); setPartyId(''); setPartyName(''); }}
+                onPress={() => { invoiceRequestRef.current += 1; setLoadingInvoices(false); setCustomerInvoices([]); setInvoiceNo(''); setTotalAmount(''); setPartyType('Vendor'); setPartyId(''); setPartyName(''); }}
               >
                 <Text style={[styles.toggleText, partyType === 'Vendor' && { color: '#fff' }]}>Vendor</Text>
               </TouchableOpacity>

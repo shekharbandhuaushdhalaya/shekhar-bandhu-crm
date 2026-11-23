@@ -4,6 +4,8 @@ const User = require('../models/User');
 const Invoice = require('../models/Invoice');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const Firm = require('../models/Firm');
+const UserFirm = require('../models/UserFirm');
 const { sendDailyDigest } = require('../utils/digestScheduler');
 const { sendWhatsAppNotification } = require('../utils/whatsappService');
 
@@ -31,18 +33,25 @@ describe('Task 1 — Daily Executive Digest Scheduler Suite', () => {
     await Invoice.deleteMany({});
     await Order.deleteMany({});
     await Product.deleteMany({});
+    await UserFirm.deleteMany({});
+    await Firm.deleteMany({});
     jest.clearAllMocks();
   });
 
   it('fetches admin/owner users with phone and dispatches formatted WhatsApp digest', async () => {
+    // Each digest is dispatched per active firm using active firm memberships.
+    const firm = await Firm.create({ name: 'Digest Test Firm' });
+
     // 1. Seed admin user with phone number
     const adminUser = await User.create({
       name: 'Admin User',
       email: 'admin@shekharbandhu.com',
       password: 'Password123!',
       role: 'admin',
+      firmId: firm._id,
       phone: '+919876543210'
     });
+    await UserFirm.create({ userId: adminUser._id, firmId: firm._id, role: 'admin', active: true });
 
     // Seed agent user (should NOT receive digest)
     await User.create({
@@ -61,6 +70,7 @@ describe('Task 1 — Daily Executive Digest Scheduler Suite', () => {
       amount: 15000,
       nettTotal: 15000,
       customerName: 'Test Ayurveda Pharmacy',
+      firmId: firm._id,
       date: new Date()
     });
 
@@ -70,6 +80,7 @@ describe('Task 1 — Daily Executive Digest Scheduler Suite', () => {
       phone: '+919876543210',
       shippingAddress: 'Varanasi, UP',
       totalAmount: 5000,
+      firmId: firm._id,
       status: 'pending'
     });
 
@@ -77,12 +88,15 @@ describe('Task 1 — Daily Executive Digest Scheduler Suite', () => {
       name: 'Ashwagandha Churna',
       sku: 'ASH-001',
       stockLevel: 5,
+      firmId: firm._id,
       mrp: 200,
       rate: 150
     });
 
     // 3. Trigger sendDailyDigest()
-    const result = await sendDailyDigest();
+    const results = await sendDailyDigest();
+    expect(results).toHaveLength(1);
+    const result = results[0];
 
     expect(result.sentCount).toBe(1);
     expect(sendWhatsAppNotification).toHaveBeenCalledTimes(1);

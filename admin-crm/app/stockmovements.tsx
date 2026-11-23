@@ -1,6 +1,6 @@
 import { AppTextInput as TextInput } from './../components/AppTextInput';
 import { AppText as Text } from './../components/AppText';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -28,16 +28,29 @@ export default function StockMovementsArchive() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const loadRequestRef = useRef(0);
 
   const load = useCallback(async (refresh = false) => {
+    const requestId = ++loadRequestRef.current;
     if (refresh) setRefreshing(true); else setLoading(true);
     setError('');
-    try { setRows(await api.getStockMovements({ search: search.trim() || undefined })); }
-    catch (e: any) { setError(e.message || 'Unable to load historical stock movements'); }
-    finally { setLoading(false); setRefreshing(false); }
+    try {
+      const result = await api.getStockMovements({ search: search.trim() || undefined });
+      if (requestId === loadRequestRef.current) setRows(result);
+    } catch (e: any) {
+      if (requestId === loadRequestRef.current) setError(e.message || 'Unable to load historical stock movements');
+    } finally {
+      if (requestId === loadRequestRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
   }, [search]);
 
-  useFocusEffect(useCallback(() => { load(false); }, [load]));
+  useFocusEffect(useCallback(() => {
+    load(false);
+    return () => { loadRequestRef.current += 1; };
+  }, [load]));
 
   const columns = useMemo<Column<StockMovement>[]>(() => [
     { key: 'docNo', title: 'Document', width: 150, render: (r) => <Text style={styles.strong}>{r.docNo}</Text> },

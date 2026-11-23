@@ -63,12 +63,20 @@ router.post('/herb-service/resolve', authorize('manufacturing:view'), async (req
 router.get('/', authorize('manufacturing:view'), async (req, res) => {
   try {
     const { warehouseId, simple, search, page, limit } = req.query;
-    const filter = search ? {
+    // Treat search input as literal text (not a caller-supplied regular expression).
+    const searchTerm = typeof search === 'string' ? search.trim().slice(0, 100) : '';
+    const escapedSearch = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const filter = escapedSearch ? {
       $or: [
-        { name: { $regex: search, $options: 'i' } },
-        { sku: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
-        { botanicalName: { $regex: search, $options: 'i' } },
+        { name: { $regex: escapedSearch, $options: 'i' } },
+        { sku: { $regex: escapedSearch, $options: 'i' } },
+        { category: { $regex: escapedSearch, $options: 'i' } },
+        { materialType: { $regex: escapedSearch, $options: 'i' } },
+        { botanicalName: { $regex: escapedSearch, $options: 'i' } },
+        { acceptedScientificName: { $regex: escapedSearch, $options: 'i' } },
+        { commonNames: { $regex: escapedSearch, $options: 'i' } },
+        { botanicalSynonyms: { $regex: escapedSearch, $options: 'i' } },
+        { partUsed: { $regex: escapedSearch, $options: 'i' } },
       ]
     } : {};
 

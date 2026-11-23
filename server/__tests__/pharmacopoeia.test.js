@@ -15,6 +15,8 @@ describe('Ayurvedic Pharmacopoeia Monograph Suite & API Endpoints', () => {
 
     app = express();
     app.use(express.json());
+    // Exercise route permissions with an authenticated administrator, as production does.
+    app.use((req, res, next) => { req.user = { id: new mongoose.Types.ObjectId().toString(), role: 'admin' }; next(); });
     app.use('/api/pharmacopoeia', pharmacopoeiaRoutes);
   }, 30000);
 

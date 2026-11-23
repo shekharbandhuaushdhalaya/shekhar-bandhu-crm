@@ -68,7 +68,12 @@ const orderSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 orderSchema.index({ createdAt: -1 });
-orderSchema.index({ firmId: 1, orderNo: 1 }, { unique: true, sparse: true });
+// Only assign an order number's uniqueness within a firm when a real order number exists.
+// Drafts and legacy records with an empty orderNo must not collide on a null firmId.
+orderSchema.index(
+  { firmId: 1, orderNo: 1 },
+  { unique: true, partialFilterExpression: { firmId: { $type: 'objectId' }, orderNo: { $type: 'string', $gt: '' } } }
+);
 orderSchema.index({ firmId: 1, customerId: 1, status: 1, createdAt: -1 });
 orderSchema.index({ firmId: 1, clientOrderRef: 1 }, { unique: true, sparse: true, partialFilterExpression: { clientOrderRef: { $type: 'string', $ne: '' } } });
 orderSchema.index({ firmId: 1, status: 1 });
