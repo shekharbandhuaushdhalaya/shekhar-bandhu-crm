@@ -41,6 +41,8 @@ export default function SalesWorkspace() {
   const [loadError, setLoadError] = useState('');
   const [busyAction, setBusyAction] = useState('');
   const autoFulfillOrderRef = useRef<string | null>(null);
+  const loadRequestRef = useRef(0);
+  const searchRequestRef = useRef(0);
 
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -59,6 +61,7 @@ export default function SalesWorkspace() {
   const [schemeDiscount, setSchemeDiscount] = useState('0');
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
     setLoadError('');
     try {
       const [d, o, ch, s, r, c, cu, pr, wh] = await Promise.all([
@@ -72,6 +75,7 @@ export default function SalesWorkspace() {
         request('/products?page=1&limit=500'),
         request('/warehouses'),
       ]);
+      if (requestId !== loadRequestRef.current) return;
       setDashboard(d);
       setOrders(Array.isArray(o) ? o : o.data || []);
       setChallans(Array.isArray(ch) ? ch : ch.data || []);
@@ -82,8 +86,12 @@ export default function SalesWorkspace() {
       setProducts(Array.isArray(pr) ? pr : pr.data || pr.products || []);
       setWarehouses(Array.isArray(wh) ? wh : wh.data || wh.warehouses || []);
     } catch (e: any) {
-      setLoadError(e.message || 'Unable to load Sales Workspace');
-    } finally { setInitialLoading(false); }
+      if (requestId === loadRequestRef.current) {
+        setLoadError(e.message || 'Unable to load Sales Workspace');
+      }
+    } finally {
+      if (requestId === loadRequestRef.current) setInitialLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -98,14 +106,16 @@ export default function SalesWorkspace() {
   };
 
   const doSearch = async () => {
+    const requestId = ++searchRequestRef.current;
     if (!search.trim()) {
       setSearchResults(null);
       return;
     }
     try {
-      setSearchResults(await request(`/sales-workflow/search?q=${encodeURIComponent(search.trim())}`));
+      const results = await request(`/sales-workflow/search?q=${encodeURIComponent(search.trim())}`);
+      if (requestId === searchRequestRef.current) setSearchResults(results);
     } catch (e: any) {
-      Alert.alert('Search', e.message);
+      if (requestId === searchRequestRef.current) Alert.alert('Search', e.message);
     }
   };
 
