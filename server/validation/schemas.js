@@ -970,6 +970,16 @@ const dispatchSchema = z.object({
   totalBoxes: z.number().default(0),
   totalWeight: z.string().default(''),
   freightCharge: z.number().default(0),
+  proofOfDelivery: z.object({
+    recipientName: z.string().trim().min(1).max(160),
+    receivedAt: z.string().or(z.date()),
+    condition: z.enum(['accepted', 'damaged', 'shortage', 'refused']),
+    notes: z.string().max(2000).optional().default(''),
+    signatureUrl: z.string().url().or(z.literal('')).optional().default(''),
+    photoUrl: z.string().url().or(z.literal('')).optional().default(''),
+    latitude: z.number().min(-90).max(90).optional().nullable(),
+    longitude: z.number().min(-180).max(180).optional().nullable()
+  }).optional(),
   status: z.enum(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned']).default('dispatched'),
 });
 

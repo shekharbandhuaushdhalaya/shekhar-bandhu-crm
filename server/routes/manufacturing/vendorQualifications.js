@@ -22,13 +22,15 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 // POST /api/vendor-qualifications — Record new vendor qualification audit
 router.post('/', authorize('manufacturing:qcApprove'), async (req, res) => {
   try {
-    const { vendorId, vendorName, qualificationStatus = 'approved', auditDate, nextAuditDue, auditorName, gmpComplianceScore, findings, rawMaterialIds } = req.body;
+    const { vendorId, vendorName, qualificationStatus = 'conditional', auditDate, nextAuditDue, auditorName, gmpComplianceScore, findings, rawMaterialIds } = req.body;
 
     if (!vendorId || !vendorName || !auditorName) {
       return res.status(400).json({ error: 'vendorId, vendorName, and auditorName are required' });
     }
 
-    const nextDue = nextAuditDue ? new Date(nextAuditDue) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year default
+    const nextDue = nextAuditDue ? new Date(nextAuditDue) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    if (!Number.isFinite(nextDue.getTime()) || nextDue <= new Date()) return res.status(400).json({ error: 'nextAuditDue must be a valid future date' });
+    if (!['approved', 'conditional', 'disqualified'].includes(qualificationStatus)) return res.status(400).json({ error: 'Invalid qualificationStatus' });
 
     const record = await VendorQualification.create({
       vendorId,

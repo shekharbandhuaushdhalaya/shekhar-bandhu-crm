@@ -36,6 +36,16 @@ const dispatchSchema = new mongoose.Schema({
     default: 'dispatched'
   },
   deliveredAt:  { type: Date },
+  proofOfDelivery: {
+    recipientName: { type: String, default: '', trim: true },
+    receivedAt: { type: Date, default: null },
+    condition: { type: String, enum: ['accepted', 'damaged', 'shortage', 'refused', ''], default: '' },
+    notes: { type: String, default: '', trim: true },
+    signatureUrl: { type: String, default: '', trim: true },
+    photoUrl: { type: String, default: '', trim: true },
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null }
+  },
   notes:        { type: String, default: '', trim: true },
 }, { timestamps: true });
 

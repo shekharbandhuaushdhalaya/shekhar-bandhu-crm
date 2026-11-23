@@ -122,11 +122,11 @@ async function backfillQcBuckets(firmId, report) {
   const RawMaterialEntry = mongoose.model('RawMaterialEntry');
   const finished = await InventoryEntry.collection.updateMany(
     { firmId, $or: [{ qcStatus: { $exists: false } }, { qcStatus: null }, { qcStatus: '' }] },
-    { $set: { qcStatus: 'approved' } }
+    { $set: { qcStatus: 'under_test' } }
   );
   const raw = await RawMaterialEntry.collection.updateMany(
     { firmId, $or: [{ qcStatus: { $exists: false } }, { qcStatus: null }, { qcStatus: '' }] },
-    { $set: { qcStatus: 'approved' } }
+    { $set: { qcStatus: 'under_test' } }
   );
   report.push({ step: 'qcBackfill', finished: finished.modifiedCount, rawMaterial: raw.modifiedCount });
 }

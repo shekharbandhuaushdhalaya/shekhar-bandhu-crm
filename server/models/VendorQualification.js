@@ -7,7 +7,7 @@ const vendorQualificationSchema = new mongoose.Schema({
   qualificationStatus: {
     type: String,
     enum: ['approved', 'conditional', 'disqualified'],
-    default: 'approved'
+    default: 'conditional'
   },
   auditDate: { type: Date, required: true, default: Date.now },
   nextAuditDue: { type: Date, required: true },
