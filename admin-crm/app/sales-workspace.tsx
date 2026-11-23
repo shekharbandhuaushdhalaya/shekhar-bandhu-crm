@@ -494,7 +494,15 @@ export default function SalesWorkspace() {
                 <TextInput style={styles.input} placeholder="Scheme name" placeholderTextColor={colors.text.muted} value={schemeName} onChangeText={setSchemeName} />
                 <TextInput style={styles.input} placeholder="Code" placeholderTextColor={colors.text.muted} value={schemeCode} onChangeText={setSchemeCode} />
               </View>
-              <TextInput style={styles.inputWide} placeholder="Product ID" placeholderTextColor={colors.text.muted} value={schemeProductId} onChangeText={setSchemeProductId} />
+              <ResponsiveSelect
+                value={schemeProductId}
+                onChange={setSchemeProductId}
+                options={products.map((product) => ({ value: product._id, label: product.name || 'Unnamed product', description: product.productType || product.size || '' }))}
+                placeholder="Select scheme product"
+                searchPlaceholder="Search products..."
+                searchable
+                style={{ width: '100%', marginBottom: 9 }}
+              />
               <View style={styles.formRow}>
                 <TextInput style={styles.input} placeholder="Buy qty" placeholderTextColor={colors.text.muted} keyboardType="numeric" value={schemeMin} onChangeText={setSchemeMin} />
                 <TextInput style={styles.input} placeholder="Free qty" placeholderTextColor={colors.text.muted} keyboardType="numeric" value={schemeFree} onChangeText={setSchemeFree} />
