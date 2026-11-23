@@ -41,11 +41,11 @@ describe('tenant isolation regression', () => {
       stockLevel: 7
     }));
 
-    const visibleToA = await runWithTenant({ firmId: firmA._id }, () => Product.find({}).lean());
+    const visibleToA = await runWithTenant({ firmId: firmA._id }, async () => await Product.find({}).lean());
     expect(visibleToA).toHaveLength(1);
     expect(String(visibleToA[0]._id)).toBe(String(productA._id));
 
-    const crossTenantLookup = await runWithTenant({ firmId: firmA._id }, () => Product.findById(productB._id).lean());
+    const crossTenantLookup = await runWithTenant({ firmId: firmA._id }, async () => await Product.findById(productB._id).lean());
     expect(crossTenantLookup).toBeNull();
 
     await expect(runWithTenant({ firmId: firmA._id }, () => Product.create({
