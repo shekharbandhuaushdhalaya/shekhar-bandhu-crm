@@ -68,6 +68,7 @@ export default function ProductsScreen() {
   const { user } = useAuth();
   const perm = usePermission();
   const styles = useStyles(createStyles);
+  const { showToast } = useToast();
 
   const [page, setPage] = useListState('products_page', 1);
   const [totalPages, setTotalPages] = useState(1);
@@ -87,11 +88,14 @@ export default function ProductsScreen() {
       setTotalPages(totalP);
       setHasMore(totalP > 1 || list.length === 50);
     } catch (e: any) {
-      if (requestId === loadRequestId.current) console.error(e);
+      if (requestId === loadRequestId.current) {
+        console.error('Failed to load products:', e);
+        showToast(e?.message || 'Unable to load products. Please retry.', 'error');
+      }
     } finally {
       if (requestId === loadRequestId.current) setLoading(false);
     }
-  }, [search, setPage]);
+  }, [search, setPage, showToast]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -113,8 +117,11 @@ export default function ProductsScreen() {
       setPage(nextPage);
       setTotalPages(totalP);
       setHasMore(nextPage < totalP || list.length === 50);
-    } catch (e) {
-      if (requestId === loadRequestId.current) console.error(e);
+    } catch (e: any) {
+      if (requestId === loadRequestId.current) {
+        console.error('Failed to load more products:', e);
+        showToast(e?.message || 'Unable to load more products. Please retry.', 'error');
+      }
     } finally {
       setLoadingMore(false);
     }

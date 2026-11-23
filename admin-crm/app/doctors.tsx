@@ -80,8 +80,10 @@ export default function DoctorsScreen() {
     try {
       const data = await api.getMRs('', 'true');
       setMrs(data);
-    } catch { }
-  }, []);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load medical representatives. Please retry.', 'error');
+    }
+  }, [showToast]);
 
   const loadDoctors = useCallback(async (targetPage = 1, isAppend = false) => {
     const requestId = ++requestSequence.current;
@@ -123,15 +125,19 @@ export default function DoctorsScreen() {
     try {
       const data = await api.getDoctorMatrix();
       setMatrixReport(data);
-    } catch { }
-  }, []);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load doctor classification. Please retry.', 'error');
+    }
+  }, [showToast]);
 
   const loadEvents = useCallback(async () => {
     try {
       const data = await api.getDoctorEvents();
       setEventsList(data);
-    } catch { }
-  }, []);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load doctor events. Please retry.', 'error');
+    }
+  }, [showToast]);
 
   useEffect(() => {
     loadMRs();

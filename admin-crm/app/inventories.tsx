@@ -953,6 +953,7 @@ function AdjustStockModal({ visible, entry, onClose, onSaved, products }: { visi
 function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visible: boolean; productInfo: { id: string; name: string; packing?: number; vendorId?: string } | null; warehouseId?: string; onClose: () => void }) {
   const { colors } = useTheme();
   const styles = useStyles(createStyles);
+  const { showToast } = useToast();
   const [ledger, setLedger] = useState<StockLedger[]>([]);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState('');
@@ -964,12 +965,13 @@ function StockLedgerModal({ visible, productInfo, warehouseId, onClose }: { visi
     try {
       const history = await api.getStockLedger(productInfo.id, warehouseId === 'all' ? undefined : warehouseId, productInfo.packing, productInfo.vendorId, startDate, endDate);
       setLedger(history);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching ledger:', err);
+      showToast(err?.message || 'Unable to load stock ledger. Please retry.', 'error');
     } finally {
       setLoading(false);
     }
-  }, [productInfo, warehouseId, startDate, endDate]);
+  }, [productInfo, warehouseId, startDate, endDate, showToast]);
 
   useEffect(() => {
     if (visible && productInfo) {
@@ -1226,8 +1228,14 @@ export default function InventoriesScreen() {
         api.getWarehouses(),
         api.getProducts(),
         api.getVendors(),
-        api.getDeadStock().catch(() => []),
-        api.getStockTransfers().catch(() => [])
+        api.getDeadStock().catch((err: any) => {
+          showToast(err?.message || 'Unable to load dead-stock report.', 'error');
+          return [];
+        }),
+        api.getStockTransfers().catch((err: any) => {
+          showToast(err?.message || 'Unable to load stock transfers.', 'error');
+          return [];
+        })
       ]);
       if (requestId !== loadRequestRef.current) return;
       setWarehouses(ws);

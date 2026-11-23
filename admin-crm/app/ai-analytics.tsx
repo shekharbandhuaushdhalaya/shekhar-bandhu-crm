@@ -35,8 +35,9 @@ export default function AiAnalyticsPage() {
       if (config && config.geminiApiKey) {
         setApiKey(config.geminiApiKey);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load system settings:', err);
+      Alert.alert('AI settings unavailable', err?.message || 'Could not load the saved AI configuration. Please retry.');
     }
   };
 
