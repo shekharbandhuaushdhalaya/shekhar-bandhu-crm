@@ -42,29 +42,15 @@ describe('Module 2: Ayurvedic Manufacturing & AYUSH / GMP Compliance', () => {
   });
 
   describe('Certificate of Analysis (CoA)', () => {
-    test('creates and validates AYUSH heavy metal thresholds (Lead, Cadmium, Mercury, Arsenic)', async () => {
-      CertificateOfAnalysis.create.mockResolvedValue({
-        _id: 'coa1',
-        coaNumber: 'COA-1001',
-        batchNo: 'B-2026-99',
-        productName: 'Chyawanprash Awaleha',
-        heavyMetalTests: { leadPpm: 1.2, cadmiumPpm: 0.05, mercuryPpm: 0.01, arsenicPpm: 0.1, passed: true },
-        status: 'approved',
+    test('blocks CoA creation without an approved product-specific specification', async () => {
+      const res = await request(app).post('/api/manufacturing/coa').send({
+        batchNo: 'B-2026-99', productName: 'Chyawanprash Awaleha',
+        manufacturingDate: '2026-01-01', expiryDate: '2028-01-01',
+        heavyMetalTests: { leadPpm: 1.2, cadmiumPpm: 0.05, mercuryPpm: 0.01, arsenicPpm: 0.1 }
       });
-
-      const res = await request(app)
-        .post('/api/manufacturing/coa')
-        .send({
-          batchNo: 'B-2026-99',
-          productName: 'Chyawanprash Awaleha',
-          manufacturingDate: '2026-01-01',
-          expiryDate: '2028-01-01',
-          heavyMetalTests: { leadPpm: 1.2, cadmiumPpm: 0.05, mercuryPpm: 0.01, arsenicPpm: 0.1 }
-        });
-
-      expect(res.status).toBe(201);
-      expect(res.body.status).toBe('approved');
-      expect(res.body.heavyMetalTests.passed).toBe(true);
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('COA_SPECIFICATION_REQUIRED');
+      expect(CertificateOfAnalysis.create).not.toHaveBeenCalled();
     });
 
     test('fetches Certificate of Analysis by batch number', async () => {
