@@ -7,6 +7,8 @@ const Contact = require('../models/Contact');
 const Product = require('../models/Product');
 const MrSampleBag = require('../models/MrSampleBag');
 const MrVisit = require('../models/MrVisit');
+const Warehouse = require('../models/Warehouse');
+const InventoryEntry = require('../models/InventoryEntry');
 const medicalRepRoutes = require('../routes/crm/medicalReps');
 
 let mongoServer;
@@ -40,6 +42,8 @@ describe('Doctor Sample Management Enhancements (Expiry Warnings, Quotas, Signat
     await Product.deleteMany({});
     await MrSampleBag.deleteMany({});
     await MrVisit.deleteMany({});
+    await InventoryEntry.deleteMany({});
+    await Warehouse.deleteMany({});
     currentUser = { id: '507f1f77bcf86cd799439011', role: 'admin', email: 'admin@company.com' };
   });
 
@@ -58,11 +62,15 @@ describe('Doctor Sample Management Enhancements (Expiry Warnings, Quotas, Signat
       mrp: 150
     });
 
+    const warehouse = await Warehouse.create({ name: 'Main Sample Warehouse', type: 'main', isDefault: true });
+    await InventoryEntry.create({ warehouseId: warehouse._id, warehouseName: warehouse.name, productId: prod._id, qtyBoxes: 100, packing: 1, batchNo: 'BATCH-2026-X', expiryDate: new Date(Date.now() + 60 * 86400000), qcStatus: 'approved' });
+
     // 15 days in the future (Near Expiry)
     const futureExpiry = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
 
     const issueRes = await request(app)
       .post(`/api/medical-reps/${mr._id}/sample-bag/issue`)
+      .set('Idempotency-Key', 'sample-bag-issue-1')
       .send({
         productId: prod._id.toString(),
         batchNo: 'BATCH-2026-X',
@@ -71,7 +79,7 @@ describe('Doctor Sample Management Enhancements (Expiry Warnings, Quotas, Signat
       });
 
     expect(issueRes.status).toBe(201);
-    expect(issueRes.body.qty).toBe(20);
+    expect(issueRes.body.items[0].qty).toBe(20);
 
     const bagRes = await request(app)
       .get(`/api/medical-reps/${mr._id}/sample-bag`);

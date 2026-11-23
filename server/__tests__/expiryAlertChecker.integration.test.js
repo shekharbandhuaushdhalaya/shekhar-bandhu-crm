@@ -5,6 +5,7 @@ const RawMaterialEntry = require('../models/RawMaterialEntry');
 const RawMaterial = require('../models/RawMaterial');
 const Notification = require('../models/Notification');
 const MrSampleBag = require('../models/MrSampleBag');
+const Firm = require('../models/Firm');
 require('../models/MedicalRepresentative');
 require('../models/Product');
 
@@ -26,19 +27,22 @@ describe('expiryAlertChecker Integration Test', () => {
 
   afterEach(async () => {
     await Notification.deleteMany({});
+    await Firm.deleteMany({});
     await RawMaterialEntry.deleteMany({});
     await RawMaterial.deleteMany({});
     await MrSampleBag.deleteMany({});
   });
 
   it('generates notifications for expiring raw materials, low stock, and expiring sample bags', async () => {
+    const firm = await Firm.create({ name: 'Expiry Test Firm' });
     // 1. Seed expiring RawMaterialEntry
     const rmDoc = await RawMaterial.create({
       name: 'Ashwagandha Extract',
       sku: 'RM-ASH-001',
       stockLevel: 100,
       minReorder: 200,
-      unit: 'kg'
+      unit: 'kg',
+      firmId: firm._id
     });
 
     const now = new Date();
@@ -48,6 +52,7 @@ describe('expiryAlertChecker Integration Test', () => {
       rawMaterialId: rmDoc._id,
       batchNo: 'BATCH-RM-101',
       qty: 50,
+      firmId: firm._id,
       expiryDate: exp20Days
     });
 
@@ -57,6 +62,7 @@ describe('expiryAlertChecker Integration Test', () => {
       productId: new mongoose.Types.ObjectId(),
       batchNo: 'SAMPLE-99',
       qty: 10,
+      firmId: firm._id,
       expiryDate: exp20Days
     });
 

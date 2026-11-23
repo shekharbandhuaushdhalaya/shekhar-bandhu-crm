@@ -41,6 +41,7 @@ describe('Item 5: Packaging Material Deduction Guard Unit Suite', () => {
       batchNo: 'PKG-LOT-001',
       initialQty: 5000,
       qty: 5000,
+      reservedQty: 2000,
       purchaseRate: 2.5,
       qcStatus: 'approved'
     });
@@ -72,7 +73,8 @@ describe('Item 5: Packaging Material Deduction Guard Unit Suite', () => {
       bomId: bom._id,
       packagingDeducted: false,
       rawMaterialCost: 0,
-      ingredientsConsumed: []
+      ingredientsConsumed: [],
+      ingredientsReserved: [{ rawMaterialId: bottleRM._id, rawMaterialEntryId: entry._id, qtyReserved: 2000, batchNo: entry.batchNo }]
     };
 
     // Trigger packaging deduction for actual yield of 2,000 bottles
