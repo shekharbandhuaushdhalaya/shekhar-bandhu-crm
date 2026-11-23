@@ -1792,12 +1792,25 @@ export default function ManufacturingScreen() {
     return <View style={styles.screen} />;
   }
 
+  const materialQuery = materialSearch.trim().toLowerCase();
   const filteredMaterials = materials.filter(rm => {
-    const matchText = (rm.name || '').toLowerCase().includes(materialSearch.toLowerCase()) ||
-      (rm.sku || '').toLowerCase().includes(materialSearch.toLowerCase());
+    const searchableValues = [
+      rm.name,
+      rm.sku,
+      rm.category,
+      rm.materialType,
+      rm.botanicalName,
+      rm.acceptedScientificName,
+      rm.partUsed,
+      ...(Array.isArray(rm.commonNames) ? rm.commonNames : []),
+      ...(Array.isArray(rm.botanicalSynonyms) ? rm.botanicalSynonyms : [])
+    ];
+    const matchText = !materialQuery || searchableValues.some(value =>
+      String(value || '').toLowerCase().includes(materialQuery)
+    );
     if (!matchText) return false;
     if (stockFilter === 'low') {
-      return (rm.stockLevel || 0) < rm.minReorder;
+      return (rm.stockLevel || 0) < (Number(rm.minReorder) || 0);
     }
     if (stockFilter === 'in_stock') {
       return (rm.stockLevel || 0) > 0;
