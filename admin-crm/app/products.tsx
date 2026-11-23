@@ -122,8 +122,8 @@ export default function ProductsScreen() {
 
   useEffect(() => {
     const sub1 = DeviceEventEmitter.addListener('inventory_updated_event', () => load());
-    const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => load(true));
-    const sub3 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => load(true));
+    const sub2 = DeviceEventEmitter.addListener('mfg_stage_updated_event', () => load());
+    const sub3 = DeviceEventEmitter.addListener('mfg_batch_created_event', () => load());
     return () => {
       sub1.remove();
       sub2.remove();
