@@ -1569,7 +1569,7 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
         name: rm.name || null,
         botanicalName: rm.botanicalName || (referenceVerified ? pharmacopoeiaEntry.botanicalName : null),
         partUsed: rm.partUsed || (referenceVerified ? pharmacopoeiaEntry.partUsed || null : null),
-        pharmacopoeialStandard: rm.pharmacopoeialStandard || (referenceVerified ? pharmacopoeiaEntry.pharmacopoeialStandard : null),
+        pharmacopoeialStandard: rm.pharmacopoeialStandard || (referenceVerified ? pharmacopoeiaEntry.pharmacopoeialStandard || null : null),
         monographRef: rm.monographRef || (referenceVerified ? pharmacopoeiaEntry.monographRef || null : null),
         pharmacopoeiaReference: pharmacopoeiaEntry ? {
           source: pharmacopoeiaEntry.source || null,
@@ -1614,6 +1614,7 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
     if (!batch.bmrApprovedBy || !batch.bmrApprovedByName || !batch.bmrApprovedAt) missingEvidence.push('Pre-execution BMR approval identity or timestamp is missing');
     if (!batch.ingredientsConsumed || batch.ingredientsConsumed.length === 0) missingEvidence.push('No actual raw-material consumption genealogy is recorded');
     if (enrichedIngredients.some(item => !item.rawMaterialEntryId || !item.stockLotNo)) missingEvidence.push('One or more consumed materials lack a linked stock-entry lot reference');
+    if (enrichedIngredients.some(item => !item.dispensingNo)) missingEvidence.push('One or more consumed material lines lack independently verified dispensing genealogy');
     if (missingPharmacopoeiaReferences.length) missingEvidence.push('One or more consumed materials lack a pharmacopoeia reference record');
     if (unverifiedIngredients.length) missingEvidence.push('One or more pharmacopoeia references are not verified');
     if (!batch.stages || batch.stages.length === 0) missingEvidence.push('Manufacturing stage execution records are missing');
@@ -1635,7 +1636,8 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
     if (dispensingRecords.some(record => record.status === 'rejected')) missingEvidence.push('One or more material dispensing records were rejected');
     if (!qualitySpecification || qualitySpecification.status !== 'approved' ||
       String(qualitySpecification.productId) !== String(product ? product._id : batch.productId) ||
-      !qualitySpecification.approvedBy || !qualitySpecification.approvedAt) {
+      !qualitySpecification.approvedBy || !qualitySpecification.approvedAt ||
+      (qualitySpecification.effectiveDate && new Date(qualitySpecification.effectiveDate) > new Date())) {
       missingEvidence.push('Effective, approved product-specific quality specification is missing');
     }
     if (!mandatoryQcTests.length) missingEvidence.push('Approved quality specification has no mandatory test requirements');
