@@ -5,11 +5,13 @@ jest.mock('../models/BatchProduction');
 jest.mock('../models/Equipment');
 jest.mock('../models/TrainingRecord');
 jest.mock('../models/RolePermission');
+jest.mock('../models/LineClearance');
 
 const BatchProduction = require('../models/BatchProduction');
 const Equipment = require('../models/Equipment');
 const TrainingRecord = require('../models/TrainingRecord');
 const RolePermission = require('../models/RolePermission');
+const LineClearance = require('../models/LineClearance');
 const router = require('../routes/manufacturing/batchProductions');
 
 describe('Manufacturing stage qualification and equipment controls', () => {
@@ -29,6 +31,10 @@ describe('Manufacturing stage qualification and equipment controls', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
+    LineClearance.findOne.mockResolvedValue({
+      cleared: true, clearedBy: 'clearance-reviewer', clearedAt: new Date(),
+      checklist: { equipmentCleaned: true, previousMaterialsRemoved: true, previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true }
+    });
     TrainingRecord.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({
       _id: 'training-record-1', topic: 'GMP', trainedBy: 'QA Lead', trainedByUser: 'trainer-1',
       certificateRef: 'training/GMP-2026.pdf', status: 'verified', verifiedBy: 'reviewer-1', verifiedAt: new Date()
@@ -36,7 +42,7 @@ describe('Manufacturing stage qualification and equipment controls', () => {
   });
 
   test('blocks stage completion without current independently verified training', async () => {
-    const batch = { _id: 'batch-training-1', status: 'in_progress', stages: [{ name: 'Mixing', status: 'pending' }], save: jest.fn() };
+    const batch = { _id: 'batch-training-1', status: 'in_progress', bmrApprovedBy: 'bmr-reviewer', bmrApprovedByName: 'BMR Reviewer', bmrApprovedAt: new Date(), stages: [{ name: 'Mixing', status: 'pending' }], save: jest.fn() };
     BatchProduction.findById.mockResolvedValue(batch);
     TrainingRecord.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
 
@@ -48,7 +54,7 @@ describe('Manufacturing stage qualification and equipment controls', () => {
   });
 
   test('blocks stage completion when equipment calibration has not been independently verified', async () => {
-    const batch = { _id: 'batch-calibration-1', status: 'in_progress', stages: [{ name: 'Mixing', status: 'pending' }], save: jest.fn() };
+    const batch = { _id: 'batch-calibration-1', status: 'in_progress', bmrApprovedBy: 'bmr-reviewer', bmrApprovedByName: 'BMR Reviewer', bmrApprovedAt: new Date(), stages: [{ name: 'Mixing', status: 'pending' }], save: jest.fn() };
     BatchProduction.findById.mockResolvedValue(batch);
     Equipment.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({
       _id: 'equipment-1', name: 'Mixer', status: 'active',
@@ -68,7 +74,7 @@ describe('Manufacturing stage qualification and equipment controls', () => {
 
   test('snapshots independently verified operator training and equipment calibration on stage completion', async () => {
     const nextDue = new Date(Date.now() + 86400000 * 30);
-    const batch = { _id: 'batch-valid-1', status: 'in_progress', stages: [{ name: 'Mixing', status: 'pending' }], save: jest.fn().mockResolvedValue(true) };
+    const batch = { _id: 'batch-valid-1', status: 'in_progress', bmrApprovedBy: 'bmr-reviewer', bmrApprovedByName: 'BMR Reviewer', bmrApprovedAt: new Date(), stages: [{ name: 'Mixing', status: 'pending' }], save: jest.fn().mockResolvedValue(true) };
     BatchProduction.findById.mockResolvedValue(batch);
     Equipment.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({
       _id: 'equipment-1', name: 'Mixer', status: 'active', calibrationDueDate: nextDue,
