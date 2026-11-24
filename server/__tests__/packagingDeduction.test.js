@@ -6,7 +6,7 @@ describe('Packaging issue requires independently verified dispensing', () => {
       _id: 'batch-1',
       packagingDeducted: false,
       bomSnapshot: {
-        ingredients: [{ rawMaterialId: 'material-1', qtyRequired: 1, itemType: 'packaging' }]
+        ingredients: [{ rawMaterialId: 'material-1', qtyRequired: 1, itemType: 'packaging', stageName: 'Packaging & Labeling' }]
       },
       ingredientsReserved: [{ rawMaterialId: 'material-1', qtyReserved: 2000 }],
       stages: [{ name: 'Packaging & Labeling' }],

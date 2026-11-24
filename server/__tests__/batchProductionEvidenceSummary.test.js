@@ -117,7 +117,8 @@ describe('Packaging stock issue controls', () => {
   test('does not deduct or accept packaging without independently verified dispensing', async () => {
     const batch = {
       packagingDeducted: false,
-      bomSnapshot: { ingredients: [{ rawMaterialId: 'material-1', itemType: 'packaging', qtyRequired: 2 }] },
+      bomSnapshot: { ingredients: [{ rawMaterialId: 'material-1', itemType: 'packaging', qtyRequired: 2, stageName: 'Packaging & Labeling' }] },
+      stages: [{ name: 'Packaging & Labeling' }],
       ingredientsConsumed: []
     };
     await expect(deductPackagingMaterials(batch, 10)).rejects.toThrow('PACKAGING_DISPENSING_REQUIRED');
@@ -127,8 +128,9 @@ describe('Packaging stock issue controls', () => {
   test('accepts packaging only when verified dispensing genealogy covers actual output', async () => {
     const batch = {
       packagingDeducted: false,
-      bomSnapshot: { ingredients: [{ rawMaterialId: 'material-1', itemType: 'packaging', qtyRequired: 2 }] },
-      ingredientsConsumed: [{ rawMaterialId: 'material-1', qtyConsumed: 20, dispensingNo: 'DSP-000001' }]
+      bomSnapshot: { ingredients: [{ rawMaterialId: 'material-1', itemType: 'packaging', qtyRequired: 2, stageName: 'Packaging & Labeling' }] },
+      stages: [{ name: 'Packaging & Labeling' }],
+      ingredientsConsumed: [{ rawMaterialId: 'material-1', qtyConsumed: 20, dispensingNo: 'DSP-000001', stageIndex: 0 }]
     };
     await expect(deductPackagingMaterials(batch, 10)).resolves.toBeUndefined();
     expect(batch.packagingDeducted).toBe(true);
