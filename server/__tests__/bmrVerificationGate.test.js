@@ -20,7 +20,6 @@ const RawMaterial = require('../models/RawMaterial');
 const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
 const RawMaterialEntry = require('../models/RawMaterialEntry');
 const SystemSettings = require('../models/SystemSettings');
-const ProductQualitySpecification = require('../models/ProductQualitySpecification');
 const LineClearance = require('../models/LineClearance');
 const RetentionSample = require('../models/RetentionSample');
 const Product = require('../models/Product');

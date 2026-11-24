@@ -42,7 +42,7 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
   });
 
   // Feature 10 Tests
-  describe('Feature 10: Packing Material Reconciliation & Schedule T Audit', () => {
+  describe('Feature 10: Internal Packaging Material Reconciliation', () => {
     test('POST /api/batch-productions/:id/label-reconciliation passes compliant reconciliation', async () => {
       const mockSave = jest.fn().mockResolvedValue(true);
       const mockBatch = {
@@ -71,11 +71,11 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.overallAuditStatus).toBe('PASSED');
+      expect(res.body.overallAuditStatus).toBe('RECONCILED');
       expect(mockSave).toHaveBeenCalled();
     });
 
-    test('POST /api/batch-productions/:id/label-reconciliation flags discrepancy > 0.5% and logs quality deviation', async () => {
+    test('POST /api/batch-productions/:id/label-reconciliation flags any unaccounted quantity and logs a deviation', async () => {
       const mockSave = jest.fn().mockResolvedValue(true);
       const mockBatch = {
         _id: 'batch_102',
@@ -97,19 +97,19 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
               qtyUsed: 950,
               qtyDamaged: 10,
               qtyReturnedToStore: 0
-              // Unaccounted = 40 (4.0% discrepancy > 0.5%)
+              // Unaccounted quantity is 40 and must be investigated.
             }
           ]
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.overallAuditStatus).toBe('FLAGGED_EXCEEDS_0.5_PERCENT');
+      expect(res.body.overallAuditStatus).toBe('FLAGGED_UNACCOUNTED_QUANTITY');
       expect(mockBatch.deviations).toHaveLength(1);
-      expect(mockBatch.deviations[0].description).toContain('Schedule T Packing Audit Alert');
+      expect(mockBatch.deviations[0].description).toContain('Packaging material reconciliation discrepancy');
       expect(mockSave).toHaveBeenCalled();
     });
 
-    test('GET /api/batch-productions/:id/label-reconciliation-report generates official Schedule T audit JSON', async () => {
+    test('GET /api/batch-productions/:id/label-reconciliation-report identifies an internal reconciliation record', async () => {
       BatchProduction.findById.mockReturnValue({
         populate: jest.fn().mockReturnValue({
           lean: jest.fn().mockResolvedValue({
@@ -117,7 +117,7 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
             batchNo: 'B-2026-101',
             productId: { name: 'Chyawanprash Special' },
             labelReconciliation: [
-              { name: 'Printed Foil', qtyIssued: 500, qtyUsed: 498, discrepancyPct: 0.4, discrepancyFlagged: false }
+              { name: 'Printed Foil', qtyIssued: 500, qtyUsed: 498, qtyReturnedToStore: 2, discrepancyPct: 0, discrepancyFlagged: false, reconciled: true, auditStatus: 'passed' }
             ]
           })
         })
@@ -131,9 +131,11 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
 
       const res = await request(app).get('/api/batch-productions/batch_101/label-reconciliation-report');
       expect(res.status).toBe(200);
-      expect(res.body.title).toContain('AYUSH SCHEDULE T PACKING MATERIAL RECONCILIATION AUDIT REPORT');
+      expect(res.body.title).toBe('Packaging Material Reconciliation Record');
+      expect(res.body.documentType).toBe('INTERNAL_PACKAGING_MATERIAL_RECONCILIATION');
+      expect(res.body.officialRegulatoryReport).toBe(false);
       expect(res.body.firmDetails.name).toBe('SHEKHAR BANDHU AUSHADHALAYA');
-      expect(res.body.auditSummary.auditResult).toContain('COMPLIANT');
+      expect(res.body.auditSummary.auditResult).toBe('RECONCILED');
     });
   });
 

@@ -59,7 +59,7 @@ router.post('/', authorize('quality:create'), async (req, res) => {
         code: test.code, name: test.name, category: test.category, mandatory: test.mandatory !== false,
         specification: test.specification, unit: test.unit, methodReference: test.methodReference,
         result: hasResult ? String(recorded.result) : '',
-        numericResult: Number.isFinite(Number(recorded.numericResult)) && recorded.numericResult !== '' ? Number(recorded.numericResult) : null,
+        numericResult: recorded.numericResult !== undefined && recorded.numericResult !== null && recorded.numericResult !== '' && Number.isFinite(Number(recorded.numericResult)) ? Number(recorded.numericResult) : null,
         status: status === 'pass' && (!hasResult || !validTimestamp) ? 'pending' : status,
         testedBy: ['pass', 'fail'].includes(status) ? req.user.id : null,
         testedByName: ['pass', 'fail'].includes(status) ? req.user.name : '',

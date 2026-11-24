@@ -916,10 +916,17 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       return res.status(404).json({ error: 'Finished goods storage warehouse was not found.' });
     }
 
-    // Save QC parameters
-    batch.qcStatus = qcStatus || 'pending';
-    batch.qcPassedByUser = req.user ? req.user.id : null;
-    batch.qcPassedBy = (req.user ? req.user.name : '') || qcPassedBy.trim();
+    // Record a QC disposition only when an explicit decision is supplied.
+    const qcDisposition = qcStatus || 'pending';
+    if (!['pending', 'approved', 'rejected'].includes(qcDisposition)) {
+      return res.status(400).json({ error: 'QC disposition must be pending, approved, or rejected' });
+    }
+    if (qcDisposition !== 'pending' && (!req.user || !req.user.id || !req.user.name)) {
+      return res.status(401).json({ error: 'Authenticated QC analyst identity is required for a QC disposition' });
+    }
+    batch.qcStatus = qcDisposition;
+    batch.qcPassedByUser = qcDisposition === 'pending' ? null : req.user.id;
+    batch.qcPassedBy = qcDisposition === 'pending' ? '' : req.user.name;
     batch.jobWorkerCertificateRef = jobWorkerCertificateRef || '';
     batch.coaDocumentRef = coaDocumentRef || '';
     batch.jobWorkCharges = Number(jobWorkCharges) || 0;
@@ -1183,7 +1190,7 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       challanNo,
       now,
       userId: req.user ? req.user.id : null,
-      createdBy: qcPassedBy || (req.user ? req.user.name : 'System'),
+      createdBy: req.user && req.user.name ? req.user.name : 'System',
       backfillIngredients: backfillIngs,
       backfillWarehouseId
     });
