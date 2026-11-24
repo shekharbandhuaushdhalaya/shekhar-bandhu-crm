@@ -1,0 +1,101 @@
+const express = require('express');
+const request = require('supertest');
+
+jest.mock('../models/GoodsReceivedNote');
+jest.mock('../models/RolePermission');
+jest.mock('../utils/withTransaction', () => ({ withTransaction: jest.fn(async work => work({})) }));
+jest.mock('../utils/auditLogger', () => ({ logAction: jest.fn().mockResolvedValue(true) }));
+
+const GoodsReceivedNote = require('../models/GoodsReceivedNote');
+const RolePermission = require('../models/RolePermission');
+const { logAction } = require('../utils/auditLogger');
+const router = require('../routes/procurement/purchaseOrders');
+
+describe('GRN independent receipt and supplier-document verification', () => {
+  let app;
+  beforeAll(() => {
+    app = express();
+    app.use(express.json());
+    app.use((req, res, next) => {
+      req.user = {
+        id: req.headers['x-user-id'] || '507f1f77bcf86cd799439022',
+        name: req.headers['x-user-name'] || 'Independent Reviewer',
+        role: 'admin'
+      };
+      next();
+    });
+    app.use('/api/purchase-orders', router);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
+  });
+
+  const pendingGrn = (overrides = {}) => ({
+    _id: 'grn-1',
+    grnNo: 'GRN-00001',
+    poId: 'po-1',
+    status: 'pending_verification',
+    receivedByUserId: '507f1f77bcf86cd799439011',
+    items: [{ name: 'Ashwagandha Powder', rawMaterialId: '507f191e810c19729de860ea', batchNo: 'SUP-BATCH-1', supplierCoaRef: 'COA-REF-2026-01' }],
+    save: jest.fn().mockResolvedValue(true),
+    ...overrides
+  });
+
+  const mockFind = record => GoodsReceivedNote.findById.mockReturnValue({
+    session: jest.fn().mockResolvedValue(record)
+  });
+
+  test('does not allow the receipt operator to verify their own GRN', async () => {
+    mockFind(pendingGrn());
+    const response = await request(app)
+      .patch('/api/purchase-orders/grn/grn-1/verify')
+      .set('x-user-id', '507f1f77bcf86cd799439011')
+      .send({ verificationNotes: 'Checked supplier documents' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('GRN_MAKER_CHECKER_REQUIRED');
+  });
+
+  test('requires supplier CoA reference for every raw-material line before verification', async () => {
+    const record = pendingGrn({ items: [{ name: 'Ashwagandha Powder', rawMaterialId: '507f191e810c19729de860ea', batchNo: 'SUP-BATCH-1', supplierCoaRef: '' }] });
+    mockFind(record);
+    const response = await request(app)
+      .patch('/api/purchase-orders/grn/grn-1/verify')
+      .send({ verificationNotes: 'Physical quantity and documents checked' });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('GRN_SUPPLIER_COA_REQUIRED');
+    expect(record.save).not.toHaveBeenCalled();
+  });
+
+  test('independent verification records reviewer and audit evidence without releasing stock', async () => {
+    const record = pendingGrn();
+    mockFind(record);
+    const response = await request(app)
+      .patch('/api/purchase-orders/grn/grn-1/verify')
+      .set('x-user-id', '507f1f77bcf86cd799439022')
+      .send({ verificationNotes: 'Supplier batch, CoA reference and received quantity checked' });
+
+    expect(response.status).toBe(200);
+    expect(record.status).toBe('verified');
+    expect(record.verifiedByUserId).toBe('507f1f77bcf86cd799439022');
+    expect(record.verifiedByName).toBe('Independent Reviewer');
+    expect(record.verifiedAt).toBeInstanceOf(Date);
+    expect(record.save).toHaveBeenCalled();
+    expect(logAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'GRN_INDEPENDENT_VERIFICATION' }));
+  });
+
+  test('requires a reason when rejecting a GRN', async () => {
+    const record = pendingGrn();
+    mockFind(record);
+    const response = await request(app)
+      .patch('/api/purchase-orders/grn/grn-1/verify')
+      .send({ decision: 'rejected', verificationNotes: 'Mismatch observed' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/rejection reason/i);
+    expect(record.save).not.toHaveBeenCalled();
+  });
+});

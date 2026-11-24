@@ -10,6 +10,7 @@ const grnItemSchema = new mongoose.Schema({
   qtyAccepted: { type: Number, required: true, min: 0 },
   qtyRejected: { type: Number, default: 0, min: 0 },
   batchNo: { type: String, required: true, trim: true },
+  supplierCoaRef: { type: String, default: '', trim: true },
   mfgDate: { type: Date },
   expiryDate: { type: Date },
   rejectionReason: { type: String, default: '', trim: true }
@@ -24,7 +25,13 @@ const goodsReceivedNoteSchema = new mongoose.Schema({
   warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: true },
   receivedDate: { type: Date, default: Date.now },
   items: [grnItemSchema],
-  status: { type: String, enum: ['draft', 'verified', 'rejected'], default: 'verified' },
+  status: { type: String, enum: ['draft', 'pending_verification', 'verified', 'rejected'], default: 'pending_verification' },
+  receivedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  verifiedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  verifiedByName: { type: String, default: '', trim: true },
+  verifiedAt: { type: Date, default: null },
+  verificationNotes: { type: String, default: '', trim: true },
+  rejectionReason: { type: String, default: '', trim: true },
   notes: { type: String, default: '', trim: true },
   receivedBy: { type: String, default: 'System' }
 }, { timestamps: true });

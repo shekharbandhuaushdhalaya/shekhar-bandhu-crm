@@ -16,6 +16,7 @@ const schemas = require('../../validation/schemas');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const { withTransaction } = require('../../utils/withTransaction');
 const idempotency = require('../../middleware/requiredIdempotency');
+const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
 
@@ -100,6 +101,9 @@ router.patch('/:id/approve', authorize('vendor:edit'), async (req, res) => {
 // until QC explicitly approves their InventoryEntry/RawMaterialEntry.
 router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.grnSchema), async (req, res) => {
   try {
+    if (!(req.user?.id || req.user?._id) || !(req.user?.name || req.user?.email)) {
+      return res.status(403).json({ error: 'Authenticated goods-receiver identity is required to record a GRN' });
+    }
     const result = await withTransaction(async session => {
       const po = await PurchaseOrder.findById(req.params.id).session(session);
       if (!po) throw Object.assign(new Error('Purchase Order not found'), { statusCode: 404 });
@@ -136,7 +140,7 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
 
         const mfgDate = item.mfgDate ? new Date(item.mfgDate) : null;
         const expiryDate = item.expiryDate ? new Date(item.expiryDate) : null;
-        grnItems.push({ ...item, mfgDate, expiryDate });
+        grnItems.push({ ...item, batchNo: String(item.batchNo).trim(), supplierCoaRef: String(item.supplierCoaRef || '').trim(), mfgDate, expiryDate });
         poItem.qtyReceived = Number(poItem.qtyReceived || 0) + accepted;
 
         if (accepted <= 0) continue;
@@ -204,13 +208,49 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
       const [grn] = await GoodsReceivedNote.create([{
         grnNo, poId: po._id, poNo: po.poNo, vendorId: po.vendorId, vendorName: po.vendorName,
         warehouseId: wh._id, receivedDate: new Date(), items: grnItems,
-        status: 'verified', notes: req.body.notes, receivedBy: req.user?.name || 'System'
+        status: 'pending_verification', notes: req.body.notes, receivedBy: req.user?.name || req.user?.email || 'System',
+        receivedByUserId: req.user?.id || req.user?._id || null
       }], { session });
       return { grn, po };
     });
     req.io?.emit('grn_updated', { type: 'created', id: result.grn._id });
-    res.status(201).json({ message: 'GRN processed; accepted stock is awaiting QC approval', ...result });
+    res.status(201).json({ message: 'GRN receipt recorded; independent document verification and incoming QC are pending', ...result });
   } catch (err) { res.status(err.statusCode || 400).json({ error: err.message }); }
+});
+
+// PATCH /api/purchase-orders/grn/:id/verify — independent GRN document/receipt review.
+router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), async (req, res) => {
+  try {
+    const reviewerId = req.user?.id || req.user?._id;
+    const reviewerName = req.user?.name || req.user?.email;
+    const decision = req.body?.decision || 'verified';
+    const verificationNotes = typeof req.body?.verificationNotes === 'string' ? req.body.verificationNotes.trim() : '';
+    if (!reviewerId || !reviewerName) return res.status(403).json({ error: 'Authenticated independent reviewer identity is required' });
+    if (!['verified', 'rejected'].includes(decision)) return res.status(400).json({ error: 'decision must be verified or rejected' });
+    if (!verificationNotes) return res.status(400).json({ error: 'Verification notes are required' });
+    if (decision === 'rejected' && !String(req.body.rejectionReason || '').trim()) return res.status(400).json({ error: 'A rejection reason is required' });
+    const grn = await withTransaction(async session => {
+      const record = await GoodsReceivedNote.findById(req.params.id).session(session);
+      if (!record) throw Object.assign(new Error('Goods Received Note not found'), { statusCode: 404 });
+      if (record.status !== 'pending_verification') throw Object.assign(new Error('Only pending GRNs can be independently verified'), { statusCode: 409 });
+      if (record.receivedByUserId && String(record.receivedByUserId) === String(reviewerId)) throw Object.assign(new Error('The person recording receipt cannot verify the same GRN'), { statusCode: 403, code: 'GRN_MAKER_CHECKER_REQUIRED' });
+      if (decision === 'verified') {
+        const missingCoa = (record.items || []).filter(item => item.rawMaterialId && !String(item.supplierCoaRef || '').trim());
+        if (missingCoa.length) throw Object.assign(new Error('Supplier CoA reference is required for every raw-material line before GRN verification: ' + missingCoa.map(item => item.name).join(', ')), { statusCode: 409, code: 'GRN_SUPPLIER_COA_REQUIRED' });
+      }
+      record.status = decision;
+      record.verifiedByUserId = reviewerId;
+      record.verifiedByName = reviewerName;
+      record.verifiedAt = new Date();
+      record.verificationNotes = verificationNotes;
+      record.rejectionReason = decision === 'rejected' ? String(req.body.rejectionReason).trim() : '';
+      await record.save({ session });
+      return record;
+    });
+    await logAction({ action: 'GRN_INDEPENDENT_VERIFICATION', description: 'GRN ' + grn.grnNo + ' ' + decision + ' by independent reviewer', details: { grnId: grn._id, grnNo: grn.grnNo, poId: grn.poId, decision, verificationNotes: grn.verificationNotes, rejectionReason: grn.rejectionReason }, req });
+    req.io?.emit('grn_updated', { type: decision, id: grn._id });
+    return res.json(grn);
+  } catch (err) { return res.status(err.statusCode || 400).json({ error: err.message, code: err.code }); }
 });
 
 router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
