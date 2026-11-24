@@ -98,4 +98,31 @@ describe('GRN independent receipt and supplier-document verification', () => {
     expect(response.body.error).toMatch(/rejection reason/i);
     expect(record.save).not.toHaveBeenCalled();
   });
+  test('lists GRNs with status, search and pagination filters', async () => {
+    const rows = [{ _id: 'grn-2', grnNo: 'GRN-00002', status: 'pending_verification' }];
+    GoodsReceivedNote.find = jest.fn().mockReturnValue({
+      sort: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue(rows)
+    });
+    GoodsReceivedNote.countDocuments = jest.fn().mockResolvedValue(1);
+    const response = await request(app).get('/api/purchase-orders/grn?status=pending_verification&search=GRN-00002&page=1&limit=10');
+    expect(response.status).toBe(200);
+    expect(response.body.items).toEqual(rows);
+    expect(response.body.total).toBe(1);
+    expect(GoodsReceivedNote.find).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'pending_verification',
+      $or: expect.arrayContaining([expect.objectContaining({ grnNo: expect.any(Object) })])
+    }));
+  });
+
+  test('returns a GRN detail record by id', async () => {
+    const record = { _id: 'grn-1', grnNo: 'GRN-00001', status: 'pending_verification' };
+    GoodsReceivedNote.findById = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(record) });
+    const response = await request(app).get('/api/purchase-orders/grn/grn-1');
+    expect(response.status).toBe(200);
+    expect(response.body.grnNo).toBe('GRN-00001');
+  });
+
 });

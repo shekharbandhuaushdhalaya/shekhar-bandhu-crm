@@ -230,6 +230,38 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
 });
 
 // PATCH /api/purchase-orders/grn/:id/verify — independent GRN document/receipt review.
+router.get('/grn', authorize('vendor:view'), async (req, res) => {
+  try {
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
+    const filter = {};
+    if (req.query.status && req.query.status !== 'all') filter.status = req.query.status;
+    if (req.query.poId) filter.poId = req.query.poId;
+    if (req.query.vendorId) filter.vendorId = req.query.vendorId;
+    if (req.query.search) {
+      const search = String(req.query.search).trim().slice(0, 100);
+      if (search) filter.$or = [
+        { grnNo: { $regex: search, $options: 'i' } },
+        { poNo: { $regex: search, $options: 'i' } },
+        { vendorName: { $regex: search, $options: 'i' } }
+      ];
+    }
+    const [items, total] = await Promise.all([
+      GoodsReceivedNote.find(filter).sort({ receivedDate: -1, createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      GoodsReceivedNote.countDocuments(filter)
+    ]);
+    res.json({ items, page, limit, total, totalPages: Math.ceil(total / limit) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/grn/:id', authorize('vendor:view'), async (req, res) => {
+  try {
+    const record = await GoodsReceivedNote.findById(req.params.id).lean();
+    if (!record) return res.status(404).json({ error: 'Goods Received Note not found' });
+    res.json(record);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), async (req, res) => {
   try {
     const reviewerId = req.user?.id || req.user?._id;
