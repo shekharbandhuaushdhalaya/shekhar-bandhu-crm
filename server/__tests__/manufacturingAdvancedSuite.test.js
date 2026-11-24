@@ -3,6 +3,7 @@ const request = require('supertest');
 
 // Mocks
 jest.mock('../models/BatchProduction');
+jest.mock('../models/LineClearance');
 jest.mock('../models/RawMaterial');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/AuditLog');
@@ -15,6 +16,7 @@ jest.mock('../models/Counter', () => ({
 }));
 
 const BatchProduction = require('../models/BatchProduction');
+const LineClearance = require('../models/LineClearance');
 const RawMaterial = require('../models/RawMaterial');
 const SystemSettings = require('../models/SystemSettings');
 const AuditLog = require('../models/AuditLog');
@@ -117,6 +119,54 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
       expect(item).toMatchObject({ unaccountedQty: 40, discrepancyFlagged: true, reconciled: true, verifiedByName: 'Independent QA' });
       expect(mockBatch.deviations).toHaveLength(1);
       expect(mockBatch.deviations[0].description).toContain('Packaging material reconciliation discrepancy');
+    });
+  });
+
+  describe('Independent line-clearance verification', () => {
+    const checklist = {
+      equipmentCleaned: true, previousMaterialsRemoved: true,
+      previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true
+    };
+
+    test('submits a complete line-clearance checklist as pending, not cleared', async () => {
+      BatchProduction.findById.mockResolvedValue({
+        _id: 'batch-line-1', status: 'draft', manufacturingUnitId: 'unit-1', releasedBy: null
+      });
+      LineClearance.findOne.mockResolvedValue(null);
+      LineClearance.create.mockImplementation(async data => ({ _id: 'clearance-1', ...data }));
+      const res = await request(app).post('/api/batch-productions/batch-line-1/line-clearance')
+        .send({ phase: 'manufacturing', checklist });
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('PENDING_INDEPENDENT_VERIFICATION');
+      expect(LineClearance.create).toHaveBeenCalledWith(expect.objectContaining({
+        cleared: false, submittedBy: '507f1f77bcf86cd799439011',
+        checklist: expect.objectContaining(checklist)
+      }));
+    });
+
+    test('prevents operator self-verification and records independent QA signoff', async () => {
+      BatchProduction.findById.mockResolvedValue({
+        _id: 'batch-line-2', status: 'draft', releasedBy: null
+      });
+      const record = {
+        _id: 'clearance-2', batchId: 'batch-line-2', cleared: false,
+        submittedBy: '507f1f77bcf86cd799439011', checklist,
+        save: jest.fn().mockResolvedValue(true)
+      };
+      LineClearance.findById.mockResolvedValue(record);
+      const selfVerify = await request(app).patch('/api/batch-productions/batch-line-2/line-clearance/clearance-2/verify');
+      expect(selfVerify.status).toBe(409);
+      const verified = await request(app)
+        .patch('/api/batch-productions/batch-line-2/line-clearance/clearance-2/verify')
+        .set('x-user-id', 'independent-line-reviewer')
+        .set('x-user-name', 'Independent Line Reviewer');
+      expect(verified.status).toBe(200);
+      expect(record).toMatchObject({
+        cleared: true, clearedBy: 'independent-line-reviewer',
+        verifiedBy: 'independent-line-reviewer', verifiedByName: 'Independent Line Reviewer'
+      });
+      expect(record.verifiedAt).toBeInstanceOf(Date);
+      expect(record.save).toHaveBeenCalled();
     });
   });
 

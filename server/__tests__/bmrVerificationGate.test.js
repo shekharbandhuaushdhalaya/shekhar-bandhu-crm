@@ -230,7 +230,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       save: jest.fn().mockResolvedValue(true)
     });
     const makeClearances = () => ['manufacturing', 'filling', 'packing'].map(phase => ({
-      phase, cleared: true, clearedBy: 'clearance-reviewer', clearedAt: new Date(),
+      phase, cleared: true, submittedBy: 'clearance-operator', verifiedBy: 'clearance-reviewer', verifiedAt: new Date(), clearedBy: 'clearance-reviewer', clearedAt: new Date(),
       checklist: { equipmentCleaned: true, previousMaterialsRemoved: true, previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true }
     }));
     const approvedSpec = {
