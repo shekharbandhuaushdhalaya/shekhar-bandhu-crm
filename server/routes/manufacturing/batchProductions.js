@@ -1203,6 +1203,113 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
 });
 
 // PATCH /api/batch-productions/:id/release — Market release approval separate from QC inspection
+// PATCH /api/batch-productions/:id/qc-tests — Record actual results against the pinned approved product specification.
+router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated QC analyst identity is required to record test results' });
+    }
+    if (batch.status === 'cancelled' || batch.status === 'rejected' || batch.releasedBy) {
+      return res.status(409).json({ error: 'QC test results cannot be added to cancelled, rejected or released batches' });
+    }
+    const tests = req.body.tests;
+    if (!Array.isArray(tests) || tests.length === 0) {
+      return res.status(400).json({ error: 'At least one actual QC test result is required' });
+    }
+    const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
+    const specificationId = batch.qcSpecificationId || req.body.qcSpecificationId;
+    if (!specificationId) {
+      return res.status(409).json({ error: 'Select an approved product-specific quality specification before recording QC tests' });
+    }
+    const spec = await ProductQualitySpecification.findById(specificationId).lean();
+    const productId = batch.productId && batch.productId._id ? batch.productId._id : batch.productId;
+    if (!spec || spec.status !== 'approved' || String(spec.productId) !== String(productId) ||
+      !spec.approvedBy || !spec.approvedAt || (spec.effectiveDate && new Date(spec.effectiveDate) > new Date())) {
+      return res.status(409).json({ error: 'QC tests require an effective, approved specification for this exact product' });
+    }
+    const specTests = new Map((spec.tests || []).map(test => [String(test.code || '').trim().toLowerCase(), test]));
+    if (!specTests.size) return res.status(409).json({ error: 'Approved product quality specification has no test requirements' });
+    const existingCodes = new Set((batch.qcTests || []).map(test => String(test.code || '').trim().toLowerCase()));
+    const submittedCodes = new Set();
+    const normalized = [];
+    for (const item of tests) {
+      const code = String(item.code || '').trim();
+      const key = code.toLowerCase();
+      const specTest = specTests.get(key);
+      if (!code || !specTest) return res.status(400).json({ error: 'Every QC test code must exist in the approved product specification', code });
+      if (submittedCodes.has(key) || existingCodes.has(key)) {
+        return res.status(409).json({ error: 'A QC result for test ' + code + ' is already recorded; use the controlled QC correction workflow rather than overwriting test history' });
+      }
+      submittedCodes.add(key);
+      const status = String(item.status || 'pending').toLowerCase();
+      if (!['pending', 'pass', 'fail'].includes(status)) {
+        return res.status(400).json({ error: 'QC test status must be pending, pass or fail', code });
+      }
+      const hasTextResult = item.result !== undefined && item.result !== null && String(item.result).trim() !== '';
+      const hasNumericResult = item.numericResult !== undefined && item.numericResult !== null &&
+        Number.isFinite(Number(item.numericResult));
+      if (!hasTextResult && !hasNumericResult) {
+        return res.status(400).json({ error: 'An actual text or numeric result is required for QC test ' + code });
+      }
+      normalized.push({
+        code: specTest.code,
+        name: specTest.name,
+        category: specTest.category || 'other',
+        specification: specTest.specification,
+        unit: specTest.unit || '',
+        methodReference: specTest.methodReference || '',
+        result: hasTextResult ? String(item.result).trim() : '',
+        numericResult: hasNumericResult ? Number(item.numericResult) : null,
+        status,
+        testedBy: req.user.id,
+        testedByName: req.user.name,
+        testedAt: new Date(),
+        remarks: String(item.remarks || '').trim()
+      });
+    }
+    batch.qcSpecificationId = spec._id;
+    batch.qcSpecificationVersion = spec.specificationVersion || '';
+    batch.qcTests = (batch.qcTests || []).concat(normalized);
+    const allResults = new Map(batch.qcTests.map(test => [String(test.code || '').trim().toLowerCase(), test]));
+    const mandatory = (spec.tests || []).filter(test => test.mandatory !== false);
+    const failed = batch.qcTests.some(test => String(test.status || '').toLowerCase() === 'fail');
+    const mandatoryPassed = mandatory.length > 0 && mandatory.every(test =>
+      String((allResults.get(String(test.code || '').trim().toLowerCase()) || {}).status || '').toLowerCase() === 'pass'
+    );
+    if (failed) {
+      batch.qcStatus = 'rejected';
+      batch.qcPassedByUser = req.user.id;
+      batch.qcPassedBy = req.user.name;
+      if (batch.status === 'completed') batch.status = 'qc_hold';
+    } else if (mandatoryPassed) {
+      batch.qcStatus = 'approved';
+      batch.qcPassedByUser = req.user.id;
+      batch.qcPassedBy = req.user.name;
+    } else {
+      batch.qcStatus = 'pending';
+      batch.qcPassedByUser = null;
+      batch.qcPassedBy = '';
+    }
+    await batch.save();
+    if (req.io) req.io.emit('mfg_batch_updated', batch);
+    res.json({
+      batch,
+      qcStatus: batch.qcStatus,
+      mandatoryTests: mandatory.length,
+      recordedTests: batch.qcTests.length,
+      mandatoryTestsPassed: mandatoryPassed,
+      deviationRequired: failed,
+      message: failed ? 'One or more recorded tests failed. Batch is on QC hold and requires deviation investigation.' :
+        (mandatoryPassed ? 'All mandatory tests are recorded as passed. Independent QA release is still required.' :
+          'QC results recorded. Remaining mandatory tests must be completed before QC approval.')
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.patch('/:id/release', authorize('manufacturing:release'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id);
@@ -1236,6 +1343,7 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
     const mandatory = (spec.tests || []).filter(t => t.mandatory !== false);
     if (!mandatory.length) return res.status(400).json({ error: 'Approved product quality specification has no mandatory test requirements' });
     const results = batch.qcTests || [];
+    if (results.some(test => String(test.status || '').toLowerCase() === 'fail')) return res.status(400).json({ error: 'A failed finished-product QC test prevents market release; investigate the deviation and document disposition' });
     const missing = mandatory.filter(t => {
       const result = results.find(x => String(x.code) === String(t.code));
       return !result || String(result.status || '').toLowerCase() !== 'pass' ||
@@ -1650,6 +1758,7 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
       }
     }
     if (batch.qcStatus !== 'approved') missingEvidence.push('Finished-product QC approval is not recorded');
+    if ((batch.qcTests || []).some(test => String(test.status || '').toLowerCase() === 'fail')) missingEvidence.push('One or more finished-product QC tests have failed');
     if (!batch.releasedBy || !batch.releasedByName || !batch.releasedAt) missingEvidence.push('Independent finished-batch QA release is missing');
     if (batch.actualYieldQty === undefined || batch.actualYieldQty === null) missingEvidence.push('Actual batch yield is not recorded');
     if (Number(batch.wasteQty || 0) > 0 && !batch.wasteReason) missingEvidence.push('Recorded production wastage has no reason');
