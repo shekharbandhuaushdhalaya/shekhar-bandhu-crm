@@ -238,71 +238,86 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
       // formulationBasis defaults to 100 for backwards compatibility.
       const FORMULATION_BASIS = bom.formulationBasis || 100;
       const FORMULATION_BASIS_UNIT = (bom.formulationBasisUnit || 'ml').toLowerCase();
-      const immediateDeductGroup = [];
+      const defaultStages = [
+        { name: 'Raw Material Verification & Weighing', targetDurationHours: 2 },
+        { name: 'Primary Processing (Swasan/Mardan)', targetDurationHours: 4 },
+        { name: 'Mixing & Blending', targetDurationHours: 4 },
+        { name: 'Forming (Vati/Gutika)', targetDurationHours: 4 },
+        { name: 'Drying', targetDurationHours: 8 },
+        { name: 'QC Testing', targetDurationHours: 4 },
+        { name: 'Packaging & Labeling', targetDurationHours: 4 }
+      ];
+      const customStages = bom.stages && bom.stages.length > 0 ? bom.stages : defaultStages;
+      const firstStageName = customStages[0] && customStages[0].name
+        ? customStages[0].name
+        : 'Raw Material Verification & Weighing';
+      const packagingStage = customStages.find(stage => /pack|label/i.test(stage.name || '')) || customStages[customStages.length - 1];
+      const packagingStageName = packagingStage && packagingStage.name ? packagingStage.name : firstStageName;
       const blockGroup = [];
+      const ingredientSnapshots = [];
 
-      if (!isDirectPurchase) {
-        for (const ing of bom.ingredients) {
-          const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
-          if (!rm) continue;
+      for (const ing of (bom.ingredients || [])) {
+        if (!ing.rawMaterialId) throw new Error('Every BOM ingredient must reference a raw material');
+        const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
+        if (!rm) throw new Error('Raw material referenced by BOM was not found: ' + String(ing.rawMaterialId));
 
-          const isPackaging = ing.itemType === 'packaging' || (rm.materialType === 'packaging' || (rm.materialType === 'packaging' || rm.category === 'Packaging' || rm.category === 'Packaging Material') || rm.category === 'Packaging Material');
-          const hasStage = ing.stageName && ing.stageName.trim().length > 0;
+        const isPackaging = ing.itemType === 'packaging' ||
+          rm.materialType === 'packaging' ||
+          rm.category === 'Packaging' ||
+          rm.category === 'Packaging Material';
+        const stageName = ing.stageName && ing.stageName.trim()
+          ? ing.stageName.trim()
+          : (isPackaging ? packagingStageName : firstStageName);
+        let qtyNeeded = 0;
 
-          let qtyNeeded = 0;
-          if (isPackaging) {
-            qtyNeeded = ing.qtyRequired * valPlanned;
-          } else {
-            if (effectiveYields) {
-              let totalBatchVolume = 0;
-              let allHaveSizes = true;
-              for (const y of effectiveYields) {
-                const sizeMl = getSizeInMl(y.size || '');
-                if (sizeMl > 0) {
-                  totalBatchVolume += sizeMl * Number(y.plannedQty);
-                } else {
-                  allHaveSizes = false;
-                  break;
-                }
-              }
-              if (allHaveSizes && totalBatchVolume > 0) {
-                const totalInBasisUnit = FORMULATION_BASIS_UNIT === 'l' ? totalBatchVolume / 1000 : totalBatchVolume;
-                qtyNeeded = ing.qtyRequired * (totalInBasisUnit / FORMULATION_BASIS);
-              } else {
-                const totalPcs = effectiveYields.reduce((s, y) => s + Number(y.plannedQty), 0);
-                qtyNeeded = ing.qtyRequired * (totalPcs / FORMULATION_BASIS);
-              }
-            } else {
-              qtyNeeded = ing.qtyRequired * (valPlanned / FORMULATION_BASIS);
-            }
+        if (isPackaging) {
+          qtyNeeded = Number(ing.qtyRequired || 0) * valPlanned;
+        } else if (effectiveYields) {
+          let totalBatchVolume = 0;
+          let allHaveSizes = true;
+          for (const y of effectiveYields) {
+            const sizeMl = getSizeInMl(y.size || '');
+            if (sizeMl > 0) totalBatchVolume += sizeMl * Number(y.plannedQty);
+            else { allHaveSizes = false; break; }
           }
+          if (allHaveSizes && totalBatchVolume > 0) {
+            const totalInBasisUnit = FORMULATION_BASIS_UNIT === 'l' ? totalBatchVolume / 1000 : totalBatchVolume;
+            qtyNeeded = Number(ing.qtyRequired || 0) * (totalInBasisUnit / FORMULATION_BASIS);
+          } else {
+            const totalPcs = effectiveYields.reduce((sum, y) => sum + Number(y.plannedQty), 0);
+            qtyNeeded = Number(ing.qtyRequired || 0) * (totalPcs / FORMULATION_BASIS);
+          }
+        } else {
+          qtyNeeded = Number(ing.qtyRequired || 0) * (valPlanned / FORMULATION_BASIS);
+        }
 
-          qtyNeeded = Number(qtyNeeded.toFixed(2));
-          if (qtyNeeded <= 0) continue;
-
-          const itemSpec = {
+        qtyNeeded = Number(qtyNeeded.toFixed(2));
+        ingredientSnapshots.push({
+          rawMaterialId: ing.rawMaterialId,
+          itemType: ing.itemType || (isPackaging ? 'packaging' : 'formulation'),
+          qtyRequired: Number(ing.qtyRequired || 0),
+          qtyRequiredForBatch: qtyNeeded,
+          stageName
+        });
+        if (!isDirectPurchase && qtyNeeded > 0) {
+          blockGroup.push({
             rawMaterialId: ing.rawMaterialId,
             rmName: rm.name,
             unit: rm.unit || 'Kg',
             qtyNeeded,
-            stageName: ing.stageName || ''
-          };
-
-          if (!isPackaging && !hasStage) {
-            immediateDeductGroup.push(itemSpec);
-          } else {
-            blockGroup.push(itemSpec);
-          }
+            stageName
+          });
         }
       }
 
+      // All raw materials, including previously "immediate" untagged ingredients,
+      // remain reserved until weighed and independently verified through dispensing.
       const ingredientsConsumed = [];
       const ingredientsReserved = [];
       let rawMaterialCost = 0;
 
       if (!isDirectPurchase) {
-        // 1. Immediate-deduct group (no stage tag, not packaging)
-        for (const item of immediateDeductGroup) {
+        for (const item of blockGroup) {
           const entries = await RawMaterialEntry.find({
             rawMaterialId: item.rawMaterialId,
             warehouseId: manufacturingWarehouse._id,
@@ -317,79 +332,35 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
             return new Date(a.createdAt) - new Date(b.createdAt);
           });
 
-          const totalAvailable = entries.reduce((acc, e) => acc + Math.max(0, (e.qty || 0) - (e.reservedQty || 0)), 0);
-          if (totalAvailable < item.qtyNeeded) {
-            throw new Error(`Insufficient available stock for raw material: ${item.rmName}. Needed: ${item.qtyNeeded.toFixed(2)} ${item.unit}, Available: ${totalAvailable.toFixed(2)} ${item.unit} (excluding stock reserved for other runs)`);
+          const totalAvailable = entries.reduce((sum, entry) =>
+            sum + Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0)), 0);
+          if (totalAvailable + 0.0001 < item.qtyNeeded) {
+            throw new Error('Insufficient available stock for raw material: ' + item.rmName +
+              '. Needed: ' + item.qtyNeeded.toFixed(2) + ' ' + item.unit +
+              ', Available: ' + totalAvailable.toFixed(2) + ' ' + item.unit +
+              ' (excluding stock reserved for other runs)');
           }
 
           let needed = item.qtyNeeded;
           for (const entry of entries) {
             if (needed <= 0.0001) break;
-            const avail = Math.max(0, (entry.qty || 0) - (entry.reservedQty || 0));
-            if (avail <= 0.0001) continue;
-
-            const deduct = Math.min(needed, avail);
-            const deductVal = Number(deduct.toFixed(2));
-            if (deductVal <= 0) continue;
-
-            entry.qty = Math.max(0, Number((entry.qty - deductVal).toFixed(2)));
-            entry.usedQty = Number(((entry.usedQty || 0) + deductVal).toFixed(2));
-            entry.issuedQty = Number(((entry.issuedQty || 0) + deductVal).toFixed(2));
+            const available = Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0));
+            if (available <= 0.0001) continue;
+            const reserve = Number(Math.min(needed, available).toFixed(2));
+            if (reserve <= 0) continue;
+            entry.reservedQty = Number((Number(entry.reservedQty || 0) + reserve).toFixed(2));
             await entry.save({ session });
-
-            rawMaterialCost += deductVal * (entry.purchaseRate || 0);
-            ingredientsConsumed.push({
-              rawMaterialId: item.rawMaterialId,
-              rawMaterialEntryId: entry._id,
-              qtyConsumed: deductVal,
-              batchNo: entry.batchNo
-            });
-            needed = Number((needed - deductVal).toFixed(2));
-          }
-        }
-
-        // 2. Block group (has stage tag OR is packaging)
-        for (const item of blockGroup) {
-          const entries = await RawMaterialEntry.find({
-            rawMaterialId: item.rawMaterialId,
-            warehouseId: manufacturingWarehouse._id,
-            qcStatus: 'approved'
-          }).session(session);
-
-          entries.sort((a, b) => {
-            if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
-            if (a.expiryDate && !b.expiryDate) return -1;
-            if (!a.expiryDate && b.expiryDate) return 1;
-            return new Date(a.createdAt) - new Date(b.createdAt);
-          });
-
-          const totalAvailable = entries.reduce((acc, e) => acc + Math.max(0, (e.qty || 0) - (e.reservedQty || 0)), 0);
-          if (totalAvailable < item.qtyNeeded) {
-            throw new Error(`Insufficient available stock for raw material: ${item.rmName}. Needed: ${item.qtyNeeded.toFixed(2)} ${item.unit}, Available: ${totalAvailable.toFixed(2)} ${item.unit} (excluding stock reserved for other runs)`);
-          }
-
-          let needed = item.qtyNeeded;
-          for (const entry of entries) {
-            if (needed <= 0.0001) break;
-            const avail = Math.max(0, (entry.qty || 0) - (entry.reservedQty || 0));
-            if (avail <= 0.0001) continue;
-
-            const block = Math.min(needed, avail);
-            const blockVal = Number(block.toFixed(2));
-            if (blockVal <= 0) continue;
-
-            entry.reservedQty = Number(((entry.reservedQty || 0) + blockVal).toFixed(2));
-            entry.issuedQty = Number(((entry.issuedQty || 0) + blockVal).toFixed(2));
-            await entry.save({ session });
-
             ingredientsReserved.push({
               rawMaterialId: item.rawMaterialId,
               rawMaterialEntryId: entry._id,
-              qtyReserved: blockVal,
+              qtyReserved: reserve,
               batchNo: entry.batchNo,
-              stageName: item.stageName || ''
+              stageName: item.stageName
             });
-            needed = Number((needed - blockVal).toFixed(2));
+            needed = Number((needed - reserve).toFixed(2));
+          }
+          if (needed > 0.0001) {
+            throw new Error('Unable to reserve the full required quantity for raw material: ' + item.rmName);
           }
         }
       }
@@ -397,19 +368,6 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
       // Scaled overhead calculation — same fixed per-100-output-unit basis as formulation ingredients
       const overheadScale = valPlanned / FORMULATION_BASIS;
       const computedOverhead = (bom.overheadCost || 0) * overheadScale;
-
-      // Configure Custom Stages or fallback to default manufacturing stages
-      const customStages = bom.stages && bom.stages.length > 0
-        ? bom.stages
-        : [
-          { name: 'Raw Material Verification & Weighing', targetDurationHours: 2 },
-          { name: 'Primary Processing (Swasan/Mardan)', targetDurationHours: 4 },
-          { name: 'Mixing & Blending', targetDurationHours: 4 },
-          { name: 'Forming (Vati/Gutika)', targetDurationHours: 4 },
-          { name: 'Drying', targetDurationHours: 8 },
-          { name: 'QC Testing', targetDurationHours: 4 },
-          { name: 'Packaging & Labeling', targetDurationHours: 4 }
-        ];
 
       const batchStages = customStages.map((st, i) => {
         const startedAt = i === 0 ? new Date() : null;
@@ -437,12 +395,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
           recipeVersion: bom.recipeVersion || `v${bom.__v || 0}`,
           formulationBasis: bom.formulationBasis || 100,
           formulationBasisUnit: bom.formulationBasisUnit || 'ml',
-          ingredients: (bom.ingredients || []).map(i => ({
-            rawMaterialId: i.rawMaterialId,
-            itemType: i.itemType || 'formulation',
-            qtyRequired: i.qtyRequired || 0,
-            stageName: i.stageName || ''
-          })),
+          ingredients: ingredientSnapshots,
           overheadCost: bom.overheadCost || 0,
           stages: (bom.stages || []).map(s => ({ name: s.name, targetDurationHours: s.targetDurationHours || (s.targetDurationDays ? s.targetDurationDays * 24 : 8) }))
         },
@@ -765,9 +718,12 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
         ingredient.itemType !== 'packaging' &&
         (ingredient.stageName ? ingredient.stageName === currentStage.name : stageIndex === 0));
       for (const ingredient of requiredLines) {
-        const requiredQty = Number(ingredient.qtyRequired || 0) * multiplier;
+        const requiredQty = ingredient.qtyRequiredForBatch !== undefined && ingredient.qtyRequiredForBatch !== null
+          ? Number(ingredient.qtyRequiredForBatch)
+          : Number(ingredient.qtyRequired || 0) * multiplier;
         const consumedQty = (batch.ingredientsConsumed || [])
-          .filter(item => String(item.rawMaterialId) === String(ingredient.rawMaterialId) && Number(item.stageIndex) === stageIndex)
+          .filter(item => String(item.rawMaterialId) === String(ingredient.rawMaterialId) &&
+            Number.isInteger(item.stageIndex) && Number(item.stageIndex) === stageIndex)
           .reduce((sum, item) => sum + Number(item.qtyConsumed || 0), 0);
         if (consumedQty + 0.0001 < requiredQty) {
           return res.status(409).json({
