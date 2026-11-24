@@ -11,6 +11,8 @@ jest.mock('../models/RawMaterialQuarantine');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/RawMaterialEntry');
 jest.mock('../models/RawMaterial');
+jest.mock('../utils/withTransaction', () => ({ withTransaction: jest.fn(async work => work({})) }));
+jest.mock('../utils/auditLogger', () => ({ logAction: jest.fn().mockResolvedValue(true) }));
 // coa.js and quarantine.js now allocate document numbers through the atomic,
 // tenant-scoped Counter model (see utils/documentCounter.js). Without this
 // mock, findOneAndUpdate() hits a real unconnected Mongoose model and the
@@ -66,20 +68,28 @@ describe('Module 2: Ayurvedic Manufacturing & AYUSH / GMP Compliance', () => {
 
   describe('Botanical Raw Material Quarantine & Expiry Tracker', () => {
     test('logs raw herb lot into quarantine with under_testing status', async () => {
-      RawMaterialQuarantine.create.mockResolvedValue({
+      const RawMaterialEntry = require('../models/RawMaterialEntry');
+      const linkedEntry = { _id: 'entry-q101', rawMaterialId: 'rm-q101', batchNo: 'HERB-881', vendorName: 'Herbal Supplier', expiryDate: new Date('2027-06-30'), qty: 50, reservedQty: 0, qcStatus: 'under_test' };
+      RawMaterialEntry.findById.mockResolvedValue(linkedEntry);
+      RawMaterialQuarantine.findOne.mockResolvedValue(null);
+      RawMaterialQuarantine.create.mockImplementation(async ([doc]) => [{
         _id: 'q101',
         quarantineLotNo: 'QRM-9901',
         herbName: 'Ashwagandha Root (Withania somnifera)',
         quarantineStatus: 'under_testing',
         qty: 50,
-        unit: 'kg'
-      });
+        unit: 'kg',
+        ...doc
+      }]);
 
       const res = await request(app)
         .post('/api/manufacturing/quarantine')
         .send({
           herbName: 'Ashwagandha Root (Withania somnifera)',
           batchNo: 'HERB-881',
+          supplierName: 'Herbal Supplier',
+          rawMaterialEntryId: 'entry-q101',
+          rawMaterialId: 'rm-q101',
           qty: 50,
           unit: 'kg',
           expiryDate: '2027-06-30'
@@ -93,13 +103,20 @@ describe('Module 2: Ayurvedic Manufacturing & AYUSH / GMP Compliance', () => {
       const mockLot = {
         _id: 'q101',
         quarantineStatus: 'under_testing',
+        rawMaterialEntryId: 'entry-q101',
+        rawMaterialId: 'rm-q101',
+        batchNo: 'HERB-881',
+        qty: 50,
         save: jest.fn().mockResolvedValue(true)
       };
-      RawMaterialQuarantine.findById.mockResolvedValue(mockLot);
+      const RawMaterialEntry = require('../models/RawMaterialEntry');
+      const linkedEntry = { _id: 'entry-q101', rawMaterialId: 'rm-q101', batchNo: 'HERB-881', qty: 50, reservedQty: 0, qcStatus: 'under_test', save: jest.fn().mockResolvedValue(true) };
+      RawMaterialEntry.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(linkedEntry) });
+      RawMaterialQuarantine.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockLot) });
 
       const res = await request(app)
         .patch('/api/manufacturing/quarantine/q101/release')
-        .send({ quarantineStatus: 'released', testReportNo: 'QC-REP-44' });
+        .send({ quarantineStatus: 'released', testReportNo: 'QC-REP-44', remarks: 'Conforms to approved specification' });
 
       expect(res.status).toBe(200);
       expect(mockLot.quarantineStatus).toBe('released');

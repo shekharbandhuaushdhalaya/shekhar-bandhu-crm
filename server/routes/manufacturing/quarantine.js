@@ -3,6 +3,7 @@ const router = express.Router();
 const RawMaterialQuarantine = require('../../models/RawMaterialQuarantine');
 const { authorize } = require('../../middleware/authorize');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
+const { logAction } = require('../../utils/auditLogger');
 
 // GET /api/manufacturing/quarantine — List raw material quarantine lots
 router.get('/', authorize('inventory:view'), async (req, res) => {
@@ -76,6 +77,11 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
     if (entry.qcStatus !== 'under_test') {
       return res.status(409).json({ error: 'Only stock entries under test can be registered in quarantine' });
     }
+    const availableQty = Number(entry.qty || 0) - Number(entry.reservedQty || 0);
+    if (Number(entry.reservedQty || 0) > 0) return res.status(409).json({ error: 'Stock with active production reservations cannot be quarantined' });
+    if (Math.abs(availableQty - quantity) > 1e-9) return res.status(400).json({ error: 'Quarantine quantity must equal the complete unreserved stock-entry quantity; partial-lot disposition is not supported' });
+    const existingLot = await RawMaterialQuarantine.findOne({ rawMaterialEntryId: entry._id });
+    if (existingLot) return res.status(409).json({ error: 'A quarantine record already exists for this stock entry' });
     if (entry.expiryDate && new Date(entry.expiryDate).getTime() !== expiry.getTime()) {
       return res.status(400).json({ error: 'Expiry date does not match the linked stock entry' });
     }
@@ -148,6 +154,11 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
         error.code = 'QUARANTINE_STOCK_ALREADY_DISPOSED';
         throw error;
       }
+      if (Number(entry.reservedQty || 0) > 0 || Math.abs(Number(entry.qty || 0) - Number(currentLot.qty || 0)) > 1e-9) {
+        const error = new Error('Quarantined stock quantity changed or is reserved; QC disposition is blocked pending reconciliation');
+        error.code = 'QUARANTINE_STOCK_QUANTITY_CONFLICT';
+        throw error;
+      }
       entry.qcStatus = quarantineStatus === 'released' ? 'approved' : 'rejected';
       await entry.save({ session });
 
@@ -160,10 +171,16 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
       await currentLot.save({ session });
       return currentLot;
     });
+    await logAction({
+      action: 'RAW_MATERIAL_QUARANTINE_DISPOSITION',
+      description: 'QC ' + quarantineStatus + ' quarantine lot ' + lot.quarantineLotNo,
+      details: { quarantineLotId: lot._id, rawMaterialEntryId: lot.rawMaterialEntryId, batchNo: lot.batchNo, testReportNo: lot.testReportNo, remarks: lot.remarks },
+      req
+    });
     res.json(lot);
   } catch (err) {
     const status = err.code === 'QUARANTINE_NOT_FOUND' ? 404 :
-      ['QUARANTINE_ALREADY_DISPOSED','QUARANTINE_STOCK_ALREADY_DISPOSED'].includes(err.code) ? 409 :
+      ['QUARANTINE_ALREADY_DISPOSED','QUARANTINE_STOCK_ALREADY_DISPOSED','QUARANTINE_STOCK_QUANTITY_CONFLICT'].includes(err.code) ? 409 :
       ['QUARANTINE_STOCK_LINK_REQUIRED','QUARANTINE_STOCK_LINK_INVALID'].includes(err.code) ? 422 : 500;
     res.status(status).json({ error: err.message });
   }

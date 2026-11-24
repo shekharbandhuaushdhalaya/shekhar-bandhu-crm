@@ -9,6 +9,8 @@ jest.mock('../models/ProductionPlan');
 jest.mock('../models/Product');
 jest.mock('../models/Warehouse');
 jest.mock('../models/RolePermission');
+jest.mock('../utils/withTransaction', () => ({ withTransaction: jest.fn(async work => work({})) }));
+jest.mock('../utils/auditLogger', () => ({ logAction: jest.fn().mockResolvedValue(true) }));
 // quarantine.js allocates lot/report numbers through the atomic, tenant-scoped
 // Counter model (see utils/documentCounter.js); mock it so findOneAndUpdate()
 // doesn't hang against a real unconnected Mongoose model.
@@ -59,10 +61,14 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
 
   describe('Quarantine Release Updates Linked RawMaterialEntry qcStatus', () => {
     test('POST /api/manufacturing/quarantine logs quarantine lot and links matching RawMaterialEntry', async () => {
-      RawMaterialEntry.findOne.mockResolvedValue({
+      RawMaterialEntry.findById.mockResolvedValue({
         _id: 'entry_101',
         rawMaterialId: 'rm_101',
         batchNo: 'BATCH-2026-001',
+        vendorName: 'Herbal Supplier',
+        expiryDate: new Date('2027-12-31'),
+        qty: 50,
+        reservedQty: 0,
         qcStatus: 'under_test'
       });
 
@@ -76,6 +82,9 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         .send({
           herbName: 'Ashwagandha',
           batchNo: 'BATCH-2026-001',
+          supplierName: 'Herbal Supplier',
+          rawMaterialEntryId: 'entry_101',
+          rawMaterialId: 'rm_101',
           qty: 50,
           unit: 'kg',
           expiryDate: '2027-12-31'
@@ -87,13 +96,16 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         batchNo: 'BATCH-2026-001',
         rawMaterialEntryId: 'entry_101',
         rawMaterialId: 'rm_101'
-      })]), expect.anything());
+      })]));
     });
 
     test('PATCH /api/manufacturing/quarantine/:id/release sets RawMaterialEntry qcStatus to approved when released', async () => {
       const mockEntry = {
         _id: 'entry_101',
         rawMaterialId: 'rm_101',
+        batchNo: 'BATCH-2026-001',
+        qty: 50,
+        reservedQty: 0,
         qcStatus: 'under_test',
         save: jest.fn().mockResolvedValue(true)
       };
@@ -102,6 +114,9 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         _id: 'quarantine_101',
         quarantineLotNo: 'QRM-1001',
         rawMaterialEntryId: 'entry_101',
+        rawMaterialId: 'rm_101',
+        batchNo: 'BATCH-2026-001',
+        qty: 50,
         quarantineStatus: 'under_testing',
         save: jest.fn().mockResolvedValue(true)
       };
@@ -127,6 +142,9 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
       const mockEntry = {
         _id: 'entry_102',
         rawMaterialId: 'rm_102',
+        batchNo: 'BATCH-2026-002',
+        qty: 20,
+        reservedQty: 0,
         qcStatus: 'under_test',
         save: jest.fn().mockResolvedValue(true)
       };
@@ -135,12 +153,15 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         _id: 'quarantine_102',
         quarantineLotNo: 'QRM-1002',
         rawMaterialEntryId: 'entry_102',
+        rawMaterialId: 'rm_102',
+        batchNo: 'BATCH-2026-002',
+        qty: 20,
         quarantineStatus: 'under_testing',
         save: jest.fn().mockResolvedValue(true)
       };
 
-      RawMaterialQuarantine.findById.mockResolvedValue(mockLot);
-      RawMaterialEntry.findById.mockResolvedValue(mockEntry);
+      RawMaterialQuarantine.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockLot) });
+      RawMaterialEntry.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockEntry) });
 
       const res = await request(app)
         .patch('/api/manufacturing/quarantine/quarantine_102/release')
