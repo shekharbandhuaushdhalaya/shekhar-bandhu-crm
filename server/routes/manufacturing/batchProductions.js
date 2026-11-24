@@ -433,48 +433,85 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
   }
 });
 
-// POST /api/batch-productions/:id/line-clearance — Record pre-batch line clearance
+// POST /api/batch-productions/:id/line-clearance — Submit checklist for independent verification.
 router.post('/:id/line-clearance', authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { previousBatchNo, checklist, notes, phase = 'manufacturing' } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
-
-    if (!checklist || !checklist.equipmentCleaned || !checklist.previousMaterialsRemoved || !checklist.previousLabelsDocumentsRemoved || !checklist.areaVisuallyInspected) {
-      return res.status(400).json({ error: 'All 4 line clearance checklist items must be verified true before clearing line' });
+    if (batch.releasedBy || ['cancelled', 'rejected'].includes(batch.status)) {
+      return res.status(409).json({ error: 'Released, cancelled or rejected batch line-clearance records are immutable' });
     }
-
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated line-clearance operator identity is required' });
+    }
+    if (!['manufacturing','filling','packing'].includes(phase)) {
+      return res.status(400).json({ error: 'phase must be manufacturing, filling or packing' });
+    }
+    if (!checklist || !checklist.equipmentCleaned || !checklist.previousMaterialsRemoved ||
+      !checklist.previousLabelsDocumentsRemoved || !checklist.areaVisuallyInspected) {
+      return res.status(400).json({ error: 'All 4 line-clearance checklist items must be verified true before submission' });
+    }
     const LineClearance = require('../../models/LineClearance');
-    if (!['manufacturing','filling','packing'].includes(phase)) return res.status(400).json({ error: 'phase must be manufacturing, filling or packing' });
-    let record = await LineClearance.findOne({ batchId: batch._id, phase });
-    if (record) {
-      record.phase = phase;
-      record.cleared = true;
-      record.checklist = checklist;
-      record.notes = notes || '';
-      record.clearedBy = req.user ? req.user.id : null;
-      record.clearedByName = req.user ? req.user.name : 'Line Inspector';
-      record.clearedAt = new Date();
-      await record.save();
-    } else {
-      record = await LineClearance.create({
-        batchId: batch._id,
-        phase,
-        cleared: true,
-        manufacturingUnitId: batch.manufacturingUnitId,
-        previousBatchNo: previousBatchNo || '',
-        checklist,
-        notes: notes || '',
-        clearedBy: req.user ? req.user.id : null,
-        clearedByName: req.user ? req.user.name : 'Line Inspector',
-        clearedAt: new Date()
-      });
+    const existing = await LineClearance.findOne({ batchId: batch._id, phase });
+    if (existing) {
+      return res.status(409).json({ error: 'A line-clearance record already exists for this batch phase; do not overwrite the submitted or verified record' });
     }
+    const record = await LineClearance.create({
+      batchId: batch._id, phase, cleared: false,
+      manufacturingUnitId: batch.manufacturingUnitId,
+      previousBatchNo: previousBatchNo || '',
+      checklist: {
+        equipmentCleaned: checklist.equipmentCleaned === true,
+        previousMaterialsRemoved: checklist.previousMaterialsRemoved === true,
+        previousLabelsDocumentsRemoved: checklist.previousLabelsDocumentsRemoved === true,
+        areaVisuallyInspected: checklist.areaVisuallyInspected === true
+      },
+      notes: String(notes || '').trim(),
+      submittedBy: req.user.id, submittedByName: req.user.name, submittedAt: new Date()
+    });
+    if (req.io) req.io.emit('line_clearance_updated', record);
+    res.status(201).json({ record, status: 'PENDING_INDEPENDENT_VERIFICATION',
+      message: 'Line-clearance checklist submitted. Production cannot start until an independent verifier signs it.' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
-    if (req.io) {
-      req.io.emit('line_clearance_updated', record);
+// PATCH /api/batch-productions/:id/line-clearance/:clearanceId/verify — Independent line-clearance signoff.
+router.patch('/:id/line-clearance/:clearanceId/verify', authorize('manufacturing:complete'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    if (batch.releasedBy) return res.status(409).json({ error: 'Released batch line-clearance records are immutable' });
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated independent line-clearance verifier identity is required' });
     }
-    res.status(201).json(record);
+    const LineClearance = require('../../models/LineClearance');
+    const record = await LineClearance.findById(req.params.clearanceId);
+    if (!record || String(record.batchId) !== String(batch._id)) {
+      return res.status(404).json({ error: 'Line-clearance record not found for this batch' });
+    }
+    if (record.cleared || record.verifiedAt) {
+      return res.status(409).json({ error: 'Line-clearance record has already been independently verified' });
+    }
+    if (!record.submittedBy || String(record.submittedBy) === String(req.user.id)) {
+      return res.status(409).json({ error: 'The line-clearance operator cannot independently verify their own checklist' });
+    }
+    const c = record.checklist || {};
+    if (!c.equipmentCleaned || !c.previousMaterialsRemoved || !c.previousLabelsDocumentsRemoved || !c.areaVisuallyInspected) {
+      return res.status(400).json({ error: 'All four line-clearance checklist items must be true before verification' });
+    }
+    record.cleared = true;
+    record.clearedBy = req.user.id;
+    record.clearedByName = req.user.name;
+    record.clearedAt = new Date();
+    record.verifiedBy = req.user.id;
+    record.verifiedByName = req.user.name;
+    record.verifiedAt = new Date();
+    await record.save();
+    if (req.io) req.io.emit('line_clearance_updated', record);
+    res.json({ success: true, record, status: 'VERIFIED' });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -598,7 +635,8 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
       const clearance = await LineClearance.findOne({ batchId: batch._id, phase: 'manufacturing' });
       const checklist = clearance && clearance.checklist;
       const clearanceComplete = Boolean(clearance && clearance.cleared === true &&
-        clearance.clearedBy && clearance.clearedAt && checklist &&
+        clearance.submittedBy && clearance.verifiedBy && String(clearance.submittedBy) !== String(clearance.verifiedBy) &&
+        clearance.verifiedAt && clearance.clearedBy && clearance.clearedAt && checklist &&
         checklist.equipmentCleaned && checklist.previousMaterialsRemoved &&
         checklist.previousLabelsDocumentsRemoved && checklist.areaVisuallyInspected);
       if (!clearanceComplete) {
@@ -1362,7 +1400,8 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
     const clearances = await LineClearance.find({ batchId: batch._id }).lean();
     for (const phase of ['manufacturing','filling','packing']) {
       const c = clearances.find(x => x.phase === phase);
-      if (!c || !c.cleared || !c.clearedBy || !c.clearedAt ||
+      if (!c || !c.cleared || !c.submittedBy || !c.verifiedBy ||
+        String(c.submittedBy) === String(c.verifiedBy) || !c.verifiedAt || !c.clearedBy || !c.clearedAt ||
         !c.checklist?.equipmentCleaned || !c.checklist?.previousMaterialsRemoved ||
         !c.checklist?.previousLabelsDocumentsRemoved || !c.checklist?.areaVisuallyInspected) {
         return res.status(400).json({ error: `Approved ${phase} line clearance with reviewer identity and timestamp is required before market release` });
@@ -1733,7 +1772,8 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
       }
     }
     if (!lineClearance.some(record => record.phase === 'manufacturing' && record.cleared === true &&
-      record.clearedBy && record.clearedAt && record.checklist &&
+      record.submittedBy && record.verifiedBy && String(record.submittedBy) !== String(record.verifiedBy) &&
+      record.verifiedAt && record.clearedBy && record.clearedAt && record.checklist &&
       record.checklist.equipmentCleaned && record.checklist.previousMaterialsRemoved &&
       record.checklist.previousLabelsDocumentsRemoved && record.checklist.areaVisuallyInspected)) {
       missingEvidence.push('Verified manufacturing line-clearance record is missing or incomplete');
