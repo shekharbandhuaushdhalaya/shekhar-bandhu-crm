@@ -4,6 +4,9 @@ const request = require('supertest');
 jest.mock('../models/VendorQualification');
 jest.mock('../models/Vendor');
 jest.mock('../models/RawMaterial');
+jest.mock('../models/RolePermission');
+
+const RolePermission = require('../models/RolePermission');
 
 const VendorQualification = require('../models/VendorQualification');
 const Vendor = require('../models/Vendor');
@@ -16,12 +19,12 @@ describe('Independent supplier qualification verification', () => {
     app = express();
     app.use(express.json());
     app.use((req, res, next) => {
-      req.user = { id: req.headers['x-user-id'] || 'auditor-1', name: req.headers['x-user-name'] || 'Supplier Auditor' };
+      req.user = { id: req.headers['x-user-id'] || 'auditor-1', name: req.headers['x-user-name'] || 'Supplier Auditor', role: 'admin' };
       next();
     });
     app.use('/api/vendor-qualifications', router);
   });
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => { jest.clearAllMocks(); RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] }); });
 
   test('records an audit as pending verification even when auditor proposes approval', async () => {
     Vendor.findById.mockReturnValue({ select: jest.fn().mockResolvedValue({ company: 'Herbal Supplier' }) });
