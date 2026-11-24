@@ -864,6 +864,27 @@ class ApiClient {
     return res.json();
   }
 
+  async getGoodsReceivedNotes(params: { search?: string; status?: string; page?: number; limit?: number; poId?: string; vendorId?: string } = {}): Promise<{ items: any[]; page: number; limit: number; total: number; totalPages: number }> {
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.status) query.set('status', params.status);
+    if (params.page !== undefined) query.set('page', String(params.page));
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.poId) query.set('poId', params.poId);
+    if (params.vendorId) query.set('vendorId', params.vendorId);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    const res = await this.request(`${API_BASE}/purchase-orders/grn${suffix}`);
+    return res.json();
+  }
+  async getGoodsReceivedNote(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}`);
+    return res.json();
+  }
+  async verifyGoodsReceivedNote(id: string, data: { decision: 'verified' | 'rejected'; verificationNotes: string; rejectionReason?: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/verify`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+
   // No generic getInvoice as backend doesn't support it
 
   async createSaleInvoice(data: Partial<Invoice>): Promise<Invoice> {

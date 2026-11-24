@@ -82,6 +82,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Vendors', route: 'parties/vendors', icon: 'storefront-outline', activeIcon: 'storefront' },
       { label: 'Purchase Invoices', route: 'invoices/purchase', icon: 'download-outline', activeIcon: 'download', permission: 'invoice:view' },
+      { label: 'Goods Received Notes', route: 'grn', icon: 'receipt-outline', activeIcon: 'receipt', permission: 'vendor:view' },
     ],
   },
   {
