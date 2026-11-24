@@ -155,16 +155,18 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
         error.code = 'QUARANTINE_STOCK_ALREADY_DISPOSED';
         throw error;
       }
-      const grnRefs = Array.isArray(entry.grnReferences) ? entry.grnReferences : [];
-      const legacyGrnNo = !grnRefs.length && /^GRN-/i.test(String(entry.purchaseRef || '')) ? String(entry.purchaseRef) : '';
-      const requiredGrnNos = grnRefs.map(ref => ref.grnNo).filter(Boolean);
-      if (legacyGrnNo) requiredGrnNos.push(legacyGrnNo);
-      for (const grnNo of [...new Set(requiredGrnNos)]) {
-        const verifiedGrn = await GoodsReceivedNote.findOne({ grnNo, status: 'verified' }).session(session);
-        if (!verifiedGrn) {
-          const error = new Error('Incoming QC release is blocked until the linked GRN ' + grnNo + ' is independently verified');
-          error.code = 'QUARANTINE_GRN_VERIFICATION_REQUIRED';
-          throw error;
+      if (quarantineStatus === 'released') {
+        const grnRefs = Array.isArray(entry.grnReferences) ? entry.grnReferences : [];
+        const legacyGrnNo = !grnRefs.length && /^GRN-/i.test(String(entry.purchaseRef || '')) ? String(entry.purchaseRef) : '';
+        const requiredGrnNos = grnRefs.map(ref => ref.grnNo).filter(Boolean);
+        if (legacyGrnNo) requiredGrnNos.push(legacyGrnNo);
+        for (const grnNo of [...new Set(requiredGrnNos)]) {
+          const verifiedGrn = await GoodsReceivedNote.findOne({ grnNo, status: 'verified' }).session(session);
+          if (!verifiedGrn) {
+            const error = new Error('Incoming QC release is blocked until the linked GRN ' + grnNo + ' is independently verified');
+            error.code = 'QUARANTINE_GRN_VERIFICATION_REQUIRED';
+            throw error;
+          }
         }
       }
       if (Number(entry.reservedQty || 0) > 0 || Math.abs(Number(entry.qty || 0) - Number(currentLot.qty || 0)) > 1e-9) {
