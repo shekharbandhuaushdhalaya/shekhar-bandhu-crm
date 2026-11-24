@@ -1324,6 +1324,18 @@ class ApiClient {
     return res.json();
   }
   async getManufacturingDeviations(): Promise<any[]> { const res=await this.request(`${API_BASE}/manufacturing/deviations`); return res.json(); }
+  async resolveManufacturingDeviation(id: string, data: { rootCause: string; correctiveAction: string; preventiveAction: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/deviations/${id}/signoff`, {
+      method: 'PUT', body: JSON.stringify({ status: 'resolved', ...data })
+    });
+    return res.json();
+  }
+  async verifyManufacturingDeviationClosure(id: string, data: { effectivenessCheck: string; effectivenessEvidenceRef: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/deviations/${id}/verify-closure`, {
+      method: 'PATCH', body: JSON.stringify(data)
+    });
+    return res.json();
+  }
   async getStabilityStudies(): Promise<any[]> { const res=await this.request(`${API_BASE}/stability-studies`); return res.json(); }
   async getRecalls(): Promise<any[]> { const res=await this.request(`${API_BASE}/recalls`); return res.json(); }
   async getVendorQualifications(): Promise<any[]> { const res=await this.request(`${API_BASE}/vendor-qualifications`); return res.json(); }
