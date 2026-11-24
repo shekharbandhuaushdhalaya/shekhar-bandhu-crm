@@ -32,7 +32,7 @@ describe('Manufacturing stage qualification and equipment controls', () => {
     jest.clearAllMocks();
     RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
     LineClearance.findOne.mockResolvedValue({
-      cleared: true, submittedBy: 'clearance-operator', verifiedBy: 'clearance-reviewer', verifiedAt: new Date(), clearedBy: 'clearance-reviewer', clearedAt: new Date(),
+      cleared: true, clearedBy: 'clearance-reviewer', clearedAt: new Date(),
       checklist: { equipmentCleaned: true, previousMaterialsRemoved: true, previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true }
     });
     TrainingRecord.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({

@@ -6,13 +6,18 @@ const vendorQualificationSchema = new mongoose.Schema({
   vendorName: { type: String, required: true, trim: true },
   qualificationStatus: {
     type: String,
-    enum: ['approved', 'conditional', 'disqualified'],
-    default: 'conditional'
+    enum: ['pending_verification', 'approved', 'conditional', 'disqualified'],
+    default: 'pending_verification'
   },
   auditDate: { type: Date, required: true, default: Date.now },
   nextAuditDue: { type: Date, required: true },
   auditorName: { type: String, required: true, trim: true },
   auditedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  proposedQualificationStatus: { type: String, enum: ['approved', 'conditional', 'disqualified'], default: 'conditional' },
+  verifiedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  verifiedByName: { type: String, default: '' },
+  verifiedAt: { type: Date, default: null },
+  verificationNotes: { type: String, default: '' },
   // A score is optional evidence; never infer a perfect score when no assessment was recorded.
   gmpComplianceScore: { type: Number, default: null, min: 0, max: 100 },
   findings: { type: String, default: '' },

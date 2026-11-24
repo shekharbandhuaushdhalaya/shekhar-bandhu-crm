@@ -76,7 +76,8 @@ router.post('/', authorize('manufacturing:qcApprove'), async (req, res) => {
     const record = await VendorQualification.create({
       vendorId,
       vendorName: vendor.company || vendor.name || 'Unnamed vendor',
-      qualificationStatus,
+      qualificationStatus: 'pending_verification',
+      proposedQualificationStatus: qualificationStatus,
       auditDate: auditAt,
       nextAuditDue: nextDue,
       auditorName,
@@ -90,6 +91,41 @@ router.post('/', authorize('manufacturing:qcApprove'), async (req, res) => {
     res.status(201).json(record);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+
+// PATCH /api/vendor-qualifications/:id/verify — independent review of a supplier audit.
+router.patch('/:id/verify', authorize('manufacturing:qcApprove'), async (req, res) => {
+  try {
+    const record = await VendorQualification.findById(req.params.id);
+    if (!record) return res.status(404).json({ error: 'Vendor qualification record not found' });
+    if (record.qualificationStatus !== 'pending_verification') {
+      return res.status(409).json({ error: 'Only pending supplier qualification records can be verified' });
+    }
+    const reviewerId = req.user?.id || req.user?._id;
+    const reviewerName = req.user?.name || req.user?.email;
+    if (!reviewerId || !reviewerName) {
+      return res.status(403).json({ error: 'Authenticated independent reviewer identity is required' });
+    }
+    if (String(record.auditedByUserId || '') === String(reviewerId)) {
+      return res.status(403).json({ error: 'The supplier auditor cannot verify their own qualification decision', code: 'SUPPLIER_QUALIFICATION_MAKER_CHECKER_REQUIRED' });
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (record.nextAuditDue && new Date(record.nextAuditDue) < today && record.proposedQualificationStatus === 'approved') {
+      return res.status(409).json({ error: 'An expired supplier audit cannot be approved', code: 'SUPPLIER_AUDIT_EXPIRED' });
+    }
+    record.qualificationStatus = record.proposedQualificationStatus;
+    record.verifiedByUserId = reviewerId;
+    record.verifiedByName = reviewerName;
+    record.verifiedAt = new Date();
+    record.verificationNotes = typeof req.body?.verificationNotes === 'string' ? req.body.verificationNotes.trim() : '';
+    await record.save();
+    req.io?.emit('vendor_qualification_updated', { type: 'verified', id: record._id });
+    return res.json(record);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 });
 

@@ -391,7 +391,7 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                     </TouchableOpacity>
                     <HelpTooltip
                       title="Batch Manufacturing Record (BMR)"
-                      description="This is an internal system-generated batch record that compiles recorded materials, process evidence, in-process checks and sign-offs. It is not an official statutory form or regulatory approval. Review completeness and obtain the required authorised QA approval before relying on it."
+                      description="A BMR is the official regulatory document that records every step of a production batch — raw materials used, quantities, in-process checks, and personnel sign-offs. It is required by Schedule M of the Drugs & Cosmetics Act for licensed pharma manufacturers."
                     />
                     {onOpenCoA && (
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -400,11 +400,11 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
                           onPress={() => onOpenCoA(batch._id)}
                         >
                           <Ionicons name="ribbon-outline" size={15} color={colors.success} />
-                          <Text style={[styles.outlineBtnText, { color: colors.success }]}>QC Summary (Not CoA)</Text>
+                          <Text style={[styles.outlineBtnText, { color: colors.success }]}>AYUSH CoA</Text>
                         </TouchableOpacity>
                         <HelpTooltip
                           title="Certificate of Analysis (CoA)"
-                          description="This opens an internal batch QC test summary based on recorded results and the approved product-specific specification. It is not a Certificate of Analysis or laboratory certificate. An authorised QA release and any required external laboratory certificate must be handled separately."
+                          description="The CoA is the quality assurance document confirming that this batch was tested and meets all specified quality standards — potency, purity, physical attributes, and microbial limits. Required for AYUSH-licensed products before they can be released for sale."
                         />
                       </View>
                     )}

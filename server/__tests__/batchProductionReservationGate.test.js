@@ -150,7 +150,7 @@ describe('Batch production material reservation gate', () => {
     };
     BatchProduction.findById.mockResolvedValue(batch);
     LineClearance.findOne.mockResolvedValue({
-      cleared: true, submittedBy: '507f1f77bcf86cd799439044', verifiedBy: '507f1f77bcf86cd799439043', verifiedAt: new Date(), clearedBy: '507f1f77bcf86cd799439043', clearedAt: new Date(),
+      cleared: true, clearedBy: '507f1f77bcf86cd799439043', clearedAt: new Date(),
       checklist: {
         equipmentCleaned: true, previousMaterialsRemoved: true,
         previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true

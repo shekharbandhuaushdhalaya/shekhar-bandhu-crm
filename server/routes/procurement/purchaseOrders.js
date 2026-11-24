@@ -78,6 +78,7 @@ router.patch('/:id/approve', authorize('vendor:edit'), async (req, res) => {
     for (const item of po.items.filter(line => line.rawMaterialId)) {
       const qualified = await VendorQualification.findOne({
         vendorId: po.vendorId, qualificationStatus: 'approved',
+        verifiedByUserId: { $ne: null }, verifiedAt: { $ne: null },
         nextAuditDue: { $gte: today }, rawMaterialIds: item.rawMaterialId
       }).lean();
       if (!qualified) return res.status(409).json({
