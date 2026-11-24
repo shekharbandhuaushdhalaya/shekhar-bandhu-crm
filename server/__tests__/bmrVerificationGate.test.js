@@ -244,7 +244,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
       LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
 
-      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').send({});
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qc-analyst-1').send({});
 
       expect(res.status).toBe(409);
       expect(res.body.error).toContain('QC analyst cannot release');
