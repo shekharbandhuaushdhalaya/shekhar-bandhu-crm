@@ -41,7 +41,7 @@ describe('Production material dispensing', () => {
     RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
     batch = {
       _id: batchId, batchNo: 'BATCH-001', status: 'in_progress',
-      stages: [{ name: 'Raw Material Verification & Weighing', status: 'in_progress', inputQty: 0 }],
+      stages: [{ name: 'Raw Material Verification & Weighing', status: 'in_progress', inputQty: 0, lossQty: 0, lossPercent: 0, lossItems: [] }],
       ingredientsReserved: [{ rawMaterialId: materialId, rawMaterialEntryId: entryId, qtyReserved: 10, batchNo: 'LOT-001' }],
       ingredientsConsumed: [], rawMaterialCost: 0, save: jest.fn().mockResolvedValue(true)
     };
@@ -53,7 +53,7 @@ describe('Production material dispensing', () => {
     record = {
       _id: '507f1f77bcf86cd799439077', dispensingNo: 'DSP-000001', batchId, batchNo: 'BATCH-001',
       stageIndex: 0, stageName: 'Raw Material Verification & Weighing',
-      items: [{ rawMaterialId: materialId, rawMaterialEntryId: entryId, qtyDispensed: 4, lotNo: 'LOT-001' }],
+      items: [{ rawMaterialId: materialId, rawMaterialEntryId: entryId, qtyDispensed: 4, qtyWasted: 1, wastageReason: 'Spillage', lotNo: 'LOT-001' }],
       status: 'pending_verification', dispensedBy: operatorId, save: jest.fn().mockResolvedValue(true)
     };
     BatchProduction.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(batch) });
@@ -70,6 +70,27 @@ describe('Production material dispensing', () => {
     expect(record.status).toBe('pending_verification');
     expect(entry.qty).toBe(100);
     expect(entry.reservedQty).toBe(10);
+  });
+
+  test('requires a reason when dispensing includes process wastage', async () => {
+    const res = await request(app).post('/api/batch-productions/' + batchId + '/dispensings')
+      .send({ stageIndex: 0, items: [{
+        rawMaterialId: materialId, rawMaterialEntryId: entryId, qtyDispensed: 4, qtyWasted: 1
+      }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('reason for any recorded wastage');
+    expect(MaterialDispensing.create).not.toHaveBeenCalled();
+  });
+
+  test('lists batch dispensing records for independent review', async () => {
+    BatchProduction.findById.mockReturnValue({ select: jest.fn().mockResolvedValue(batch) });
+    MaterialDispensing.find.mockReturnValue({
+      sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([record]) })
+    });
+    const res = await request(app).get('/api/batch-productions/' + batchId + '/dispensings');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].dispensingNo).toBe('DSP-000001');
   });
 
   test('rejects dispensing quantities above the batch reservation', async () => {
@@ -94,6 +115,11 @@ describe('Production material dispensing', () => {
     expect(entry.reservedQty).toBe(6);
     expect(entry.issuedQty).toBe(4);
     expect(batch.ingredientsConsumed[0].qtyConsumed).toBe(4);
+    expect(batch.ingredientsConsumed[0].qtyWasted).toBe(1);
+    expect(batch.ingredientsConsumed[0].wastageReason).toBe('Spillage');
+    expect(batch.stages[0].lossQty).toBe(1);
+    expect(batch.stages[0].lossPercent).toBe(25);
+    expect(batch.stages[0].lossItems[0].qty).toBe(1);
     expect(batch.ingredientsReserved[0].qtyReserved).toBe(6);
     expect(batch.rawMaterialCost).toBe(8);
     expect(record.status).toBe('verified');

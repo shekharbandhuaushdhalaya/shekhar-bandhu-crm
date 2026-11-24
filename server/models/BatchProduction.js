@@ -130,6 +130,8 @@ const batchProductionSchema = new mongoose.Schema({
         required: true,
       },
       qtyConsumed: { type: Number, required: true },
+      qtyWasted: { type: Number, default: 0 },
+      wastageReason: { type: String, default: '' },
       batchNo: { type: String, required: true },
       stageIndex: { type: Number, default: null },
       dispensingNo: { type: String, default: '' },
