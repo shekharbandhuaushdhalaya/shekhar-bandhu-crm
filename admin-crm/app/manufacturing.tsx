@@ -1170,8 +1170,8 @@ export default function ManufacturingScreen() {
         const itemType = ingredient.itemType || 'formulation';
         const requiredQty = itemType === 'packaging'
           ? Number(ingredient.qtyRequired || 0) * totalOutputQty
-          : (ingredient.qtyRequiredForBatch !== undefined && ingredient.qtyRequiredForBatch !== null
-            ? Number(ingredient.qtyRequiredForBatch)
+          : ((ingredient as any).qtyRequiredForBatch !== undefined && (ingredient as any).qtyRequiredForBatch !== null
+            ? Number((ingredient as any).qtyRequiredForBatch)
             : Number(ingredient.qtyRequired || 0) * scale);
         const existing = requiredByMaterial.get(rawMaterialId) || {
           rawMaterialId, itemType, name: materials.find((material: any) => material._id === rawMaterialId)?.name || 'Unknown',
@@ -2566,7 +2566,7 @@ export default function ManufacturingScreen() {
                         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
                           <View style={{ flex: 1 }}>
                             <Text style={{ ...Typography.caption, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>
-                               Taken from Stock ({si.unit})
+                               Weighed / issued ({si.unit})
                             </Text>
                             <TextInput
                               style={[styles.input, { height: 44, marginBottom: 0, borderColor: isOverUsed ? colors.danger : colors.border, fontWeight: '700' }]}
@@ -2576,7 +2576,7 @@ export default function ManufacturingScreen() {
                               placeholderTextColor={colors.text.muted}
                               placeholder={theoretical.toFixed(3)}
                             />
-                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Deducted from inventory</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Submitted for independent stock issue</Text>
                             {isOverUsed && (
                               <Text style={{ ...Typography.eyebrow, color: colors.danger, marginTop: 2 }}> More than formula qty</Text>
                             )}
@@ -2635,8 +2635,8 @@ export default function ManufacturingScreen() {
                       <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{record.dispensingNo} · {String(record.status || '').replace('_', ' ').toUpperCase()}</Text>
                       <Text style={{ ...Typography.caption, color: colors.text.secondary }}>{(record.items || []).map((item: any) => item.materialName + ' ' + item.qtyDispensed + ' ' + item.unit + (item.lotNo ? ' · ' + item.lotNo : '')).join(', ')}</Text>
                       {record.status === 'pending_verification' && (
-                        <TouchableOpacity style={[styles.secondaryBtn, { marginTop: 6, alignSelf: 'flex-start' }]} onPress={() => handleVerifyMaterialDispensing(record._id)}>
-                          <Text style={styles.secondaryBtnText}>Verify as independent reviewer</Text>
+                        <TouchableOpacity style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }} onPress={() => handleVerifyMaterialDispensing(record._id)}>
+                          <Text style={{ ...Typography.caption, color: '#FFFFFF', fontWeight: '800' }}>Verify as independent reviewer</Text>
                         </TouchableOpacity>
                       )}
                       {record.status === 'verified' && <Text style={{ ...Typography.caption, color: colors.success, marginTop: 4 }}>Verified by {record.verifiedByName || 'recorded reviewer'}</Text>}
