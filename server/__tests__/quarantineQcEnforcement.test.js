@@ -66,10 +66,10 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         qcStatus: 'under_test'
       });
 
-      RawMaterialQuarantine.create.mockImplementation(async (data) => ({
+      RawMaterialQuarantine.create.mockImplementation(async (data) => [{
         _id: 'quarantine_101',
-        ...data
-      }));
+        ...data[0]
+      }]);
 
       const res = await request(app)
         .post('/api/manufacturing/quarantine')
@@ -82,12 +82,12 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         });
 
       expect(res.status).toBe(201);
-      expect(RawMaterialQuarantine.create).toHaveBeenCalledWith(expect.objectContaining({
+      expect(RawMaterialQuarantine.create).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({
         herbName: 'Ashwagandha',
         batchNo: 'BATCH-2026-001',
         rawMaterialEntryId: 'entry_101',
         rawMaterialId: 'rm_101'
-      }));
+      })]), expect.anything());
     });
 
     test('PATCH /api/manufacturing/quarantine/:id/release sets RawMaterialEntry qcStatus to approved when released', async () => {
@@ -106,8 +106,8 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         save: jest.fn().mockResolvedValue(true)
       };
 
-      RawMaterialQuarantine.findById.mockResolvedValue(mockLot);
-      RawMaterialEntry.findById.mockResolvedValue(mockEntry);
+      RawMaterialQuarantine.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockLot) });
+      RawMaterialEntry.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockEntry) });
 
       const res = await request(app)
         .patch('/api/manufacturing/quarantine/quarantine_101/release')

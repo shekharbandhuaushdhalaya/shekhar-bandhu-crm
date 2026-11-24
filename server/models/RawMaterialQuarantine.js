@@ -6,7 +6,7 @@ const rawMaterialQuarantineSchema = new mongoose.Schema({
   herbName: { type: String, required: true, index: true },
   botanicalName: { type: String, default: '' },
   batchNo: { type: String, required: true, index: true },
-  supplierName: { type: String, default: 'Herbal Vendor' },
+  supplierName: { type: String, required: true, trim: true },
   qty: { type: Number, required: true },
   unit: { type: String, default: 'kg' },
   receivedDate: { type: Date, default: Date.now },
@@ -26,5 +26,15 @@ const rawMaterialQuarantineSchema = new mongoose.Schema({
   rawMaterialEntryId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterialEntry', default: null },
 }, { timestamps: true });
 
+rawMaterialQuarantineSchema.pre('validate', function validateDispositionEvidence(next) {
+  if (['released', 'rejected'].includes(this.quarantineStatus)) {
+    if (!this.testReportNo?.trim() || !this.testedBy?.trim() || !this.releasedBy?.trim() || !this.remarks?.trim() || !this.testingDate) {
+      return next(new Error('A final quarantine disposition requires test report, tester, approver, testing date, and remarks'));
+    }
+  }
+  next();
+});
+
+rawMaterialQuarantineSchema.index({ rawMaterialEntryId: 1, quarantineStatus: 1 });
 rawMaterialQuarantineSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('RawMaterialQuarantine', rawMaterialQuarantineSchema);

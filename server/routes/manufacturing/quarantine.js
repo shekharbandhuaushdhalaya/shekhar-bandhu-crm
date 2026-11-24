@@ -53,115 +53,119 @@ router.get('/near-expiry', authorize('inventory:view'), async (req, res) => {
   }
 });
 
-// POST /api/manufacturing/quarantine — Log new botanical raw material into quarantine
+// POST /api/manufacturing/quarantine — register a specific received stock lot for QC.
 router.post('/', authorize('inventory:create'), async (req, res) => {
   try {
     const RawMaterialEntry = require('../../models/RawMaterialEntry');
-    const RawMaterial = require('../../models/RawMaterial');
-
     const { herbName, botanicalName, batchNo, supplierName, qty, unit, expiryDate, rawMaterialId, rawMaterialEntryId } = req.body;
-
-    if (!herbName || !batchNo || !qty || !expiryDate) {
-      return res.status(400).json({ error: 'herbName, batchNo, qty, and expiryDate are required' });
+    const quantity = Number(qty);
+    const expiry = new Date(expiryDate);
+    if (!herbName?.trim() || !batchNo?.trim() || !supplierName?.trim() || !rawMaterialEntryId || !Number.isFinite(quantity) || quantity <= 0 || !expiryDate || Number.isNaN(expiry.getTime())) {
+      return res.status(400).json({ error: 'herbName, batchNo, supplierName, positive qty, expiryDate, and rawMaterialEntryId are required' });
     }
 
-    let linkedEntry = null;
-    let targetRawMatId = rawMaterialId || null;
-    try {
-      if (rawMaterialEntryId && typeof RawMaterialEntry.findById === 'function') {
-        linkedEntry = await RawMaterialEntry.findById(rawMaterialEntryId);
-      }
-      if (!linkedEntry && batchNo && typeof RawMaterialEntry.findOne === 'function') {
-        linkedEntry = await RawMaterialEntry.findOne({ batchNo: batchNo.trim() });
-      }
-      if (linkedEntry) targetRawMatId = linkedEntry.rawMaterialId;
-      if (!linkedEntry && !targetRawMatId && herbName && typeof RawMaterial.findOne === 'function') {
-        const rawMat = await RawMaterial.findOne({
-          name: { $regex: new RegExp(`^${herbName.trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') }
-        });
-        if (rawMat) {
-          targetRawMatId = rawMat._id;
-          if (typeof RawMaterialEntry.findOne === 'function') {
-            linkedEntry = await RawMaterialEntry.findOne({ rawMaterialId: rawMat._id });
-          }
-        }
-      }
-    } catch (e) {
-      linkedEntry = null;
+    // Never associate a quarantine record with a guessed batch or a different material.
+    const entry = await RawMaterialEntry.findById(rawMaterialEntryId);
+    if (!entry) return res.status(404).json({ error: 'Linked raw-material stock entry not found' });
+    if (String(entry.batchNo).trim().toUpperCase() !== batchNo.trim().toUpperCase()) {
+      return res.status(400).json({ error: 'Batch number does not match the linked stock entry' });
+    }
+    if (rawMaterialId && String(entry.rawMaterialId) !== String(rawMaterialId)) {
+      return res.status(400).json({ error: 'Raw material does not match the linked stock entry' });
+    }
+    if (entry.qcStatus !== 'under_test') {
+      return res.status(409).json({ error: 'Only stock entries under test can be registered in quarantine' });
+    }
+    if (entry.expiryDate && new Date(entry.expiryDate).getTime() !== expiry.getTime()) {
+      return res.status(400).json({ error: 'Expiry date does not match the linked stock entry' });
+    }
+    if (entry.vendorName && entry.vendorName.trim().toLowerCase() !== supplierName.trim().toLowerCase()) {
+      return res.status(400).json({ error: 'Supplier does not match the linked stock entry' });
     }
 
     const quarantineLotNo = await generateAtomicDocumentNumber('quarantineLotNo_QRM', 'QRM-', 6);
-
-    const lot = await RawMaterialQuarantine.create({
+    const [lot] = await RawMaterialQuarantine.create([{
       quarantineLotNo,
       herbName: herbName.trim(),
       botanicalName: botanicalName || '',
-      batchNo: batchNo.trim(),
-      supplierName: supplierName || 'Herbal Vendor',
-      qty: parseFloat(qty),
+      batchNo: entry.batchNo,
+      supplierName: supplierName.trim(),
+      qty: quantity,
       unit: unit || 'kg',
-      expiryDate: new Date(expiryDate),
+      expiryDate: expiry,
       quarantineStatus: 'under_testing',
       receivedDate: new Date(),
-      rawMaterialId: targetRawMatId || null,
-      rawMaterialEntryId: linkedEntry ? linkedEntry._id : null
-    });
-
+      rawMaterialId: entry.rawMaterialId,
+      rawMaterialEntryId: entry._id
+    }]);
     res.status(201).json(lot);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// PATCH /api/manufacturing/quarantine/:id/release — Quality release or rejection of quarantine lot
+// PATCH /api/manufacturing/quarantine/:id/release — evidence-backed QC disposition.
 router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
   try {
     const RawMaterialEntry = require('../../models/RawMaterialEntry');
-    const RawMaterial = require('../../models/RawMaterial');
-
+    const { withTransaction } = require('../../utils/withTransaction');
     const { quarantineStatus, testReportNo, remarks } = req.body;
     if (!['released', 'rejected'].includes(quarantineStatus)) {
       return res.status(400).json({ error: 'quarantineStatus must be "released" or "rejected"' });
     }
-
-    const lot = await RawMaterialQuarantine.findById(req.params.id);
-    if (!lot) return res.status(404).json({ error: 'Quarantine lot not found' });
-
-    lot.quarantineStatus = quarantineStatus;
-    lot.testReportNo = testReportNo || await generateAtomicDocumentNumber('rawMaterialQcReportNo', 'QC-', 6);
-    lot.testingDate = new Date();
-    lot.testedBy = req.user ? req.user.name : 'QC Chemist';
-    lot.releasedBy = req.user ? req.user.name : 'QC Head';
-    if (remarks) lot.remarks = remarks;
-
-    // Update linked RawMaterialEntry qcStatus
-    let entry = null;
-    if (lot.rawMaterialEntryId) {
-      entry = await RawMaterialEntry.findById(lot.rawMaterialEntryId);
+    if (!testReportNo?.trim() || !remarks?.trim()) {
+      return res.status(400).json({ error: 'A real testReportNo and QC remarks are required for disposition' });
     }
-    if (!entry && lot.batchNo) {
-      entry = await RawMaterialEntry.findOne({ batchNo: lot.batchNo });
-    }
-    if (!entry && lot.herbName) {
-      const rawMat = await RawMaterial.findOne({
-        name: { $regex: new RegExp(`^${lot.herbName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') }
-      });
-      if (rawMat) {
-        entry = await RawMaterialEntry.findOne({ rawMaterialId: rawMat._id });
+    const actor = req.user && (req.user.name || req.user.email);
+    if (!actor) return res.status(403).json({ error: 'Authenticated QC tester identity is required' });
+
+    const lot = await withTransaction(async session => {
+      const currentLot = await RawMaterialQuarantine.findById(req.params.id).session(session);
+      if (!currentLot) {
+        const error = new Error('Quarantine lot not found');
+        error.code = 'QUARANTINE_NOT_FOUND';
+        throw error;
       }
-    }
-
-    if (entry) {
+      if (currentLot.quarantineStatus !== 'under_testing') {
+        const error = new Error('Only a lot under testing can receive a QC disposition');
+        error.code = 'QUARANTINE_ALREADY_DISPOSED';
+        throw error;
+      }
+      if (!currentLot.rawMaterialEntryId || !currentLot.rawMaterialId) {
+        const error = new Error('Quarantine lot has no verified stock-entry link');
+        error.code = 'QUARANTINE_STOCK_LINK_REQUIRED';
+        throw error;
+      }
+      const entry = await RawMaterialEntry.findById(currentLot.rawMaterialEntryId).session(session);
+      if (!entry || String(entry.rawMaterialId) !== String(currentLot.rawMaterialId) ||
+          String(entry.batchNo).trim().toUpperCase() !== String(currentLot.batchNo).trim().toUpperCase()) {
+        const error = new Error('Linked stock entry does not match the quarantined material batch');
+        error.code = 'QUARANTINE_STOCK_LINK_INVALID';
+        throw error;
+      }
+      if (entry.qcStatus !== 'under_test') {
+        const error = new Error('Linked stock entry is no longer under QC testing');
+        error.code = 'QUARANTINE_STOCK_ALREADY_DISPOSED';
+        throw error;
+      }
       entry.qcStatus = quarantineStatus === 'released' ? 'approved' : 'rejected';
-      await entry.save();
-      lot.rawMaterialEntryId = entry._id;
-      if (!lot.rawMaterialId) lot.rawMaterialId = entry.rawMaterialId;
-    }
+      await entry.save({ session });
 
-    await lot.save();
+      currentLot.quarantineStatus = quarantineStatus;
+      currentLot.testReportNo = testReportNo.trim();
+      currentLot.testingDate = new Date();
+      currentLot.testedBy = actor;
+      currentLot.releasedBy = actor;
+      currentLot.remarks = remarks.trim();
+      await currentLot.save({ session });
+      return currentLot;
+    });
     res.json(lot);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = err.code === 'QUARANTINE_NOT_FOUND' ? 404 :
+      ['QUARANTINE_ALREADY_DISPOSED','QUARANTINE_STOCK_ALREADY_DISPOSED'].includes(err.code) ? 409 :
+      ['QUARANTINE_STOCK_LINK_REQUIRED','QUARANTINE_STOCK_LINK_INVALID'].includes(err.code) ? 422 : 500;
+    res.status(status).json({ error: err.message });
   }
 });
 

@@ -473,17 +473,29 @@ router.post('/entries', idempotency, authorize('manufacturing:create'), validate
 // PATCH /api/raw-materials/entries/:id/qc-status — Quality control approval for raw material stock entries
 router.patch('/entries/:id/qc-status', authorize('manufacturing:qcApprove'), async (req, res) => {
   try {
-    const { qcStatus } = req.body;
-    if (!['under_test', 'approved', 'rejected'].includes(qcStatus)) {
-      return res.status(400).json({ error: 'qcStatus must be under_test, approved, or rejected' });
+    const { qcStatus, testReportNo, remarks } = req.body;
+    if (!['approved', 'rejected'].includes(qcStatus)) {
+      return res.status(400).json({ error: 'qcStatus must be approved or rejected; new receipts already start under_test' });
     }
+    if (!testReportNo?.trim() || !remarks?.trim()) {
+      return res.status(400).json({ error: 'A testReportNo and QC remarks are required for a final QC decision' });
+    }
+    const actor = req.user && (req.user.name || req.user.email);
+    if (!actor) return res.status(403).json({ error: 'Authenticated QC tester identity is required' });
 
     const entry = await RawMaterialEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ error: 'Raw material entry not found' });
+    if (entry.qcStatus !== 'under_test') {
+      return res.status(409).json({ error: 'Only a stock entry under_test can receive a final QC decision' });
+    }
 
     entry.qcStatus = qcStatus;
+    entry.analyticalReportNo = testReportNo.trim();
+    entry.qcRemarks = remarks.trim();
+    entry.qcTestedBy = actor;
+    entry.qcTestedAt = new Date();
     await entry.save();
-    await logAction({ action: 'RAW_MATERIAL_QC_STATUS_CHANGED', description: `Set raw-material batch ${entry.batchNo} QC status to ${qcStatus}`, details: { id: entry._id, qcStatus }, req });
+    await logAction({ action: 'RAW_MATERIAL_QC_STATUS_CHANGED', description: `Set raw-material batch ${entry.batchNo} QC status to ${qcStatus}`, details: { id: entry._id, qcStatus, testReportNo: entry.analyticalReportNo }, req });
 
     if (req.io) {
       req.io.emit('raw_material_updated', { type: 'qc_status_changed', id: entry._id, qcStatus });
