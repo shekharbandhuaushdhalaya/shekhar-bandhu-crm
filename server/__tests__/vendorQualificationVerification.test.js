@@ -16,7 +16,7 @@ describe('Independent supplier qualification verification', () => {
     app = express();
     app.use(express.json());
     app.use((req, res, next) => {
-      req.user = { id: 'auditor-1', name: 'Supplier Auditor' };
+      req.user = { id: req.headers['x-user-id'] || 'auditor-1', name: req.headers['x-user-name'] || 'Supplier Auditor' };
       next();
     });
     app.use('/api/vendor-qualifications', router);
@@ -59,10 +59,9 @@ describe('Independent supplier qualification verification', () => {
       nextAuditDue: new Date(Date.now() + 86400000),
       save: jest.fn().mockResolvedValue(true)
     });
-    app.use((req, res, next) => next());
-    const response = await request(app).patch('/api/vendor-qualifications/qualification-1/verify').send({ verificationNotes: 'Documents checked' });
+    const response = await request(app).patch('/api/vendor-qualifications/qualification-1/verify').set('x-user-id', 'reviewer-2').set('x-user-name', 'Independent Reviewer').send({ verificationNotes: 'Documents checked' });
     expect(response.status).toBe(200);
     expect(response.body.qualificationStatus).toBe('approved');
-    expect(response.body.verifiedByUserId).toBe('auditor-1');
+    expect(response.body.verifiedByUserId).toBe('reviewer-2');
   });
 });
