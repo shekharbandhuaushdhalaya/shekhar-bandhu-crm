@@ -145,14 +145,14 @@ export default function GoodsReceivedNotesScreen() {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {loading ? <View style={styles.loading}><ActivityIndicator color={colors.primary} /></View> : (
         <ScrollView contentContainerStyle={styles.listContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}>
-          {items.length === 0 ? <EmptyState title="No GRNs found" description="No goods received notes match the selected filter." /> : items.map(item => (
+          {items.length === 0 ? <EmptyState title="No GRNs found" message="No goods received notes match the selected filter." /> : items.map(item => (
             <Pressable key={item._id} onPress={() => openDetail(item)} style={styles.card}>
               <View style={styles.cardTop}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.grnNo}>{item.grnNo || 'GRN'}</Text>
                   <Text style={styles.vendor}>{item.vendorName || 'Supplier not recorded'}</Text>
                 </View>
-                <StatusPill status={item.status} />
+                <StatusPill label={item.status.replaceAll('_', ' ')} tone={item.status === 'verified' ? 'success' : item.status === 'rejected' ? 'danger' : item.status === 'pending_verification' ? 'warning' : 'neutral'} />
               </View>
               <View style={styles.metaRow}>
                 <Text style={styles.meta}>PO: {item.poNo || '—'}</Text>
