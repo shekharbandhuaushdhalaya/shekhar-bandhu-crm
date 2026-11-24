@@ -58,6 +58,7 @@ const notificationRoutes = require('./routes/system/notifications');
 const rawMaterialRoutes = require('./routes/manufacturing/rawMaterials');
 const bomRoutes = require('./routes/manufacturing/bom');
 const batchProductionRoutes = require('./routes/manufacturing/batchProductions');
+const materialDispensingRoutes = require('./routes/manufacturing/materialDispensing');
 const manufacturingUnitRoutes = require('./routes/manufacturing/manufacturingUnits');
 
 const paymentRoutes = require('./routes/finance/payments');
@@ -243,6 +244,7 @@ app.use('/api/sales-intelligence', authenticateJWT, salesIntelligenceRoutes);
 app.use('/api/raw-materials', authenticateJWT, rawMaterialRoutes);
 app.use('/api/bom', authenticateJWT, bomRoutes);
 app.use('/api/batch-productions', authenticateJWT, batchProductionRoutes);
+app.use('/api/batch-productions', authenticateJWT, materialDispensingRoutes);
 app.use('/api/manufacturing-units', authenticateJWT, manufacturingUnitRoutes);
 app.use('/api/complaints', authenticateJWT, complaintRoutes);
 app.use('/api/samples', authenticateJWT, sampleRoutes);

@@ -11,7 +11,7 @@ const StockLedger = require('../../models/StockLedger');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
-const { getSizeInMl, consumeFromReservation, releaseAllReservations, deductPackagingMaterials, calculateAggregateMaterialSufficiency } = require('../../services/batchProductionService');
+const { getSizeInMl, releaseAllReservations, deductPackagingMaterials, calculateAggregateMaterialSufficiency } = require('../../services/batchProductionService');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const { resolveManufacturingWarehouse } = require('../../services/manufacturingWarehouseService');
 const { withTransaction } = require('../../utils/withTransaction');
@@ -750,36 +750,30 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
       }
     }
 
-    // Deduct stage-tied ingredients from inventory (FIFO) when stage is completed
-    // Guard: skip if already deducted to prevent double-deduction on re-completion
-    if (!currentStage.ingredientsDeducted) {
-      const stageIngredients = req.body.stageIngredients;
-      if (newStatus === 'completed' && stageIngredients && stageIngredients.length > 0) {
-        let totalInputQty = 0;
-        let totalLossQty = 0;
-        const lossReasons = [];
-        for (const si of stageIngredients) {
-          const qtyNeeded = Number(si.qtyNeeded) || 0;
-          const wastage = Number(si.wastage) || 0;
-          const totalDeductQty = qtyNeeded + wastage;
-          if (totalDeductQty > 0) {
-            await consumeFromReservation(batch, si.rawMaterialId, totalDeductQty);
-          }
-
-          totalInputQty += qtyNeeded;
-          totalLossQty += wastage;
-          if (wastage > 0) {
-            lossReasons.push({ rawMaterialId: si.rawMaterialId, qty: wastage, reason: si.lossReason || '' });
-          }
+    // Stock is issued only through the independently verified dispensing workflow.
+    if (Array.isArray(req.body.stageIngredients) && req.body.stageIngredients.length > 0) {
+      return res.status(409).json({ error: 'Direct stage material deduction is disabled. Create and independently verify a material dispensing record first.' });
+    }
+    if (newStatus === 'completed' && batch.bomSnapshot && Array.isArray(batch.bomSnapshot.ingredients)) {
+      const basis = Number(batch.bomSnapshot.formulationBasis || 100);
+      const multiplier = basis > 0 ? Number(batch.plannedQty || 0) / basis : 0;
+      const requiredLines = batch.bomSnapshot.ingredients.filter(ingredient =>
+        ingredient.itemType !== 'packaging' &&
+        (ingredient.stageName ? ingredient.stageName === currentStage.name : stageIndex === 0));
+      for (const ingredient of requiredLines) {
+        const requiredQty = Number(ingredient.qtyRequired || 0) * multiplier;
+        const consumedQty = (batch.ingredientsConsumed || [])
+          .filter(item => String(item.rawMaterialId) === String(ingredient.rawMaterialId) && Number(item.stageIndex) === stageIndex)
+          .reduce((sum, item) => sum + Number(item.qtyConsumed || 0), 0);
+        if (consumedQty + 0.0001 < requiredQty) {
+          return res.status(409).json({
+            error: 'Required materials must be dispensed and independently verified before this manufacturing stage can be completed',
+            code: 'MATERIAL_DISPENSING_REQUIRED',
+            rawMaterialId: ingredient.rawMaterialId,
+            requiredQty: Number(requiredQty.toFixed(2)),
+            verifiedDispensedQty: Number(consumedQty.toFixed(2))
+          });
         }
-
-        currentStage.inputQty = (currentStage.inputQty || 0) + totalInputQty;
-        currentStage.lossQty = (currentStage.lossQty || 0) + totalLossQty;
-        currentStage.outputQty = Math.max(0, currentStage.inputQty - currentStage.lossQty);
-        currentStage.lossPercent = currentStage.inputQty > 0 ? Number(((currentStage.lossQty / currentStage.inputQty) * 100).toFixed(2)) : 0;
-        if (req.body.lossReason) currentStage.lossReason = req.body.lossReason;
-        if (lossReasons.length > 0) currentStage.lossItems = lossReasons;
-        currentStage.ingredientsDeducted = true;
       }
     }
 
