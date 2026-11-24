@@ -917,7 +917,7 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     }
 
     // Save QC parameters
-    batch.qcStatus = qcStatus || 'approved';
+    batch.qcStatus = qcStatus || 'pending';
     batch.qcPassedByUser = req.user ? req.user.id : null;
     batch.qcPassedBy = (req.user ? req.user.name : '') || qcPassedBy.trim();
     batch.jobWorkerCertificateRef = jobWorkerCertificateRef || '';
@@ -1227,7 +1227,7 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
     }
 
     batch.releasedBy = req.user ? req.user.id : null;
-    batch.releasedByName = req.user ? req.user.name : 'Authorized Quality Releaser';
+    batch.releasedByName = req.user && req.user.name ? req.user.name : '';
     batch.releasedAt = new Date();
 
     await batch.save();
@@ -1376,7 +1376,7 @@ router.get('/genealogy/search', authorize('manufacturing:view'), async (req, res
           wasteQty: fb.wasteQty || 0,
           wasteReason: fb.wasteReason || '',
           variancePercent: fb.variancePercent || 0,
-          qcStatus: fb.qcStatus || 'approved',
+          qcStatus: fb.qcStatus || 'pending',
           qcParameters: fb.qcParameters || null,
           ingredients: enrichedIngredients
         }
@@ -1466,7 +1466,7 @@ router.get('/:id/genealogy', authorize('manufacturing:view'), async (req, res) =
       wasteQty: batch.wasteQty || 0,
       wasteReason: batch.wasteReason || '',
       variancePercent: batch.variancePercent || 0,
-      qcStatus: batch.qcStatus || 'approved',
+      qcStatus: batch.qcStatus || 'pending',
       qcParameters: batch.qcParameters || null,
       ingredients: enrichedIngredients
     });
@@ -1609,7 +1609,7 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
       endDate: batch.endDate,
       qcNotes: batch.qcNotes || 'N/A',
       qcPassedBy: batch.qcPassedBy || 'N/A',
-      qcStatus: batch.qcStatus || 'approved',
+      qcStatus: batch.qcStatus || 'pending',
       qcParameters: batch.qcParameters || null,
       rawMaterialCost: batch.rawMaterialCost || 0,
       overheadCost: batch.overheadCost || 0,
@@ -1626,63 +1626,70 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
   }
 });
 
-// GET /api/batch-productions/:id/coa — Auto-generate Certificate of Analysis (CoA) document JSON
+// GET /api/batch-productions/:id/coa — evidence-based QC summary, not an official certificate.
 router.get('/:id/coa', authorize('manufacturing:view'), async (req, res) => {
   try {
-    const batch = await BatchProduction.findById(req.params.id)
-      .populate('productId')
-      .lean();
-
+    const batch = await BatchProduction.findById(req.params.id).populate('productId').lean();
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
-
     const SystemSettings = require('../../models/SystemSettings');
+    const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
     const settings = await SystemSettings.findOne().lean() || {};
-
     const product = batch.productId || {};
     const qc = batch.qcParameters || {};
-
-    const testResults = [
-      { parameter: 'Organoleptic Evaluation', specification: 'Standard', result: qc.organoleptic || 'Complies', status: 'PASS' },
-      { parameter: 'Moisture Content', specification: qc.moistureLimit || 'NMT 10% w/w', result: qc.moistureContent !== null && qc.moistureContent !== undefined ? `${qc.moistureContent}% w/w` : 'N/A', status: 'PASS' },
-      { parameter: 'Total Ash Value', specification: qc.ashValueLimit || 'NMT 5% w/w', result: qc.ashValue !== null && qc.ashValue !== undefined ? `${qc.ashValue}% w/w` : 'N/A', status: 'PASS' },
-      { parameter: 'pH Value (1% w/v soln)', specification: qc.pHLimit || '4.0 - 7.0', result: qc.pHValue !== null && qc.pHValue !== undefined ? `${qc.pHValue}` : 'N/A', status: 'PASS' },
-      { parameter: 'Disintegration Time', specification: qc.disintegrationLimit || 'NMT 30 mins', result: qc.disintegrationTime !== null && qc.disintegrationTime !== undefined ? `${qc.disintegrationTime} mins` : 'N/A', status: 'PASS' },
-      { parameter: 'Heavy Metals (Pb, Cd, As, Hg)', specification: 'Within API limits', result: qc.heavyMetals || 'Complies', status: 'PASS' },
-      { parameter: 'Microbial Limit Test', specification: 'Within API limits', result: qc.microbialLimit || 'Complies', status: 'PASS' }
-    ];
-
-    const coaDocument = {
-      title: 'CERTIFICATE OF ANALYSIS (CoA)',
+    const approvedSpec = batch.qcSpecificationId ? await ProductQualitySpecification.findById(batch.qcSpecificationId).lean() : null;
+    const testResults = (batch.qcTests || []).map(test => ({
+      code: test.code, parameter: test.name, category: test.category || '',
+      specification: test.specification || '', methodReference: test.methodReference || '',
+      result: test.result === undefined ? null : test.result,
+      numericResult: test.numericResult === undefined ? null : test.numericResult,
+      unit: test.unit || '', status: test.status || 'not_tested',
+      testedBy: test.testedByName || null, testedAt: test.testedAt || null, remarks: test.remarks || ''
+    }));
+    const missingEvidence = [];
+    if (!settings.manufacturingLicenseNo) missingEvidence.push('Manufacturing licence number is not configured');
+    if (!settings.gmpCertificateNo) missingEvidence.push('GMP certificate number is not configured');
+    if (!batch.qcSpecificationId || !approvedSpec || approvedSpec.status !== 'approved') missingEvidence.push('Approved, batch-linked product quality specification is unavailable');
+    if (!batch.qcPassedBy || !batch.qcPassedByUser) missingEvidence.push('Identified QC analyst approval is missing');
+    if (!batch.endDate) missingEvidence.push('Recorded QC/testing completion date is missing');
+    if (!batch.releasedBy || !batch.releasedByName || !batch.releasedAt) missingEvidence.push('Independent finished-batch QA release evidence is missing');
+    if (!testResults.length) missingEvidence.push('No batch-specific QC test results are recorded');
+    if (testResults.some(test => !test.result || !test.testedBy || !test.testedAt || !['pass', 'fail'].includes(test.status))) {
+      missingEvidence.push('One or more QC results lack a result, tester identity, test timestamp, or completed disposition');
+    }
+    const hasFailedTest = testResults.some(test => test.status === 'fail');
+    const allTestsPassed = testResults.length > 0 && testResults.every(test => test.status === 'pass');
+    const evidenceComplete = missingEvidence.length === 0 && allTestsPassed;
+    res.json({
+      documentType: 'BATCH_QC_RESULT_SUMMARY',
+      title: 'Batch Quality Control Result Summary',
+      notice: 'System-generated internal record only. This is not a statutory Certificate of Analysis, government-issued certificate, laboratory certificate, or market-release authorisation.',
+      documentStatus: evidenceComplete ? 'EVIDENCE_COMPLETE_PENDING_AUTHORISED_DOCUMENT_ISSUANCE' : 'DRAFT_INCOMPLETE',
+      officialCertificate: false, requiresAuthorisedQASignature: true, evidenceComplete, missingEvidence,
       firmDetails: {
-        name: settings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
-        address: settings.firmAddress || 'VARANASI (U.P.)',
-        licenseNo: settings.manufacturingLicenseNo || 'N/A',
-        gmpCertNo: settings.gmpCertificateNo || 'N/A'
+        name: settings.firmName || null, address: settings.firmAddress || null,
+        manufacturingLicenseNo: settings.manufacturingLicenseNo || null,
+        manufacturingLicenseValidTill: settings.licenseValidTill || null,
+        gmpCertificateNo: settings.gmpCertificateNo || null, gmpValidTill: settings.gmpValidTill || null
       },
       batchDetails: {
-        batchNo: batch.batchNo,
-        productName: product.name || 'Ayurvedic Medicine',
-        productSku: product.sku || 'N/A',
-        spcCode: product.specificProductCode || 'N/A',
-        batchSize: `${batch.actualYieldQty || batch.plannedQty} units`,
-        mfgDate: batch.mfgDate ? new Date(batch.mfgDate).toLocaleDateString('en-IN') : 'N/A',
-        expiryDate: batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString('en-IN') : 'N/A',
-        testingDate: batch.endDate ? new Date(batch.endDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
-        testStandardRef: qc.testStandardRef || 'As per Pharmacopoeial API Standards'
+        batchNo: batch.batchNo || null, productName: product.name || null,
+        productSku: product.sku || null, specificProductCode: product.specificProductCode || null,
+        plannedQuantity: batch.plannedQty ?? null, actualYieldQuantity: batch.actualYieldQty ?? null,
+        manufacturingDate: batch.mfgDate || null, expiryDate: batch.expiryDate || null,
+        qcCompletionDate: batch.endDate || null, specificationId: batch.qcSpecificationId || null,
+        specificationVersion: batch.qcSpecificationVersion || null,
+        pharmacopoeialStandard: approvedSpec ? approvedSpec.pharmacopoeialStandard : null,
+        monographReference: approvedSpec ? approvedSpec.monographReference : null,
+        testStandardReference: qc.testStandardRef || null, laboratoryReportReference: qc.labReportRef || null
       },
       testResults,
-      overallResult: batch.qcStatus === 'rejected' ? 'REJECTED' : 'APPROVED & PASSED',
-      inspectorSignature: {
-        name: batch.qcPassedBy || 'Authorized Quality Analyst',
-        timestamp: batch.endDate ? new Date(batch.endDate).toISOString() : new Date().toISOString()
-      },
-      marketReleaserSignature: {
-        name: batch.releasedByName || 'Authorized Quality Releaser',
-        timestamp: batch.releasedAt ? new Date(batch.releasedAt).toISOString() : null
-      }
-    };
-
-    res.json(coaDocument);
+      qcDecision: hasFailedTest ? 'FAILED_TEST_RECORDED' : (allTestsPassed ? 'ALL_RECORDED_TESTS_PASSED' : 'NOT_DETERMINED'),
+      recordedQcDisposition: batch.qcStatus || null,
+      qcAnalyst: batch.qcPassedBy ? { name: batch.qcPassedBy, userId: batch.qcPassedByUser || null, recordedAt: batch.endDate || null } : null,
+      independentQaRelease: batch.releasedBy && batch.releasedByName && batch.releasedAt
+        ? { userId: batch.releasedBy, name: batch.releasedByName, releasedAt: batch.releasedAt } : null,
+      generatedAt: new Date().toISOString()
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1750,7 +1757,7 @@ router.get('/analytics/yield-variance', authorize('manufacturing:view'), async (
         varianceQty: actual - planned,
         yieldEfficiencyPercent: yieldEfficiency,
         processLossPercent: Math.max(0, processLossPercent),
-        qcStatus: b.qcStatus || 'approved',
+        qcStatus: b.qcStatus || 'pending',
         unitProductionCost: b.unitProductionCost || 0
       };
     });
@@ -1788,7 +1795,7 @@ router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async 
       const returned = Number(item.qtyReturnedToStore || 0);
       const unaccounted = Math.max(0, issued - (used + damaged + returned));
       const discrepancyPct = issued > 0 ? Number(((unaccounted / issued) * 100).toFixed(2)) : 0;
-      const isFlagged = discrepancyPct > 0.5;
+      const isFlagged = unaccounted > 0.01;
 
       if (isFlagged) overallFlagged = true;
 
@@ -1806,7 +1813,7 @@ router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async 
         reconciled: true,
         reconciledBy: req.user ? req.user.id : null,
         reconciledAt: new Date(),
-        discrepancyNote: item.discrepancyNote || (isFlagged ? `Flagged: ${discrepancyPct}% discrepancy exceeds 0.5% Schedule T limit` : 'Pass')
+        discrepancyNote: item.discrepancyNote || (isFlagged ? `Unaccounted quantity remains (${unaccounted})` : 'Quantity reconciled')
       };
     });
 
@@ -1815,7 +1822,7 @@ router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async 
     if (overallFlagged) {
       batch.deviations.push({
         type: 'process_loss',
-        description: `Schedule T Packing Audit Alert: Label reconciliation discrepancy exceeds 0.5% threshold on batch ${batch.batchNo}`,
+        description: `Packaging material reconciliation discrepancy on batch ${batch.batchNo}`,
         detectedAt: new Date(),
         status: 'open'
       });
@@ -1833,7 +1840,7 @@ router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async 
     res.json({
       success: true,
       batchId: batch._id,
-      overallAuditStatus: overallFlagged ? 'FLAGGED_EXCEEDS_0.5_PERCENT' : 'PASSED',
+      overallAuditStatus: overallFlagged ? 'FLAGGED_UNACCOUNTED_QUANTITY' : 'RECONCILED',
       reconciledItems: batch.labelReconciliation
     });
   } catch (err) {
@@ -1841,36 +1848,34 @@ router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async 
   }
 });
 
-// GET /api/batch-productions/:id/label-reconciliation-report — Official AYUSH Schedule T Audit Report JSON
+// GET /api/batch-productions/:id/label-reconciliation-report — Internal packaging reconciliation record
 router.get('/:id/label-reconciliation-report', authorize('manufacturing:view'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id).populate('productId', 'name sku').lean();
     if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
-
     const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne().lean() || {};
-
     const items = batch.labelReconciliation || [];
-    const hasFlagged = items.some(i => i.discrepancyFlagged);
-
+    const hasFlagged = items.some(item => item.discrepancyFlagged || item.auditStatus === 'flagged');
+    const allReconciled = items.length > 0 && items.every(item => item.reconciled && item.auditStatus === 'passed');
     res.json({
-      title: `AYUSH SCHEDULE T PACKING MATERIAL RECONCILIATION AUDIT REPORT — BATCH ${batch.batchNo}`,
+      documentType: 'INTERNAL_PACKAGING_MATERIAL_RECONCILIATION',
+      title: 'Packaging Material Reconciliation Record',
+      notice: 'System-generated internal record. It is not an official AYUSH, Schedule T, government, or regulatory audit certificate.',
+      officialRegulatoryReport: false,
       firmDetails: {
-        name: settings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
-        gmpCertNo: settings.gmpCertificateNo || 'GMP-AYUSH-2026-VNS',
-        licenseNo: settings.manufacturingLicenseNo || 'AYUSH-1983-UP'
+        name: settings.firmName || null, address: settings.firmAddress || null,
+        manufacturingLicenseNo: settings.manufacturingLicenseNo || null,
+        gmpCertificateNo: settings.gmpCertificateNo || null
       },
       batchDetails: {
-        batchNo: batch.batchNo,
-        productName: batch.productId ? batch.productId.name : 'N/A',
-        status: batch.status,
-        mfgDate: batch.mfgDate,
-        expiryDate: batch.expiryDate
+        batchNo: batch.batchNo || null, productName: batch.productId ? batch.productId.name : null,
+        status: batch.status || null, manufacturingDate: batch.mfgDate || null, expiryDate: batch.expiryDate || null
       },
       auditSummary: {
         totalPackagingItems: items.length,
-        auditResult: hasFlagged ? 'REJECTED / FLAGGED (DISCREPANCY > 0.5%)' : 'COMPLIANT (SCHEDULE T PASSED)',
-        maxDiscrepancyPct: items.length > 0 ? Math.max(...items.map(i => i.discrepancyPct || 0)) : 0
+        auditResult: hasFlagged ? 'FLAGGED_REQUIRES_INVESTIGATION' : (allReconciled ? 'RECONCILED' : 'INCOMPLETE'),
+        maxDiscrepancyPct: items.length > 0 ? Math.max(...items.map(item => item.discrepancyPct || 0)) : null
       },
       reconciliationItems: items
     });

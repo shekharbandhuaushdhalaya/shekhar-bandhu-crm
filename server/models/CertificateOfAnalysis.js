@@ -3,6 +3,8 @@ const tenantPlugin = require('../utils/tenantPlugin');
 
 const certificateOfAnalysisSchema = new mongoose.Schema({
   coaNumber: { type: String, required: true, unique: true },
+  documentType: { type: String, default: 'INTERNAL_QC_RESULT_DRAFT' },
+  officialCertificate: { type: Boolean, default: false },
   batchNo: { type: String, required: true, index: true },
   productName: { type: String, required: true },
   manufacturingLicenseNo: { type: String, default: '' },
@@ -70,7 +72,7 @@ const certificateOfAnalysisSchema = new mongoose.Schema({
   approvedAt: { type: Date },
   remarks: { type: String, default: '' },
   tests: [{
-    code: { type: String, required: true }, name: { type: String, required: true }, category: String,
+    code: { type: String, required: true }, name: { type: String, required: true }, category: String, mandatory: { type: Boolean, default: true },
     specification: String, unit: String, methodReference: String, result: String, numericResult: Number,
     status: { type: String, enum: ['not_tested','pending','pass','fail'], default: 'not_tested' },
     testedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, testedByName: String, testedAt: Date, remarks: String

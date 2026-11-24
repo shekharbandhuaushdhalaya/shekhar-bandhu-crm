@@ -173,7 +173,7 @@ const batchProductionSchema = new mongoose.Schema({
   releasedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   releasedByName: { type: String, default: '' },
   releasedAt: { type: Date, default: null },
-  qcStatus: { type: String, enum: ['approved', 'rejected'], default: 'approved' },
+  qcStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   qcSpecificationId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductQualitySpecification', default: null },
   qcSpecificationVersion: { type: String, default: '' },
   qcTests: [{

@@ -73,6 +73,16 @@ describe('GMP Compliance & BMR Upgrade Suite', () => {
     expect(batch.qcParameters.testStandardRef).toBe('As per API Appendix 2.2');
   });
 
+  it('keeps QC disposition pending until an explicit QC decision is recorded', () => {
+    const batch = new BatchProduction({
+      batchNo: 'BAT-QC-PENDING-001',
+      productId: '507f1f77bcf86cd799439011',
+      manufacturingUnitId: '507f1f77bcf86cd799439033',
+      plannedQty: 100
+    });
+    expect(batch.qcStatus).toBe('pending');
+  });
+
   it('enforces 4-eye verification logic when performer equals verifier', () => {
     const performerId = '507f1f77bcf86cd799439044';
     const verifierId = '507f1f77bcf86cd799439044';

@@ -6,6 +6,7 @@ jest.mock('../models/RawMaterial');
 jest.mock('../models/PharmacopoeiaEntry');
 jest.mock('../models/RawMaterialEntry');
 jest.mock('../models/SystemSettings');
+jest.mock('../models/ProductQualitySpecification');
 jest.mock('../models/LineClearance');
 jest.mock('../models/RetentionSample');
 jest.mock('../models/Product');
@@ -19,6 +20,7 @@ const RawMaterial = require('../models/RawMaterial');
 const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
 const RawMaterialEntry = require('../models/RawMaterialEntry');
 const SystemSettings = require('../models/SystemSettings');
+const ProductQualitySpecification = require('../models/ProductQualitySpecification');
 const LineClearance = require('../models/LineClearance');
 const RetentionSample = require('../models/RetentionSample');
 const Product = require('../models/Product');
@@ -161,4 +163,35 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
     expect(res.body.unverifiedIngredients).toHaveLength(1);
     expect(res.body.unverifiedIngredients[0].name).toBe('UNVERIFIED_HERB');
   });
+
+  test('GET /api/batch-productions/:id/coa returns an internal incomplete summary and never invents test passes or signatories', async () => {
+    BatchProduction.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({
+          _id: 'batch_coa_1',
+          batchNo: 'B-COA-01',
+          productId: { name: 'Test formulation' },
+          plannedQty: 100,
+          qcStatus: null,
+          qcParameters: {},
+          qcTests: []
+        })
+      })
+    });
+    SystemSettings.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({}) });
+
+    const res = await request(app).get('/api/batch-productions/batch_coa_1/coa');
+    expect(res.status).toBe(200);
+    expect(res.body.documentType).toBe('BATCH_QC_RESULT_SUMMARY');
+    expect(res.body.officialCertificate).toBe(false);
+    expect(res.body.documentStatus).toBe('DRAFT_INCOMPLETE');
+    expect(res.body.testResults).toEqual([]);
+    expect(res.body.qcDecision).toBe('NOT_DETERMINED');
+    expect(res.body.recordedQcDisposition).toBeNull();
+    expect(res.body.qcAnalyst).toBeNull();
+    expect(res.body.independentQaRelease).toBeNull();
+    expect(res.body.missingEvidence).toContain('No batch-specific QC test results are recorded');
+    expect(res.body.firmDetails.manufacturingLicenseNo).toBeNull();
+  });
+
 });
