@@ -21,9 +21,17 @@ const deviationCapaSchema = new mongoose.Schema({
     enum: ['open', 'under_investigation', 'capa_assigned', 'resolved', 'closed'],
     default: 'open'
   },
-  reportedBy: { type: String, default: 'System Accountant' },
+  reportedBy: { type: String, default: '' },
+  reportedByUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   signedOffBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  signedOffAt: { type: Date, default: null }
+  signedOffByName: { type: String, default: '' },
+  signedOffAt: { type: Date, default: null },
+  effectivenessCheck: { type: String, default: '', trim: true },
+  effectivenessEvidenceRef: { type: String, default: '', trim: true },
+  closureVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  closureVerifiedByName: { type: String, default: '' },
+  closureVerifiedAt: { type: Date, default: null },
+  closedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 deviationCapaSchema.index({ deviationNo: 'text', batchNo: 'text', deviationType: 'text' });
