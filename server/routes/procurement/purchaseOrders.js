@@ -242,9 +242,9 @@ router.get('/grn', authorize('vendor:view'), async (req, res) => {
       const search = String(req.query.search).trim().slice(0, 100);
       const escapedSearch = Array.from(search).map(char => '.*+?^$()|[]{}\\'.includes(char) ? '\\' + char : char).join('');
       if (escapedSearch) filter.$or = [
-        { grnNo: { $regex: search, $options: 'i' } },
-        { poNo: { $regex: search, $options: 'i' } },
-        { vendorName: { $regex: search, $options: 'i' } }
+        { grnNo: { $regex: escapedSearch, $options: 'i' } },
+        { poNo: { $regex: escapedSearch, $options: 'i' } },
+        { vendorName: { $regex: escapedSearch, $options: 'i' } }
       ];
     }
     const [items, total] = await Promise.all([
