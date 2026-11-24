@@ -6,7 +6,18 @@ const plannedBatchSchema = new mongoose.Schema({
   productName: { type: String, required: true },
   plannedQty: { type: Number, required: true, min: 1 },
   targetBatchNo: { type: String, default: '' },
-  estimatedDays: { type: Number, default: 7 }
+  estimatedDays: { type: Number, default: 7 },
+  bomId: { type: mongoose.Schema.Types.ObjectId, ref: 'BillOfMaterials', required: true },
+  bomSnapshot: {
+    recipeName: { type: String, required: true },
+    recipeUpdatedAt: { type: Date, required: true },
+    formulationBasis: { type: Number, required: true, min: 0.000001 },
+    formulationBasisUnit: { type: String, default: '' },
+    formulationStandardRef: { type: String, default: '' },
+    ingredients: [{ rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial', required: true }, qtyRequired: { type: Number, required: true, min: 0 }, itemType: { type: String, default: 'formulation' }, stageName: { type: String, default: '' }, isPrintedMaterial: { type: Boolean, default: false } }],
+    stages: [{ name: String, targetDurationHours: Number }],
+    overheadCost: { type: Number, default: 0 }
+  }
 }, { _id: false });
 
 const productionPlanSchema = new mongoose.Schema({

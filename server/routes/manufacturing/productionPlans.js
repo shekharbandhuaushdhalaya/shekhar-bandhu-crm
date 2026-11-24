@@ -52,6 +52,7 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
 
     // Aggregate total raw material requirements across all planned batches
     const rawMaterialNeeds = new Map(); // rawMaterialId -> totalNeeded
+    const pinnedBatches = [];
 
     for (const pb of plannedBatches) {
       const bom = await BillOfMaterials.findOne({ productId: pb.productId, isActive: true })
@@ -63,11 +64,10 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       if (!Array.isArray(bom.ingredients) || bom.ingredients.length === 0) {
         return res.status(400).json({ error: `Active recipe for ${pb.productName || pb.productId} has no ingredients` });
       }
-      const yieldSize = Number(bom.batchYieldQty) || 100;
-      if (yieldSize <= 0) {
-        return res.status(400).json({ error: `Active recipe for ${pb.productName || pb.productId} has an invalid batch yield` });
-      }
-      const multiplier = Number(pb.plannedQty) / yieldSize;
+      const basis = Number(bom.formulationBasis) || 100;
+      if (!Number.isFinite(basis) || basis <= 0) return res.status(400).json({ error: 'Active recipe has an invalid formulation basis' });
+      const multiplier = Number(pb.plannedQty) / basis;
+      pinnedBatches.push({ ...pb, bomId: bom._id, bomSnapshot: { recipeName: bom.recipeName, recipeUpdatedAt: bom.updatedAt, formulationBasis: basis, formulationBasisUnit: bom.formulationBasisUnit || '', formulationStandardRef: bom.formulationStandardRef || '', ingredients: bom.ingredients.map(ing => ({ rawMaterialId: ing.rawMaterialId, qtyRequired: Number(ing.qtyRequired), itemType: ing.itemType || 'formulation', stageName: ing.stageName || '', isPrintedMaterial: Boolean(ing.isPrintedMaterial) })), stages: (bom.stages || []).map(stage => ({ name: stage.name, targetDurationHours: stage.targetDurationHours || 8 })), overheadCost: Number(bom.overheadCost || 0) } });
       for (const ing of bom.ingredients) {
         const rmId = ing.rawMaterialId ? ing.rawMaterialId.toString() : null;
         if (!rmId) continue;
@@ -114,7 +114,7 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       manufacturingUnitName,
       startDate: parsedStartDate,
       endDate: parsedEndDate,
-      plannedBatches,
+      plannedBatches: pinnedBatches,
       rawMaterialSufficiencyStatus: shortageDetected ? 'shortage_detected' : 'sufficient',
       shortageDetails,
       status: 'draft',
@@ -151,11 +151,11 @@ router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) =>
 
         const needs = new Map();
         for (const batch of plan.plannedBatches || []) {
-          const bom = await BillOfMaterials.findOne({ productId: batch.productId, isActive: true }).sort({ isDefault: -1, updatedAt: -1 }).session(session).lean();
-          if (!bom || !Array.isArray(bom.ingredients) || !bom.ingredients.length) { const e = new Error('An active, non-empty recipe is required for ' + (batch.productName || batch.productId)); e.code = 'PLAN_RECIPE_UNAVAILABLE'; throw e; }
-          const basis = Number(bom.formulationBasis) || 100;
-          if (!Number.isFinite(basis) || basis <= 0) { const e = new Error('Recipe formulation basis is invalid'); e.code = 'PLAN_RECIPE_INVALID'; throw e; }
-          for (const ingredient of bom.ingredients) {
+          const snapshot = batch.bomSnapshot;
+          if (!batch.bomId || !snapshot || !Array.isArray(snapshot.ingredients) || !snapshot.ingredients.length) { const error = new Error('This production plan has no pinned formula snapshot. Recreate the draft before approval.'); error.code = 'PLAN_RECIPE_SNAPSHOT_REQUIRED'; throw error; }
+          const basis = Number(snapshot.formulationBasis);
+          if (!Number.isFinite(basis) || basis <= 0) { const error = new Error('Pinned recipe formulation basis is invalid'); error.code = 'PLAN_RECIPE_INVALID'; throw error; }
+          for (const ingredient of snapshot.ingredients) {
             if (!ingredient.rawMaterialId) continue;
             const perBasis = Number(ingredient.qtyRequired);
             if (!Number.isFinite(perBasis) || perBasis < 0) { const e = new Error('Recipe contains an invalid ingredient quantity'); e.code = 'PLAN_RECIPE_INVALID'; throw e; }
@@ -237,7 +237,7 @@ router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) =>
       return res.status(409).json({ error: err.message, code: err.code, shortageDetails: err.shortageDetails || [] });
     }
     const statusCode = err.code === 'PLAN_NOT_FOUND' ? 404
-      : ['INVALID_PLAN_TRANSITION', 'PLAN_MAKER_CHECKER_REQUIRED', 'PLAN_WAREHOUSE_UNAVAILABLE', 'PLAN_RECIPE_UNAVAILABLE', 'PLAN_RECIPE_INVALID', 'RESERVATION_RELEASE_CONFLICT'].includes(err.code) ? 409
+      : ['INVALID_PLAN_TRANSITION', 'PLAN_MAKER_CHECKER_REQUIRED', 'PLAN_WAREHOUSE_UNAVAILABLE', 'PLAN_RECIPE_UNAVAILABLE', 'PLAN_RECIPE_SNAPSHOT_REQUIRED', 'PLAN_RECIPE_INVALID', 'RESERVATION_RELEASE_CONFLICT'].includes(err.code) ? 409
       : err.code === 'APPROVER_REQUIRED' ? 403 : 500;
     res.status(statusCode).json({ error: err.message, code: err.code });
   }
