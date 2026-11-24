@@ -532,6 +532,10 @@ router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), async (r
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated BMR approver identity is required' });
+    if (!batch.bomSnapshot || !Array.isArray(batch.bomSnapshot.ingredients) || batch.bomSnapshot.ingredients.length === 0) {
+      return res.status(409).json({ error: 'A pinned, non-empty batch formula snapshot is required before BMR approval' });
+    }
 
     const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
     const RawMaterial = require('../../models/RawMaterial');
@@ -588,14 +592,14 @@ router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), async (r
       });
     }
 
-    batch.bmrApprovedBy = req.user ? req.user.id : null;
-    batch.bmrApprovedByName = req.user ? req.user.name : 'Authorized Approver';
+    batch.bmrApprovedBy = req.user.id;
+    batch.bmrApprovedByName = req.user.name;
     batch.bmrApprovedAt = new Date();
 
     if (unverifiedIngredients.length > 0) {
       batch.bmrUnverifiedAcknowledged = true;
-      batch.bmrUnverifiedAcknowledgedBy = req.user ? req.user.id : null;
-      batch.bmrUnverifiedAcknowledgedByName = req.user ? req.user.name : 'Authorized Approver';
+      batch.bmrUnverifiedAcknowledgedBy = req.user.id;
+      batch.bmrUnverifiedAcknowledgedByName = req.user.name;
       batch.bmrUnverifiedAcknowledgedAt = new Date();
     }
 
@@ -1510,148 +1514,230 @@ router.get('/:id/genealogy', authorize('manufacturing:view'), async (req, res) =
   }
 });
 
-// GET /api/batch-productions/:id/bmr-report — Generate a compliance-friendly BMR
+// GET /api/batch-productions/:id/bmr-report — System-generated internal batch manufacturing record.
 router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id)
       .populate('productId')
       .populate('ingredientsConsumed.rawMaterialId')
       .lean();
-
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
 
     const RawMaterialEntry = require('../../models/RawMaterialEntry');
     const SystemSettings = require('../../models/SystemSettings');
     const LineClearance = require('../../models/LineClearance');
     const RetentionSample = require('../../models/RetentionSample');
-
-    const [settings, lineClearance, retentionSamples] = await Promise.all([
-      SystemSettings.findOne().lean(),
+    const MaterialDispensing = require('../../models/MaterialDispensing');
+    const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
+    const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
+    const settings = await SystemSettings.findOne().lean() || {};
+    const [lineClearance, retentionSamples, dispensingRecords, qualitySpecification] = await Promise.all([
       LineClearance.find({ batchId: batch._id }).lean(),
-      RetentionSample.find({ batchId: batch._id }).lean()
+      RetentionSample.find({ batchId: batch._id }).lean(),
+      MaterialDispensing.find({ batchId: batch._id }).sort({ stageIndex: 1, dispensedAt: 1 }).lean(),
+      batch.qcSpecificationId ? ProductQualitySpecification.findById(batch.qcSpecificationId).lean() : Promise.resolve(null)
     ]);
 
-    const sysSettings = settings || {};
-
-    const botanicalLookup = require('../../utils/botanicalLookup');
     const enrichedIngredients = [];
-    for (const ing of batch.ingredientsConsumed) {
-      const entry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).lean();
-      const rate = entry ? (entry.purchaseRate || 0) : 0;
+    const unverifiedIngredients = [];
+    const missingPharmacopoeiaReferences = [];
+    for (const ing of (batch.ingredientsConsumed || [])) {
+      const entry = ing.rawMaterialEntryId ? await RawMaterialEntry.findById(ing.rawMaterialEntryId).lean() : null;
       const rm = ing.rawMaterialId || {};
-      const botProfile = await botanicalLookup.getBotanicalProfile(rm.name || '');
-
+      let pharmacopoeiaEntry = null;
+      if (rm.name) {
+        const escapedName = rm.name.trim().replace(/[.*+?^{}()|[\]\\]/g, '\\$&');
+        const escapedBot = (rm.botanicalName || '').trim().replace(/[.*+?^{}()|[\]\\]/g, '\\$&');
+        const searchConds = [{ ayurvedicName: new RegExp('^' + escapedName + '$', 'i') }];
+        if (escapedBot) searchConds.push({ botanicalName: new RegExp('^' + escapedBot + '$', 'i') });
+        pharmacopoeiaEntry = await PharmacopoeiaEntry.findOne({ $or: searchConds }).lean();
+      }
+      const referenceVerified = Boolean(pharmacopoeiaEntry && pharmacopoeiaEntry.verified === true);
+      if (!pharmacopoeiaEntry) {
+        missingPharmacopoeiaReferences.push({ rawMaterialId: rm._id || ing.rawMaterialId || null, name: rm.name || null });
+      } else if (!referenceVerified) {
+        unverifiedIngredients.push({
+          rawMaterialId: rm._id || ing.rawMaterialId || null,
+          name: rm.name || null,
+          botanicalName: pharmacopoeiaEntry.botanicalName || rm.botanicalName || null,
+          monographRef: pharmacopoeiaEntry.monographRef || rm.monographRef || null,
+          source: pharmacopoeiaEntry.source || null
+        });
+      }
+      const purchaseRate = entry && Number.isFinite(Number(entry.purchaseRate)) ? Number(entry.purchaseRate) : null;
       enrichedIngredients.push({
-        name: rm.name || 'Unknown Material',
-        botanicalName: rm.botanicalName || botProfile.latinName || '',
-        partUsed: rm.partUsed || botProfile.partUsed || '',
-        pharmacopoeialStandard: rm.pharmacopoeialStandard || botProfile.standard || 'API',
-        monographRef: rm.monographRef || botProfile.monographRef || '',
-        pharmacopoeiaSpecs: {
-          standard: botProfile.standard || 'API',
-          latinName: botProfile.latinName || '',
-          ashValue: botProfile.ashValue || null,
-          extractiveValue: botProfile.extractiveValue || null
-        },
-        isScheduleE1: Boolean(rm.isScheduleE1),
-        code: rm.sku || rm.code || 'N/A',
-        batchNo: ing.batchNo,
-        qtyConsumed: ing.qtyConsumed,
-        unit: rm.unit || 'kg',
-        purchaseRate: rate,
-        itemCost: Number((ing.qtyConsumed * rate).toFixed(2))
+        name: rm.name || null,
+        botanicalName: rm.botanicalName || (referenceVerified ? pharmacopoeiaEntry.botanicalName : null),
+        partUsed: rm.partUsed || (referenceVerified ? pharmacopoeiaEntry.partUsed || null : null),
+        pharmacopoeialStandard: rm.pharmacopoeialStandard || (referenceVerified ? pharmacopoeiaEntry.pharmacopoeialStandard : null),
+        monographRef: rm.monographRef || (referenceVerified ? pharmacopoeiaEntry.monographRef || null : null),
+        pharmacopoeiaReference: pharmacopoeiaEntry ? {
+          source: pharmacopoeiaEntry.source || null,
+          verified: referenceVerified,
+          standard: referenceVerified ? pharmacopoeiaEntry.pharmacopoeialStandard || null : null,
+          monographRef: pharmacopoeiaEntry.monographRef || null
+        } : null,
+        isScheduleE1: rm.isScheduleE1 === true,
+        code: rm.sku || rm.code || null,
+        rawMaterialId: rm._id || ing.rawMaterialId || null,
+        rawMaterialEntryId: ing.rawMaterialEntryId || null,
+        stockLotNo: entry ? entry.batchNo || null : ing.batchNo || null,
+        batchNo: ing.batchNo || (entry ? entry.batchNo || null : null),
+        qtyConsumed: Number.isFinite(Number(ing.qtyConsumed)) ? Number(ing.qtyConsumed) : null,
+        unit: rm.unit || null,
+        purchaseRate,
+        itemCost: purchaseRate === null ? null : Number((Number(ing.qtyConsumed || 0) * purchaseRate).toFixed(2)),
+        stageIndex: ing.stageIndex ?? null,
+        dispensingNo: ing.dispensingNo || null
       });
     }
 
-    const productPopulated = batch.productId ? batch.productId : null;
-
-    // Fetch product names for plannedYields / yields if productId is not populated
+    const product = batch.productId || null;
     const yieldProdIds = new Set();
-    if (batch.plannedYields) batch.plannedYields.forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
-    if (batch.yields) batch.yields.forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
-    const yieldProducts = yieldProdIds.size > 0 ? await Product.find({ _id: { $in: [...yieldProdIds] } }).select('name size sku category').lean() : [];
+    (batch.plannedYields || []).forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
+    (batch.yields || []).forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
+    const yieldProducts = yieldProdIds.size > 0
+      ? await Product.find({ _id: { $in: [...yieldProdIds] } }).select('name size sku category').lean()
+      : [];
     const yieldProdMap = {};
     yieldProducts.forEach(p => { yieldProdMap[p._id.toString()] = p; });
 
-    const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
-    const unverifiedIngredients = [];
-
-    for (const ing of enrichedIngredients) {
-      if (ing.name) {
-        const escapedName = ing.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const escapedBot = (ing.botanicalName || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const searchConds = [{ ayurvedicName: new RegExp(`^${escapedName}$`, 'i') }];
-        if (escapedBot) searchConds.push({ botanicalName: new RegExp(`^${escapedBot}$`, 'i') });
-        const pEntry = await PharmacopoeiaEntry.findOne({ $or: searchConds }).lean();
-        if (pEntry && pEntry.verified === false) {
-          unverifiedIngredients.push({
-            name: ing.name,
-            botanicalName: ing.botanicalName || pEntry.botanicalName || '',
-            monographRef: ing.monographRef || pEntry.monographRef || '',
-            source: pEntry.source || 'AI-generated'
-          });
-        }
+    const mandatoryQcTests = qualitySpecification && qualitySpecification.status === 'approved'
+      ? (qualitySpecification.tests || []).filter(test => test.mandatory !== false)
+      : [];
+    const qcTests = batch.qcTests || [];
+    const qcTestsByCode = new Map(qcTests.map(test => [String(test.code || '').trim().toLowerCase(), test]));
+    const missingEvidence = [];
+    if (!batch.bomSnapshot || !Array.isArray(batch.bomSnapshot.ingredients) || batch.bomSnapshot.ingredients.length === 0) {
+      missingEvidence.push('Pinned batch formula snapshot is missing');
+    }
+    if (!batch.bmrApprovedBy || !batch.bmrApprovedByName || !batch.bmrApprovedAt) missingEvidence.push('Pre-execution BMR approval identity or timestamp is missing');
+    if (!batch.ingredientsConsumed || batch.ingredientsConsumed.length === 0) missingEvidence.push('No actual raw-material consumption genealogy is recorded');
+    if (enrichedIngredients.some(item => !item.rawMaterialEntryId || !item.stockLotNo)) missingEvidence.push('One or more consumed materials lack a linked stock-entry lot reference');
+    if (missingPharmacopoeiaReferences.length) missingEvidence.push('One or more consumed materials lack a pharmacopoeia reference record');
+    if (unverifiedIngredients.length) missingEvidence.push('One or more pharmacopoeia references are not verified');
+    if (!batch.stages || batch.stages.length === 0) missingEvidence.push('Manufacturing stage execution records are missing');
+    else {
+      for (const stage of batch.stages) {
+        if (!['completed', 'skipped'].includes(stage.status)) missingEvidence.push('Stage is not completed or formally skipped: ' + stage.name);
+        if (stage.status === 'completed' && (!stage.performedBy || !stage.performedByName)) missingEvidence.push('Stage operator identity is missing: ' + stage.name);
+        if (stage.status === 'completed' && (!stage.equipmentId || stage.equipmentCalibrationStatus !== 'valid')) missingEvidence.push('Verified equipment calibration evidence is missing: ' + stage.name);
+        if (stage.status === 'completed' && !stage.operatorTrainingRecordId) missingEvidence.push('Operator training evidence is missing: ' + stage.name);
       }
     }
-
+    if (!lineClearance.some(record => record.phase === 'manufacturing' && record.cleared === true &&
+      record.clearedBy && record.clearedAt && record.checklist &&
+      record.checklist.equipmentCleaned && record.checklist.previousMaterialsRemoved &&
+      record.checklist.previousLabelsDocumentsRemoved && record.checklist.areaVisuallyInspected)) {
+      missingEvidence.push('Verified manufacturing line-clearance record is missing or incomplete');
+    }
+    if (dispensingRecords.some(record => record.status === 'pending_verification')) missingEvidence.push('One or more material dispensing records are awaiting independent verification');
+    if (dispensingRecords.some(record => record.status === 'rejected')) missingEvidence.push('One or more material dispensing records were rejected');
+    if (!qualitySpecification || qualitySpecification.status !== 'approved' ||
+      String(qualitySpecification.productId) !== String(product ? product._id : batch.productId) ||
+      !qualitySpecification.approvedBy || !qualitySpecification.approvedAt) {
+      missingEvidence.push('Effective, approved product-specific quality specification is missing');
+    }
+    if (!mandatoryQcTests.length) missingEvidence.push('Approved quality specification has no mandatory test requirements');
+    for (const specTest of mandatoryQcTests) {
+      const recorded = qcTestsByCode.get(String(specTest.code || '').trim().toLowerCase());
+      if (!recorded) missingEvidence.push('Mandatory finished-product QC test is not recorded: ' + specTest.code);
+      else if (!['pass', 'fail'].includes(String(recorded.status || '').toLowerCase()) ||
+        !recorded.testedBy || !recorded.testedByName || !recorded.testedAt ||
+        ((recorded.result === undefined || recorded.result === null || String(recorded.result).trim() === '') &&
+        (recorded.numericResult === undefined || recorded.numericResult === null))) {
+        missingEvidence.push('Finished-product QC test evidence is incomplete: ' + specTest.code);
+      }
+    }
+    if (batch.qcStatus !== 'approved') missingEvidence.push('Finished-product QC approval is not recorded');
+    if (!batch.releasedBy || !batch.releasedByName || !batch.releasedAt) missingEvidence.push('Independent finished-batch QA release is missing');
+    if (batch.actualYieldQty === undefined || batch.actualYieldQty === null) missingEvidence.push('Actual batch yield is not recorded');
+    if (Number(batch.wasteQty || 0) > 0 && !batch.wasteReason) missingEvidence.push('Recorded production wastage has no reason');
+    if (!retentionSamples.length) missingEvidence.push('Batch retention-sample record is missing');
+    if (batch.packagingMode === 'self_packed' && (!batch.labelReconciliation || !batch.labelReconciliation.length ||
+      batch.labelReconciliation.some(item => !item.reconciled || item.auditStatus !== 'passed'))) {
+      missingEvidence.push('Self-packed batch packaging reconciliation is missing or incomplete');
+    }
     const hasUnverifiedReferences = unverifiedIngredients.length > 0;
-
+    const bmrComplete = missingEvidence.length === 0;
     res.json({
-      batchNo: batch.batchNo,
+      documentType: 'system_generated_batch_manufacturing_record',
+      title: 'BATCH MANUFACTURING RECORD — INTERNAL SYSTEM-GENERATED RECORD',
+      notice: 'This is an internal system-generated batch record, not an official statutory form, government certificate, GMP certificate, or regulatory approval. Completeness reflects only evidence currently recorded in this system.',
+      officialStatutoryForm: false,
+      documentStatus: bmrComplete ? 'READY_FOR_QA_REVIEW' : 'DRAFT_INCOMPLETE',
+      bmrComplete,
+      missingEvidence,
+      generatedAt: new Date().toISOString(),
+      batchNo: batch.batchNo || null,
       hasUnverifiedReferences,
       unverifiedIngredients,
-      ayushHeader: {
-        firmName: sysSettings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
-        firmAddress: sysSettings.firmAddress || 'PILIKOTHI, VARANASI (U.P.)',
-        manufacturingLicenseNo: sysSettings.manufacturingLicenseNo || 'AYUSH-1983-UP',
-        gmpCertificateNo: sysSettings.gmpCertificateNo || 'GMP-AYUSH-2026-VNS',
-        stateUtCode: sysSettings.stateUtCode || 'UP'
+      missingPharmacopoeiaReferences,
+      organizationDetails: {
+        firmName: settings.firmName || null,
+        firmAddress: settings.firmAddress || null,
+        manufacturingLicenseNo: settings.manufacturingLicenseNo || null,
+        gmpCertificateNo: settings.gmpCertificateNo || null,
+        stateUtCode: settings.stateUtCode || null
       },
-      productName: productPopulated ? productPopulated.name : 'Unknown Product',
-      productSku: productPopulated ? productPopulated.sku : 'N/A',
-      productPrice: productPopulated ? productPopulated.price : 0,
-      productSize: productPopulated ? productPopulated.size : '',
-      productCategory: productPopulated ? (productPopulated.category || 'Ayurvedic Medicine') : 'Ayurvedic Medicine',
-      plannedQty: batch.plannedQty,
-      actualYieldQty: batch.actualYieldQty || 0,
+      productDetails: {
+        name: product ? product.name || null : null,
+        sku: product ? product.sku || null : null,
+        price: product && product.price !== undefined ? product.price : null,
+        size: product ? product.size || null : null,
+        category: product ? product.category || null : null
+      },
+      plannedQty: batch.plannedQty ?? null,
+      actualYieldQty: batch.actualYieldQty ?? null,
       mfgDate: batch.mfgDate || null,
       expiryDate: batch.expiryDate || null,
-      shelfLifeMonths: batch.shelfLifeMonths || null,
-      bmrApprovedBy: batch.bmrApprovedBy || null,
-      bmrApprovedByName: batch.bmrApprovedByName || '',
-      bmrApprovedAt: batch.bmrApprovedAt || null,
-      releasedBy: batch.releasedBy || null,
-      releasedByName: batch.releasedByName || '',
-      releasedAt: batch.releasedAt || null,
+      shelfLifeMonths: batch.shelfLifeMonths ?? null,
+      bmrApproval: {
+        userId: batch.bmrApprovedBy || null,
+        name: batch.bmrApprovedByName || null,
+        approvedAt: batch.bmrApprovedAt || null
+      },
+      independentQaRelease: batch.releasedBy && batch.releasedByName && batch.releasedAt
+        ? { userId: batch.releasedBy, name: batch.releasedByName, releasedAt: batch.releasedAt }
+        : null,
       plannedYields: (batch.plannedYields || []).map(y => ({
-        productId: y.productId ? y.productId.toString() : '',
-        plannedQty: y.plannedQty,
-        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || '') : ''),
-        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || '') : ''
+        productId: y.productId ? y.productId.toString() : null,
+        plannedQty: y.plannedQty ?? null,
+        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || null) : null),
+        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || null) : null
       })),
       yields: (batch.yields || []).map(y => ({
-        productId: y.productId ? y.productId.toString() : '',
-        actualYieldQty: y.actualYieldQty,
-        packing: y.packing || 1,
-        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || '') : ''),
-        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || '') : ''
+        productId: y.productId ? y.productId.toString() : null,
+        actualYieldQty: y.actualYieldQty ?? null,
+        packing: y.packing ?? null,
+        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || null) : null),
+        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || null) : null
       })),
-      wasteQty: batch.wasteQty || 0,
-      wasteReason: batch.wasteReason || '',
-      variancePercent: batch.variancePercent || 0,
-      status: batch.status,
-      startDate: batch.startDate,
-      endDate: batch.endDate,
-      qcNotes: batch.qcNotes || 'N/A',
-      qcPassedBy: batch.qcPassedBy || 'N/A',
-      qcStatus: batch.qcStatus || 'pending',
+      wasteQty: batch.wasteQty ?? null,
+      wasteReason: batch.wasteReason || null,
+      variancePercent: batch.variancePercent ?? null,
+      batchStatus: batch.status || null,
+      startDate: batch.startDate || null,
+      endDate: batch.endDate || null,
+      qcNotes: batch.qcNotes || null,
+      qcPassedBy: batch.qcPassedBy || null,
+      qcStatus: batch.qcStatus || null,
       qcParameters: batch.qcParameters || null,
-      rawMaterialCost: batch.rawMaterialCost || 0,
-      overheadCost: batch.overheadCost || 0,
-      unitProductionCost: batch.unitProductionCost || 0,
+      qcSpecification: qualitySpecification ? {
+        id: qualitySpecification._id,
+        version: qualitySpecification.specificationVersion || null,
+        status: qualitySpecification.status || null,
+        approvedBy: qualitySpecification.approvedBy || null,
+        approvedAt: qualitySpecification.approvedAt || null
+      } : null,
+      qcTests,
+      rawMaterialCost: batch.rawMaterialCost ?? null,
+      overheadCost: batch.overheadCost ?? null,
+      unitProductionCost: batch.unitProductionCost ?? null,
       stages: batch.stages || [],
       ingredients: enrichedIngredients,
       bomSnapshot: batch.bomSnapshot || null,
+      materialDispensingRecords: dispensingRecords || [],
       lineClearance: lineClearance || [],
       labelReconciliation: batch.labelReconciliation || [],
       retentionSamples: retentionSamples || []

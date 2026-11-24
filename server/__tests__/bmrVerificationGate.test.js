@@ -9,6 +9,7 @@ jest.mock('../models/SystemSettings');
 jest.mock('../models/ProductQualitySpecification');
 jest.mock('../models/LineClearance');
 jest.mock('../models/RetentionSample');
+jest.mock('../models/MaterialDispensing');
 jest.mock('../models/Product');
 jest.mock('../models/RolePermission');
 jest.mock('../utils/botanicalLookup', () => ({
@@ -22,6 +23,7 @@ const RawMaterialEntry = require('../models/RawMaterialEntry');
 const SystemSettings = require('../models/SystemSettings');
 const LineClearance = require('../models/LineClearance');
 const RetentionSample = require('../models/RetentionSample');
+const MaterialDispensing = require('../models/MaterialDispensing');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
 
@@ -125,6 +127,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
     SystemSettings.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({}) });
     LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
     RetentionSample.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+    MaterialDispensing.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) });
     Product.find.mockReturnValue({
       select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) })
     });
@@ -158,9 +161,19 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
 
     const res = await request(app).get('/api/batch-productions/batch_report_1/bmr-report');
     expect(res.status).toBe(200);
+    expect(res.body.documentType).toBe('system_generated_batch_manufacturing_record');
+    expect(res.body.officialStatutoryForm).toBe(false);
+    expect(res.body.documentStatus).toBe('DRAFT_INCOMPLETE');
     expect(res.body.hasUnverifiedReferences).toBe(true);
     expect(res.body.unverifiedIngredients).toHaveLength(1);
     expect(res.body.unverifiedIngredients[0].name).toBe('UNVERIFIED_HERB');
+    expect(res.body.ingredients[0].botanicalName).toBeNull();
+    expect(res.body.ingredients[0].pharmacopoeialStandard).toBeNull();
+    expect(res.body.ingredients[0].purchaseRate).toBe(100);
+    expect(res.body.organizationDetails.manufacturingLicenseNo).toBeNull();
+    expect(res.body.organizationDetails.gmpCertificateNo).toBeNull();
+    expect(res.body.productDetails.name).toBeNull();
+    expect(res.body.missingEvidence).toContain('Pre-execution BMR approval identity or timestamp is missing');
   });
 
   test('GET /api/batch-productions/:id/coa returns an internal incomplete summary and never invents test passes or signatories', async () => {
