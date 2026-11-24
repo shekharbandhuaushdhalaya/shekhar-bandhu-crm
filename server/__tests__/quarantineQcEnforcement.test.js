@@ -4,6 +4,7 @@ const request = require('supertest');
 jest.mock('../models/RawMaterial');
 jest.mock('../models/RawMaterialEntry');
 jest.mock('../models/RawMaterialQuarantine');
+jest.mock('../models/GoodsReceivedNote');
 jest.mock('../models/BillOfMaterials');
 jest.mock('../models/ProductionPlan');
 jest.mock('../models/Product');
@@ -31,6 +32,7 @@ jest.mock('../routes/analytics/demandForecasting', () => ({
 const RawMaterial = require('../models/RawMaterial');
 const RawMaterialEntry = require('../models/RawMaterialEntry');
 const RawMaterialQuarantine = require('../models/RawMaterialQuarantine');
+const GoodsReceivedNote = require('../models/GoodsReceivedNote');
 const BillOfMaterials = require('../models/BillOfMaterials');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
@@ -57,6 +59,7 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     RolePermission.getEffectivePermissions.mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
+    GoodsReceivedNote.findOne = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue({ grnNo: 'GRN-00001', status: 'verified' }) });
   });
 
   describe('Quarantine Release Updates Linked RawMaterialEntry qcStatus', () => {
@@ -107,6 +110,7 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         qty: 50,
         reservedQty: 0,
         qcStatus: 'under_test',
+        grnReferences: [{ grnNo: 'GRN-00001', supplierCoaRef: 'COA-REF-1', receivedQty: 50 }],
         save: jest.fn().mockResolvedValue(true)
       };
 
@@ -175,6 +179,18 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
       expect(mockEntry.qcStatus).toBe('rejected');
       expect(mockEntry.save).toHaveBeenCalled();
       expect(mockLot.quarantineStatus).toBe('rejected');
+    });
+
+    test('blocks incoming QC release until every linked GRN is independently verified', async () => {
+      const mockEntry = { _id: 'entry_pending_grn', rawMaterialId: 'rm_pending', batchNo: 'BATCH-PENDING', qty: 10, reservedQty: 0, qcStatus: 'under_test', grnReferences: [{ grnNo: 'GRN-PENDING', supplierCoaRef: 'COA-REF-PENDING', receivedQty: 10 }], save: jest.fn().mockResolvedValue(true) };
+      const mockLot = { _id: 'quarantine_pending', quarantineLotNo: 'QRM-PENDING', rawMaterialEntryId: 'entry_pending_grn', rawMaterialId: 'rm_pending', batchNo: 'BATCH-PENDING', qty: 10, quarantineStatus: 'under_testing', save: jest.fn().mockResolvedValue(true) };
+      RawMaterialQuarantine.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockLot) });
+      RawMaterialEntry.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockEntry) });
+      GoodsReceivedNote.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(null) });
+      const res = await request(app).patch('/api/manufacturing/quarantine/quarantine_pending/release').send({ quarantineStatus: 'released', testReportNo: 'QC-PENDING', remarks: 'Testing completed' });
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/GRN.*independently verified/i);
+      expect(mockEntry.save).not.toHaveBeenCalled();
     });
   });
 

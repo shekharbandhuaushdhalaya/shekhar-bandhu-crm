@@ -162,6 +162,15 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
             existing.vendorId = po.vendorId;
             existing.vendorName = po.vendorName;
             existing.purchaseRef = grnNo;
+            if (existing.supplierCoaRef && item.supplierCoaRef && existing.supplierCoaRef !== String(item.supplierCoaRef).trim()) {
+              throw Object.assign(new Error(item.name + ': supplier CoA reference differs from the existing supplier batch record'), { statusCode: 409, code: 'SUPPLIER_COA_BATCH_CONFLICT' });
+            }
+            existing.supplierCoaRef = String(item.supplierCoaRef || existing.supplierCoaRef || '').trim();
+            existing.analyticalReportNo = existing.supplierCoaRef;
+            existing.grnReferences = existing.grnReferences || [];
+            const priorGrnRef = existing.grnReferences.find(ref => ref.grnNo === grnNo);
+            if (priorGrnRef) priorGrnRef.receivedQty = Number(priorGrnRef.receivedQty || 0) + accepted;
+            else existing.grnReferences.push({ grnNo, supplierCoaRef: String(item.supplierCoaRef || '').trim(), receivedQty: accepted });
             if (mfgDate) existing.mfgDate = mfgDate;
             if (expiryDate) existing.expiryDate = expiryDate;
             await existing.save({ session });
@@ -170,6 +179,8 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
               rawMaterialId: item.rawMaterialId, batchNo: item.batchNo,
               initialQty: accepted, qty: accepted, purchaseRate: Number(poItem.unitPrice || 0),
               vendorId: po.vendorId, vendorName: po.vendorName, purchaseRef: grnNo,
+              supplierCoaRef: String(item.supplierCoaRef || '').trim(), analyticalReportNo: String(item.supplierCoaRef || '').trim(),
+              grnReferences: [{ grnNo, supplierCoaRef: String(item.supplierCoaRef || '').trim(), receivedQty: accepted }],
               warehouseId: wh._id, warehouseName: wh.name, mfgDate, expiryDate,
               receivedDate: new Date(), qcStatus: 'under_test'
             }], { session });
