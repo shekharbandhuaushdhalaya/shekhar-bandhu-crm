@@ -27,7 +27,7 @@ router.post('/', authorize('manufacturing:qcApprove'), async (req, res) => {
   try {
     const {
       vendorId, qualificationStatus = 'conditional', auditDate, nextAuditDue,
-      gmpComplianceScore, findings, rawMaterialIds
+      gmpComplianceScore, findings, rawMaterialIds, documents
     } = req.body;
 
     if (!vendorId || !mongoose.isValidObjectId(vendorId)) {
@@ -55,6 +55,10 @@ router.post('/', authorize('manufacturing:qcApprove'), async (req, res) => {
       rawMaterialIds.some(id => !mongoose.isValidObjectId(id))) {
       return res.status(400).json({ error: 'Select at least one valid raw material for this qualification' });
     }
+    if (!Array.isArray(documents) || documents.length === 0 || documents.some(doc => !doc || typeof doc.name !== 'string' || !doc.name.trim() || typeof doc.url !== 'string' || !doc.url.trim())) {
+      return res.status(400).json({ error: 'At least one named supplier qualification evidence reference is required' });
+    }
+    const normalizedDocuments = documents.map(doc => ({ name: doc.name.trim().slice(0, 200), url: doc.url.trim().slice(0, 1000) }));
     const uniqueMaterialIds = [...new Set(rawMaterialIds.map(String))];
     const [vendor, materials] = await Promise.all([
       Vendor.findById(vendorId).select('name company').lean(),
@@ -84,6 +88,7 @@ router.post('/', authorize('manufacturing:qcApprove'), async (req, res) => {
       auditedByUserId: auditorId,
       gmpComplianceScore: score,
       findings: typeof findings === 'string' ? findings.trim() : '',
+      documents: normalizedDocuments,
       rawMaterialIds: uniqueMaterialIds
     });
 
@@ -108,6 +113,9 @@ router.patch('/:id/verify', authorize('manufacturing:qcApprove'), async (req, re
     if (!reviewerId || !reviewerName) {
       return res.status(403).json({ error: 'Authenticated independent reviewer identity is required' });
     }
+    if (!Array.isArray(record.documents) || record.documents.length === 0 || record.documents.some(doc => !doc?.name?.trim() || !doc?.url?.trim())) {
+      return res.status(409).json({ error: 'Supplier qualification cannot be approved without named supporting evidence references', code: 'SUPPLIER_QUALIFICATION_EVIDENCE_REQUIRED' });
+    }
     if (String(record.auditedByUserId || '') === String(reviewerId)) {
       return res.status(403).json({ error: 'The supplier auditor cannot verify their own qualification decision', code: 'SUPPLIER_QUALIFICATION_MAKER_CHECKER_REQUIRED' });
     }
@@ -121,6 +129,7 @@ router.patch('/:id/verify', authorize('manufacturing:qcApprove'), async (req, re
     record.verifiedByName = reviewerName;
     record.verifiedAt = new Date();
     record.verificationNotes = typeof req.body?.verificationNotes === 'string' ? req.body.verificationNotes.trim() : '';
+    if (!record.verificationNotes) return res.status(400).json({ error: 'Independent verification notes are required' });
     await record.save();
     req.io?.emit('vendor_qualification_updated', { type: 'verified', id: record._id });
     return res.json(record);

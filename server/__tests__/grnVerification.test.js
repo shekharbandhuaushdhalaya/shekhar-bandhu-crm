@@ -117,6 +117,13 @@ describe('GRN independent receipt and supplier-document verification', () => {
     }));
   });
 
+  test('escapes regex metacharacters in GRN register search input', async () => {
+    GoodsReceivedNote.find = jest.fn().mockReturnValue({ sort: jest.fn().mockReturnThis(), skip: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([]) });
+    GoodsReceivedNote.countDocuments = jest.fn().mockResolvedValue(0);
+    await request(app).get('/api/purchase-orders/grn?search=.*');
+    expect(GoodsReceivedNote.find.mock.calls[0][0].$or[0].grnNo.$regex).toBe('\\.\\*');
+  });
+
   test('returns a GRN detail record by id', async () => {
     const record = { _id: 'grn-1', grnNo: 'GRN-00001', status: 'pending_verification' };
     GoodsReceivedNote.findById = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(record) });

@@ -34,7 +34,8 @@ describe('Independent supplier qualification verification', () => {
       vendorId: '507f1f77bcf86cd799439011',
       qualificationStatus: 'approved',
       nextAuditDue: new Date(Date.now() + 86400000).toISOString(),
-      rawMaterialIds: ['507f191e810c19729de860ea']
+      rawMaterialIds: ['507f191e810c19729de860ea'],
+      documents: [{ name: 'GMP certificate', url: 'evidence://supplier/gmp-certificate' }]
     });
     expect(response.status).toBe(201);
     expect(VendorQualification.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -44,21 +45,40 @@ describe('Independent supplier qualification verification', () => {
     }));
   });
 
+  test('requires named supporting evidence before creating an audit', async () => {
+    Vendor.findById.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ company: 'Herbal Supplier' }) }) });
+    RawMaterial.find.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: '507f191e810c19729de860ea' }]) }) });
+    const response = await request(app).post('/api/vendor-qualifications').send({ vendorId: '507f1f77bcf86cd799439011', nextAuditDue: new Date(Date.now() + 86400000).toISOString(), rawMaterialIds: ['507f191e810c19729de860ea'] });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/evidence reference/i);
+    expect(VendorQualification.create).not.toHaveBeenCalled();
+  });
+
   test('prevents the auditor from verifying their own qualification', async () => {
     VendorQualification.findById.mockResolvedValue({
       _id: 'qualification-1', qualificationStatus: 'pending_verification',
       proposedQualificationStatus: 'approved', auditedByUserId: 'auditor-1',
-      save: jest.fn()
+      documents: [{ name: 'GMP certificate', url: 'evidence://supplier/gmp' }], save: jest.fn()
     });
     const response = await request(app).patch('/api/vendor-qualifications/qualification-1/verify').send({});
     expect(response.status).toBe(403);
     expect(response.body.code).toBe('SUPPLIER_QUALIFICATION_MAKER_CHECKER_REQUIRED');
   });
 
+  test('does not approve an audit without supporting evidence references', async () => {
+    const record = { _id: 'qualification-1', qualificationStatus: 'pending_verification', proposedQualificationStatus: 'approved', auditedByUserId: 'auditor-1', documents: [], save: jest.fn() };
+    VendorQualification.findById.mockResolvedValue(record);
+    const response = await request(app).patch('/api/vendor-qualifications/qualification-1/verify').set('x-user-id', 'reviewer-2').send({ verificationNotes: 'Reviewed' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('SUPPLIER_QUALIFICATION_EVIDENCE_REQUIRED');
+    expect(record.save).not.toHaveBeenCalled();
+  });
+
   test('allows a different reviewer to verify and records reviewer identity and timestamp', async () => {
     VendorQualification.findById.mockResolvedValue({
       _id: 'qualification-1', qualificationStatus: 'pending_verification',
       proposedQualificationStatus: 'approved', auditedByUserId: 'auditor-1',
+      documents: [{ name: 'GMP certificate', url: 'evidence://supplier/gmp' }],
       nextAuditDue: new Date(Date.now() + 86400000),
       save: jest.fn().mockResolvedValue(true)
     });

@@ -24,7 +24,7 @@ router.get('/', authorize('vendor:view'), async (req, res) => {
   try {
     const { search, status, vendorId } = req.query;
     const filter = {};
-    if (search) filter.$or = [{ poNo: { $regex: search, $options: 'i' } }, { vendorName: { $regex: search, $options: 'i' } }];
+    if (search) filter.$or = [{ poNo: { $regex: escapedSearch, $options: 'i' } }, { vendorName: { $regex: search, $options: 'i' } }];
     if (status && status !== 'all') filter.status = status;
     if (vendorId) filter.vendorId = vendorId;
     res.json(await PurchaseOrder.find(filter).sort({ orderDate: -1, createdAt: -1 }).lean());
@@ -240,7 +240,8 @@ router.get('/grn', authorize('vendor:view'), async (req, res) => {
     if (req.query.vendorId) filter.vendorId = req.query.vendorId;
     if (req.query.search) {
       const search = String(req.query.search).trim().slice(0, 100);
-      if (search) filter.$or = [
+      const escapedSearch = Array.from(search).map(char => '.*+?^$()|[]{}\\'.includes(char) ? '\\' + char : char).join('');
+      if (escapedSearch) filter.$or = [
         { grnNo: { $regex: search, $options: 'i' } },
         { poNo: { $regex: search, $options: 'i' } },
         { vendorName: { $regex: search, $options: 'i' } }
