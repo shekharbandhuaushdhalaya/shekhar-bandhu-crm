@@ -652,15 +652,48 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
 
     const currentStage = batch.stages[stageIndex];
     const newStatus = status || 'completed';
+    if (req.body.equipmentId !== undefined) currentStage.equipmentId = req.body.equipmentId;
+
+    if (['completed', 'skipped', 'failed'].includes(newStatus)) {
+      if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated operator identity is required to record a manufacturing stage disposition' });
+      const TrainingRecord = require('../../models/TrainingRecord');
+      const now = new Date();
+      const training = await TrainingRecord.findOne({
+        userId: req.user.id,
+        $or: [{ topic: currentStage.name }, { topic: /GMP|Good Manufacturing Practice/i }],
+        trainedOn: { $lte: now }, validUntil: { $gt: now },
+        trainedBy: { $nin: ['', null] }, certificateRef: { $nin: ['', null] },
+        status: 'verified', verifiedBy: { $ne: req.user.id }, verifiedAt: { $ne: null }
+      }).lean();
+      if (!training) return res.status(400).json({ error: 'Current, independently verified, relevant GMP or stage-specific training evidence is required before this operator can complete the stage' });
+      currentStage.operatorTrainingRecordId = training._id;
+      currentStage.operatorTrainingTopic = training.topic;
+      if (currentStage.equipmentId) {
+        const Equipment = require('../../models/Equipment');
+        const equipment = await Equipment.findById(currentStage.equipmentId).lean();
+        if (!equipment || equipment.status !== 'active') return res.status(400).json({ error: 'Selected equipment is unavailable or not active' });
+        const latestCalibration = (equipment.calibrationLogs || []).slice().sort((x, y) => new Date(y.calibratedOn || 0) - new Date(x.calibratedOn || 0))[0];
+        if (!latestCalibration || latestCalibration.status !== 'verified' || !latestCalibration.verifiedBy ||
+            !latestCalibration.verifiedAt || String(latestCalibration.calibratedByUser) === String(latestCalibration.verifiedBy) ||
+            !latestCalibration.certificateNo || !latestCalibration.certificateRef || !latestCalibration.calibratedByUser ||
+            !latestCalibration.nextDue || new Date(latestCalibration.nextDue) <= now ||
+            !equipment.calibrationDueDate || new Date(equipment.calibrationDueDate) <= now) {
+          return res.status(400).json({ error: 'Current, independently verified calibration certificate evidence is required before this stage can be completed' });
+        }
+        currentStage.equipmentName = equipment.name;
+        currentStage.equipmentCalibrationStatus = 'valid';
+        currentStage.equipmentCalibrationCertificateNo = latestCalibration.certificateNo;
+      }
+    }
 
     if (newStatus === 'in_progress') {
       currentStage.startedAt = currentStage.startedAt || new Date();
     }
     if (newStatus === 'completed' || newStatus === 'skipped' || newStatus === 'failed') {
       currentStage.completedAt = new Date();
-      currentStage.completedBy = completedBy || (req.user ? req.user.name : '');
-      currentStage.performedBy = req.user ? req.user.id : null;
-      currentStage.performedByName = req.user ? req.user.name : (completedBy || '');
+      currentStage.completedBy = req.user.name;
+      currentStage.performedBy = req.user.id;
+      currentStage.performedByName = req.user.name;
     }
     if (notes !== undefined) {
       currentStage.notes = notes;
@@ -800,15 +833,16 @@ router.patch('/:id/stage/:stageIndex/verify', authorize('manufacturing:verify'),
       return res.status(400).json({ error: 'Stage must be completed before verification' });
     }
 
-    const userId = req.user ? req.user.id.toString() : null;
+    if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated verifier identity is required' });
+    const userId = req.user.id.toString();
     const performedById = stage.performedBy ? stage.performedBy.toString() : null;
 
     if (userId && performedById && userId === performedById) {
       return res.status(400).json({ error: 'Performer cannot verify their own stage — 4-eye verification required' });
     }
 
-    stage.verifiedBy = req.user ? req.user.id : null;
-    stage.verifiedByName = req.user ? req.user.name : 'Verifier';
+    stage.verifiedBy = req.user.id;
+    stage.verifiedByName = req.user.name;
     stage.verifiedAt = new Date();
 
     await batch.save();

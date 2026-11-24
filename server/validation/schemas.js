@@ -893,8 +893,7 @@ const equipmentSchema = z.object({
   name: z.string().min(1),
   category: z.enum(['mixer', 'drier', 'pulverizer', 'tableting', 'filling', 'packaging', 'qc_instrument', 'other']),
   manufacturingUnitId: objectId,
-  calibrationDueDate: z.string().or(z.date()).optional().nullable(),
-  lastMaintenanceDate: z.string().or(z.date()).optional().nullable(),
+  calibrationFrequencyDays: z.number().int().positive().optional(),
   notes: z.string().optional().default('')
 });
 
@@ -1041,6 +1040,7 @@ const batchStageUpdateSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'completed', 'skipped', 'failed']).optional(),
   notes: z.string().optional(),
   completedBy: z.string().optional(),
+  equipmentId: objectId.optional().nullable(),
   inputQty: z.number().min(0).optional(),
   outputQty: z.number().min(0).optional(),
   actualYieldQty: z.number().min(0).optional(),

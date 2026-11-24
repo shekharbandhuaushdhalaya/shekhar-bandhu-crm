@@ -270,6 +270,7 @@ app.use('/api/social', (req, res, next) => {
 const purchaseOrderRoutes = require('./routes/procurement/purchaseOrders');
 app.use('/api/purchase-orders', authenticateJWT, purchaseOrderRoutes);
 const equipmentRoutes = require('./routes/manufacturing/equipment');
+const trainingRecordRoutes = require('./routes/manufacturing/trainingRecords');
 const deviationRoutes = require('./routes/manufacturing/deviations');
 const retentionSampleRoutes = require('./routes/manufacturing/retentionSamples');
 const stabilityStudyRoutes = require('./routes/manufacturing/stabilityStudies');
@@ -277,6 +278,7 @@ const qualityAuditRoutes = require('./routes/manufacturing/qualityAudits');
 const lineClearanceRoutes = require('./routes/manufacturing/lineClearances');
 const pharmacopoeiaRoutes = require('./routes/manufacturing/pharmacopoeia');
 app.use('/api/manufacturing/equipment', authenticateJWT, equipmentRoutes);
+app.use('/api/manufacturing/training-records', authenticateJWT, trainingRecordRoutes);
 app.use('/api/manufacturing/deviations', authenticateJWT, deviationRoutes);
 app.use('/api/retention-samples', authenticateJWT, retentionSampleRoutes);
 app.use('/api/stability-studies', authenticateJWT, stabilityStudyRoutes);
