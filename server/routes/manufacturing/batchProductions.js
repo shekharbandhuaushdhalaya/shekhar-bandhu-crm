@@ -1207,30 +1207,62 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
-
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated independent QA releaser identity is required' });
+    }
     if (batch.status !== 'completed' || batch.qcStatus !== 'approved') {
       return res.status(400).json({ error: 'Batch must be completed and QC approved before market release' });
     }
-    if (!batch.bmrApprovedBy) return res.status(400).json({ error: 'BMR approval is required before market release' });
+    if (!batch.bmrApprovedBy || !batch.bmrApprovedAt) {
+      return res.status(400).json({ error: 'Pre-execution BMR approval is required before market release' });
+    }
+    if (!batch.qcPassedByUser || !batch.qcPassedBy) {
+      return res.status(400).json({ error: 'Identified QC analyst disposition is required before market release' });
+    }
+    if (String(batch.qcPassedByUser) === String(req.user.id)) {
+      return res.status(409).json({ error: 'Independent QA release is required; the QC analyst cannot release the same batch' });
+    }
     const criticalStages = (batch.stages || []).filter(s => s.name !== 'QC Testing');
     if (criticalStages.some(s => s.status !== 'completed' && s.status !== 'skipped')) return res.status(400).json({ error: 'All critical manufacturing stages must be completed or formally skipped before market release' });
     if (criticalStages.some(s => s.status === 'completed' && !s.isDualSigned)) return res.status(400).json({ error: 'Every completed critical manufacturing stage must have independent Chemist and QA signatures' });
     const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
     const LineClearance = require('../../models/LineClearance');
     const spec = batch.qcSpecificationId ? await ProductQualitySpecification.findById(batch.qcSpecificationId).lean() : null;
-    if (!spec || spec.status !== 'approved') return res.status(400).json({ error: 'An approved product-specific AYUSH QC specification is required before market release' });
+    const productId = batch.productId && batch.productId._id ? batch.productId._id : batch.productId;
+    if (!spec || spec.status !== 'approved' || String(spec.productId) !== String(productId) ||
+      !spec.approvedBy || !spec.approvedAt || (spec.effectiveDate && new Date(spec.effectiveDate) > new Date())) {
+      return res.status(400).json({ error: 'An effective, approved product-specific quality specification with approval evidence is required before market release' });
+    }
     const mandatory = (spec.tests || []).filter(t => t.mandatory !== false);
+    if (!mandatory.length) return res.status(400).json({ error: 'Approved product quality specification has no mandatory test requirements' });
     const results = batch.qcTests || [];
-    const missing = mandatory.filter(t => { const r = results.find(x => x.code === t.code); return !r || r.status !== 'pass'; });
-    if (missing.length) return res.status(400).json({ error: 'Mandatory QC tests are incomplete or not passed', tests: missing.map(t => t.code) });
+    const missing = mandatory.filter(t => {
+      const result = results.find(x => String(x.code) === String(t.code));
+      return !result || String(result.status || '').toLowerCase() !== 'pass' ||
+        !result.testedBy || !result.testedByName || !result.testedAt ||
+        ((result.result === undefined || result.result === null || String(result.result).trim() === '') &&
+          (result.numericResult === undefined || result.numericResult === null));
+    });
+    if (missing.length) return res.status(400).json({
+      error: 'Mandatory QC tests must have passed with tester identity, timestamp and recorded result',
+      tests: missing.map(t => t.code)
+    });
+    const qaIsTestAnalyst = results.some(result => result.testedBy && String(result.testedBy) === String(req.user.id));
+    if (qaIsTestAnalyst) {
+      return res.status(409).json({ error: 'Independent QA release is required; a QC test analyst cannot release the same batch' });
+    }
     const clearances = await LineClearance.find({ batchId: batch._id }).lean();
     for (const phase of ['manufacturing','filling','packing']) {
       const c = clearances.find(x => x.phase === phase);
-      if (!c || !c.cleared || !c.checklist?.equipmentCleaned || !c.checklist?.previousMaterialsRemoved || !c.checklist?.previousLabelsDocumentsRemoved || !c.checklist?.areaVisuallyInspected) return res.status(400).json({ error: `Approved ${phase} line clearance is required before market release` });
+      if (!c || !c.cleared || !c.clearedBy || !c.clearedAt ||
+        !c.checklist?.equipmentCleaned || !c.checklist?.previousMaterialsRemoved ||
+        !c.checklist?.previousLabelsDocumentsRemoved || !c.checklist?.areaVisuallyInspected) {
+        return res.status(400).json({ error: `Approved ${phase} line clearance with reviewer identity and timestamp is required before market release` });
+      }
     }
 
-    batch.releasedBy = req.user ? req.user.id : null;
-    batch.releasedByName = req.user && req.user.name ? req.user.name : '';
+    batch.releasedBy = req.user.id;
+    batch.releasedByName = req.user.name;
     batch.releasedAt = new Date();
 
     await batch.save();

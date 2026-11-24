@@ -26,6 +26,7 @@ const RetentionSample = require('../models/RetentionSample');
 const MaterialDispensing = require('../models/MaterialDispensing');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
+const ProductQualitySpecification = require('../models/ProductQualitySpecification');
 
 RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
 
@@ -38,7 +39,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
     app = express();
     app.use(express.json());
     app.use((req, res, next) => {
-      req.user = { id: 'user_123', name: 'QA Manager', role: 'admin' };
+      req.user = req.headers['x-test-user'] ? { id: req.headers['x-test-user'], name: 'Independent QA Reviewer', role: 'admin' } : { id: 'user_123', name: 'QA Manager', role: 'admin' };
       next();
     });
     app.use('/api/batch-productions', batchRouter);
@@ -208,6 +209,76 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
     expect(res.body.independentQaRelease).toBeNull();
     expect(res.body.missingEvidence).toContain('No specification-linked batch QC test results are recorded');
     expect(res.body.firmDetails).toBeUndefined();
+  });
+
+  describe('independent finished-batch QA release', () => {
+    const makeReleaseBatch = () => ({
+      _id: 'batch-release-1',
+      productId: 'product-release-1',
+      qcSpecificationId: 'spec-release-1',
+      status: 'completed',
+      qcStatus: 'approved',
+      bmrApprovedBy: 'bmr-approver',
+      bmrApprovedAt: new Date(),
+      qcPassedBy: 'QC Analyst',
+      qcPassedByUser: 'qc-analyst-1',
+      qcTests: [{
+        code: 'IDENTITY', status: 'pass', result: 'Conforms',
+        testedBy: 'qc-analyst-1', testedByName: 'QC Analyst', testedAt: new Date()
+      }],
+      stages: [{ name: 'Mixing', status: 'completed', isDualSigned: true }],
+      save: jest.fn().mockResolvedValue(true)
+    });
+    const makeClearances = () => ['manufacturing', 'filling', 'packing'].map(phase => ({
+      phase, cleared: true, clearedBy: 'clearance-reviewer', clearedAt: new Date(),
+      checklist: { equipmentCleaned: true, previousMaterialsRemoved: true, previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true }
+    }));
+    const approvedSpec = {
+      _id: 'spec-release-1', productId: 'product-release-1', status: 'approved',
+      approvedBy: 'spec-approver', approvedAt: new Date(), tests: [{ code: 'IDENTITY', mandatory: true }]
+    };
+
+    test('blocks the QC analyst from releasing their own batch', async () => {
+      const batch = makeReleaseBatch();
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').send({});
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain('QC analyst cannot release');
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('allows a distinct QA releaser only after complete QC and line-clearance evidence', async () => {
+      const batch = makeReleaseBatch();
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(200);
+      expect(batch.releasedBy).toBe('qa-reviewer-1');
+      expect(batch.releasedByName).toBe('Independent QA Reviewer');
+      expect(batch.releasedAt).toBeInstanceOf(Date);
+      expect(batch.save).toHaveBeenCalled();
+    });
+
+    test('rejects a QC test result without tester identity or timestamp', async () => {
+      const batch = makeReleaseBatch();
+      batch.qcTests[0].testedBy = null;
+      batch.qcTests[0].testedByName = '';
+      batch.qcTests[0].testedAt = null;
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.tests).toEqual(['IDENTITY']);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
   });
 
 });
