@@ -104,6 +104,7 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
       expect(submitted.status).toBe(201);
       const item = mockBatch.labelReconciliation[0];
       item._id = 'reconciliation-item-1';
+      mockBatch.labelReconciliation.id = (itemId) => mockBatch.labelReconciliation.find(entry => entry._id === itemId);
       const selfVerify = await request(app).patch('/api/batch-productions/batch_103/label-reconciliation/reconciliation-item-1/verify');
       expect(selfVerify.status).toBe(409);
       const verified = await request(app)
