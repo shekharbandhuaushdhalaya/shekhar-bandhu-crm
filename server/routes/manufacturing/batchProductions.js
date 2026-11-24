@@ -2051,72 +2051,142 @@ router.get('/analytics/yield-variance', authorize('manufacturing:view'), async (
 
 // ─── FEATURE 10: Packing Material Reconciliation & Schedule T Audit ───
 
-// POST /api/batch-productions/:id/label-reconciliation — Record packaging label reconciliation & audit check
+// POST /api/batch-productions/:id/label-reconciliation — Submit packaging reconciliation for independent verification.
 router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async (req, res) => {
   try {
-    const { items } = req.body; // array of { rawMaterialId, name, qtyIssued, qtyUsed, qtyDamaged, qtyReturnedToStore, discrepancyNote }
+    const { items } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
-
+    if (batch.releasedBy || ['cancelled', 'rejected'].includes(batch.status)) {
+      return res.status(409).json({ error: 'Released, cancelled or rejected batch packaging records cannot be changed' });
+    }
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated packaging reconciliation operator identity is required' });
+    }
+    if (!batch.bomSnapshot || !Array.isArray(batch.bomSnapshot.ingredients)) {
+      return res.status(409).json({ error: 'A pinned batch formula snapshot is required for packaging reconciliation' });
+    }
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Reconciliation items array is required' });
     }
-
-    let overallFlagged = false;
-    const reconciledItems = items.map(item => {
-      const issued = Number(item.qtyIssued || 0);
-      const used = Number(item.qtyUsed || 0);
+    const packagingIds = new Set(batch.bomSnapshot.ingredients
+      .filter(ingredient => ingredient.itemType === 'packaging')
+      .map(ingredient => String(ingredient.rawMaterialId)));
+    const submittedIds = new Set();
+    const reconciledItems = [];
+    for (const item of items) {
+      const rawMaterialId = String(item.rawMaterialId || '');
+      if (!rawMaterialId || !packagingIds.has(rawMaterialId)) {
+        return res.status(400).json({ error: 'Only packaging materials present in the pinned batch formula can be reconciled', rawMaterialId });
+      }
+      if (submittedIds.has(rawMaterialId) || (batch.labelReconciliation || []).some(existing => String(existing.rawMaterialId) === rawMaterialId)) {
+        return res.status(409).json({ error: 'Packaging material already has a reconciliation record; use a controlled correction workflow instead of overwriting it', rawMaterialId });
+      }
+      submittedIds.add(rawMaterialId);
+      const issued = (batch.ingredientsConsumed || [])
+        .filter(consumed => String(consumed.rawMaterialId) === rawMaterialId && Boolean(consumed.dispensingNo))
+        .reduce((sum, consumed) => sum + Number(consumed.qtyConsumed || 0), 0);
+      if (issued <= 0) {
+        return res.status(409).json({ error: 'Packaging material must have independently verified dispensing before reconciliation', rawMaterialId });
+      }
+      const used = Number(item.qtyUsed);
       const damaged = Number(item.qtyDamaged || 0);
       const returned = Number(item.qtyReturnedToStore || 0);
-      const unaccounted = Math.max(0, issued - (used + damaged + returned));
-      const discrepancyPct = issued > 0 ? Number(((unaccounted / issued) * 100).toFixed(2)) : 0;
-      const isFlagged = unaccounted > 0.01;
-
-      if (isFlagged) overallFlagged = true;
-
-      return {
-        rawMaterialId: item.rawMaterialId,
-        name: item.name,
-        qtyIssued: issued,
-        qtyUsed: used,
-        qtyDamaged: damaged,
-        qtyReturnedToStore: returned,
-        unaccountedQty: unaccounted,
-        discrepancyPct,
-        discrepancyFlagged: isFlagged,
-        auditStatus: isFlagged ? 'flagged' : 'passed',
-        reconciled: true,
-        reconciledBy: req.user ? req.user.id : null,
+      if (![used, damaged, returned].every(Number.isFinite) || used < 0 || damaged < 0 || returned < 0) {
+        return res.status(400).json({ error: 'Used, damaged and returned quantities must be valid non-negative numbers', rawMaterialId });
+      }
+      if (used + damaged + returned > issued + 0.0001) {
+        return res.status(400).json({ error: 'Accounted packaging quantity cannot exceed independently verified issued quantity', rawMaterialId, issued });
+      }
+      const material = await RawMaterial.findById(rawMaterialId).lean();
+      if (!material) return res.status(404).json({ error: 'Packaging material not found', rawMaterialId });
+      reconciledItems.push({
+        rawMaterialId,
+        name: material.name,
+        qtyIssued: Number(issued.toFixed(4)),
+        qtyUsed: Number(used.toFixed(4)),
+        qtyDamaged: Number(damaged.toFixed(4)),
+        qtyReturnedToStore: Number(returned.toFixed(4)),
+        unaccountedQty: Number(Math.max(0, issued - used - damaged - returned).toFixed(4)),
+        discrepancyPct: Number((Math.max(0, issued - used - damaged - returned) / issued * 100).toFixed(2)),
+        discrepancyFlagged: issued - used - damaged - returned > 0.01,
+        auditStatus: 'pending',
+        reconciled: false,
+        reconciledBy: req.user.id,
+        reconciledByName: req.user.name,
         reconciledAt: new Date(),
-        discrepancyNote: item.discrepancyNote || (isFlagged ? `Unaccounted quantity remains (${unaccounted})` : 'Quantity reconciled')
-      };
+        discrepancyNote: String(item.discrepancyNote || '').trim()
+      });
+    }
+    batch.labelReconciliation = (batch.labelReconciliation || []).concat(reconciledItems);
+    await batch.save();
+    res.status(201).json({
+      success: true,
+      batchId: batch._id,
+      overallAuditStatus: 'PENDING_INDEPENDENT_VERIFICATION',
+      reconciledItems: batch.labelReconciliation
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    batch.labelReconciliation = reconciledItems;
-
-    if (overallFlagged) {
+// PATCH /api/batch-productions/:id/label-reconciliation/:itemId/verify — Independent verification of packaging reconciliation.
+router.patch('/:id/label-reconciliation/:itemId/verify', authorize('manufacturing:complete'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
+    if (batch.releasedBy) return res.status(409).json({ error: 'Released batch packaging reconciliation is immutable' });
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated independent verifier identity is required' });
+    }
+    const item = (batch.labelReconciliation || []).id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Packaging reconciliation item not found' });
+    if (item.reconciled && item.auditStatus !== 'pending') {
+      return res.status(409).json({ error: 'Packaging reconciliation has already been independently verified' });
+    }
+    if (String(item.reconciledBy) === String(req.user.id)) {
+      return res.status(409).json({ error: 'The reconciliation operator cannot independently verify the same record' });
+    }
+    const issued = Number(item.qtyIssued || 0);
+    const accounted = Number(item.qtyUsed || 0) + Number(item.qtyDamaged || 0) + Number(item.qtyReturnedToStore || 0);
+    if (!Number.isFinite(issued) || issued <= 0 || accounted > issued + 0.0001) {
+      return res.status(409).json({ error: 'Packaging reconciliation quantities are invalid and cannot be verified' });
+    }
+    const unaccounted = Math.max(0, issued - accounted);
+    const flagged = unaccounted > 0.01;
+    const discrepancyNote = String(req.body.discrepancyNote || item.discrepancyNote || '').trim();
+    if (flagged && !discrepancyNote) {
+      return res.status(400).json({ error: 'A discrepancy investigation note is required when packaging quantity remains unaccounted' });
+    }
+    item.unaccountedQty = Number(unaccounted.toFixed(4));
+    item.discrepancyPct = Number((unaccounted / issued * 100).toFixed(2));
+    item.discrepancyFlagged = flagged;
+    item.auditStatus = flagged ? 'flagged' : 'passed';
+    item.reconciled = true;
+    item.verifiedBy = req.user.id;
+    item.verifiedByName = req.user.name;
+    item.verifiedAt = new Date();
+    item.discrepancyNote = discrepancyNote;
+    if (flagged) {
       batch.deviations.push({
         type: 'process_loss',
-        description: `Packaging material reconciliation discrepancy on batch ${batch.batchNo}`,
+        description: 'Packaging material reconciliation discrepancy on batch ' + batch.batchNo + ' for material ' + item.name,
         detectedAt: new Date(),
         status: 'open'
       });
-
-      if (req.io) {
-        req.io.emit('quality_alert', {
-          type: 'label_reconciliation_discrepancy',
-          batchId: batch._id,
-          batchNo: batch.batchNo
-        });
-      }
+      if (req.io) req.io.emit('quality_alert', {
+        type: 'label_reconciliation_discrepancy', batchId: batch._id, batchNo: batch.batchNo
+      });
     }
-
     await batch.save();
     res.json({
       success: true,
       batchId: batch._id,
-      overallAuditStatus: overallFlagged ? 'FLAGGED_UNACCOUNTED_QUANTITY' : 'RECONCILED',
-      reconciledItems: batch.labelReconciliation
+      auditStatus: item.auditStatus,
+      reconciled: item.reconciled,
+      verifiedBy: item.verifiedByName,
+      verifiedAt: item.verifiedAt
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

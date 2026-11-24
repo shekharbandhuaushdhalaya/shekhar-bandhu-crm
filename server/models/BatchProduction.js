@@ -236,7 +236,11 @@ const batchProductionSchema = new mongoose.Schema({
     auditStatus: { type: String, enum: ['passed', 'flagged', 'pending'], default: 'pending' },
     reconciled: { type: Boolean, default: false },
     reconciledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    reconciledByName: { type: String, default: '' },
     reconciledAt: { type: Date, default: null },
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    verifiedByName: { type: String, default: '' },
+    verifiedAt: { type: Date, default: null },
     discrepancyNote: { type: String, default: '' }
   }],
   rawMaterialCost: { type: Number, default: 0 },
