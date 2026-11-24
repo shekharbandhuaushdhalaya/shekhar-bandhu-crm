@@ -150,56 +150,33 @@ async function releaseAllReservations(batch, session) {
 }
 
 /**
- * Auto-deduct packaging materials (bottles, labels, boxes) when reaching packaging stage or completion.
+ * Verify that packaging material has already been issued through the independently
+ * verified dispensing workflow. This helper must never deduct stock itself.
  */
 async function deductPackagingMaterials(batch, outputQtyOrYields) {
   if (batch.packagingDeducted) return;
-
-  let itemsToProcess = [];
-  if (Array.isArray(outputQtyOrYields)) {
-    itemsToProcess = outputQtyOrYields;
-  } else {
-    itemsToProcess = [{
-      productId: batch.productId.toString(),
-      actualYieldQty: Number(outputQtyOrYields) || 0
-    }];
+  if (!batch.bomSnapshot || !Array.isArray(batch.bomSnapshot.ingredients)) {
+    throw new Error('BATCH_BOM_SNAPSHOT_REQUIRED: packaging reconciliation requires the batch-pinned formula snapshot');
   }
-
-  for (const item of itemsToProcess) {
-    const qty = Number(item.actualYieldQty);
-    if (qty <= 0) continue;
-
-    let bom = await BillOfMaterials.findOne({ productId: item.productId, isActive: true });
-    if (!bom) {
-      bom = await BillOfMaterials.findById(batch.bomId);
-    }
-    if (!bom) continue;
-
-    const pkgIngs = bom.ingredients.filter(ing => ing.itemType === 'packaging');
-
-    for (const ing of bom.ingredients) {
-      if (ing.itemType !== 'packaging') {
-        const rm = await RawMaterial.findById(ing.rawMaterialId);
-        if (rm && (rm.materialType === 'packaging' || (rm.materialType === 'packaging' || rm.category === 'Packaging' || rm.category === 'Packaging Material') || rm.category === 'Packaging Material') && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
-          pkgIngs.push(ing);
-        }
-      }
-    }
-
-    if (!pkgIngs || pkgIngs.length === 0) continue;
-
-    for (const ing of pkgIngs) {
-      if (batch.ingredientsConsumed.some(c => c.rawMaterialId?.toString() === ing.rawMaterialId?.toString())) {
-        continue;
-      }
-      const qtyNeeded = ing.qtyRequired * qty;
-      const rm = await RawMaterial.findById(ing.rawMaterialId);
-      if (!rm) continue;
-
-      await consumeFromReservation(batch, ing.rawMaterialId, qtyNeeded);
+  const itemsToProcess = Array.isArray(outputQtyOrYields)
+    ? outputQtyOrYields
+    : [{ actualYieldQty: Number(outputQtyOrYields) || 0 }];
+  const totalActualOutput = itemsToProcess.reduce((sum, item) => sum + Math.max(0, Number(item.actualYieldQty) || 0), 0);
+  if (totalActualOutput <= 0) throw new Error('ACTUAL_PACKAGING_OUTPUT_REQUIRED: record actual packed output before packaging reconciliation');
+  const packagingIngredients = batch.bomSnapshot.ingredients.filter(ingredient =>
+    ingredient.itemType === 'packaging'
+  );
+  for (const ingredient of packagingIngredients) {
+    const requiredQty = Number(ingredient.qtyRequired || 0) * totalActualOutput;
+    const dispensedQty = (batch.ingredientsConsumed || [])
+      .filter(consumed => String(consumed.rawMaterialId) === String(ingredient.rawMaterialId))
+      .reduce((sum, consumed) => sum + Number(consumed.qtyConsumed || 0), 0);
+    if (dispensedQty + 0.0001 < requiredQty) {
+      throw new Error('PACKAGING_DISPENSING_REQUIRED: packaging material ' + String(ingredient.rawMaterialId) +
+        ' requires ' + requiredQty.toFixed(2) + ' units verified through the independent dispensing workflow; ' +
+        dispensedQty.toFixed(2) + ' verified');
     }
   }
-
   batch.packagingDeducted = true;
 }
 

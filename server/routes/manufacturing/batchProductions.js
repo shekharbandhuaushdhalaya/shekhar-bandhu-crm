@@ -1661,68 +1661,113 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
   }
 });
 
-// GET /api/batch-productions/:id/coa — evidence-based QC summary, not an official certificate.
+// GET /api/batch-productions/:id/coa — evidence-based internal QC summary, never an official certificate.
 router.get('/:id/coa', authorize('manufacturing:view'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id).populate('productId').lean();
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
-    const SystemSettings = require('../../models/SystemSettings');
     const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
-    const settings = await SystemSettings.findOne().lean() || {};
     const product = batch.productId || {};
-    const qc = batch.qcParameters || {};
-    const approvedSpec = batch.qcSpecificationId ? await ProductQualitySpecification.findById(batch.qcSpecificationId).lean() : null;
-    const testResults = (batch.qcTests || []).map(test => ({
-      code: test.code, parameter: test.name, category: test.category || '',
-      specification: test.specification || '', methodReference: test.methodReference || '',
-      result: test.result === undefined ? null : test.result,
-      numericResult: test.numericResult === undefined ? null : test.numericResult,
-      unit: test.unit || '', status: test.status || 'not_tested',
-      testedBy: test.testedByName || null, testedAt: test.testedAt || null, remarks: test.remarks || ''
-    }));
+    const approvedSpec = batch.qcSpecificationId
+      ? await ProductQualitySpecification.findById(batch.qcSpecificationId).lean()
+      : null;
+    const now = new Date();
+    const specMatchesProduct = Boolean(approvedSpec &&
+      String(approvedSpec.productId) === String(product._id || batch.productId));
+    const specApproved = Boolean(specMatchesProduct && approvedSpec.status === 'approved' &&
+      approvedSpec.approvedBy && approvedSpec.approvedAt &&
+      (!approvedSpec.effectiveDate || new Date(approvedSpec.effectiveDate) <= now));
+    const requiredTests = specApproved && Array.isArray(approvedSpec.tests)
+      ? approvedSpec.tests.filter(test => test.mandatory !== false)
+      : [];
+    const recordedTests = Array.isArray(batch.qcTests) ? batch.qcTests : [];
+    const recordedByCode = new Map(recordedTests.map(test => [String(test.code || '').trim().toLowerCase(), test]));
+    const requiredResults = requiredTests.map(specTest => {
+      const recorded = recordedByCode.get(String(specTest.code || '').trim().toLowerCase());
+      if (!recorded) return {
+        code: specTest.code, parameter: specTest.name, category: specTest.category || '',
+        specification: specTest.specification || '', methodReference: specTest.methodReference || '',
+        unit: specTest.unit || '', result: null, numericResult: null, status: 'NOT_RECORDED',
+        testedBy: null, testedByUser: null, testedAt: null, remarks: ''
+      };
+      return {
+        code: recorded.code, parameter: recorded.name, category: recorded.category || specTest.category || '',
+        specification: specTest.specification || '', methodReference: specTest.methodReference || recorded.methodReference || '',
+        result: recorded.result === undefined ? null : recorded.result,
+        numericResult: recorded.numericResult === undefined ? null : recorded.numericResult,
+        unit: recorded.unit || specTest.unit || '',
+        status: String(recorded.status || 'not_tested').toLowerCase(),
+        testedBy: recorded.testedByName || null, testedByUser: recorded.testedBy || null,
+        testedAt: recorded.testedAt || null, remarks: recorded.remarks || ''
+      };
+    });
+    const requiredCodes = new Set(requiredTests.map(test => String(test.code || '').trim().toLowerCase()));
+    const additionalResults = recordedTests
+      .filter(test => !requiredCodes.has(String(test.code || '').trim().toLowerCase()))
+      .map(test => ({
+        code: test.code, parameter: test.name, category: test.category || '',
+        specification: test.specification || '', methodReference: test.methodReference || '',
+        result: test.result === undefined ? null : test.result,
+        numericResult: test.numericResult === undefined ? null : test.numericResult,
+        unit: test.unit || '', status: String(test.status || 'not_tested').toLowerCase(),
+        testedBy: test.testedByName || null, testedByUser: test.testedBy || null,
+        testedAt: test.testedAt || null, remarks: test.remarks || ''
+      }));
+    const testResults = requiredResults.concat(additionalResults);
     const missingEvidence = [];
-    if (!settings.manufacturingLicenseNo) missingEvidence.push('Manufacturing licence number is not configured');
-    if (!settings.gmpCertificateNo) missingEvidence.push('GMP certificate number is not configured');
-    if (!batch.qcSpecificationId || !approvedSpec || approvedSpec.status !== 'approved') missingEvidence.push('Approved, batch-linked product quality specification is unavailable');
-    if (!batch.qcPassedBy || !batch.qcPassedByUser) missingEvidence.push('Identified QC analyst approval is missing');
-    if (!batch.endDate) missingEvidence.push('Recorded QC/testing completion date is missing');
-    if (!batch.releasedBy || !batch.releasedByName || !batch.releasedAt) missingEvidence.push('Independent finished-batch QA release evidence is missing');
-    if (!testResults.length) missingEvidence.push('No batch-specific QC test results are recorded');
-    if (testResults.some(test => !test.result || !test.testedBy || !test.testedAt || !['pass', 'fail'].includes(test.status))) {
-      missingEvidence.push('One or more QC results lack a result, tester identity, test timestamp, or completed disposition');
+    if (!approvedSpec || !specMatchesProduct || !specApproved) {
+      missingEvidence.push('An effective, approved product-specific quality specification with approval identity and timestamp is required');
     }
-    const hasFailedTest = testResults.some(test => test.status === 'fail');
-    const allTestsPassed = testResults.length > 0 && testResults.every(test => test.status === 'pass');
-    const evidenceComplete = missingEvidence.length === 0 && allTestsPassed;
+    if (specApproved && requiredTests.length === 0) {
+      missingEvidence.push('The approved quality specification contains no mandatory test requirements');
+    }
+    if (!testResults.length) missingEvidence.push('No specification-linked batch QC test results are recorded');
+    for (const test of requiredResults) {
+      const hasResult = test.result !== null && test.result !== undefined && String(test.result).trim() !== '';
+      if (test.status === 'NOT_RECORDED') missingEvidence.push('Required QC test not recorded: ' + test.code);
+      else if (!hasResult && (test.numericResult === null || test.numericResult === undefined)) missingEvidence.push('QC result value is missing: ' + test.code);
+      if (!['pass', 'fail'].includes(test.status)) missingEvidence.push('QC disposition is incomplete: ' + test.code);
+      if (!test.testedBy || !test.testedByUser || !test.testedAt) missingEvidence.push('QC tester identity or timestamp is missing: ' + test.code);
+    }
+    if (!batch.qcPassedBy || !batch.qcPassedByUser) missingEvidence.push('Identified QC analyst disposition is missing');
+    if (batch.qcStatus !== 'approved') missingEvidence.push('Batch QC disposition is not recorded as approved');
+    if (!batch.releasedBy || !batch.releasedByName || !batch.releasedAt) missingEvidence.push('Independent finished-batch QA release evidence is missing');
+    const hasFailedTest = testResults.some(test => test.status === 'fail') || batch.qcStatus === 'rejected';
+    const mandatoryTestsPassed = requiredResults.length > 0 && requiredResults.every(test => test.status === 'pass');
+    const qcEvidenceReady = specApproved && requiredTests.length > 0 && mandatoryTestsPassed &&
+      Boolean(batch.qcPassedBy && batch.qcPassedByUser) && batch.qcStatus === 'approved';
+    const qaReleaseRecorded = Boolean(batch.releasedBy && batch.releasedByName && batch.releasedAt);
+    const overallResult = hasFailedTest ? 'REJECTED' : (qcEvidenceReady && qaReleaseRecorded ? 'PASS' : 'PENDING');
     res.json({
-      documentType: 'BATCH_QC_RESULT_SUMMARY',
-      title: 'Batch Quality Control Result Summary',
-      notice: 'System-generated internal record only. This is not a statutory Certificate of Analysis, government-issued certificate, laboratory certificate, or market-release authorisation.',
-      documentStatus: evidenceComplete ? 'EVIDENCE_COMPLETE_PENDING_AUTHORISED_DOCUMENT_ISSUANCE' : 'DRAFT_INCOMPLETE',
-      officialCertificate: false, requiresAuthorisedQASignature: true, evidenceComplete, missingEvidence,
-      firmDetails: {
-        name: settings.firmName || null, address: settings.firmAddress || null,
-        manufacturingLicenseNo: settings.manufacturingLicenseNo || null,
-        manufacturingLicenseValidTill: settings.licenseValidTill || null,
-        gmpCertificateNo: settings.gmpCertificateNo || null, gmpValidTill: settings.gmpValidTill || null
-      },
+      documentType: 'system_generated_qc_summary',
+      title: 'BATCH QC TEST SUMMARY — NOT A CERTIFICATE OF ANALYSIS',
+      notice: 'System-generated internal QC summary only. It is not a statutory Certificate of Analysis, laboratory certificate, government-issued certificate, or market-release authorisation.',
+      officialCertificate: false,
+      requiresAuthorisedQASignature: true,
+      documentStatus: hasFailedTest ? 'REJECTED' : (qcEvidenceReady ? (qaReleaseRecorded ? 'RELEASE_RECORDED' : 'READY_FOR_QA_REVIEW') : 'INCOMPLETE'),
+      overallResult,
+      qcEvidenceReady,
+      qaReleaseRecorded,
+      missingEvidence,
       batchDetails: {
-        batchNo: batch.batchNo || null, productName: product.name || null,
-        productSku: product.sku || null, specificProductCode: product.specificProductCode || null,
-        plannedQuantity: batch.plannedQty ?? null, actualYieldQuantity: batch.actualYieldQty ?? null,
-        manufacturingDate: batch.mfgDate || null, expiryDate: batch.expiryDate || null,
-        qcCompletionDate: batch.endDate || null, specificationId: batch.qcSpecificationId || null,
-        specificationVersion: batch.qcSpecificationVersion || null,
-        pharmacopoeialStandard: approvedSpec ? approvedSpec.pharmacopoeialStandard : null,
-        monographReference: approvedSpec ? approvedSpec.monographReference : null,
-        testStandardReference: qc.testStandardRef || null, laboratoryReportReference: qc.labReportRef || null
+        batchNo: batch.batchNo || null,
+        productName: product.name || null,
+        productSku: product.sku || null,
+        plannedQuantity: batch.plannedQty ?? null,
+        actualYieldQuantity: batch.actualYieldQty ?? null,
+        manufacturingDate: batch.mfgDate || null,
+        expiryDate: batch.expiryDate || null,
+        specificationId: batch.qcSpecificationId || null,
+        specificationVersion: specApproved ? approvedSpec.specificationVersion : null,
+        pharmacopoeialStandard: specApproved ? approvedSpec.pharmacopoeialStandard : null,
+        monographReference: specApproved ? approvedSpec.monographReference || null : null
       },
       testResults,
-      qcDecision: hasFailedTest ? 'FAILED_TEST_RECORDED' : (allTestsPassed ? 'ALL_RECORDED_TESTS_PASSED' : 'NOT_DETERMINED'),
       recordedQcDisposition: batch.qcStatus || null,
-      qcAnalyst: batch.qcPassedBy ? { name: batch.qcPassedBy, userId: batch.qcPassedByUser || null, recordedAt: batch.endDate || null } : null,
-      independentQaRelease: batch.releasedBy && batch.releasedByName && batch.releasedAt
-        ? { userId: batch.releasedBy, name: batch.releasedByName, releasedAt: batch.releasedAt } : null,
+      qcAnalyst: batch.qcPassedBy ? { name: batch.qcPassedBy, userId: batch.qcPassedByUser || null } : null,
+      independentQaRelease: qaReleaseRecorded
+        ? { userId: batch.releasedBy, name: batch.releasedByName, releasedAt: batch.releasedAt }
+        : null,
       generatedAt: new Date().toISOString()
     });
   } catch (err) {
