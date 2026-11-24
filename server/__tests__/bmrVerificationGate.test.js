@@ -181,16 +181,17 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
 
     const res = await request(app).get('/api/batch-productions/batch_coa_1/coa');
     expect(res.status).toBe(200);
-    expect(res.body.documentType).toBe('BATCH_QC_RESULT_SUMMARY');
+    expect(res.body.documentType).toBe('system_generated_qc_summary');
+    expect(res.body.title).toContain('NOT A CERTIFICATE OF ANALYSIS');
     expect(res.body.officialCertificate).toBe(false);
-    expect(res.body.documentStatus).toBe('DRAFT_INCOMPLETE');
+    expect(res.body.documentStatus).toBe('INCOMPLETE');
+    expect(res.body.overallResult).toBe('PENDING');
     expect(res.body.testResults).toEqual([]);
-    expect(res.body.qcDecision).toBe('NOT_DETERMINED');
     expect(res.body.recordedQcDisposition).toBeNull();
     expect(res.body.qcAnalyst).toBeNull();
     expect(res.body.independentQaRelease).toBeNull();
-    expect(res.body.missingEvidence).toContain('No batch-specific QC test results are recorded');
-    expect(res.body.firmDetails.manufacturingLicenseNo).toBeNull();
+    expect(res.body.missingEvidence).toContain('No specification-linked batch QC test results are recorded');
+    expect(res.body.firmDetails).toBeUndefined();
   });
 
 });

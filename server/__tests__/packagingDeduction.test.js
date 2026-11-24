@@ -1,92 +1,39 @@
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const RawMaterial = require('../models/RawMaterial');
-const RawMaterialEntry = require('../models/RawMaterialEntry');
-const BillOfMaterials = require('../models/BillOfMaterials');
-const Product = require('../models/Product');
 const { deductPackagingMaterials } = require('../services/batchProductionService');
 
-let mongoServer;
-
-describe('Item 5: Packaging Material Deduction Guard Unit Suite', () => {
-  beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    await mongoose.connect(mongoServer.getUri());
-  }, 30000);
-
-  afterAll(async () => {
-    await mongoose.disconnect();
-    if (mongoServer) {
-      await mongoServer.stop();
-    }
-  });
-
-  beforeEach(async () => {
-    await RawMaterial.deleteMany({});
-    await RawMaterialEntry.deleteMany({});
-    await BillOfMaterials.deleteMany({});
-    await Product.deleteMany({});
-  });
-
-  it('deducts packaging quantity proportional to actualYieldQty (ing.qtyRequired * actualYieldQty)', async () => {
-    const bottleRM = await RawMaterial.create({
-      name: '200 ML BOTTLE',
-      sku: 'RM-BOT-200',
-      unit: 'pcs',
-      category: 'Packaging'
-    });
-
-    const entry = await RawMaterialEntry.create({
-      rawMaterialId: bottleRM._id,
-      batchNo: 'PKG-LOT-001',
-      initialQty: 5000,
-      qty: 5000,
-      reservedQty: 2000,
-      purchaseRate: 2.5,
-      qcStatus: 'approved'
-    });
-
-    const product = await Product.create({
-      name: 'ABHAYARISHTA 200ML',
-      sku: 'PROD-ABH-200',
-      price: 150
-    });
-
-    const bom = await BillOfMaterials.create({
-      productId: product._id,
-      batchYieldSize: 2000,
-      isActive: true,
-      ingredients: [
-        {
-          rawMaterialId: bottleRM._id,
-          qtyRequired: 1, // 1 bottle per finished product unit
-          unit: 'pcs',
-          itemType: 'packaging'
-        }
-      ]
-    });
-
-    const mockBatch = {
-      _id: new mongoose.Types.ObjectId(),
-      batchNo: 'ABH-2026-TEST',
-      productId: product._id,
-      bomId: bom._id,
+describe('Packaging issue requires independently verified dispensing', () => {
+  test('blocks completion when packaging quantity has not been independently dispensed', async () => {
+    const batch = {
+      _id: 'batch-1',
       packagingDeducted: false,
-      rawMaterialCost: 0,
-      ingredientsConsumed: [],
-      ingredientsReserved: [{ rawMaterialId: bottleRM._id, rawMaterialEntryId: entry._id, qtyReserved: 2000, batchNo: entry.batchNo }]
+      bomSnapshot: {
+        ingredients: [{ rawMaterialId: 'material-1', qtyRequired: 1, itemType: 'packaging' }]
+      },
+      ingredientsReserved: [{ rawMaterialId: 'material-1', qtyReserved: 2000 }],
+      ingredientsConsumed: []
     };
 
-    // Trigger packaging deduction for actual yield of 2,000 bottles
-    const actualYieldQty = 2000;
-    await deductPackagingMaterials(mockBatch, actualYieldQty);
+    await expect(deductPackagingMaterials(batch, 2000))
+      .rejects.toThrow('PACKAGING_DISPENSING_REQUIRED');
+    expect(batch.packagingDeducted).toBe(false);
+    expect(batch.ingredientsReserved[0].qtyReserved).toBe(2000);
+    expect(batch.ingredientsConsumed).toHaveLength(0);
+  });
 
-    expect(mockBatch.packagingDeducted).toBe(true);
-    expect(mockBatch.ingredientsConsumed.length).toBe(1);
-    expect(mockBatch.ingredientsConsumed[0].rawMaterialId.toString()).toBe(bottleRM._id.toString());
-    expect(mockBatch.ingredientsConsumed[0].qtyConsumed).toBe(2000); // 1 * 2000 = 2000, NOT a fixed/fractional ~0.03
+  test('reconciles packaging only after verified dispensing covers actual yield', async () => {
+    const batch = {
+      _id: 'batch-2',
+      packagingDeducted: false,
+      bomSnapshot: {
+        ingredients: [{ rawMaterialId: 'material-1', qtyRequired: 1, itemType: 'packaging' }]
+      },
+      ingredientsReserved: [],
+      ingredientsConsumed: [{
+        rawMaterialId: 'material-1', qtyConsumed: 2000, dispensingNo: 'DSP-000001', stageIndex: 6
+      }]
+    };
 
-    const updatedEntry = await RawMaterialEntry.findById(entry._id);
-    expect(updatedEntry.qty).toBe(3000); // 5000 - 2000 = 3000
+    await expect(deductPackagingMaterials(batch, 2000)).resolves.toBeUndefined();
+    expect(batch.packagingDeducted).toBe(true);
+    expect(batch.ingredientsConsumed[0].qtyConsumed).toBe(2000);
   });
 });
