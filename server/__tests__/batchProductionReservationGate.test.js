@@ -9,6 +9,7 @@ jest.mock('../models/RawMaterial');
 jest.mock('../models/RawMaterialEntry');
 jest.mock('../models/RolePermission');
 jest.mock('../models/TrainingRecord');
+jest.mock('../models/LineClearance');
 jest.mock('../utils/transactionHelper', () => ({
   runWithTransaction: jest.fn(work => work({}))
 }));
@@ -27,6 +28,7 @@ const RawMaterial = require('../models/RawMaterial');
 const RawMaterialEntry = require('../models/RawMaterialEntry');
 const RolePermission = require('../models/RolePermission');
 const TrainingRecord = require('../models/TrainingRecord');
+const LineClearance = require('../models/LineClearance');
 const router = require('../routes/manufacturing/batchProductions');
 
 describe('Batch production material reservation gate', () => {
@@ -105,6 +107,9 @@ describe('Batch production material reservation gate', () => {
     });
     expect(res.status).toBe(201);
     const created = BatchProduction.create.mock.calls[0][0][0];
+    expect(created.status).toBe('draft');
+    expect(created.stages[0].status).toBe('pending');
+    expect(created.stages[0].startedAt).toBeNull();
     expect(created.ingredientsConsumed).toEqual([]);
     expect(created.rawMaterialCost).toBe(0);
     expect(created.ingredientsReserved).toHaveLength(2);
@@ -119,6 +124,45 @@ describe('Batch production material reservation gate', () => {
     expect(app.entries[packagingMaterialId].qty).toBe(500);
     expect(app.entries[packagingMaterialId].reservedQty).toBe(100);
     expect(app.entries[packagingMaterialId].issuedQty).toBe(0);
+  });
+
+  test('does not start production without signed line clearance and pre-execution BMR approval', async () => {
+    const batch = {
+      _id: '507f1f77bcf86cd799439041', status: 'draft',
+      stages: [{ name: 'Mixing', status: 'pending' }],
+      save: jest.fn().mockResolvedValue(true)
+    };
+    BatchProduction.findById.mockResolvedValue(batch);
+    LineClearance.findOne.mockResolvedValue(null);
+    const res = await request(app).patch('/api/batch-productions/' + batch._id + '/stage/0')
+      .send({ status: 'in_progress' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('signed manufacturing line-clearance');
+    expect(batch.save).not.toHaveBeenCalled();
+  });
+
+  test('starts a draft batch only after complete line clearance and BMR approval', async () => {
+    const batch = {
+      _id: '507f1f77bcf86cd799439042', status: 'draft',
+      bmrApprovedBy: userId, bmrApprovedByName: 'BMR Reviewer', bmrApprovedAt: new Date(),
+      stages: [{ name: 'Mixing', status: 'pending' }],
+      save: jest.fn().mockResolvedValue(true)
+    };
+    BatchProduction.findById.mockResolvedValue(batch);
+    LineClearance.findOne.mockResolvedValue({
+      cleared: true, clearedBy: '507f1f77bcf86cd799439043', clearedAt: new Date(),
+      checklist: {
+        equipmentCleaned: true, previousMaterialsRemoved: true,
+        previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true
+      }
+    });
+    const res = await request(app).patch('/api/batch-productions/' + batch._id + '/stage/0')
+      .send({ status: 'in_progress' });
+    expect(res.status).toBe(200);
+    expect(batch.status).toBe('in_progress');
+    expect(batch.stages[0].status).toBe('in_progress');
+    expect(batch.stages[0].startedAt).toBeInstanceOf(Date);
+    expect(batch.save).toHaveBeenCalled();
   });
 
   test('legacy consumption without a stage index cannot satisfy the dispensing gate', async () => {

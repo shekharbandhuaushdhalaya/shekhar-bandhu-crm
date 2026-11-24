@@ -52,6 +52,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
   test('PATCH /api/batch-productions/:id/approve-bmr approves normally when all ingredients cite verified entries', async () => {
     const mockBatch = {
       _id: 'batch_verified_1',
+      status: 'draft',
       batchNo: 'B-VERIFIED-01',
       bomSnapshot: {
         ingredients: [{ rawMaterialId: 'rm_1' }]
@@ -75,6 +76,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
   test('PATCH /api/batch-productions/:id/approve-bmr rejects without acknowledgement flag when ingredient is unverified', async () => {
     const mockBatch = {
       _id: 'batch_unverified_1',
+      status: 'draft',
       batchNo: 'B-UNVERIFIED-01',
       bomSnapshot: {
         ingredients: [{ rawMaterialId: 'rm_2' }]
@@ -99,6 +101,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
   test('PATCH /api/batch-productions/:id/approve-bmr succeeds when acknowledgeUnverifiedRefs is true', async () => {
     const mockBatch = {
       _id: 'batch_unverified_2',
+      status: 'draft',
       batchNo: 'B-UNVERIFIED-02',
       bomSnapshot: {
         ingredients: [{ rawMaterialId: 'rm_2' }]

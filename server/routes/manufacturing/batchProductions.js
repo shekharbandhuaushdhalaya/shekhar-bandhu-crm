@@ -370,7 +370,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
       const computedOverhead = (bom.overheadCost || 0) * overheadScale;
 
       const batchStages = customStages.map((st, i) => {
-        const startedAt = i === 0 ? new Date() : null;
+        const startedAt = null;
         const targetDurationHours = st.targetDurationHours || (st.targetDurationDays ? st.targetDurationDays * 24 : 8);
         let targetCompletionDate = null;
         if (startedAt) {
@@ -380,7 +380,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
           name: st.name,
           targetDurationDays: Math.ceil(targetDurationHours / 24),  // legacy field
           targetDurationHours,
-          status: i === 0 ? 'in_progress' : 'pending',
+          status: 'pending',
           startedAt,
           targetCompletionDate
         };
@@ -403,7 +403,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
         manufacturingUnitName: mfgUnit.name,
         plannedQty: valPlanned,
         plannedYields: effectiveYields || [],
-        status: 'in_progress',
+        status: 'draft',
         stages: batchStages,
         ingredientsConsumed,
         ingredientsReserved,
@@ -424,7 +424,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
 
     if (req.io) {
       req.io.emit('mfg_batch_created', newBatch);
-      req.io.emit('inventory_updated', { type: 'raw_material_deduction', batchNo: newBatch.batchNo });
+      req.io.emit('inventory_updated', { type: 'raw_material_reserved', batchNo: newBatch.batchNo });
     }
 
     res.status(201).json(newBatch);
@@ -486,6 +486,7 @@ router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), async (r
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated BMR approver identity is required' });
+    if (batch.status !== 'draft') return res.status(409).json({ error: 'Pre-execution BMR approval is only allowed while the batch remains in draft status' });
     if (!batch.bomSnapshot || !Array.isArray(batch.bomSnapshot.ingredients) || batch.bomSnapshot.ingredients.length === 0) {
       return res.status(409).json({ error: 'A pinned, non-empty batch formula snapshot is required before BMR approval' });
     }
@@ -590,15 +591,21 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
       return res.status(400).json({ error: 'Invalid stage index' });
     }
 
-    // Gate Stage 1 start on Line Clearance & BMR Approval
-    if (stageIndex === 0 && (status === 'in_progress' || !status)) {
+    // A newly created batch stays in draft until both pre-execution BMR approval
+    // and a complete, independently recorded manufacturing line clearance exist.
+    if (stageIndex === 0 && batch.stages[0].status === 'pending' && status !== 'pending') {
       const LineClearance = require('../../models/LineClearance');
       const clearance = await LineClearance.findOne({ batchId: batch._id, phase: 'manufacturing' });
-      if (!clearance) {
-        return res.status(400).json({ error: 'Line clearance required before starting production' });
+      const checklist = clearance && clearance.checklist;
+      const clearanceComplete = Boolean(clearance && clearance.cleared === true &&
+        clearance.clearedBy && clearance.clearedAt && checklist &&
+        checklist.equipmentCleaned && checklist.previousMaterialsRemoved &&
+        checklist.previousLabelsDocumentsRemoved && checklist.areaVisuallyInspected);
+      if (!clearanceComplete) {
+        return res.status(400).json({ error: 'A completed, signed manufacturing line-clearance checklist is required before starting production' });
       }
-      if (!batch.bmrApprovedBy) {
-        return res.status(400).json({ error: 'BMR pre-execution approval required before starting production' });
+      if (!batch.bmrApprovedBy || !batch.bmrApprovedByName || !batch.bmrApprovedAt) {
+        return res.status(400).json({ error: 'Authenticated pre-execution BMR approval is required before starting production' });
       }
     }
 
@@ -656,6 +663,7 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
       currentStage.notes = notes;
     }
     currentStage.status = newStatus;
+    if (stageIndex === 0 && newStatus !== 'pending') batch.status = 'in_progress';
 
     if (req.body.actualYieldQty !== undefined) {
       const actualYieldVal = Number(req.body.actualYieldQty);
