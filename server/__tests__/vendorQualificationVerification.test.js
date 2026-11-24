@@ -27,8 +27,8 @@ describe('Independent supplier qualification verification', () => {
   beforeEach(() => { jest.clearAllMocks(); RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] }); });
 
   test('records an audit as pending verification even when auditor proposes approval', async () => {
-    Vendor.findById.mockReturnValue({ select: jest.fn().mockResolvedValue({ company: 'Herbal Supplier' }) });
-    RawMaterial.find.mockReturnValue({ select: jest.fn().mockResolvedValue([{ _id: 'material-1' }]) });
+    Vendor.findById.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ company: 'Herbal Supplier' }) }) });
+    RawMaterial.find.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: '507f191e810c19729de860ea' }] ) }) });
     VendorQualification.create.mockImplementation(async value => value);
     const response = await request(app).post('/api/vendor-qualifications').send({
       vendorId: '507f1f77bcf86cd799439011',
