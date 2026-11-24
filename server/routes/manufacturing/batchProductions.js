@@ -1548,6 +1548,8 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
         stockLotNo: entry ? entry.batchNo || null : ing.batchNo || null,
         batchNo: ing.batchNo || (entry ? entry.batchNo || null : null),
         qtyConsumed: Number.isFinite(Number(ing.qtyConsumed)) ? Number(ing.qtyConsumed) : null,
+        qtyWasted: Number.isFinite(Number(ing.qtyWasted)) ? Number(ing.qtyWasted) : 0,
+        wastageReason: ing.wastageReason || null,
         unit: rm.unit || null,
         purchaseRate,
         itemCost: purchaseRate === null ? null : Number((Number(ing.qtyConsumed || 0) * purchaseRate).toFixed(2)),

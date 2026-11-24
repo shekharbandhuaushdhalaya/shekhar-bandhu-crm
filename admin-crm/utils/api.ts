@@ -1215,7 +1215,23 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
-  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; lossReason?: string; actualYieldQty?: number; stageIngredients?: { rawMaterialId: string; qtyNeeded: number; wastage?: number; itemType?: string; lossReason?: string }[]; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[] }): Promise<BatchProduction> {
+  async getMaterialDispensings(id: string): Promise<any[]> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/dispensings`);
+    return res.json();
+  }
+  async createMaterialDispensing(id: string, stageIndex: number, items: any[]): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/dispensings`, {
+      method: 'POST', body: JSON.stringify({ stageIndex, items })
+    });
+    return res.json();
+  }
+  async verifyMaterialDispensing(id: string, dispensingId: string, notes = ''): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/dispensings/${dispensingId}/verify`, {
+      method: 'PATCH', body: JSON.stringify({ notes })
+    });
+    return res.json();
+  }
+  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; lossReason?: string; actualYieldQty?: number; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[] }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }

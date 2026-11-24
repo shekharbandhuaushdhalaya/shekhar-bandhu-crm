@@ -9,6 +9,16 @@ const { withTransaction } = require('../../utils/withTransaction');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const router = express.Router();
 
+router.get('/:id/dispensings', authorize('manufacturing:view'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id).select('_id');
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    const records = await MaterialDispensing.find({ batchId: batch._id })
+      .sort({ stageIndex: 1, dispensedAt: 1 }).lean();
+    res.json(records);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/:id/dispensings', authorize('manufacturing:edit'), async (req, res) => {
   try {
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated dispensing operator identity is required' });
@@ -29,8 +39,12 @@ router.post('/:id/dispensings', authorize('manufacturing:edit'), async (req, res
       }
       const normalized = [], submittedEntryIds = new Set();
       for (const line of items) {
-        const qty = Number(line.qtyDispensed), entryKey = String(line.rawMaterialEntryId || '');
-        if (!line.rawMaterialId || !line.rawMaterialEntryId || !Number.isFinite(qty) || qty <= 0) throw Object.assign(new Error('Each dispensing line needs a material, reserved stock lot and positive weighed quantity'), { statusCode: 400 });
+        const qty = Number(line.qtyDispensed), qtyWasted = Number(line.qtyWasted || 0), entryKey = String(line.rawMaterialEntryId || '');
+        if (!line.rawMaterialId || !line.rawMaterialEntryId || !Number.isFinite(qty) || qty <= 0 ||
+            !Number.isFinite(qtyWasted) || qtyWasted < 0 || qtyWasted > qty ||
+            (qtyWasted > 0 && !String(line.wastageReason || '').trim())) {
+          throw Object.assign(new Error('Each dispensing line needs a material, reserved stock lot, positive weighed quantity and a reason for any recorded wastage'), { statusCode: 400 });
+        }
         if (submittedEntryIds.has(entryKey)) throw Object.assign(new Error('Use one dispensing line per stock lot; combine duplicate lot quantities'), { statusCode: 400 });
         submittedEntryIds.add(entryKey);
         const reservation = (batch.ingredientsReserved || []).find(r => String(r.rawMaterialId) === String(line.rawMaterialId) && String(r.rawMaterialEntryId) === entryKey);
@@ -44,7 +58,7 @@ router.post('/:id/dispensings', authorize('manufacturing:edit'), async (req, res
           throw Object.assign(new Error('Selected raw-material lot is missing, expired, not QC-approved, or has insufficient reserved balance'), { statusCode: 409 });
         }
         const material = await RawMaterial.findById(line.rawMaterialId).session(session);
-        normalized.push({ rawMaterialId: line.rawMaterialId, rawMaterialEntryId: entry._id, materialName: material ? material.name : '', lotNo: entry.batchNo, qtyDispensed: Number(qty.toFixed(2)), unit: line.unit || (material && material.unit) || '' });
+        normalized.push({ rawMaterialId: line.rawMaterialId, rawMaterialEntryId: entry._id, materialName: material ? material.name : '', lotNo: entry.batchNo, qtyDispensed: Number(qty.toFixed(2)), qtyWasted: Number(qtyWasted.toFixed(2)), wastageReason: String(line.wastageReason || '').trim(), unit: line.unit || (material && material.unit) || '' });
         pendingByEntry.set(entryKey, alreadyPending + qty);
       }
       const [record] = await MaterialDispensing.create([{
@@ -84,8 +98,15 @@ router.patch('/:id/dispensings/:dispensingId/verify', authorize('manufacturing:e
         await entry.save({ session });
         reservation.qtyReserved = Number((reservation.qtyReserved - line.qtyDispensed).toFixed(2));
         const consumed = (batch.ingredientsConsumed || []).find(c => String(c.rawMaterialEntryId) === String(entry._id) && Number(c.stageIndex) === record.stageIndex);
-        if (consumed) consumed.qtyConsumed = Number((consumed.qtyConsumed + line.qtyDispensed).toFixed(2));
-        else batch.ingredientsConsumed.push({ rawMaterialId: entry.rawMaterialId, rawMaterialEntryId: entry._id, qtyConsumed: line.qtyDispensed, batchNo: entry.batchNo, stageIndex: record.stageIndex, dispensingNo: record.dispensingNo });
+        if (consumed) {
+          consumed.qtyConsumed = Number((consumed.qtyConsumed + line.qtyDispensed).toFixed(2));
+          consumed.qtyWasted = Number(((consumed.qtyWasted || 0) + Number(line.qtyWasted || 0)).toFixed(2));
+          if (line.wastageReason) consumed.wastageReason = line.wastageReason;
+        } else batch.ingredientsConsumed.push({
+          rawMaterialId: entry.rawMaterialId, rawMaterialEntryId: entry._id, qtyConsumed: line.qtyDispensed,
+          qtyWasted: Number(line.qtyWasted || 0), wastageReason: line.wastageReason || '',
+          batchNo: entry.batchNo, stageIndex: record.stageIndex, dispensingNo: record.dispensingNo
+        });
         batch.rawMaterialCost = Number(((batch.rawMaterialCost || 0) + line.qtyDispensed * (entry.purchaseRate || 0)).toFixed(2));
         await RawMaterialLedger.create([{
           rawMaterialId: entry.rawMaterialId, warehouseId: entry.warehouseId, warehouseName: entry.warehouseName || '',
@@ -94,6 +115,16 @@ router.patch('/:id/dispensings/:dispensingId/verify', authorize('manufacturing:e
           movementKey: record.dispensingNo + ':' + String(entry._id), createdBy: req.user.name
         }], { session });
         stage.inputQty = Number(((stage.inputQty || 0) + line.qtyDispensed).toFixed(2));
+        stage.lossQty = Number(((stage.lossQty || 0) + Number(line.qtyWasted || 0)).toFixed(2));
+        stage.lossPercent = stage.inputQty > 0 ? Number((stage.lossQty / stage.inputQty * 100).toFixed(2)) : 0;
+        if (Number(line.qtyWasted || 0) > 0) {
+          const lossItem = (stage.lossItems || []).find(item => String(item.rawMaterialId) === String(line.rawMaterialId));
+          if (lossItem) {
+            lossItem.qty = Number((lossItem.qty + Number(line.qtyWasted)).toFixed(2));
+            lossItem.reason = line.wastageReason || lossItem.reason;
+          } else stage.lossItems.push({ rawMaterialId: line.rawMaterialId, qty: Number(line.qtyWasted), reason: line.wastageReason });
+          stage.lossReason = line.wastageReason || stage.lossReason;
+        }
       }
       batch.ingredientsReserved = (batch.ingredientsReserved || []).filter(r => Number(r.qtyReserved || 0) > 0.0001);
       record.status = 'verified';
