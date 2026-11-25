@@ -8,6 +8,7 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { createPaymentAndAllocate, allocateExistingPayment, reversePayment } = require('../../services/paymentPostingService');
 const idempotency = require('../../middleware/requiredIdempotency');
+const { getInvoiceAgeMetrics } = require('../../services/invoiceAgingService');
 
 const router = express.Router();
 
@@ -110,6 +111,7 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
 
     const now = new Date();
     const brackets = {
+      notDue: 0,
       b0_30: 0,
       b31_60: 0,
       b61_90: 0,
@@ -125,30 +127,17 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
 
       brackets.totalOutstanding += outstanding;
 
-      const baseDate = inv.dueDate ? new Date(inv.dueDate) : new Date(inv.date || inv.createdAt);
-      const diffTime = now.getTime() - baseDate.getTime();
-      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-
-      let bracket = '0-30';
-      if (diffDays <= 30) {
-        brackets.b0_30 += outstanding;
-        bracket = '0-30';
-      } else if (diffDays <= 60) {
-        brackets.b31_60 += outstanding;
-        bracket = '31-60';
-      } else if (diffDays <= 90) {
-        brackets.b61_90 += outstanding;
-        bracket = '61-90';
-      } else {
-        brackets.b90_plus += outstanding;
-        bracket = '90+';
-      }
+      const age = getInvoiceAgeMetrics(inv, now);
+      const diffDays = age.daysOverdue;
+      const bracket = age.label;
+      brackets[age.bucket] += outstanding;
 
       const custName = inv.customerName || 'Walk-in Customer';
       if (!customerMap[custName]) {
         customerMap[custName] = {
           customerName: custName,
           totalOutstanding: 0,
+          notDue: 0,
           b0_30: 0,
           b31_60: 0,
           b61_90: 0,
@@ -157,10 +146,11 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
         };
       }
       customerMap[custName].totalOutstanding += outstanding;
-      if (bracket === '0-30') customerMap[custName].b0_30 += outstanding;
-      else if (bracket === '31-60') customerMap[custName].b31_60 += outstanding;
-      else if (bracket === '61-90') customerMap[custName].b61_90 += outstanding;
-      else customerMap[custName].b90_plus += outstanding;
+      if (age.bucket === 'notDue') customerMap[custName].notDue += outstanding;
+      else if (age.bucket === 'b0_30') customerMap[custName].b0_30 += outstanding;
+      else if (age.bucket === 'b31_60') customerMap[custName].b31_60 += outstanding;
+      else if (age.bucket === 'b61_90') customerMap[custName].b61_90 += outstanding;
+      else if (age.bucket === 'b90_plus') customerMap[custName].b90_plus += outstanding;
 
       customerMap[custName].invoices.push({
         _id: inv._id,
@@ -170,8 +160,8 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
         amount: inv.amount,
         amountPaid: inv.amountPaid || 0,
         balanceDue: outstanding,
-        daysOld: diffDays,
-        daysOverdue: diffDays,
+        daysOld: age.daysOld,
+        daysOverdue: age.daysOverdue,
         bracket
       });
     });
@@ -197,6 +187,7 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
 
     const now = new Date();
     const brackets = {
+      notDue: 0,
       b0_30: 0,
       b31_60: 0,
       b61_90: 0,
@@ -213,34 +204,22 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
 
       brackets.totalOutstanding += outstanding;
 
-      const baseDate = inv.dueDate ? new Date(inv.dueDate) : new Date(inv.date || inv.createdAt);
-      const diffTime = now.getTime() - baseDate.getTime();
-      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-
-      let bracket = '0-30';
-      if (diffDays <= 30) {
-        brackets.b0_30 += outstanding;
-        bracket = '0-30';
-      } else if (diffDays <= 60) {
-        brackets.b31_60 += outstanding;
-        bracket = '31-60';
-      } else if (diffDays <= 90) {
-        brackets.b61_90 += outstanding;
-        bracket = '61-90';
-      } else {
-        brackets.b90_plus += outstanding;
-        bracket = '90+';
-      }
+      const age = getInvoiceAgeMetrics(inv, now);
+      const diffDays = age.daysOverdue;
+      const bracket = age.label;
+      brackets[age.bucket] += outstanding;
 
       const vName = inv.partyName || inv.vendorName || inv.supplierName || 'Vendor';
       if (!vendorMap[vName]) {
         vendorMap[vName] = {
           vendorName: vName,
           totalOutstanding: 0,
+          notDue: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0,
           invoices: []
         };
       }
       vendorMap[vName].totalOutstanding += outstanding;
+      vendorMap[vName][age.bucket] += outstanding;
       vendorMap[vName].invoices.push({
         _id: inv._id,
         invoiceNo: inv.invoiceNo,
@@ -249,8 +228,8 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
         amount: totalAmt,
         amountPaid: inv.amountPaid || 0,
         balanceDue: outstanding,
-        daysOld: diffDays,
-        daysOverdue: diffDays,
+        daysOld: age.daysOld,
+        daysOverdue: age.daysOverdue,
         bracket
       });
     });
