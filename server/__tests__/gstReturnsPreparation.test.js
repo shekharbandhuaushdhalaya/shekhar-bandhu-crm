@@ -20,7 +20,7 @@ describe('GST report preparation safeguards', () => {
 
   beforeAll(() => {
     app = express();
-    app.use('/api/gst', router);
+    app.use('/', router);
   });
 
   beforeEach(() => {
