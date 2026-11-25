@@ -170,11 +170,31 @@ describe('GRN independent receipt and supplier-document verification', () => {
   test('creates a supplier return only within the verified GRN rejected quantity', async () => {
     const grn = { _id: 'grn-1', grnNo: 'GRN-00001', poId: 'po-1', poNo: 'PO-1', vendorId: 'vendor-1', vendorName: 'Supplier', status: 'verified', items: [{ name: 'Ashwagandha', batchNo: 'LOT-1', qtyRejected: 5, unit: 'kg', rawMaterialId: 'raw-1' }] };
     GoodsReceivedNote.findById = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue(grn) });
+    GoodsReceivedNote.findOneAndUpdate = jest.fn().mockResolvedValue({ ...grn, returnReservationVersion: 1 });
     SupplierReturn.find = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue([{ qty: 3, status: 'pending_approval' }]) });
     SupplierReturn.create = jest.fn().mockResolvedValue([{ _id: 'return-1', returnNo: 'SR-000001', qty: 2 }]);
     const response = await request(app).post('/api/purchase-orders/grn/grn-1/supplier-returns').send({ itemIndex: 0, qty: 2, reason: 'Damaged packaging', resolutionType: 'replacement_requested' });
     expect(response.status).toBe(201);
+    expect(GoodsReceivedNote.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: 'grn-1', status: 'verified' },
+      { $inc: { returnReservationVersion: 1 } },
+      { new: true, session: {} }
+    );
     expect(SupplierReturn.create).toHaveBeenCalledWith([expect.objectContaining({ qty: 2, status: 'pending_approval', requestedByUserId: '507f1f77bcf86cd799439022' })], { session: {} });
+  });
+
+
+  test('rejects a stale concurrent supplier-return quantity reservation', async () => {
+    const grn = { _id: 'grn-1', status: 'verified', items: [{ name: 'Ashwagandha', batchNo: 'LOT-1', qtyRejected: 5, rawMaterialId: 'raw-1' }] };
+    GoodsReceivedNote.findById = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue(grn) });
+    SupplierReturn.find = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue([{ qty: 3, status: 'approved' }]) });
+    GoodsReceivedNote.findOneAndUpdate = jest.fn().mockResolvedValue(null);
+    SupplierReturn.create = jest.fn();
+    const response = await request(app).post('/api/purchase-orders/grn/grn-1/supplier-returns')
+      .send({ itemIndex: 0, qty: 2, reason: 'Damaged packaging', resolutionType: 'return_to_supplier' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('SUPPLIER_RETURN_RESERVATION_CONFLICT');
+    expect(SupplierReturn.create).not.toHaveBeenCalled();
   });
 
   test('blocks supplier return quantities above the remaining rejected quantity', async () => {

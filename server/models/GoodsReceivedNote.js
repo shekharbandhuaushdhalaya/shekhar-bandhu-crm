@@ -53,6 +53,8 @@ const goodsReceivedNoteSchema = new mongoose.Schema({
   verifiedAt: { type: Date, default: null },
   verificationNotes: { type: String, default: '', trim: true },
   rejectionReason: { type: String, default: '', trim: true },
+  // Incremented inside the supplier-return transaction to serialize quantity reservations per GRN.
+  returnReservationVersion: { type: Number, default: 0, min: 0 },
   notes: { type: String, default: '', trim: true },
   receivedBy: { type: String, default: 'System' }
 }, { timestamps: true });

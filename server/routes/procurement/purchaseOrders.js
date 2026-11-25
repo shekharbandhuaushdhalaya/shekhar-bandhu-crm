@@ -433,6 +433,14 @@ router.post('/grn/:id/supplier-returns', authorize('vendor:edit'), async (req, r
       const prior = await SupplierReturn.find({ grnId: grn._id, itemIndex: b.itemIndex }).session(session);
       const outstanding = prior.filter(x => !['rejected','cancelled'].includes(x.status)).reduce((sum,x) => sum + Number(x.qty || 0), 0);
       if (outstanding + Number(b.qty) > Number(item.qtyRejected || 0)) throw Object.assign(new Error('Return quantity exceeds remaining rejected quantity'), { statusCode: 409, code: 'SUPPLIER_RETURN_QTY_EXCEEDED' });
+      // Force all return reservations for this GRN to write the same document in the
+      // transaction. Concurrent requests conflict/retry and re-read committed returns.
+      const reservation = await GoodsReceivedNote.findOneAndUpdate(
+        { _id: grn._id, status: 'verified' },
+        { $inc: { returnReservationVersion: 1 } },
+        { new: true, session }
+      );
+      if (!reservation) throw Object.assign(new Error('Verified GRN changed while reserving rejected quantity; reload and retry'), { statusCode: 409, code: 'SUPPLIER_RETURN_RESERVATION_CONFLICT' });
       const returnNo = await generateAtomicDocumentNumber('supplierReturnNo', 'SR', 6, session);
       const docs = await SupplierReturn.create([{ returnNo, grnId: grn._id, grnNo: grn.grnNo, poId: grn.poId, poNo: grn.poNo, vendorId: grn.vendorId, vendorName: grn.vendorName, itemIndex: b.itemIndex, rawMaterialId: item.rawMaterialId || null, productId: item.productId || null, itemName: item.name, batchNo: item.batchNo, qty: Number(b.qty), unit: item.unit || '', reason: String(b.reason).trim(), resolutionType: b.resolutionType, status: 'pending_approval', requestedByUserId: makerId, requestedByName: makerName }], { session });
       return docs[0];
