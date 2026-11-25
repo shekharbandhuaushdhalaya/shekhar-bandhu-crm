@@ -1,6 +1,7 @@
 const express = require('express');
 const { authorize } = require('../../middleware/authorize');
 const ManufacturingUnit = require('../../models/ManufacturingUnit');
+const { createManufacturingUnitWithWarehouse } = require('../../services/manufacturingUnitSetupService');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
@@ -16,11 +17,11 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
   }
 });
 
-// POST /api/manufacturing-units — Create a manufacturing unit
+// POST /api/manufacturing-units — Create a manufacturing unit and its production-house warehouse atomically
 router.post('/', authorize('manufacturing:create'), validate(schemas.manufacturingUnitSchema), async (req, res) => {
   try {
     const { name, code, addressLine1, city, state, pincode, contactPerson, phone } = req.body;
-    
+
     const existing = await ManufacturingUnit.findOne({
       $or: [
         { name: name.trim() },
@@ -31,7 +32,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.manufacturi
       return res.status(400).json({ error: 'Manufacturing unit with this name or code already exists' });
     }
 
-    const unit = await ManufacturingUnit.create({
+    const { unit, warehouse } = await createManufacturingUnitWithWarehouse({
       name: name.trim(),
       code: code.trim().toUpperCase(),
       addressLine1: addressLine1 ? addressLine1.trim() : '',
@@ -44,9 +45,13 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.manufacturi
 
     if (req.io) {
       req.io.emit('mfg_unit_updated', { type: 'created', id: unit._id });
+      req.io.emit('warehouse_updated', { type: 'created', id: warehouse._id });
     }
-    res.status(201).json(unit);
+    res.status(201).json({ ...unit.toObject(), productionWarehouseId: warehouse._id });
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'A manufacturing unit or production-house warehouse with this identity already exists' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
