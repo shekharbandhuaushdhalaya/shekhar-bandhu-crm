@@ -5,12 +5,14 @@ const quarantineRouter = require('../routes/manufacturing/quarantine');
 const CertificateOfAnalysis = require('../models/CertificateOfAnalysis');
 const RawMaterialQuarantine = require('../models/RawMaterialQuarantine');
 const SystemSettings = require('../models/SystemSettings');
+const RawMaterialQualitySpecification = require('../models/RawMaterialQualitySpecification');
 
 jest.mock('../models/CertificateOfAnalysis');
 jest.mock('../models/RawMaterialQuarantine');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/RawMaterialEntry');
 jest.mock('../models/RawMaterial');
+jest.mock('../models/RawMaterialQualitySpecification');
 jest.mock('../utils/withTransaction', () => ({ withTransaction: jest.fn(async work => work({})) }));
 jest.mock('../utils/auditLogger', () => ({ logAction: jest.fn().mockResolvedValue(true) }));
 // coa.js and quarantine.js now allocate document numbers through the atomic,
@@ -38,6 +40,7 @@ app.use('/api/manufacturing/quarantine', quarantineRouter);
 describe('Module 2: Ayurvedic Manufacturing & AYUSH / GMP Compliance', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    RawMaterialQualitySpecification.findOne.mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: 'spec-q101', specificationVersion: '1.0', approvedByUserId: 'qa-approver', approvedAt: new Date(), tests: [{ code: 'IDENTITY', name: 'Botanical identity', specification: 'Conforms to approved raw-material specification', unit: '', methodReference: 'Approved identity method', mandatory: true }] }) }) });
     SystemSettings.findOne.mockReturnValue({
       lean: jest.fn().mockResolvedValue({})
     });
@@ -107,6 +110,7 @@ describe('Module 2: Ayurvedic Manufacturing & AYUSH / GMP Compliance', () => {
         rawMaterialId: 'rm-q101',
         batchNo: 'HERB-881',
         qty: 50,
+        qcSpecificationId: 'spec-q101', qcSpecificationVersion: '1.0', qcSpecificationTests: [{ code: 'IDENTITY', name: 'Botanical identity', specification: 'Conforms to approved raw-material specification', unit: '', methodReference: 'Approved identity method', mandatory: true }],
         save: jest.fn().mockResolvedValue(true)
       };
       const RawMaterialEntry = require('../models/RawMaterialEntry');
