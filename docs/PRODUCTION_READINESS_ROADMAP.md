@@ -165,6 +165,7 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - Supplier-return backend lifecycle exists (request, independent approval/rejection, dispatch, resolution). This delivery completes the corresponding GRN-screen actions and adds visible evidence for each state.
 - Incoming QC inspection now pins the approved material specification/version and requires every mandatory test; its regression fixture correction is included in this delivery.
 - Incoming QC inspection result sets are now immutable after first recording and use an atomic timestamp-checked update, preventing concurrent analysts from replacing batch-linked test evidence.
+- The CRM now exposes a dedicated Incoming Material QC workspace: eligible unreserved stock entries can be registered into quarantine, actual results are entered against the pinned test methods/specifications, and an independent QA reviewer can release or reject the lot with a report reference and remarks.
 - Manufacturing line-clearance now has separate submit and independent verify steps; production cannot self-clear a line, and verified records cannot be overwritten.
 - BMR presentation removes default licence identifiers, shelf-life values, generic QC limits and placeholder signatories; recorded test results are shown with their actual statuses, and missing data is not presented as a pass.
 - Filling and packing stage starts now require their own complete, independently verified line-clearance records; BMR completeness also reports missing clearances for each production phase.
@@ -190,6 +191,6 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - The above foundations are not a blanket completion claim for the functional IDs. Remaining phases require end-to-end UAT and evidence-based closure.
 
 ### Next verification batch
-- Exercise the manufacturing completion UI through the post-completion QC analyst and independent QA reviewer journey on web and mobile.
+- Exercise the incoming material QC workspace and the manufacturing completion/post-completion QC journey on web and mobile, including maker-checker role combinations and rejected/failed-result paths.
 - Add failure-injection coverage for production-house warehouse creation; receipt/Challan rollback and idempotent service retry are now covered by MongoDB replica-set integration tests.
 - Complete an end-to-end material genealogy rehearsal from reserved raw-material lots through independently verified dispensing, finished-goods receipt, QC release and production-transfer posting.
