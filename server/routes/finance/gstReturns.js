@@ -291,12 +291,13 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
   }
 });
 
-// GET /api/gst/filing-status — Get ARN details for period
+// GET /api/gst/filing-status — Read the recorded filing evidence for a period.
 router.get('/filing-status', authorize('report:view'), async (req, res) => {
   try {
-    const { period, returnType } = req.query;
-    if (!period || !returnType) {
-      return res.status(400).json({ error: 'period and returnType are required' });
+    const period = String(req.query.period || '').trim();
+    const returnType = String(req.query.returnType || '').trim();
+    if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(period) || !['gstr1', 'gstr3b'].includes(returnType)) {
+      return res.status(400).json({ error: 'A valid YYYY-MM period and returnType (gstr1 or gstr3b) are required', code: 'GST_FILING_PERIOD_INVALID' });
     }
     const GstFiling = require('../../models/GstFiling');
     const filing = await GstFiling.findOne({ period, returnType }).lean();
@@ -307,33 +308,45 @@ router.get('/filing-status', authorize('report:view'), async (req, res) => {
   }
 });
 
-// POST /api/gst/filing-status — Save ARN and mark month returns as filed
-router.post('/filing-status', authorize('report:view'), async (req, res) => {
+// POST /api/gst/filing-status — Record filing evidence after the external portal submission.
+// This endpoint records an operator assertion; it does not submit to or verify the GST portal.
+router.post('/filing-status', authorize('invoice:finalize'), async (req, res) => {
   try {
-    const { period, returnType, arn, url, name, snapshot } = req.body;
-    if (!period || !returnType || !arn) {
-      return res.status(400).json({ error: 'period, returnType, and arn are required' });
+    const period = String(req.body.period || '').trim();
+    const returnType = String(req.body.returnType || '').trim();
+    const arn = String(req.body.arn || '').trim();
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = String(req.user?.name || req.user?.email || '').trim();
+
+    if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(period) || !['gstr1', 'gstr3b'].includes(returnType) || !arn || arn.length > 64) {
+      return res.status(400).json({ error: 'A valid YYYY-MM period, return type, and ARN (1–64 characters) are required', code: 'GST_FILING_EVIDENCE_INVALID' });
     }
+    if (!actorId || !actorName) {
+      return res.status(403).json({ error: 'Authenticated filing recorder identity is required', code: 'GST_FILING_ACTOR_REQUIRED' });
+    }
+
     const GstFiling = require('../../models/GstFiling');
-    let filing = await GstFiling.findOne({ period, returnType });
-    if (!filing) {
-      filing = new GstFiling({ period, returnType, arn });
-    } else {
-      filing.arn = arn;
-    }
-    filing.filedDate = new Date();
-    filing.filedBy = req.user ? req.user.name : 'System Accountant';
-    if (snapshot) filing.snapshot = snapshot;
-    if (url) {
-      filing.supportingDocuments = [{ name: name || 'Filing Receipt', url, uploadedAt: new Date() }];
-    }
-    await filing.save();
+    const url = String(req.body.url || '').trim();
+    const filing = await GstFiling.create({
+      period,
+      returnType,
+      arn,
+      filedDate: new Date(),
+      filedBy: actorName,
+      filedByUserId: actorId,
+      snapshot: req.body.snapshot && typeof req.body.snapshot === 'object' && !Array.isArray(req.body.snapshot) ? req.body.snapshot : null,
+      supportingDocuments: url ? [{ name: String(req.body.name || 'GST Filing Receipt').trim().slice(0, 120), url: url.slice(0, 2048), uploadedAt: new Date() }] : [],
+    });
+
     if (req.io) {
       req.io.emit('gst_return_updated', { type: 'filing_saved', period, returnType });
     }
-    res.status(201).json({ filed: true, filing });
+    res.status(201).json({ filed: true, filing, portalVerified: false });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'Filing evidence already exists for this return period and type. Use the formal correction process rather than overwriting it.', code: 'GST_FILING_ALREADY_RECORDED' });
+    }
+    res.status(500).json({ error: err.message, code: 'GST_FILING_RECORD_FAILED' });
   }
 });
 

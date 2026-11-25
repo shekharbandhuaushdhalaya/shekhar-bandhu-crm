@@ -6,7 +6,8 @@ const gstFilingSchema = new mongoose.Schema({
   returnType: { type: String, required: true, enum: ['gstr1', 'gstr3b'] },
   arn: { type: String, required: true },
   filedDate: { type: Date, default: Date.now },
-  filedBy: { type: String },
+  filedBy: { type: String, required: true },
+  filedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   snapshot: { type: mongoose.Schema.Types.Mixed, default: null },
   supportingDocuments: [
     {
