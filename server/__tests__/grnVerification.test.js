@@ -39,7 +39,7 @@ describe('GRN independent receipt and supplier-document verification', () => {
     poId: 'po-1',
     status: 'pending_verification',
     receivedByUserId: '507f1f77bcf86cd799439011',
-    items: [{ name: 'Ashwagandha Powder', rawMaterialId: '507f191e810c19729de860ea', batchNo: 'SUP-BATCH-1', supplierCoaRef: 'COA-REF-2026-01' }],
+    items: [{ name: 'Ashwagandha Powder', rawMaterialId: '507f191e810c19729de860ea', batchNo: 'SUP-BATCH-1', supplierCoaRef: 'COA-REF-2026-01', supplierCoaNo: 'COA-2026-01', supplierCoaDate: new Date('2026-11-20'), supplierCoaLabName: 'Supplier QC Laboratory', supplierCoaBatchNo: 'SUP-BATCH-1', supplierCoaDocumentRef: 'DOC-REF-2026-01' }],
     save: jest.fn().mockResolvedValue(true),
     ...overrides
   });
@@ -79,12 +79,21 @@ describe('GRN independent receipt and supplier-document verification', () => {
   });
 
   test('requires supplier CoA reference for every raw-material line before verification', async () => {
-    const record = pendingGrn({ items: [{ name: 'Ashwagandha Powder', rawMaterialId: '507f191e810c19729de860ea', batchNo: 'SUP-BATCH-1', supplierCoaRef: '' }] });
+    const record = pendingGrn({ items: [{ name: 'Ashwagandha Powder', rawMaterialId: '507f191e810c19729de860ea', batchNo: 'SUP-BATCH-1', supplierCoaRef: '', supplierCoaNo: '', supplierCoaDate: null, supplierCoaLabName: '', supplierCoaBatchNo: '', supplierCoaDocumentRef: '' }] });
     mockFind(record);
     const response = await request(app)
       .patch('/api/purchase-orders/grn/grn-1/verify')
       .send({ verificationNotes: 'Physical quantity and documents checked' });
 
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('GRN_SUPPLIER_COA_REQUIRED');
+    expect(record.save).not.toHaveBeenCalled();
+  });
+
+  test('rejects supplier CoA metadata when its declared supplier batch differs from the received batch', async () => {
+    const record = pendingGrn({ items: [{ name: 'Ashwagandha Powder', rawMaterialId: '507f191e810c19729de860ea', batchNo: 'SUP-BATCH-1', supplierCoaRef: 'COA-REF', supplierCoaNo: 'COA-1', supplierCoaDate: new Date('2026-11-20'), supplierCoaLabName: 'Supplier QC Laboratory', supplierCoaBatchNo: 'OTHER-BATCH', supplierCoaDocumentRef: 'DOC-1' }] });
+    mockFind(record);
+    const response = await request(app).patch('/api/purchase-orders/grn/grn-1/verify').send({ verificationNotes: 'Reviewed supplier CoA details' });
     expect(response.status).toBe(409);
     expect(response.body.code).toBe('GRN_SUPPLIER_COA_REQUIRED');
     expect(record.save).not.toHaveBeenCalled();
@@ -104,6 +113,9 @@ describe('GRN independent receipt and supplier-document verification', () => {
     expect(record.verifiedByName).toBe('Independent Reviewer');
     expect(record.verifiedAt).toBeInstanceOf(Date);
     expect(record.save).toHaveBeenCalled();
+    expect(record.items[0].supplierCoaReviewStatus).toBe('reviewed');
+    expect(record.items[0].supplierCoaReviewedByUserId).toBe('507f1f77bcf86cd799439022');
+    expect(record.items[0].supplierCoaReviewedAt).toBeInstanceOf(Date);
     expect(logAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'GRN_INDEPENDENT_VERIFICATION' }));
   });
 

@@ -35,7 +35,7 @@ type Grn = {
   verifiedAt?: string;
   verificationNotes?: string;
   rejectionReason?: string;
-  items?: Array<{ name?: string; qtyReceived?: number; qtyAccepted?: number; qtyRejected?: number; unit?: string; batchNo?: string; supplierCoaRef?: string; rawMaterialId?: string }>;
+  items?: Array<{ name?: string; qtyReceived?: number; qtyAccepted?: number; qtyRejected?: number; unit?: string; batchNo?: string; supplierCoaRef?: string; supplierCoaNo?: string; supplierCoaDate?: string; supplierCoaLabName?: string; supplierCoaBatchNo?: string; supplierCoaDocumentRef?: string; supplierCoaReviewStatus?: 'not_reviewed' | 'reviewed'; supplierCoaReviewedByName?: string; supplierCoaReviewedAt?: string; rawMaterialId?: string }>;
 };
 
 const STATUS_OPTIONS = [
@@ -210,7 +210,7 @@ export default function GoodsReceivedNotesScreen() {
                 <Text style={styles.lineName}>{line.name || 'Unnamed item'}</Text>
                 <Text style={styles.detailLine}>Received: {line.qtyReceived ?? '—'} {line.unit || ''} · Accepted: {line.qtyAccepted ?? '—'} · Rejected: {line.qtyRejected ?? '—'}</Text>
                 <Text style={styles.detailLine}>Supplier lot: {line.batchNo || '—'}</Text>
-                {line.rawMaterialId ? <Text style={styles.detailLine}>Supplier CoA reference: {line.supplierCoaRef || 'Missing'}</Text> : null}
+                {line.rawMaterialId ? <><Text style={styles.detailLine}>Supplier CoA reference / number: {line.supplierCoaRef || 'Missing'} / {line.supplierCoaNo || 'Missing'}</Text><Text style={styles.detailLine}>CoA date / laboratory: {formatDate(line.supplierCoaDate)} · {line.supplierCoaLabName || 'Not recorded'}</Text><Text style={styles.detailLine}>CoA batch / received batch: {line.supplierCoaBatchNo || 'Missing'} / {line.batchNo || 'Missing'}</Text><Text style={styles.detailLine}>Source document reference: {line.supplierCoaDocumentRef || 'Missing'}</Text><Text style={styles.detailLine}>Independent CoA review: {line.supplierCoaReviewStatus === 'reviewed' ? `Reviewed by ${line.supplierCoaReviewedByName || 'reviewer'} on ${formatDate(line.supplierCoaReviewedAt)}` : 'Pending'}</Text></> : null}
               </View>
             ))}
             {selected.status === 'pending_verification' && isOwnReceipt ? <Text style={styles.warningText}>Maker-checker control: the person who recorded this receipt cannot verify it.</Text> : null}

@@ -869,6 +869,11 @@ const grnItemInputSchema = z.object({
   qtyRejected: z.number().nonnegative().optional().default(0),
   batchNo: z.string().min(1, 'Supplier batch number is required'),
   supplierCoaRef: z.string().trim().max(500).optional().default(''),
+  supplierCoaNo: z.string().trim().max(120).optional().default(''),
+  supplierCoaDate: z.string().or(z.date()).optional(),
+  supplierCoaLabName: z.string().trim().max(200).optional().default(''),
+  supplierCoaBatchNo: z.string().trim().max(120).optional().default(''),
+  supplierCoaDocumentRef: z.string().trim().max(500).optional().default(''),
   mfgDate: z.string().or(z.date()).optional(),
   expiryDate: z.string().or(z.date()).optional(),
   rejectionReason: z.string().optional().default('')

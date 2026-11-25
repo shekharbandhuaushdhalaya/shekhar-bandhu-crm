@@ -226,7 +226,7 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
 
         const mfgDate = item.mfgDate ? new Date(item.mfgDate) : null;
         const expiryDate = item.expiryDate ? new Date(item.expiryDate) : null;
-        grnItems.push({ ...item, batchNo: String(item.batchNo).trim(), supplierCoaRef: String(item.supplierCoaRef || '').trim(), mfgDate, expiryDate });
+        grnItems.push({ ...item, batchNo: String(item.batchNo).trim(), supplierCoaRef: String(item.supplierCoaRef || '').trim(), supplierCoaNo: String(item.supplierCoaNo || '').trim(), supplierCoaDate: item.supplierCoaDate ? new Date(item.supplierCoaDate) : null, supplierCoaLabName: String(item.supplierCoaLabName || '').trim(), supplierCoaBatchNo: String(item.supplierCoaBatchNo || '').trim(), supplierCoaDocumentRef: String(item.supplierCoaDocumentRef || '').trim(), supplierCoaReviewStatus: 'not_reviewed', mfgDate, expiryDate });
         poItem.qtyReceived = Number(poItem.qtyReceived || 0) + accepted;
 
         if (accepted <= 0) continue;
@@ -378,8 +378,15 @@ router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), async (req
       if (record.status !== 'pending_verification') throw Object.assign(new Error('Only pending GRNs can be independently verified'), { statusCode: 409 });
       if (record.receivedByUserId && String(record.receivedByUserId) === String(reviewerId)) throw Object.assign(new Error('The person recording receipt cannot verify the same GRN'), { statusCode: 403, code: 'GRN_MAKER_CHECKER_REQUIRED' });
       if (decision === 'verified') {
-        const missingCoa = (record.items || []).filter(item => item.rawMaterialId && !String(item.supplierCoaRef || '').trim());
-        if (missingCoa.length) throw Object.assign(new Error('Supplier CoA reference is required for every raw-material line before GRN verification: ' + missingCoa.map(item => item.name).join(', ')), { statusCode: 409, code: 'GRN_SUPPLIER_COA_REQUIRED' });
+        const incompleteCoa = (record.items || []).filter(item => item.rawMaterialId && (!String(item.supplierCoaRef || '').trim() || !String(item.supplierCoaNo || '').trim() || !item.supplierCoaDate || !String(item.supplierCoaLabName || '').trim() || !String(item.supplierCoaBatchNo || '').trim() || !String(item.supplierCoaDocumentRef || '').trim() || String(item.supplierCoaBatchNo).trim().toUpperCase() !== String(item.batchNo).trim().toUpperCase()));
+        if (incompleteCoa.length) throw Object.assign(new Error('Complete supplier CoA metadata, source-document reference and matching supplier batch are required for every raw-material line before GRN verification: ' + incompleteCoa.map(item => item.name).join(', ')), { statusCode: 409, code: 'GRN_SUPPLIER_COA_REQUIRED' });
+        for (const item of record.items || []) {
+          if (!item.rawMaterialId) continue;
+          item.supplierCoaReviewStatus = 'reviewed';
+          item.supplierCoaReviewedByUserId = reviewerId;
+          item.supplierCoaReviewedByName = reviewerName;
+          item.supplierCoaReviewedAt = new Date();
+        }
       }
       record.status = decision;
       record.verifiedByUserId = reviewerId;
