@@ -163,6 +163,9 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
 
   describe('Quarantine Release Updates Linked RawMaterialEntry qcStatus', () => {
     test('POST /api/manufacturing/quarantine logs quarantine lot and links matching RawMaterialEntry', async () => {
+      RawMaterial.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({
+        _id: 'rm_101', name: 'Ashwagandha', botanicalName: 'Withania somnifera', unit: 'kg'
+      }) });
       RawMaterialEntry.findById.mockResolvedValue({
         _id: 'entry_101',
         rawMaterialId: 'rm_101',
@@ -203,6 +206,9 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
     });
 
     test('returns a conflict when concurrent requests register the same stock entry in quarantine', async () => {
+      RawMaterial.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({
+        _id: 'rm_duplicate', name: 'Ashwagandha', botanicalName: 'Withania somnifera', unit: 'kg'
+      }) });
       RawMaterialEntry.findById.mockResolvedValue({
         _id: 'entry_duplicate', rawMaterialId: 'rm_duplicate', batchNo: 'BATCH-DUP',
         vendorName: 'Herbal Supplier', expiryDate: new Date('2027-12-31'),

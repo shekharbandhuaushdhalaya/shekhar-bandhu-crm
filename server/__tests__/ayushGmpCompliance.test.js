@@ -4,6 +4,7 @@ const coaRouter = require('../routes/manufacturing/coa');
 const quarantineRouter = require('../routes/manufacturing/quarantine');
 const CertificateOfAnalysis = require('../models/CertificateOfAnalysis');
 const RawMaterialQuarantine = require('../models/RawMaterialQuarantine');
+const RawMaterial = require('../models/RawMaterial');
 const SystemSettings = require('../models/SystemSettings');
 const RawMaterialQualitySpecification = require('../models/RawMaterialQualitySpecification');
 
@@ -74,6 +75,9 @@ describe('Module 2: Ayurvedic Manufacturing & AYUSH / GMP Compliance', () => {
       const RawMaterialEntry = require('../models/RawMaterialEntry');
       const linkedEntry = { _id: 'entry-q101', rawMaterialId: 'rm-q101', batchNo: 'HERB-881', vendorName: 'Herbal Supplier', expiryDate: new Date('2027-06-30'), qty: 50, reservedQty: 0, qcStatus: 'under_test' };
       RawMaterialEntry.findById.mockResolvedValue(linkedEntry);
+      RawMaterial.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({
+        _id: 'rm-q101', name: 'Ashwagandha Root (Withania somnifera)', botanicalName: 'Withania somnifera', unit: 'kg'
+      }) });
       RawMaterialQuarantine.findOne.mockResolvedValue(null);
       RawMaterialQuarantine.create.mockImplementation(async ([doc]) => [{
         _id: 'q101',

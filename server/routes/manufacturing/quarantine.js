@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const RawMaterialQuarantine = require('../../models/RawMaterialQuarantine');
+const RawMaterial = require('../../models/RawMaterial');
 const RawMaterialQualitySpecification = require('../../models/RawMaterialQualitySpecification');
 const GoodsReceivedNote = require('../../models/GoodsReceivedNote');
 const { authorize } = require('../../middleware/authorize');
@@ -60,16 +61,18 @@ router.get('/near-expiry', authorize('inventory:view'), async (req, res) => {
 router.post('/', authorize('inventory:create'), async (req, res) => {
   try {
     const RawMaterialEntry = require('../../models/RawMaterialEntry');
-    const { herbName, botanicalName, batchNo, supplierName, qty, unit, expiryDate, rawMaterialId, rawMaterialEntryId } = req.body;
+    const { batchNo, supplierName, qty, unit, expiryDate, rawMaterialId, rawMaterialEntryId } = req.body;
     const quantity = Number(qty);
     const expiry = new Date(expiryDate);
-    if (!herbName?.trim() || !batchNo?.trim() || !supplierName?.trim() || !rawMaterialEntryId || !Number.isFinite(quantity) || quantity <= 0 || !expiryDate || Number.isNaN(expiry.getTime())) {
-      return res.status(400).json({ error: 'herbName, batchNo, supplierName, positive qty, expiryDate, and rawMaterialEntryId are required' });
+    if (!batchNo?.trim() || !supplierName?.trim() || !rawMaterialEntryId || !Number.isFinite(quantity) || quantity <= 0 || !expiryDate || Number.isNaN(expiry.getTime())) {
+      return res.status(400).json({ error: 'batchNo, supplierName, positive qty, expiryDate, and rawMaterialEntryId are required' });
     }
 
     // Never associate a quarantine record with a guessed batch or a different material.
     const entry = await RawMaterialEntry.findById(rawMaterialEntryId);
     if (!entry) return res.status(404).json({ error: 'Linked raw-material stock entry not found' });
+    const material = await RawMaterial.findById(entry.rawMaterialId).lean();
+    if (!material) return res.status(404).json({ error: 'Linked raw-material definition not found' });
     if (String(entry.batchNo).trim().toUpperCase() !== batchNo.trim().toUpperCase()) {
       return res.status(400).json({ error: 'Batch number does not match the linked stock entry' });
     }
@@ -84,11 +87,14 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
     if (Math.abs(availableQty - quantity) > 1e-9) return res.status(400).json({ error: 'Quarantine quantity must equal the complete unreserved stock-entry quantity; partial-lot disposition is not supported' });
     const existingLot = await RawMaterialQuarantine.findOne({ rawMaterialEntryId: entry._id });
     if (existingLot) return res.status(409).json({ error: 'A quarantine record already exists for this stock entry' });
-    if (entry.expiryDate && new Date(entry.expiryDate).getTime() !== expiry.getTime()) {
-      return res.status(400).json({ error: 'Expiry date does not match the linked stock entry' });
+    if (!entry.expiryDate || new Date(entry.expiryDate).getTime() !== expiry.getTime()) {
+      return res.status(400).json({ error: 'Expiry date must match an expiry date recorded on the linked stock entry' });
     }
-    if (entry.vendorName && entry.vendorName.trim().toLowerCase() !== supplierName.trim().toLowerCase()) {
-      return res.status(400).json({ error: 'Supplier does not match the linked stock entry' });
+    if (!String(entry.vendorName || '').trim() || entry.vendorName.trim().toLowerCase() !== supplierName.trim().toLowerCase()) {
+      return res.status(400).json({ error: 'Supplier must match the supplier recorded on the linked stock entry' });
+    }
+    if (unit && String(unit).trim().toLowerCase() !== String(material.unit || '').trim().toLowerCase()) {
+      return res.status(400).json({ error: 'Unit does not match the linked raw-material definition' });
     }
 
     const approvedSpecification = await RawMaterialQualitySpecification.findOne({ rawMaterialId: entry.rawMaterialId, status: 'approved', effectiveDate: { $lte: new Date() } }).sort({ effectiveDate: -1, approvedAt: -1 }).lean();
@@ -98,13 +104,13 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
     const quarantineLotNo = await generateAtomicDocumentNumber('quarantineLotNo_QRM', 'QRM-', 6);
     const [lot] = await RawMaterialQuarantine.create([{
       quarantineLotNo,
-      herbName: herbName.trim(),
-      botanicalName: botanicalName || '',
+      herbName: material.name,
+      botanicalName: material.botanicalName || '',
       batchNo: entry.batchNo,
-      supplierName: supplierName.trim(),
+      supplierName: entry.vendorName.trim(),
       qty: quantity,
-      unit: unit || 'kg',
-      expiryDate: expiry,
+      unit: material.unit || 'kg',
+      expiryDate: new Date(entry.expiryDate),
       quarantineStatus: 'under_testing',
       receivedDate: new Date(),
       rawMaterialId: entry.rawMaterialId,
