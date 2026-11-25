@@ -14,7 +14,7 @@ import { Spacing, Typography, Radius } from '../constants/theme';
 
 type InspectionValue = { result: string; outcome: 'pass' | 'fail'; evidenceRef: string };
 type QuarantineLot = {
-  _id: string; quarantineLotNo: string; herbName: string; botanicalName?: string;
+  _id: string; rawMaterialEntryId?: string; quarantineLotNo: string; herbName: string; botanicalName?: string;
   batchNo: string; supplierName: string; qty: number; unit: string; expiryDate: string;
   quarantineStatus: 'under_testing' | 'released' | 'rejected';
   qcSpecificationVersion?: string;
@@ -152,7 +152,7 @@ export default function IncomingQcScreen() {
     const results = dispositionLot.inspectionResults || [];
     const failed = results.some(result => result.outcome === 'fail');
     const recordedBy = dispositionLot.inspectionRecordedByUserId;
-    if (!recordedBy || String(recordedBy) === String(user?.id || user?._id || '')) {
+    if (!recordedBy || String(recordedBy) === String(user?.id || '')) {
       showToast('The QC analyst cannot approve their own inspection. Sign in as an independent QA reviewer.', 'error');
       return;
     }
@@ -210,7 +210,7 @@ export default function IncomingQcScreen() {
         {loading ? null : lots.length ? lots.map(lot => {
           const hasResults = Boolean(lot.inspectionRecordedAt || lot.inspectionResults?.length);
           const failed = (lot.inspectionResults || []).some(result => result.outcome === 'fail');
-          const sameAnalyst = Boolean(lot.inspectionRecordedByUserId && String(lot.inspectionRecordedByUserId) === String(user?.id || user?._id || ''));
+          const sameAnalyst = Boolean(lot.inspectionRecordedByUserId && String(lot.inspectionRecordedByUserId) === String(user?.id || ''));
           return (
             <View key={lot._id} style={styles.card}>
               <View style={styles.row}>
@@ -220,7 +220,7 @@ export default function IncomingQcScreen() {
                   <Text style={styles.muted}>{lot.qty} {lot.unit} · Spec {lot.qcSpecificationVersion || '—'}</Text>
                   <Text style={styles.muted}>Expiry {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString('en-IN') : '—'}</Text>
                   <View style={{ marginTop: 6 }}>
-                    <StatusPill status={lot.quarantineStatus} />
+                    <StatusPill label={lot.quarantineStatus.replace('_', ' ')} tone={lot.quarantineStatus === 'released' ? 'success' : lot.quarantineStatus === 'rejected' ? 'danger' : 'warning'} />
                   </View>
                   {hasResults ? <Text style={styles.muted}>Inspection by {lot.inspectionRecordedByName || 'QC analyst'} · {(lot.inspectionResults || []).length} results · {failed ? 'Failure recorded' : 'No failures recorded'}</Text> : null}
                 </View>
