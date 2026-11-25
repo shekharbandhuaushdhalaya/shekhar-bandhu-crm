@@ -99,13 +99,14 @@ router.patch('/:id/approve', authorize('vendor:edit'), async (req, res) => {
     if (String(record.requestedByUserId) === String(user.id)) {
       return res.status(403).json({ error: 'Requester cannot approve their own requisition', code: 'REQUISITION_MAKER_CHECKER_REQUIRED' });
     }
-    record.status = 'approved';
-    record.approvedByUserId = user.id;
-    record.approvedByName = user.name;
-    record.approvedAt = new Date();
-    await record.save();
-    req.io?.emit('purchase_requisition_updated', { type: 'approved', id: record._id });
-    res.json(record);
+    const approved = await PurchaseRequisition.findOneAndUpdate(
+      { _id: record._id, status: 'pending_approval', requestedByUserId: { $ne: user.id } },
+      { $set: { status: 'approved', approvedByUserId: user.id, approvedByName: user.name, approvedAt: new Date() } },
+      { new: true, runValidators: true }
+    );
+    if (!approved) return res.status(409).json({ error: 'Requisition changed while approval was being prepared; reload and review it again', code: 'REQUISITION_APPROVAL_CONFLICT' });
+    req.io?.emit('purchase_requisition_updated', { type: 'approved', id: approved._id });
+    res.json(approved);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
@@ -121,14 +122,17 @@ router.patch('/:id/reject', authorize('vendor:edit'), async (req, res) => {
     if (String(record.requestedByUserId) === String(user.id)) {
       return res.status(403).json({ error: 'Requester cannot reject their own requisition', code: 'REQUISITION_MAKER_CHECKER_REQUIRED' });
     }
-    record.status = 'rejected';
-    record.rejectedByUserId = user.id;
-    record.rejectedByName = user.name;
-    record.rejectedAt = new Date();
-    record.rejectionReason = reason.slice(0, 1000);
-    await record.save();
-    req.io?.emit('purchase_requisition_updated', { type: 'rejected', id: record._id });
-    res.json(record);
+    const rejected = await PurchaseRequisition.findOneAndUpdate(
+      { _id: record._id, status: 'pending_approval', requestedByUserId: { $ne: user.id } },
+      { $set: {
+        status: 'rejected', rejectedByUserId: user.id, rejectedByName: user.name,
+        rejectedAt: new Date(), rejectionReason: reason.slice(0, 1000)
+      } },
+      { new: true, runValidators: true }
+    );
+    if (!rejected) return res.status(409).json({ error: 'Requisition changed while rejection was being prepared; reload and review it again', code: 'REQUISITION_REVIEW_CONFLICT' });
+    req.io?.emit('purchase_requisition_updated', { type: 'rejected', id: rejected._id });
+    res.json(rejected);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 

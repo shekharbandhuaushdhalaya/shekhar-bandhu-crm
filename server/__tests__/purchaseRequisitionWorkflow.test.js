@@ -58,21 +58,44 @@ describe('Purchase requisition maker-checker workflow', () => {
     expect(response.body.code).toBe('REQUISITION_MAKER_CHECKER_REQUIRED');
   });
 
-  test('allows independent approval and records reviewer identity', async () => {
-    const record = { _id: 'req-1', status: 'pending_approval', requestedByUserId: 'requester-1', save: jest.fn().mockResolvedValue(true) };
+  test('allows independent approval through a single-winner conditional update', async () => {
+    const record = { _id: 'req-1', status: 'pending_approval', requestedByUserId: 'requester-1' };
     PurchaseRequisition.findById.mockResolvedValue(record);
+    PurchaseRequisition.findOneAndUpdate.mockResolvedValue({
+      _id: 'req-1', status: 'approved', approvedByUserId: 'approver-2', approvedAt: new Date()
+    });
     const response = await request(app).patch('/api/purchase-requisitions/req-1/approve').set('x-user-id', 'approver-2').set('x-user-name', 'Approver').send({});
     expect(response.status).toBe(200);
-    expect(record.status).toBe('approved');
-    expect(record.approvedByUserId).toBe('approver-2');
-    expect(record.approvedAt).toBeInstanceOf(Date);
+    expect(response.body.status).toBe('approved');
+    expect(response.body.approvedByUserId).toBe('approver-2');
+    expect(PurchaseRequisition.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: 'req-1', status: 'pending_approval', requestedByUserId: { $ne: 'approver-2' } },
+      { $set: expect.objectContaining({ status: 'approved', approvedByUserId: 'approver-2' }) },
+      { new: true, runValidators: true }
+    );
   });
 
-  test('requires a reason and independent reviewer for rejection', async () => {
-    const record = { _id: 'req-1', status: 'pending_approval', requestedByUserId: 'requester-1', save: jest.fn() };
+  test('rejects a stale approval when another reviewer has already changed the requisition', async () => {
+    PurchaseRequisition.findById.mockResolvedValue({ _id: 'req-1', status: 'pending_approval', requestedByUserId: 'requester-1' });
+    PurchaseRequisition.findOneAndUpdate.mockResolvedValue(null);
+    const response = await request(app).patch('/api/purchase-requisitions/req-1/approve').set('x-user-id', 'approver-2').send({});
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('REQUISITION_APPROVAL_CONFLICT');
+  });
+
+  test('requires a reason before rejection', async () => {
+    const record = { _id: 'req-1', status: 'pending_approval', requestedByUserId: 'requester-1' };
     PurchaseRequisition.findById.mockResolvedValue(record);
     const response = await request(app).patch('/api/purchase-requisitions/req-1/reject').set('x-user-id', 'approver-2').send({});
     expect(response.status).toBe(400);
-    expect(record.save).not.toHaveBeenCalled();
+    expect(PurchaseRequisition.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  test('rejects a stale review when another reviewer wins the state transition', async () => {
+    PurchaseRequisition.findById.mockResolvedValue({ _id: 'req-1', status: 'pending_approval', requestedByUserId: 'requester-1' });
+    PurchaseRequisition.findOneAndUpdate.mockResolvedValue(null);
+    const response = await request(app).patch('/api/purchase-requisitions/req-1/reject').set('x-user-id', 'approver-2').send({ reason: 'Not required' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('REQUISITION_REVIEW_CONFLICT');
   });
 });
