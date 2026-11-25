@@ -31,7 +31,8 @@ describe('GST report preparation safeguards', () => {
     CreditNote.find.mockImplementation(query => {
       if (query.partyType === 'Customer') return queryResult([
         { type: 'credit_note', totalAmount: 118 },
-        { type: 'debit_note', baseAmount: 20, totalAmount: 23.6 }
+        { type: 'debit_note', baseAmount: 20, totalAmount: 23.6 },
+        { type: 'debit_note', baseAmount: -5, totalAmount: 0 }
       ]);
       return queryResult([
         { type: 'credit_note', baseAmount: 50, totalAmount: 59 },
@@ -51,8 +52,9 @@ describe('GST report preparation safeguards', () => {
       baseAmount: 0, baseAmountMissing: true, totalAmount: 118
     });
     expect(response.body.table9B_DebitNotes).toMatchObject({
-      baseAmount: 20, unquantifiedBaseAmountCount: 0
+      baseAmount: 20, unquantifiedBaseAmountCount: 1
     });
+    expect(response.body.table9B_DebitNotes.items[1]).toMatchObject({ baseAmount: 0, baseAmountMissing: true });
   });
 
 
