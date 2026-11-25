@@ -7,8 +7,22 @@ const dispensingItemSchema = new mongoose.Schema({
   materialName: { type: String, default: '' },
   lotNo: { type: String, required: true, trim: true },
   qtyDispensed: { type: Number, required: true, min: 0.0001 },
+  qtyWasted: { type: Number, default: 0, min: 0 },
+  wastageReason: { type: String, default: '', trim: true },
   unit: { type: String, required: true, trim: true }
 }, { _id: false });
+
+dispensingItemSchema.pre('validate', function(next) {
+  const wasted = Number(this.qtyWasted || 0);
+  const dispensed = Number(this.qtyDispensed || 0);
+  if (!Number.isFinite(wasted) || wasted < 0 || wasted > dispensed) {
+    return next(new Error('Recorded dispensing wastage must be non-negative and cannot exceed the weighed quantity'));
+  }
+  if (wasted > 0 && !String(this.wastageReason || '').trim()) {
+    return next(new Error('A documented reason is required for recorded dispensing wastage'));
+  }
+  return next();
+});
 
 const schema = new mongoose.Schema({
   dispensingNo: { type: String, required: true, unique: true },

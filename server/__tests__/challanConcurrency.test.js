@@ -11,6 +11,7 @@ const Customer = require('../models/Customer');
 const Order = require('../models/Order');
 const StockLedger = require('../models/StockLedger');
 const BatchProduction = require('../models/BatchProduction');
+const MaterialDispensing = require('../models/MaterialDispensing');
 const { postChallanInventory, completeProductionReceiptAndCreateTransfer } = require('../services/challanInventoryService');
 const { runWithTenant } = require('../utils/tenantContext');
 
@@ -307,5 +308,69 @@ describe('Challan concurrent posting', () => {
       expect(persistedBatch.status).toBe('completed');
       expect(String(persistedBatch.productionTransferChallanId)).toBe(String(first.challan._id));
     });
+  });
+ 
+  it('persists measured dispensing wastage and its reason in the GMP record', async () => {
+    const firm = await Firm.create({ name: 'Dispensing Wastage Persistence Firm', active: true });
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const product = await Product.create({ name: 'Dispensing Trace Product', sku: 'DSP-TRACE-001', stockLevel: 0 });
+      const batch = await BatchProduction.create({
+        batchNo: 'AY-DSP-TRACE-001',
+        productId: product._id,
+        manufacturingUnitId: new mongoose.Types.ObjectId(),
+        plannedQty: 10,
+        status: 'in_progress'
+      });
+      const record = await MaterialDispensing.create({
+        dispensingNo: 'DSP-TRACE-000001',
+        batchId: batch._id,
+        batchNo: batch.batchNo,
+        stageIndex: 0,
+        stageName: 'Mixing',
+        items: [{
+          rawMaterialId: new mongoose.Types.ObjectId(),
+          rawMaterialEntryId: new mongoose.Types.ObjectId(),
+          lotNo: 'HERB-LOT-TRACE-01',
+          qtyDispensed: 4,
+          qtyWasted: 1,
+          wastageReason: 'Documented spillage during weighing',
+          unit: 'kg'
+        }],
+        status: 'verified',
+        dispensedBy: new mongoose.Types.ObjectId(),
+        dispensedByName: 'Dispensing Operator',
+        dispensedAt: new Date(),
+        verifiedBy: new mongoose.Types.ObjectId(),
+        verifiedByName: 'Independent Reviewer',
+        verifiedAt: new Date()
+      });
+
+      const persisted = await MaterialDispensing.findById(record._id).lean();
+      expect(persisted.items[0].qtyDispensed).toBe(4);
+      expect(persisted.items[0].qtyWasted).toBe(1);
+      expect(persisted.items[0].wastageReason).toBe('Documented spillage during weighing');
+    });
+  });
+
+  it('rejects a dispensing record with unexplained wastage at model validation', async () => {
+    const record = new MaterialDispensing({
+      dispensingNo: 'DSP-TRACE-INVALID',
+      batchId: new mongoose.Types.ObjectId(),
+      batchNo: 'AY-DSP-TRACE-INVALID',
+      stageIndex: 0,
+      stageName: 'Mixing',
+      items: [{
+        rawMaterialId: new mongoose.Types.ObjectId(),
+        rawMaterialEntryId: new mongoose.Types.ObjectId(),
+        lotNo: 'HERB-LOT-INVALID',
+        qtyDispensed: 4,
+        qtyWasted: 1,
+        unit: 'kg'
+      }],
+      dispensedBy: new mongoose.Types.ObjectId(),
+      dispensedByName: 'Dispensing Operator',
+      dispensedAt: new Date()
+    });
+    await expect(record.validate()).rejects.toThrow('A documented reason is required for recorded dispensing wastage');
   });
 });
