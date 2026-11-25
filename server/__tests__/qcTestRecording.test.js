@@ -162,12 +162,13 @@ describe('Product-specific QC test recording and independent QA disposition', ()
   });
 
   test('records independent QA approval and leaves market release as a separate gate', async () => {
-    const batch = makeBatch({ qcStatus: 'pending_qa_review', qcSpecificationId: specId,
+    const batch = makeBatch({ qcStatus: 'pending_qa_review', qcSpecificationId: specId, qcSpecificationVersion: '2.1',
       qcPassedByUser: 'qc-analyst-1', qcTests: [
         { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
     BatchProduction.findById.mockResolvedValue(batch);
+    ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(spec) });
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval')
       .set('x-user-id', 'qa-reviewer-2').set('x-user-name', 'QA Reviewer')
       .send({ notes: 'Reviewed actual results against approved specification' });
