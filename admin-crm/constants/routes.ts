@@ -42,6 +42,7 @@ export const APP_ROUTES: RouteMetadata[] = [
   { path: '/rbac',              title: 'Access Control',             icon: 'shield-checkmark-outline', permission: 'rbac:view' },
   { path: '/audit',             title: 'System Audit Logs',          icon: 'clipboard-outline', permission: 'audit:view' },
   { path: '/manufacturing',     title: 'Manufacturing & BMR',        icon: 'analytics' },
+  { path: '/incoming-qc',       title: 'Incoming Material QC',      icon: 'flask-outline', permission: 'inventory:view' },
   { path: '/stockmovements',    title: 'Delivery Challans',          icon: 'cube-outline' },
   { path: '/campaigns',         title: 'Campaigns',                  icon: 'megaphone-outline' },
   { path: '/credit-notes',      title: 'Credit / Debit Notes',       icon: 'document-outline' },

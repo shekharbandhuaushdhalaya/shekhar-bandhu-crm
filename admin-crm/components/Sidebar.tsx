@@ -71,6 +71,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Inventories & Warehouses', route: 'inventories', icon: 'home-outline', activeIcon: 'home' },
       { label: 'Delivery Challans', route: 'stockmovements', icon: 'swap-horizontal-outline', activeIcon: 'swap-horizontal', permission: 'stockmovement:view' },
       { label: 'Manufacturing & BMR', route: 'manufacturing', icon: 'hammer-outline', activeIcon: 'hammer' },
+      { label: 'Incoming Material QC', route: 'incoming-qc', icon: 'flask-outline', activeIcon: 'flask', permission: 'inventory:view' },
       { label: 'Inventory Reconciliation', route: 'inventory-reconciliation', icon: 'git-compare-outline', activeIcon: 'git-compare', permission: 'inventory:view' },
       { label: 'GMP & Compliance', route: 'compliance', icon: 'shield-checkmark-outline', activeIcon: 'shield-checkmark', permission: 'quality:view' },
     ],

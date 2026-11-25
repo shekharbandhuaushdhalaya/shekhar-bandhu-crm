@@ -902,6 +902,32 @@ class ApiClient {
     return res.json();
   }
 
+  async getQuarantineLots(status?: string): Promise<any[]> {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : '';
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine${suffix}`);
+    return res.json();
+  }
+  async registerQuarantineLot(data: {
+    herbName: string; botanicalName?: string; batchNo: string; supplierName: string;
+    qty: number; unit: string; expiryDate: string; rawMaterialId: string; rawMaterialEntryId: string;
+  }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async recordIncomingInspection(id: string, inspectionResults: Array<{
+    testCode: string; testName: string; methodReference: string; specification: string;
+    result: string; unit?: string; outcome: 'pass' | 'fail'; evidenceRef?: string;
+  }>): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine/${id}/inspection`, { method: 'PATCH', body: JSON.stringify({ inspectionResults }) });
+    return res.json();
+  }
+  async disposeQuarantineLot(id: string, data: {
+    quarantineStatus: 'released' | 'rejected'; testReportNo: string; remarks: string;
+  }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine/${id}/release`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+
   async getGoodsReceivedNotes(params: { search?: string; status?: string; page?: number; limit?: number; poId?: string; vendorId?: string } = {}): Promise<{ items: any[]; page: number; limit: number; total: number; totalPages: number }> {
     const query = new URLSearchParams();
     if (params.search) query.set('search', params.search);
