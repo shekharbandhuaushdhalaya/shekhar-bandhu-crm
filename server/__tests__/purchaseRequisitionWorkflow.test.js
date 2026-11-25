@@ -3,6 +3,7 @@ const request = require('supertest');
 
 jest.mock('../models/PurchaseRequisition');
 jest.mock('../models/RolePermission');
+jest.mock('../utils/documentCounter', () => ({ generateAtomicDocumentNumber: jest.fn().mockResolvedValue('PR-00001') }));
 const PurchaseRequisition = require('../models/PurchaseRequisition');
 const RolePermission = require('../models/RolePermission');
 const router = require('../routes/procurement/purchaseRequisitions');
