@@ -71,7 +71,7 @@ describe('Credit/debit note finalization accounting safeguards', () => {
   });
 
   test('rejects a note without substantive reason evidence', async () => {
-    note.reason = 'Correction';
+    note.reason = 'Fix';
     const response = await request(app).patch('/api/credit-notes/note-1/finalize');
     expect(response.status).toBe(400);
     expect(response.body.code).toBe('NOTE_REASON_REQUIRED');
