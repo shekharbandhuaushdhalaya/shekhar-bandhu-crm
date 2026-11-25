@@ -10,7 +10,7 @@ const ProductQualitySpecification = require('../models/ProductQualitySpecificati
 const RolePermission = require('../models/RolePermission');
 const router = require('../routes/manufacturing/batchProductions');
 
-describe('Product-specific QC test recording', () => {
+describe('Product-specific QC test recording and independent QA disposition', () => {
   let app;
   const productId = 'product-qc-1';
   const specId = 'spec-qc-1';
@@ -72,7 +72,7 @@ describe('Product-specific QC test recording', () => {
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
     expect(res.status).toBe(200);
-    expect(batch.qcStatus).toBe('approved');
+    expect(batch.qcStatus).toBe('pending_qa_review');
     expect(batch.qcPassedByUser).toBe('qc-analyst-1');
     expect(res.body.mandatoryTestsPassed).toBe(true);
   });
@@ -120,4 +120,34 @@ describe('Product-specific QC test recording', () => {
     expect(res.status).toBe(400);
     expect(batch.save).not.toHaveBeenCalled();
   });
+
+  test('requires an independent QA reviewer to approve the completed analyst disposition', async () => {
+    const batch = makeBatch({ qcStatus: 'pending_qa_review', qcSpecificationId: specId,
+      qcPassedByUser: 'qc-analyst-1', qcTests: [
+        { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
+        { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
+      ] });
+    BatchProduction.findById.mockResolvedValue(batch);
+    const self = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval').send({ notes: 'Reviewed results' });
+    expect(self.status).toBe(409);
+    expect(batch.save).not.toHaveBeenCalled();
+  });
+
+  test('records independent QA approval and leaves market release as a separate gate', async () => {
+    const batch = makeBatch({ qcStatus: 'pending_qa_review', qcSpecificationId: specId,
+      qcPassedByUser: 'qc-analyst-1', qcTests: [
+        { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
+        { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
+      ] });
+    BatchProduction.findById.mockResolvedValue(batch);
+    const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval')
+      .set('x-user-id', 'qa-reviewer-2').set('x-user-name', 'QA Reviewer')
+      .send({ notes: 'Reviewed actual results against approved specification' });
+    expect(res.status).toBe(200);
+    expect(batch.qcStatus).toBe('approved');
+    expect(batch.qcApprovedByUser).toBe('qa-reviewer-2');
+    expect(batch.qcApprovedAt).toBeInstanceOf(Date);
+    expect(res.body.message).toMatch(/separate market release/i);
+  });
+
 });

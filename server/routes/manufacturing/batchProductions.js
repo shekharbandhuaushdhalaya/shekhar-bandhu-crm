@@ -1322,13 +1322,21 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
       batch.qcPassedBy = req.user.name;
       if (batch.status === 'completed') batch.status = 'qc_hold';
     } else if (mandatoryPassed) {
-      batch.qcStatus = 'approved';
+      batch.qcStatus = 'pending_qa_review';
       batch.qcPassedByUser = req.user.id;
       batch.qcPassedBy = req.user.name;
+      batch.qcApprovedByUser = null;
+      batch.qcApprovedByName = '';
+      batch.qcApprovedAt = null;
+      batch.qcApprovalNotes = '';
     } else {
       batch.qcStatus = 'pending';
       batch.qcPassedByUser = null;
       batch.qcPassedBy = '';
+      batch.qcApprovedByUser = null;
+      batch.qcApprovedByName = '';
+      batch.qcApprovedAt = null;
+      batch.qcApprovalNotes = '';
     }
     await batch.save();
     if (req.io) req.io.emit('mfg_batch_updated', batch);
@@ -1340,12 +1348,49 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
       mandatoryTestsPassed: mandatoryPassed,
       deviationRequired: failed,
       message: failed ? 'One or more recorded tests failed. Batch is on QC hold and requires deviation investigation.' :
-        (mandatoryPassed ? 'All mandatory tests are recorded as passed. Independent QA release is still required.' :
+        (mandatoryPassed ? 'All mandatory tests are recorded as passed. Independent QA disposition approval is now required.' :
           'QC results recorded. Remaining mandatory tests must be completed before QC approval.')
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    const reviewerId = req.user?.id || req.user?._id;
+    const reviewerName = req.user?.name || req.user?.email;
+    const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() : '';
+    if (!reviewerId || !reviewerName) return res.status(401).json({ error: 'Authenticated QA reviewer identity is required' });
+    if (!notes) return res.status(400).json({ error: 'QA disposition review notes are required' });
+    if (batch.qcStatus !== 'pending_qa_review') return res.status(409).json({ error: 'Only QC dispositions pending QA review can be approved' });
+    if (!batch.qcPassedByUser || String(batch.qcPassedByUser) === String(reviewerId)) {
+      return res.status(409).json({ error: 'QC analyst cannot independently approve their own test disposition' });
+    }
+    if (batch.status !== 'completed' || batch.releasedBy) return res.status(409).json({ error: 'Only completed, unreleased batches can receive QA disposition approval' });
+    const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
+    const spec = await ProductQualitySpecification.findById(batch.qcSpecificationId).lean();
+    if (!spec || spec.status !== 'approved') return res.status(409).json({ error: 'Effective approved product quality specification is required for QA disposition review' });
+    const results = new Map((batch.qcTests || []).map(test => [String(test.code || '').trim().toLowerCase(), test]));
+    const mandatory = (spec.tests || []).filter(test => test.mandatory !== false);
+    const allPassed = mandatory.length > 0 && mandatory.every(test => {
+      const result = results.get(String(test.code || '').trim().toLowerCase());
+      return result && result.status === 'pass' && (String(result.result || '').trim() || Number.isFinite(result.numericResult));
+    });
+    if (!allPassed || (batch.qcTests || []).some(test => test.status === 'fail')) {
+      return res.status(409).json({ error: 'All mandatory tests must have actual passing results and no recorded test may have failed' });
+    }
+    batch.qcStatus = 'approved';
+    batch.qcApprovedByUser = reviewerId;
+    batch.qcApprovedByName = reviewerName;
+    batch.qcApprovedAt = new Date();
+    batch.qcApprovalNotes = notes;
+    await batch.save();
+    req.io?.emit('mfg_batch_updated', batch);
+    return res.json({ batch, message: 'Independent QA disposition approved; separate market release approval is still required' });
+  } catch (err) { return res.status(400).json({ error: err.message }); }
 });
 
 router.patch('/:id/release', authorize('manufacturing:release'), async (req, res) => {
