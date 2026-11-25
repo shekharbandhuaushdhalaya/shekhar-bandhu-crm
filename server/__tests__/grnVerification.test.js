@@ -122,16 +122,34 @@ describe('GRN independent receipt and supplier-document verification', () => {
     expect(logAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'GRN_INDEPENDENT_VERIFICATION' }));
   });
 
-  test('requires a reason when rejecting a GRN', async () => {
-    const record = pendingGrn();
-    mockFind(record);
-    const response = await request(app)
+  test('requires substantive verification notes and rejection reasons', async () => {
+    const shortNotesRecord = pendingGrn();
+    mockFind(shortNotesRecord);
+    const shortNotes = await request(app)
       .patch('/api/purchase-orders/grn/grn-1/verify')
-      .send({ decision: 'rejected', verificationNotes: 'Mismatch observed' });
+      .send({ verificationNotes: 'Checked' });
+    expect(shortNotes.status).toBe(400);
+    expect(shortNotes.body.error).toMatch(/at least 10 characters/i);
+    expect(shortNotesRecord.save).not.toHaveBeenCalled();
 
-    expect(response.status).toBe(400);
-    expect(response.body.error).toMatch(/rejection reason/i);
-    expect(record.save).not.toHaveBeenCalled();
+    const shortReasonRecord = pendingGrn();
+    mockFind(shortReasonRecord);
+    const shortReason = await request(app)
+      .patch('/api/purchase-orders/grn/grn-1/verify')
+      .send({ decision: 'rejected', verificationNotes: 'Supplier batch mismatch reviewed', rejectionReason: 'Mismatch' });
+    expect(shortReason.status).toBe(400);
+    expect(shortReason.body.error).toMatch(/rejection reason/i);
+    expect(shortReasonRecord.save).not.toHaveBeenCalled();
+
+    const rejectedRecord = pendingGrn();
+    mockFind(rejectedRecord);
+    const rejected = await request(app)
+      .patch('/api/purchase-orders/grn/grn-1/verify')
+      .send({ decision: 'rejected', verificationNotes: 'Supplier batch mismatch reviewed', rejectionReason: 'Supplier batch number does not match the received material lot' });
+    expect(rejected.status).toBe(200);
+    expect(rejectedRecord.status).toBe('rejected');
+    expect(rejectedRecord.rejectionReason).toBe('Supplier batch number does not match the received material lot');
+    expect(rejectedRecord.save).toHaveBeenCalled();
   });
   test('lists GRNs with status, search and pagination filters', async () => {
     const rows = [{ _id: 'grn-2', grnNo: 'GRN-00002', status: 'pending_verification' }];
