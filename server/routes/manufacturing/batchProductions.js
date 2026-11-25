@@ -1169,13 +1169,17 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
         splitYieldTotal
       });
     }
-    const enteredWaste = wasteQty !== undefined
-      ? Number(wasteQty)
-      : Math.max(0, Number(batch.plannedQty || 0) - valYield);
+    // Yield variance is a performance measure, not proof that material was
+    // physically discarded. Use only explicitly recorded wastage (from this
+    // request or an earlier batch-stage record) for the waste register.
+    const enteredWaste = wasteQty !== undefined ? Number(wasteQty) : Number(batch.wasteQty || 0);
+    const enteredWasteReason = wasteReason !== undefined
+      ? String(wasteReason || '').trim()
+      : String(batch.wasteReason || '').trim();
     if (!Number.isFinite(enteredWaste) || enteredWaste < 0) {
       return res.status(400).json({ error: 'Waste quantity must be a finite, non-negative number', code: 'INVALID_WASTE_QUANTITY' });
     }
-    if (enteredWaste > 0 && !String(wasteReason || '').trim()) {
+    if (enteredWaste > 0 && !enteredWasteReason) {
       return res.status(400).json({ error: 'A documented reason is required when waste quantity is recorded', code: 'WASTE_REASON_REQUIRED' });
     }
 
@@ -1421,12 +1425,12 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     // atomically after all batch validation/cost/backfill work is complete.
     let challan = null;
 
-    const valWaste = wasteQty !== undefined ? Number(wasteQty) : Math.max(0, batch.plannedQty - valYield);
+    const valWaste = enteredWaste;
     const variancePct = batch.plannedQty > 0 ? Number((((valYield - batch.plannedQty) / batch.plannedQty) * 100).toFixed(2)) : 0;
 
     batch.actualYieldQty = valYield;
     batch.wasteQty = valWaste;
-    batch.wasteReason = wasteReason || '';
+    batch.wasteReason = valWaste > 0 ? enteredWasteReason : '';
     batch.variancePercent = variancePct;
     batch.unitProductionCost = valYield > 0 ? Number((totalCost / valYield).toFixed(2)) : 0;
 

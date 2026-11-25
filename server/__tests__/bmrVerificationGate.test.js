@@ -393,6 +393,58 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       expect(batch.save).not.toHaveBeenCalled();
     });
 
+    test('does not record ordinary yield variance as physical wastage', async () => {
+      const batch = {
+        _id: 'batch-yield-variance-not-waste',
+        status: 'in_progress',
+        productId: '121212121212121212121212',
+        batchNo: 'B-YIELD-01',
+        plannedQty: 100,
+        rawMaterialCost: 1000,
+        overheadCost: 0,
+        jobWorkCharges: 0,
+        stages: [{
+          name: 'Mixing', status: 'completed',
+          performedBy: 'operator-1', performedByName: 'Operator One',
+          verifiedBy: 'reviewer-1', verifiedAt: new Date(), isDualSigned: true,
+          operatorTrainingRecordId: 'training-1', equipmentId: 'equipment-1',
+          equipmentCalibrationStatus: 'valid'
+        }],
+        bomSnapshot: { ingredients: [] },
+        ingredientsConsumed: [],
+        packagingMode: 'packed_by_vendor',
+        packagingDeducted: false,
+        save: jest.fn()
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Product.find.mockResolvedValue([{ _id: batch.productId, name: 'Test Product', mrp: 10 }]);
+      Warehouse.findById.mockResolvedValue({ _id: '222222222222222222222222', name: 'Finished Goods' });
+      Warehouse.findOne.mockResolvedValue({ _id: '333333333333333333333333', name: 'Production House' });
+      const { completeProductionReceiptAndCreateTransfer } = require('../services/challanInventoryService');
+      completeProductionReceiptAndCreateTransfer.mockImplementation(async ({ batch: candidate }) => ({
+        batch: candidate,
+        challan: {
+          _id: 'challan-yield-variance',
+          challanNo: 'CH-YIELD-01',
+          status: 'draft',
+          challanType: 'production_transfer',
+          warehouseId: '333333333333333333333333',
+          warehouseName: 'Production House',
+          destinationWarehouseId: '222222222222222222222222',
+          destinationWarehouseName: 'Finished Goods'
+        }
+      }));
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-yield-variance-not-waste/complete')
+        .send({ actualYieldQty: 95, warehouseId: '222222222222222222222222' });
+
+      expect(res.status).toBe(200);
+      expect(batch.wasteQty).toBe(0);
+      expect(batch.wasteReason).toBe('');
+      expect(batch.variancePercent).toBe(-5);
+    });
+
     test('blocks skipped critical stages without a documented reason', async () => {
       const batch = {
         _id: 'batch-completion-gate-2',
