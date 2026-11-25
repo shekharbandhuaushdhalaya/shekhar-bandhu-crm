@@ -47,6 +47,11 @@ const dispatchSchema = new mongoose.Schema({
     longitude: { type: Number, default: null }
   },
   notes:        { type: String, default: '', trim: true },
+  createdByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  createdByName: { type: String, default: '' },
+  updatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  updatedByName: { type: String, default: '' },
+  updatedByAt: { type: Date, default: null },
 }, { timestamps: true });
 
 dispatchSchema.index({ createdAt: -1 });

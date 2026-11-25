@@ -24,6 +24,10 @@ async function nextDispatchNo() {
   return generateAtomicDocumentNumber('dispatchNo', 'DSP-', 5);
 }
 
+function escapeRegex(value) {
+  return String(value || '').slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function logisticsFields(body = {}) {
   const allowed = ['transporter','lrNo','vehicleNo','courierName','trackingId','trackingUrl','totalBoxes','totalWeight','freightCharge','status','notes','dispatchDate','proofOfDelivery'];
   return Object.fromEntries(allowed.filter(k => Object.prototype.hasOwnProperty.call(body, k)).map(k => [k, body[k]]));
@@ -57,14 +61,10 @@ router.get('/', authorize('dispatch:view'), async (req, res) => {
     const { status, search } = req.query;
     const filter = {};
     if (status && status !== 'all') filter.status = status;
-    if (search) filter.$or = [
-      { customerName: new RegExp(search, 'i') },
-      { dispatchNo: new RegExp(search, 'i') },
-      { invoiceNo: new RegExp(search, 'i') },
-      { challanNo: new RegExp(search, 'i') },
-      { lrNo: new RegExp(search, 'i') },
-      { trackingId: new RegExp(search, 'i') },
-    ];
+    if (search) { const safeSearch = new RegExp(escapeRegex(search), 'i'); filter.$or = [
+      { customerName: safeSearch }, { dispatchNo: safeSearch }, { invoiceNo: safeSearch },
+      { challanNo: safeSearch }, { lrNo: safeSearch }, { trackingId: safeSearch },
+    ]; }
     res.json(await Dispatch.find(filter).sort({ createdAt: -1 }).lean());
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
@@ -72,6 +72,9 @@ router.get('/', authorize('dispatch:view'), async (req, res) => {
 router.post('/', idempotency, authorize('dispatch:create'), validate(schemas.dispatchSchema), async (req, res) => {
   try {
     if (!req.body.challanId) return res.status(400).json({ error: 'challanId is required', code: 'CHALLAN_REQUIRED' });
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated dispatch operator identity is required' });
     const { challan, order, invoice } = await hydrateDispatchSource(req.body.challanId);
     const dispatchNo = await nextDispatchNo();
     const physicalItems = (challan.items || []).map(item => ({
@@ -95,6 +98,11 @@ router.post('/', idempotency, authorize('dispatch:create'), validate(schemas.dis
       items: physicalItems,
       totalBoxes,
       ...logisticsFields(req.body),
+      createdByUserId: actorId,
+      createdByName: actorName,
+      updatedByUserId: actorId,
+      updatedByName: actorName,
+      updatedByAt: new Date(),
     });
     await recomputeOrderLogisticsFromChallan(challan._id);
     if (req.io) req.io.emit('dispatch_updated', { type: 'created', id: dispatch._id });
@@ -109,6 +117,9 @@ router.patch('/:id', authorize('dispatch:edit'), validate(schemas.dispatchUpdate
   try {
     const dispatch = await Dispatch.findById(req.params.id);
     if (!dispatch) return res.status(404).json({ error: 'Dispatch not found' });
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated dispatch operator identity is required' });
     const immutable = ['challanId','challanNo','invoiceId','invoiceNo','customerName','customerPhone','shippingAddress','items'];
     if (immutable.some(k => Object.prototype.hasOwnProperty.call(req.body, k))) {
       return res.status(409).json({ error: 'Dispatch source/customer/items are immutable after creation', code: 'DISPATCH_SOURCE_IMMUTABLE' });
@@ -124,7 +135,7 @@ router.patch('/:id', authorize('dispatch:edit'), validate(schemas.dispatchUpdate
       if (['damaged', 'shortage', 'refused'].includes(pod.condition) && !String(pod.notes || '').trim()) return res.status(400).json({ error: 'Delivery exception notes are required', code: 'POD_EXCEPTION_NOTES_REQUIRED' });
     }
     if (dispatch.status === 'delivered' && req.body.proofOfDelivery) return res.status(409).json({ error: 'Proof of delivery is immutable after delivery is recorded', code: 'POD_IMMUTABLE' });
-    const update = logisticsFields(req.body);
+    const update = { ...logisticsFields(req.body), updatedByUserId: actorId, updatedByName: actorName, updatedByAt: new Date() };
     if (requestedStatus === 'delivered' && !dispatch.deliveredAt) update.deliveredAt = pod.receivedAt || new Date();
     const filter = { _id: dispatch._id, status: dispatch.status };
     if (dispatch.updatedAt) filter.updatedAt = dispatch.updatedAt;
