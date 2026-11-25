@@ -34,7 +34,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
     app = express();
     app.use(express.json());
     app.use((req, res, next) => {
-      req.user = { id: 'qc-analyst-1', name: 'QC Analyst', role: 'admin' };
+      req.user = { id: req.headers['x-user-id'] || 'qc-analyst-1', name: req.headers['x-user-name'] || 'QC Analyst', role: 'admin' };
       next();
     });
     app.use('/api/batch-productions', router);
