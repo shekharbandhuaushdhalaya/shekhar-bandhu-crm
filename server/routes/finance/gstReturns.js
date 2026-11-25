@@ -301,8 +301,10 @@ router.get('/filing-status', authorize('report:view'), async (req, res) => {
     }
     const GstFiling = require('../../models/GstFiling');
     const filing = await GstFiling.findOne({ period, returnType }).lean();
-    if (!filing) return res.json({ filed: false });
-    res.json({ filed: true, filing });
+    if (!filing) return res.json({ filed: false, evidenceRecorded: false, portalVerified: false });
+    // "filed" is retained for compatibility; evidenceRecorded is the authoritative
+    // CRM state. Portal verification is deliberately never inferred from ARN entry.
+    res.json({ filed: true, evidenceRecorded: true, portalVerified: false, filing });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -341,7 +343,7 @@ router.post('/filing-status', authorize('invoice:finalize'), async (req, res) =>
     if (req.io) {
       req.io.emit('gst_return_updated', { type: 'filing_saved', period, returnType });
     }
-    res.status(201).json({ filed: true, filing, portalVerified: false });
+    res.status(201).json({ filed: true, evidenceRecorded: true, filing, portalVerified: false });
   } catch (err) {
     if (err.code === 11000) {
       return res.status(409).json({ error: 'Filing evidence already exists for this return period and type. Use the formal correction process rather than overwriting it.', code: 'GST_FILING_ALREADY_RECORDED' });

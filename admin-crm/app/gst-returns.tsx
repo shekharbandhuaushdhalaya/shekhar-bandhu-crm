@@ -149,24 +149,29 @@ function GstReturnsPage() {
         {/* Filing status card */}
         <View style={{ backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.lg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: filingStatus?.filed ? colors.success + '15' : colors.warning + '15', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name={filingStatus?.filed ? "shield-checkmark" : "alert-circle"} size={20} color={filingStatus?.filed ? colors.success : colors.warning} />
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: filingStatus?.evidenceRecorded || filingStatus?.filed ? colors.warning + '15' : colors.border, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="alert-circle" size={20} color={colors.warning} />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>
-                Filing Status: {filingStatus?.filed ? 'FILED' : 'PENDING FILING'}
+                {filingStatus?.evidenceRecorded || filingStatus?.filed ? 'FILING EVIDENCE RECORDED' : 'NO FILING EVIDENCE RECORDED'}
               </Text>
-              {filingStatus?.filed ? (
-                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 1 }}>
-                  ARN: {filingStatus.filing.arn} | Date: {new Date(filingStatus.filing.filedDate).toLocaleDateString('en-IN')}
-                </Text>
+              {filingStatus?.evidenceRecorded || filingStatus?.filed ? (
+                <>
+                  <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 1 }}>
+                    ARN: {filingStatus.filing.arn} | Recorded: {new Date(filingStatus.filing.filedDate).toLocaleDateString('en-IN')} by {filingStatus.filing.filedBy}
+                  </Text>
+                  <Text style={{ ...Typography.caption, color: colors.warning, marginTop: 3, fontWeight: '700' }}>
+                    Not verified against the GST portal. Confirm filing independently on the portal.
+                  </Text>
+                </>
               ) : (
-                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 1 }}>Download the JSON utility and upload to the GST portal</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 1 }}>Record the ARN only after completing the external GST portal filing.</Text>
               )}
             </View>
           </View>
           
-          {filingStatus?.filed ? (
+          {filingStatus?.evidenceRecorded || filingStatus?.filed ? (
             filingStatus.filing.supportingDocuments?.length > 0 ? (
               <TouchableOpacity 
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary + '15', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}
@@ -216,7 +221,7 @@ function GstReturnsPage() {
             <TouchableOpacity onPress={() => setArnModalVisible(false)}>
               <Ionicons name="close" size={24} color={colors.text.primary} />
             </TouchableOpacity>
-            <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary }}>Record Return Filing ARN</Text>
+            <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary }}>Record GST Portal ARN Evidence</Text>
             <TouchableOpacity onPress={async () => {
               if (filingSaving) return;
               if (!arnInput.trim()) {
@@ -247,10 +252,14 @@ function GstReturnsPage() {
           </View>
 
           <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
+            <View style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.warning, backgroundColor: colors.warning + '10', marginBottom: 16 }}>
+              <Text style={{ ...Typography.bodySm, color: colors.text.primary, fontWeight: '700' }}>Evidence only — no portal submission or verification</Text>
+              <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 4 }}>Complete the return on the GST portal first. Then record the ARN and attach the portal acknowledgement. This CRM stores the operator's evidence and cannot confirm that the portal accepted the return.</Text>
+            </View>
             <Text style={{ ...Typography.caption, color: colors.text.muted, fontWeight: '800', marginBottom: 4 }}>Period</Text>
             <Text style={{ ...Typography.h3, fontWeight: '700', color: colors.text.primary, marginBottom: 14 }}>{months[month - 1]} {year} - {view.toUpperCase()}</Text>
 
-            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>Government ARN *</Text>
+            <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 4 }}>Portal ARN (as shown on GST portal) *</Text>
             <TextInput 
               style={{ ...Typography.bodySm, backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.text.primary, marginBottom: 16 }}
               placeholder="e.g. AA090726123456F"
@@ -297,7 +306,7 @@ function GstReturnsPage() {
                   }
                 }}
               >
-                <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>+ Upload Government PDF Receipt</Text>
+                <Text style={{ ...Typography.bodySm, color: colors.primary, fontWeight: '700' }}>+ Attach Portal Acknowledgement</Text>
               </TouchableOpacity>
             )}
           </ScrollView>

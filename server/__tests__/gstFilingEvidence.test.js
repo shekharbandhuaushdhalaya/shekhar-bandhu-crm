@@ -78,6 +78,24 @@ describe('GST filing evidence controls', () => {
     expect(response.body.code).toBe('GST_FILING_ALREADY_RECORDED');
   });
 
+  test('reports saved filing as operator evidence, never portal-verified', async () => {
+    const filing = { _id: 'filing-1', arn: 'AA091026123456X', filedBy: 'Finance Controller' };
+    GstFiling.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(filing) });
+    const response = await request(app).get('/api/gst/filing-status?period=2026-10&returnType=gstr1');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      filed: true, evidenceRecorded: true, portalVerified: false, filing
+    });
+    expect(GstFiling.findOne).toHaveBeenCalledWith({ period: '2026-10', returnType: 'gstr1' });
+  });
+
+  test('reports missing filing evidence without implying portal status', async () => {
+    GstFiling.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    const response = await request(app).get('/api/gst/filing-status?period=2026-10&returnType=gstr1');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ filed: false, evidenceRecorded: false, portalVerified: false });
+  });
+
   test('validates lookup parameters before querying', async () => {
     const response = await request(app).get('/api/gst/filing-status?period=2026-00&returnType=gstr1');
     expect(response.status).toBe(400);
