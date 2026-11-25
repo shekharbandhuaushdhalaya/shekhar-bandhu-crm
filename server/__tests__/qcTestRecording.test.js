@@ -4,6 +4,10 @@ const request = require('supertest');
 jest.mock('../models/BatchProduction');
 jest.mock('../models/ProductQualitySpecification');
 jest.mock('../models/RolePermission');
+jest.mock('../models/DeviationCapa');
+jest.mock('../utils/documentCounter', () => ({
+  generateAtomicDocumentNumber: jest.fn().mockResolvedValue('DEV-00001')
+}));
 jest.mock('../utils/withTransaction', () => ({
   withTransaction: jest.fn(async work => work({}))
 }));
@@ -12,6 +16,8 @@ jest.mock('../utils/withTransaction', () => ({
 const BatchProduction = require('../models/BatchProduction');
 const ProductQualitySpecification = require('../models/ProductQualitySpecification');
 const RolePermission = require('../models/RolePermission');
+const DeviationCapa = require('../models/DeviationCapa');
+const { generateAtomicDocumentNumber } = require('../utils/documentCounter');
 const router = require('../routes/manufacturing/batchProductions');
 
 describe('Product-specific QC test recording and independent QA disposition', () => {
@@ -55,6 +61,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
     jest.clearAllMocks();
     RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
     mockSpec(spec);
+    DeviationCapa.create.mockResolvedValue([{ _id: 'deviation-1', deviationNo: 'DEV-00001', sourceTestCode: 'IDENTITY' }]);
   });
 
   test('records only actual values and derives pending status until every mandatory test passes', async () => {
@@ -98,6 +105,18 @@ describe('Product-specific QC test recording and independent QA disposition', ()
     expect(batch.qcStatus).toBe('rejected');
     expect(batch.status).toBe('qc_hold');
     expect(res.body.deviationRequired).toBe(true);
+    expect(res.body.deviations).toEqual([{ id: 'deviation-1', deviationNo: 'DEV-00001', sourceTestCode: 'IDENTITY' }]);
+    expect(batch.qcTests[0].deviationCapaId).toBe('deviation-1');
+    expect(DeviationCapa.create).toHaveBeenCalledWith([expect.objectContaining({
+      deviationType: 'qc_failure',
+      batchNo: batch.batchNo,
+      sourceTestCode: 'IDENTITY',
+      sourceSpecificationVersion: '2.1',
+      reportedBy: 'QC Analyst',
+      reportedByUser: 'qc-analyst-1',
+      status: 'open'
+    })], { session: expect.any(Object) });
+    expect(generateAtomicDocumentNumber).toHaveBeenCalledWith('deviationNo_DEV', 'DEV-', 5, expect.any(Object));
   });
 
   test('rejects a QC result submission when the batch changes after the analyst read it', async () => {

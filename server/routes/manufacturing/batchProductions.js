@@ -1576,11 +1576,38 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
       const mandatoryPassed = mandatory.length > 0 && mandatory.every(test =>
         String((allResults.get(String(test.code || '').trim().toLowerCase()) || {}).status || '').toLowerCase() === 'pass'
       );
+      const createdDeviations = [];
       if (failed) {
+        const DeviationCapa = require('../../models/DeviationCapa');
         current.qcStatus = 'rejected';
         current.qcPassedByUser = req.user.id;
         current.qcPassedBy = req.user.name;
         current.status = 'qc_hold';
+        for (let index = 0; index < normalized.length; index += 1) {
+          const failedTest = normalized[index];
+          if (String(failedTest.status || '').toLowerCase() !== 'fail') continue;
+          const qcTestRecord = current.qcTests[current.qcTests.length - normalized.length + index];
+          const deviationNo = await generateAtomicDocumentNumber('deviationNo_DEV', 'DEV-', 5, session);
+          const resultText = failedTest.result || String(failedTest.numericResult);
+          const [deviation] = await DeviationCapa.create([{
+            deviationNo,
+            batchId: current._id,
+            batchNo: current.batchNo,
+            deviationType: 'qc_failure',
+            description: 'Finished-product QC test ' + failedTest.code + ' failed against approved specification ' +
+              (currentSpec.specificationVersion || '') + '. Recorded result: ' + resultText +
+              (failedTest.unit ? ' ' + failedTest.unit : '') + '. Specification: ' + (failedTest.specification || ''),
+            reportedBy: req.user.name,
+            reportedByUser: req.user.id,
+            sourceTestCode: failedTest.code,
+            sourceQcTestId: qcTestRecord && qcTestRecord._id ? qcTestRecord._id : null,
+            sourceSpecificationId: currentSpec._id,
+            sourceSpecificationVersion: currentSpec.specificationVersion || '',
+            status: 'open'
+          }], { session });
+          if (deviation && qcTestRecord) qcTestRecord.deviationCapaId = deviation._id;
+          if (deviation) createdDeviations.push(deviation);
+        }
       } else if (mandatoryPassed) {
         current.qcStatus = 'pending_qa_review';
         current.qcPassedByUser = req.user.id;
@@ -1599,7 +1626,7 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
         current.qcApprovalNotes = '';
       }
       await current.save({ session });
-      return { batch: current, mandatoryTests: mandatory.length, mandatoryPassed, failed };
+      return { batch: current, mandatoryTests: mandatory.length, mandatoryPassed, failed, createdDeviations };
     });
     if (req.io) req.io.emit('mfg_batch_updated', outcome.batch);
     res.json({
@@ -1609,6 +1636,11 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
       recordedTests: outcome.batch.qcTests.length,
       mandatoryTestsPassed: outcome.mandatoryPassed,
       deviationRequired: outcome.failed,
+      deviations: (outcome.createdDeviations || []).map(deviation => ({
+        id: deviation._id,
+        deviationNo: deviation.deviationNo,
+        sourceTestCode: deviation.sourceTestCode
+      })),
       message: outcome.failed ? 'One or more recorded tests failed. Batch is on QC hold and requires deviation investigation.' :
         (outcome.mandatoryPassed ? 'All mandatory tests are recorded as passed. Independent QA disposition approval is now required.' :
           'QC results recorded. Remaining mandatory tests must be completed before QC approval.')
