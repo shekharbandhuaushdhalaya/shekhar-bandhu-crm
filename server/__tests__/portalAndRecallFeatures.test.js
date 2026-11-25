@@ -312,6 +312,42 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
       expect(recall.save).not.toHaveBeenCalled();
     });
 
+    test('prevents the recall initiator from independently closing a fully reconciled recall', async () => {
+      const recall = {
+        _id: 'recall_maker_checker', updatedAt: new Date('2026-11-25T10:00:00Z'),
+        initiatedByUserId: '507f1f77bcf86cd799439011', status: 'in_progress',
+        totalAffectedQty: 100, recalledQty: 100,
+        closureNotes: 'All affected stock accounted for and reviewed',
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: true }]
+      };
+      Recall.findById.mockResolvedValue(recall);
+      const response = await request(app).patch('/api/recalls/recall_maker_checker/status').send({
+        status: 'completed', recalledQty: 100,
+        closureNotes: 'All affected stock accounted for and reviewed'
+      });
+      expect(response.status).toBe(403);
+      expect(response.body.code).toBe('RECALL_MAKER_CHECKER_REQUIRED');
+      expect(Recall.findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
+    test('returns a conflict when recall closure evidence changes concurrently', async () => {
+      const recall = {
+        _id: 'recall_stale_close', updatedAt: new Date('2026-11-25T10:00:00Z'),
+        initiatedByUserId: '507f191e810c19729de860ea', status: 'in_progress',
+        totalAffectedQty: 100, recalledQty: 100,
+        closureNotes: 'All affected stock accounted for and reviewed',
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: true }]
+      };
+      Recall.findById.mockResolvedValue(recall);
+      Recall.findOneAndUpdate.mockResolvedValue(null);
+      const response = await request(app).patch('/api/recalls/recall_stale_close/status').send({
+        status: 'completed', recalledQty: 100,
+        closureNotes: 'All affected stock accounted for and reviewed'
+      });
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe('RECALL_UPDATE_CONFLICT');
+    });
+
     test('rejects recalled quantities above the traced distributed quantity', async () => {
       const recall = {
         _id: 'recall_qty', updatedAt: new Date('2026-11-25T10:00:00Z'), status: 'in_progress', totalAffectedQty: 100,
