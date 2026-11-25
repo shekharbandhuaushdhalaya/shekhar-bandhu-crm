@@ -982,8 +982,8 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       jobWorkCharges
     } = req.body;
 
-    if (actualYieldQty === undefined || !qcPassedBy) {
-      return res.status(400).json({ error: 'Actual yield quantity and QC inspector name are required' });
+    if (actualYieldQty === undefined) {
+      return res.status(400).json({ error: 'Actual yield quantity is required' });
     }
 
     const valYield = Number(actualYieldQty);
@@ -1081,15 +1081,12 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     if (!['pending', 'approved', 'rejected'].includes(qcDisposition)) {
       return res.status(400).json({ error: 'QC disposition must be pending, approved, or rejected' });
     }
-    if (qcDisposition === 'approved') {
+    if (qcDisposition !== 'pending') {
       return res.status(409).json({
-        error: 'QC approval must follow recorded, specification-linked test results and independent QA review',
-        code: 'SPECIFICATION_QC_APPROVAL_REQUIRED',
-        nextStep: 'Record actual results through the qc-tests endpoint, then obtain independent approval through qc-approval'
+        error: 'Batch completion cannot approve or reject QC using legacy disposition fields; record actual specification-linked test results through the QC workflow',
+        code: 'SPECIFICATION_QC_DISPOSITION_REQUIRED',
+        nextStep: 'Record actual results through qc-tests; failed results place the batch on QC hold, while passing mandatory results require independent QA review'
       });
-    }
-    if (qcDisposition !== 'pending' && (!req.user || !req.user.id || !req.user.name)) {
-      return res.status(401).json({ error: 'Authenticated QC analyst identity is required for a QC disposition' });
     }
 
     const warehouse = await Warehouse.findById(warehouseId);
@@ -1134,91 +1131,7 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     const plannedQtyVal = batch.plannedQty || 1;
     const varianceVal = Number((((valYield - plannedQtyVal) / plannedQtyVal) * 100).toFixed(2));
 
-    if (qcStatus === 'approved') {
-      const SystemSettings = require('../../models/SystemSettings');
-      const settings = await SystemSettings.findOne().lean();
-      const tolerance = settings ? (settings.yieldVarianceTolerancePercent || 5) : 5;
-
-      const varianceExceeded = Math.abs(varianceVal) > tolerance;
-
-      let qcLimitBreached = false;
-      if (moistureContent !== null && moistureContent !== undefined && req.body.moistureLimit) {
-        const match = req.body.moistureLimit.match(/NMT\s*(\d+(?:\.\d+)?)/i);
-        if (match && moistureContent > parseFloat(match[1])) qcLimitBreached = true;
-      }
-
-      if (varianceExceeded || qcLimitBreached) {
-        const hasValidDeviation = batch.deviations && batch.deviations.some(d => d.rootCause && d.correctiveAction);
-        if (!hasValidDeviation) {
-          return res.status(400).json({
-            error: `Out-of-tolerance result (Variance: ${varianceVal}%, Tolerance: ±${tolerance}%) requires a populated deviation record (root cause & corrective action) before approval.`
-          });
-        }
-      }
-
-      // Label reconciliation check for printed BOM ingredients
-      if (batch.bomSnapshot && batch.bomSnapshot.ingredients) {
-        const printedIngs = batch.bomSnapshot.ingredients.filter(i => i.isPrintedMaterial);
-        if (printedIngs.length > 0) {
-          for (const ing of printedIngs) {
-            const rec = (batch.labelReconciliation || []).find(r => r.rawMaterialId.toString() === ing.rawMaterialId.toString());
-            if (!rec) {
-              return res.status(400).json({ error: `Label & printed packaging reconciliation required for material ID ${ing.rawMaterialId}` });
-            }
-            const validSum = Math.abs(rec.qtyIssued - (rec.qtyUsed + rec.qtyDamaged + rec.qtyReturnedToStore)) <= 0.01;
-            if (!validSum && !rec.discrepancyNote) {
-              return res.status(400).json({ error: `Discrepancy in label reconciliation for "${rec.name}": Issued ${rec.qtyIssued} vs Sum ${rec.qtyUsed + rec.qtyDamaged + rec.qtyReturnedToStore}. Provide a discrepancy note.` });
-            }
-          }
-        }
-      }
-
-      // Retention sample check
-      const RetentionSample = require('../../models/RetentionSample');
-      const sampleCount = await RetentionSample.countDocuments({ batchId: batch._id });
-      if (sampleCount === 0) {
-        return res.status(400).json({ error: 'At least one reference/retention sample record is required before batch QC approval' });
-      }
-    }
-
     const totalCost = batch.rawMaterialCost + (batch.overheadCost || 0) + batch.jobWorkCharges;
-
-    if (qcStatus === 'rejected') {
-      // Rejection logic: No stock added, full planned quantity is waste
-      batch.actualYieldQty = 0;
-      batch.wasteQty = batch.plannedQty;
-      batch.wasteReason = wasteReason || 'Failed Quality Control (QC) specifications';
-      batch.variancePercent = -100;
-      batch.unitProductionCost = 0;
-      batch.qcNotes = `${qcNotes ? qcNotes.trim() + '\n\n' : ''}BATCH REJECTED by QC Inspector: ${qcPassedBy.trim()}. QC Parameters failed specifications.`;
-      batch.qcPassedBy = qcPassedBy.trim();
-      batch.status = 'rejected';
-      batch.endDate = new Date();
-
-      const qcStage = batch.stages.find(s => s.name.toLowerCase().includes('qc'));
-      if (qcStage && qcStage.status !== 'completed') {
-        qcStage.status = 'completed';
-        qcStage.completedAt = new Date();
-        qcStage.completedBy = qcPassedBy.trim();
-        qcStage.notes = 'QC Failed - Batch Rejected';
-      }
-      const packagingStage = batch.stages.find(s => s.name.toLowerCase().includes('packaging') || s.name.toLowerCase().includes('label'));
-      if (packagingStage && packagingStage.status !== 'completed') {
-        packagingStage.status = 'skipped';
-        packagingStage.completedAt = new Date();
-        packagingStage.completedBy = qcPassedBy.trim();
-        packagingStage.notes = 'Skipped due to QC failure';
-      }
-
-      await batch.save();
-      if (req.io) {
-        req.io.emit('mfg_batch_completed', batch);
-        req.io.emit('inventory_updated', { type: 'batch_rejected', batchNo: batch.batchNo });
-      }
-      return res.json(batch);
-    }
-
-
 
     // Persist actual yields on batch document
     batch.yields = yieldsList.map(y => ({
@@ -1331,7 +1244,6 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
 
     const splitSummary = createdEntries.map(e => `${e.name} (${e.size}): ${e.qty} units (${e.boxes} boxes @ ₹${e.unitCost}/unit)`).join('\n');
     batch.qcNotes = `${qcNotes ? qcNotes.trim() + '\n\n' : ''}Packaging Split Inward:\n${splitSummary}`;
-    batch.qcPassedBy = qcPassedBy.trim();
     batch.status = 'completed';
     batch.endDate = now;
     batch.mfgDate = now;
@@ -1401,6 +1313,9 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
     }
     if (batch.status === 'cancelled' || batch.status === 'rejected' || batch.releasedBy) {
       return res.status(409).json({ error: 'QC test results cannot be added to cancelled, rejected or released batches' });
+    }
+    if (batch.status !== 'completed') {
+      return res.status(409).json({ error: 'Specification-linked finished-product QC testing is available only after batch completion', code: 'BATCH_COMPLETION_REQUIRED' });
     }
     const tests = req.body.tests;
     if (!Array.isArray(tests) || tests.length === 0) {

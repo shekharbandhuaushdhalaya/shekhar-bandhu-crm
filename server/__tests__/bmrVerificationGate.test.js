@@ -296,6 +296,23 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
   });
 
   describe('specification-driven QC approval gate', () => {
+    test('does not accept finished-product QC results before batch completion', async () => {
+      BatchProduction.findById.mockResolvedValue({
+        _id: 'batch-qc-before-completion',
+        status: 'in_progress',
+        releasedBy: null,
+        save: jest.fn()
+      });
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-qc-before-completion/qc-tests')
+        .send({ tests: [{ code: 'IDENTITY', result: 'Conforms', status: 'pass' }] });
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('BATCH_COMPLETION_REQUIRED');
+      expect(ProductQualitySpecification.findById).not.toHaveBeenCalled();
+    });
+
     test('does not allow the completion request to self-approve QC using legacy fields', async () => {
       const batch = {
         _id: 'batch-qc-bypass-1',
@@ -321,6 +338,35 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
 
       expect(res.status).toBe(409);
       expect(res.body.code).toBe('SPECIFICATION_QC_APPROVAL_REQUIRED');
+      expect(Warehouse.findById).not.toHaveBeenCalled();
+      expect(batch.packagingDeducted).toBe(false);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('does not allow the completion request to reject QC without recorded specification test failures', async () => {
+      const batch = {
+        _id: 'batch-qc-reject-bypass-1',
+        status: 'in_progress',
+        productId: '555555555555555555555555',
+        plannedQty: 100,
+        stages: [],
+        packagingMode: 'self_packed',
+        packagingDeducted: false,
+        save: jest.fn()
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Product.find.mockResolvedValue([{ _id: '555555555555555555555555', name: 'Test Product', mrp: 10 }]);
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-qc-reject-bypass-1/complete')
+        .send({
+          actualYieldQty: 100,
+          qcStatus: 'rejected',
+          warehouseId: '222222222222222222222222'
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('SPECIFICATION_QC_DISPOSITION_REQUIRED');
       expect(Warehouse.findById).not.toHaveBeenCalled();
       expect(batch.packagingDeducted).toBe(false);
       expect(batch.save).not.toHaveBeenCalled();
