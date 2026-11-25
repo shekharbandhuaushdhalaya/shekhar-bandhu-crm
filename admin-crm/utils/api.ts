@@ -1208,8 +1208,8 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/payments`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey || createMutationKey('payment') }, body: JSON.stringify(data) });
     return res.json();
   }
-  async deletePayment(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/payments/${id}`, { method: 'DELETE' });
+  async deletePayment(id: string, reason = ''): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/payments/${id}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
     return res.ok;
   }
 

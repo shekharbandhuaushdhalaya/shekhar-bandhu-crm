@@ -12,6 +12,10 @@ const { getInvoiceAgeMetrics } = require('../../services/invoiceAgingService');
 
 const router = express.Router();
 
+function escapeRegex(value) {
+  return String(value || '').slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // GET /api/payments — List payments with optional filters
 router.get('/', authorize('payment:view'), async (req, res) => {
   try {
@@ -20,8 +24,8 @@ router.get('/', authorize('payment:view'), async (req, res) => {
 
     if (search) {
       filter.$or = [
-        { partyName: { $regex: search, $options: 'i' } },
-        { referenceNo: { $regex: search, $options: 'i' } }
+        { partyName: { $regex: escapeRegex(search), $options: 'i' } },
+        { referenceNo: { $regex: escapeRegex(search), $options: 'i' } }
       ];
     }
     if (type && type !== 'all') filter.type = type;
@@ -32,7 +36,7 @@ router.get('/', authorize('payment:view'), async (req, res) => {
       if (mongoose.Types.ObjectId.isValid(partyId)) {
         filter.partyId = partyId;
       } else {
-        filter.partyName = { $regex: partyId, $options: 'i' };
+        filter.partyName = { $regex: escapeRegex(partyId), $options: 'i' };
       }
     }
 
@@ -60,7 +64,13 @@ router.post('/', idempotency, authorize('payment:create'), validate(schemas.paym
     if (mode === 'cash' && (!req.user || !req.user.canAccessCash)) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to perform cash transactions.' });
     }
-    const { payment } = await createPaymentAndAllocate({ paymentData: req.body, allocations });
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated payment creator identity is required' });
+    const { payment } = await createPaymentAndAllocate({
+      paymentData: { ...req.body, createdByUserId: actorId, createdByName: actorName },
+      allocations
+    });
     if (req.io) {
       req.io.emit('payment_updated', { type: 'created', id: payment._id });
       if (payment.allocations?.length) req.io.emit('invoice_updated', { type: 'payment_allocated', paymentId: payment._id });
@@ -78,7 +88,7 @@ router.post('/', idempotency, authorize('payment:create'), validate(schemas.paym
   }
 });
 
-// DELETE /api/payments/:id — controlled payment reversal
+// DELETE /api/payments/:id — controlled, reasoned, maker-checker payment reversal
 router.delete('/:id', authorize('payment:create'), async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
@@ -86,16 +96,22 @@ router.delete('/:id', authorize('payment:create'), async (req, res) => {
     if (payment.mode === 'cash' && (!req.user || !req.user.canAccessCash)) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to reverse cash transactions.' });
     }
-    const reversed = await reversePayment(req.params.id, req.user?.id || null);
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    const reason = String(req.body?.reason || '').trim();
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated payment reversal identity is required' });
+    if (reason.length < 10) return res.status(400).json({ error: 'A substantive payment reversal reason of at least 10 characters is required', code: 'PAYMENT_REVERSAL_REASON_REQUIRED' });
+    const reversed = await reversePayment(req.params.id, { id: actorId, name: actorName }, reason);
     if (req.io) {
       req.io.emit('payment_updated', { id: req.params.id, type: 'reversed' });
       if (reversed.allocations?.length) req.io.emit('invoice_updated', { type: 'payment_reversed', paymentId: req.params.id });
     }
     const { logAction } = require('../../utils/auditLogger');
-    await logAction({ action: 'REVERSE_PAYMENT', description: `Reversed payment ${req.params.id}`, details: { id: req.params.id }, req });
+    await logAction({ action: 'REVERSE_PAYMENT', description: `Reversed payment ${req.params.id}: ${reason}`, details: { id: req.params.id, reason }, req });
     res.json({ message: 'Payment reversed and balances restored' });
   } catch (err) {
-    res.status(err.code === 'PAYMENT_NOT_FOUND' ? 404 : 400).json({ error: err.message, code: err.code || 'PAYMENT_REVERSAL_FAILED' });
+    const status = err.code === 'PAYMENT_NOT_FOUND' ? 404 : err.code === 'PAYMENT_REVERSAL_MAKER_CHECKER_REQUIRED' ? 403 : 400;
+    res.status(status).json({ error: err.message, code: err.code || 'PAYMENT_REVERSAL_FAILED' });
   }
 });
 
