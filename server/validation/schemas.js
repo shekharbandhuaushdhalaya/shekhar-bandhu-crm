@@ -878,7 +878,36 @@ const grnSchema = z.object({
   poId: objectId,
   warehouseId: objectId,
   items: z.array(grnItemInputSchema).min(1, 'At least one GRN item required'),
-  notes: z.string().optional().default('')
+  notes: z.string().optional().default(''),
+  gateEntryNo: z.string().trim().max(80).optional().default(''),
+  vehicleNo: z.string().trim().max(40).optional().default(''),
+  driverName: z.string().trim().max(120).optional().default(''),
+  transporterName: z.string().trim().max(160).optional().default(''),
+  eWayBillNo: z.string().trim().max(80).optional().default(''),
+  gateInAt: z.string().or(z.date()).optional(),
+  grossWeight: z.number().nonnegative().optional(),
+  tareWeight: z.number().nonnegative().optional(),
+  netWeight: z.number().nonnegative().optional(),
+  weightUnit: z.enum(['kg', 'g', 'mt']).optional().default('kg'),
+  weighmentSlipRef: z.string().trim().max(500).optional().default('')
+}).superRefine((value, ctx) => {
+  const weights = [value.grossWeight, value.tareWeight, value.netWeight];
+  const hasAnyWeight = weights.some(weight => weight !== undefined);
+  if (hasAnyWeight && weights.some(weight => weight === undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['grossWeight'], message: 'Gross, tare and net weights must be supplied together' });
+    return;
+  }
+  if (hasAnyWeight) {
+    if (value.grossWeight < value.tareWeight) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['grossWeight'], message: 'Gross weight cannot be less than tare weight' });
+    }
+    if (Math.abs((value.grossWeight - value.tareWeight) - value.netWeight) > 0.001) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['netWeight'], message: 'Net weight must equal gross weight minus tare weight' });
+    }
+    if (!value.weighmentSlipRef.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['weighmentSlipRef'], message: 'Weighment slip reference is required when weights are recorded' });
+    }
+  }
 });
 
 // ── Manufacturing Structural & GMP Compliance Schemas ─────────

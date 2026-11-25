@@ -10,6 +10,7 @@ const GoodsReceivedNote = require('../models/GoodsReceivedNote');
 const RolePermission = require('../models/RolePermission');
 const { logAction } = require('../utils/auditLogger');
 const router = require('../routes/procurement/purchaseOrders');
+const schemas = require('../validation/schemas');
 
 describe('GRN independent receipt and supplier-document verification', () => {
   let app;
@@ -45,6 +46,25 @@ describe('GRN independent receipt and supplier-document verification', () => {
 
   const mockFind = record => GoodsReceivedNote.findById.mockReturnValue({
     session: jest.fn().mockResolvedValue(record)
+  });
+
+  test('validates gate-entry and internally consistent weighment data', () => {
+    const base = {
+      poId: '507f1f77bcf86cd799439011',
+      warehouseId: '507f1f77bcf86cd799439012',
+      items: [{ rawMaterialId: '507f191e810c19729de860ea', name: 'Ashwagandha', qtyReceived: 10, qtyAccepted: 10, qtyRejected: 0, batchNo: 'SUP-1' }],
+      gateEntryNo: 'GATE-2026-001',
+      vehicleNo: 'UP65AB1234',
+      grossWeight: 1250,
+      tareWeight: 250,
+      netWeight: 1000,
+      weightUnit: 'kg',
+      weighmentSlipRef: 'WEIGH-SLIP-001'
+    };
+    expect(schemas.grnSchema.safeParse(base).success).toBe(true);
+    expect(schemas.grnSchema.safeParse({ ...base, netWeight: 999 }).success).toBe(false);
+    expect(schemas.grnSchema.safeParse({ ...base, tareWeight: undefined }).success).toBe(false);
+    expect(schemas.grnSchema.safeParse({ ...base, weighmentSlipRef: '' }).success).toBe(false);
   });
 
   test('does not allow the receipt operator to verify their own GRN', async () => {

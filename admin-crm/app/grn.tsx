@@ -17,6 +17,17 @@ type Grn = {
   poId?: string;
   vendorName?: string;
   receivedDate?: string;
+  gateEntryNo?: string;
+  vehicleNo?: string;
+  driverName?: string;
+  transporterName?: string;
+  eWayBillNo?: string;
+  gateInAt?: string;
+  grossWeight?: number | null;
+  tareWeight?: number | null;
+  netWeight?: number | null;
+  weightUnit?: string;
+  weighmentSlipRef?: string;
   status: 'draft' | 'pending_verification' | 'verified' | 'rejected';
   receivedByUserId?: string;
   receivedByName?: string;
@@ -182,6 +193,12 @@ export default function GoodsReceivedNotesScreen() {
               <Text style={styles.detailLine}>Purchase order: {selected.poNo || selected.poId || '—'}</Text>
               <Text style={styles.detailLine}>Received: {formatDate(selected.receivedDate)}</Text>
               <Text style={styles.detailLine}>Received by: {selected.receivedByName || 'Not recorded'}</Text>
+              <Text style={styles.detailLine}>Gate entry: {selected.gateEntryNo || 'Not recorded'}</Text>
+              <Text style={styles.detailLine}>Vehicle: {selected.vehicleNo || 'Not recorded'}</Text>
+              <Text style={styles.detailLine}>Driver / transporter: {[selected.driverName, selected.transporterName].filter(Boolean).join(' / ') || 'Not recorded'}</Text>
+              <Text style={styles.detailLine}>Gate-in time: {selected.gateInAt ? new Date(selected.gateInAt).toLocaleString('en-IN') : 'Not recorded'}</Text>
+              {selected.eWayBillNo ? <Text style={styles.detailLine}>e-Way Bill reference: {selected.eWayBillNo}</Text> : null}
+              {selected.netWeight !== undefined && selected.netWeight !== null ? <Text style={styles.detailLine}>Weighment: Gross {selected.grossWeight} − Tare {selected.tareWeight} = Net {selected.netWeight} {selected.weightUnit || 'kg'} · Slip: {selected.weighmentSlipRef || 'Missing'}</Text> : <Text style={styles.detailLine}>Weighment: Not recorded</Text>}
               <Text style={styles.detailLine}>Verified by: {selected.verifiedByName || 'Not yet verified'}</Text>
               <Text style={styles.detailLine}>Verified at: {formatDate(selected.verifiedAt)}</Text>
               {selected.verificationNotes ? <Text style={styles.detailLine}>Reviewer notes: {selected.verificationNotes}</Text> : null}

@@ -305,11 +305,24 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
       const [grn] = await GoodsReceivedNote.create([{
         grnNo, poId: po._id, poNo: po.poNo, vendorId: po.vendorId, vendorName: po.vendorName,
         warehouseId: wh._id, receivedDate: new Date(), items: grnItems,
+        gateEntryNo: String(req.body.gateEntryNo || '').trim(),
+        vehicleNo: String(req.body.vehicleNo || '').trim(),
+        driverName: String(req.body.driverName || '').trim(),
+        transporterName: String(req.body.transporterName || '').trim(),
+        eWayBillNo: String(req.body.eWayBillNo || '').trim(),
+        gateInAt: req.body.gateInAt ? new Date(req.body.gateInAt) : new Date(),
+        grossWeight: req.body.grossWeight ?? null,
+        tareWeight: req.body.tareWeight ?? null,
+        netWeight: req.body.netWeight ?? null,
+        weightUnit: req.body.weightUnit || 'kg',
+        weighmentSlipRef: String(req.body.weighmentSlipRef || '').trim(),
         status: 'pending_verification', notes: req.body.notes, receivedBy: req.user?.name || req.user?.email || 'System',
+        receivedByName: req.user?.name || req.user?.email || 'System',
         receivedByUserId: req.user?.id || req.user?._id || null
       }], { session });
       return { grn, po };
     });
+    await logAction({ action: 'GRN_GATE_ENTRY_RECORDED', description: 'Gate entry and weighment details recorded for ' + result.grn.grnNo, details: { grnId: result.grn._id, grnNo: result.grn.grnNo, gateEntryNo: result.grn.gateEntryNo, vehicleNo: result.grn.vehicleNo, grossWeight: result.grn.grossWeight, tareWeight: result.grn.tareWeight, netWeight: result.grn.netWeight, weightUnit: result.grn.weightUnit, weighmentSlipRef: result.grn.weighmentSlipRef }, req });
     req.io?.emit('grn_updated', { type: 'created', id: result.grn._id });
     res.status(201).json({ message: 'GRN receipt recorded; independent document verification and incoming QC are pending', ...result });
   } catch (err) { res.status(err.statusCode || 400).json({ error: err.message }); }
