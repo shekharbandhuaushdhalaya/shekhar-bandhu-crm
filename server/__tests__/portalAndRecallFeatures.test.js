@@ -76,6 +76,7 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Recall.findOneAndUpdate = jest.fn().mockImplementation(async (_filter, update) => ({ ...update.$set }));
     RolePermission.getEffectivePermissions.mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
   });
 
@@ -273,25 +274,31 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
 
 
     test('requires traceable notification evidence for an affected invoice', async () => {
-      const recall = { _id: 'recall_notify', affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }], save: jest.fn().mockResolvedValue(true) };
+      const recall = { _id: 'recall_notify', updatedAt: new Date('2026-11-25T10:00:00Z'), affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }] };
       Recall.findById.mockResolvedValue(recall);
       const missing = await request(app).patch('/api/recalls/recall_notify/notify-customer').send({ invoiceNo: 'INV-1' });
       expect(missing.status).toBe(400);
-      expect(recall.save).not.toHaveBeenCalled();
+      expect(Recall.findOneAndUpdate).not.toHaveBeenCalled();
       const recorded = await request(app).patch('/api/recalls/recall_notify/notify-customer').send({
         invoiceNo: 'INV-1', notificationMethod: 'email', notificationReference: 'mail-log-2026-001'
       });
       expect(recorded.status).toBe(200);
-      expect(recall.affectedCustomers[0]).toMatchObject({
-        notified: true, notifiedByName: 'Test User', notificationMethod: 'email',
-        notificationReference: 'mail-log-2026-001'
-      });
-      expect(recall.save).toHaveBeenCalledTimes(1);
+      expect(Recall.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: 'recall_notify', updatedAt: recall.updatedAt,
+          affectedCustomers: { $elemMatch: { invoiceNo: 'INV-1', notified: { $ne: true } } } }),
+        expect.objectContaining({ $set: expect.objectContaining({
+          'affectedCustomers.$.notified': true,
+          'affectedCustomers.$.notifiedByName': 'Test User',
+          'affectedCustomers.$.notificationMethod': 'email',
+          'affectedCustomers.$.notificationReference': 'mail-log-2026-001'
+        }) }),
+        { new: true, runValidators: true }
+      );
     });
 
     test('blocks recall completion until notification and full recovery evidence are reconciled', async () => {
       const recall = {
-        _id: 'recall_close', status: 'in_progress', totalAffectedQty: 100,
+        _id: 'recall_close', updatedAt: new Date('2026-11-25T10:00:00Z'), status: 'in_progress', totalAffectedQty: 100,
         recalledQty: 90, closureNotes: '',
         affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }],
         save: jest.fn()
@@ -307,7 +314,7 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
 
     test('rejects recalled quantities above the traced distributed quantity', async () => {
       const recall = {
-        _id: 'recall_qty', status: 'in_progress', totalAffectedQty: 100,
+        _id: 'recall_qty', updatedAt: new Date('2026-11-25T10:00:00Z'), status: 'in_progress', totalAffectedQty: 100,
         recalledQty: 0, affectedCustomers: [], save: jest.fn()
       };
       Recall.findById.mockResolvedValue(recall);

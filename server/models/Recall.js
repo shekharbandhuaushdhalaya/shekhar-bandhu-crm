@@ -28,6 +28,10 @@ const recallSchema = new mongoose.Schema({
   recalledQty: { type: Number, default: 0 },
   status: { type: String, enum: ['initiated', 'in_progress', 'completed', 'closed'], default: 'initiated' },
   initiatedBy: { type: String, default: 'System' },
+  initiatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  statusUpdatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  statusUpdatedByName: { type: String, default: '' },
+  statusUpdatedAt: { type: Date },
   closureNotes: { type: String, default: '' }
 }, { timestamps: true });
 

@@ -24,9 +24,11 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 router.post('/', authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { batchNo, productId, productName, reason, severity = 'class_II' } = req.body;
-
-    if (!batchNo || !reason) {
-      return res.status(400).json({ error: 'batchNo and reason are required' });
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!batchNo || String(batchNo).trim().length > 100 || !reason || String(reason).trim().length < 10 ||
+        !['class_I', 'class_II', 'class_III'].includes(severity) || !actorId || !actorName) {
+      return res.status(400).json({ error: 'Batch, substantive reason, valid severity and authenticated initiator are required', code: 'RECALL_INITIATION_EVIDENCE_REQUIRED' });
     }
 
     const fy = new Date().getFullYear() % 100 + '-' + (new Date().getFullYear() + 1) % 100;
@@ -68,7 +70,8 @@ router.post('/', authorize('manufacturing:edit'), async (req, res) => {
       affectedCustomers,
       totalAffectedQty,
       status: 'initiated',
-      initiatedBy: req.user ? req.user.name : 'System'
+      initiatedBy: actorName,
+      initiatedByUserId: actorId
     });
 
     if (req.io) req.io.emit('recall_initiated', recall);
@@ -95,16 +98,24 @@ router.patch('/:id/notify-customer', authorize('manufacturing:edit'), async (req
     const cust = recall.affectedCustomers.find(c => c.invoiceNo === invoiceNo);
     if (!cust) return res.status(404).json({ error: 'Invoice is not in this recall distribution list' });
     if (cust.notified) return res.status(409).json({ error: 'Notification is already recorded for this affected invoice', code: 'RECALL_NOTIFICATION_ALREADY_RECORDED' });
-    cust.notified = true;
-    cust.notifiedAt = new Date();
-    cust.notifiedByUserId = actorId;
-    cust.notifiedByName = actorName;
-    cust.notificationMethod = method;
-    cust.notificationReference = reference.slice(0, 500);
-    cust.notificationNotes = String(req.body.notificationNotes || '').trim().slice(0, 1000);
-    await recall.save();
-
-    res.json(recall);
+    const notifiedAt = new Date();
+    const updated = await Recall.findOneAndUpdate({
+      _id: recall._id,
+      updatedAt: recall.updatedAt,
+      affectedCustomers: { $elemMatch: { invoiceNo, notified: { $ne: true } } }
+    }, {
+      $set: {
+        'affectedCustomers.$.notified': true,
+        'affectedCustomers.$.notifiedAt': notifiedAt,
+        'affectedCustomers.$.notifiedByUserId': actorId,
+        'affectedCustomers.$.notifiedByName': actorName,
+        'affectedCustomers.$.notificationMethod': method,
+        'affectedCustomers.$.notificationReference': reference.slice(0, 500),
+        'affectedCustomers.$.notificationNotes': String(req.body.notificationNotes || '').trim().slice(0, 1000)
+      }
+    }, { new: true, runValidators: true });
+    if (!updated) return res.status(409).json({ error: 'Recall changed concurrently or notification was already recorded', code: 'RECALL_UPDATE_CONFLICT' });
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -133,7 +144,13 @@ router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) =>
     }
     const nextStatus = status || recall.status;
     const nextClosureNotes = closureNotes === undefined ? String(recall.closureNotes || '') : String(closureNotes).trim();
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated recall reviewer identity is required' });
     if (['completed', 'closed'].includes(nextStatus)) {
+      if (recall.initiatedByUserId && String(recall.initiatedByUserId) === String(actorId)) {
+        return res.status(403).json({ error: 'Recall initiator cannot independently complete or close the same recall', code: 'RECALL_MAKER_CHECKER_REQUIRED' });
+      }
       const affected = recall.affectedCustomers || [];
       const notifiedCount = affected.filter(customer => customer.notified).length;
       if (notifiedCount !== affected.length || nextRecalledQty !== totalAffectedQty || nextClosureNotes.trim().length < 20) {
@@ -148,11 +165,22 @@ router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) =>
       }
     }
 
-    recall.status = nextStatus;
-    recall.recalledQty = nextRecalledQty;
-    recall.closureNotes = nextClosureNotes;
-    await recall.save();
-    res.json(recall);
+    const updated = await Recall.findOneAndUpdate({
+      _id: recall._id,
+      updatedAt: recall.updatedAt,
+      status: recall.status
+    }, {
+      $set: {
+        status: nextStatus,
+        recalledQty: nextRecalledQty,
+        closureNotes: nextClosureNotes,
+        statusUpdatedByUserId: actorId,
+        statusUpdatedByName: actorName,
+        statusUpdatedAt: new Date()
+      }
+    }, { new: true, runValidators: true });
+    if (!updated) return res.status(409).json({ error: 'Recall status or evidence changed concurrently; reload before retrying', code: 'RECALL_UPDATE_CONFLICT' });
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
