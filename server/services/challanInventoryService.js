@@ -414,7 +414,7 @@ async function reverseChallanInventory(challan, options = {}) {
  * destination transfer Challan, and persists the completed batch. The Challan
  * remains draft, so the subsequent physical transfer is controlled by its posting.
  */
-async function completeProductionReceiptAndCreateTransfer({ batch, challanItems, productionWarehouse, destinationWarehouse, challanNo, now, userId, createdBy }) {
+async function completeProductionReceiptAndCreateTransfer({ batch, challanItems, productionWarehouse, destinationWarehouse, challanNo, now, userId, createdBy, expectedUpdatedAt }) {
   return withTransaction(async (session) => {
     const BatchProduction = require('../models/BatchProduction');
     const Challan = require('../models/Challan');
@@ -424,6 +424,15 @@ async function completeProductionReceiptAndCreateTransfer({ batch, challanItems,
     if (freshBatch.status === 'completed') {
       if (freshBatch.productionTransferChallanId) return { batch: freshBatch, challan: await Challan.findById(freshBatch.productionTransferChallanId).session(session) };
       throw inventoryError('BATCH_ALREADY_COMPLETED', 'Production batch is already completed');
+    }
+    if (expectedUpdatedAt && freshBatch.updatedAt &&
+        new Date(freshBatch.updatedAt).getTime() !== new Date(expectedUpdatedAt).getTime()) {
+      const err = inventoryError(
+        'BATCH_CHANGED_DURING_COMPLETION',
+        'Batch evidence changed while completion was being prepared. Reload the batch and review its latest stage and dispensing records before retrying.'
+      );
+      err.statusCode = 409;
+      throw err;
     }
 
     // Copy the validated in-memory state first. Any late raw-material consumption

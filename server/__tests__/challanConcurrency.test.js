@@ -310,6 +310,65 @@ describe('Challan concurrent posting', () => {
     });
   });
  
+  it('rejects a stale completion snapshot without creating finished stock or a transfer Challan', async () => {
+    const firm = await Firm.create({ name: 'Stale Production Completion Firm', active: true });
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const product = await Product.create({ name: 'Stale Completion Product', sku: 'STALE-COMP-001', stockLevel: 0 });
+      const manufacturingUnitId = new mongoose.Types.ObjectId();
+      const productionWarehouse = await Warehouse.create({
+        name: 'Stale Completion Production House', type: 'manufacturing', manufacturingUnitId
+      });
+      const destinationWarehouse = await Warehouse.create({ name: 'Stale Completion Finished Goods' });
+      const batch = await BatchProduction.create({
+        batchNo: 'AY-STALE-COMP-001',
+        productId: product._id,
+        manufacturingUnitId,
+        plannedQty: 5,
+        status: 'in_progress',
+        rawMaterialCost: 50,
+        overheadCost: 0
+      });
+      const expectedUpdatedAt = batch.updatedAt;
+      await BatchProduction.updateOne(
+        { _id: batch._id },
+        { $set: { plannedQty: 6, updatedAt: new Date(expectedUpdatedAt.getTime() + 1000) } },
+        { timestamps: false }
+      );
+
+      const args = {
+        batch,
+        expectedUpdatedAt,
+        challanItems: [{
+          productId: product._id,
+          name: product.name,
+          qty: 5,
+          packing: 1,
+          batchNo: batch.batchNo,
+          manufacturingUnitId,
+          manufacturingUnitName: 'Stale Completion Unit'
+        }],
+        productionWarehouse,
+        destinationWarehouse,
+        challanNo: 'CH-STALE-COMP-001',
+        now: new Date(),
+        userId: new mongoose.Types.ObjectId(),
+        createdBy: 'Stale Completion Test'
+      };
+
+      await expect(completeProductionReceiptAndCreateTransfer(args)).rejects.toMatchObject({
+        code: 'BATCH_CHANGED_DURING_COMPLETION',
+        statusCode: 409
+      });
+      expect(await InventoryEntry.countDocuments({ productionBatchId: batch._id })).toBe(0);
+      expect(await StockLedger.countDocuments({ reference: batch.batchNo })).toBe(0);
+      expect(await Challan.countDocuments({ challanNo: 'CH-STALE-COMP-001' })).toBe(0);
+      const persistedBatch = await BatchProduction.findById(batch._id).lean();
+      expect(persistedBatch.status).toBe('in_progress');
+      expect(persistedBatch.plannedQty).toBe(6);
+      expect((await Product.findById(product._id).lean()).stockLevel).toBe(0);
+    });
+  });
+
   it('persists measured dispensing wastage and its reason in the GMP record', async () => {
     const firm = await Firm.create({ name: 'Dispensing Wastage Persistence Firm', active: true });
     await runWithTenant({ firmId: firm._id }, async () => {

@@ -1407,6 +1407,7 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       destinationWarehouse: warehouse,
       challanNo,
       now,
+      expectedUpdatedAt: batch.updatedAt || null,
       userId: req.user ? req.user.id : null,
       createdBy: req.user && req.user.name ? req.user.name : 'System'    });
     batch = completed.batch;
@@ -1417,7 +1418,11 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     }
     res.json({ batch, challan: { _id: challan._id, challanNo: challan.challanNo, status: challan.status, challanType: challan.challanType, sourceWarehouseId: challan.warehouseId, sourceWarehouseName: challan.warehouseName, destinationWarehouseId: challan.destinationWarehouseId, destinationWarehouseName: challan.destinationWarehouseName } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const statusCode = err.statusCode || (err.code === 'BATCH_CHANGED_DURING_COMPLETION' ? 409 : 500);
+    res.status(statusCode).json({
+      error: err.message,
+      ...(err.code ? { code: err.code } : {})
+    });
   }
 });
 
