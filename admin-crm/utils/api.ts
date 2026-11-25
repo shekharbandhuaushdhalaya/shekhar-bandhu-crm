@@ -864,6 +864,40 @@ class ApiClient {
     return res.json();
   }
 
+
+  // --- Procurement requisitions and supplier quotations ---
+  async getPurchaseRequisitions(params: { status?: string; department?: string; mine?: boolean; page?: number; limit?: number } = {}): Promise<any> {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.department) query.set('department', params.department);
+    if (params.mine) query.set('mine', 'true');
+    if (params.page !== undefined) query.set('page', String(params.page));
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    const suffix = query.toString() ? '?' + query.toString() : '';
+    const res = await this.request(`${API_BASE}/purchase-requisitions${suffix}`);
+    return res.json();
+  }
+  async submitPurchaseRequisition(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/submit`, { method: 'PATCH' });
+    return res.json();
+  }
+  async approvePurchaseRequisition(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/approve`, { method: 'PATCH' });
+    return res.json();
+  }
+  async rejectPurchaseRequisition(id: string, reason: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) });
+    return res.json();
+  }
+  async getSupplierQuotations(requisitionId: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${requisitionId}/quotations`);
+    return res.json();
+  }
+  async selectSupplierQuotation(requisitionId: string, quotationId: string, reviewNotes: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${requisitionId}/quotations/${quotationId}/select`, { method: 'PATCH', body: JSON.stringify({ reviewNotes }) });
+    return res.json();
+  }
+
   async getGoodsReceivedNotes(params: { search?: string; status?: string; page?: number; limit?: number; poId?: string; vendorId?: string } = {}): Promise<{ items: any[]; page: number; limit: number; total: number; totalPages: number }> {
     const query = new URLSearchParams();
     if (params.search) query.set('search', params.search);
