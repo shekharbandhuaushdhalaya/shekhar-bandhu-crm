@@ -54,6 +54,13 @@ export default function GoodsReceivedNotesScreen() {
   const permission = usePermission();
   const canView = permission.can('vendor:view');
   const canVerify = permission.can('manufacturing:qcApprove');
+  const canRequestSupplierReturn = permission.can('vendor:edit');
+  const [supplierReturns, setSupplierReturns] = useState<any[]>([]);
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [returnItemIndex, setReturnItemIndex] = useState(0);
+  const [returnQty, setReturnQty] = useState('');
+  const [returnReason, setReturnReason] = useState('');
+  const [returnResolution, setReturnResolution] = useState<'return_to_supplier' | 'replacement_requested' | 'debit_note_requested'>('replacement_requested');
   const [items, setItems] = useState<Grn[]>([]);
   const [selected, setSelected] = useState<Grn | null>(null);
   const [status, setStatus] = useState('pending_verification');
@@ -97,6 +104,7 @@ export default function GoodsReceivedNotesScreen() {
     try {
       const detail = await api.getGoodsReceivedNote(item._id);
       setSelected(detail);
+      if (detail.status === 'verified') setSupplierReturns(await api.getSupplierReturnsForGrn(item._id));
     } catch (err: any) {
       setError(err?.message || 'Unable to load GRN details');
     }
@@ -107,6 +115,19 @@ export default function GoodsReceivedNotesScreen() {
     setNotes('');
     setRejectionReason('');
     setReviewOpen(true);
+  };
+
+  const submitSupplierReturn = async () => {
+    if (!selected || !returnQty.trim() || !returnReason.trim()) return;
+    const qty = Number(returnQty);
+    if (!Number.isFinite(qty) || qty <= 0) { setError('Enter a valid positive return quantity'); return; }
+    setBusy(true);
+    try {
+      await api.createSupplierReturnForGrn(selected._id, { itemIndex: returnItemIndex, qty, reason: returnReason.trim(), resolutionType: returnResolution });
+      setSupplierReturns(await api.getSupplierReturnsForGrn(selected._id));
+      setReturnOpen(false); setReturnQty(''); setReturnReason('');
+    } catch (err: any) { setError(err?.message || 'Unable to create supplier return request'); }
+    finally { setBusy(false); }
   };
 
   const submitReview = async () => {
@@ -213,6 +234,23 @@ export default function GoodsReceivedNotesScreen() {
                 {line.rawMaterialId ? <><Text style={styles.detailLine}>Supplier CoA reference / number: {line.supplierCoaRef || 'Missing'} / {line.supplierCoaNo || 'Missing'}</Text><Text style={styles.detailLine}>CoA date / laboratory: {formatDate(line.supplierCoaDate)} · {line.supplierCoaLabName || 'Not recorded'}</Text><Text style={styles.detailLine}>CoA batch / received batch: {line.supplierCoaBatchNo || 'Missing'} / {line.batchNo || 'Missing'}</Text><Text style={styles.detailLine}>Source document reference: {line.supplierCoaDocumentRef || 'Missing'}</Text><Text style={styles.detailLine}>Independent CoA review: {line.supplierCoaReviewStatus === 'reviewed' ? `Reviewed by ${line.supplierCoaReviewedByName || 'reviewer'} on ${formatDate(line.supplierCoaReviewedAt)}` : 'Pending'}</Text></> : null}
               </View>
             ))}
+            {selected.status === 'verified' ? <View style={styles.detailCard}>
+              <Text style={styles.sectionTitle}>Supplier rejection / return traceability</Text>
+              {(selected.items || []).map((line, index) => Number(line.qtyRejected || 0) > 0 ? <View key={String(index)} style={styles.lineCard}>
+                <Text style={styles.lineName}>{line.name || 'Rejected material'} · {line.batchNo || 'No batch'}</Text>
+                <Text style={styles.detailLine}>Rejected quantity: {line.qtyRejected} {line.unit || ''}</Text>
+                {canRequestSupplierReturn ? <Pressable onPress={() => { setReturnItemIndex(index); setReturnOpen(true); }} style={[styles.actionButton, styles.approveButton]}><Text style={styles.actionText}>Request supplier return / replacement</Text></Pressable> : null}
+              </View> : null)}
+              {supplierReturns.map(row => <View key={String(row._id)} style={styles.lineCard}>
+                <Text style={styles.lineName}>{row.returnNo} · {row.itemName}</Text>
+                <Text style={styles.detailLine}>Qty: {row.qty} {row.unit || ''} · {String(row.status || '').replace(/_/g, ' ')}</Text>
+                <Text style={styles.detailLine}>Resolution: {String(row.resolutionType || '').replace(/_/g, ' ')} · Reason: {row.reason}</Text>
+                {row.dispatchRef ? <Text style={styles.detailLine}>Dispatch: {row.dispatchRef}</Text> : null}
+                {row.supplierReference ? <Text style={styles.detailLine}>Supplier reference: {row.supplierReference}</Text> : null}
+              </View>)}
+              {!supplierReturns.length ? <Text style={styles.meta}>No supplier return requests recorded.</Text> : null}
+              <Text style={styles.disclaimer}>Rejected quantities were excluded from accepted inward stock at GRN creation. This workflow records supplier return evidence and does not deduct rejected stock a second time or post a financial debit-note adjustment.</Text>
+            </View> : null}
             {selected.status === 'pending_verification' && isOwnReceipt ? <Text style={styles.warningText}>Maker-checker control: the person who recorded this receipt cannot verify it.</Text> : null}
             {selected.status === 'pending_verification' && canVerify && !isOwnReceipt ? <View style={styles.actionRow}>
               <Pressable onPress={() => openReview('verified')} style={[styles.actionButton, styles.approveButton]}><Text style={styles.actionText}>Verify receipt</Text></Pressable>
@@ -222,6 +260,27 @@ export default function GoodsReceivedNotesScreen() {
             <Text style={styles.disclaimer}>GRN verification confirms the receipt record and referenced supplier documents only. Incoming material remains under quarantine/testing until the separate QC disposition workflow is completed. A CoA reference is not itself a validated document attachment.</Text>
           </ScrollView> : null}
         </View>
+      </Modal>
+
+      <Modal visible={returnOpen} transparent animationType="fade" onRequestClose={() => setReturnOpen(false)}>
+        <View style={styles.overlay}><View style={styles.reviewCard}>
+          <Text style={styles.modalTitle}>Request supplier return</Text>
+          <Text style={styles.meta}>{selected?.items?.[returnItemIndex]?.name || 'Rejected material'} · Rejected quantity: {selected?.items?.[returnItemIndex]?.qtyRejected || 0}</Text>
+          <Text style={styles.fieldLabel}>Return quantity *</Text>
+          <TextInput value={returnQty} onChangeText={setReturnQty} keyboardType="decimal-pad" placeholder="Quantity" placeholderTextColor={colors.text.muted} style={styles.textArea} />
+          <Text style={styles.fieldLabel}>Reason *</Text>
+          <TextInput multiline value={returnReason} onChangeText={setReturnReason} placeholder="Describe rejection / supplier issue" placeholderTextColor={colors.text.muted} style={styles.textArea} />
+          <Text style={styles.fieldLabel}>Requested resolution</Text>
+          {(['replacement_requested','return_to_supplier','debit_note_requested'] as const).map(value => <Pressable key={value} onPress={() => setReturnResolution(value)} style={styles.actionRow}>
+            <Text style={styles.detailLine}>{returnResolution === value ? '●' : '○'} {value.replace(/_/g, ' ')}</Text>
+          </Pressable>)}
+          <View style={styles.actionRow}>
+            <Pressable disabled={busy} onPress={() => setReturnOpen(false)} style={[styles.actionButton, styles.cancelButton]}><Text style={styles.cancelText}>Cancel</Text></Pressable>
+            <Pressable disabled={busy || !returnQty.trim() || !returnReason.trim()} onPress={submitSupplierReturn} style={[styles.actionButton, styles.approveButton, (busy || !returnQty.trim() || !returnReason.trim()) && styles.disabled]}>
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionText}>Submit request</Text>}
+            </Pressable>
+          </View>
+        </View></View>
       </Modal>
 
       <Modal visible={reviewOpen} transparent animationType="fade" onRequestClose={() => setReviewOpen(false)}>

@@ -1,7 +1,7 @@
 const PERMISSIONS = {
   product:       ['view', 'create', 'edit', 'delete', 'viewPricing', 'editPricing'],
   inventory:     ['view', 'create', 'edit', 'delete', 'viewValue'],
-  vendor:        ['view', 'create', 'edit', 'delete'],
+  vendor:        ['view', 'create', 'edit', 'delete', 'approve'],
   customer:      ['view', 'create', 'edit', 'delete'],
   invoice:       ['view', 'create', 'edit', 'delete', 'finalize', 'markPaid'],
   order:         ['view', 'create', 'edit', 'approve', 'cancel', 'fulfill'],
