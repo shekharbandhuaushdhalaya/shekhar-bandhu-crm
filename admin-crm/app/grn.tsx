@@ -10,6 +10,14 @@ import { usePermission } from '../utils/permissions';
 import { useTheme, useStyles } from '../utils/themeContext';
 import { LightColors, Radius, Spacing, Typography } from '../constants/theme';
 
+type SupplierReturnAction = 'approve' | 'reject' | 'dispatch' | 'resolve';
+type SupplierReturnRecord = {
+  _id: string; returnNo: string; itemName: string; qty: number; unit?: string; status: string;
+  resolutionType: 'return_to_supplier' | 'replacement_requested' | 'debit_note_requested';
+  reason: string; requestedByUserId?: string; dispatchRef?: string; supplierReference?: string;
+  replacementBatchNo?: string; supplierDebitNoteRef?: string; reviewNotes?: string; rejectionReason?: string;
+};
+
 type Grn = {
   _id: string;
   grnNo: string;
@@ -55,7 +63,15 @@ export default function GoodsReceivedNotesScreen() {
   const canView = permission.can('vendor:view');
   const canVerify = permission.can('manufacturing:qcApprove');
   const canRequestSupplierReturn = permission.can('vendor:edit');
-  const [supplierReturns, setSupplierReturns] = useState<any[]>([]);
+  const canReviewSupplierReturn = permission.can('vendor:approve');
+  const canManageSupplierReturn = permission.can('vendor:edit');
+  const [supplierReturns, setSupplierReturns] = useState<SupplierReturnRecord[]>([]);
+  const [supplierReturnAction, setSupplierReturnAction] = useState<SupplierReturnAction | null>(null);
+  const [activeSupplierReturn, setActiveSupplierReturn] = useState<SupplierReturnRecord | null>(null);
+  const [supplierReturnNotes, setSupplierReturnNotes] = useState('');
+  const [supplierReturnReason, setSupplierReturnReason] = useState('');
+  const [supplierReturnReference, setSupplierReturnReference] = useState('');
+  const [replacementBatchNo, setReplacementBatchNo] = useState('');
   const [returnOpen, setReturnOpen] = useState(false);
   const [returnItemIndex, setReturnItemIndex] = useState(0);
   const [returnQty, setReturnQty] = useState('');
@@ -127,6 +143,31 @@ export default function GoodsReceivedNotesScreen() {
       setSupplierReturns(await api.getSupplierReturnsForGrn(selected._id));
       setReturnOpen(false); setReturnQty(''); setReturnReason('');
     } catch (err: any) { setError(err?.message || 'Unable to create supplier return request'); }
+    finally { setBusy(false); }
+  };
+
+  const openSupplierReturnAction = (record: SupplierReturnRecord, action: SupplierReturnAction) => {
+    setActiveSupplierReturn(record); setSupplierReturnAction(action);
+    setSupplierReturnNotes(''); setSupplierReturnReason(''); setSupplierReturnReference(''); setReplacementBatchNo('');
+  };
+
+  const submitSupplierReturnAction = async () => {
+    if (!activeSupplierReturn || !supplierReturnAction) return;
+    if ((supplierReturnAction === 'approve' || supplierReturnAction === 'reject') && (!supplierReturnNotes.trim() || (supplierReturnAction === 'reject' && !supplierReturnReason.trim()))) return;
+    if ((supplierReturnAction === 'dispatch' || supplierReturnAction === 'resolve') && !supplierReturnReference.trim()) return;
+    if (supplierReturnAction === 'resolve' && activeSupplierReturn.resolutionType === 'replacement_requested' && !replacementBatchNo.trim()) return;
+    setBusy(true);
+    try {
+      if (supplierReturnAction === 'approve' || supplierReturnAction === 'reject') {
+        await api.reviewSupplierReturn(activeSupplierReturn._id, { decision: supplierReturnAction === 'approve' ? 'approved' : 'rejected', reviewNotes: supplierReturnNotes.trim(), ...(supplierReturnAction === 'reject' ? { rejectionReason: supplierReturnReason.trim() } : {}) });
+      } else if (supplierReturnAction === 'dispatch') {
+        await api.dispatchSupplierReturn(activeSupplierReturn._id, supplierReturnReference.trim());
+      } else {
+        await api.resolveSupplierReturn(activeSupplierReturn._id, { supplierReference: supplierReturnReference.trim(), ...(activeSupplierReturn.resolutionType === 'replacement_requested' ? { replacementBatchNo: replacementBatchNo.trim() } : {}), ...(activeSupplierReturn.resolutionType === 'debit_note_requested' ? { supplierDebitNoteDate: new Date().toISOString() } : {}) });
+      }
+      if (selected) setSupplierReturns(await api.getSupplierReturnsForGrn(selected._id));
+      setSupplierReturnAction(null); setActiveSupplierReturn(null);
+    } catch (err: any) { setError(err?.message || 'Unable to update supplier return'); }
     finally { setBusy(false); }
   };
 
@@ -245,8 +286,19 @@ export default function GoodsReceivedNotesScreen() {
                 <Text style={styles.lineName}>{row.returnNo} · {row.itemName}</Text>
                 <Text style={styles.detailLine}>Qty: {row.qty} {row.unit || ''} · {String(row.status || '').replace(/_/g, ' ')}</Text>
                 <Text style={styles.detailLine}>Resolution: {String(row.resolutionType || '').replace(/_/g, ' ')} · Reason: {row.reason}</Text>
+                {row.reviewNotes ? <Text style={styles.detailLine}>Review: {row.reviewNotes}</Text> : null}
+                {row.rejectionReason ? <Text style={styles.detailLine}>Rejection: {row.rejectionReason}</Text> : null}
                 {row.dispatchRef ? <Text style={styles.detailLine}>Dispatch: {row.dispatchRef}</Text> : null}
                 {row.supplierReference ? <Text style={styles.detailLine}>Supplier reference: {row.supplierReference}</Text> : null}
+                {row.replacementBatchNo ? <Text style={styles.detailLine}>Replacement batch: {row.replacementBatchNo}</Text> : null}
+                {row.supplierDebitNoteRef ? <Text style={styles.detailLine}>Debit note reference: {row.supplierDebitNoteRef}</Text> : null}
+                {row.status === 'pending_approval' && canReviewSupplierReturn && String(row.requestedByUserId || '') !== String(user?.id || '') ? <View style={styles.actionRow}>
+                  <Pressable onPress={() => openSupplierReturnAction(row, 'approve')} style={[styles.actionButton, styles.approveButton]}><Text style={styles.actionText}>Approve</Text></Pressable>
+                  <Pressable onPress={() => openSupplierReturnAction(row, 'reject')} style={[styles.actionButton, styles.rejectButton]}><Text style={styles.actionText}>Reject</Text></Pressable>
+                </View> : null}
+                {row.status === 'pending_approval' && canReviewSupplierReturn && String(row.requestedByUserId || '') === String(user?.id || '') ? <Text style={styles.warningText}>Requester cannot approve their own supplier return.</Text> : null}
+                {row.status === 'approved' && canManageSupplierReturn ? <Pressable onPress={() => openSupplierReturnAction(row, 'dispatch')} style={[styles.actionButton, styles.approveButton]}><Text style={styles.actionText}>Record dispatch / handover</Text></Pressable> : null}
+                {row.status === 'dispatched' && canManageSupplierReturn ? <Pressable onPress={() => openSupplierReturnAction(row, 'resolve')} style={[styles.actionButton, styles.approveButton]}><Text style={styles.actionText}>Record supplier resolution</Text></Pressable> : null}
               </View>)}
               {!supplierReturns.length ? <Text style={styles.meta}>No supplier return requests recorded.</Text> : null}
               <Text style={styles.disclaimer}>Rejected quantities were excluded from accepted inward stock at GRN creation. This workflow records supplier return evidence and does not deduct rejected stock a second time or post a financial debit-note adjustment.</Text>
@@ -278,6 +330,29 @@ export default function GoodsReceivedNotesScreen() {
             <Pressable disabled={busy} onPress={() => setReturnOpen(false)} style={[styles.actionButton, styles.cancelButton]}><Text style={styles.cancelText}>Cancel</Text></Pressable>
             <Pressable disabled={busy || !returnQty.trim() || !returnReason.trim()} onPress={submitSupplierReturn} style={[styles.actionButton, styles.approveButton, (busy || !returnQty.trim() || !returnReason.trim()) && styles.disabled]}>
               {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionText}>Submit request</Text>}
+            </Pressable>
+          </View>
+        </View></View>
+      </Modal>
+
+      <Modal visible={Boolean(supplierReturnAction)} transparent animationType="fade" onRequestClose={() => setSupplierReturnAction(null)}>
+        <View style={styles.overlay}><View style={styles.reviewCard}>
+          <Text style={styles.modalTitle}>{supplierReturnAction === 'approve' ? 'Approve supplier return' : supplierReturnAction === 'reject' ? 'Reject supplier return' : supplierReturnAction === 'dispatch' ? 'Record supplier handover' : 'Resolve supplier return'}</Text>
+          <Text style={styles.meta}>{activeSupplierReturn?.returnNo} · {activeSupplierReturn?.itemName}</Text>
+          {supplierReturnAction === 'approve' || supplierReturnAction === 'reject' ? <>
+            <Text style={styles.fieldLabel}>Independent review notes *</Text>
+            <TextInput multiline value={supplierReturnNotes} onChangeText={setSupplierReturnNotes} placeholder="Record the review and decision basis" placeholderTextColor={colors.text.muted} style={styles.textArea} />
+            {supplierReturnAction === 'reject' ? <><Text style={styles.fieldLabel}>Rejection reason *</Text><TextInput multiline value={supplierReturnReason} onChangeText={setSupplierReturnReason} placeholder="Explain why this request is rejected" placeholderTextColor={colors.text.muted} style={styles.textArea} /></> : null}
+          </> : <>
+            <Text style={styles.fieldLabel}>{supplierReturnAction === 'dispatch' ? 'Dispatch / handover reference *' : 'Supplier response reference *'}</Text>
+            <TextInput value={supplierReturnReference} onChangeText={setSupplierReturnReference} placeholder="Enter a traceable reference" placeholderTextColor={colors.text.muted} style={styles.textArea} />
+            {supplierReturnAction === 'resolve' && activeSupplierReturn?.resolutionType === 'replacement_requested' ? <><Text style={styles.fieldLabel}>Replacement batch number *</Text><TextInput value={replacementBatchNo} onChangeText={setReplacementBatchNo} placeholder="Supplier replacement batch" placeholderTextColor={colors.text.muted} style={styles.textArea} /></> : null}
+            {supplierReturnAction === 'resolve' && activeSupplierReturn?.resolutionType === 'debit_note_requested' ? <Text style={styles.meta}>This records supplier debit-note evidence only. It does not create an accounting entry.</Text> : null}
+          </>}
+          <View style={styles.actionRow}>
+            <Pressable disabled={busy} onPress={() => setSupplierReturnAction(null)} style={[styles.actionButton, styles.cancelButton]}><Text style={styles.cancelText}>Cancel</Text></Pressable>
+            <Pressable disabled={busy || ((supplierReturnAction === 'approve' || supplierReturnAction === 'reject') ? !supplierReturnNotes.trim() || (supplierReturnAction === 'reject' && !supplierReturnReason.trim()) : !supplierReturnReference.trim() || (supplierReturnAction === 'resolve' && activeSupplierReturn?.resolutionType === 'replacement_requested' && !replacementBatchNo.trim()))} onPress={submitSupplierReturnAction} style={[styles.actionButton, styles.approveButton]}>
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionText}>Save workflow step</Text>}
             </Pressable>
           </View>
         </View></View>
