@@ -78,6 +78,10 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     RolePermission.getEffectivePermissions.mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
+    DeviationCapa.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([]),
+      session: jest.fn().mockReturnThis()
+    });
   });
 
   test('PATCH /api/batch-productions/:id/approve-bmr approves normally when all ingredients cite verified entries', async () => {

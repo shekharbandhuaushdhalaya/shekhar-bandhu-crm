@@ -17,6 +17,7 @@ jest.mock('../models/SystemSettings');
 jest.mock('../models/LineClearance');
 jest.mock('../models/RetentionSample');
 jest.mock('../models/MaterialDispensing');
+jest.mock('../models/DeviationCapa');
 jest.mock('../models/Product');
 jest.mock('../models/RolePermission');
 jest.mock('../models/PharmacopoeiaEntry');
@@ -51,6 +52,7 @@ const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
 const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
 const MaterialDispensing = require('../models/MaterialDispensing');
+const DeviationCapa = require('../models/DeviationCapa');
 
 RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
 
@@ -78,6 +80,10 @@ describe('5 CRM Enhancements Integration Suite', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     RolePermission.getEffectivePermissions.mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
+    DeviationCapa.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([]),
+      session: jest.fn().mockReturnThis()
+    });
     if (PharmacopoeiaEntry.findOne) {
       PharmacopoeiaEntry.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({ verified: true, source: 'manual' }) });
     }
