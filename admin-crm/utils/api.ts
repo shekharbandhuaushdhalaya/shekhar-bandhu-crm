@@ -584,6 +584,10 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/vendors/${id}`, { method: 'DELETE' });
     return res.ok;
   }
+  async getSupplierScorecard(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-scorecards/${id}`);
+    return res.json();
+  }
 
   async verifyGSTIN(gstin: string): Promise<{ companyName: string; billingAddress: string; state: string; placeOfSupply: string }> {
     const res = await this.request(`${API_BASE}/parties/verify-gstin`, {
