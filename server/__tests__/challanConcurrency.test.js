@@ -11,7 +11,7 @@ const Customer = require('../models/Customer');
 const Order = require('../models/Order');
 const StockLedger = require('../models/StockLedger');
 const BatchProduction = require('../models/BatchProduction');
-const { postChallanInventory } = require('../services/challanInventoryService');
+const { postChallanInventory, completeProductionReceiptAndCreateTransfer } = require('../services/challanInventoryService');
 const { runWithTenant } = require('../utils/tenantContext');
 
 let replSet;
@@ -193,6 +193,119 @@ describe('Challan concurrent posting', () => {
       const inventory = await InventoryEntry.findOne({ warehouseId: warehouse._id, productId: product._id }).lean();
       expect(inventory.qtyBoxes).toBe(5);
       expect(await StockLedger.countDocuments({ reference: challan.challanNo })).toBe(0);
+    });
+  });
+ 
+  it('rolls back finished-goods receipt, stock ledger and batch when transfer Challan creation fails', async () => {
+    const firm = await Firm.create({ name: 'Atomic Production Receipt Failure Firm', active: true });
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const product = await Product.create({ name: 'Atomic Receipt Failure Product', sku: 'ATOMIC-FAIL-001', stockLevel: 0 });
+      const manufacturingUnitId = new mongoose.Types.ObjectId();
+      const productionWarehouse = await Warehouse.create({
+        name: 'Atomic Failure Production House', type: 'manufacturing', manufacturingUnitId
+      });
+      const destinationWarehouse = await Warehouse.create({ name: 'Atomic Failure Finished Goods' });
+      const batch = await BatchProduction.create({
+        batchNo: 'AY-ATOMIC-FAIL-001',
+        productId: product._id,
+        manufacturingUnitId,
+        plannedQty: 5,
+        status: 'in_progress',
+        rawMaterialCost: 50,
+        overheadCost: 0
+      });
+      batch.status = 'completed';
+      batch.actualYieldQty = 5;
+      batch.jobWorkCharges = 0;
+
+      const challanCreate = jest.spyOn(Challan, 'create')
+        .mockRejectedValueOnce(new Error('Injected production-transfer Challan write failure'));
+      try {
+        await expect(completeProductionReceiptAndCreateTransfer({
+          batch,
+          challanItems: [{
+            productId: product._id,
+            name: product.name,
+            qty: 5,
+            packing: 1,
+            batchNo: batch.batchNo,
+            manufacturingUnitId,
+            manufacturingUnitName: 'Atomic Failure Unit'
+          }],
+          productionWarehouse,
+          destinationWarehouse,
+          challanNo: 'CH-ATOMIC-FAIL-001',
+          now: new Date(),
+          userId: new mongoose.Types.ObjectId(),
+          createdBy: 'Atomic Failure Test'
+        })).rejects.toThrow('Injected production-transfer Challan write failure');
+      } finally {
+        challanCreate.mockRestore();
+      }
+
+      const persistedBatch = await BatchProduction.findById(batch._id).lean();
+      const persistedProduct = await Product.findById(product._id).lean();
+      expect(await InventoryEntry.countDocuments({ productionBatchId: batch._id })).toBe(0);
+      expect(await StockLedger.countDocuments({ reference: batch.batchNo })).toBe(0);
+      expect(await Challan.countDocuments({ challanNo: 'CH-ATOMIC-FAIL-001' })).toBe(0);
+      expect(persistedProduct.stockLevel).toBe(0);
+      expect(persistedBatch.status).toBe('in_progress');
+      expect(persistedBatch.productionTransferChallanId).toBeFalsy();
+    });
+  });
+
+  it('creates production receipt and transfer Challan exactly once across service retries', async () => {
+    const firm = await Firm.create({ name: 'Atomic Production Receipt Retry Firm', active: true });
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const product = await Product.create({ name: 'Atomic Receipt Retry Product', sku: 'ATOMIC-RETRY-001', stockLevel: 0 });
+      const manufacturingUnitId = new mongoose.Types.ObjectId();
+      const productionWarehouse = await Warehouse.create({
+        name: 'Atomic Retry Production House', type: 'manufacturing', manufacturingUnitId
+      });
+      const destinationWarehouse = await Warehouse.create({ name: 'Atomic Retry Finished Goods' });
+      const batch = await BatchProduction.create({
+        batchNo: 'AY-ATOMIC-RETRY-001',
+        productId: product._id,
+        manufacturingUnitId,
+        plannedQty: 5,
+        status: 'in_progress',
+        rawMaterialCost: 50,
+        overheadCost: 0
+      });
+      batch.status = 'completed';
+      batch.actualYieldQty = 5;
+      batch.jobWorkCharges = 0;
+      const args = {
+        batch,
+        challanItems: [{
+          productId: product._id,
+          name: product.name,
+          qty: 5,
+          packing: 1,
+          batchNo: batch.batchNo,
+          manufacturingUnitId,
+          manufacturingUnitName: 'Atomic Retry Unit'
+        }],
+        productionWarehouse,
+        destinationWarehouse,
+        challanNo: 'CH-ATOMIC-RETRY-001',
+        now: new Date(),
+        userId: new mongoose.Types.ObjectId(),
+        createdBy: 'Atomic Retry Test'
+      };
+
+      const first = await completeProductionReceiptAndCreateTransfer(args);
+      const retry = await completeProductionReceiptAndCreateTransfer(args);
+
+      expect(String(retry.batch._id)).toBe(String(first.batch._id));
+      expect(String(retry.challan._id)).toBe(String(first.challan._id));
+      expect(await InventoryEntry.countDocuments({ productionBatchId: batch._id })).toBe(1);
+      expect(await StockLedger.countDocuments({ reference: batch.batchNo })).toBe(1);
+      expect(await Challan.countDocuments({ challanNo: 'CH-ATOMIC-RETRY-001' })).toBe(1);
+      expect((await Product.findById(product._id).lean()).stockLevel).toBe(5);
+      const persistedBatch = await BatchProduction.findById(batch._id).lean();
+      expect(persistedBatch.status).toBe('completed');
+      expect(String(persistedBatch.productionTransferChallanId)).toBe(String(first.challan._id));
     });
   });
 });

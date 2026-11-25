@@ -179,5 +179,6 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 
 ### Next verification batch
 - Exercise the manufacturing completion UI through the post-completion QC analyst and independent QA reviewer journey on web and mobile.
-- Add failure-injection coverage for production-house warehouse creation, batch receipt, transfer Challan creation and idempotent retry; verify no partial inventory, batch or Challan writes survive an aborted transaction.
+- Add failure-injection coverage for production-house warehouse creation; receipt/Challan rollback and idempotent service retry are now covered by MongoDB replica-set integration tests.
+- Complete an end-to-end material genealogy rehearsal from reserved raw-material lots through independently verified dispensing, finished-goods receipt, QC release and production-transfer posting.
 - Complete an end-to-end material genealogy rehearsal from reserved raw-material lots through independently verified dispensing, finished-goods receipt, QC release and production-transfer posting.
