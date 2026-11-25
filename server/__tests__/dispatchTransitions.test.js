@@ -7,7 +7,7 @@ jest.mock('../models/Challan');
 jest.mock('../models/Invoice');
 jest.mock('../models/Order');
 jest.mock('../models/RolePermission');
-jest.mock('../utils/dispatchService', () => ({
+jest.mock('../services/dispatchService', () => ({
   recomputeOrderLogisticsFromChallan: jest.fn().mockResolvedValue(true)
 }));
 
