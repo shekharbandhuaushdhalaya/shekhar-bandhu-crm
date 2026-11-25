@@ -17,6 +17,16 @@ const rawMaterialQuarantineSchema = new mongoose.Schema({
     index: true,
   },
   testReportNo: { type: String, default: '' },
+  qcSpecificationId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterialQualitySpecification', default: null },
+  qcSpecificationVersion: { type: String, default: '', trim: true },
+  qcSpecificationTests: [{
+    code: { type: String, required: true, trim: true, uppercase: true },
+    name: { type: String, required: true, trim: true },
+    specification: { type: String, required: true, trim: true },
+    unit: { type: String, default: '', trim: true },
+    methodReference: { type: String, required: true, trim: true },
+    mandatory: { type: Boolean, default: true }
+  }],
   inspectionResults: [{
     testCode: { type: String, required: true, trim: true },
     testName: { type: String, required: true, trim: true },

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const RawMaterialQuarantine = require('../../models/RawMaterialQuarantine');
+const RawMaterialQualitySpecification = require('../../models/RawMaterialQualitySpecification');
 const GoodsReceivedNote = require('../../models/GoodsReceivedNote');
 const { authorize } = require('../../middleware/authorize');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
@@ -90,6 +91,10 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
       return res.status(400).json({ error: 'Supplier does not match the linked stock entry' });
     }
 
+    const approvedSpecification = await RawMaterialQualitySpecification.findOne({ rawMaterialId: entry.rawMaterialId, status: 'approved', effectiveDate: { $lte: new Date() } }).sort({ effectiveDate: -1, approvedAt: -1 }).lean();
+    if (!approvedSpecification || !approvedSpecification.approvedByUserId || !approvedSpecification.approvedAt) {
+      return res.status(409).json({ error: 'An independently approved, effective incoming QC specification is required before quarantine registration' });
+    }
     const quarantineLotNo = await generateAtomicDocumentNumber('quarantineLotNo_QRM', 'QRM-', 6);
     const [lot] = await RawMaterialQuarantine.create([{
       quarantineLotNo,
@@ -103,7 +108,10 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
       quarantineStatus: 'under_testing',
       receivedDate: new Date(),
       rawMaterialId: entry.rawMaterialId,
-      rawMaterialEntryId: entry._id
+      rawMaterialEntryId: entry._id,
+      qcSpecificationId: approvedSpecification._id,
+      qcSpecificationVersion: approvedSpecification.specificationVersion,
+      qcSpecificationTests: approvedSpecification.tests.map(test => ({ code: test.code, name: test.name, specification: test.specification, unit: test.unit || '', methodReference: test.methodReference, mandatory: test.mandatory !== false }))
     }]);
     res.status(201).json(lot);
   } catch (err) {
@@ -136,6 +144,25 @@ router.patch('/:id/inspection', authorize('quality:approve'), async (req, res) =
     const lot = await RawMaterialQuarantine.findById(req.params.id);
     if (!lot) return res.status(404).json({ error: 'Quarantine lot not found' });
     if (lot.quarantineStatus !== 'under_testing') return res.status(409).json({ error: 'Inspection results can only be recorded while the lot is under testing' });
+    const specificationTests = Array.isArray(lot.qcSpecificationTests) ? lot.qcSpecificationTests : [];
+    if (!lot.qcSpecificationId || !lot.qcSpecificationVersion || !specificationTests.length) {
+      return res.status(409).json({ error: 'Quarantine lot has no pinned approved incoming QC specification; re-register it against an approved specification' });
+    }
+    const specificationByCode = new Map(specificationTests.map(test => [String(test.code).trim().toUpperCase(), test]));
+    for (const result of inspectionResults) {
+      const code = String(result.testCode).trim().toUpperCase();
+      const expected = specificationByCode.get(code);
+      if (!expected || String(result.testName).trim() !== expected.name ||
+          String(result.methodReference).trim() !== expected.methodReference ||
+          String(result.specification).trim() !== expected.specification ||
+          String(result.unit || '').trim() !== String(expected.unit || '').trim()) {
+        return res.status(400).json({ error: 'Inspection test ' + code + ' does not match the lot\'s pinned approved specification' });
+      }
+    }
+    const mandatoryCodes = specificationTests.filter(test => test.mandatory).map(test => String(test.code).trim().toUpperCase());
+    const submittedCodes = new Set(inspectionResults.map(result => String(result.testCode).trim().toUpperCase()));
+    const missingMandatory = mandatoryCodes.filter(code => !submittedCodes.has(code));
+    if (missingMandatory.length) return res.status(400).json({ error: 'All mandatory specification tests must be recorded: ' + missingMandatory.join(', ') });
     lot.inspectionResults = inspectionResults.map(result => ({
       testCode: String(result.testCode).trim().toUpperCase(), testName: String(result.testName).trim(),
       methodReference: String(result.methodReference).trim(), specification: String(result.specification).trim(),
@@ -198,6 +225,19 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
       // Both release and rejection are controlled QC dispositions. Rejection needs
       // at least one recorded failure; release requires every recorded test to pass.
       const inspectionResults = Array.isArray(currentLot.inspectionResults) ? currentLot.inspectionResults : [];
+      const specificationTests = Array.isArray(currentLot.qcSpecificationTests) ? currentLot.qcSpecificationTests : [];
+      if (!currentLot.qcSpecificationId || !currentLot.qcSpecificationVersion || !specificationTests.length) {
+        const error = new Error('Incoming QC disposition requires a pinned approved material specification');
+        error.code = 'QUARANTINE_SPECIFICATION_REQUIRED';
+        throw error;
+      }
+      const mandatoryCodes = specificationTests.filter(test => test.mandatory).map(test => String(test.code).trim().toUpperCase());
+      const recordedCodes = new Set(inspectionResults.map(result => String(result.testCode).trim().toUpperCase()));
+      if (mandatoryCodes.some(code => !recordedCodes.has(code))) {
+        const error = new Error('Incoming QC disposition requires results for every mandatory test in the pinned specification');
+        error.code = 'QUARANTINE_SPECIFICATION_TESTS_INCOMPLETE';
+        throw error;
+      }
       if (!inspectionResults.length ||
           (quarantineStatus === 'released' && inspectionResults.some(result => result.outcome !== 'pass')) ||
           (quarantineStatus === 'rejected' && !inspectionResults.some(result => result.outcome === 'fail'))) {
@@ -254,7 +294,7 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
     const status = err.code === 'QUARANTINE_NOT_FOUND' ? 404 :
       ['QUARANTINE_ALREADY_DISPOSED','QUARANTINE_STOCK_ALREADY_DISPOSED','QUARANTINE_STOCK_QUANTITY_CONFLICT'].includes(err.code) ? 409 :
       ['QUARANTINE_STOCK_LINK_REQUIRED','QUARANTINE_STOCK_LINK_INVALID'].includes(err.code) ? 422 :
-      ['QUARANTINE_GRN_VERIFICATION_REQUIRED','QUARANTINE_INSPECTION_INCOMPLETE','QUARANTINE_INSPECTION_MAKER_CHECKER_REQUIRED'].includes(err.code) ? 409 : 500;
+      ['QUARANTINE_GRN_VERIFICATION_REQUIRED','QUARANTINE_INSPECTION_INCOMPLETE','QUARANTINE_INSPECTION_MAKER_CHECKER_REQUIRED','QUARANTINE_SPECIFICATION_REQUIRED','QUARANTINE_SPECIFICATION_TESTS_INCOMPLETE'].includes(err.code) ? 409 : 500;
     res.status(status).json({ error: err.message });
   }
 });
