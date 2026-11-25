@@ -94,4 +94,24 @@ describe('Bank reconciliation confirmation', () => {
     expect(response.body.code).toBe('BANK_MATCH_EVIDENCE_MISMATCH');
     expect(BankStatement.findOneAndUpdate).not.toHaveBeenCalled();
   });
+  test('returns a conflict when the bank line is changed before the conditional confirmation', async () => {
+    BankStatement.findOneAndUpdate.mockResolvedValue(null);
+    const response = await request(app).patch('/api/bank-reconciliations/' + statementId + '/match')
+      .send({ paymentId, reviewNotes: 'Reviewed reference and amount before confirming' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('BANK_MATCH_CONCURRENT_UPDATE');
+  });
+
+  test('translates a concurrent unique-payment match race into a stable conflict response', async () => {
+    BankStatement.findOneAndUpdate.mockRejectedValue(Object.assign(
+      new Error('duplicate key'),
+      { code: 11000, keyPattern: { firmId: 1, matchedPaymentId: 1 } }
+    ));
+    const response = await request(app).patch('/api/bank-reconciliations/' + statementId + '/match')
+      .send({ paymentId, reviewNotes: 'Reviewed reference and amount before confirming' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('PAYMENT_ALREADY_RECONCILED');
+    expect(response.body.error).toMatch(/concurrently/);
+  });
+
 });

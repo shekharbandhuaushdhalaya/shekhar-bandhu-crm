@@ -78,7 +78,15 @@ router.patch('/:id/match', authorize('payment:create'), async (req, res) => {
     });
     return res.json(matched);
   } catch (err) {
-    const status = err.statusCode || (err.code === 11000 ? 409 : 400);
+    // The firm-scoped unique index is the final guard against two concurrent
+    // confirmations assigning one payment to different bank statement lines.
+    if (err.code === 11000) {
+      return res.status(409).json({
+        error: 'This payment was reconciled to another bank statement line concurrently',
+        code: 'PAYMENT_ALREADY_RECONCILED'
+      });
+    }
+    const status = err.statusCode || 400;
     return res.status(status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
   }
 });
