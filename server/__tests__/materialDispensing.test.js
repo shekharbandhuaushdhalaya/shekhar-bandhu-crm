@@ -101,6 +101,49 @@ describe('Production material dispensing', () => {
     expect(MaterialDispensing.create).not.toHaveBeenCalled();
   });
 
+  test('keeps separate genealogy lines when the same reserved lot is dispensed more than once', async () => {
+    MaterialDispensing.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(record) });
+    RawMaterialLedger.create.mockResolvedValue([{}]);
+
+    const first = await request(app)
+      .patch('/api/batch-productions/' + batchId + '/dispensings/' + record._id + '/verify')
+      .set('x-user-id', reviewerId).set('x-user-name', 'QA Verifier').send({});
+    expect(first.status).toBe(200);
+    expect(batch.ingredientsConsumed).toHaveLength(1);
+    expect(batch.ingredientsConsumed[0].dispensingNo).toBe('DSP-000001');
+
+    const secondRecord = {
+      ...record,
+      _id: '507f1f77bcf86cd799439088',
+      dispensingNo: 'DSP-000002',
+      status: 'pending_verification',
+      items: [{
+        rawMaterialId: materialId,
+        rawMaterialEntryId: entryId,
+        qtyDispensed: 2,
+        qtyWasted: 0,
+        wastageReason: '',
+        lotNo: 'LOT-001'
+      }],
+      save: jest.fn().mockResolvedValue(true)
+    };
+    entry.qty = 96;
+    entry.reservedQty = 6;
+    entry.issuedQty = 4;
+    batch.ingredientsReserved[0].qtyReserved = 6;
+    MaterialDispensing.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(secondRecord) });
+
+    const second = await request(app)
+      .patch('/api/batch-productions/' + batchId + '/dispensings/' + secondRecord._id + '/verify')
+      .set('x-user-id', reviewerId).set('x-user-name', 'QA Verifier').send({});
+
+    expect(second.status).toBe(200);
+    expect(batch.ingredientsConsumed).toHaveLength(2);
+    expect(batch.ingredientsConsumed.map(item => item.dispensingNo)).toEqual(['DSP-000001', 'DSP-000002']);
+    expect(batch.ingredientsConsumed.map(item => item.qtyConsumed)).toEqual([4, 2]);
+    expect(batch.ingredientsConsumed.map(item => item.qtyWasted)).toEqual([1, 0]);
+  });
+
   test('requires independent verification and consumes reserved stock atomically', async () => {
     MaterialDispensing.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(record) });
     RawMaterialLedger.create.mockResolvedValue([{}]);

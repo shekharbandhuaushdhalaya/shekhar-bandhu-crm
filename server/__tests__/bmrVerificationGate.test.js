@@ -547,6 +547,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
   describe('independent finished-batch QA release', () => {
     const makeReleaseBatch = () => ({
       _id: 'batch-release-1',
+      batchNo: 'BATCH-RELEASE-1',
       productId: 'product-release-1',
       qcSpecificationId: 'spec-release-1',
       status: 'completed',
@@ -570,9 +571,10 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
     });
     const mockVerifiedDispensing = () => {
       MaterialDispensing.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([{
-        dispensingNo: 'DSP-1', status: 'verified', dispensedBy: 'material-operator',
+        dispensingNo: 'DSP-1', batchNo: 'BATCH-RELEASE-1', stageIndex: 0, stageName: 'Mixing',
+        status: 'verified', dispensedBy: 'material-operator',
         verifiedBy: 'material-reviewer', verifiedAt: new Date(),
-        items: [{ rawMaterialEntryId: 'entry-1', rawMaterialId: 'rm-1', qtyDispensed: 10 }]
+        items: [{ rawMaterialEntryId: 'entry-1', rawMaterialId: 'rm-1', lotNo: 'LOT-1', qtyDispensed: 10, qtyWasted: 0 }]
       }]) });
     };
     const makeClearances = () => ['manufacturing', 'filling', 'packing'].map(phase => ({
@@ -652,6 +654,39 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('MATERIAL_GENEALOGY_INCOMPLETE');
       expect(res.body.missingEvidence.some(item => item.includes('below the pinned formula requirement'))).toBe(true);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('blocks release when consumed quantity differs from the verified dispensing record', async () => {
+      const batch = makeReleaseBatch();
+      batch.ingredientsConsumed[0].qtyConsumed = 11;
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      mockVerifiedDispensing();
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('MATERIAL_GENEALOGY_INCOMPLETE');
+      expect(res.body.missingEvidence.some(item => item.includes('does not reconcile with independently verified dispensing quantity'))).toBe(true);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('blocks release when consumed wastage differs from the verified dispensing record', async () => {
+      const batch = makeReleaseBatch();
+      batch.ingredientsConsumed[0].qtyWasted = 1;
+      batch.ingredientsConsumed[0].wastageReason = 'Unmatched spillage note';
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      mockVerifiedDispensing();
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('MATERIAL_GENEALOGY_INCOMPLETE');
+      expect(res.body.missingEvidence.some(item => item.includes('does not reconcile with independently verified dispensing evidence'))).toBe(true);
       expect(batch.save).not.toHaveBeenCalled();
     });
 

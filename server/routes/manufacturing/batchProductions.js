@@ -27,7 +27,8 @@ function getMaterialGenealogyIssues(batch, dispensingRecords = []) {
   const consumed = Array.isArray(batch.ingredientsConsumed) ? batch.ingredientsConsumed : [];
   const records = Array.isArray(dispensingRecords) ? dispensingRecords : [];
   const verifiedRecords = new Map();
-  const verifiedItems = new Set();
+  const verifiedItems = new Map();
+  const matchedVerifiedItems = new Set();
   if (formula.some(item => item.itemType !== 'packaging') && records.length === 0) {
     issues.push('No independently verified material dispensing records are recorded');
   }
@@ -38,9 +39,46 @@ function getMaterialGenealogyIssues(batch, dispensingRecords = []) {
       issues.push('Material dispensing record is not independently verified: ' + (record.dispensingNo || String(record._id || 'Unknown')));
       continue;
     }
-    verifiedRecords.set(String(record.dispensingNo), record);
-    for (const item of record.items || []) {
-      verifiedItems.add(String(record.dispensingNo) + ':' + String(item.rawMaterialEntryId));
+    const dispensingNo = String(record.dispensingNo || '');
+    const stageIndex = Number(record.stageIndex);
+    const stage = Number.isInteger(stageIndex) ? (batch.stages || [])[stageIndex] : null;
+    if (!dispensingNo || !record.batchNo || String(record.batchNo) !== String(batch.batchNo) ||
+        !stage || String(stage.name || '') !== String(record.stageName || '')) {
+      issues.push('Verified dispensing record has an invalid batch or manufacturing-stage reference: ' + (dispensingNo || String(record._id || 'Unknown')));
+    }
+    verifiedRecords.set(dispensingNo, record);
+    if (!Array.isArray(record.items) || record.items.length === 0) {
+      issues.push('Verified dispensing record has no material lines: ' + dispensingNo);
+      continue;
+    }
+    for (const item of record.items) {
+      const entryId = String(item.rawMaterialEntryId || '');
+      const materialId = item.rawMaterialId && item.rawMaterialId._id
+        ? String(item.rawMaterialId._id) : String(item.rawMaterialId || '');
+      const qtyDispensed = Number(item.qtyDispensed);
+      const qtyWasted = Number(item.qtyWasted || 0);
+      const wastageReason = String(item.wastageReason || '').trim();
+      if (!entryId || !materialId || !item.lotNo ||
+          !Number.isFinite(qtyDispensed) || qtyDispensed <= 0 ||
+          !Number.isFinite(qtyWasted) || qtyWasted < 0 || qtyWasted > qtyDispensed ||
+          (qtyWasted > 0 && !wastageReason)) {
+        issues.push('Verified dispensing record contains an incomplete or invalid weighed material line: ' + dispensingNo);
+        continue;
+      }
+      const key = dispensingNo + ':' + entryId;
+      if (verifiedItems.has(key)) {
+        issues.push('Verified dispensing record contains a duplicate stock-lot line: ' + key);
+        continue;
+      }
+      verifiedItems.set(key, {
+        materialId,
+        entryId,
+        lotNo: String(item.lotNo),
+        stageIndex,
+        qtyDispensed,
+        qtyWasted,
+        wastageReason
+      });
     }
   }
   if (consumed.length === 0) issues.push('No actual raw-material consumption genealogy is recorded');
@@ -51,13 +89,37 @@ function getMaterialGenealogyIssues(batch, dispensingRecords = []) {
       issues.push('A consumed material line is missing its stock lot, dispensing, stage or quantity evidence');
       continue;
     }
-    if (!verifiedRecords.has(String(item.dispensingNo)) ||
-        !verifiedItems.has(String(item.dispensingNo) + ':' + String(item.rawMaterialEntryId))) {
+    const dispensingNo = String(item.dispensingNo);
+    const entryId = String(item.rawMaterialEntryId);
+    const key = dispensingNo + ':' + entryId;
+    const verifiedItem = verifiedItems.get(key);
+    if (!verifiedRecords.has(dispensingNo) || !verifiedItem) {
       issues.push('Consumed material line is not linked to an independently verified dispensing record: ' + String(item.rawMaterialId));
+    } else {
+      matchedVerifiedItems.add(key);
+      const materialId = item.rawMaterialId && item.rawMaterialId._id
+        ? String(item.rawMaterialId._id) : String(item.rawMaterialId);
+      if (materialId !== verifiedItem.materialId ||
+          Number(item.stageIndex) !== verifiedItem.stageIndex ||
+          String(item.batchNo) !== verifiedItem.lotNo) {
+        issues.push('Consumed material identity, stock lot or stage does not match its verified dispensing record: ' + String(item.rawMaterialId));
+      }
+      if (Math.abs(qty - verifiedItem.qtyDispensed) > 0.0001) {
+        issues.push('Consumed quantity does not reconcile with independently verified dispensing quantity: ' + String(item.rawMaterialId));
+      }
+      if (Math.abs(wasted - verifiedItem.qtyWasted) > 0.0001 ||
+          (verifiedItem.qtyWasted > 0 && String(item.wastageReason || '').trim() !== verifiedItem.wastageReason)) {
+        issues.push('Recorded wastage quantity or reason does not reconcile with independently verified dispensing evidence: ' + String(item.rawMaterialId));
+      }
     }
     if (!Number.isFinite(wasted) || wasted < 0 || wasted > qty ||
         (wasted > 0 && !String(item.wastageReason || '').trim())) {
       issues.push('Consumed material line has invalid or unexplained wastage: ' + String(item.rawMaterialId));
+    }
+  }
+  for (const key of verifiedItems.keys()) {
+    if (!matchedVerifiedItems.has(key)) {
+      issues.push('Verified dispensing line has no matching batch consumption record: ' + key);
     }
   }
   const plannedQty = Number(batch.plannedQty), basis = Number(batch.bomSnapshot.formulationBasis || 100);

@@ -97,7 +97,11 @@ router.patch('/:id/dispensings/:dispensingId/verify', authorize('manufacturing:e
         entry.issuedQty = Number(((entry.issuedQty || 0) + line.qtyDispensed).toFixed(2));
         await entry.save({ session });
         reservation.qtyReserved = Number((reservation.qtyReserved - line.qtyDispensed).toFixed(2));
-        const consumed = (batch.ingredientsConsumed || []).find(c => String(c.rawMaterialEntryId) === String(entry._id) && Number(c.stageIndex) === record.stageIndex);
+        const consumed = (batch.ingredientsConsumed || []).find(c =>
+          String(c.rawMaterialEntryId) === String(entry._id) &&
+          Number(c.stageIndex) === record.stageIndex &&
+          String(c.dispensingNo || '') === String(record.dispensingNo)
+        );
         if (consumed) {
           consumed.qtyConsumed = Number((consumed.qtyConsumed + line.qtyDispensed).toFixed(2));
           consumed.qtyWasted = Number(((consumed.qtyWasted || 0) + Number(line.qtyWasted || 0)).toFixed(2));
