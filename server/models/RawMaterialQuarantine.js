@@ -58,6 +58,12 @@ rawMaterialQuarantineSchema.pre('validate', function validateDispositionEvidence
   next();
 });
 
+// One stock entry can have only one quarantine record per tenant. The partial
+// index keeps legacy/manual records without a stock-entry link valid.
+rawMaterialQuarantineSchema.index({ rawMaterialEntryId: 1 }, {
+  unique: true,
+  partialFilterExpression: { rawMaterialEntryId: { $type: 'objectId' } }
+});
 rawMaterialQuarantineSchema.index({ rawMaterialEntryId: 1, quarantineStatus: 1 });
 rawMaterialQuarantineSchema.plugin(tenantPlugin);
 module.exports = mongoose.model('RawMaterialQuarantine', rawMaterialQuarantineSchema);

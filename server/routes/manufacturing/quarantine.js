@@ -115,6 +115,10 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
     }]);
     res.status(201).json(lot);
   } catch (err) {
+    if (err.code === 11000) return res.status(409).json({
+      error: 'A quarantine record already exists for this stock entry',
+      code: 'QUARANTINE_ALREADY_EXISTS'
+    });
     res.status(500).json({ error: err.message });
   }
 });

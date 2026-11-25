@@ -202,6 +202,27 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
       })]));
     });
 
+    test('returns a conflict when concurrent requests register the same stock entry in quarantine', async () => {
+      RawMaterialEntry.findById.mockResolvedValue({
+        _id: 'entry_duplicate', rawMaterialId: 'rm_duplicate', batchNo: 'BATCH-DUP',
+        vendorName: 'Herbal Supplier', expiryDate: new Date('2027-12-31'),
+        qty: 12, reservedQty: 0, qcStatus: 'under_test'
+      });
+      RawMaterialQuarantine.findOne.mockResolvedValue(null);
+      RawMaterialQuarantine.create.mockRejectedValue(Object.assign(
+        new Error('duplicate key'), { code: 11000 }
+      ));
+
+      const res = await request(app).post('/api/manufacturing/quarantine').send({
+        herbName: 'Ashwagandha', batchNo: 'BATCH-DUP', supplierName: 'Herbal Supplier',
+        rawMaterialEntryId: 'entry_duplicate', rawMaterialId: 'rm_duplicate',
+        qty: 12, unit: 'kg', expiryDate: '2027-12-31'
+      });
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('QUARANTINE_ALREADY_EXISTS');
+    });
+
     test('PATCH /api/manufacturing/quarantine/:id/release sets RawMaterialEntry qcStatus to approved when released', async () => {
       const mockEntry = {
         _id: 'entry_101',
