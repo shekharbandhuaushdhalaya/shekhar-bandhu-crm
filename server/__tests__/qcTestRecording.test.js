@@ -212,7 +212,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
     mockBatch(batch);
-    ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(spec) });
+    mockSpec(spec);
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval')
       .set('x-user-id', 'qa-reviewer-2').set('x-user-name', 'QA Reviewer')
       .send({ notes: 'Reviewed actual results against approved specification' });
