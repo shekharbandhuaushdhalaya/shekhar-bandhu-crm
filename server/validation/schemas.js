@@ -493,7 +493,7 @@ const batchCompleteSchema = z.object({
   qcPassedBy: z.string().default(''),
   packing: z.number().int().min(1).default(1),
   yields: z.array(yieldItemSchema).optional(),
-  qcStatus: z.enum(['approved', 'rejected']).default('approved'),
+  qcStatus: z.enum(['pending', 'approved', 'rejected']).default('pending'),
   organoleptic: z.string().optional(),
   moistureContent: z.number().nullable().optional(),
   moistureLimit: z.string().optional(),

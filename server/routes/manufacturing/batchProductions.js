@@ -1074,6 +1074,24 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       });
     }
 
+    // QC approval is a separate, specification-driven workflow. Completion may
+    // record a pending disposition or a rejection, but cannot self-approve QC
+    // using legacy summary fields supplied in this request.
+    const qcDisposition = qcStatus || 'pending';
+    if (!['pending', 'approved', 'rejected'].includes(qcDisposition)) {
+      return res.status(400).json({ error: 'QC disposition must be pending, approved, or rejected' });
+    }
+    if (qcDisposition === 'approved') {
+      return res.status(409).json({
+        error: 'QC approval must follow recorded, specification-linked test results and independent QA review',
+        code: 'SPECIFICATION_QC_APPROVAL_REQUIRED',
+        nextStep: 'Record actual results through the qc-tests endpoint, then obtain independent approval through qc-approval'
+      });
+    }
+    if (qcDisposition !== 'pending' && (!req.user || !req.user.id || !req.user.name)) {
+      return res.status(401).json({ error: 'Authenticated QC analyst identity is required for a QC disposition' });
+    }
+
     const warehouse = await Warehouse.findById(warehouseId);
     if (!warehouse) {
       return res.status(404).json({ error: 'Finished-goods storage warehouse was not found.' });
@@ -1089,14 +1107,7 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       }
     }
 
-    // Record a QC disposition only when an explicit decision is supplied.
-    const qcDisposition = qcStatus || 'pending';
-    if (!['pending', 'approved', 'rejected'].includes(qcDisposition)) {
-      return res.status(400).json({ error: 'QC disposition must be pending, approved, or rejected' });
-    }
-    if (qcDisposition !== 'pending' && (!req.user || !req.user.id || !req.user.name)) {
-      return res.status(401).json({ error: 'Authenticated QC analyst identity is required for a QC disposition' });
-    }
+    // Persist only the pending or rejected disposition validated above.
     batch.qcStatus = qcDisposition;
     batch.qcPassedByUser = qcDisposition === 'pending' ? null : req.user.id;
     batch.qcPassedBy = qcDisposition === 'pending' ? '' : req.user.name;

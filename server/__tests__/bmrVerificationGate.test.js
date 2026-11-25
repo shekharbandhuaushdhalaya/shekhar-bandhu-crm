@@ -295,6 +295,38 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
     });
   });
 
+  describe('specification-driven QC approval gate', () => {
+    test('does not allow the completion request to self-approve QC using legacy fields', async () => {
+      const batch = {
+        _id: 'batch-qc-bypass-1',
+        status: 'in_progress',
+        productId: '444444444444444444444444',
+        plannedQty: 100,
+        stages: [],
+        packagingMode: 'self_packed',
+        packagingDeducted: false,
+        save: jest.fn()
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Product.find.mockResolvedValue([{ _id: '444444444444444444444444', name: 'Test Product', mrp: 10 }]);
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-qc-bypass-1/complete')
+        .send({
+          actualYieldQty: 100,
+          qcPassedBy: 'QC Analyst',
+          qcStatus: 'approved',
+          warehouseId: '222222222222222222222222'
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('SPECIFICATION_QC_APPROVAL_REQUIRED');
+      expect(Warehouse.findById).not.toHaveBeenCalled();
+      expect(batch.packagingDeducted).toBe(false);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+  });
+
   describe('independent finished-batch QA release', () => {
     const makeReleaseBatch = () => ({
       _id: 'batch-release-1',
