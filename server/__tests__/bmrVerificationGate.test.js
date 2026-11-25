@@ -10,6 +10,7 @@ jest.mock('../models/ProductQualitySpecification');
 jest.mock('../models/LineClearance');
 jest.mock('../models/RetentionSample');
 jest.mock('../models/MaterialDispensing');
+jest.mock('../models/DeviationCapa');
 jest.mock('../models/InventoryEntry');
 jest.mock('../models/Warehouse');
 jest.mock('../models/Challan');
@@ -48,6 +49,7 @@ const SystemSettings = require('../models/SystemSettings');
 const LineClearance = require('../models/LineClearance');
 const RetentionSample = require('../models/RetentionSample');
 const MaterialDispensing = require('../models/MaterialDispensing');
+const DeviationCapa = require('../models/DeviationCapa');
 const InventoryEntry = require('../models/InventoryEntry');
 const Warehouse = require('../models/Warehouse');
 const Challan = require('../models/Challan');
@@ -745,6 +747,28 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       expect(batch.save).toHaveBeenCalled();
     });
 
+    test('blocks market release while a QC failure Deviation/CAPA remains open', async () => {
+      const batch = makeReleaseBatch();
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      mockVerifiedDispensing();
+      mockRetentionSample();
+      DeviationCapa.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([{
+          _id: 'deviation-open-1', deviationNo: 'DEV-00001', sourceTestCode: 'IDENTITY', status: 'open'
+        }]),
+        session: jest.fn().mockReturnThis()
+      });
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('QC_DEVIATION_OPEN');
+      expect(res.body.deviations[0].deviationNo).toBe('DEV-00001');
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
     test('blocks market release when no current stored retention sample exists', async () => {
       const batch = makeReleaseBatch();
       BatchProduction.findById.mockResolvedValue(batch);
@@ -792,6 +816,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
       LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
       MaterialDispensing.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+    DeviationCapa.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]), session: jest.fn().mockReturnThis() });
       const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('MATERIAL_GENEALOGY_INCOMPLETE');

@@ -1867,6 +1867,17 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
       code: 'PACKAGING_RECONCILIATION_INCOMPLETE',
       missingEvidence: packagingIssues
     });
+    const DeviationCapa = require('../../models/DeviationCapa');
+    const openQcDeviations = await DeviationCapa.find({
+      batchId: batch._id, deviationType: 'qc_failure', status: { $ne: 'closed' }
+    }).lean();
+    if (openQcDeviations.length) return res.status(409).json({
+      error: 'Open QC failure Deviation/CAPA records must be independently verified and closed before market release',
+      code: 'QC_DEVIATION_OPEN',
+      deviations: openQcDeviations.map(deviation => ({
+        id: deviation._id, deviationNo: deviation.deviationNo, sourceTestCode: deviation.sourceTestCode || ''
+      }))
+    });
     for (const phase of ['manufacturing','filling','packing']) {
       const c = clearances.find(x => x.phase === phase);
       if (!c || !c.cleared || !c.submittedBy || !c.verifiedBy ||
@@ -1885,6 +1896,14 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
         $or: [{ releasedBy: null }, { releasedBy: { $exists: false } }]
       }).session(session);
       if (!current) throw Object.assign(new Error('Batch was released or changed concurrently; refresh and retry'), { code: 'BATCH_RELEASE_CONFLICT' });
+      const openQcDeviationsInTransaction = await DeviationCapa.find({
+        batchId: current._id, deviationType: 'qc_failure', status: { $ne: 'closed' }
+      }).session(session).lean();
+      if (openQcDeviationsInTransaction.length) {
+        throw Object.assign(new Error('Open QC failure Deviation/CAPA records must be independently verified and closed before market release'), {
+          code: 'QC_DEVIATION_OPEN'
+        });
+      }
       current.releasedBy = req.user.id;
       current.releasedByName = req.user.name;
       current.releasedAt = releasedAt;
@@ -1903,7 +1922,7 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
 
     res.json(batch);
   } catch (err) {
-    res.status(err.code === 'BATCH_RELEASE_CONFLICT' ? 409 : 500).json({ error: err.message, code: err.code });
+    res.status(['BATCH_RELEASE_CONFLICT', 'QC_DEVIATION_OPEN'].includes(err.code) ? 409 : 500).json({ error: err.message, code: err.code });
   }
 });
 
@@ -2156,12 +2175,14 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
     const MaterialDispensing = require('../../models/MaterialDispensing');
     const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
     const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
+    const DeviationCapa = require('../../models/DeviationCapa');
     const settings = await SystemSettings.findOne().lean() || {};
-    const [lineClearance, retentionSamples, dispensingRecords, qualitySpecification] = await Promise.all([
+    const [lineClearance, retentionSamples, dispensingRecords, qualitySpecification, openQcDeviations] = await Promise.all([
       LineClearance.find({ batchId: batch._id }).lean(),
       RetentionSample.find({ batchId: batch._id }).lean(),
       MaterialDispensing.find({ batchId: batch._id }).sort({ stageIndex: 1, dispensedAt: 1 }).lean(),
-      batch.qcSpecificationId ? ProductQualitySpecification.findById(batch.qcSpecificationId).lean() : Promise.resolve(null)
+      batch.qcSpecificationId ? ProductQualitySpecification.findById(batch.qcSpecificationId).lean() : Promise.resolve(null),
+      DeviationCapa.find({ batchId: batch._id, deviationType: 'qc_failure', status: { $ne: 'closed' } }).lean()
     ]);
 
     const enrichedIngredients = [];
@@ -2290,6 +2311,9 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
     if (Number(batch.wasteQty || 0) > 0 && !batch.wasteReason) missingEvidence.push('Recorded production wastage has no reason');
     missingEvidence.push(...getRetentionSampleIssues(batch, retentionSamples));
     missingEvidence.push(...getPackagingReconciliationIssues(batch, dispensingRecords));
+    for (const deviation of openQcDeviations) {
+      missingEvidence.push('Open QC failure Deviation/CAPA must be independently verified and closed before release: ' + deviation.deviationNo);
+    }
     const hasUnverifiedReferences = unverifiedIngredients.length > 0;
     const bmrComplete = missingEvidence.length === 0;
     res.json({
