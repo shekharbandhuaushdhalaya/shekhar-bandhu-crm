@@ -388,8 +388,9 @@ router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), async (req
     const verificationNotes = typeof req.body?.verificationNotes === 'string' ? req.body.verificationNotes.trim() : '';
     if (!reviewerId || !reviewerName) return res.status(403).json({ error: 'Authenticated independent reviewer identity is required' });
     if (!['verified', 'rejected'].includes(decision)) return res.status(400).json({ error: 'decision must be verified or rejected' });
-    if (!verificationNotes) return res.status(400).json({ error: 'Verification notes are required' });
-    if (decision === 'rejected' && !String(req.body.rejectionReason || '').trim()) return res.status(400).json({ error: 'A rejection reason is required' });
+    if (verificationNotes.length < 10) return res.status(400).json({ error: 'Substantive verification notes of at least 10 characters are required' });
+    const rejectionReason = String(req.body.rejectionReason || '').trim();
+    if (decision === 'rejected' && rejectionReason.length < 10) return res.status(400).json({ error: 'A substantive rejection reason of at least 10 characters is required' });
     const grn = await withTransaction(async session => {
       const record = await GoodsReceivedNote.findById(req.params.id).session(session);
       if (!record) throw Object.assign(new Error('Goods Received Note not found'), { statusCode: 404 });
@@ -411,7 +412,7 @@ router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), async (req
       record.verifiedByName = reviewerName;
       record.verifiedAt = new Date();
       record.verificationNotes = verificationNotes;
-      record.rejectionReason = decision === 'rejected' ? String(req.body.rejectionReason).trim() : '';
+      record.rejectionReason = decision === 'rejected' ? rejectionReason : '';
       await record.save({ session });
       return record;
     });
