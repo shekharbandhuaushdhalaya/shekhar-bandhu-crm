@@ -1,6 +1,7 @@
 const express = require('express');
 const PurchaseOrder = require('../../models/PurchaseOrder');
 const PurchaseRequisition = require('../../models/PurchaseRequisition');
+const SupplierQuotation = require('../../models/SupplierQuotation');
 const GoodsReceivedNote = require('../../models/GoodsReceivedNote');
 const Vendor = require('../../models/Vendor');
 const VendorQualification = require('../../models/VendorQualification');
@@ -62,6 +63,28 @@ router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchem
             throw Object.assign(new Error('PO item quantity and unit must exactly match the approved requisition'), { statusCode: 409, code: 'REQUISITION_LINE_MISMATCH' });
           }
         }
+        let selectedQuote = null;
+        if (requisition.selectedQuotationId) {
+          selectedQuote = await SupplierQuotation.findById(requisition.selectedQuotationId).session(session);
+          if (!selectedQuote || selectedQuote.status !== 'selected' ||
+              String(selectedQuote.requisitionId) !== String(requisition._id) ||
+              String(selectedQuote.vendorId) !== String(vendorId) ||
+              new Date(selectedQuote.validUntil) <= new Date()) {
+            throw Object.assign(new Error('The selected supplier quotation is unavailable, expired or does not match the selected vendor'), { statusCode: 409, code: 'SELECTED_QUOTATION_INVALID' });
+          }
+          for (const item of items) {
+            const quoteLine = selectedQuote.items.find(line =>
+              item.rawMaterialId && line.rawMaterialId && String(line.rawMaterialId) === String(item.rawMaterialId) ||
+              item.productId && line.productId && String(line.productId) === String(item.productId)
+            );
+            if (!quoteLine || Math.abs(Number(item.unitPrice) - Number(quoteLine.unitPrice)) > 0.0001 ||
+                Math.abs(Number(item.gstRate || 0) - Number(quoteLine.gstRate || 0)) > 0.0001) {
+              throw Object.assign(new Error('PO line pricing and GST must match the independently selected supplier quotation'), { statusCode: 409, code: 'SELECTED_QUOTATION_PRICE_MISMATCH' });
+            }
+          }
+        } else if (String(req.body.procurementExceptionReason || '').trim().length < 20) {
+          throw Object.assign(new Error('Select an independently reviewed supplier quotation or record a procurement exception of at least 20 characters'), { statusCode: 409, code: 'PROCUREMENT_QUOTATION_OR_EXCEPTION_REQUIRED' });
+        }
         const vendor = await Vendor.findById(vendorId).session(session);
         if (!vendor) throw Object.assign(new Error('Vendor not found'), { statusCode: 404 });
         const resolvedVendorName = vendorName || vendor.company || vendor.name || 'Vendor';
@@ -77,11 +100,17 @@ router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchem
         });
         const [created] = await PurchaseOrder.create([{
           poNo, vendorId, vendorName: resolvedVendorName, sourceRequisitionId: requisition._id,
+          sourceQuotationId: selectedQuote ? selectedQuote._id : null,
+          procurementExceptionReason: String(req.body.procurementExceptionReason || '').trim(),
           orderDate: new Date(), items: processedItems,
           subtotal: Number(subtotal.toFixed(2)), taxAmount: Number(taxAmount.toFixed(2)),
           totalAmount: Number((subtotal + taxAmount).toFixed(2)), status: 'draft', notes,
           createdBy: req.user?.name || 'System', createdByUserId: req.user?.id || null
         }], { session });
+        if (selectedQuote) {
+          selectedQuote.status = 'converted';
+          await selectedQuote.save({ session });
+        }
         requisition.status = 'converted';
         requisition.purchaseOrderId = created._id;
         await requisition.save({ session });

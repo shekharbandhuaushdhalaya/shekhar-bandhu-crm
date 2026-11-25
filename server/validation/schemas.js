@@ -853,6 +853,7 @@ const poItemInputSchema = z.object({
 
 const purchaseOrderSchema = z.object({
   requisitionId: objectId.optional(),
+  procurementExceptionReason: z.string().optional().default(''),
   vendorId: objectId,
   vendorName: z.string().optional().default(''),
   items: z.array(poItemInputSchema).min(1, 'At least one item required'),

@@ -29,6 +29,7 @@ const schema = new mongoose.Schema({
   rejectedByName: { type: String, default: '' },
   rejectedAt: { type: Date, default: null },
   rejectionReason: { type: String, default: '' },
+  selectedQuotationId: { type: mongoose.Schema.Types.ObjectId, ref: 'SupplierQuotation', default: null },
   purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder', default: null },
   createdByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
