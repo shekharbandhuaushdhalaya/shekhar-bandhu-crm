@@ -16,6 +16,7 @@ const poItemSchema = new mongoose.Schema({
 const purchaseOrderSchema = new mongoose.Schema({
   poNo: { type: String, required: true, unique: true, trim: true },
   vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  sourceRequisitionId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseRequisition', default: null, index: true },
   vendorName: { type: String, required: true, trim: true },
   orderDate: { type: Date, default: Date.now },
   expectedDeliveryDate: { type: Date },

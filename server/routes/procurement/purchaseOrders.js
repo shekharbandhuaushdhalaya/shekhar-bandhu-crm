@@ -1,5 +1,6 @@
 const express = require('express');
 const PurchaseOrder = require('../../models/PurchaseOrder');
+const PurchaseRequisition = require('../../models/PurchaseRequisition');
 const GoodsReceivedNote = require('../../models/GoodsReceivedNote');
 const Vendor = require('../../models/Vendor');
 const VendorQualification = require('../../models/VendorQualification');
@@ -33,7 +34,63 @@ router.get('/', authorize('vendor:view'), async (req, res) => {
 
 router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchema), async (req, res) => {
   try {
-    const { vendorId, vendorName, items, notes } = req.body;
+    const { vendorId, vendorName, items, notes, requisitionId } = req.body;
+    if (requisitionId) {
+      const po = await withTransaction(async session => {
+        const requisition = await PurchaseRequisition.findById(requisitionId).session(session);
+        if (!requisition) throw Object.assign(new Error('Purchase requisition not found'), { statusCode: 404 });
+        if (requisition.status !== 'approved' || requisition.purchaseOrderId) {
+          throw Object.assign(new Error('Only an approved, unconverted requisition can be converted to a purchase order'), { statusCode: 409, code: 'REQUISITION_NOT_CONVERTIBLE' });
+        }
+        if (!Array.isArray(requisition.items) || requisition.items.length !== items.length) {
+          throw Object.assign(new Error('Purchase order must contain every approved requisition line exactly once'), { statusCode: 400 });
+        }
+        const seen = new Set();
+        for (const item of items) {
+          if ((!item.rawMaterialId && !item.productId) || (item.rawMaterialId && item.productId)) {
+            throw Object.assign(new Error('Each PO line must reference exactly one raw material or finished product'), { statusCode: 400 });
+          }
+          const key = item.rawMaterialId ? 'raw:' + String(item.rawMaterialId) : 'product:' + String(item.productId);
+          if (seen.has(key)) throw Object.assign(new Error('Duplicate purchase order line for the same requisition item'), { statusCode: 400 });
+          seen.add(key);
+          const requested = requisition.items.find(line =>
+            item.rawMaterialId && line.rawMaterialId && String(line.rawMaterialId) === String(item.rawMaterialId) ||
+            item.productId && line.productId && String(line.productId) === String(item.productId)
+          );
+          if (!requested || Math.abs(Number(item.qtyOrdered) - Number(requested.qtyRequested)) > 0.0001 ||
+              String(item.unit || '').trim().toLowerCase() !== String(requested.unit || '').trim().toLowerCase()) {
+            throw Object.assign(new Error('PO item quantity and unit must exactly match the approved requisition'), { statusCode: 409, code: 'REQUISITION_LINE_MISMATCH' });
+          }
+        }
+        const vendor = await Vendor.findById(vendorId).session(session);
+        if (!vendor) throw Object.assign(new Error('Vendor not found'), { statusCode: 404 });
+        const resolvedVendorName = vendorName || vendor.company || vendor.name || 'Vendor';
+        const poNo = await generateAtomicDocumentNumber('purchaseOrderNo', 'PO', 5, session);
+        let subtotal = 0;
+        let taxAmount = 0;
+        const processedItems = items.map(item => {
+          const lineBase = Number(item.qtyOrdered) * Number(item.unitPrice);
+          const lineTax = lineBase * Number(item.gstRate || 0) / 100;
+          subtotal += lineBase;
+          taxAmount += lineTax;
+          return { ...item, qtyReceived: 0 };
+        });
+        const [created] = await PurchaseOrder.create([{
+          poNo, vendorId, vendorName: resolvedVendorName, sourceRequisitionId: requisition._id,
+          orderDate: new Date(), items: processedItems,
+          subtotal: Number(subtotal.toFixed(2)), taxAmount: Number(taxAmount.toFixed(2)),
+          totalAmount: Number((subtotal + taxAmount).toFixed(2)), status: 'draft', notes,
+          createdBy: req.user?.name || 'System', createdByUserId: req.user?.id || null
+        }], { session });
+        requisition.status = 'converted';
+        requisition.purchaseOrderId = created._id;
+        await requisition.save({ session });
+        return created;
+      });
+      req.io?.emit('po_updated', { type: 'created', id: po._id });
+      req.io?.emit('purchase_requisition_updated', { type: 'converted', id: req.body.requisitionId });
+      return res.status(201).json(po);
+    }
     const vend = await Vendor.findById(vendorId);
     if (!vend) return res.status(404).json({ error: 'Vendor not found' });
     const resolvedVendorName = vendorName || vend.company || vend.name || 'Vendor';
