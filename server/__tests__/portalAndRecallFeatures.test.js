@@ -261,10 +261,27 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
 
       const res = await request(app).get('/api/recalls/recall_1/audit-report');
       expect(res.status).toBe(200);
-      expect(res.body.title).toContain('AYUSH DRUG INSPECTOR BATCH RECALL AUDIT REPORT');
+      expect(res.body.title).toContain('Internal batch recall traceability and effectiveness report');
+      expect(res.body.reportStatus).toBe('INTERNAL_RECORD_NOT_A_STATUTORY_SUBMISSION');
       expect(res.body.firmDetails.name).toBe('SHEKHAR BANDHU AUSHADHALAYA');
+      expect(res.body.firmDetails.licenseNo).toBe('AYUSH-1983-UP');
+      expect(res.body.firmDetails.gmpCertNo).toBeUndefined();
       expect(res.body.reconciliationMetrics.reconciliationPercentage).toBe(95);
       expect(res.body.reconciliationMetrics.unrecoveredQty).toBe(50);
+    });
+
+    test('does not invent firm identity, licence or GMP certificate values when configuration is absent', async () => {
+      Recall.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({
+        _id: 'recall_2', recallNo: 'REC-2026-002', batchNo: 'B-2026-89',
+        productName: 'Test formulation', severity: 'class_II', reason: 'Investigation',
+        totalAffectedQty: 0, recalledQty: 0, status: 'initiated', affectedCustomers: []
+      }) });
+      SystemSettings.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({}) });
+      const res = await request(app).get('/api/recalls/recall_2/audit-report');
+      expect(res.status).toBe(200);
+      expect(res.body.firmDetails).toEqual({});
+      expect(res.body.reconciliationMetrics.reconciliationPercentage).toBeNull();
+      expect(res.body.reconciliationMetrics.reconciliationStatus).toBe('no_distributed_quantity_identified');
     });
   });
 });

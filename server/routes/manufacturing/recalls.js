@@ -127,15 +127,16 @@ router.get('/:id/audit-report', authorize('manufacturing:view'), async (req, res
 
     const totalAffected = recall.totalAffectedQty || 0;
     const recalled = recall.recalledQty || 0;
-    const reconciliationPct = totalAffected > 0 ? Number(((recalled / totalAffected) * 100).toFixed(1)) : 100;
+    const reconciliationPct = totalAffected > 0 ? Number(((recalled / totalAffected) * 100).toFixed(1)) : null;
     const notifiedCount = (recall.affectedCustomers || []).filter(c => c.notified).length;
 
     res.json({
-      title: `AYUSH DRUG INSPECTOR BATCH RECALL AUDIT REPORT — ${recall.recallNo}`,
+      title: `Internal batch recall traceability and effectiveness report — ${recall.recallNo}`,
+      reportStatus: 'INTERNAL_RECORD_NOT_A_STATUTORY_SUBMISSION',
       firmDetails: {
-        name: settings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
-        licenseNo: settings.manufacturingLicenseNo || 'AYUSH-1983-UP',
-        gmpCertNo: settings.gmpCertificateNo || 'GMP-AYUSH-2026-VNS'
+        ...(settings.firmName ? { name: settings.firmName } : {}),
+        ...(settings.manufacturingLicenseNo ? { licenseNo: settings.manufacturingLicenseNo } : {}),
+        ...(settings.gmpCertificateNo ? { gmpCertNo: settings.gmpCertificateNo } : {})
       },
       recallDetails: {
         recallNo: recall.recallNo,
@@ -153,6 +154,7 @@ router.get('/:id/audit-report', authorize('manufacturing:view'), async (req, res
         recalledQty: recalled,
         unrecoveredQty: Math.max(0, totalAffected - recalled),
         reconciliationPercentage: reconciliationPct,
+        reconciliationStatus: totalAffected > 0 ? 'distribution_quantity_reconciled' : 'no_distributed_quantity_identified',
         totalCustomersNotified: `${notifiedCount} of ${(recall.affectedCustomers || []).length}`
       },
       affectedDistributionList: recall.affectedCustomers || []
