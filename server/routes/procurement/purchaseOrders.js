@@ -673,4 +673,31 @@ router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/purchase-orders/supplier-scorecards/:vendorId — evidence-based supplier performance metrics.
+router.get('/supplier-scorecards/:vendorId', authorize('vendor:view'), async (req, res) => {
+  try {
+    const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const to = req.query.to ? new Date(req.query.to) : new Date();
+    if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from > to) {
+      return res.status(400).json({ error: 'Valid from/to date range is required' });
+    }
+    const vendor = await Vendor.findById(req.params.vendorId).lean();
+    if (!vendor) return res.status(404).json({ error: 'Supplier not found' });
+    const [purchaseOrders, goodsReceivedNotes, supplierReturns, qualifications] = await Promise.all([
+      PurchaseOrder.find({ vendorId: vendor._id, orderDate: { $gte: from, $lte: to } }).lean(),
+      GoodsReceivedNote.find({ vendorId: vendor._id, receivedDate: { $gte: from, $lte: to } }).lean(),
+      SupplierReturn.find({ vendorId: vendor._id, createdAt: { $gte: from, $lte: to } }).lean(),
+      VendorQualification.find({ vendorId: vendor._id }).lean()
+    ]);
+    const { buildSupplierScorecard } = require('../../services/supplierScorecardService');
+    res.json({
+      vendor: { _id: vendor._id, name: vendor.company || vendor.name || vendor.vendorName || 'Supplier' },
+      scorecard: buildSupplierScorecard({ purchaseOrders, goodsReceivedNotes, supplierReturns, qualifications, from, to }),
+      scoringPolicy: 'Raw evidence metrics only; no composite supplier rating is inferred from missing or incomplete records.'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
