@@ -337,7 +337,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
         });
 
       expect(res.status).toBe(409);
-      expect(res.body.code).toBe('SPECIFICATION_QC_APPROVAL_REQUIRED');
+      expect(res.body.code).toBe('SPECIFICATION_QC_DISPOSITION_REQUIRED');
       expect(Warehouse.findById).not.toHaveBeenCalled();
       expect(batch.packagingDeducted).toBe(false);
       expect(batch.save).not.toHaveBeenCalled();
