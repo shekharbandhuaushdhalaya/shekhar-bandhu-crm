@@ -3,6 +3,7 @@ const PurchaseOrder = require('../../models/PurchaseOrder');
 const PurchaseRequisition = require('../../models/PurchaseRequisition');
 const SupplierQuotation = require('../../models/SupplierQuotation');
 const GoodsReceivedNote = require('../../models/GoodsReceivedNote');
+const SupplierReturn = require('../../models/SupplierReturn');
 const Vendor = require('../../models/Vendor');
 const VendorQualification = require('../../models/VendorQualification');
 const Warehouse = require('../../models/Warehouse');
@@ -403,6 +404,52 @@ router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), async (req
   } catch (err) { return res.status(err.statusCode || 400).json({ error: err.message, code: err.code }); }
 });
 
+// Supplier returns track rejected quantities separately; rejected goods were never inwarded.
+router.get('/grn/:id/supplier-returns', authorize('vendor:view'), async (req, res) => {
+  try { const grn = await GoodsReceivedNote.findById(req.params.id).lean(); if (!grn) return res.status(404).json({ error: 'Goods Received Note not found' }); const rows = await SupplierReturn.find({ grnId: grn._id }).sort({ createdAt: -1 }).lean(); return res.json(rows); } catch (err) { return res.status(500).json({ error: err.message }); }
+});
+router.post('/grn/:id/supplier-returns', authorize('vendor:edit'), async (req, res) => {
+  try {
+    const makerId = req.user?.id || req.user?._id; const makerName = req.user?.name || req.user?.email;
+    if (!makerId || !makerName) return res.status(403).json({ error: 'Authenticated return-request identity is required' });
+    const b = req.body || {};
+    if (!Number.isInteger(b.itemIndex) || !Number.isFinite(Number(b.qty)) || Number(b.qty) <= 0 || !String(b.reason || '').trim()) return res.status(400).json({ error: 'A valid item index, positive quantity and reason are required' });
+    if (!['return_to_supplier','replacement_requested','debit_note_requested'].includes(b.resolutionType)) return res.status(400).json({ error: 'Invalid supplier return resolution type' });
+    const record = await withTransaction(async session => {
+      const grn = await GoodsReceivedNote.findById(req.params.id).session(session);
+      if (!grn) throw Object.assign(new Error('Goods Received Note not found'), { statusCode: 404 });
+      if (grn.status !== 'verified') throw Object.assign(new Error('Supplier returns require an independently verified GRN'), { statusCode: 409 });
+      const item = (grn.items || [])[b.itemIndex]; if (!item) throw Object.assign(new Error('GRN item not found'), { statusCode: 404 });
+      const prior = await SupplierReturn.find({ grnId: grn._id, itemIndex: b.itemIndex }).session(session);
+      const outstanding = prior.filter(x => !['rejected','cancelled'].includes(x.status)).reduce((sum,x) => sum + Number(x.qty || 0), 0);
+      if (outstanding + Number(b.qty) > Number(item.qtyRejected || 0)) throw Object.assign(new Error('Return quantity exceeds remaining rejected quantity'), { statusCode: 409, code: 'SUPPLIER_RETURN_QTY_EXCEEDED' });
+      const returnNo = await generateAtomicDocumentNumber('supplierReturnNo', 'SR', 6, session);
+      const docs = await SupplierReturn.create([{ returnNo, grnId: grn._id, grnNo: grn.grnNo, poId: grn.poId, poNo: grn.poNo, vendorId: grn.vendorId, vendorName: grn.vendorName, itemIndex: b.itemIndex, rawMaterialId: item.rawMaterialId || null, productId: item.productId || null, itemName: item.name, batchNo: item.batchNo, qty: Number(b.qty), unit: item.unit || '', reason: String(b.reason).trim(), resolutionType: b.resolutionType, status: 'pending_approval', requestedByUserId: makerId, requestedByName: makerName }], { session });
+      return docs[0];
+    });
+    await logAction({ action: 'SUPPLIER_RETURN_REQUESTED', description: 'Supplier return ' + record.returnNo + ' requested', details: { supplierReturnId: record._id, returnNo: record.returnNo, grnId: record.grnId, qty: record.qty, resolutionType: record.resolutionType }, req });
+    req.io?.emit('supplier_return_updated', { type: 'created', id: record._id }); return res.status(201).json(record);
+  } catch (err) { return res.status(err.statusCode || 400).json({ error: err.message, code: err.code }); }
+});
+router.patch('/supplier-returns/:id/approve', authorize('vendor:approve'), async (req, res) => {
+  try {
+    const reviewerId = req.user?.id || req.user?._id; const reviewerName = req.user?.name || req.user?.email;
+    if (!reviewerId || !reviewerName) return res.status(403).json({ error: 'Authenticated independent reviewer identity is required' });
+    const record = await SupplierReturn.findById(req.params.id); if (!record) return res.status(404).json({ error: 'Supplier return not found' });
+    if (record.status !== 'pending_approval') return res.status(409).json({ error: 'Only pending supplier returns can be reviewed' });
+    if (String(record.requestedByUserId) === String(reviewerId)) return res.status(403).json({ error: 'Requester cannot approve own supplier return', code: 'SUPPLIER_RETURN_MAKER_CHECKER_REQUIRED' });
+    const decision = req.body?.decision || 'approved'; if (!['approved','rejected'].includes(decision)) return res.status(400).json({ error: 'Invalid decision' });
+    if (!String(req.body?.reviewNotes || '').trim() || (decision === 'rejected' && !String(req.body?.rejectionReason || '').trim())) return res.status(400).json({ error: 'Review notes and, when rejecting, a rejection reason are required' });
+    record.status = decision; record.reviewedByUserId = reviewerId; record.reviewedByName = reviewerName; record.reviewedAt = new Date(); record.reviewNotes = String(req.body.reviewNotes).trim(); record.rejectionReason = decision === 'rejected' ? String(req.body.rejectionReason).trim() : ''; await record.save();
+    await logAction({ action: 'SUPPLIER_RETURN_REVIEWED', description: 'Supplier return ' + record.returnNo + ' ' + decision, details: { supplierReturnId: record._id, decision }, req }); return res.json(record);
+  } catch (err) { return res.status(400).json({ error: err.message, code: err.code }); }
+});
+router.patch('/supplier-returns/:id/dispatch', authorize('vendor:edit'), async (req, res) => {
+  try { const record = await SupplierReturn.findById(req.params.id); if (!record) return res.status(404).json({ error: 'Supplier return not found' }); if (record.status !== 'approved') return res.status(409).json({ error: 'Only approved returns can be dispatched' }); const ref = String(req.body?.dispatchRef || '').trim(); if (!ref) return res.status(400).json({ error: 'Dispatch/handover reference is required' }); record.status = 'dispatched'; record.dispatchRef = ref; record.dispatchedByUserId = req.user?.id || req.user?._id || null; record.dispatchedByName = req.user?.name || req.user?.email || ''; record.dispatchedAt = new Date(); await record.save(); await logAction({ action: 'SUPPLIER_RETURN_DISPATCHED', description: 'Supplier return ' + record.returnNo + ' dispatched', details: { supplierReturnId: record._id, dispatchRef: ref }, req }); return res.json(record); } catch (err) { return res.status(400).json({ error: err.message }); }
+});
+router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (req, res) => {
+  try { const record = await SupplierReturn.findById(req.params.id); if (!record) return res.status(404).json({ error: 'Supplier return not found' }); if (record.status !== 'dispatched') return res.status(409).json({ error: 'Only dispatched returns can be resolved' }); const ref = String(req.body?.supplierReference || '').trim(); if (!ref) return res.status(400).json({ error: 'Supplier replacement/debit-note reference is required' }); if (record.resolutionType === 'replacement_requested') { const batch = String(req.body?.replacementBatchNo || '').trim(); if (!batch) return res.status(400).json({ error: 'Replacement batch number is required' }); record.replacementBatchNo = batch; record.replacementReceivedAt = new Date(); } if (record.resolutionType === 'debit_note_requested') { record.supplierDebitNoteRef = ref; record.supplierDebitNoteDate = req.body?.supplierDebitNoteDate ? new Date(req.body.supplierDebitNoteDate) : null; } record.supplierReference = ref; record.resolvedByUserId = req.user?.id || req.user?._id || null; record.resolvedByName = req.user?.name || req.user?.email || ''; record.resolvedAt = new Date(); record.status = 'closed'; await record.save(); await logAction({ action: 'SUPPLIER_RETURN_RESOLVED', description: 'Supplier return ' + record.returnNo + ' resolved', details: { supplierReturnId: record._id, supplierReference: ref, resolutionType: record.resolutionType }, req }); return res.json(record); } catch (err) { return res.status(400).json({ error: err.message }); }
+});
 router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
   try {
     const { poId, purchaseInvoiceId } = req.body;
