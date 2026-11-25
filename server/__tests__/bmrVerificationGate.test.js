@@ -223,7 +223,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       const batch = {
         _id: 'batch-completion-gate-1',
         status: 'qc_hold',
-        productId: 'product-completion-1',
+        productId: '111111111111111111111111',
         plannedQty: 100,
         stages: [{
           name: 'Mixing',
@@ -242,14 +242,14 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
         save: jest.fn()
       };
       BatchProduction.findById.mockResolvedValue(batch);
-      Product.find.mockResolvedValue([{ _id: 'product-completion-1', name: 'Test Product', mrp: 10 }]);
+      Product.find.mockResolvedValue([{ _id: '111111111111111111111111', name: 'Test Product', mrp: 10 }]);
 
       const res = await request(app)
         .patch('/api/batch-productions/batch-completion-gate-1/complete')
         .send({
           actualYieldQty: 100,
           qcPassedBy: 'QC Analyst',
-          warehouseId: 'warehouse-1'
+          warehouseId: '222222222222222222222222'
         });
 
       expect(res.status).toBe(400);
@@ -264,7 +264,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       const batch = {
         _id: 'batch-completion-gate-2',
         status: 'qc_hold',
-        productId: 'product-completion-2',
+        productId: '333333333333333333333333',
         plannedQty: 100,
         stages: [{
           name: 'Mixing',
@@ -277,14 +277,14 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
         save: jest.fn()
       };
       BatchProduction.findById.mockResolvedValue(batch);
-      Product.find.mockResolvedValue([{ _id: 'product-completion-2', name: 'Test Product', mrp: 10 }]);
+      Product.find.mockResolvedValue([{ _id: '333333333333333333333333', name: 'Test Product', mrp: 10 }]);
 
       const res = await request(app)
         .patch('/api/batch-productions/batch-completion-gate-2/complete')
         .send({
           actualYieldQty: 100,
           qcPassedBy: 'QC Analyst',
-          warehouseId: 'warehouse-1'
+          warehouseId: '222222222222222222222222'
         });
 
       expect(res.status).toBe(400);
