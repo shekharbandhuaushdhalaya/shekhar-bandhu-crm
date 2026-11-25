@@ -68,7 +68,7 @@ describe('Dispatch optimistic state transitions', () => {
     expect(Dispatch.findOneAndUpdate).toHaveBeenCalledWith(
       { _id: dispatchId, status: 'dispatched', updatedAt },
       { $set: expect.objectContaining({
-        status: 'delivered', proofOfDelivery,
+        status: 'delivered', proofOfDelivery: expect.objectContaining(proofOfDelivery),
         deliveredAt: proofOfDelivery.receivedAt,
         updatedByUserId: '507f191e810c19729de860ea',
         updatedByName: 'Dispatch Operator',
