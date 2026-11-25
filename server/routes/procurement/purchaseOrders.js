@@ -117,7 +117,7 @@ router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchem
     });
     req.io?.emit('po_updated', { type: 'created', id: po._id });
     res.status(201).json(po);
-  } catch (err) { res.status(err.statusCode || 400).json({ error: err.message }); }
+  } catch (err) { res.status(err.statusCode || 400).json({ error: err.message, ...(err.code ? { code: err.code } : {}) }); }
 });
 
 
