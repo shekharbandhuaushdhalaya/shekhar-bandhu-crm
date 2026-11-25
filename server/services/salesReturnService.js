@@ -212,6 +212,16 @@ async function postSalesReturn(returnId, actor = {}) {
       Warehouse.findById(ret.warehouseId).session(session),
     ]);
     if (!challan) throw err('ORIGINAL_CHALLAN_REQUIRED', 'Original posted Challan is required');
+    // Serialize return postings for this source Challan. Without a shared write,
+    // concurrent transactions can both read the same prior-return snapshot and
+    // over-return different lines. The revision bump forces a transaction conflict;
+    // the retry then sees the first committed return in the cumulative check.
+    const lockedChallan = await Challan.findOneAndUpdate(
+      { _id: challan._id, challanType: 'sale', status: 'finalized', inventoryPostingStatus: 'posted' },
+      { $inc: { salesReturnRevision: 1 } },
+      { new: true, session }
+    );
+    if (!lockedChallan) throw err('RETURN_SOURCE_CONCURRENT_UPDATE', 'Original Challan changed while the return was being posted; retry against the current source document');
     if (!customer || String(challan.customerId) !== String(customer._id)) throw err('CUSTOMER_MISMATCH', 'Return customer does not match original Challan');
     if (!warehouse) throw err('WAREHOUSE_NOT_FOUND', 'Return warehouse not found');
 

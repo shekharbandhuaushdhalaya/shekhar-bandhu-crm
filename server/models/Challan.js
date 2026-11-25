@@ -40,6 +40,8 @@ const challanSchema = new mongoose.Schema({
   productionBatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', default: null },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
   fulfillmentSequence: { type: Number, default: 1 },
+  // Transactional serialization token for cumulative Sales Return posting.
+  salesReturnRevision: { type: Number, default: 0, min: 0 },
   items: [challanItemSchema],
   status: { type: String, default: 'draft' },
   mode: { type: String, enum: ['regular', 'pakka', 'cash'], default: 'pakka' },
