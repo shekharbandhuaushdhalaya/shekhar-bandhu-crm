@@ -10,6 +10,7 @@ const Challan = require('../models/Challan');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
 const StockLedger = require('../models/StockLedger');
+const BatchProduction = require('../models/BatchProduction');
 const { postChallanInventory } = require('../services/challanInventoryService');
 const { runWithTenant } = require('../utils/tenantContext');
 
@@ -90,6 +91,75 @@ describe('Challan concurrent posting', () => {
       expect(refreshedChallan.inventoryPostingStatus).toBe('posted');
       expect(ledgers).toHaveLength(1);
       expect(ledgers[0].qtyBoxes).toBe(-4);
+    });
+  });
+
+  it('blocks production-house stock transfer until the source batch has independent market release', async () => {
+    const firm = await Firm.create({ name: 'Production Release Gate Firm', active: true });
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const product = await Product.create({ name: 'Held Finished Good', sku: 'FG-HOLD-001', stockLevel: 5 });
+      const source = await Warehouse.create({ name: 'Production House', type: 'manufacturing' });
+      const destination = await Warehouse.create({ name: 'Finished Goods Warehouse' });
+      const manufacturingUnitId = new mongoose.Types.ObjectId();
+      const batch = await BatchProduction.create({
+        batchNo: 'AY-BATCH-HOLD-001', productId: product._id, manufacturingUnitId,
+        plannedQty: 5, actualYieldQty: 5, status: 'completed', qcStatus: 'pending_qa_review'
+      });
+      await InventoryEntry.create({
+        warehouseId: source._id, warehouseName: source.name, productId: product._id,
+        qtyBoxes: 5, packing: 1, batchNo: batch.batchNo, vendorName: 'In-House Production',
+        manufacturingUnitId, productionBatchId: batch._id, marketReleased: false, qcStatus: 'approved'
+      });
+      const challan = await Challan.create({
+        challanNo: 'CH-FG-HOLD-001', challanType: 'production_transfer', productionBatchId: batch._id,
+        warehouseId: source._id, warehouseName: source.name,
+        destinationWarehouseId: destination._id, destinationWarehouseName: destination.name,
+        items: [{ productId: product._id, name: product.name, qty: 2, packing: 1, batchNo: batch.batchNo }],
+        status: 'draft'
+      });
+
+      await expect(postChallanInventory(challan, { createdBy: 'Release Gate Test' }))
+        .rejects.toMatchObject({ code: 'PRODUCTION_BATCH_NOT_RELEASED' });
+      expect((await InventoryEntry.findOne({ warehouseId: source._id, productId: product._id })).qtyBoxes).toBe(5);
+      expect(await InventoryEntry.countDocuments({ warehouseId: destination._id })).toBe(0);
+      expect(await StockLedger.countDocuments({ reference: challan.challanNo })).toBe(0);
+    });
+  });
+
+  it('preserves the batch release state when released production stock is transferred', async () => {
+    const firm = await Firm.create({ name: 'Production Release Posting Firm', active: true });
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const product = await Product.create({ name: 'Released Finished Good', sku: 'FG-REL-001', stockLevel: 5 });
+      const source = await Warehouse.create({ name: 'Released Production House', type: 'manufacturing' });
+      const destination = await Warehouse.create({ name: 'Released Finished Goods Warehouse' });
+      const manufacturingUnitId = new mongoose.Types.ObjectId();
+      const releasedBy = new mongoose.Types.ObjectId();
+      const batch = await BatchProduction.create({
+        batchNo: 'AY-BATCH-REL-001', productId: product._id, manufacturingUnitId,
+        plannedQty: 5, actualYieldQty: 5, status: 'completed', qcStatus: 'approved',
+        releasedBy, releasedByName: 'Independent QA', releasedAt: new Date()
+      });
+      const sourceEntry = await InventoryEntry.create({
+        warehouseId: source._id, warehouseName: source.name, productId: product._id,
+        qtyBoxes: 5, packing: 1, batchNo: batch.batchNo, vendorName: 'In-House Production',
+        manufacturingUnitId, productionBatchId: batch._id, marketReleased: true,
+        marketReleasedAt: batch.releasedAt, marketReleasedBy: releasedBy, qcStatus: 'approved'
+      });
+      const challan = await Challan.create({
+        challanNo: 'CH-FG-REL-001', challanType: 'production_transfer', productionBatchId: batch._id,
+        warehouseId: source._id, warehouseName: source.name,
+        destinationWarehouseId: destination._id, destinationWarehouseName: destination.name,
+        items: [{ productId: product._id, name: product.name, qty: 2, packing: 1, batchNo: batch.batchNo, inventoryEntryId: sourceEntry._id }],
+        status: 'draft'
+      });
+
+      const posted = await postChallanInventory(challan, { createdBy: 'Release Gate Test' });
+      expect(posted.inventoryPostingStatus).toBe('posted');
+      const destinationEntry = await InventoryEntry.findOne({ warehouseId: destination._id, productId: product._id }).lean();
+      expect(destinationEntry.qtyBoxes).toBe(2);
+      expect(String(destinationEntry.productionBatchId)).toBe(String(batch._id));
+      expect(destinationEntry.marketReleased).toBe(true);
+      expect(await StockLedger.countDocuments({ reference: challan.challanNo })).toBe(2);
     });
   });
 

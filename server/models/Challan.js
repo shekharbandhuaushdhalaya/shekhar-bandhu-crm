@@ -13,6 +13,7 @@ const challanItemSchema = new mongoose.Schema({
   gstRate: { type: Number, default: 0 },
   vendorId: { type: String, default: '', trim: true },
   vendorName: { type: String, default: '', trim: true },
+  inventoryEntryId: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryEntry', default: null },
   batchNo: { type: String, default: '', trim: true },
   qcStatus: { type: String, enum: ['under_test', 'approved', 'rejected'], default: 'approved' }
 }, { _id: false });
@@ -36,6 +37,7 @@ const challanSchema = new mongoose.Schema({
   sourceManufacturingUnitName: { type: String, default: '', trim: true },
   salesOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
   stockTransferId: { type: mongoose.Schema.Types.ObjectId, ref: 'StockTransfer', default: null },
+  productionBatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', default: null },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
   fulfillmentSequence: { type: Number, default: 1 },
   items: [challanItemSchema],

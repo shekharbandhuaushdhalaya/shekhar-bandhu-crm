@@ -22,6 +22,10 @@ const inventoryEntrySchema = new mongoose.Schema({
   purchaseRate:  { type: Number, default: 0 },
   manufacturingUnitId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ManufacturingUnit' },
   manufacturingUnitName: { type: String, default: '', trim: true },
+  productionBatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'BatchProduction', default: null },
+  marketReleased: { type: Boolean, default: true },
+  marketReleasedAt: { type: Date, default: null },
+  marketReleasedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   qcStatus: { type: String, enum: ['under_test', 'approved', 'rejected'], default: 'under_test' }
 }, { timestamps: true });
 

@@ -80,6 +80,7 @@ router.post('/', idempotency, authorize('dispatch:create'), validate(schemas.dis
       qty: Number(item.qty || 0),
       packing: Number(item.packing || 1),
       batchNo: item.batchNo || '',
+      inventoryEntryId: item.inventoryEntryId || null,
     }));
     const totalBoxes = physicalItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
     const dispatch = await Dispatch.create({

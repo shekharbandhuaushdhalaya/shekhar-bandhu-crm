@@ -1497,7 +1497,7 @@ router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), async (re
 
 router.patch('/:id/release', authorize('manufacturing:release'), async (req, res) => {
   try {
-    const batch = await BatchProduction.findById(req.params.id);
+    let batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
     if (!req.user || !req.user.id || !req.user.name) {
       return res.status(401).json({ error: 'Authenticated independent QA releaser identity is required' });
@@ -1563,11 +1563,25 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
       }
     }
 
-    batch.releasedBy = req.user.id;
-    batch.releasedByName = req.user.name;
-    batch.releasedAt = new Date();
-
-    await batch.save();
+    if (batch.releasedBy) return res.status(409).json({ error: 'Batch has already received independent market release' });
+    const releasedAt = new Date();
+    batch = await withTransaction(async session => {
+      const current = await BatchProduction.findOne({
+        _id: batch._id, updatedAt: batch.updatedAt, status: 'completed', qcStatus: 'approved',
+        $or: [{ releasedBy: null }, { releasedBy: { $exists: false } }]
+      }).session(session);
+      if (!current) throw Object.assign(new Error('Batch was released or changed concurrently; refresh and retry'), { code: 'BATCH_RELEASE_CONFLICT' });
+      current.releasedBy = req.user.id;
+      current.releasedByName = req.user.name;
+      current.releasedAt = releasedAt;
+      await current.save({ session });
+      await InventoryEntry.updateMany(
+        { productionBatchId: current._id, marketReleased: false },
+        { $set: { marketReleased: true, marketReleasedAt: releasedAt, marketReleasedBy: req.user.id } },
+        { session }
+      );
+      return current;
+    });
 
     if (req.io) {
       req.io.emit('mfg_batch_released', batch);
@@ -1575,7 +1589,7 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
 
     res.json(batch);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'BATCH_RELEASE_CONFLICT' ? 409 : 500).json({ error: err.message, code: err.code });
   }
 });
 

@@ -22,11 +22,13 @@ function entryFilter(warehouseId, item) {
     batchNo: item.batchNo || '',
     qcStatus: item.qcStatus || 'approved'
   };
+  if (item.inventoryEntryId) filter._id = item.inventoryEntryId;
   return filter;
 }
 
 async function getOrCreateDestinationEntry({ warehouse, item, product, sourceEntry = null, session }) {
-  const filter = entryFilter(warehouse._id, item);
+  const destinationItem = { ...item, inventoryEntryId: undefined };
+  const filter = entryFilter(warehouse._id, destinationItem);
   let entry = await InventoryEntry.findOne(filter).session(session);
   if (entry) return entry;
 
@@ -50,6 +52,10 @@ async function getOrCreateDestinationEntry({ warehouse, item, product, sourceEnt
     purchaseRate: item.rate || item.purchaseRate || 0,
     manufacturingUnitId: item.manufacturingUnitId || undefined,
     manufacturingUnitName: item.manufacturingUnitName || '',
+    productionBatchId: sourceEntry?.productionBatchId || item.productionBatchId || null,
+    marketReleased: sourceEntry?.marketReleased !== false,
+    marketReleasedAt: sourceEntry?.marketReleasedAt || null,
+    marketReleasedBy: sourceEntry?.marketReleasedBy || null,
     qcStatus: sourceEntry?.qcStatus || 'approved'
   });
   return entry;
@@ -74,6 +80,19 @@ async function postChallanInventory(challan, options = {}) {
       throw inventoryError('CHALLAN_NOT_POSTABLE', `Challan cannot be finalized from status: ${fresh.status}`);
     }
     if (!fresh.items?.length) throw inventoryError('CHALLAN_EMPTY', 'A Challan must contain at least one item');
+
+    if (fresh.challanType === 'production_transfer') {
+      if (!fresh.productionBatchId) throw inventoryError('PRODUCTION_BATCH_REQUIRED', 'Production transfer must identify its source manufacturing batch');
+      const BatchProduction = require('../models/BatchProduction');
+      const productionBatch = await BatchProduction.findById(fresh.productionBatchId).session(session);
+      if (!productionBatch || productionBatch.status !== 'completed' || productionBatch.qcStatus !== 'approved' ||
+          !productionBatch.releasedBy || !productionBatch.releasedAt) {
+        throw inventoryError('PRODUCTION_BATCH_NOT_RELEASED', 'Finished goods cannot leave the production house before independent QA market release');
+      }
+      if ((fresh.items || []).some(item => String(item.batchNo || '') !== String(productionBatch.batchNo))) {
+        throw inventoryError('PRODUCTION_BATCH_MISMATCH', 'Production transfer lines must match the identified manufacturing batch');
+      }
+    }
 
     // Every Sale Challan must be linked to an active Sales Order. This invariant is
     // enforced here, inside the inventory transaction, so programmatic callers cannot
@@ -192,6 +211,11 @@ async function postChallanInventory(challan, options = {}) {
         { new: true, session }
       );
 
+      if (fresh.challanType === 'production_transfer' && sourceEntry &&
+          (String(sourceEntry.productionBatchId || '') !== String(fresh.productionBatchId) || sourceEntry.marketReleased !== true)) {
+        throw inventoryError('PRODUCTION_BATCH_STOCK_NOT_RELEASED', 'Production stock is not linked to this released batch or its market-release flag is missing');
+      }
+
       if (!sourceEntry) {
         const existing = await InventoryEntry.findOne(filter).session(session).lean();
         const available = existing ? existing.qtyBoxes : 0;
@@ -220,7 +244,7 @@ async function postChallanInventory(challan, options = {}) {
         batchNo: item.batchNo || '',
         manufacturingUnitId: item.manufacturingUnitId || undefined,
         manufacturingUnitName: item.manufacturingUnitName || '',
-        movementKey: `${fresh._id}:OUT:${sourceWarehouse._id}:${product._id}:${item.batchNo || ''}:${item.packing || 1}:${item.vendorId || ''}`
+        movementKey: `${fresh._id}:OUT:${sourceWarehouse._id}:${product._id}:${item.batchNo || ''}:${item.packing || 1}:${item.vendorId || ''}:${sourceEntry._id}`
       });
 
       // Product.stockLevel is the legacy firm-wide aggregate. Internal transfers must
@@ -333,7 +357,7 @@ async function reverseChallanInventory(challan, options = {}) {
       reversalItems.push({ item, sourceQty: source.qtyBoxes });
 
       if (isTransfer) {
-        const destFilter = entryFilter(destinationWarehouse._id, item);
+        const destFilter = entryFilter(destinationWarehouse._id, { ...item, inventoryEntryId: undefined });
         const dest = await InventoryEntry.findOne({ ...destFilter, qtyBoxes: { $gte: qty } }).session(session);
         if (!dest) throw inventoryError('REVERSAL_DESTINATION_STOCK_MISSING', `Destination stock is insufficient to reverse ${item.name}`);
         dest.qtyBoxes -= qty;
@@ -352,7 +376,7 @@ async function reverseChallanInventory(challan, options = {}) {
     for (const { item, sourceQty } of reversalItems) {
       ledgerWrites.push({ productId: item.productId, warehouseId: sourceWarehouse._id, warehouseName: sourceWarehouse.name, type: 'IN', qtyBoxes: Number(item.qty), balanceBoxes: sourceQty, reference: fresh.challanNo, note: `REVERSAL of ${fresh.challanType.toUpperCase()} Challan ${fresh.challanNo}`, createdBy: options.createdBy || 'System', packing: item.packing || 1, vendorId: item.vendorId || '', vendorName: item.vendorName || '', batchNo: item.batchNo || '', movementKey: `${fresh._id}:REV:IN:${sourceWarehouse._id}:${item.productId}:${item.batchNo || ''}:${item.packing || 1}:${item.vendorId || ''}` });
       if (isTransfer) {
-        const dest = await InventoryEntry.findOne(entryFilter(destinationWarehouse._id, item)).session(session);
+        const dest = await InventoryEntry.findOne(entryFilter(destinationWarehouse._id, { ...item, inventoryEntryId: undefined })).session(session);
         ledgerWrites.push({ productId: item.productId, warehouseId: destinationWarehouse._id, warehouseName: destinationWarehouse.name, type: 'OUT', qtyBoxes: -Number(item.qty), balanceBoxes: dest.qtyBoxes, reference: fresh.challanNo, note: `REVERSAL of ${fresh.challanType.toUpperCase()} Challan ${fresh.challanNo}`, createdBy: options.createdBy || 'System', packing: item.packing || 1, vendorId: item.vendorId || '', vendorName: item.vendorName || '', batchNo: item.batchNo || '', movementKey: `${fresh._id}:REV:OUT:${destinationWarehouse._id}:${item.productId}:${item.batchNo || ''}:${item.packing || 1}:${item.vendorId || ''}` });
       }
     }
@@ -481,11 +505,18 @@ async function completeProductionReceiptAndCreateTransfer({ batch, challanItems,
       const filter = entryFilter(production._id, { ...item, vendorId: '', packing: item.packing || 1, batchNo: item.batchNo || '' });
       let entry = await InventoryEntry.findOne(filter).session(session);
       if (!entry) {
-        entry = new InventoryEntry({ warehouseId: production._id, warehouseName: production.name, productId: product._id, productType: product.productType || '', size: product.size || '', colour: product.colour || '', shape: product.shape || '', weight: product.weight || '', hsnCode: product.hsnCode || '', vendorId: '', vendorName: 'In-House Production', qtyBoxes: 0, packing: item.packing || 1, batchNo: item.batchNo || '', mfgDate: item.mfgDate || now, expiryDate: item.expiryDate || undefined, purchaseRate: item.rate || 0, manufacturingUnitId: item.manufacturingUnitId, manufacturingUnitName: item.manufacturingUnitName || '', qcStatus: 'approved' });
+        entry = new InventoryEntry({ warehouseId: production._id, warehouseName: production.name, productId: product._id, productType: product.productType || '', size: product.size || '', colour: product.colour || '', shape: product.shape || '', weight: product.weight || '', hsnCode: product.hsnCode || '', vendorId: '', vendorName: 'In-House Production', qtyBoxes: 0, packing: item.packing || 1, batchNo: item.batchNo || '', mfgDate: item.mfgDate || now, expiryDate: item.expiryDate || undefined, purchaseRate: item.rate || 0, manufacturingUnitId: item.manufacturingUnitId, manufacturingUnitName: item.manufacturingUnitName || '', productionBatchId: freshBatch._id, marketReleased: false, marketReleasedAt: null, marketReleasedBy: null, qcStatus: 'approved' });
       }
       entry.qtyBoxes += Number(item.qty);
       entry.qcStatus = 'approved';
+      entry.productionBatchId = freshBatch._id;
+      entry.marketReleased = false;
+      entry.marketReleasedAt = null;
+      entry.marketReleasedBy = null;
       await entry.save({ session });
+      item.productionBatchId = freshBatch._id;
+      item.inventoryEntryId = entry._id;
+      item.marketReleased = false;
       await StockLedger.create([{
         productId: product._id, warehouseId: production._id, warehouseName: production.name, type: 'IN', qtyBoxes: Number(item.qty), balanceBoxes: entry.qtyBoxes, reference: batch.batchNo, note: `Production completed — Batch ${batch.batchNo} received at production house`, createdBy: createdBy || 'System', packing: item.packing || 1, batchNo: item.batchNo || '', mfgDate: item.mfgDate || now, expiryDate: item.expiryDate || undefined, manufacturingUnitId: item.manufacturingUnitId, manufacturingUnitName: item.manufacturingUnitName || '', movementKey: `BATCH_PRODUCTION_IN:${batch._id}:${item.productId}:${item.batchNo || ''}:${item.packing || 1}`
       }], { session });
@@ -496,6 +527,7 @@ async function completeProductionReceiptAndCreateTransfer({ batch, challanItems,
       challanNo,
       date: now,
       challanType: 'production_transfer',
+      productionBatchId: freshBatch._id,
       warehouseId: production._id,
       warehouseName: production.name,
       destinationWarehouseId: destination._id,
