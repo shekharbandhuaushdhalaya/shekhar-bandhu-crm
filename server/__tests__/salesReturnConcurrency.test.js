@@ -32,11 +32,15 @@ describe('Sales Return posting serialization', () => {
       inventoryPostingStatus: 'posted', customerId: 'customer-1', items: []
     };
     SalesReturn.findById = jest.fn(() => ({ session: jest.fn().mockResolvedValue(ret) }));
-    SalesReturn.find = jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockReturnThis(),
-      session: jest.fn().mockResolvedValue([])
-    }));
+    SalesReturn.find = jest.fn(() => {
+      const query = {
+        select: jest.fn(() => query),
+        lean: jest.fn(() => query),
+        session: jest.fn(() => query),
+        then: (resolve, reject) => Promise.resolve([]).then(resolve, reject)
+      };
+      return query;
+    });
     Challan.findOne = jest.fn(() => ({ session: jest.fn().mockResolvedValue(challan) }));
     Challan.findOneAndUpdate = jest.fn().mockResolvedValue({ ...challan, salesReturnRevision: 1 });
     Customer.findById = jest.fn(() => ({ session: jest.fn().mockResolvedValue({ _id: 'customer-1' }) }));
