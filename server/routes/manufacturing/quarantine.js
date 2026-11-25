@@ -195,18 +195,24 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
         error.code = 'QUARANTINE_STOCK_ALREADY_DISPOSED';
         throw error;
       }
+      // Both release and rejection are controlled QC dispositions. Rejection needs
+      // at least one recorded failure; release requires every recorded test to pass.
+      const inspectionResults = Array.isArray(currentLot.inspectionResults) ? currentLot.inspectionResults : [];
+      if (!inspectionResults.length ||
+          (quarantineStatus === 'released' && inspectionResults.some(result => result.outcome !== 'pass')) ||
+          (quarantineStatus === 'rejected' && !inspectionResults.some(result => result.outcome === 'fail'))) {
+        const error = new Error(quarantineStatus === 'released'
+          ? 'Incoming QC release requires recorded actual inspection results and every recorded test must pass'
+          : 'Incoming QC rejection requires recorded actual inspection results with at least one failed test');
+        error.code = 'QUARANTINE_INSPECTION_INCOMPLETE';
+        throw error;
+      }
+      if (!currentLot.inspectionRecordedByUserId || String(currentLot.inspectionRecordedByUserId) === String(req.user?.id || req.user?._id)) {
+        const error = new Error('Incoming QC analyst cannot independently approve their own inspection results or rejection');
+        error.code = 'QUARANTINE_INSPECTION_MAKER_CHECKER_REQUIRED';
+        throw error;
+      }
       if (quarantineStatus === 'released') {
-        if (!Array.isArray(currentLot.inspectionResults) || currentLot.inspectionResults.length === 0 ||
-            currentLot.inspectionResults.some(result => result.outcome !== 'pass')) {
-          const error = new Error('Incoming QC release requires recorded actual inspection results and every recorded test must pass');
-          error.code = 'QUARANTINE_INSPECTION_INCOMPLETE';
-          throw error;
-        }
-        if (!currentLot.inspectionRecordedByUserId || String(currentLot.inspectionRecordedByUserId) === String(req.user?.id || req.user?._id)) {
-          const error = new Error('Incoming QC analyst cannot independently approve their own inspection results');
-          error.code = 'QUARANTINE_INSPECTION_MAKER_CHECKER_REQUIRED';
-          throw error;
-        }
         const grnRefs = Array.isArray(entry.grnReferences) ? entry.grnReferences : [];
         const legacyGrnNo = !grnRefs.length && /^GRN-/i.test(String(entry.purchaseRef || '')) ? String(entry.purchaseRef) : '';
         const requiredGrnNos = grnRefs.map(ref => ref.grnNo).filter(Boolean);

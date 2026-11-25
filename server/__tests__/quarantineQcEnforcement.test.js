@@ -163,6 +163,8 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         batchNo: 'BATCH-2026-002',
         qty: 20,
         quarantineStatus: 'under_testing',
+        inspectionResults: [{ testCode: 'MOISTURE', outcome: 'fail', result: '12%' }],
+        inspectionRecordedByUserId: 'qc-analyst-2',
         save: jest.fn().mockResolvedValue(true)
       };
 
@@ -184,6 +186,28 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
     });
 
 
+    test('blocks rejection without actual failed inspection evidence', async () => {
+      const mockEntry = { _id: 'entry_no_fail', rawMaterialId: 'rm_no_fail', batchNo: 'BATCH-NO-FAIL', qty: 10, reservedQty: 0, qcStatus: 'under_test', save: jest.fn() };
+      const mockLot = { _id: 'quarantine_no_fail', quarantineLotNo: 'QRM-NO-FAIL', rawMaterialEntryId: 'entry_no_fail', rawMaterialId: 'rm_no_fail', batchNo: 'BATCH-NO-FAIL', qty: 10, quarantineStatus: 'under_testing', inspectionResults: [{ testCode: 'IDENTITY', outcome: 'pass', result: 'Conforms' }], inspectionRecordedByUserId: 'qc-analyst-2', save: jest.fn() };
+      RawMaterialQuarantine.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockLot) });
+      RawMaterialEntry.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockEntry) });
+      const res = await request(app).patch('/api/manufacturing/quarantine/quarantine_no_fail/release').send({ quarantineStatus: 'rejected', testReportNo: 'QC-NO-FAIL', remarks: 'Reject lot' });
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/at least one failed test/i);
+      expect(mockEntry.save).not.toHaveBeenCalled();
+    });
+
+    test('blocks QC analyst from approving their own rejection', async () => {
+      const mockEntry = { _id: 'entry_self_reject', rawMaterialId: 'rm_self_reject', batchNo: 'BATCH-SELF', qty: 10, reservedQty: 0, qcStatus: 'under_test', save: jest.fn() };
+      const mockLot = { _id: 'quarantine_self_reject', quarantineLotNo: 'QRM-SELF', rawMaterialEntryId: 'entry_self_reject', rawMaterialId: 'rm_self_reject', batchNo: 'BATCH-SELF', qty: 10, quarantineStatus: 'under_testing', inspectionResults: [{ testCode: 'IDENTITY', outcome: 'fail', result: 'Not conforming' }], inspectionRecordedByUserId: '507f1f77bcf86cd799439011', save: jest.fn() };
+      RawMaterialQuarantine.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockLot) });
+      RawMaterialEntry.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockEntry) });
+      const res = await request(app).patch('/api/manufacturing/quarantine/quarantine_self_reject/release').send({ quarantineStatus: 'rejected', testReportNo: 'QC-SELF', remarks: 'Reject lot' });
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/cannot independently approve/i);
+      expect(mockEntry.save).not.toHaveBeenCalled();
+    });
+
     test('allows QC rejection while the linked GRN is still pending verification', async () => {
       const mockEntry = {
         _id: 'entry_reject_pending', rawMaterialId: 'rm_reject_pending', batchNo: 'BATCH-REJECT-PENDING',
@@ -195,6 +219,8 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         _id: 'quarantine_reject_pending', quarantineLotNo: 'QRM-REJECT-PENDING',
         rawMaterialEntryId: 'entry_reject_pending', rawMaterialId: 'rm_reject_pending',
         batchNo: 'BATCH-REJECT-PENDING', qty: 10, quarantineStatus: 'under_testing',
+        inspectionResults: [{ testCode: 'IDENTITY', outcome: 'fail', result: 'Not conforming' }],
+        inspectionRecordedByUserId: 'qc-analyst-2',
         save: jest.fn().mockResolvedValue(true)
       };
       RawMaterialQuarantine.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockLot) });
