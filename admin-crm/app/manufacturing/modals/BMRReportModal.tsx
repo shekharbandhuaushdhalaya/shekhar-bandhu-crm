@@ -35,7 +35,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
           <!DOCTYPE html>
           <html>
           <head>
-            <title>BMR_${bmrReport.batchNo}_AYUSH_GMP</title>
+            <title>INTERNAL_BMR_${bmrReport.batchNo}</title>
             <style>
               body { font-family: 'Arial', sans-serif; padding: 20px; color: #111; font-size: 12px; }
               .header { text-align: center; border-bottom: 2px solid #1b4d3e; padding-bottom: 10px; margin-bottom: 15px; }
@@ -62,8 +62,8 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                 <span class="lic-badge">AYUSH GMP Cert: ${header.gmpCertificateNo || 'Not recorded'}</span>
                 <span class="lic-badge">Dosage Category: ${bmrReport.productCategory || bmrReport.productDetails?.category || 'Not recorded'}</span>
               </div>
-              <h3 style="margin-top:12px; margin-bottom:0; letter-spacing:1px; color:#333;">BATCH MANUFACTURING RECORD (BMR)</h3>
-              <div style="font-size:10px; color:#666;">Schedule T — Drugs & Cosmetics Act Compliance Audit</div>
+              <h3 style="margin-top:12px; margin-bottom:0; letter-spacing:1px; color:#333;">INTERNAL BATCH MANUFACTURING RECORD (BMR)</h3>
+              <div style="font-size:10px; color:#666;">Internal record only — confirm applicable licence and Schedule T requirements with authorised QA.</div>
             </div>
 
             <div class="section-title">I. BATCH IDENTIFICATION & REGULATORY METADATA</div>
@@ -73,7 +73,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               <div><strong>Planned Batch Qty:</strong> ${bmrReport.plannedQty} units</div>
               <div><strong>Actual Packaged Yield:</strong> ${bmrReport.actualYieldQty} units</div>
               <div><strong>Mfg Date:</strong> ${fmtDate(bmrReport.mfgDate)}</div>
-              <div><strong>Expiry Date:</strong> ${fmtDate(bmrReport.expiryDate)} (${bmrReport.shelfLifeMonths || 'Not recorded'} Months)</div>
+              <div><strong>Expiry Date:</strong> ${fmtDate(bmrReport.expiryDate)} (${bmrReport.shelfLifeMonths ? bmrReport.shelfLifeMonths + ' Months' : 'Not recorded'})</div>
               <div><strong>Pre-BMR Approval:</strong> ${bmrReport.bmrApprovedByName ? `${bmrReport.bmrApprovedByName} (${fmtDateTime(bmrReport.bmrApprovedAt)})` : 'Pending'}</div>
               <div><strong>Line Clearance:</strong> ${manufacturingLineClearance ? `${manufacturingLineClearance.clearedByName} (${fmtDateTime(manufacturingLineClearance.clearedAt)})` : 'Pending'}</div>
             </div>
@@ -497,7 +497,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                   <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
-                    SECTION VIII: STATUTORY MAKER-CHECKER & MARKET RELEASE SIGNATURES
+                    SECTION VIII: CONTROLLED REVIEW & MARKET RELEASE SIGNATURES
                   </Text>
                 </View>
                 <View style={{ padding: 12, gap: 10 }}>
@@ -535,7 +535,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
             {bmrReport && (
               <TouchableOpacity style={styles.submitBtn} onPress={handlePrintPdf}>
                 <Ionicons name="print-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                <Text style={styles.submitBtnText}>Print Official BMR PDF</Text>
+                <Text style={styles.submitBtnText}>Print Internal BMR Record</Text>
               </TouchableOpacity>
             )}
           </View>

@@ -628,6 +628,23 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
       return res.status(400).json({ error: 'Invalid stage index' });
     }
 
+    const stageNameForClearance = String(batch.stages[stageIndex].name || '').toLowerCase();
+    const requiredClearancePhase = stageNameForClearance.includes('filling') ? 'filling' :
+      (stageNameForClearance.includes('packaging') || stageNameForClearance.includes('label')) ? 'packing' : null;
+    if (requiredClearancePhase && batch.stages[stageIndex].status === 'pending' && status !== 'pending') {
+      const LineClearance = require('../../models/LineClearance');
+      const phaseClearance = await LineClearance.findOne({ batchId: batch._id, phase: requiredClearancePhase });
+      const c = phaseClearance && phaseClearance.checklist;
+      const complete = Boolean(phaseClearance && phaseClearance.cleared === true && phaseClearance.submittedBy &&
+        phaseClearance.verifiedBy && String(phaseClearance.submittedBy) !== String(phaseClearance.verifiedBy) &&
+        phaseClearance.verifiedAt && phaseClearance.clearedBy && phaseClearance.clearedAt && c &&
+        c.equipmentCleaned && c.previousMaterialsRemoved && c.previousLabelsDocumentsRemoved && c.areaVisuallyInspected);
+      if (!complete) return res.status(409).json({
+        error: 'A completed, independently verified ' + requiredClearancePhase + ' line-clearance checklist is required before this stage can start',
+        code: 'STAGE_LINE_CLEARANCE_REQUIRED', phase: requiredClearancePhase
+      });
+    }
+
     // A newly created batch stays in draft until both pre-execution BMR approval
     // and a complete, independently recorded manufacturing line clearance exist.
     if (stageIndex === 0 && batch.stages[0].status === 'pending' && status !== 'pending') {
@@ -1824,12 +1841,13 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
         if (stage.status === 'completed' && !stage.operatorTrainingRecordId) missingEvidence.push('Operator training evidence is missing: ' + stage.name);
       }
     }
-    if (!lineClearance.some(record => record.phase === 'manufacturing' && record.cleared === true &&
-      record.submittedBy && record.verifiedBy && String(record.submittedBy) !== String(record.verifiedBy) &&
-      record.verifiedAt && record.clearedBy && record.clearedAt && record.checklist &&
-      record.checklist.equipmentCleaned && record.checklist.previousMaterialsRemoved &&
-      record.checklist.previousLabelsDocumentsRemoved && record.checklist.areaVisuallyInspected)) {
-      missingEvidence.push('Verified manufacturing line-clearance record is missing or incomplete');
+    for (const phase of ['manufacturing', 'filling', 'packing']) {
+      const verifiedClearance = lineClearance.some(record => record.phase === phase && record.cleared === true &&
+        record.submittedBy && record.verifiedBy && String(record.submittedBy) !== String(record.verifiedBy) &&
+        record.verifiedAt && record.clearedBy && record.clearedAt && record.checklist &&
+        record.checklist.equipmentCleaned && record.checklist.previousMaterialsRemoved &&
+        record.checklist.previousLabelsDocumentsRemoved && record.checklist.areaVisuallyInspected);
+      if (!verifiedClearance) missingEvidence.push('Verified ' + phase + ' line-clearance record is missing or incomplete');
     }
     if (dispensingRecords.some(record => record.status === 'pending_verification')) missingEvidence.push('One or more material dispensing records are awaiting independent verification');
     if (dispensingRecords.some(record => record.status === 'rejected')) missingEvidence.push('One or more material dispensing records were rejected');

@@ -95,4 +95,47 @@ describe('Manufacturing stage qualification and equipment controls', () => {
     expect(batch.stages[0].equipmentCalibrationCertificateNo).toBe('CAL-VERIFIED-01');
     expect(batch.save).toHaveBeenCalled();
   });
+
+  test('blocks a filling stage until its own line clearance is independently verified', async () => {
+    const batch = { _id: 'batch-filling-clearance-1', status: 'in_progress', stages: [
+      { name: 'Mixing', status: 'completed' }, { name: 'Filling', status: 'pending' }
+    ], save: jest.fn() };
+    BatchProduction.findById.mockResolvedValue(batch);
+    LineClearance.findOne.mockResolvedValue(null);
+    const res = await request(app).patch('/api/batch-productions/batch-filling-clearance-1/stage/1').send({ status: 'in_progress' });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('STAGE_LINE_CLEARANCE_REQUIRED');
+    expect(res.body.phase).toBe('filling');
+    expect(batch.save).not.toHaveBeenCalled();
+  });
+
+  test('blocks a packing stage until its own line clearance is independently verified', async () => {
+    const batch = { _id: 'batch-packing-clearance-1', status: 'in_progress', stages: [
+      { name: 'Drying', status: 'completed' }, { name: 'Packaging & Labeling', status: 'pending' }
+    ], save: jest.fn() };
+    BatchProduction.findById.mockResolvedValue(batch);
+    LineClearance.findOne.mockResolvedValue(null);
+    const res = await request(app).patch('/api/batch-productions/batch-packing-clearance-1/stage/1').send({ status: 'in_progress' });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('STAGE_LINE_CLEARANCE_REQUIRED');
+    expect(res.body.phase).toBe('packing');
+    expect(batch.save).not.toHaveBeenCalled();
+  });
+
+  test('allows a filling stage to start only after a complete independent clearance', async () => {
+    const batch = { _id: 'batch-filling-clearance-valid', status: 'in_progress', stages: [
+      { name: 'Mixing', status: 'completed' }, { name: 'Filling', status: 'pending' }
+    ], save: jest.fn().mockResolvedValue(true) };
+    BatchProduction.findById.mockResolvedValue(batch);
+    LineClearance.findOne.mockResolvedValue({
+      cleared: true, submittedBy: 'line-operator', verifiedBy: 'independent-reviewer',
+      verifiedAt: new Date(), clearedBy: 'independent-reviewer', clearedAt: new Date(),
+      checklist: { equipmentCleaned: true, previousMaterialsRemoved: true, previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true }
+    });
+    const res = await request(app).patch('/api/batch-productions/batch-filling-clearance-valid/stage/1').send({ status: 'in_progress' });
+    expect(res.status).toBe(200);
+    expect(batch.stages[1].status).toBe('in_progress');
+    expect(batch.save).toHaveBeenCalled();
+  });
+
 });
