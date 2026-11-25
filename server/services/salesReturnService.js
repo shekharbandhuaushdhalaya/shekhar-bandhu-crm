@@ -206,6 +206,9 @@ async function postSalesReturn(returnId, actor = {}) {
     if (!ret) throw err('RETURN_NOT_FOUND', 'Sales Return not found');
     if (ret.status === 'posted') return { return: ret, creditNote: ret.creditNoteId ? await CreditNote.findById(ret.creditNoteId).session(session) : null };
     if (ret.status !== 'draft') throw err('RETURN_NOT_POSTABLE', `Sales Return is ${ret.status}`);
+    if (ret.requestedByUserId && String(ret.requestedByUserId) === String(actor.id)) {
+      throw err('RETURN_POST_MAKER_CHECKER_REQUIRED', 'The person who created the return draft cannot independently post it');
+    }
     if (ret.resolution === 'refund') throw err('REFUND_WORKFLOW_REQUIRED', 'Refund returns require the dedicated refund-payment workflow');
     const [challan, customer, warehouse] = await Promise.all([
       Challan.findOne({ _id: ret.challanId, challanType: 'sale', status: 'finalized', inventoryPostingStatus: 'posted' }).session(session),

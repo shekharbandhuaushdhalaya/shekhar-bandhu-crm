@@ -28,6 +28,19 @@ describe('Sales Return posting serialization', () => {
     expect(withTransaction).not.toHaveBeenCalled();
   });
 
+  test('prevents the return requester from independently posting their own draft', async () => {
+    const ret = {
+      _id: 'return-1', status: 'draft', resolution: 'replacement',
+      requestedByUserId: 'reviewer-2', challanId: 'challan-1',
+      customerId: 'customer-1', warehouseId: 'warehouse-1', items: []
+    };
+    SalesReturn.findById = jest.fn(() => ({ session: jest.fn().mockResolvedValue(ret) }));
+
+    await expect(postSalesReturn('return-1', { id: 'reviewer-2', name: 'Return Requester' }))
+      .rejects.toMatchObject({ code: 'RETURN_POST_MAKER_CHECKER_REQUIRED' });
+    expect(Challan.findOne).not.toHaveBeenCalled();
+  });
+
   test('bumps the source Challan revision inside the posting transaction before cumulative checks', async () => {
     const ret = {
       _id: 'return-1', status: 'draft', resolution: 'replacement',
