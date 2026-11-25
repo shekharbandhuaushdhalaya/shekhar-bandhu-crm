@@ -16,6 +16,24 @@ jest.mock('../models/Challan');
 jest.mock('../utils/withTransaction', () => ({
   withTransaction: jest.fn(async work => work({}))
 }));
+jest.mock('../services/challanInventoryService', () => ({
+  completeProductionReceiptAndCreateTransfer: jest.fn(async ({ batch, productionWarehouse, destinationWarehouse, challanNo }) => ({
+    batch,
+    challan: {
+      _id: 'challan-completion-test',
+      challanNo,
+      status: 'draft',
+      challanType: 'production_transfer',
+      warehouseId: productionWarehouse._id,
+      warehouseName: productionWarehouse.name,
+      destinationWarehouseId: destinationWarehouse._id,
+      destinationWarehouseName: destinationWarehouse.name
+    }
+  }))
+}));
+jest.mock('../utils/documentCounter', () => ({
+  generateAtomicDocumentNumber: jest.fn().mockResolvedValue('CH-COMPLETION-TEST')
+}));
 jest.mock('../models/Product');
 jest.mock('../models/RolePermission');
 jest.mock('../utils/botanicalLookup', () => ({
@@ -36,6 +54,7 @@ const Challan = require('../models/Challan');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
 const ProductQualitySpecification = require('../models/ProductQualitySpecification');
+const { completeProductionReceiptAndCreateTransfer } = require('../services/challanInventoryService');
 
 RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
 
@@ -482,6 +501,65 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       expect(res.status).toBe(409);
       expect(res.body.code).toBe('BATCH_COMPLETION_REQUIRED');
       expect(ProductQualitySpecification.findById).not.toHaveBeenCalled();
+    });
+
+    test('does not persist legacy QC summary values supplied during manufacturing completion', async () => {
+      const productId = '666666666666666666666667';
+      const destinationWarehouse = { _id: '222222222222222222222222', name: 'Finished Goods' };
+      const productionWarehouse = { _id: '333333333333333333333333', name: 'Production House' };
+      const batch = {
+        _id: '666666666666666666666668',
+        batchNo: 'BATCH-QC-ISOLATION',
+        status: 'in_progress',
+        productId,
+        plannedQty: 100,
+        rawMaterialCost: 10,
+        overheadCost: 0,
+        jobWorkCharges: 0,
+        updatedAt: new Date(),
+        packagingMode: 'packed_by_vendor',
+        packagingDeducted: false,
+        stages: [{
+          name: 'Mixing',
+          status: 'completed',
+          performedBy: 'operator-1',
+          performedByName: 'Operator One',
+          verifiedBy: 'reviewer-1',
+          verifiedAt: new Date(),
+          isDualSigned: true,
+          operatorTrainingRecordId: 'training-1',
+          equipmentId: 'equipment-1',
+          equipmentCalibrationStatus: 'valid'
+        }]
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Product.find.mockResolvedValue([{ _id: productId, name: 'QC Isolation Product', mrp: 10, price: 10, size: 'Std' }]);
+      Warehouse.findById.mockResolvedValue(destinationWarehouse);
+      Warehouse.findOne.mockResolvedValue(productionWarehouse);
+
+      const res = await request(app)
+        .patch('/api/batch-productions/666666666666666666666668/complete')
+        .send({
+          actualYieldQty: 100,
+          warehouseId: destinationWarehouse._id,
+          organoleptic: 'Pass',
+          moistureContent: 3.2,
+          moistureLimit: 'NMT 5%',
+          ashValue: 1.1,
+          pHValue: 6.5,
+          heavyMetals: 'Pass',
+          microbialLimit: 'Pass',
+          labReportRef: 'UNVERIFIED-REPORT-REF'
+        });
+
+      expect(res.status).toBe(200);
+      expect(batch.qcStatus).toBe('pending');
+      expect(batch.qcPassedByUser).toBeNull();
+      expect(batch.qcPassedBy).toBe('');
+      expect(batch.qcParameters).toEqual({});
+      expect(batch.qcTests).toBeUndefined();
+      expect(completeProductionReceiptAndCreateTransfer).toHaveBeenCalled();
+      expect(completeProductionReceiptAndCreateTransfer.mock.calls[0][0].batch.qcParameters).toEqual({});
     });
 
     test('does not allow the completion request to self-approve QC using legacy fields', async () => {

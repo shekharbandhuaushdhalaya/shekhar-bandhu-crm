@@ -1090,14 +1090,6 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       packing,
       yields,
       qcStatus,
-      organoleptic,
-      moistureContent,
-      ashValue,
-      pHValue,
-      disintegrationTime,
-      heavyMetals,
-      microbialLimit,
-      labReportRef,
       warehouseId,
       jobWorkerCertificateRef,
       coaDocumentRef,
@@ -1319,21 +1311,9 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     batch.jobWorkerCertificateRef = jobWorkerCertificateRef || '';
     batch.coaDocumentRef = coaDocumentRef || '';
     batch.jobWorkCharges = Number(jobWorkCharges) || 0;
-    batch.qcParameters = {
-      organoleptic: organoleptic || '',
-      moistureContent: moistureContent !== undefined ? moistureContent : null,
-      moistureLimit: req.body.moistureLimit || '',
-      ashValue: ashValue !== undefined ? ashValue : null,
-      ashValueLimit: req.body.ashValueLimit || '',
-      pHValue: pHValue !== undefined ? pHValue : null,
-      pHLimit: req.body.pHLimit || '',
-      disintegrationTime: disintegrationTime !== undefined ? disintegrationTime : null,
-      disintegrationLimit: req.body.disintegrationLimit || '',
-      heavyMetals: heavyMetals || '',
-      microbialLimit: microbialLimit || '',
-      labReportRef: labReportRef || '',
-      testStandardRef: req.body.testStandardRef || ''
-    };
+    // Completion is not a QC test event. Actual results are recorded only through
+    // the specification-linked QC workflow with analyst identity and timestamp.
+    batch.qcParameters = {};
 
     // Calculate yield variance
     const plannedQtyVal = batch.plannedQty || 1;
