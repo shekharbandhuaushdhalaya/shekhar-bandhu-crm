@@ -1031,15 +1031,6 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       }
     }
 
-    // Ensure packaging materials are deducted if not already deducted during stage advance
-    if (!batch.packagingDeducted) {
-      if (batch.packagingMode === 'self_packed') {
-        await deductPackagingMaterials(batch, yieldsList);
-      } else {
-        batch.packagingDeducted = true;
-      }
-    }
-
     const allDone = batch.stages.every(s => s.status === 'completed' || s.status === 'skipped');
     if (!allDone) {
       const pending = batch.stages.filter(s => s.status === 'pending' || s.status === 'in_progress').map(s => s.name);
@@ -1048,7 +1039,17 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
 
     const warehouse = await Warehouse.findById(warehouseId);
     if (!warehouse) {
-      return res.status(404).json({ error: 'Finished goods storage warehouse was not found.' });
+      return res.status(404).json({ error: 'Finished-goods storage warehouse was not found.' });
+    }
+
+    // Do not consume packaging stock until all preconditions above have passed.
+    // A rejected completion attempt must leave packaging inventory untouched.
+    if (!batch.packagingDeducted) {
+      if (batch.packagingMode === 'self_packed') {
+        await deductPackagingMaterials(batch, yieldsList);
+      } else {
+        batch.packagingDeducted = true;
+      }
     }
 
     // Record a QC disposition only when an explicit decision is supplied.
@@ -1523,6 +1524,13 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
     }
     const criticalStages = (batch.stages || []).filter(s => s.name !== 'QC Testing');
     if (criticalStages.some(s => s.status !== 'completed' && s.status !== 'skipped')) return res.status(400).json({ error: 'All critical manufacturing stages must be completed or formally skipped before market release' });
+    if (criticalStages.some(s => ['completed', 'skipped'].includes(s.status) &&
+      (!s.performedBy || !s.verifiedBy || !s.verifiedAt || String(s.performedBy) === String(s.verifiedBy)))) {
+      return res.status(400).json({ error: 'Every completed or skipped critical manufacturing stage requires independent operator and verifier identities with verification timestamp before market release' });
+    }
+    if (criticalStages.some(s => s.status === 'skipped' && !String(s.notes || '').trim())) {
+      return res.status(400).json({ error: 'Every skipped critical manufacturing stage requires a documented reason before market release' });
+    }
     if (criticalStages.some(s => s.status === 'completed' && !s.isDualSigned)) return res.status(400).json({ error: 'Every completed critical manufacturing stage must have independent Chemist and QA signatures' });
     const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
     const LineClearance = require('../../models/LineClearance');

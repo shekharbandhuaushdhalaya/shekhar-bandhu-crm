@@ -237,7 +237,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
         code: 'IDENTITY', status: 'pass', result: 'Conforms',
         testedBy: 'qc-analyst-1', testedByName: 'QC Analyst', testedAt: new Date()
       }],
-      stages: [{ name: 'Mixing', status: 'completed', isDualSigned: true }],
+      stages: [{ name: 'Mixing', status: 'completed', isDualSigned: true, performedBy: 'mixing-operator', verifiedBy: 'mixing-reviewer', verifiedAt: new Date() }],
       save: jest.fn().mockResolvedValue(true)
     });
     const mockVerifiedDispensing = () => {
@@ -255,6 +255,32 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       _id: 'spec-release-1', productId: 'product-release-1', status: 'approved',
       approvedBy: 'spec-approver', approvedAt: new Date(), tests: [{ code: 'IDENTITY', mandatory: true }]
     };
+
+    test('blocks market release when a skipped stage lacks independent verification', async () => {
+      const batch = makeReleaseBatch();
+      batch.stages[0] = { name: 'Mixing', status: 'skipped', notes: 'Not applicable to this formulation', performedBy: 'operator-1', verifiedBy: null, verifiedAt: null };
+      BatchProduction.findById.mockResolvedValue(batch);
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('completed or skipped critical manufacturing stage requires independent');
+      expect(ProductQualitySpecification.findById).not.toHaveBeenCalled();
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('blocks market release when a skipped stage has no documented reason', async () => {
+      const batch = makeReleaseBatch();
+      batch.stages[0] = { name: 'Mixing', status: 'skipped', notes: '', performedBy: 'operator-1', verifiedBy: 'reviewer-1', verifiedAt: new Date() };
+      BatchProduction.findById.mockResolvedValue(batch);
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('skipped critical manufacturing stage requires a documented reason');
+      expect(ProductQualitySpecification.findById).not.toHaveBeenCalled();
+      expect(batch.save).not.toHaveBeenCalled();
+    });
 
     test('blocks the QC analyst from releasing their own batch', async () => {
       const batch = makeReleaseBatch();
