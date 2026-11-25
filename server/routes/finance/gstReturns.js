@@ -296,7 +296,7 @@ router.get('/filing-status', authorize('report:view'), async (req, res) => {
   try {
     const period = String(req.query.period || '').trim();
     const returnType = String(req.query.returnType || '').trim();
-    if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(period) || !['gstr1', 'gstr3b'].includes(returnType)) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || !['gstr1', 'gstr3b'].includes(returnType)) {
       return res.status(400).json({ error: 'A valid YYYY-MM period and returnType (gstr1 or gstr3b) are required', code: 'GST_FILING_PERIOD_INVALID' });
     }
     const GstFiling = require('../../models/GstFiling');
@@ -318,7 +318,7 @@ router.post('/filing-status', authorize('invoice:finalize'), async (req, res) =>
     const actorId = req.user?.id || req.user?._id;
     const actorName = String(req.user?.name || req.user?.email || '').trim();
 
-    if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(period) || !['gstr1', 'gstr3b'].includes(returnType) || !arn || arn.length > 64) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || !['gstr1', 'gstr3b'].includes(returnType) || !arn || arn.length > 64) {
       return res.status(400).json({ error: 'A valid YYYY-MM period, return type, and ARN (1–64 characters) are required', code: 'GST_FILING_EVIDENCE_INVALID' });
     }
     if (!actorId || !actorName) {

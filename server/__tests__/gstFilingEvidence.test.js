@@ -28,7 +28,6 @@ describe('GST filing evidence controls', () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
     GstFiling.create = jest.fn().mockResolvedValue({ _id: 'filing-1' });
     GstFiling.findOne = jest.fn();
   });
