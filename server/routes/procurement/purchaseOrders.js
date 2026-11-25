@@ -121,6 +121,13 @@ router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchem
       req.io?.emit('purchase_requisition_updated', { type: 'converted', id: req.body.requisitionId });
       return res.status(201).json(po);
     }
+    const procurementExceptionReason = String(req.body.procurementExceptionReason || '').trim();
+    if (procurementExceptionReason.length < 20) {
+      throw Object.assign(
+        new Error('A direct purchase order requires a documented procurement exception of at least 20 characters'),
+        { statusCode: 409, code: 'PROCUREMENT_EXCEPTION_REQUIRED' }
+      );
+    }
     const vend = await Vendor.findById(vendorId);
     if (!vend) return res.status(404).json({ error: 'Vendor not found' });
     const resolvedVendorName = vendorName || vend.company || vend.name || 'Vendor';
@@ -140,7 +147,7 @@ router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchem
     });
 
     const po = await PurchaseOrder.create({
-      poNo, vendorId, vendorName: resolvedVendorName, orderDate: new Date(), items: processedItems,
+      poNo, vendorId, vendorName: resolvedVendorName, procurementExceptionReason, orderDate: new Date(), items: processedItems,
       subtotal: Number(subtotal.toFixed(2)), taxAmount: Number(taxAmount.toFixed(2)),
       totalAmount: Number((subtotal + taxAmount).toFixed(2)), status: 'draft', notes,
       createdBy: req.user?.name || 'System', createdByUserId: req.user?.id || null
