@@ -20,6 +20,7 @@ jest.mock('../utils/auditLogger', () => ({ logAction: jest.fn().mockResolvedValu
 jest.mock('../utils/documentCounter', () => ({ generateAtomicDocumentNumber: jest.fn().mockResolvedValue('SR-000001') }));
 
 const SupplierReturn = require('../models/SupplierReturn');
+const GoodsReceivedNote = require('../models/GoodsReceivedNote');
 const RolePermission = require('../models/RolePermission');
 const router = require('../routes/procurement/purchaseOrders');
 
@@ -88,14 +89,22 @@ describe('Supplier return lifecycle', () => {
   });
 
   test('closes a replacement request through a conditional update with supplier evidence', async () => {
-    SupplierReturn.findById.mockResolvedValue({ _id: 'return-5', returnNo: 'SR-5', status: 'dispatched', resolutionType: 'replacement_requested' });
+    SupplierReturn.findById.mockResolvedValue({
+      _id: 'return-5', returnNo: 'SR-5', status: 'dispatched', resolutionType: 'replacement_requested',
+      poId: 'po-5', vendorId: 'vendor-5', rawMaterialId: 'raw-5', qty: 2
+    });
+    GoodsReceivedNote.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({
+      _id: 'replacement-grn-5', grnNo: 'GRN-REPL-5', status: 'verified',
+      verifiedAt: new Date(), items: [{ rawMaterialId: 'raw-5', batchNo: 'REPL-BATCH-5', qtyAccepted: 2 }]
+    }) });
     SupplierReturn.findOneAndUpdate.mockResolvedValue({
       _id: 'return-5', returnNo: 'SR-5', status: 'closed', supplierReference: 'SUP-ACK-5',
-      replacementBatchNo: 'REPL-BATCH-5', resolvedByUserId: 'stores-1'
+      replacementBatchNo: 'REPL-BATCH-5', replacementGrnId: 'replacement-grn-5',
+      replacementGrnNo: 'GRN-REPL-5', resolvedByUserId: 'stores-1'
     });
     const response = await request(app).patch('/api/purchase-orders/supplier-returns/return-5/resolve').set('x-user-id', 'stores-1').send({ supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5' });
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5', resolvedByUserId: 'stores-1' });
+    expect(response.body).toMatchObject({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5', replacementGrnNo: 'GRN-REPL-5', resolvedByUserId: 'stores-1' });
     expect(SupplierReturn.findOneAndUpdate).toHaveBeenCalledWith(
       { _id: 'return-5', status: 'dispatched' },
       { $set: expect.objectContaining({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5' }) },

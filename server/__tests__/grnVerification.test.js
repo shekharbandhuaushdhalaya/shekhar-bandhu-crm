@@ -194,25 +194,62 @@ describe('GRN independent receipt and supplier-document verification', () => {
     record.requestedByUserId = 'another-user';
     const missingNotes = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/approve').send({ decision: 'approved' });
     expect(missingNotes.status).toBe(400);
+    SupplierReturn.findOneAndUpdate = jest.fn().mockResolvedValue({
+      _id: 'return-1', status: 'approved', reviewedByUserId: '507f1f77bcf86cd799439022'
+    });
     const approved = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/approve').send({ decision: 'approved', reviewNotes: 'Reviewed evidence' });
     expect(approved.status).toBe(200);
-    expect(record.status).toBe('approved');
-    expect(record.reviewedByUserId).toBe('507f1f77bcf86cd799439022');
+    expect(approved.body.status).toBe('approved');
+    expect(approved.body.reviewedByUserId).toBe('507f1f77bcf86cd799439022');
   });
 
-  test('requires dispatch and supplier resolution evidence in sequence', async () => {
-    const record = { _id: 'return-1', status: 'approved', resolutionType: 'replacement_requested', save: jest.fn() };
-    SupplierReturn.findById = jest.fn().mockResolvedValue(record);
+  test('requires dispatch evidence and a verified replacement GRN before closing a replacement request', async () => {
+    const approvedRecord = {
+      _id: 'return-1', returnNo: 'SR-1', status: 'approved', resolutionType: 'replacement_requested',
+      poId: 'po-1', vendorId: 'vendor-1', rawMaterialId: 'raw-1', qty: 2
+    };
+    const dispatchedRecord = { ...approvedRecord, status: 'dispatched', updatedAt: new Date('2026-11-25T10:00:00Z') };
+    SupplierReturn.findById = jest.fn()
+      .mockResolvedValueOnce(approvedRecord)
+      .mockResolvedValueOnce(approvedRecord)
+      .mockResolvedValueOnce(dispatchedRecord)
+      .mockResolvedValueOnce(dispatchedRecord);
+    SupplierReturn.findOneAndUpdate = jest.fn()
+      .mockResolvedValueOnce({ ...dispatchedRecord, dispatchRef: 'LR-001' })
+      .mockResolvedValueOnce({
+        ...dispatchedRecord, status: 'closed', replacementBatchNo: 'NEW-LOT-1',
+        replacementGrnId: 'replacement-grn-1', replacementGrnNo: 'GRN-REPL-1'
+      });
     const missingDispatch = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/dispatch').send({});
     expect(missingDispatch.status).toBe(400);
     const dispatched = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/dispatch').send({ dispatchRef: 'LR-001' });
     expect(dispatched.status).toBe(200);
     const missingBatch = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/resolve').send({ supplierReference: 'SUP-ACK-1' });
     expect(missingBatch.status).toBe(400);
+    GoodsReceivedNote.findOne = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({
+      _id: 'replacement-grn-1', grnNo: 'GRN-REPL-1', status: 'verified',
+      receivedDate: new Date('2026-11-24'), verifiedAt: new Date('2026-11-25'),
+      items: [{ rawMaterialId: 'raw-1', batchNo: 'NEW-LOT-1', qtyAccepted: 2 }]
+    }) });
     const resolved = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/resolve').send({ supplierReference: 'SUP-ACK-1', replacementBatchNo: 'NEW-LOT-1' });
     expect(resolved.status).toBe(200);
-    expect(record.status).toBe('closed');
-    expect(record.replacementBatchNo).toBe('NEW-LOT-1');
+    expect(resolved.body).toMatchObject({
+      status: 'closed', replacementBatchNo: 'NEW-LOT-1',
+      replacementGrnId: 'replacement-grn-1', replacementGrnNo: 'GRN-REPL-1'
+    });
+  });
+
+  test('does not close a replacement request without a verified replacement GRN', async () => {
+    SupplierReturn.findById = jest.fn().mockResolvedValue({
+      _id: 'return-2', status: 'dispatched', resolutionType: 'replacement_requested',
+      poId: 'po-1', vendorId: 'vendor-1', rawMaterialId: 'raw-1', qty: 2
+    });
+    GoodsReceivedNote.findOne = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    const response = await request(app).patch('/api/purchase-orders/supplier-returns/return-2/resolve')
+      .send({ supplierReference: 'SUP-ACK-2', replacementBatchNo: 'NEW-LOT-2' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('SUPPLIER_REPLACEMENT_GRN_NOT_VERIFIED');
+    expect(SupplierReturn.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
 });

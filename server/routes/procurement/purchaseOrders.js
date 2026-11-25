@@ -509,8 +509,34 @@ router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (r
     if (record.resolutionType === 'replacement_requested') {
       const batch = String(req.body?.replacementBatchNo || '').trim();
       if (!batch) return res.status(400).json({ error: 'Replacement batch number is required' });
-      set.replacementBatchNo = batch;
-      set.replacementReceivedAt = new Date();
+      const itemIdentity = record.rawMaterialId
+        ? { rawMaterialId: record.rawMaterialId }
+        : record.productId ? { productId: record.productId } : null;
+      if (!itemIdentity) return res.status(409).json({ error: 'Supplier return has no linked material/product identity; replacement receipt cannot be verified', code: 'SUPPLIER_REPLACEMENT_ITEM_UNLINKED' });
+      const replacementGrn = await GoodsReceivedNote.findOne({
+        poId: record.poId,
+        vendorId: record.vendorId,
+        status: 'verified',
+        items: { $elemMatch: {
+          ...itemIdentity,
+          batchNo: batch,
+          qtyAccepted: { $gte: Number(record.qty || 0) }
+        } }
+      }).lean();
+      if (!replacementGrn) return res.status(409).json({
+        error: 'Replacement cannot be closed until a verified GRN records the same supplier, PO, material/product, batch and sufficient accepted quantity',
+        code: 'SUPPLIER_REPLACEMENT_GRN_NOT_VERIFIED'
+      });
+      const replacementLine = (replacementGrn.items || []).find(line =>
+        String(line.batchNo || '') === batch &&
+        (record.rawMaterialId ? String(line.rawMaterialId || '') === String(record.rawMaterialId) : String(line.productId || '') === String(record.productId)) &&
+        Number(line.qtyAccepted || 0) >= Number(record.qty || 0)
+      );
+      if (!replacementLine) return res.status(409).json({ error: 'Verified replacement GRN line did not reconcile to the supplier return', code: 'SUPPLIER_REPLACEMENT_GRN_LINE_MISMATCH' });
+      set.replacementBatchNo = replacementLine.batchNo;
+      set.replacementGrnId = replacementGrn._id;
+      set.replacementGrnNo = replacementGrn.grnNo;
+      set.replacementReceivedAt = replacementGrn.verifiedAt || replacementGrn.receivedDate || null;
     }
     if (record.resolutionType === 'debit_note_requested') {
       const noteDate = req.body?.supplierDebitNoteDate ? new Date(req.body.supplierDebitNoteDate) : null;
