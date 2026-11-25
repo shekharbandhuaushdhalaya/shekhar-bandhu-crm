@@ -26,6 +26,7 @@ interface Props {
   onOpenCoA?: (batchId: string) => void;
   onCancelProduction: (batchId: string) => void;
   onQcSignOff: (batch: any) => void;
+  onOpenQcWorkflow: (batch: any) => void;
   isIntegerQty: (unit: string, category: string) => boolean;
   getStatusColor: (status: string) => string;
 }
@@ -33,7 +34,7 @@ interface Props {
 const BatchProductionsTab = React.memo(function BatchProductionsTab({
   batches, products, warehouses, expandedBatchIds, toggleBatchExpanded,
   onStartProductionBatch, onTraceBatch, onAdvanceStage, onSkipStage, onFailStage,
-  onDeleteBatchDoc, onUploadBatchDoc, onOpenBMR, onOpenCoA, onCancelProduction, onQcSignOff,
+  onDeleteBatchDoc, onUploadBatchDoc, onOpenBMR, onOpenCoA, onCancelProduction, onQcSignOff, onOpenQcWorkflow,
   isIntegerQty, getStatusColor
 }: Props) {
   const { colors } = useTheme();
@@ -368,19 +369,19 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
 
             {/* Action Controls */}
             {isQcHold && (
-              <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: colors.warning + '15', borderWidth: 1, borderColor: colors.warning, marginBottom: 8 }}>
+              <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: colors.danger + '12', borderWidth: 1, borderColor: colors.danger, marginBottom: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <Ionicons name="flask-outline" size={15} color={colors.warning} />
-                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.warning }}>ALL STAGES COMPLETE — QC SIGN-OFF REQUIRED</Text>
+                  <Ionicons name="alert-circle-outline" size={15} color={colors.danger} />
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.danger }}>QC FAILURE — DEVIATION / CAPA HOLD</Text>
                 </View>
-                <Text style={{ ...Typography.caption, color: colors.text.secondary }}>All manufacturing stages are done. Complete QC inspection to inward finished stock into inventory.</Text>
+                <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Manufacturing is complete. Investigate and independently close every linked QC failure CAPA before submitting a controlled retest. This batch is not market released.</Text>
               </View>
             )}
             {/* Action Controls Row */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: 10 }}>
               {/* Left Side: Report & Genealogy Actions */}
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {isFinished && (
+                {(isFinished || isQcHold) && (
                   <>
                     <TouchableOpacity
                       style={[styles.outlineBtn, { paddingVertical: 6, paddingHorizontal: 12 }]}
@@ -431,18 +432,34 @@ const BatchProductionsTab = React.memo(function BatchProductionsTab({
               </View>
 
               {/* Right Side: Active Process State Actions */}
-              {(isInProgress || isQcHold) && (
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity style={styles.cancelBatchBtn} onPress={() => onCancelProduction(batch._id)}>
-                    <Ionicons name="close-circle-outline" size={15} color={colors.danger} />
-                    <Text style={styles.cancelBatchBtnText}>Cancel & Revert Stock</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {isInProgress && (
+                  <>
+                    <TouchableOpacity style={styles.cancelBatchBtn} onPress={() => onCancelProduction(batch._id)}>
+                      <Ionicons name="close-circle-outline" size={15} color={colors.danger} />
+                      <Text style={styles.cancelBatchBtnText}>Cancel & Revert Stock</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.completeBatchBtn} onPress={() => onQcSignOff(batch)}>
+                      <Ionicons name="checkmark-done-circle-outline" size={15} color="#fff" />
+                      <Text style={styles.completeBatchBtnText}>Complete Manufacturing & Transfer</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+                {(isFinished || isQcHold) && !batch.releasedBy && (
+                  <TouchableOpacity
+                    style={[styles.completeBatchBtn, { backgroundColor: batch.qcStatus === 'approved' ? colors.success : batch.qcStatus === 'pending_qa_review' ? colors.primary : batch.qcStatus === 'rejected' ? colors.warning : colors.primary }]}
+                    onPress={() => onOpenQcWorkflow(batch)}
+                  >
+                    <Ionicons name={batch.qcStatus === 'approved' ? 'shield-checkmark-outline' : batch.qcStatus === 'pending_qa_review' ? 'clipboard-outline' : 'flask-outline'} size={15} color="#fff" />
+                    <Text style={styles.completeBatchBtnText}>
+                      {batch.qcStatus === 'approved' ? 'Independent Market Release' :
+                        batch.qcStatus === 'pending_qa_review' ? 'Independent QA Review' :
+                          batch.qcStatus === 'rejected' ? 'QC Retest / CAPA' : 'Record Finished-Product QC'}
+                    </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.completeBatchBtn} onPress={() => onQcSignOff(batch)}>
-                    <Ionicons name="checkmark-done-circle-outline" size={15} color="#fff" />
-                    <Text style={styles.completeBatchBtnText}>QC Sign-off & Inward Stock</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+                )}
+                {batch.releasedBy && <StatusPill label="Market released" tone="success" />}
+              </View>
             </View>
           </View>
         );

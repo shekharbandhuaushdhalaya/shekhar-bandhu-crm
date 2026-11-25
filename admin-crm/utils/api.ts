@@ -1364,6 +1364,20 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/complete`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
+  async recordBatchQcTests(id: string, data: { qcSpecificationId?: string; tests: Array<{
+    code: string; result?: string; numericResult?: number; status: 'pass' | 'fail'; remarks?: string;
+  }> }): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/qc-tests`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async approveBatchQcDisposition(id: string, notes: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/qc-approval`, { method: 'PATCH', body: JSON.stringify({ notes }) });
+    return res.json();
+  }
+  async releaseBatchProduction(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/release`, { method: 'PATCH' });
+    return res.json();
+  }
   async cancelBatchProduction(id: string): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/cancel`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`batch-cancel-${id}`) } });
     return res.json();

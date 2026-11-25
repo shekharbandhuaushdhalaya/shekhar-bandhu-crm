@@ -30,6 +30,7 @@ import RawMaterialModal from './manufacturing/modals/RawMaterialModal';
 import BOMModal from './manufacturing/modals/BOMModal';
 import LaunchBatchModal from './manufacturing/modals/LaunchBatchModal';
 import QCSignoffModal from './manufacturing/modals/QCSignoffModal';
+import FinishedProductQcModal from './manufacturing/modals/FinishedProductQcModal';
 import BMRReportModal from './manufacturing/modals/BMRReportModal';
 import CoAModal from './manufacturing/modals/CoAModal';
 import PharmacopoeiaModal from './manufacturing/modals/PharmacopoeiaModal';
@@ -116,6 +117,8 @@ export default function ManufacturingScreen() {
   const [bomModalVisible, setBomModalVisible] = useState(false);
   const [productionModalVisible, setProductionModalVisible] = useState(false);
   const [qcModalVisible, setQcModalVisible] = useState(false);
+  const [qcWorkflowBatch, setQcWorkflowBatch] = useState<any>(null);
+  const [qcWorkflowVisible, setQcWorkflowVisible] = useState(false);
   const [genealogyModalVisible, setGenealogyModalVisible] = useState(false);
   const [genealogyData, setGenealogyData] = useState<any>(null);
   const [genealogyLoading, setGenealogyLoading] = useState(false);
@@ -2062,6 +2065,10 @@ export default function ManufacturingScreen() {
               setQcError('');
               setQcModalVisible(true);
             }}
+            onOpenQcWorkflow={(batch) => {
+              setQcWorkflowBatch(batch);
+              setQcWorkflowVisible(true);
+            }}
             isIntegerQty={isIntegerQty}
             getStatusColor={getStatusColor}
           />
@@ -2242,6 +2249,18 @@ export default function ManufacturingScreen() {
         onAddQcYieldRow={handleAddQcYieldRow}
         onRemoveQcYieldRow={handleRemoveQcYieldRow}
         onQcYieldChange={handleQcYieldChange}
+      />
+
+      <FinishedProductQcModal
+        visible={qcWorkflowVisible}
+        batch={qcWorkflowBatch}
+        onClose={() => setQcWorkflowVisible(false)}
+        onCompleted={() => {
+          setQcWorkflowVisible(false);
+          setQcWorkflowBatch(null);
+          loadedRef.current.delete('batches');
+          fetchDataset('batches');
+        }}
       />
 
       <BMRReportModal
