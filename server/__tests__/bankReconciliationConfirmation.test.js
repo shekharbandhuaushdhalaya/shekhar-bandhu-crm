@@ -38,6 +38,11 @@ describe('Bank reconciliation confirmation', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset implementations as well as call history: earlier negative-path
+    // tests may intentionally return before consuming the prior-match lookup.
+    BankStatement.findOne.mockReset();
+    BankStatement.findOneAndUpdate.mockReset();
+    Payment.findOne.mockReset();
     RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
     BankStatement.findOne
       .mockReturnValueOnce({ session: jest.fn().mockResolvedValue({ ...statement }) })
