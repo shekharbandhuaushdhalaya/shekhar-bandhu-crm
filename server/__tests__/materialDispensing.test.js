@@ -16,6 +16,7 @@ const RawMaterialEntry = require('../models/RawMaterialEntry');
 const RawMaterialLedger = require('../models/RawMaterialLedger');
 const MaterialDispensing = require('../models/MaterialDispensing');
 const RolePermission = require('../models/RolePermission');
+const { generateAtomicDocumentNumber } = require('../utils/documentCounter');
 const router = require('../routes/manufacturing/materialDispensing');
 
 describe('Production material dispensing', () => {
@@ -67,6 +68,7 @@ describe('Production material dispensing', () => {
     const res = await request(app).post('/api/batch-productions/' + batchId + '/dispensings')
       .send({ stageIndex: 0, items: [{ rawMaterialId: materialId, rawMaterialEntryId: entryId, qtyDispensed: 4 }] });
     expect(res.status).toBe(201);
+    expect(generateAtomicDocumentNumber).toHaveBeenCalledWith('dispensingNo', 'DSP-', 6, expect.any(Object));
     expect(record.status).toBe('pending_verification');
     expect(entry.qty).toBe(100);
     expect(entry.reservedQty).toBe(10);

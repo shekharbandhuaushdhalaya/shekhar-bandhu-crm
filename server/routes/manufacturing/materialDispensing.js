@@ -62,7 +62,7 @@ router.post('/:id/dispensings', authorize('manufacturing:edit'), async (req, res
         pendingByEntry.set(entryKey, alreadyPending + qty);
       }
       const [record] = await MaterialDispensing.create([{
-        dispensingNo: await generateAtomicDocumentNumber('dispensingNo', 'DSP-', 6),
+        dispensingNo: await generateAtomicDocumentNumber('dispensingNo', 'DSP-', 6, session),
         batchId: batch._id, batchNo: batch.batchNo, stageIndex, stageName: stage.name, items: normalized,
         status: 'pending_verification', dispensedBy: req.user.id, dispensedByName: req.user.name, dispensedAt: new Date()
       }], { session });
