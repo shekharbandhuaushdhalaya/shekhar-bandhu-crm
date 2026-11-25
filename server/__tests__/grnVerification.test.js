@@ -2,11 +2,14 @@ const express = require('express');
 const request = require('supertest');
 
 jest.mock('../models/GoodsReceivedNote');
+jest.mock('../models/SupplierReturn');
+jest.mock('../utils/documentCounter', () => ({ generateAtomicDocumentNumber: jest.fn().mockResolvedValue('SR-000001') }));
 jest.mock('../models/RolePermission');
 jest.mock('../utils/withTransaction', () => ({ withTransaction: jest.fn(async work => work({})) }));
 jest.mock('../utils/auditLogger', () => ({ logAction: jest.fn().mockResolvedValue(true) }));
 
 const GoodsReceivedNote = require('../models/GoodsReceivedNote');
+const SupplierReturn = require('../models/SupplierReturn');
 const RolePermission = require('../models/RolePermission');
 const { logAction } = require('../utils/auditLogger');
 const router = require('../routes/procurement/purchaseOrders');
@@ -162,6 +165,54 @@ describe('GRN independent receipt and supplier-document verification', () => {
     const response = await request(app).get('/api/purchase-orders/grn/grn-1');
     expect(response.status).toBe(200);
     expect(response.body.grnNo).toBe('GRN-00001');
+  });
+
+  test('creates a supplier return only within the verified GRN rejected quantity', async () => {
+    const grn = { _id: 'grn-1', grnNo: 'GRN-00001', poId: 'po-1', poNo: 'PO-1', vendorId: 'vendor-1', vendorName: 'Supplier', status: 'verified', items: [{ name: 'Ashwagandha', batchNo: 'LOT-1', qtyRejected: 5, unit: 'kg', rawMaterialId: 'raw-1' }] };
+    GoodsReceivedNote.findById = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue(grn) });
+    SupplierReturn.find = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue([{ qty: 3, status: 'pending_approval' }]) });
+    SupplierReturn.create = jest.fn().mockResolvedValue([{ _id: 'return-1', returnNo: 'SR-000001', qty: 2 }]);
+    const response = await request(app).post('/api/purchase-orders/grn/grn-1/supplier-returns').send({ itemIndex: 0, qty: 2, reason: 'Damaged packaging', resolutionType: 'replacement_requested' });
+    expect(response.status).toBe(201);
+    expect(SupplierReturn.create).toHaveBeenCalledWith([expect.objectContaining({ qty: 2, status: 'pending_approval', requestedByUserId: '507f1f77bcf86cd799439022' })], { session: {} });
+  });
+
+  test('blocks supplier return quantities above the remaining rejected quantity', async () => {
+    const grn = { _id: 'grn-1', status: 'verified', items: [{ name: 'Ashwagandha', batchNo: 'LOT-1', qtyRejected: 5 }] };
+    GoodsReceivedNote.findById = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue(grn) });
+    SupplierReturn.find = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue([{ qty: 3, status: 'approved' }]) });
+    const response = await request(app).post('/api/purchase-orders/grn/grn-1/supplier-returns').send({ itemIndex: 0, qty: 3, reason: 'Damaged', resolutionType: 'return_to_supplier' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('SUPPLIER_RETURN_QTY_EXCEEDED');
+  });
+
+  test('enforces maker-checker on supplier return approval and requires review notes', async () => {
+    const record = { _id: 'return-1', status: 'pending_approval', requestedByUserId: '507f1f77bcf86cd799439022', save: jest.fn() };
+    SupplierReturn.findById = jest.fn().mockResolvedValue(record);
+    const self = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/approve').send({ decision: 'approved', reviewNotes: 'Checked' });
+    expect(self.status).toBe(403);
+    record.requestedByUserId = 'another-user';
+    const missingNotes = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/approve').send({ decision: 'approved' });
+    expect(missingNotes.status).toBe(400);
+    const approved = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/approve').send({ decision: 'approved', reviewNotes: 'Reviewed evidence' });
+    expect(approved.status).toBe(200);
+    expect(record.status).toBe('approved');
+    expect(record.reviewedByUserId).toBe('507f1f77bcf86cd799439022');
+  });
+
+  test('requires dispatch and supplier resolution evidence in sequence', async () => {
+    const record = { _id: 'return-1', status: 'approved', resolutionType: 'replacement_requested', save: jest.fn() };
+    SupplierReturn.findById = jest.fn().mockResolvedValue(record);
+    const missingDispatch = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/dispatch').send({});
+    expect(missingDispatch.status).toBe(400);
+    const dispatched = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/dispatch').send({ dispatchRef: 'LR-001' });
+    expect(dispatched.status).toBe(200);
+    const missingBatch = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/resolve').send({ supplierReference: 'SUP-ACK-1' });
+    expect(missingBatch.status).toBe(400);
+    const resolved = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/resolve').send({ supplierReference: 'SUP-ACK-1', replacementBatchNo: 'NEW-LOT-1' });
+    expect(resolved.status).toBe(200);
+    expect(record.status).toBe('closed');
+    expect(record.replacementBatchNo).toBe('NEW-LOT-1');
   });
 
 });

@@ -922,6 +922,26 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/verify`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
+  async getSupplierReturnsForGrn(id: string): Promise<any[]> {
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/supplier-returns`);
+    return res.json();
+  }
+  async createSupplierReturnForGrn(id: string, data: { itemIndex: number; qty: number; reason: string; resolutionType: 'return_to_supplier' | 'replacement_requested' | 'debit_note_requested' }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/supplier-returns`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async reviewSupplierReturn(id: string, data: { decision: 'approved' | 'rejected'; reviewNotes: string; rejectionReason?: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/approve`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async dispatchSupplierReturn(id: string, dispatchRef: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/dispatch`, { method: 'PATCH', body: JSON.stringify({ dispatchRef }) });
+    return res.json();
+  }
+  async resolveSupplierReturn(id: string, data: { supplierReference: string; replacementBatchNo?: string; supplierDebitNoteDate?: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/resolve`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
 
   // No generic getInvoice as backend doesn't support it
 

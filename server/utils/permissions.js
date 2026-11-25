@@ -56,7 +56,7 @@ function getDefaultPermissionsForRole(role) {
       return [
         'product:view', 'product:create', 'product:edit', 'product:viewPricing', 'product:editPricing',
         'inventory:view', 'inventory:create', 'inventory:edit', 'inventory:viewValue',
-        'vendor:view', 'vendor:create', 'vendor:edit',
+        'vendor:view', 'vendor:create', 'vendor:edit', 'vendor:approve',
         'customer:view', 'customer:create', 'customer:edit',
         'invoice:view', 'invoice:create', 'invoice:edit', 'invoice:finalize', 'invoice:markPaid',
         'order:view', 'order:create', 'order:edit', 'order:approve', 'order:cancel', 'order:fulfill',
