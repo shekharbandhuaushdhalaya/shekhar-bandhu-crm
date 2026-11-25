@@ -348,6 +348,52 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
       expect(response.body.code).toBe('RECALL_UPDATE_CONFLICT');
     });
 
+    test('allows an independent reviewer to complete a fully reconciled recall and records reviewer evidence', async () => {
+      const recall = {
+        _id: 'recall_valid_close', updatedAt: new Date('2026-11-25T10:00:00Z'),
+        initiatedByUserId: '507f191e810c19729de860ea', status: 'in_progress',
+        totalAffectedQty: 100, recalledQty: 100,
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: true }]
+      };
+      Recall.findById.mockResolvedValue(recall);
+      const response = await request(app).patch('/api/recalls/recall_valid_close/status').send({
+        status: 'completed', recalledQty: 100,
+        closureNotes: 'All affected quantities reconciled and customer notifications evidenced'
+      });
+      expect(response.status).toBe(200);
+      expect(Recall.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: recall._id, updatedAt: recall.updatedAt, status: 'in_progress' }),
+        expect.objectContaining({ $set: expect.objectContaining({
+          status: 'completed',
+          recalledQty: 100,
+          statusUpdatedByUserId: '507f1f77bcf86cd799439011',
+          statusUpdatedByName: 'Test User',
+          statusUpdatedAt: expect.any(Date)
+        }) }),
+        { new: true, runValidators: true }
+      );
+    });
+
+    test('returns a conflict when customer notification loses a concurrent update race', async () => {
+      const recall = {
+        _id: 'recall_notify_race', updatedAt: new Date('2026-11-25T10:00:00Z'),
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }]
+      };
+      Recall.findById.mockResolvedValue(recall);
+      Recall.findOneAndUpdate.mockResolvedValue(null);
+      const response = await request(app).patch('/api/recalls/recall_notify_race/notify-customer').send({
+        invoiceNo: 'INV-1', notificationMethod: 'email', notificationReference: 'mail-log-race-001'
+      });
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe('RECALL_UPDATE_CONFLICT');
+      expect(Recall.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ updatedAt: recall.updatedAt,
+          affectedCustomers: { $elemMatch: { invoiceNo: 'INV-1', notified: { $ne: true } } } }),
+        expect.any(Object),
+        { new: true, runValidators: true }
+      );
+    });
+
     test('rejects recalled quantities above the traced distributed quantity', async () => {
       const recall = {
         _id: 'recall_qty', updatedAt: new Date('2026-11-25T10:00:00Z'), status: 'in_progress', totalAffectedQty: 100,
