@@ -32,10 +32,10 @@ describe('Production receipt and transfer transaction integration', () => {
   async function seed() {
     const firm = await Firm.create({ name: 'Production Receipt Integration Firm', active: true });
     return runWithTenant({ firmId: firm._id }, async () => {
-      const productionWarehouse = await Warehouse.create({ name: 'Production House', type: 'manufacturing' });
+      const manufacturingUnitId = new mongoose.Types.ObjectId();
+      const productionWarehouse = await Warehouse.create({ name: 'Production House', type: 'manufacturing', manufacturingUnitId });
       const destinationWarehouse = await Warehouse.create({ name: 'Finished Goods Warehouse', type: 'main' });
       const product = await Product.create({ name: 'Integration Herbal Tablets', sku: 'PROD-RCPT-INT-001', price: 40, mrp: 50 });
-      const manufacturingUnitId = new mongoose.Types.ObjectId();
       const batch = await BatchProduction.create({
         batchNo: 'AY-PROD-RCPT-INT-001',
         productId: product._id,
