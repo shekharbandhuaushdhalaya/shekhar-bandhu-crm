@@ -284,7 +284,8 @@ async function postSalesReturn(returnId, actor = {}) {
         partyType: 'Customer', partyId: customer._id, partyName: customer.company || customer.name,
         reason: `Sales return ${ret.returnNo}`, baseAmount: totals.baseAmount,
         cgst: totals.cgst, sgst: totals.sgst, igst: totals.igst, totalAmount: totals.totalAmount,
-        status: 'finalized',
+        status: 'finalized', createdBy: ret.requestedByUserId || null,
+        finalizedBy: actor.id || null, finalizedAt: new Date(),
         items: priced.map(item => ({
           productId: item.productId, name: item.name, qty: item.qty, boxes: item.qty,
           billableQty: item.billableQty || 0, freeQty: item.freeQty || 0,

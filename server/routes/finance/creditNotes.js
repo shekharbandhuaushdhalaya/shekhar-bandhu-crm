@@ -119,7 +119,7 @@ router.get('/:id', authorize('invoice:view'), async (req, res) => {
 router.post('/', authorize('invoice:create'), validate(schemas.creditNoteSchema), async (req, res) => {
   try {
     const type = req.body.type || 'credit_note';
-    const data = { ...req.body, noteNo: req.body.noteNo || await generateNoteNo(type), type, status: 'draft' };
+    const data = { ...req.body, noteNo: req.body.noteNo || await generateNoteNo(type), type, status: 'draft', createdBy: req.user?.id || req.user?._id || null };
     const note = await CreditNote.create(data);
     if (req.io) req.io.emit('credit_note_updated', { type: 'created', id: note._id });
     res.status(201).json(note);
@@ -131,7 +131,7 @@ router.put('/:id', authorize('invoice:edit'), async (req, res) => {
     const note = await CreditNote.findById(req.params.id);
     if (!note) return res.status(404).json({ error: 'Note not found' });
     if (note.status !== 'draft') return res.status(409).json({ error: 'Only draft notes can be edited' });
-    const protectedFields = ['noteNo', 'status'];
+    const protectedFields = ['noteNo', 'status', 'createdBy', 'finalizedBy', 'finalizedAt'];
     for (const field of protectedFields) delete req.body[field];
     Object.assign(note, req.body);
     await note.save();
@@ -146,10 +146,16 @@ router.patch('/:id/finalize', authorize('invoice:finalize'), async (req, res) =>
       const locked = await CreditNote.findById(req.params.id).session(session);
       if (!locked) throw Object.assign(new Error('Note not found'), { status: 404, code: 'NOTE_NOT_FOUND' });
       if (locked.status !== 'draft') throw Object.assign(new Error('Only draft notes can be finalized'), { status: 409, code: 'NOTE_NOT_DRAFT' });
+      const actorId = req.user?.id || req.user?._id;
+      if (locked.createdBy && actorId && String(locked.createdBy) === String(actorId)) {
+        throw Object.assign(new Error('The person who created the credit/debit note cannot independently finalize it'), { status: 403, code: 'NOTE_FINALIZATION_MAKER_CHECKER_REQUIRED' });
+      }
       if (!(Number(locked.totalAmount || 0) > 0)) throw Object.assign(new Error('Note amount must be greater than zero'), { status: 400, code: 'INVALID_NOTE_AMOUNT' });
       validateFinalizableAmounts(locked);
       await applyNoteBalance(locked, 1, session);
       locked.status = 'finalized';
+      locked.finalizedBy = actorId || null;
+      locked.finalizedAt = new Date();
       await locked.save({ session });
       return locked;
     });

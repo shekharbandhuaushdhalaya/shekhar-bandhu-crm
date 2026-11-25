@@ -32,6 +32,9 @@ const creditNoteSchema = new mongoose.Schema({
   igst: { type: Number, default: 0 },
   totalAmount: { type: Number, default: 0 },
   status: { type: String, enum: ['draft', 'finalized', 'cancelled'], default: 'draft' },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  finalizedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  finalizedAt: { type: Date, default: null },
   items: [creditNoteItemSchema]
 }, { timestamps: true });
 

@@ -53,6 +53,15 @@ describe('Credit/debit note finalization accounting safeguards', () => {
     Customer.findById = jest.fn(() => ({ session: jest.fn().mockResolvedValue(customer) }));
   });
 
+  test('prevents the note creator from independently finalizing it', async () => {
+    note.createdBy = 'reviewer-1';
+    const response = await request(app).patch('/api/credit-notes/note-1/finalize');
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('NOTE_FINALIZATION_MAKER_CHECKER_REQUIRED');
+    expect(customer.save).not.toHaveBeenCalled();
+    expect(note.save).not.toHaveBeenCalled();
+  });
+
   test('rejects a note whose total does not reconcile to taxable base and GST', async () => {
     note.totalAmount = 120;
     const response = await request(app).patch('/api/credit-notes/note-1/finalize');
