@@ -1,6 +1,6 @@
 # Production-readiness roadmap
 
-**Branch:** `work/production-readiness-phase-7`  
+**Active delivery branch:** `work/gst-hardening-recovery`  
 **Tracking PR:** #10 (keep open; do not merge without explicit approval)  
 **Baseline commit:** `44ed2bd373d28f08c15428ecbffa286ec36f6f5f`
 
@@ -160,6 +160,11 @@ System-generated BMRs, test records, CoAs, registers and reports must retain bat
 Supplier debit-note references are evidence only; they do not post accounting adjustments. Rejected receipt quantities already excluded from accepted stock must never be deducted a second time.
 
 ## Current verified checkpoint
+
+- Latest engineering checkpoint: commit `6a72cf9c1955d1024e4f56eed52be7df400112cc`; GitHub Actions quality run #421 passed both frontend typecheck/web build and backend lint/tests. This is CI evidence for this commit, not a production certification.
+- Credit/debit note finalization now rejects non-finite/negative amount components, inconsistent intra/inter-state GST splits, totals that do not reconcile to taxable base plus GST, and reasons shorter than 10 characters. The balance update and note finalization are performed in one transaction, with focused regression tests.
+- GSTR-3B JSON output is explicitly a draft, blocks finalized invoices with unquantified taxable bases, excludes unverified input tax credit, and lists omitted statutory sections and external review/filing limitations.
+- Background jobs require a firm ID; tenantless legacy jobs are dead-lettered without handler execution, and valid handlers execute within their firm tenant context.
 
 - Purchase requisition, quotation, PO/GRN, inventory ledger, stocktake, dispatch, batch genealogy, QC specification/quarantine, deviation/CAPA, stability, retention-sample and recall foundations exist in the repository.
 - Supplier-return backend lifecycle exists (request, independent approval/rejection, dispatch, resolution). This delivery completes the corresponding GRN-screen actions and adds visible evidence for each state.
