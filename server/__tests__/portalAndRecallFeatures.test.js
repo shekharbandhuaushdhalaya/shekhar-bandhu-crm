@@ -270,6 +270,52 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
       expect(res.body.reconciliationMetrics.unrecoveredQty).toBe(50);
     });
 
+
+    test('requires traceable notification evidence for an affected invoice', async () => {
+      const recall = { _id: 'recall_notify', affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }], save: jest.fn().mockResolvedValue(true) };
+      Recall.findById.mockResolvedValue(recall);
+      const missing = await request(app).patch('/api/recalls/recall_notify/notify-customer').send({ invoiceNo: 'INV-1' });
+      expect(missing.status).toBe(400);
+      expect(recall.save).not.toHaveBeenCalled();
+      const recorded = await request(app).patch('/api/recalls/recall_notify/notify-customer').send({
+        invoiceNo: 'INV-1', notificationMethod: 'email', notificationReference: 'mail-log-2026-001'
+      });
+      expect(recorded.status).toBe(200);
+      expect(recall.affectedCustomers[0]).toMatchObject({
+        notified: true, notifiedByName: 'Test User', notificationMethod: 'email',
+        notificationReference: 'mail-log-2026-001'
+      });
+      expect(recall.save).toHaveBeenCalledTimes(1);
+    });
+
+    test('blocks recall completion until notification and full recovery evidence are reconciled', async () => {
+      const recall = {
+        _id: 'recall_close', status: 'in_progress', totalAffectedQty: 100,
+        recalledQty: 90, closureNotes: '',
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }],
+        save: jest.fn()
+      };
+      Recall.findById.mockResolvedValue(recall);
+      const incomplete = await request(app).patch('/api/recalls/recall_close/status').send({
+        status: 'completed', recalledQty: 100, closureNotes: 'Closure reviewed and approved'
+      });
+      expect(incomplete.status).toBe(409);
+      expect(incomplete.body.code).toBe('RECALL_EFFECTIVENESS_EVIDENCE_INCOMPLETE');
+      expect(recall.save).not.toHaveBeenCalled();
+    });
+
+    test('rejects recalled quantities above the traced distributed quantity', async () => {
+      const recall = {
+        _id: 'recall_qty', status: 'in_progress', totalAffectedQty: 100,
+        recalledQty: 0, affectedCustomers: [], save: jest.fn()
+      };
+      Recall.findById.mockResolvedValue(recall);
+      const response = await request(app).patch('/api/recalls/recall_qty/status').send({ recalledQty: 101 });
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('INVALID_RECALL_RECONCILIATION');
+      expect(recall.save).not.toHaveBeenCalled();
+    });
+
     test('does not invent firm identity, licence or GMP certificate values when configuration is absent', async () => {
       Recall.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({
         _id: 'recall_2', recallNo: 'REC-2026-002', batchNo: 'B-2026-89',

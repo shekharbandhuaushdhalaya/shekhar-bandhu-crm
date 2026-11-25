@@ -81,16 +81,28 @@ router.post('/', authorize('manufacturing:edit'), async (req, res) => {
 // PATCH /api/recalls/:id/notify-customer — Mark affected customer as notified
 router.patch('/:id/notify-customer', authorize('manufacturing:edit'), async (req, res) => {
   try {
-    const { invoiceNo } = req.body;
+    const invoiceNo = String(req.body.invoiceNo || '').trim();
+    const method = String(req.body.notificationMethod || '').trim().toLowerCase();
+    const reference = String(req.body.notificationReference || '').trim();
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!invoiceNo || !['email', 'phone', 'letter', 'portal', 'other'].includes(method) || !reference || !actorId || !actorName) {
+      return res.status(400).json({ error: 'Affected invoice, notification method, evidence reference and authenticated recorder are required', code: 'RECALL_NOTIFICATION_EVIDENCE_REQUIRED' });
+    }
     const recall = await Recall.findById(req.params.id);
     if (!recall) return res.status(404).json({ error: 'Recall not found' });
 
     const cust = recall.affectedCustomers.find(c => c.invoiceNo === invoiceNo);
-    if (cust) {
-      cust.notified = true;
-      cust.notifiedAt = new Date();
-      await recall.save();
-    }
+    if (!cust) return res.status(404).json({ error: 'Invoice is not in this recall distribution list' });
+    if (cust.notified) return res.status(409).json({ error: 'Notification is already recorded for this affected invoice', code: 'RECALL_NOTIFICATION_ALREADY_RECORDED' });
+    cust.notified = true;
+    cust.notifiedAt = new Date();
+    cust.notifiedByUserId = actorId;
+    cust.notifiedByName = actorName;
+    cust.notificationMethod = method;
+    cust.notificationReference = reference.slice(0, 500);
+    cust.notificationNotes = String(req.body.notificationNotes || '').trim().slice(0, 1000);
+    await recall.save();
 
     res.json(recall);
   } catch (err) {
@@ -105,10 +117,40 @@ router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) =>
     const recall = await Recall.findById(req.params.id);
     if (!recall) return res.status(404).json({ error: 'Recall not found' });
 
-    if (status) recall.status = status;
-    if (recalledQty !== undefined) recall.recalledQty = Number(recalledQty);
-    if (closureNotes) recall.closureNotes = closureNotes;
+    const transitions = {
+      initiated: new Set(['initiated', 'in_progress']),
+      in_progress: new Set(['in_progress', 'completed']),
+      completed: new Set(['completed', 'closed']),
+      closed: new Set(['closed'])
+    };
+    if (status && (!Object.prototype.hasOwnProperty.call(transitions, recall.status) || !transitions[recall.status].has(status))) {
+      return res.status(409).json({ error: 'Invalid recall status transition', code: 'INVALID_RECALL_TRANSITION' });
+    }
+    const nextRecalledQty = recalledQty === undefined ? Number(recall.recalledQty || 0) : Number(recalledQty);
+    const totalAffectedQty = Number(recall.totalAffectedQty || 0);
+    if (!Number.isFinite(nextRecalledQty) || nextRecalledQty < 0 || nextRecalledQty > totalAffectedQty) {
+      return res.status(400).json({ error: 'Recalled quantity must be finite and between zero and the traced distributed quantity', code: 'INVALID_RECALL_RECONCILIATION' });
+    }
+    const nextStatus = status || recall.status;
+    const nextClosureNotes = closureNotes === undefined ? String(recall.closureNotes || '') : String(closureNotes).trim();
+    if (['completed', 'closed'].includes(nextStatus)) {
+      const affected = recall.affectedCustomers || [];
+      const notifiedCount = affected.filter(customer => customer.notified).length;
+      if (notifiedCount !== affected.length || nextRecalledQty !== totalAffectedQty || nextClosureNotes.trim().length < 20) {
+        return res.status(409).json({
+          error: 'Recall completion requires documented notification for every affected invoice, full quantity reconciliation and substantive closure notes',
+          code: 'RECALL_EFFECTIVENESS_EVIDENCE_INCOMPLETE',
+          affectedCustomers: affected.length,
+          notifiedCustomers: notifiedCount,
+          totalAffectedQty,
+          recalledQty: nextRecalledQty
+        });
+      }
+    }
 
+    recall.status = nextStatus;
+    recall.recalledQty = nextRecalledQty;
+    recall.closureNotes = nextClosureNotes;
     await recall.save();
     res.json(recall);
   } catch (err) {
