@@ -21,6 +21,18 @@ function referenceMatches(statement, payment) {
   return Boolean(bankReference && paymentReference && bankReference === paymentReference);
 }
 
+function evaluateBankPaymentMatch(statement, payment, windowDays = 3) {
+  const direction = statementDirection(statement);
+  if (!direction || payment.status !== 'active' || payment.type !== direction.type ||
+      Math.abs(money(payment.amount) - direction.amount) > 0.01) return null;
+  if (referenceMatches(statement, payment)) return 'reference_amount_direction';
+  const bankDate = new Date(statement.transactionDate);
+  const date = paymentDate(payment);
+  const withinWindow = Number.isFinite(bankDate.getTime()) && date &&
+    Math.abs(bankDate.getTime() - date.getTime()) <= windowDays * DAY_MS;
+  return withinWindow ? 'amount_direction_date' : null;
+}
+
 function suggestBankStatementMatches({ bankStatements = [], ledgerPayments = [], windowDays = 3 }) {
   const usedPaymentIds = new Set();
   const matches = [];
@@ -40,15 +52,7 @@ function suggestBankStatementMatches({ bankStatements = [], ledgerPayments = [],
       continue;
     }
 
-    const bankDate = new Date(statement.transactionDate);
-    const validBankDate = Number.isFinite(bankDate.getTime());
-    const candidates = ledgerPayments.filter(payment => {
-      if (payment.status !== 'active' || payment.type !== direction.type) return false;
-      if (Math.abs(money(payment.amount) - direction.amount) > 0.01) return false;
-      const date = paymentDate(payment);
-      const withinWindow = Boolean(validBankDate && date && Math.abs(bankDate.getTime() - date.getTime()) <= windowDays * DAY_MS);
-      return referenceMatches(statement, payment) || withinWindow;
-    });
+    const candidates = ledgerPayments.filter(payment => evaluateBankPaymentMatch(statement, payment, windowDays));
     const available = candidates.filter(payment => !usedPaymentIds.has(String(payment._id)));
     const referenceCandidates = available.filter(payment => referenceMatches(statement, payment));
     const finalists = referenceCandidates.length ? referenceCandidates : available;
@@ -90,4 +94,4 @@ function suggestBankStatementMatches({ bankStatements = [], ledgerPayments = [],
   return { matches, unreconciledBankLines };
 }
 
-module.exports = { suggestBankStatementMatches };
+module.exports = { suggestBankStatementMatches, evaluateBankPaymentMatch };

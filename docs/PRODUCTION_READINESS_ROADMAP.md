@@ -200,6 +200,8 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - Recall customer notification now captures the affected invoice, notification channel, evidence reference, authenticated recorder and timestamp. Recall completion/closure requires every affected invoice to have notification evidence, full quantity reconciliation and substantive closure notes; over-recovery and invalid status transitions are blocked.
 - Dispatch status and proof-of-delivery updates now use optimistic conditional writes against the previously read status/version, preventing concurrent logistics updates from silently overwriting one another.
 
+- Bank reconciliation now distinguishes bank credits/receipts from debits/payments, uses actual statement references and ledger payment dates, excludes reversed payments, refuses ambiguous suggestions and prevents one payment being suggested against multiple statement lines. Suggestions do not alter the ledger. A separately permissioned confirmation action records the reviewed match, reviewer, timestamp and notes transactionally; a tenant-scoped unique index prevents one payment being reconciled to multiple bank lines.
+
 ### Next verification batch
 - Execute web/mobile UAT for incoming material specification authoring/approval, quarantine registration, incoming inspection and independent disposition, plus finished-product QC, CAPA retest, QA approval and market release. Verify role permissions, evidence capture and blocked paths against licensed product specifications.
 - Add failure-injection coverage for production-house warehouse creation; receipt/Challan rollback and idempotent service retry are now covered by MongoDB replica-set integration tests.
