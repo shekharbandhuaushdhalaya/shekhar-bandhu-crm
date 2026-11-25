@@ -443,22 +443,90 @@ router.post('/grn/:id/supplier-returns', authorize('vendor:edit'), async (req, r
 });
 router.patch('/supplier-returns/:id/approve', authorize('vendor:approve'), async (req, res) => {
   try {
-    const reviewerId = req.user?.id || req.user?._id; const reviewerName = req.user?.name || req.user?.email;
+    const reviewerId = req.user?.id || req.user?._id;
+    const reviewerName = req.user?.name || req.user?.email;
     if (!reviewerId || !reviewerName) return res.status(403).json({ error: 'Authenticated independent reviewer identity is required' });
-    const record = await SupplierReturn.findById(req.params.id); if (!record) return res.status(404).json({ error: 'Supplier return not found' });
+    const record = await SupplierReturn.findById(req.params.id);
+    if (!record) return res.status(404).json({ error: 'Supplier return not found' });
     if (record.status !== 'pending_approval') return res.status(409).json({ error: 'Only pending supplier returns can be reviewed' });
     if (String(record.requestedByUserId) === String(reviewerId)) return res.status(403).json({ error: 'Requester cannot approve own supplier return', code: 'SUPPLIER_RETURN_MAKER_CHECKER_REQUIRED' });
-    const decision = req.body?.decision || 'approved'; if (!['approved','rejected'].includes(decision)) return res.status(400).json({ error: 'Invalid decision' });
-    if (!String(req.body?.reviewNotes || '').trim() || (decision === 'rejected' && !String(req.body?.rejectionReason || '').trim())) return res.status(400).json({ error: 'Review notes and, when rejecting, a rejection reason are required' });
-    record.status = decision; record.reviewedByUserId = reviewerId; record.reviewedByName = reviewerName; record.reviewedAt = new Date(); record.reviewNotes = String(req.body.reviewNotes).trim(); record.rejectionReason = decision === 'rejected' ? String(req.body.rejectionReason).trim() : ''; await record.save();
-    await logAction({ action: 'SUPPLIER_RETURN_REVIEWED', description: 'Supplier return ' + record.returnNo + ' ' + decision, details: { supplierReturnId: record._id, decision }, req }); return res.json(record);
+    const decision = req.body?.decision || 'approved';
+    if (!['approved', 'rejected'].includes(decision)) return res.status(400).json({ error: 'Invalid decision' });
+    const reviewNotes = String(req.body?.reviewNotes || '').trim();
+    const rejectionReason = String(req.body?.rejectionReason || '').trim();
+    if (reviewNotes.length < 10 || (decision === 'rejected' && rejectionReason.length < 10)) {
+      return res.status(400).json({ error: 'Substantive review notes and, when rejecting, a substantive rejection reason are required' });
+    }
+    const reviewed = await SupplierReturn.findOneAndUpdate(
+      { _id: record._id, status: 'pending_approval', requestedByUserId: { $ne: reviewerId } },
+      { $set: {
+        status: decision, reviewedByUserId: reviewerId, reviewedByName: reviewerName,
+        reviewedAt: new Date(), reviewNotes, rejectionReason: decision === 'rejected' ? rejectionReason : ''
+      } },
+      { new: true, runValidators: true }
+    );
+    if (!reviewed) return res.status(409).json({ error: 'Supplier return was changed by another reviewer', code: 'SUPPLIER_RETURN_REVIEW_CONFLICT' });
+    await logAction({ action: 'SUPPLIER_RETURN_REVIEWED', description: 'Supplier return ' + reviewed.returnNo + ' ' + decision, details: { supplierReturnId: reviewed._id, decision }, req });
+    return res.json(reviewed);
   } catch (err) { return res.status(400).json({ error: err.message, code: err.code }); }
 });
 router.patch('/supplier-returns/:id/dispatch', authorize('vendor:edit'), async (req, res) => {
-  try { const record = await SupplierReturn.findById(req.params.id); if (!record) return res.status(404).json({ error: 'Supplier return not found' }); if (record.status !== 'approved') return res.status(409).json({ error: 'Only approved returns can be dispatched' }); const ref = String(req.body?.dispatchRef || '').trim(); if (!ref) return res.status(400).json({ error: 'Dispatch/handover reference is required' }); record.status = 'dispatched'; record.dispatchRef = ref; record.dispatchedByUserId = req.user?.id || req.user?._id || null; record.dispatchedByName = req.user?.name || req.user?.email || ''; record.dispatchedAt = new Date(); await record.save(); await logAction({ action: 'SUPPLIER_RETURN_DISPATCHED', description: 'Supplier return ' + record.returnNo + ' dispatched', details: { supplierReturnId: record._id, dispatchRef: ref }, req }); return res.json(record); } catch (err) { return res.status(400).json({ error: err.message }); }
+  try {
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated dispatch identity is required' });
+    const record = await SupplierReturn.findById(req.params.id);
+    if (!record) return res.status(404).json({ error: 'Supplier return not found' });
+    if (record.status !== 'approved') return res.status(409).json({ error: 'Only approved returns can be dispatched' });
+    const ref = String(req.body?.dispatchRef || '').trim();
+    if (!ref) return res.status(400).json({ error: 'Dispatch/handover reference is required' });
+    const filter = { _id: record._id, status: 'approved' };
+    if (record.updatedAt) filter.updatedAt = record.updatedAt;
+    const dispatched = await SupplierReturn.findOneAndUpdate(
+      filter,
+      { $set: { status: 'dispatched', dispatchRef: ref, dispatchedByUserId: actorId, dispatchedByName: actorName, dispatchedAt: new Date() } },
+      { new: true, runValidators: true }
+    );
+    if (!dispatched) return res.status(409).json({ error: 'Supplier return changed before dispatch was recorded', code: 'SUPPLIER_RETURN_DISPATCH_CONFLICT' });
+    await logAction({ action: 'SUPPLIER_RETURN_DISPATCHED', description: 'Supplier return ' + dispatched.returnNo + ' dispatched', details: { supplierReturnId: dispatched._id, dispatchRef: ref }, req });
+    return res.json(dispatched);
+  } catch (err) { return res.status(400).json({ error: err.message }); }
 });
 router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (req, res) => {
-  try { const record = await SupplierReturn.findById(req.params.id); if (!record) return res.status(404).json({ error: 'Supplier return not found' }); if (record.status !== 'dispatched') return res.status(409).json({ error: 'Only dispatched returns can be resolved' }); const ref = String(req.body?.supplierReference || '').trim(); if (!ref) return res.status(400).json({ error: 'Supplier replacement/debit-note reference is required' }); if (record.resolutionType === 'replacement_requested') { const batch = String(req.body?.replacementBatchNo || '').trim(); if (!batch) return res.status(400).json({ error: 'Replacement batch number is required' }); record.replacementBatchNo = batch; record.replacementReceivedAt = new Date(); } if (record.resolutionType === 'debit_note_requested') { record.supplierDebitNoteRef = ref; record.supplierDebitNoteDate = req.body?.supplierDebitNoteDate ? new Date(req.body.supplierDebitNoteDate) : null; } record.supplierReference = ref; record.resolvedByUserId = req.user?.id || req.user?._id || null; record.resolvedByName = req.user?.name || req.user?.email || ''; record.resolvedAt = new Date(); record.status = 'closed'; await record.save(); await logAction({ action: 'SUPPLIER_RETURN_RESOLVED', description: 'Supplier return ' + record.returnNo + ' resolved', details: { supplierReturnId: record._id, supplierReference: ref, resolutionType: record.resolutionType }, req }); return res.json(record); } catch (err) { return res.status(400).json({ error: err.message }); }
+  try {
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated resolution identity is required' });
+    const record = await SupplierReturn.findById(req.params.id);
+    if (!record) return res.status(404).json({ error: 'Supplier return not found' });
+    if (record.status !== 'dispatched') return res.status(409).json({ error: 'Only dispatched returns can be resolved' });
+    const ref = String(req.body?.supplierReference || '').trim();
+    if (!ref) return res.status(400).json({ error: 'Supplier replacement/debit-note reference is required' });
+    const set = {
+      status: 'closed', supplierReference: ref,
+      resolvedByUserId: actorId, resolvedByName: actorName, resolvedAt: new Date()
+    };
+    if (record.resolutionType === 'replacement_requested') {
+      const batch = String(req.body?.replacementBatchNo || '').trim();
+      if (!batch) return res.status(400).json({ error: 'Replacement batch number is required' });
+      set.replacementBatchNo = batch;
+      set.replacementReceivedAt = new Date();
+    }
+    if (record.resolutionType === 'debit_note_requested') {
+      const noteDate = req.body?.supplierDebitNoteDate ? new Date(req.body.supplierDebitNoteDate) : null;
+      if (req.body?.supplierDebitNoteDate && !Number.isFinite(noteDate.getTime())) return res.status(400).json({ error: 'Supplier debit-note date is invalid' });
+      set.supplierDebitNoteRef = ref;
+      set.supplierDebitNoteDate = noteDate;
+    }
+    const filter = { _id: record._id, status: 'dispatched' };
+    if (record.updatedAt) filter.updatedAt = record.updatedAt;
+    const resolved = await SupplierReturn.findOneAndUpdate(
+      filter, { $set: set }, { new: true, runValidators: true }
+    );
+    if (!resolved) return res.status(409).json({ error: 'Supplier return changed before resolution was recorded', code: 'SUPPLIER_RETURN_RESOLUTION_CONFLICT' });
+    await logAction({ action: 'SUPPLIER_RETURN_RESOLVED', description: 'Supplier return ' + resolved.returnNo + ' resolved', details: { supplierReturnId: resolved._id, supplierReference: ref, resolutionType: resolved.resolutionType }, req });
+    return res.json(resolved);
+  } catch (err) { return res.status(400).json({ error: err.message }); }
 });
 router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
   try {

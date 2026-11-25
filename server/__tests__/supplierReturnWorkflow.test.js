@@ -47,13 +47,28 @@ describe('Supplier return lifecycle', () => {
     expect(record.save).not.toHaveBeenCalled();
   });
 
-  test('records independent approval identity and review evidence', async () => {
-    const record = { _id: 'return-2', returnNo: 'SR-2', status: 'pending_approval', requestedByUserId: 'maker-1', save: jest.fn().mockResolvedValue(true) };
-    SupplierReturn.findById.mockResolvedValue(record);
+  test('records independent approval identity and review evidence with a conditional update', async () => {
+    SupplierReturn.findById.mockResolvedValue({ _id: 'return-2', returnNo: 'SR-2', status: 'pending_approval', requestedByUserId: 'maker-1' });
+    SupplierReturn.findOneAndUpdate.mockResolvedValue({
+      _id: 'return-2', returnNo: 'SR-2', status: 'approved',
+      reviewedByUserId: 'reviewer-2', reviewNotes: 'Quantity and evidence checked'
+    });
     const response = await request(app).patch('/api/purchase-orders/supplier-returns/return-2/approve').set('x-user-id', 'reviewer-2').send({ decision: 'approved', reviewNotes: 'Quantity and evidence checked' });
     expect(response.status).toBe(200);
-    expect(record).toMatchObject({ status: 'approved', reviewedByUserId: 'reviewer-2', reviewNotes: 'Quantity and evidence checked' });
-    expect(record.reviewedAt).toBeInstanceOf(Date);
+    expect(response.body).toMatchObject({ status: 'approved', reviewedByUserId: 'reviewer-2', reviewNotes: 'Quantity and evidence checked' });
+    expect(SupplierReturn.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: 'return-2', status: 'pending_approval', requestedByUserId: { $ne: 'reviewer-2' } },
+      { $set: expect.objectContaining({ status: 'approved', reviewedByUserId: 'reviewer-2' }) },
+      { new: true, runValidators: true }
+    );
+  });
+
+  test('returns conflict when another reviewer wins supplier-return approval', async () => {
+    SupplierReturn.findById.mockResolvedValue({ _id: 'return-2', status: 'pending_approval', requestedByUserId: 'maker-1' });
+    SupplierReturn.findOneAndUpdate.mockResolvedValue(null);
+    const response = await request(app).patch('/api/purchase-orders/supplier-returns/return-2/approve').set('x-user-id', 'reviewer-2').send({ decision: 'approved', reviewNotes: 'Quantity and evidence checked' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('SUPPLIER_RETURN_REVIEW_CONFLICT');
   });
 
   test('requires dispatch evidence and only dispatches approved returns', async () => {
@@ -72,12 +87,19 @@ describe('Supplier return lifecycle', () => {
     expect(record.save).not.toHaveBeenCalled();
   });
 
-  test('closes a replacement request only after supplier reference and replacement batch are recorded', async () => {
-    const record = { _id: 'return-5', returnNo: 'SR-5', status: 'dispatched', resolutionType: 'replacement_requested', save: jest.fn().mockResolvedValue(true) };
-    SupplierReturn.findById.mockResolvedValue(record);
+  test('closes a replacement request through a conditional update with supplier evidence', async () => {
+    SupplierReturn.findById.mockResolvedValue({ _id: 'return-5', returnNo: 'SR-5', status: 'dispatched', resolutionType: 'replacement_requested' });
+    SupplierReturn.findOneAndUpdate.mockResolvedValue({
+      _id: 'return-5', returnNo: 'SR-5', status: 'closed', supplierReference: 'SUP-ACK-5',
+      replacementBatchNo: 'REPL-BATCH-5', resolvedByUserId: 'stores-1'
+    });
     const response = await request(app).patch('/api/purchase-orders/supplier-returns/return-5/resolve').set('x-user-id', 'stores-1').send({ supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5' });
     expect(response.status).toBe(200);
-    expect(record).toMatchObject({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5', resolvedByUserId: 'stores-1' });
-    expect(record.resolvedAt).toBeInstanceOf(Date);
+    expect(response.body).toMatchObject({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5', resolvedByUserId: 'stores-1' });
+    expect(SupplierReturn.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: 'return-5', status: 'dispatched' },
+      { $set: expect.objectContaining({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5' }) },
+      { new: true, runValidators: true }
+    );
   });
 });
