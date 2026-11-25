@@ -1372,7 +1372,15 @@ router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), async (re
     if (batch.status !== 'completed' || batch.releasedBy) return res.status(409).json({ error: 'Only completed, unreleased batches can receive QA disposition approval' });
     const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
     const spec = await ProductQualitySpecification.findById(batch.qcSpecificationId).lean();
-    if (!spec || spec.status !== 'approved') return res.status(409).json({ error: 'Effective approved product quality specification is required for QA disposition review' });
+    const batchProductId = batch.productId && batch.productId._id ? batch.productId._id : batch.productId;
+    if (!spec || spec.status !== 'approved' || !spec.approvedBy || !spec.approvedAt ||
+      String(spec.productId) !== String(batchProductId) ||
+      (spec.effectiveDate && new Date(spec.effectiveDate) > new Date())) {
+      return res.status(409).json({ error: 'An effective, approved specification with approval evidence for this exact product is required for QA disposition review' });
+    }
+    if (String(batch.qcSpecificationVersion || '') !== String(spec.specificationVersion || '')) {
+      return res.status(409).json({ error: 'The batch QC specification version does not match the approved specification record' });
+    }
     const results = new Map((batch.qcTests || []).map(test => [String(test.code || '').trim().toLowerCase(), test]));
     const mandatory = (spec.tests || []).filter(test => test.mandatory !== false);
     const allPassed = mandatory.length > 0 && mandatory.every(test => {
