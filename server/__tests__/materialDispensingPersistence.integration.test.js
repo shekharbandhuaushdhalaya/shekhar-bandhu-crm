@@ -52,7 +52,7 @@ describe('Material dispensing persistence and genealogy integration', () => {
     const firm = await Firm.create({ name: 'Material Dispensing Integration Firm', active: true });
     await runWithTenant({ firmId: firm._id }, async () => {
       const warehouse = await Warehouse.create({ name: 'Dispensing Integration Store' });
-      const material = await RawMaterial.create({ name: 'Integration Ashwagandha', unit: 'kg' });
+      const material = await RawMaterial.create({ name: 'Integration Ashwagandha', sku: 'DSP-INT-ASH-001', unit: 'kg' });
       const entry = await RawMaterialEntry.create({
         rawMaterialId: material._id,
         batchNo: 'ASH-INT-LOT-01',
