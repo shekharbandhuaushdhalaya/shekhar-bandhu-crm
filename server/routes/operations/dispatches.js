@@ -105,7 +105,7 @@ router.post('/', idempotency, authorize('dispatch:create'), validate(schemas.dis
   }
 });
 
-router.patch('/:id', authorize('dispatch:edit'), validate(schemas.dispatchSchema.partial()), async (req, res) => {
+router.patch('/:id', authorize('dispatch:edit'), validate(schemas.dispatchUpdateSchema), async (req, res) => {
   try {
     const dispatch = await Dispatch.findById(req.params.id);
     if (!dispatch) return res.status(404).json({ error: 'Dispatch not found' });

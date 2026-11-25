@@ -1005,6 +1005,39 @@ const dispatchSchema = z.object({
   status: z.enum(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned']).default('dispatched'),
 });
 
+// PATCH /api/dispatches/:id — no defaults on partial updates. In particular,
+// source fields stay visible to the route's immutable-source guard.
+const dispatchUpdateSchema = z.object({
+  dispatchNo: z.string().optional(),
+  invoiceId: objectId.optional(),
+  invoiceNo: z.string().optional(),
+  challanId: objectId.optional(),
+  challanNo: z.string().optional(),
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
+  shippingAddress: z.string().optional(),
+  items: z.array(z.object({
+    productId: objectId.optional(),
+    name: z.string().min(1),
+    qty: z.number().nonnegative(),
+    packing: z.number().int().min(1).optional(),
+    batchNo: z.string().optional(),
+  })).optional(),
+  transporter: z.string().optional(),
+  lrNo: z.string().optional(),
+  vehicleNo: z.string().optional(),
+  courierName: z.string().optional(),
+  trackingId: z.string().optional(),
+  trackingUrl: z.string().optional(),
+  totalBoxes: z.number().nonnegative().optional(),
+  totalWeight: z.string().optional(),
+  freightCharge: z.number().nonnegative().optional(),
+  status: z.enum(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned']).optional(),
+  notes: z.string().optional(),
+  dispatchDate: z.string().or(z.date()).optional(),
+  proofOfDelivery: dispatchSchema.shape.proofOfDelivery,
+}).strict();
+
 // ── ManufacturingUnit ────────────────────────────────────────
 const manufacturingUnitSchema = z.object({
   name: z.string().min(1, 'Manufacturing unit name required'),
@@ -1145,6 +1178,7 @@ module.exports = {
   campaignSchema,
   complaintSchema,
   dispatchSchema,
+  dispatchUpdateSchema,
   systemSettingsSchema,
   rbacPermissionsSchema,
   querySubmitSchema,
