@@ -13,7 +13,12 @@ const itemSchema = new mongoose.Schema({
   vendorId: { type: String, default: '', trim: true },
   vendorName: { type: String, default: '', trim: true },
   condition: { type: String, enum: ['saleable','damaged','expired','other'], default: 'saleable' },
-  reason: { type: String, default: '' }
+  reason: { type: String, default: '' },
+  qcDisposition: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  qcReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  qcReviewedByName: { type: String, default: '' },
+  qcReviewedAt: { type: Date, default: null },
+  qcReviewNotes: { type: String, default: '' }
 }, { _id: false });
 const schema = new mongoose.Schema({
   returnNo: { type: String, required: true },
@@ -33,6 +38,8 @@ const schema = new mongoose.Schema({
   creditNoteId: { type: mongoose.Schema.Types.ObjectId, ref: 'CreditNote', default: null },
   reversedAt: { type: Date, default: null },
   reversedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  requestedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  requestedByName: { type: String, default: '' },
   reversalReason: { type: String, default: '' }
 }, { timestamps: true });
 schema.index({ firmId: 1, returnNo: 1 }, { unique: true });

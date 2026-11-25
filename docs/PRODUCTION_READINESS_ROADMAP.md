@@ -213,3 +213,6 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - Execute web/mobile UAT for incoming material specification authoring/approval, quarantine registration, incoming inspection and independent disposition, plus finished-product QC, CAPA retest, QA approval and market release. Verify role permissions, evidence capture and blocked paths against licensed product specifications.
 - Add failure-injection coverage for production-house warehouse creation; receipt/Challan rollback and idempotent service retry are now covered by MongoDB replica-set integration tests.
 - Complete an end-to-end material genealogy rehearsal from reserved raw-material lots through independently verified dispensing, finished-goods receipt, QC release and production-transfer posting.
+
+
+- Sales returns now have an authenticated API lifecycle for draft creation from an authoritative posted Sale Challan, transactional posting, credit-note linkage, and reasoned reversal. Returned goods enter an explicit QC hold rather than being treated as immediately saleable; independent QA disposition transfers each return line from hold to approved/rejected stock with reviewer identity, timestamp, notes and balanced stock-ledger evidence. Return poster cannot approve the returned stock, and reversals retain actor/reason evidence.

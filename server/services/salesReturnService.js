@@ -153,7 +153,9 @@ async function assertCumulativeReturnLimit({ challan, pricedItems, excludeReturn
   }
 }
 
-async function createSalesReturn(data) {
+async function createSalesReturn(data, actor = {}) {
+  if (!actor.id || !actor.name) throw err('RETURN_REQUESTER_REQUIRED', 'Authenticated return requester identity is required');
+  if (!data.items?.length) throw err('RETURN_ITEMS_REQUIRED', 'At least one returned line is required');
   if (!data.challanId) throw err('ORIGINAL_CHALLAN_REQUIRED', 'A posted Sale Challan is required for a Sales Return');
   if (data.resolution === 'refund') {
     throw err('REFUND_WORKFLOW_REQUIRED', 'Cash/bank refunds must be handled through a dedicated authorized refund payment workflow; use a credit note or replacement return here');
@@ -192,6 +194,8 @@ async function createSalesReturn(data) {
     items,
     totalAmount: totals.totalAmount,
     status: 'draft',
+    requestedByUserId: actor.id || null,
+    requestedByName: actor.name || '',
   });
 }
 
@@ -222,7 +226,8 @@ async function postSalesReturn(returnId, actor = {}) {
       const item = priced[idx];
       const product = await Product.findById(item.productId).session(session);
       if (!product) throw err('PRODUCT_NOT_FOUND', `Product not found: ${item.name}`);
-      const qcStatus = item.condition === 'saleable' ? 'approved' : 'rejected';
+      // Returned goods are never automatically saleable: every returned lot enters QC hold.
+      const qcStatus = 'under_test';
       const slot = {
         warehouseId: warehouse._id,
         productId: product._id,
@@ -242,6 +247,7 @@ async function postSalesReturn(returnId, actor = {}) {
         });
       }
       entry.qtyBoxes = Number(entry.qtyBoxes || 0) + Number(item.qty || 0);
+      entry.marketReleased = false;
       await entry.save({ session });
       product.stockLevel = Number(product.stockLevel || 0) + Number(item.qty || 0);
       await product.save({ session });
@@ -289,11 +295,13 @@ async function postSalesReturn(returnId, actor = {}) {
 }
 
 async function reverseSalesReturn(returnId, actor = {}, reason = '') {
+  if (!actor.id || !actor.name || String(reason).trim().length < 10) throw err('RETURN_REVERSAL_EVIDENCE_REQUIRED', 'Authenticated actor and substantive reversal reason are required');
   return withTransaction(async session => {
     const ret = await SalesReturn.findById(returnId).session(session);
     if (!ret) throw err('RETURN_NOT_FOUND', 'Sales Return not found');
     if (ret.status === 'reversed') return ret;
     if (ret.status !== 'posted') throw err('RETURN_NOT_REVERSIBLE', 'Only a posted Sales Return can be reversed');
+    if (ret.postedBy && String(ret.postedBy) === String(actor.id)) throw err('RETURN_REVERSAL_MAKER_CHECKER_REQUIRED', 'The person who posted the return cannot independently reverse it');
     const [customer, warehouse] = await Promise.all([
       Customer.findById(ret.customerId).session(session),
       Warehouse.findById(ret.warehouseId).session(session),
@@ -302,7 +310,7 @@ async function reverseSalesReturn(returnId, actor = {}, reason = '') {
 
     for (let idx = 0; idx < (ret.items || []).length; idx += 1) {
       const item = ret.items[idx];
-      const qcStatus = item.condition === 'saleable' ? 'approved' : 'rejected';
+      const qcStatus = item.qcDisposition === 'approved' ? 'approved' : item.qcDisposition === 'rejected' ? 'rejected' : item.qcDisposition === 'pending' ? 'under_test' : (item.condition === 'saleable' ? 'approved' : 'rejected');
       const entry = await InventoryEntry.findOne({
         warehouseId: warehouse._id, productId: item.productId, vendorId: item.vendorId || '',
         packing: item.packing || 1, batchNo: item.batchNo || '', qcStatus,
@@ -342,4 +350,61 @@ async function reverseSalesReturn(returnId, actor = {}, reason = '') {
   });
 }
 
-module.exports = { createSalesReturn, postSalesReturn, reverseSalesReturn, deriveReturnPricing, assertCumulativeReturnLimit };
+
+async function dispositionSalesReturnItem(returnId, itemIndex, { disposition, actor = {}, notes = '' } = {}) {
+  if (!['approved', 'rejected'].includes(disposition)) throw err('INVALID_RETURN_QC_DISPOSITION', 'Disposition must be approved or rejected');
+  if (!actor.id || !actor.name || String(notes).trim().length < 10) throw err('RETURN_QC_EVIDENCE_REQUIRED', 'Authenticated QA reviewer and substantive disposition notes are required');
+  return withTransaction(async session => {
+    const ret = await SalesReturn.findById(returnId).session(session);
+    if (!ret) throw err('RETURN_NOT_FOUND', 'Sales Return not found');
+    if (ret.status !== 'posted') throw err('RETURN_NOT_POSTED', 'Only posted Sales Returns can receive QC disposition');
+    if (ret.postedBy && String(ret.postedBy) === String(actor.id)) throw err('RETURN_QC_MAKER_CHECKER_REQUIRED', 'The person posting the return cannot independently disposition its returned stock');
+    const item = ret.items?.[Number(itemIndex)];
+    if (!item) throw err('RETURN_ITEM_NOT_FOUND', 'Sales Return item was not found');
+    if (item.qcDisposition && item.qcDisposition !== 'pending') throw err('RETURN_QC_ALREADY_DISPOSITIONED', 'Returned item already has a QC disposition');
+    const slot = {
+      warehouseId: ret.warehouseId, productId: item.productId, vendorId: item.vendorId || '',
+      packing: item.packing || 1, batchNo: item.batchNo || ''
+    };
+    const held = await InventoryEntry.findOne({ ...slot, qcStatus: 'under_test' }).session(session);
+    if (!held || Number(held.qtyBoxes || 0) < Number(item.qty || 0)) throw err('RETURN_QC_HOLD_STOCK_MISSING', 'Returned quantity is not available in the QC-hold stock bucket');
+    held.qtyBoxes = Number(held.qtyBoxes || 0) - Number(item.qty || 0);
+    await held.save({ session });
+    let destination = await InventoryEntry.findOne({ ...slot, qcStatus: disposition }).session(session);
+    if (!destination) {
+      const source = held.toObject();
+      delete source._id;
+      delete source.createdAt;
+      delete source.updatedAt;
+      destination = new InventoryEntry({ ...source, qcStatus: disposition, qtyBoxes: 0, marketReleased: disposition === 'approved' });
+    }
+    destination.qtyBoxes = Number(destination.qtyBoxes || 0) + Number(item.qty || 0);
+    destination.marketReleased = disposition === 'approved';
+    await destination.save({ session });
+    await StockLedger.create([
+      {
+        productId: item.productId, warehouseId: ret.warehouseId, warehouseName: held.warehouseName,
+        type: 'ADJUSTMENT', qtyBoxes: -Number(item.qty), balanceBoxes: held.qtyBoxes,
+        reference: ret.returnNo, movementKey: `sales-return:${ret._id}:${itemIndex}:qc:${disposition}:hold`,
+        note: `Returned stock moved from QC hold to ${disposition}`, createdBy: actor.name,
+        packing: item.packing || 1, vendorId: item.vendorId || '', vendorName: item.vendorName || '', batchNo: item.batchNo || ''
+      },
+      {
+        productId: item.productId, warehouseId: ret.warehouseId, warehouseName: destination.warehouseName,
+        type: 'ADJUSTMENT', qtyBoxes: Number(item.qty), balanceBoxes: destination.qtyBoxes,
+        reference: ret.returnNo, movementKey: `sales-return:${ret._id}:${itemIndex}:qc:${disposition}:destination`,
+        note: `Returned stock moved from QC hold to ${disposition}`, createdBy: actor.name,
+        packing: item.packing || 1, vendorId: item.vendorId || '', vendorName: item.vendorName || '', batchNo: item.batchNo || ''
+      }
+    ], { session });
+    item.qcDisposition = disposition;
+    item.qcReviewedBy = actor.id;
+    item.qcReviewedByName = actor.name;
+    item.qcReviewedAt = new Date();
+    item.qcReviewNotes = String(notes).trim().slice(0, 1000);
+    await ret.save({ session });
+    return ret;
+  });
+}
+
+module.exports = { createSalesReturn, postSalesReturn, reverseSalesReturn, dispositionSalesReturnItem, deriveReturnPricing, assertCumulativeReturnLimit };
