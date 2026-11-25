@@ -944,6 +944,56 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       expect(res.body.tests).toEqual(['IDENTITY']);
       expect(batch.save).not.toHaveBeenCalled();
     });
+
+    test('blocks market release when a verified dispensing record belongs to a different batch', async () => {
+      const batch = makeReleaseBatch();
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      mockRetentionSample();
+      DeviationCapa.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]), session: jest.fn().mockReturnThis() });
+      MaterialDispensing.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([{
+        dispensingNo: 'DSP-1', batchNo: 'ANOTHER-BATCH', stageIndex: 0, stageName: 'Mixing',
+        status: 'verified', dispensedBy: 'material-operator',
+        verifiedBy: 'material-reviewer', verifiedAt: new Date(),
+        items: [{ rawMaterialEntryId: 'entry-1', rawMaterialId: 'rm-1', lotNo: 'LOT-1', qtyDispensed: 10, qtyWasted: 0 }]
+      }]) });
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release')
+        .set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('MATERIAL_GENEALOGY_INCOMPLETE');
+      expect(res.body.missingEvidence.some(item => item.includes('invalid batch or manufacturing-stage reference'))).toBe(true);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('blocks market release when one verified dispensing record repeats the same stock-lot line', async () => {
+      const batch = makeReleaseBatch();
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      mockRetentionSample();
+      DeviationCapa.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]), session: jest.fn().mockReturnThis() });
+      MaterialDispensing.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([{
+        dispensingNo: 'DSP-1', batchNo: 'BATCH-RELEASE-1', stageIndex: 0, stageName: 'Mixing',
+        status: 'verified', dispensedBy: 'material-operator',
+        verifiedBy: 'material-reviewer', verifiedAt: new Date(),
+        items: [
+          { rawMaterialEntryId: 'entry-1', rawMaterialId: 'rm-1', lotNo: 'LOT-1', qtyDispensed: 10, qtyWasted: 0 },
+          { rawMaterialEntryId: 'entry-1', rawMaterialId: 'rm-1', lotNo: 'LOT-1', qtyDispensed: 10, qtyWasted: 0 }
+        ]
+      }]) });
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release')
+        .set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('MATERIAL_GENEALOGY_INCOMPLETE');
+      expect(res.body.missingEvidence.some(item => item.includes('duplicate stock-lot line'))).toBe(true);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
   });
 
 });
