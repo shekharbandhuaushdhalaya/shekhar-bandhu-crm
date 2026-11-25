@@ -9,7 +9,7 @@ describe('Evidence-based supplier scorecard', () => {
       purchaseOrders: [{
         _id: 'po-1', poNo: 'PO-1', status: 'completed', totalAmount: 10000,
         expectedDeliveryDate: new Date('2026-05-10'),
-        items: [{ rawMaterialId: 'raw-1', qtyOrdered: 10 }]
+        items: [{ rawMaterialId: 'raw-1', qtyOrdered: 8 }]
       }],
       goodsReceivedNotes: [{
         _id: 'grn-1', poId: 'po-1', receivedDate: new Date('2026-05-09'),
