@@ -271,6 +271,8 @@ app.use('/api/social', (req, res, next) => {
 }, socialRoutes);
 const purchaseOrderRoutes = require('./routes/procurement/purchaseOrders');
 app.use('/api/purchase-orders', authenticateJWT, purchaseOrderRoutes);
+const purchaseRequisitionRoutes = require('./routes/procurement/purchaseRequisitions');
+app.use('/api/purchase-requisitions', authenticateJWT, purchaseRequisitionRoutes);
 const equipmentRoutes = require('./routes/manufacturing/equipment');
 const trainingRecordRoutes = require('./routes/manufacturing/trainingRecords');
 const deviationRoutes = require('./routes/manufacturing/deviations');
