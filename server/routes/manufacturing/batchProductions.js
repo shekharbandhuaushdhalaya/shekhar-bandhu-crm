@@ -90,17 +90,24 @@ function getMaterialGenealogyIssues(batch, dispensingRecords = []) {
   const verifiedRecords = new Map();
   const verifiedItems = new Map();
   const matchedVerifiedItems = new Set();
+  const seenDispensingNos = new Set();
+  const seenConsumedLines = new Set();
   if (formula.some(item => item.itemType !== 'packaging') && records.length === 0) {
     issues.push('No independently verified material dispensing records are recorded');
   }
   for (const record of records) {
+    const dispensingNo = String(record.dispensingNo || '');
+    if (dispensingNo && seenDispensingNos.has(dispensingNo)) {
+      issues.push('Duplicate material dispensing record identifier: ' + dispensingNo);
+    } else if (dispensingNo) {
+      seenDispensingNos.add(dispensingNo);
+    }
     const independent = record.status === 'verified' && record.dispensedBy && record.verifiedBy &&
       String(record.dispensedBy) !== String(record.verifiedBy) && record.verifiedAt;
     if (!independent) {
-      issues.push('Material dispensing record is not independently verified: ' + (record.dispensingNo || String(record._id || 'Unknown')));
+      issues.push('Material dispensing record is not independently verified: ' + (dispensingNo || String(record._id || 'Unknown')));
       continue;
     }
-    const dispensingNo = String(record.dispensingNo || '');
     const stageIndex = Number(record.stageIndex);
     const stage = Number.isInteger(stageIndex) ? (batch.stages || [])[stageIndex] : null;
     if (!dispensingNo || !record.batchNo || String(record.batchNo) !== String(batch.batchNo) ||
@@ -153,6 +160,11 @@ function getMaterialGenealogyIssues(batch, dispensingRecords = []) {
     const dispensingNo = String(item.dispensingNo);
     const entryId = String(item.rawMaterialEntryId);
     const key = dispensingNo + ':' + entryId;
+    if (seenConsumedLines.has(key)) {
+      issues.push('Duplicate batch consumption genealogy line: ' + key);
+      continue;
+    }
+    seenConsumedLines.add(key);
     const verifiedItem = verifiedItems.get(key);
     if (!verifiedRecords.has(dispensingNo) || !verifiedItem) {
       issues.push('Consumed material line is not linked to an independently verified dispensing record: ' + String(item.rawMaterialId));
