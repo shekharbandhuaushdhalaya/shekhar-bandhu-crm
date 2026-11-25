@@ -220,6 +220,12 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       qcStatus: 'approved',
       bmrApprovedBy: 'bmr-approver',
       bmrApprovedAt: new Date(),
+      plannedQty: 100,
+      bomSnapshot: { formulationBasis: 100, ingredients: [{ rawMaterialId: 'rm-1', itemType: 'formulation', qtyRequired: 10, stageName: 'Mixing' }] },
+      ingredientsConsumed: [{
+        rawMaterialId: 'rm-1', rawMaterialEntryId: 'entry-1', qtyConsumed: 10,
+        qtyWasted: 0, batchNo: 'LOT-1', stageIndex: 0, dispensingNo: 'DSP-1'
+      }],
       qcPassedBy: 'QC Analyst',
       qcPassedByUser: 'qc-analyst-1',
       qcTests: [{
@@ -229,6 +235,13 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       stages: [{ name: 'Mixing', status: 'completed', isDualSigned: true }],
       save: jest.fn().mockResolvedValue(true)
     });
+    const mockVerifiedDispensing = () => {
+      MaterialDispensing.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([{
+        dispensingNo: 'DSP-1', status: 'verified', dispensedBy: 'material-operator',
+        verifiedBy: 'material-reviewer', verifiedAt: new Date(),
+        items: [{ rawMaterialEntryId: 'entry-1', rawMaterialId: 'rm-1', qtyDispensed: 10 }]
+      }]) });
+    };
     const makeClearances = () => ['manufacturing', 'filling', 'packing'].map(phase => ({
       phase, cleared: true, submittedBy: 'line-operator', submittedAt: new Date(), clearedBy: 'clearance-reviewer', clearedAt: new Date(), verifiedBy: 'clearance-reviewer', verifiedAt: new Date(),
       checklist: { equipmentCleaned: true, previousMaterialsRemoved: true, previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true }
@@ -243,6 +256,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       BatchProduction.findById.mockResolvedValue(batch);
       ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
       LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      mockVerifiedDispensing();
 
       const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qc-analyst-1').send({});
 
@@ -256,6 +270,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       BatchProduction.findById.mockResolvedValue(batch);
       ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
       LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      mockVerifiedDispensing();
       const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
 
       expect(res.status).toBe(200);
@@ -263,6 +278,37 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       expect(batch.releasedByName).toBe('Independent QA Reviewer');
       expect(batch.releasedAt).toBeInstanceOf(Date);
       expect(batch.save).toHaveBeenCalled();
+    });
+
+    test('blocks release when formula material consumption is missing or short', async () => {
+      const batch = makeReleaseBatch();
+      batch.ingredientsConsumed = [];
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      MaterialDispensing.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('MATERIAL_GENEALOGY_INCOMPLETE');
+      expect(res.body.missingEvidence.some(item => item.includes('below the pinned formula requirement'))).toBe(true);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('blocks release while material dispensing awaits independent verification', async () => {
+      const batch = makeReleaseBatch();
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      MaterialDispensing.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([{
+        dispensingNo: 'DSP-1', status: 'pending_verification', dispensedBy: 'material-operator',
+        verifiedBy: null, verifiedAt: null,
+        items: [{ rawMaterialEntryId: 'entry-1', rawMaterialId: 'rm-1', qtyDispensed: 10 }]
+      }]) });
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('MATERIAL_GENEALOGY_INCOMPLETE');
+      expect(res.body.missingEvidence.some(item => item.includes('not independently verified'))).toBe(true);
+      expect(batch.save).not.toHaveBeenCalled();
     });
 
     test('rejects a QC test result without tester identity or timestamp', async () => {

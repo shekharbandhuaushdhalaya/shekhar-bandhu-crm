@@ -20,6 +20,83 @@ const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
 
+function getMaterialGenealogyIssues(batch, dispensingRecords = []) {
+  const issues = [];
+  const formula = batch.bomSnapshot && batch.bomSnapshot.ingredients;
+  if (!Array.isArray(formula) || formula.length === 0) return ['Pinned, non-empty batch formula snapshot is missing'];
+  const consumed = Array.isArray(batch.ingredientsConsumed) ? batch.ingredientsConsumed : [];
+  const records = Array.isArray(dispensingRecords) ? dispensingRecords : [];
+  const verifiedRecords = new Map();
+  const verifiedItems = new Set();
+  if (formula.some(item => item.itemType !== 'packaging') && records.length === 0) {
+    issues.push('No independently verified material dispensing records are recorded');
+  }
+  for (const record of records) {
+    const independent = record.status === 'verified' && record.dispensedBy && record.verifiedBy &&
+      String(record.dispensedBy) !== String(record.verifiedBy) && record.verifiedAt;
+    if (!independent) {
+      issues.push('Material dispensing record is not independently verified: ' + (record.dispensingNo || String(record._id || 'Unknown')));
+      continue;
+    }
+    verifiedRecords.set(String(record.dispensingNo), record);
+    for (const item of record.items || []) {
+      verifiedItems.add(String(record.dispensingNo) + ':' + String(item.rawMaterialEntryId));
+    }
+  }
+  if (consumed.length === 0) issues.push('No actual raw-material consumption genealogy is recorded');
+  for (const item of consumed) {
+    const qty = Number(item.qtyConsumed), wasted = Number(item.qtyWasted || 0);
+    if (!item.rawMaterialId || !item.rawMaterialEntryId || !item.batchNo ||
+        !Number.isFinite(qty) || qty <= 0 || !Number.isInteger(Number(item.stageIndex)) || !item.dispensingNo) {
+      issues.push('A consumed material line is missing its stock lot, dispensing, stage or quantity evidence');
+      continue;
+    }
+    if (!verifiedRecords.has(String(item.dispensingNo)) ||
+        !verifiedItems.has(String(item.dispensingNo) + ':' + String(item.rawMaterialEntryId))) {
+      issues.push('Consumed material line is not linked to an independently verified dispensing record: ' + String(item.rawMaterialId));
+    }
+    if (!Number.isFinite(wasted) || wasted < 0 || wasted > qty ||
+        (wasted > 0 && !String(item.wastageReason || '').trim())) {
+      issues.push('Consumed material line has invalid or unexplained wastage: ' + String(item.rawMaterialId));
+    }
+  }
+  const plannedQty = Number(batch.plannedQty), basis = Number(batch.bomSnapshot.formulationBasis || 100);
+  const required = new Map();
+  for (const ingredient of formula) {
+    if (ingredient.itemType === 'packaging') continue;
+    const materialId = ingredient.rawMaterialId && ingredient.rawMaterialId._id
+      ? String(ingredient.rawMaterialId._id) : String(ingredient.rawMaterialId || '');
+    if (!materialId) { issues.push('A formula ingredient is missing its raw-material identity'); continue; }
+    const stageName = String(ingredient.stageName || '').trim().toLowerCase();
+    const stageIndex = stageName
+      ? (batch.stages || []).findIndex(stage => String(stage.name || '').trim().toLowerCase() === stageName)
+      : 0;
+    if (stageIndex < 0) { issues.push('Formula ingredient has no matching manufacturing stage: ' + materialId); continue; }
+    const expected = ingredient.qtyRequiredForBatch !== undefined && ingredient.qtyRequiredForBatch !== null
+      ? Number(ingredient.qtyRequiredForBatch)
+      : Number(ingredient.qtyRequired || 0) * (basis > 0 ? plannedQty / basis : 0);
+    if (!Number.isFinite(expected) || expected <= 0) { issues.push('Formula ingredient has no valid positive batch quantity: ' + materialId); continue; }
+    const key = materialId + ':' + stageIndex;
+    const current = required.get(key) || { materialId, stageIndex, expected: 0 };
+    current.expected += expected;
+    required.set(key, current);
+  }
+  for (const line of required.values()) {
+    const actual = consumed.filter(item => {
+      const id = item.rawMaterialId && item.rawMaterialId._id
+        ? String(item.rawMaterialId._id) : String(item.rawMaterialId || '');
+      return id === line.materialId && Number(item.stageIndex) === line.stageIndex;
+    }).reduce((sum, item) => sum + (Number(item.qtyConsumed) || 0), 0);
+    if (actual + 0.0001 < line.expected) {
+      issues.push('Verified material consumption is below the pinned formula requirement for ' +
+        line.materialId + ' at stage ' + line.stageIndex + ' (required ' +
+        line.expected.toFixed(4) + ', recorded ' + actual.toFixed(4) + ')');
+    }
+  }
+  return [...new Set(issues)];
+}
+
+
 // POST /api/batch-productions/planning/aggregate-sufficiency — Aggregate raw material sufficiency across planned batches
 router.post('/planning/aggregate-sufficiency', authorize('manufacturing:view'), async (req, res) => {
   try {
@@ -1468,6 +1545,14 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
       return res.status(409).json({ error: 'Independent QA release is required; a QC test analyst cannot release the same batch' });
     }
     const clearances = await LineClearance.find({ batchId: batch._id }).lean();
+    const MaterialDispensing = require('../../models/MaterialDispensing');
+    const dispensingRecords = await MaterialDispensing.find({ batchId: batch._id }).lean();
+    const materialGenealogyIssues = getMaterialGenealogyIssues(batch, dispensingRecords);
+    if (materialGenealogyIssues.length) return res.status(400).json({
+      error: 'Batch material genealogy and formula reconciliation must be complete before market release',
+      code: 'MATERIAL_GENEALOGY_INCOMPLETE',
+      missingEvidence: materialGenealogyIssues
+    });
     for (const phase of ['manufacturing','filling','packing']) {
       const c = clearances.find(x => x.phase === phase);
       if (!c || !c.cleared || !c.submittedBy || !c.verifiedBy ||
@@ -1827,9 +1912,7 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
       missingEvidence.push('Pinned batch formula snapshot is missing');
     }
     if (!batch.bmrApprovedBy || !batch.bmrApprovedByName || !batch.bmrApprovedAt) missingEvidence.push('Pre-execution BMR approval identity or timestamp is missing');
-    if (!batch.ingredientsConsumed || batch.ingredientsConsumed.length === 0) missingEvidence.push('No actual raw-material consumption genealogy is recorded');
-    if (enrichedIngredients.some(item => !item.rawMaterialEntryId || !item.stockLotNo)) missingEvidence.push('One or more consumed materials lack a linked stock-entry lot reference');
-    if (enrichedIngredients.some(item => !item.dispensingNo)) missingEvidence.push('One or more consumed material lines lack independently verified dispensing genealogy');
+    missingEvidence.push(...getMaterialGenealogyIssues(batch, dispensingRecords));
     if (missingPharmacopoeiaReferences.length) missingEvidence.push('One or more consumed materials lack a pharmacopoeia reference record');
     if (unverifiedIngredients.length) missingEvidence.push('One or more pharmacopoeia references are not verified');
     if (!batch.stages || batch.stages.length === 0) missingEvidence.push('Manufacturing stage execution records are missing');
@@ -1849,8 +1932,6 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
         record.checklist.previousLabelsDocumentsRemoved && record.checklist.areaVisuallyInspected);
       if (!verifiedClearance) missingEvidence.push('Verified ' + phase + ' line-clearance record is missing or incomplete');
     }
-    if (dispensingRecords.some(record => record.status === 'pending_verification')) missingEvidence.push('One or more material dispensing records are awaiting independent verification');
-    if (dispensingRecords.some(record => record.status === 'rejected')) missingEvidence.push('One or more material dispensing records were rejected');
     if (!qualitySpecification || qualitySpecification.status !== 'approved' ||
       String(qualitySpecification.productId) !== String(product ? product._id : batch.productId) ||
       !qualitySpecification.approvedBy || !qualitySpecification.approvedAt ||

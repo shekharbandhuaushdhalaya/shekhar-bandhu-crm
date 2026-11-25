@@ -167,4 +167,5 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - Manufacturing line-clearance now has separate submit and independent verify steps; production cannot self-clear a line, and verified records cannot be overwritten.
 - BMR presentation removes default licence identifiers, shelf-life values, generic QC limits and placeholder signatories; recorded test results are shown with their actual statuses, and missing data is not presented as a pass.
 - Filling and packing stage starts now require their own complete, independently verified line-clearance records; BMR completeness also reports missing clearances for each production phase.
+- Market release now reconciles each non-packaging ingredient against the pinned formula quantity and requires stock-lot-linked consumption backed by independently verified dispensing records; missing, short, unverified or unexplained-wastage evidence blocks release.
 - The above foundations are not a blanket completion claim for the functional IDs. Remaining phases require end-to-end UAT and evidence-based closure.
