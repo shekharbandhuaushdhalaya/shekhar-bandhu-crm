@@ -49,7 +49,8 @@ router.patch('/:id/post', authorize('invoice:finalize'), async (req, res) => {
     const actor = actorFrom(req);
     if (!actor.id || !actor.name) return res.status(403).json({ error: 'Authenticated posting identity is required' });
     const result = await postSalesReturn(req.params.id, actor);
-    await logAction({ action: 'POST_SALES_RETURN', description: `Posted Sales Return ${result.returnNo}`, details: { id: result._id, creditNoteId: result.creditNoteId }, req });
+    const postedReturn = result.return || result;
+    await logAction({ action: 'POST_SALES_RETURN', description: `Posted Sales Return ${postedReturn.returnNo}`, details: { id: postedReturn._id, creditNoteId: result.creditNote?._id || postedReturn.creditNoteId }, req });
     res.json(result);
   } catch (error) { res.status(statusFor(error)).json({ error: error.message, code: error.code || 'SALES_RETURN_POST_FAILED' }); }
 });

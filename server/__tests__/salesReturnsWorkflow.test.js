@@ -27,7 +27,7 @@ describe('Sales Return API lifecycle', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service.createSalesReturn.mockResolvedValue({ _id: 'ret-1', returnNo: 'SR-00001', status: 'draft', challanId: 'challan-1' });
-    service.postSalesReturn.mockResolvedValue({ _id: 'ret-1', returnNo: 'SR-00001', status: 'posted' });
+    service.postSalesReturn.mockResolvedValue({ return: { _id: 'ret-1', returnNo: 'SR-00001', status: 'posted', creditNoteId: 'cn-1' }, creditNote: { _id: 'cn-1' } });
     service.dispositionSalesReturnItem.mockResolvedValue({ _id: 'ret-1', returnNo: 'SR-00001' });
     service.reverseSalesReturn.mockResolvedValue({ _id: 'ret-1', returnNo: 'SR-00001', status: 'reversed' });
   });
@@ -42,6 +42,12 @@ describe('Sales Return API lifecycle', () => {
     const response = await request(app).patch('/api/sales-returns/ret-1/post');
     expect(response.status).toBe(200);
     expect(service.postSalesReturn).toHaveBeenCalledWith('ret-1', actor);
+    const { logAction } = require('../utils/auditLogger');
+    expect(logAction).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'POST_SALES_RETURN',
+      description: 'Posted Sales Return SR-00001',
+      details: { id: 'ret-1', creditNoteId: 'cn-1' }
+    }));
   });
 
   test('requires independent QA disposition evidence and records the requested item index', async () => {
