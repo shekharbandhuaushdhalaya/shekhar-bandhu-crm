@@ -93,6 +93,24 @@ describe('Returned-stock QA disposition transaction', () => {
     expect(StockLedger.create).not.toHaveBeenCalled();
   });
 
+  test('rejects a second disposition for an already reviewed return line without stock movements', async () => {
+    returned.items[0].qcDisposition = 'approved';
+    await expect(dispositionSalesReturnItem('return-1', 0, {
+      disposition: 'rejected', actor, notes: 'Second review attempt with sufficient notes'
+    })).rejects.toMatchObject({ code: 'RETURN_QC_ALREADY_DISPOSITIONED' });
+    expect(InventoryEntry.findOne).not.toHaveBeenCalled();
+    expect(StockLedger.create).not.toHaveBeenCalled();
+  });
+
+  test('fails closed when the returned quantity is missing from the QC-hold stock bucket', async () => {
+    InventoryEntry.findOne.mockReset();
+    InventoryEntry.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(null) });
+    await expect(dispositionSalesReturnItem('return-1', 0, {
+      disposition: 'approved', actor, notes: 'Inspected return and attempted to locate held stock'
+    })).rejects.toMatchObject({ code: 'RETURN_QC_HOLD_STOCK_MISSING' });
+    expect(StockLedger.create).not.toHaveBeenCalled();
+    expect(returned.save).not.toHaveBeenCalled();
+  });
   test('requires notes and a valid disposition before starting a transaction', async () => {
     await expect(dispositionSalesReturnItem('return-1', 0, {
       disposition: 'approved', actor, notes: 'short'
