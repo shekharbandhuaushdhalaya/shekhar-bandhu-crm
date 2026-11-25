@@ -296,6 +296,69 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
   });
 
   describe('specification-driven QC approval gate', () => {
+    test('allows manufacturing completion while the separate QC Testing stage remains pending', async () => {
+      const batch = {
+        _id: 'batch-qc-stage-pending', status: 'in_progress',
+        productId: '666666666666666666666666', plannedQty: 100,
+        stages: [
+          { name: 'Mixing', status: 'completed', performedBy: 'operator-1', performedByName: 'Operator One',
+            verifiedBy: 'reviewer-1', verifiedAt: new Date(), isDualSigned: true,
+            operatorTrainingRecordId: 'training-1', equipmentId: 'equipment-1', equipmentCalibrationStatus: 'valid' },
+          { name: 'QC Testing', status: 'pending' }
+        ],
+        packagingMode: 'packed_by_vendor', packagingDeducted: false, save: jest.fn()
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Product.find.mockResolvedValue([{ _id: '666666666666666666666666', name: 'Test Product', mrp: 10 }]);
+      Warehouse.findById.mockResolvedValue(null);
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-qc-stage-pending/complete')
+        .send({ actualYieldQty: 100, warehouseId: '222222222222222222222222' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toContain('storage warehouse');
+      expect(batch.stages[1].status).toBe('pending');
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('rejects a size-wise yield split that does not reconcile to total actual yield', async () => {
+      BatchProduction.findById.mockResolvedValue({
+        _id: 'batch-yield-mismatch', status: 'in_progress',
+        productId: '777777777777777777777777', plannedQty: 100, stages: [],
+        save: jest.fn()
+      });
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-yield-mismatch/complete')
+        .send({
+          actualYieldQty: 100,
+          yields: [{ productId: '777777777777777777777777', actualYieldQty: 80 }],
+          warehouseId: '222222222222222222222222'
+        });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('YIELD_SPLIT_MISMATCH');
+      expect(Warehouse.findById).not.toHaveBeenCalled();
+    });
+
+    test('requires a reason for recorded wastage', async () => {
+      BatchProduction.findById.mockResolvedValue({
+        _id: 'batch-waste-reason', status: 'in_progress',
+        productId: '888888888888888888888888', plannedQty: 100, stages: [],
+        save: jest.fn()
+      });
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-waste-reason/complete')
+        .send({
+          actualYieldQty: 95,
+          wasteQty: 5,
+          warehouseId: '222222222222222222222222'
+        });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('WASTE_REASON_REQUIRED');
+      expect(Warehouse.findById).not.toHaveBeenCalled();
+    });
+
+
     test('does not accept finished-product QC results before batch completion', async () => {
       BatchProduction.findById.mockResolvedValue({
         _id: 'batch-qc-before-completion',

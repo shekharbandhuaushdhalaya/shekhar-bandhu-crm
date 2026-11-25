@@ -288,16 +288,6 @@ export default function ManufacturingScreen() {
   const [qcWasteQty, setQcWasteQty] = useState('');
   const [qcWasteReason, setQcWasteReason] = useState('');
   const [qcNotes, setQcNotes] = useState('');
-  const [qcPassedBy, setQcPassedBy] = useState('');
-  const [qcStatus, setQcStatus] = useState<'approved' | 'rejected'>('approved');
-  const [qcOrganoleptic, setQcOrganoleptic] = useState('');
-  const [qcMoisture, setQcMoisture] = useState('');
-  const [qcAsh, setQcAsh] = useState('');
-  const [qcPh, setQcPh] = useState('');
-  const [qcDisintegration, setQcDisintegration] = useState('');
-  const [qcHeavyMetals, setQcHeavyMetals] = useState('Pass');
-  const [qcMicrobial, setQcMicrobial] = useState('Pass');
-  const [qcLabReportRef, setQcLabReportRef] = useState('');
   const [qcJobWorkerCertificateRef, setQcJobWorkerCertificateRef] = useState('');
   const [qcCoaDocumentRef, setQcCoaDocumentRef] = useState('');
   const [qcJobWorkCharges, setQcJobWorkCharges] = useState('');
@@ -977,10 +967,6 @@ export default function ManufacturingScreen() {
       setQcError('Please enter a valid positive number for Actual Output Yield Size.');
       return;
     }
-    if (!qcPassedBy || !qcPassedBy.trim()) {
-      setQcError('QC Inspector Name is mandatory.');
-      return;
-    }
     if (!qcWarehouseId) {
       setQcError('Target Storage Warehouse selection is mandatory.');
       return;
@@ -1006,17 +992,7 @@ export default function ManufacturingScreen() {
         actualYieldQty: Number(qcYieldQty),
         packing: Number(qcPacking) || undefined,
         qcNotes: qcNotes.trim(),
-        qcPassedBy: qcPassedBy.trim(),
         yields: yieldsPayload,
-        qcStatus,
-        organoleptic: qcOrganoleptic.trim(),
-        moistureContent: qcMoisture ? parseFloat(qcMoisture) : null,
-        ashValue: qcAsh ? parseFloat(qcAsh) : null,
-        pHValue: qcPh ? parseFloat(qcPh) : null,
-        disintegrationTime: qcDisintegration ? parseInt(qcDisintegration) : null,
-        heavyMetals: qcHeavyMetals,
-        microbialLimit: qcMicrobial,
-        labReportRef: qcLabReportRef.trim(),
         warehouseId: qcWarehouseId,
         jobWorkerCertificateRef: selectedBatchRun.productionType === 'job_work' ? qcJobWorkerCertificateRef.trim() : '',
         coaDocumentRef: selectedBatchRun.productionType === 'job_work' ? qcCoaDocumentRef.trim() : '',
@@ -1036,16 +1012,6 @@ export default function ManufacturingScreen() {
       setQcWasteQty('');
       setQcWasteReason('');
       setQcNotes('');
-      setQcPassedBy('');
-      setQcStatus('approved');
-      setQcOrganoleptic('');
-      setQcMoisture('');
-      setQcAsh('');
-      setQcPh('');
-      setQcDisintegration('');
-      setQcHeavyMetals('Pass');
-      setQcMicrobial('Pass');
-      setQcLabReportRef('');
       setQcJobWorkerCertificateRef('');
       setQcCoaDocumentRef('');
       setQcJobWorkCharges('');
@@ -2265,16 +2231,6 @@ export default function ManufacturingScreen() {
         qcWasteQty={qcWasteQty} setQcWasteQty={setQcWasteQty}
         qcWasteReason={qcWasteReason} setQcWasteReason={setQcWasteReason}
         qcNotes={qcNotes} setQcNotes={setQcNotes}
-        qcPassedBy={qcPassedBy} setQcPassedBy={setQcPassedBy}
-        qcStatus={qcStatus} setQcStatus={setQcStatus}
-        qcOrganoleptic={qcOrganoleptic} setQcOrganoleptic={setQcOrganoleptic}
-        qcMoisture={qcMoisture} setQcMoisture={setQcMoisture}
-        qcAsh={qcAsh} setQcAsh={setQcAsh}
-        qcPh={qcPh} setQcPh={setQcPh}
-        qcDisintegration={qcDisintegration} setQcDisintegration={setQcDisintegration}
-        qcHeavyMetals={qcHeavyMetals} setQcHeavyMetals={setQcHeavyMetals}
-        qcMicrobial={qcMicrobial} setQcMicrobial={setQcMicrobial}
-        qcLabReportRef={qcLabReportRef} setQcLabReportRef={setQcLabReportRef}
         qcJobWorkerCertificateRef={qcJobWorkerCertificateRef} setQcJobWorkerCertificateRef={setQcJobWorkerCertificateRef}
         qcCoaDocumentRef={qcCoaDocumentRef} setQcCoaDocumentRef={setQcCoaDocumentRef}
         qcJobWorkCharges={qcJobWorkCharges} setQcJobWorkCharges={setQcJobWorkCharges}

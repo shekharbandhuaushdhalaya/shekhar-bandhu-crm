@@ -21,16 +21,6 @@ interface Props {
   qcWasteQty: string; setQcWasteQty: (v: string) => void;
   qcWasteReason: string; setQcWasteReason: (v: string) => void;
   qcNotes: string; setQcNotes: (v: string) => void;
-  qcPassedBy: string; setQcPassedBy: (v: string) => void;
-  qcStatus: 'approved' | 'rejected'; setQcStatus: (v: 'approved' | 'rejected') => void;
-  qcOrganoleptic: string; setQcOrganoleptic: (v: string) => void;
-  qcMoisture: string; setQcMoisture: (v: string) => void;
-  qcAsh: string; setQcAsh: (v: string) => void;
-  qcPh: string; setQcPh: (v: string) => void;
-  qcDisintegration: string; setQcDisintegration: (v: string) => void;
-  qcHeavyMetals: string; setQcHeavyMetals: (v: string) => void;
-  qcMicrobial: string; setQcMicrobial: (v: string) => void;
-  qcLabReportRef: string; setQcLabReportRef: (v: string) => void;
   qcJobWorkerCertificateRef: string; setQcJobWorkerCertificateRef: (v: string) => void;
   qcCoaDocumentRef: string; setQcCoaDocumentRef: (v: string) => void;
   qcJobWorkCharges: string; setQcJobWorkCharges: (v: string) => void;
@@ -49,11 +39,7 @@ export default function QCSignoffModal({
   visible, selectedBatchRun, warehouses, products,
   qcYieldQty, setQcYieldQty, qcPacking, setQcPacking,
   qcWasteQty, setQcWasteQty, qcWasteReason, setQcWasteReason,
-  qcNotes, setQcNotes, qcPassedBy, setQcPassedBy,
-  qcStatus, setQcStatus, qcOrganoleptic, setQcOrganoleptic,
-  qcMoisture, setQcMoisture, qcAsh, setQcAsh, qcPh, setQcPh,
-  qcDisintegration, setQcDisintegration, qcHeavyMetals, setQcHeavyMetals,
-  qcMicrobial, setQcMicrobial, qcLabReportRef, setQcLabReportRef,
+  qcNotes, setQcNotes,
   qcJobWorkerCertificateRef, setQcJobWorkerCertificateRef,
   qcCoaDocumentRef, setQcCoaDocumentRef, qcJobWorkCharges, setQcJobWorkCharges,
   qcWarehouseId, setQcWarehouseId, qcError,
@@ -79,34 +65,14 @@ export default function QCSignoffModal({
         <Pressable style={styles.modalBackdrop} onPress={onClose} />
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Quality Control Sign-Off</Text>
+            <Text style={styles.modalTitle}>Manufacturing Completion</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={20} color={colors.text.primary} />
             </TouchableOpacity>
           </View>
           {qcError ? <Text style={styles.modalError}>{qcError}</Text> : null}
           <ScrollView style={styles.modalForm}>
-            {/* QC Decision */}
-            <Text style={styles.inputLabel}>QC Decision *</Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-              {(['approved', 'rejected'] as const).map(opt => (
-                <TouchableOpacity
-                  key={opt}
-                  onPress={() => setQcStatus(opt)}
-                  style={{
-                    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    paddingVertical: 10, borderRadius: 6, borderWidth: 1,
-                    backgroundColor: qcStatus === opt ? (opt === 'approved' ? colors.success : colors.danger) : colors.bg.secondary,
-                    borderColor: qcStatus === opt ? (opt === 'approved' ? colors.success : colors.danger) : colors.border
-                  }}
-                >
-                  <Ionicons name={opt === 'approved' ? 'checkmark-circle-outline' : 'close-circle-outline'} size={16} color={qcStatus === opt ? '#fff' : (opt === 'approved' ? colors.success : colors.danger)} />
-                  <Text style={{ ...Typography.bodySm, fontWeight: '700', color: qcStatus === opt ? '#fff' : colors.text.secondary }}>
-                    {opt === 'approved' ? 'APPROVE BATCH' : 'REJECT BATCH'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Text style={styles.warningDisclaimer}>This step records manufacturing output and creates a controlled production-transfer Challan. Finished-product QC testing, independent QA disposition and market release are separate steps after completion.</Text>
 
             <Text style={styles.inputLabel}>Actual Output Yield Size (units) *</Text>
             <TextInput style={styles.input} placeholder="e.g. 498" placeholderTextColor={colors.text.muted} value={qcYieldQty} onChangeText={setQcYieldQty} keyboardType="numeric" />
@@ -200,75 +166,23 @@ export default function QCSignoffModal({
             <Text style={styles.inputLabel}>Waste / Variance Reason</Text>
             <TextInput style={styles.input} placeholder="e.g. Drying loss, spillage, QC rejects" placeholderTextColor={colors.text.muted} value={qcWasteReason} onChangeText={setQcWasteReason} />
 
-            {/* GMP Lab Parameters */}
-            <View style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, marginVertical: 14 }}>
-              <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}> GMP Lab Specifications & Testing</Text>
-              <Text style={styles.inputLabel}>Organoleptic Description</Text>
-              <TextInput style={styles.input} placeholder="Color, odour, taste (e.g. Dark brown, herbal odour)" placeholderTextColor={colors.text.muted} value={qcOrganoleptic} onChangeText={setQcOrganoleptic} />
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>Moisture Content (% w/w)</Text>
-                  <TextInput style={styles.input} placeholder="e.g. 4.5" placeholderTextColor={colors.text.muted} value={qcMoisture} onChangeText={setQcMoisture} keyboardType="numeric" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>Ash Value (% w/w)</Text>
-                  <TextInput style={styles.input} placeholder="e.g. 6.2" placeholderTextColor={colors.text.muted} value={qcAsh} onChangeText={setQcAsh} keyboardType="numeric" />
-                </View>
+            {selectedBatchRun && selectedBatchRun.productionType === 'job_work' && (
+              <View style={{ backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, marginVertical: 14 }}>
+                <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary, marginBottom: 8 }}>Job-work completion references</Text>
+                <Text style={styles.inputLabel}>Job Worker Batch Certificate No. *</Text>
+                <TextInput style={styles.input} placeholder="e.g. JW-CERT-88762" placeholderTextColor={colors.text.muted} value={qcJobWorkerCertificateRef} onChangeText={setQcJobWorkerCertificateRef} />
+                <Text style={styles.inputLabel}>Certificate of Analysis (CoA) document reference</Text>
+                <TextInput style={styles.input} placeholder="Document reference" placeholderTextColor={colors.text.muted} value={qcCoaDocumentRef} onChangeText={setQcCoaDocumentRef} />
+                <Text style={styles.inputLabel}>Job-work processing service charges (₹)</Text>
+                <TextInput style={styles.input} placeholder="e.g. 5000" placeholderTextColor={colors.text.muted} value={qcJobWorkCharges} onChangeText={setQcJobWorkCharges} keyboardType="numeric" />
               </View>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>pH Value</Text>
-                  <TextInput style={styles.input} placeholder="e.g. 5.5" placeholderTextColor={colors.text.muted} value={qcPh} onChangeText={setQcPh} keyboardType="numeric" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>Disintegration Time (min)</Text>
-                  <TextInput style={styles.input} placeholder="e.g. 15" placeholderTextColor={colors.text.muted} value={qcDisintegration} onChangeText={setQcDisintegration} keyboardType="numeric" />
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 10, marginVertical: 6 }}>
-                {[{ label: 'Heavy Metals Limit', val: qcHeavyMetals, set: setQcHeavyMetals }, { label: 'Microbial Limit', val: qcMicrobial, set: setQcMicrobial }].map(({ label, val, set }) => (
-                  <View key={label} style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>{label}</Text>
-                    <View style={{ flexDirection: 'row', gap: 4 }}>
-                      {['Pass', 'Fail'].map(opt => (
-                        <TouchableOpacity
-                          key={opt}
-                          onPress={() => set(opt)}
-                          style={{
-                            flex: 1, paddingVertical: 6, borderRadius: 6, borderWidth: 1, alignItems: 'center',
-                            backgroundColor: val === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.bg.primary,
-                            borderColor: val === opt ? (opt === 'Pass' ? colors.success : colors.danger) : colors.border
-                          }}
-                        >
-                          <Text style={{ ...Typography.caption, fontWeight: '700', color: val === opt ? '#fff' : colors.text.secondary }}>{opt.toUpperCase()}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                ))}
-              </View>
-              <Text style={styles.inputLabel}>Lab Report Reference No. / File Link</Text>
-              <TextInput style={styles.input} placeholder="e.g. LAB-2026-07-23-01" placeholderTextColor={colors.text.muted} value={qcLabReportRef} onChangeText={setQcLabReportRef} />
-              {selectedBatchRun && selectedBatchRun.productionType === 'job_work' && (
-                <>
-                  <Text style={styles.inputLabel}>Job Worker Batch Certificate No. *</Text>
-                  <TextInput style={styles.input} placeholder="e.g. JW-CERT-88762" placeholderTextColor={colors.text.muted} value={qcJobWorkerCertificateRef} onChangeText={setQcJobWorkerCertificateRef} />
-                  <Text style={styles.inputLabel}>Certificate of Analysis (COA) Document Link</Text>
-                  <TextInput style={styles.input} placeholder="e.g. https://cloudinary.com/docs/coa.pdf" placeholderTextColor={colors.text.muted} value={qcCoaDocumentRef} onChangeText={setQcCoaDocumentRef} />
-                  <Text style={styles.inputLabel}>Job Work Processing Service Charges (₹)</Text>
-                  <TextInput style={styles.input} placeholder="e.g. 5000" placeholderTextColor={colors.text.muted} value={qcJobWorkCharges} onChangeText={setQcJobWorkCharges} keyboardType="numeric" />
-                </>
-              )}
-            </View>
+            )}
 
-            <Text style={styles.inputLabel}>QC Inspector Name *</Text>
-            <TextInput style={styles.input} placeholder="e.g. Dr. P. K. Sharma" placeholderTextColor={colors.text.muted} value={qcPassedBy} onChangeText={setQcPassedBy} />
-
-            <Text style={styles.inputLabel}>Quality Check Notes / Lab Remarks</Text>
+            <Text style={styles.inputLabel}>Manufacturing completion notes</Text>
             <TextInput style={[styles.input, { height: 80, paddingVertical: 8 }]} placeholder="Enter quality verification notes..." placeholderTextColor={colors.text.muted} value={qcNotes} onChangeText={setQcNotes} multiline numberOfLines={3} />
 
             <Text style={styles.warningDisclaimer}>
-               Submitting this approval will officially complete the batch, close the manufacturing run, and add the actual yield stock to the Finished Goods Warehouse.
+               Completion does not approve QC or release stock for sale. Finished goods remain market-blocked until independent QC and QA release are complete.
             </Text>
           </ScrollView>
           <View style={styles.modalFooter}>
@@ -276,7 +190,7 @@ export default function QCSignoffModal({
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.submitBtn} onPress={onComplete}>
-              <Text style={styles.submitBtnText}>Approve & Stock</Text>
+              <Text style={styles.submitBtnText}>Complete Batch & Create Transfer</Text>
             </TouchableOpacity>
           </View>
         </View>

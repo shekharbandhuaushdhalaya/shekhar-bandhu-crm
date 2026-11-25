@@ -964,7 +964,6 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       wasteQty,
       wasteReason,
       qcNotes,
-      qcPassedBy,
       packing,
       yields,
       qcStatus,
@@ -987,8 +986,8 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     }
 
     const valYield = Number(actualYieldQty);
-    if (isNaN(valYield) || valYield < 0) {
-      return res.status(400).json({ error: 'Actual yield must be a positive number' });
+    if (!Number.isFinite(valYield) || valYield <= 0) {
+      return res.status(400).json({ error: 'Actual yield must be a finite positive number' });
     }
 
     let batch = await BatchProduction.findById(req.params.id);
@@ -1014,6 +1013,25 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
         packing: packing || 1
       }]);
 
+    const splitYieldTotal = yieldsList.reduce((sum, item) => sum + Number(item.actualYieldQty || 0), 0);
+    if (!Number.isFinite(splitYieldTotal) || Math.abs(splitYieldTotal - valYield) > 0.0001) {
+      return res.status(400).json({
+        error: 'The sum of size-wise actual yields must equal the batch actual yield',
+        code: 'YIELD_SPLIT_MISMATCH',
+        actualYieldQty: valYield,
+        splitYieldTotal
+      });
+    }
+    const enteredWaste = wasteQty !== undefined
+      ? Number(wasteQty)
+      : Math.max(0, Number(batch.plannedQty || 0) - valYield);
+    if (!Number.isFinite(enteredWaste) || enteredWaste < 0) {
+      return res.status(400).json({ error: 'Waste quantity must be a finite, non-negative number', code: 'INVALID_WASTE_QUANTITY' });
+    }
+    if (enteredWaste > 0 && !String(wasteReason || '').trim()) {
+      return res.status(400).json({ error: 'A documented reason is required when waste quantity is recorded', code: 'WASTE_REASON_REQUIRED' });
+    }
+
     // Validate products exist
     const Product = require('../../models/Product');
     const productIds = yieldsList.map(y => y.productId);
@@ -1031,18 +1049,18 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       }
     }
 
-    const allDone = batch.stages.every(s => s.status === 'completed' || s.status === 'skipped');
+    // Finished-product QC is a separate post-completion workflow.
+    const manufacturingStages = (batch.stages || []).filter(stage => String(stage.name || '').trim().toLowerCase() !== 'qc testing');
+    const allDone = manufacturingStages.every(s => s.status === 'completed' || s.status === 'skipped');
     if (!allDone) {
-      const pending = batch.stages.filter(s => s.status === 'pending' || s.status === 'in_progress').map(s => s.name);
+      const pending = manufacturingStages.filter(s => s.status === 'pending' || s.status === 'in_progress').map(s => s.name);
       return res.status(400).json({ error: `Cannot complete batch. Pending stages: ${pending.join(', ')}` });
     }
 
     // A batch may enter completion only when every critical stage has a complete,
     // independently reviewed execution record. This mirrors the evidence required
     // for eventual market release, so completion cannot create an unreleasable batch.
-    const criticalStages = (batch.stages || []).filter(stage =>
-      String(stage.name || '').trim().toLowerCase() !== 'qc testing'
-    );
+    const criticalStages = manufacturingStages;
     const stageEvidenceIssues = [];
     for (const stage of criticalStages) {
       const label = String(stage.name || 'Unnamed stage');
@@ -1248,18 +1266,8 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     batch.endDate = now;
     batch.mfgDate = now;
 
-    const qcStage = batch.stages.find(s => s.name.toLowerCase().includes('qc'));
-    if (qcStage && qcStage.status !== 'completed') {
-      qcStage.status = 'completed';
-      qcStage.completedAt = new Date();
-      qcStage.completedBy = qcPassedBy.trim();
-    }
-    const packagingStage = batch.stages.find(s => s.name.toLowerCase().includes('packaging') || s.name.toLowerCase().includes('label'));
-    if (packagingStage && packagingStage.status !== 'completed') {
-      packagingStage.status = 'completed';
-      packagingStage.completedAt = new Date();
-      packagingStage.completedBy = qcPassedBy.trim();
-    }
+    // Preserve manufacturing stage evidence exactly as recorded. QC tests and
+    // review occur after completion; skipped stages retain their formal disposition.
 
     // Backfill: deduct any stage-tied ingredients missed during stage advancement
     // (covers both formulation and packaging that fell through due to the stageName filter bug)
@@ -1485,7 +1493,7 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
     if (String(batch.qcPassedByUser) === String(req.user.id)) {
       return res.status(409).json({ error: 'Independent QA release is required; the QC analyst cannot release the same batch' });
     }
-    const criticalStages = (batch.stages || []).filter(s => s.name !== 'QC Testing');
+    const criticalStages = (batch.stages || []).filter(s => String(s.name || '').trim().toLowerCase() !== 'qc testing');
     if (criticalStages.some(s => s.status !== 'completed' && s.status !== 'skipped')) return res.status(400).json({ error: 'All critical manufacturing stages must be completed or formally skipped before market release' });
     if (criticalStages.some(s => ['completed', 'skipped'].includes(s.status) &&
       (!s.performedBy || !s.verifiedBy || !s.verifiedAt || String(s.performedBy) === String(s.verifiedBy)))) {
