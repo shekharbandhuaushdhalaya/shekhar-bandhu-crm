@@ -17,6 +17,43 @@ async function generateNoteNo(type, session = null) {
 
 function money(value) { return Number(Number(value || 0).toFixed(2)); }
 
+function validateFinalizableAmounts(note) {
+  const fields = ['baseAmount', 'cgst', 'sgst', 'igst', 'totalAmount'];
+  for (const field of fields) {
+    const value = Number(note[field]);
+    if (!Number.isFinite(value) || value < 0) {
+      throw Object.assign(new Error(`Credit/debit note ${field} must be a finite non-negative amount`), {
+        status: 400, code: 'INVALID_NOTE_AMOUNT_COMPONENT'
+      });
+    }
+  }
+  if (Number(note.cgst || 0) > 0 && Number(note.igst || 0) > 0 ||
+      Number(note.sgst || 0) > 0 && Number(note.igst || 0) > 0) {
+    throw Object.assign(new Error('A note cannot contain both IGST and CGST/SGST'), {
+      status: 400, code: 'INVALID_NOTE_TAX_SPLIT'
+    });
+  }
+  if (Number(note.cgst || 0) > 0 || Number(note.sgst || 0) > 0) {
+    if (Math.abs(Number(note.cgst || 0) - Number(note.sgst || 0)) > 0.01) {
+      throw Object.assign(new Error('CGST and SGST amounts must be equal'), {
+        status: 400, code: 'INVALID_NOTE_TAX_SPLIT'
+      });
+    }
+  }
+  const expectedTotal = money(Number(note.baseAmount || 0) + Number(note.cgst || 0) +
+    Number(note.sgst || 0) + Number(note.igst || 0));
+  if (Math.abs(expectedTotal - Number(note.totalAmount || 0)) > 0.01) {
+    throw Object.assign(new Error('Note total must equal taxable base plus recorded GST components'), {
+      status: 400, code: 'NOTE_TOTAL_MISMATCH'
+    });
+  }
+  if (String(note.reason || '').trim().length < 10) {
+    throw Object.assign(new Error('A substantive credit/debit note reason of at least 10 characters is required'), {
+      status: 400, code: 'NOTE_REASON_REQUIRED'
+    });
+  }
+}
+
 async function resolvePartyAndInvoice(note, session) {
   const isCustomer = note.partyType === 'Customer';
   const party = isCustomer
@@ -110,6 +147,7 @@ router.patch('/:id/finalize', authorize('invoice:finalize'), async (req, res) =>
       if (!locked) throw Object.assign(new Error('Note not found'), { status: 404, code: 'NOTE_NOT_FOUND' });
       if (locked.status !== 'draft') throw Object.assign(new Error('Only draft notes can be finalized'), { status: 409, code: 'NOTE_NOT_DRAFT' });
       if (!(Number(locked.totalAmount || 0) > 0)) throw Object.assign(new Error('Note amount must be greater than zero'), { status: 400, code: 'INVALID_NOTE_AMOUNT' });
+      validateFinalizableAmounts(locked);
       await applyNoteBalance(locked, 1, session);
       locked.status = 'finalized';
       await locked.save({ session });
