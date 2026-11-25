@@ -21,6 +21,7 @@ type QuarantineLot = {
   qcSpecificationTests?: Array<{ code: string; name: string; specification: string; unit?: string; methodReference: string; mandatory?: boolean }>;
   inspectionResults?: Array<{ testCode: string; outcome: 'pass' | 'fail'; result: string }>;
   inspectionRecordedByUserId?: string; inspectionRecordedByName?: string; inspectionRecordedAt?: string;
+  rawMaterialId?: string;
   testReportNo?: string; remarks?: string;
 };
 type RawEntry = {
@@ -37,11 +38,23 @@ export default function IncomingQcScreen() {
   const { user } = useAuth();
   const permission = usePermission();
   const { showToast } = useToast();
-  const canView = permission.can('inventory:view');
+  const canView = permission.can('inventory:view') && permission.can('manufacturing:view');
+  const canViewSpecs = permission.can('quality:view');
+  const canCreateSpec = permission.can('quality:create');
   const canRegister = permission.can('inventory:create');
   const canInspect = permission.can('quality:approve');
   const [lots, setLots] = useState<QuarantineLot[]>([]);
   const [entries, setEntries] = useState<RawEntry[]>([]);
+  const [specifications, setSpecifications] = useState<any[]>([]);
+  const [specModal, setSpecModal] = useState(false);
+  const [specMaterialId, setSpecMaterialId] = useState('');
+  const [specForm, setSpecForm] = useState({
+    specificationVersion: '', pharmacopoeialStandard: 'API', monographReference: '',
+    effectiveDate: new Date().toISOString().slice(0, 10), sourceNote: ''
+  });
+  const [specTests, setSpecTests] = useState<Array<{
+    code: string; name: string; specification: string; methodReference: string; unit: string; mandatory: boolean;
+  }>>([{ code: '', name: '', specification: '', methodReference: '', unit: '', mandatory: true }]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -57,19 +70,21 @@ export default function IncomingQcScreen() {
     if (refresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
-      const [nextLots, nextEntries] = await Promise.all([
+      const [nextLots, nextEntries, nextSpecs] = await Promise.all([
         api.getQuarantineLots(),
-        api.getRawMaterialEntries()
+        api.getRawMaterialEntries(),
+        canViewSpecs ? api.getRawMaterialQualitySpecifications() : Promise.resolve([])
       ]);
       setLots(Array.isArray(nextLots) ? nextLots : []);
       setEntries(Array.isArray(nextEntries) ? nextEntries : []);
+      setSpecifications(Array.isArray(nextSpecs) ? nextSpecs : []);
     } catch (err: any) {
       setError(err?.message || 'Unable to load incoming QC records');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [canView]);
+  }, [canView, canViewSpecs]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -78,6 +93,70 @@ export default function IncomingQcScreen() {
     Boolean(entry.expiryDate) && Boolean(entry.vendorName?.trim()) &&
     !lots.some(lot => String(lot.rawMaterialEntryId) === String(entry._id))
   ), [entries, lots]);
+
+  const materials = useMemo(() => {
+    const seen = new Set<string>();
+    return entries.map(entry => valueOf(entry.rawMaterialId)).filter((material: any) => {
+      if (!material?._id || seen.has(String(material._id))) return false;
+      seen.add(String(material._id));
+      return true;
+    });
+  }, [entries]);
+
+  const openSpecModal = () => {
+    setSpecMaterialId(specMaterialId || String(materials[0]?._id || ''));
+    setSpecForm({
+      specificationVersion: '', pharmacopoeialStandard: 'API', monographReference: '',
+      effectiveDate: new Date().toISOString().slice(0, 10), sourceNote: ''
+    });
+    setSpecTests([{ code: '', name: '', specification: '', methodReference: '', unit: '', mandatory: true }]);
+    setSpecModal(true);
+  };
+
+  const updateSpecTest = (index: number, key: string, value: string | boolean) => {
+    setSpecTests(prev => prev.map((test, i) => i === index ? { ...test, [key]: value } : test));
+  };
+
+  const createSpecification = async () => {
+    if (!specMaterialId || !specForm.specificationVersion.trim() || !specForm.pharmacopoeialStandard.trim() || !specForm.effectiveDate.trim()) {
+      showToast('Select a material and enter specification version, standard and effective date.', 'error');
+      return;
+    }
+    if (!specTests.some(test => test.mandatory) || specTests.some(test =>
+      !test.code.trim() || !test.name.trim() || !test.specification.trim() || !test.methodReference.trim()
+    )) {
+      showToast('Complete every test field and include at least one mandatory test.', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.createRawMaterialQualitySpecification({
+        rawMaterialId: specMaterialId,
+        ...specForm,
+        tests: specTests.map(test => ({ ...test, category: 'other' }))
+      });
+      showToast('Draft incoming QC specification created. A different QA approver must approve it.', 'success');
+      setSpecModal(false);
+      await load(true);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to create incoming QC specification', 'error');
+    } finally { setBusy(false); }
+  };
+
+  const approveSpecification = async (spec: any) => {
+    if (String(spec.createdByUserId || '') === String(user?.id || '')) {
+      showToast('The specification author cannot approve their own specification.', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.approveRawMaterialQualitySpecification(spec._id);
+      showToast('Incoming QC specification independently approved.', 'success');
+      await load(true);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to approve incoming QC specification', 'error');
+    } finally { setBusy(false); }
+  };
 
   const registerEntry = async (entry: RawEntry) => {
     const material = valueOf(entry.rawMaterialId);
@@ -182,6 +261,39 @@ export default function IncomingQcScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
         <View style={styles.sectionHeader}>
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionTitle}>Material-specific incoming QC specifications</Text>
+              <Text style={styles.muted}>Create draft test requirements for each raw material; approval must be independent.</Text>
+            </View>
+            {canCreateSpec ? <TouchableOpacity disabled={busy || materials.length === 0} onPress={openSpecModal} style={styles.primaryButton}>
+              <Text style={styles.buttonText}>New specification</Text>
+            </TouchableOpacity> : null}
+          </View>
+        </View>
+        {canViewSpecs ? (specifications.length ? specifications.map(spec => {
+          const sameAuthor = String(spec.createdByUserId || '') === String(user?.id || '');
+          return <View key={spec._id} style={styles.card}>
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>{spec.materialName} · v{spec.specificationVersion}</Text>
+                <Text style={styles.muted}>{spec.pharmacopoeialStandard} · {spec.tests?.length || 0} configured tests · Effective {spec.effectiveDate ? new Date(spec.effectiveDate).toLocaleDateString('en-IN') : '—'}</Text>
+                <Text style={styles.muted}>Author: {spec.createdByName || '—'}{spec.approvedByName ? ' · Approved by ' + spec.approvedByName : ''}</Text>
+                <View style={{ marginTop: 6 }}>
+                  <StatusPill label={spec.status} tone={spec.status === 'approved' ? 'success' : spec.status === 'superseded' ? 'neutral' : 'warning'} />
+                </View>
+              </View>
+              {spec.status === 'draft' && permission.can('quality:approve') ? (
+                <TouchableOpacity disabled={busy || sameAuthor} onPress={() => approveSpecification(spec)} style={[styles.primaryButton, (busy || sameAuthor) && { opacity: 0.5 }]}>
+                  <Text style={styles.buttonText}>Approve</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            {spec.status === 'draft' && sameAuthor ? <Text style={styles.warning}>The author cannot approve this specification.</Text> : null}
+          </View>;
+        }) : <Text style={styles.muted}>No incoming QC specifications found. Create a material-specific draft to begin.</Text>) : <Text style={styles.muted}>Specification visibility requires quality view permission.</Text>}
+
+        <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Stock awaiting quarantine registration</Text>
           <Text style={styles.muted}>Only unreserved stock under test with supplier and expiry evidence is eligible.</Text>
         </View>
@@ -239,6 +351,53 @@ export default function IncomingQcScreen() {
         }) : <Text style={styles.muted}>No quarantine lots found.</Text>}
       </ScrollView>
 
+      <Modal visible={specModal} transparent animationType="slide" onRequestClose={() => setSpecModal(false)}>
+        <View style={styles.modalBackdrop}><View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Create incoming QC specification</Text>
+          <Text style={styles.muted}>Define tests for this material only. Do not copy a generic panel across formulations or herbs.</Text>
+          <ScrollView style={{ maxHeight: 520 }}>
+            <Text style={styles.fieldLabel}>Raw material</Text>
+            <View style={styles.row}>
+              {materials.map((material: any) => <TouchableOpacity key={material._id} onPress={() => setSpecMaterialId(String(material._id))} style={[styles.choiceButton, specMaterialId === String(material._id) && styles.choiceSelected]}>
+                <Text style={styles.choiceText}>{material.name}</Text>
+              </TouchableOpacity>)}
+            </View>
+            <Text style={styles.fieldLabel}>Specification version</Text>
+            <TextInput value={specForm.specificationVersion} onChangeText={value => setSpecForm(prev => ({ ...prev, specificationVersion: value }))} placeholder="e.g. 1.0" placeholderTextColor={colors.text.muted} style={styles.input} />
+            <Text style={styles.fieldLabel}>Pharmacopoeial / approved standard</Text>
+            <TextInput value={specForm.pharmacopoeialStandard} onChangeText={value => setSpecForm(prev => ({ ...prev, pharmacopoeialStandard: value }))} placeholder="API / AFI / IP / approved in-house standard" placeholderTextColor={colors.text.muted} style={styles.input} />
+            <Text style={styles.fieldLabel}>Monograph reference</Text>
+            <TextInput value={specForm.monographReference} onChangeText={value => setSpecForm(prev => ({ ...prev, monographReference: value }))} placeholder="Exact volume / part / page / reference" placeholderTextColor={colors.text.muted} style={styles.input} />
+            <Text style={styles.fieldLabel}>Effective date (YYYY-MM-DD)</Text>
+            <TextInput value={specForm.effectiveDate} onChangeText={value => setSpecForm(prev => ({ ...prev, effectiveDate: value }))} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.muted} style={styles.input} />
+            <Text style={styles.fieldLabel}>Source note</Text>
+            <TextInput value={specForm.sourceNote} onChangeText={value => setSpecForm(prev => ({ ...prev, sourceNote: value }))} placeholder="Controlled source / internal approval reference" placeholderTextColor={colors.text.muted} style={styles.input} />
+            {specTests.map((test, index) => <View key={index} style={styles.testCard}>
+              <View style={styles.row}>
+                <Text style={styles.cardTitle}>Test {index + 1}</Text>
+                {specTests.length > 1 ? <TouchableOpacity onPress={() => setSpecTests(prev => prev.filter((_, i) => i !== index))}><Text style={styles.warning}>Remove</Text></TouchableOpacity> : null}
+              </View>
+              <TextInput value={test.code} onChangeText={value => updateSpecTest(index, 'code', value)} placeholder="Unique test code" placeholderTextColor={colors.text.muted} style={styles.input} />
+              <TextInput value={test.name} onChangeText={value => updateSpecTest(index, 'name', value)} placeholder="Test name" placeholderTextColor={colors.text.muted} style={styles.input} />
+              <TextInput value={test.specification} onChangeText={value => updateSpecTest(index, 'specification', value)} placeholder="Acceptance specification / limit" placeholderTextColor={colors.text.muted} style={styles.input} />
+              <TextInput value={test.methodReference} onChangeText={value => updateSpecTest(index, 'methodReference', value)} placeholder="Approved test method reference" placeholderTextColor={colors.text.muted} style={styles.input} />
+              <TextInput value={test.unit} onChangeText={value => updateSpecTest(index, 'unit', value)} placeholder="Unit (if applicable)" placeholderTextColor={colors.text.muted} style={styles.input} />
+              <TouchableOpacity onPress={() => updateSpecTest(index, 'mandatory', !test.mandatory)} style={styles.row}>
+                <Text style={styles.muted}>Mandatory test</Text>
+                <StatusPill label={test.mandatory ? 'Required' : 'Optional'} tone={test.mandatory ? 'primary' : 'neutral'} />
+              </TouchableOpacity>
+            </View>)}
+            <TouchableOpacity onPress={() => setSpecTests(prev => [...prev, { code: '', name: '', specification: '', methodReference: '', unit: '', mandatory: true }])} style={styles.secondaryButton}>
+              <Text style={styles.secondaryText}>+ Add test</Text>
+            </TouchableOpacity>
+          </ScrollView>
+          <View style={styles.row}>
+            <TouchableOpacity onPress={() => setSpecModal(false)} style={styles.secondaryButton}><Text style={styles.secondaryText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity disabled={busy || !materials.length} onPress={createSpecification} style={styles.primaryButton}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Save draft</Text>}</TouchableOpacity>
+          </View>
+        </View></View>
+      </Modal>
+
       <Modal visible={Boolean(inspectionLot)} transparent animationType="slide" onRequestClose={() => setInspectionLot(null)}>
         <View style={styles.modalBackdrop}><View style={styles.modalCard}>
           <Text style={styles.modalTitle}>Record incoming inspection</Text>
@@ -291,6 +450,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   cardTitle: { ...Typography.body, fontWeight: '700', color: colors.text.primary },
   muted: { ...Typography.caption, color: colors.text.secondary, marginTop: 3 },
   warning: { ...Typography.caption, color: colors.warning, marginTop: 8 },
+  fieldLabel: { ...Typography.caption, color: colors.text.secondary, marginTop: 8, marginBottom: 2 },
   primaryButton: { minHeight: 38, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: colors.primary, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
   buttonText: { ...Typography.bodySm, color: '#fff', fontWeight: '700' },
   secondaryButton: { minHeight: 38, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, justifyContent: 'center' },

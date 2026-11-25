@@ -902,6 +902,26 @@ class ApiClient {
     return res.json();
   }
 
+  async getRawMaterialQualitySpecifications(rawMaterialId?: string): Promise<any[]> {
+    const suffix = rawMaterialId ? `?rawMaterialId=${encodeURIComponent(rawMaterialId)}` : '';
+    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications${suffix}`);
+    return res.json();
+  }
+  async createRawMaterialQualitySpecification(data: {
+    rawMaterialId: string; pharmacopoeialStandard: string; monographReference?: string;
+    specificationVersion: string; effectiveDate: string; tests: Array<{
+      code: string; name: string; category?: string; specification: string;
+      unit?: string; methodReference: string; mandatory?: boolean;
+    }>; sourceNote?: string;
+  }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async approveRawMaterialQualitySpecification(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications/${id}/approve`, { method: 'PATCH' });
+    return res.json();
+  }
+
   async getQuarantineLots(status?: string): Promise<any[]> {
     const suffix = status ? `?status=${encodeURIComponent(status)}` : '';
     const res = await this.request(`${API_BASE}/manufacturing/quarantine${suffix}`);
