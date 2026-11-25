@@ -993,8 +993,40 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     let batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
 
-    if (batch.status === 'completed' || batch.status === 'rejected') {
-      return res.status(400).json({ error: 'Batch is already completed or rejected' });
+    // A client may retry after the completion transaction committed but the
+    // response was lost. Return the authoritative existing transfer instead of
+    // treating a successful completion as a failed retry.
+    if (batch.status === 'completed') {
+      if (!batch.productionTransferChallanId) {
+        return res.status(409).json({
+          error: 'Batch is completed but has no linked production-transfer Challan',
+          code: 'COMPLETED_BATCH_TRANSFER_MISSING'
+        });
+      }
+      const Challan = require('../../models/Challan');
+      const existingChallan = await Challan.findById(batch.productionTransferChallanId).lean();
+      if (!existingChallan) {
+        return res.status(409).json({
+          error: 'The completed batch transfer Challan could not be found; reconcile the batch before retrying',
+          code: 'COMPLETED_BATCH_TRANSFER_MISSING'
+        });
+      }
+      return res.json({
+        batch,
+        challan: {
+          _id: existingChallan._id,
+          challanNo: existingChallan.challanNo,
+          status: existingChallan.status,
+          challanType: existingChallan.challanType,
+          sourceWarehouseId: existingChallan.warehouseId,
+          sourceWarehouseName: existingChallan.warehouseName,
+          destinationWarehouseId: existingChallan.destinationWarehouseId,
+          destinationWarehouseName: existingChallan.destinationWarehouseName
+        }
+      });
+    }
+    if (batch.status === 'rejected') {
+      return res.status(400).json({ error: 'Rejected batch cannot be completed' });
     }
     if (batch.status === 'cancelled') {
       return res.status(400).json({ error: 'Cannot complete a cancelled batch' });
@@ -1104,6 +1136,39 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
         error: 'Batch completion cannot approve or reject QC using legacy disposition fields; record actual specification-linked test results through the QC workflow',
         code: 'SPECIFICATION_QC_DISPOSITION_REQUIRED',
         nextStep: 'Record actual results through qc-tests; failed results place the batch on QC hold, while passing mandatory results require independent QA review'
+      });
+    }
+
+    // Never compensate for missing stage dispensing by silently deducting
+    // unverified raw-material stock during finished-goods receipt. Every
+    // formula line must already be linked to stage-level dispensing evidence.
+    const formulaIngredients = Array.isArray(batch.bomSnapshot?.ingredients) ? batch.bomSnapshot.ingredients : [];
+    const consumedLines = Array.isArray(batch.ingredientsConsumed) ? batch.ingredientsConsumed : [];
+    const missingDispensing = formulaIngredients.filter(ingredient => {
+      const rawMaterialId = ingredient.rawMaterialId && ingredient.rawMaterialId._id
+        ? String(ingredient.rawMaterialId._id) : String(ingredient.rawMaterialId || '');
+      if (!rawMaterialId) return true;
+      const stageName = String(ingredient.stageName || '').trim().toLowerCase();
+      const expectedStageIndex = stageName
+        ? manufacturingStages.findIndex(stage => String(stage.name || '').trim().toLowerCase() === stageName)
+        : 0;
+      if (expectedStageIndex < 0) return true;
+      return !consumedLines.some(consumed => {
+        const consumedMaterialId = consumed.rawMaterialId && consumed.rawMaterialId._id
+          ? String(consumed.rawMaterialId._id) : String(consumed.rawMaterialId || '');
+        return consumedMaterialId === rawMaterialId &&
+          Number(consumed.stageIndex) === expectedStageIndex &&
+          Boolean(String(consumed.dispensingNo || '').trim());
+      });
+    });
+    if (missingDispensing.length > 0) {
+      return res.status(409).json({
+        error: 'Every formula material must be issued through the independently verified dispensing workflow before batch completion',
+        code: 'MATERIAL_DISPENSING_REQUIRED',
+        missingMaterials: missingDispensing.map(item => ({
+          rawMaterialId: item.rawMaterialId && item.rawMaterialId._id ? item.rawMaterialId._id : item.rawMaterialId,
+          stageName: item.stageName || ''
+        }))
       });
     }
 
@@ -1269,21 +1334,6 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     // Preserve manufacturing stage evidence exactly as recorded. QC tests and
     // review occur after completion; skipped stages retain their formal disposition.
 
-    // Backfill: deduct any stage-tied ingredients missed during stage advancement
-    // (covers both formulation and packaging that fell through due to the stageName filter bug)
-    const backfillIngs = (batch.bomSnapshot?.ingredients || []).filter(i => {
-      const hasStage = i.stageName && i.stageName.trim().length > 0;
-      const alreadyConsumed = batch.ingredientsConsumed.some(
-        c => c.rawMaterialId?.toString() === i.rawMaterialId?.toString()
-      );
-      return hasStage && !alreadyConsumed;
-    });
-    let backfillWarehouseId = null;
-    if (backfillIngs.length > 0) {
-      const manufacturingWarehouseForMaterials = await resolveManufacturingWarehouse(batch.manufacturingUnitId);
-      backfillWarehouseId = manufacturingWarehouseForMaterials._id;
-    }
-
     const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
     const challanNo = await generateAtomicDocumentNumber('productionTransferChallanNo', 'CH', 5);
     const completed = await completeProductionReceiptAndCreateTransfer({
@@ -1294,10 +1344,7 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       challanNo,
       now,
       userId: req.user ? req.user.id : null,
-      createdBy: req.user && req.user.name ? req.user.name : 'System',
-      backfillIngredients: backfillIngs,
-      backfillWarehouseId
-    });
+      createdBy: req.user && req.user.name ? req.user.name : 'System'    });
     batch = completed.batch;
     challan = completed.challan;
     if (req.io) {

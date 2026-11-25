@@ -414,7 +414,7 @@ async function reverseChallanInventory(challan, options = {}) {
  * destination transfer Challan, and persists the completed batch. The Challan
  * remains draft, so the subsequent physical transfer is controlled by its posting.
  */
-async function completeProductionReceiptAndCreateTransfer({ batch, challanItems, productionWarehouse, destinationWarehouse, challanNo, now, userId, createdBy, backfillIngredients = [], backfillWarehouseId = null }) {
+async function completeProductionReceiptAndCreateTransfer({ batch, challanItems, productionWarehouse, destinationWarehouse, challanNo, now, userId, createdBy }) {
   return withTransaction(async (session) => {
     const BatchProduction = require('../models/BatchProduction');
     const Challan = require('../models/Challan');
@@ -431,47 +431,6 @@ async function completeProductionReceiptAndCreateTransfer({ batch, challanItems,
     const snapshot = batch.toObject ? batch.toObject() : batch;
     const protectedFields = new Set(['_id', 'createdAt', 'updatedAt', 'firmId', 'batchNo']);
     for (const [key, value] of Object.entries(snapshot)) if (!protectedFields.has(key)) freshBatch.set(key, value);
-
-    if (backfillIngredients.length > 0) {
-      if (!backfillWarehouseId) throw inventoryError('MANUFACTURING_WAREHOUSE_REQUIRED', 'Manufacturing warehouse is required for raw-material backfill');
-      for (const ingredient of backfillIngredients) {
-        const qtyNeeded = ingredient.itemType === 'packaging'
-          ? Number(((ingredient.qtyRequired || 0) * Number(freshBatch.actualYieldQty || 0)).toFixed(2))
-          : Number(((ingredient.qtyRequired || 0) * (Number(freshBatch.plannedQty || 0) / 100)).toFixed(2));
-        if (qtyNeeded <= 0) continue;
-
-        const entries = await RawMaterialEntry.find({
-          rawMaterialId: ingredient.rawMaterialId,
-          warehouseId: backfillWarehouseId,
-          qcStatus: 'approved',
-          qty: { $gt: 0 },
-          $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }]
-        }).sort({ expiryDate: 1, createdAt: 1 }).session(session);
-        let remaining = qtyNeeded;
-        for (const entry of entries) {
-          if (remaining <= 0.0001) break;
-          const deduct = Math.min(remaining, Math.round(Number(entry.qty || 0) * 100) / 100);
-          if (deduct <= 0) continue;
-          const updated = await RawMaterialEntry.findOneAndUpdate(
-            { _id: entry._id, qty: { $gte: deduct } },
-            { $inc: { qty: -deduct } },
-            { new: true, session }
-          );
-          if (!updated) throw inventoryError('RAW_MATERIAL_CONCURRENCY_CONFLICT', `Raw-material batch ${entry.batchNo} changed while completing production`);
-          freshBatch.rawMaterialCost = Number(freshBatch.rawMaterialCost || 0) + deduct * Number(entry.purchaseRate || 0);
-          freshBatch.ingredientsConsumed.push({
-            rawMaterialId: ingredient.rawMaterialId,
-            rawMaterialEntryId: entry._id,
-            qtyConsumed: deduct,
-            batchNo: entry.batchNo
-          });
-          remaining = Number((remaining - deduct).toFixed(2));
-        }
-        if (remaining > 0.0001) {
-          throw inventoryError('INSUFFICIENT_RAW_MATERIAL', `Insufficient approved stock to backfill material ${ingredient.rawMaterialId}; short by ${remaining}`);
-        }
-      }
-    }
 
     const production = await Warehouse.findById(productionWarehouse._id).session(session);
     const destination = await Warehouse.findById(destinationWarehouse._id).session(session);

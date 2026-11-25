@@ -12,6 +12,7 @@ jest.mock('../models/RetentionSample');
 jest.mock('../models/MaterialDispensing');
 jest.mock('../models/InventoryEntry');
 jest.mock('../models/Warehouse');
+jest.mock('../models/Challan');
 jest.mock('../utils/withTransaction', () => ({
   withTransaction: jest.fn(async work => work({}))
 }));
@@ -31,6 +32,7 @@ const RetentionSample = require('../models/RetentionSample');
 const MaterialDispensing = require('../models/MaterialDispensing');
 const InventoryEntry = require('../models/InventoryEntry');
 const Warehouse = require('../models/Warehouse');
+const Challan = require('../models/Challan');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
 const ProductQualitySpecification = require('../models/ProductQualitySpecification');
@@ -218,6 +220,41 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
     expect(res.body.firmDetails).toBeUndefined();
   });
 
+  describe('idempotent production completion retry', () => {
+    test('returns the existing transfer Challan when completion is retried after commit', async () => {
+      const batch = {
+        _id: 'batch-completed-retry',
+        status: 'completed',
+        qcStatus: 'approved',
+        releasedBy: 'qa-reviewer-1',
+        productionTransferChallanId: 'challan-existing-1'
+      };
+      const existingChallan = {
+        _id: 'challan-existing-1',
+        challanNo: 'CH-00042',
+        status: 'draft',
+        challanType: 'production_transfer',
+        warehouseId: 'production-warehouse',
+        warehouseName: 'Production House',
+        destinationWarehouseId: 'finished-warehouse',
+        destinationWarehouseName: 'Finished Goods'
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Challan.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(existingChallan) });
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-completed-retry/complete')
+        .send({ actualYieldQty: 100, warehouseId: 'finished-warehouse' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.batch._id).toBe('batch-completed-retry');
+      expect(res.body.challan.challanNo).toBe('CH-00042');
+      expect(res.body.challan.destinationWarehouseId).toBe('finished-warehouse');
+      expect(Challan.findById).toHaveBeenCalledWith('challan-existing-1');
+      expect(Warehouse.findById).not.toHaveBeenCalled();
+    });
+  });
+
   describe('batch completion evidence gate', () => {
     test('blocks completion before warehouse or packaging processing when critical stage evidence is incomplete', async () => {
       const batch = {
@@ -257,6 +294,47 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       expect(res.body.missingEvidence).toContain('Independent operator and verifier evidence is missing: Mixing');
       expect(Warehouse.findById).not.toHaveBeenCalled();
       expect(batch.packagingDeducted).toBe(false);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('blocks completion when a formula material has no stage dispensing evidence', async () => {
+      const batch = {
+        _id: 'batch-missing-dispensing',
+        status: 'in_progress',
+        productId: '121212121212121212121212',
+        plannedQty: 100,
+        bomSnapshot: {
+          formulationBasis: 100,
+          ingredients: [{ rawMaterialId: 'rm-missing', itemType: 'formulation', qtyRequired: 10, stageName: 'Mixing' }]
+        },
+        ingredientsConsumed: [],
+        stages: [{
+          name: 'Mixing',
+          status: 'completed',
+          performedBy: 'operator-1',
+          performedByName: 'Operator One',
+          verifiedBy: 'reviewer-1',
+          verifiedAt: new Date(),
+          isDualSigned: true,
+          operatorTrainingRecordId: 'training-1',
+          equipmentId: 'equipment-1',
+          equipmentCalibrationStatus: 'valid'
+        }],
+        packagingMode: 'packed_by_vendor',
+        packagingDeducted: false,
+        save: jest.fn()
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Product.find.mockResolvedValue([{ _id: '121212121212121212121212', name: 'Test Product', mrp: 10 }]);
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-missing-dispensing/complete')
+        .send({ actualYieldQty: 100, warehouseId: '222222222222222222222222' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('MATERIAL_DISPENSING_REQUIRED');
+      expect(res.body.missingMaterials).toHaveLength(1);
+      expect(Warehouse.findById).not.toHaveBeenCalled();
       expect(batch.save).not.toHaveBeenCalled();
     });
 
