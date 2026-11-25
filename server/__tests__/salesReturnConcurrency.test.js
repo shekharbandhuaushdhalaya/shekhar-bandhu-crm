@@ -17,9 +17,16 @@ const Challan = require('../models/Challan');
 const Customer = require('../models/Customer');
 const Warehouse = require('../models/Warehouse');
 const { postSalesReturn } = require('../services/salesReturnService');
+const { withTransaction } = require('../utils/withTransaction');
 
 describe('Sales Return posting serialization', () => {
   beforeEach(() => jest.clearAllMocks());
+
+  test('requires an authenticated posting actor before opening a transaction', async () => {
+    await expect(postSalesReturn('return-1', {})).rejects.toMatchObject({ code: 'RETURN_POSTER_REQUIRED' });
+    await expect(postSalesReturn('return-1', { id: 'reviewer-1' })).rejects.toMatchObject({ code: 'RETURN_POSTER_REQUIRED' });
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
 
   test('bumps the source Challan revision inside the posting transaction before cumulative checks', async () => {
     const ret = {

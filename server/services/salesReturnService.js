@@ -200,6 +200,7 @@ async function createSalesReturn(data, actor = {}) {
 }
 
 async function postSalesReturn(returnId, actor = {}) {
+  if (!actor.id || !actor.name) throw err('RETURN_POSTER_REQUIRED', 'Authenticated return posting identity is required');
   return withTransaction(async session => {
     const ret = await SalesReturn.findById(returnId).session(session);
     if (!ret) throw err('RETURN_NOT_FOUND', 'Sales Return not found');
