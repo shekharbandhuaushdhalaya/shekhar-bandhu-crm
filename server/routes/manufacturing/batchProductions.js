@@ -1537,52 +1537,84 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
         remarks: String(item.remarks || '').trim()
       });
     }
-    batch.qcSpecificationId = spec._id;
-    batch.qcSpecificationVersion = spec.specificationVersion || '';
-    batch.qcTests = (batch.qcTests || []).concat(normalized);
-    const allResults = new Map(batch.qcTests.map(test => [String(test.code || '').trim().toLowerCase(), test]));
-    const mandatory = (spec.tests || []).filter(test => test.mandatory !== false);
-    const failed = batch.qcTests.some(test => String(test.status || '').toLowerCase() === 'fail');
-    const mandatoryPassed = mandatory.length > 0 && mandatory.every(test =>
-      String((allResults.get(String(test.code || '').trim().toLowerCase()) || {}).status || '').toLowerCase() === 'pass'
-    );
-    if (failed) {
-      batch.qcStatus = 'rejected';
-      batch.qcPassedByUser = req.user.id;
-      batch.qcPassedBy = req.user.name;
-      if (batch.status === 'completed') batch.status = 'qc_hold';
-    } else if (mandatoryPassed) {
-      batch.qcStatus = 'pending_qa_review';
-      batch.qcPassedByUser = req.user.id;
-      batch.qcPassedBy = req.user.name;
-      batch.qcApprovedByUser = null;
-      batch.qcApprovedByName = '';
-      batch.qcApprovedAt = null;
-      batch.qcApprovalNotes = '';
-    } else {
-      batch.qcStatus = 'pending';
-      batch.qcPassedByUser = null;
-      batch.qcPassedBy = '';
-      batch.qcApprovedByUser = null;
-      batch.qcApprovedByName = '';
-      batch.qcApprovedAt = null;
-      batch.qcApprovalNotes = '';
-    }
-    await batch.save();
-    if (req.io) req.io.emit('mfg_batch_updated', batch);
+
+    const outcome = await withTransaction(async session => {
+      const current = await BatchProduction.findOne({
+        _id: batch._id,
+        updatedAt: batch.updatedAt,
+        status: 'completed',
+        releasedBy: null
+      }).session(session);
+      if (!current) {
+        throw Object.assign(new Error('Batch changed while QC results were being recorded. Reload the batch and review its latest QC history.'), {
+          statusCode: 409, code: 'QC_TEST_CONFLICT'
+        });
+      }
+      const currentSpec = await ProductQualitySpecification.findById(spec._id).session(session).lean();
+      if (!currentSpec || currentSpec.status !== 'approved' ||
+          String(currentSpec.productId) !== String(productId) ||
+          String(currentSpec.specificationVersion || '') !== String(spec.specificationVersion || '') ||
+          !currentSpec.approvedBy || !currentSpec.approvedAt ||
+          (currentSpec.effectiveDate && new Date(currentSpec.effectiveDate) > new Date())) {
+        throw Object.assign(new Error('The approved QC specification changed while results were being recorded. Reload and retry against the current approved version.'), {
+          statusCode: 409, code: 'QC_SPECIFICATION_CONFLICT'
+        });
+      }
+      const currentCodes = new Set((current.qcTests || []).map(test => String(test.code || '').trim().toLowerCase()));
+      if (normalized.some(test => currentCodes.has(String(test.code || '').trim().toLowerCase()))) {
+        throw Object.assign(new Error('A QC result was recorded concurrently. Reload the batch before submitting another result.'), {
+          statusCode: 409, code: 'QC_TEST_CONFLICT'
+        });
+      }
+
+      current.qcSpecificationId = currentSpec._id;
+      current.qcSpecificationVersion = currentSpec.specificationVersion || '';
+      current.qcTests = (current.qcTests || []).concat(normalized);
+      const allResults = new Map(current.qcTests.map(test => [String(test.code || '').trim().toLowerCase(), test]));
+      const mandatory = (currentSpec.tests || []).filter(test => test.mandatory !== false);
+      const failed = current.qcTests.some(test => String(test.status || '').toLowerCase() === 'fail');
+      const mandatoryPassed = mandatory.length > 0 && mandatory.every(test =>
+        String((allResults.get(String(test.code || '').trim().toLowerCase()) || {}).status || '').toLowerCase() === 'pass'
+      );
+      if (failed) {
+        current.qcStatus = 'rejected';
+        current.qcPassedByUser = req.user.id;
+        current.qcPassedBy = req.user.name;
+        current.status = 'qc_hold';
+      } else if (mandatoryPassed) {
+        current.qcStatus = 'pending_qa_review';
+        current.qcPassedByUser = req.user.id;
+        current.qcPassedBy = req.user.name;
+        current.qcApprovedByUser = null;
+        current.qcApprovedByName = '';
+        current.qcApprovedAt = null;
+        current.qcApprovalNotes = '';
+      } else {
+        current.qcStatus = 'pending';
+        current.qcPassedByUser = null;
+        current.qcPassedBy = '';
+        current.qcApprovedByUser = null;
+        current.qcApprovedByName = '';
+        current.qcApprovedAt = null;
+        current.qcApprovalNotes = '';
+      }
+      await current.save({ session });
+      return { batch: current, mandatoryTests: mandatory.length, mandatoryPassed, failed };
+    });
+    if (req.io) req.io.emit('mfg_batch_updated', outcome.batch);
     res.json({
-      batch,
-      qcStatus: batch.qcStatus,
-      mandatoryTests: mandatory.length,
-      recordedTests: batch.qcTests.length,
-      mandatoryTestsPassed: mandatoryPassed,
-      deviationRequired: failed,
-      message: failed ? 'One or more recorded tests failed. Batch is on QC hold and requires deviation investigation.' :
-        (mandatoryPassed ? 'All mandatory tests are recorded as passed. Independent QA disposition approval is now required.' :
+      batch: outcome.batch,
+      qcStatus: outcome.batch.qcStatus,
+      mandatoryTests: outcome.mandatoryTests,
+      recordedTests: outcome.batch.qcTests.length,
+      mandatoryTestsPassed: outcome.mandatoryPassed,
+      deviationRequired: outcome.failed,
+      message: outcome.failed ? 'One or more recorded tests failed. Batch is on QC hold and requires deviation investigation.' :
+        (outcome.mandatoryPassed ? 'All mandatory tests are recorded as passed. Independent QA disposition approval is now required.' :
           'QC results recorded. Remaining mandatory tests must be completed before QC approval.')
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(err.statusCode || 400).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
   }
 });
 
@@ -1620,15 +1652,53 @@ router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), async (re
     if (!allPassed || (batch.qcTests || []).some(test => test.status === 'fail')) {
       return res.status(409).json({ error: 'All mandatory tests must have actual passing results and no recorded test may have failed' });
     }
-    batch.qcStatus = 'approved';
-    batch.qcApprovedByUser = reviewerId;
-    batch.qcApprovedByName = reviewerName;
-    batch.qcApprovedAt = new Date();
-    batch.qcApprovalNotes = notes;
-    await batch.save();
-    req.io?.emit('mfg_batch_updated', batch);
-    return res.json({ batch, message: 'Independent QA disposition approved; separate market release approval is still required' });
-  } catch (err) { return res.status(400).json({ error: err.message }); }
+
+    const approvedBatch = await withTransaction(async session => {
+      const current = await BatchProduction.findOne({
+        _id: batch._id,
+        updatedAt: batch.updatedAt,
+        status: 'completed',
+        qcStatus: 'pending_qa_review',
+        releasedBy: null
+      }).session(session);
+      if (!current || !current.qcPassedByUser || String(current.qcPassedByUser) === String(reviewerId)) {
+        throw Object.assign(new Error('Batch QC evidence changed or was approved concurrently. Reload and review the latest QC results.'), {
+          statusCode: 409, code: 'QC_APPROVAL_CONFLICT'
+        });
+      }
+      const currentSpec = await ProductQualitySpecification.findById(current.qcSpecificationId).session(session).lean();
+      if (!currentSpec || currentSpec.status !== 'approved' || !currentSpec.approvedBy || !currentSpec.approvedAt ||
+          String(currentSpec.productId) !== String(batchProductId) ||
+          String(currentSpec.specificationVersion || '') !== String(batch.qcSpecificationVersion || '') ||
+          (currentSpec.effectiveDate && new Date(currentSpec.effectiveDate) > new Date())) {
+        throw Object.assign(new Error('The approved QC specification changed during QA disposition review. Reload and retry.'), {
+          statusCode: 409, code: 'QC_SPECIFICATION_CONFLICT'
+        });
+      }
+      const currentResults = new Map((current.qcTests || []).map(test => [String(test.code || '').trim().toLowerCase(), test]));
+      const currentMandatory = (currentSpec.tests || []).filter(test => test.mandatory !== false);
+      const currentAllPassed = currentMandatory.length > 0 && currentMandatory.every(test => {
+        const result = currentResults.get(String(test.code || '').trim().toLowerCase());
+        return result && result.status === 'pass' && (String(result.result || '').trim() || Number.isFinite(result.numericResult));
+      });
+      if (!currentAllPassed || (current.qcTests || []).some(test => test.status === 'fail')) {
+        throw Object.assign(new Error('QC results changed during QA disposition review; all mandatory tests must still pass.'), {
+          statusCode: 409, code: 'QC_APPROVAL_CONFLICT'
+        });
+      }
+      current.qcStatus = 'approved';
+      current.qcApprovedByUser = reviewerId;
+      current.qcApprovedByName = reviewerName;
+      current.qcApprovedAt = new Date();
+      current.qcApprovalNotes = notes;
+      await current.save({ session });
+      return current;
+    });
+    req.io?.emit('mfg_batch_updated', approvedBatch);
+    return res.json({ batch: approvedBatch, message: 'Independent QA disposition approved; separate market release approval is still required' });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
+  }
 });
 
 router.patch('/:id/release', authorize('manufacturing:release'), async (req, res) => {

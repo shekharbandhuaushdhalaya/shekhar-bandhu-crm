@@ -4,6 +4,10 @@ const request = require('supertest');
 jest.mock('../models/BatchProduction');
 jest.mock('../models/ProductQualitySpecification');
 jest.mock('../models/RolePermission');
+jest.mock('../utils/withTransaction', () => ({
+  withTransaction: jest.fn(async work => work({}))
+}));
+
 
 const BatchProduction = require('../models/BatchProduction');
 const ProductQualitySpecification = require('../models/ProductQualitySpecification');
@@ -29,6 +33,14 @@ describe('Product-specific QC test recording and independent QA disposition', ()
       { code: 'COLOUR', name: 'Colour', category: 'organoleptic', specification: 'As approved reference', mandatory: false }
     ]
   };
+  const mockBatch = batch => {
+    mockBatch(batch);
+    BatchProduction.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(batch) });
+  };
+  const mockSpec = value => ProductQualitySpecification.findById.mockReturnValue({
+    session: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockResolvedValue(value)
+  });
 
   beforeAll(() => {
     app = express();
@@ -42,7 +54,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
   beforeEach(() => {
     jest.clearAllMocks();
     RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
-    ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(spec) });
+    mockSpec(spec);
   });
 
   test('records only actual values and derives pending status until every mandatory test passes', async () => {
@@ -88,10 +100,21 @@ describe('Product-specific QC test recording and independent QA disposition', ()
     expect(res.body.deviationRequired).toBe(true);
   });
 
+  test('rejects a QC result submission when the batch changes after the analyst read it', async () => {
+    const batch = makeBatch();
+    mockBatch(batch);
+    BatchProduction.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(null) });
+    const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
+      .send({ qcSpecificationId: specId, tests: [{ code: 'IDENTITY', result: 'Conforms', status: 'pass' }] });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('QC_TEST_CONFLICT');
+    expect(batch.save).not.toHaveBeenCalled();
+  });
+
   test('rejects unapproved, wrong-product or ineffective specifications', async () => {
     const batch = makeBatch();
     BatchProduction.findById.mockResolvedValue(batch);
-    ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({ ...spec, status: 'draft' }) });
+    mockSpec({ ...spec, status: 'draft' });
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
       .send({ qcSpecificationId: specId, tests: [{ code: 'IDENTITY', result: 'Conforms', status: 'pass' }] });
     expect(res.status).toBe(409);
@@ -140,7 +163,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
     BatchProduction.findById.mockResolvedValue(batch);
-    ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({ ...spec, productId: 'different-product' }) });
+    mockSpec({ ...spec, productId: 'different-product' });
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval')
       .set('x-user-id', 'qa-reviewer-2').set('x-user-name', 'QA Reviewer').send({ notes: 'Reviewed' });
     expect(res.status).toBe(409);
@@ -154,7 +177,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
     BatchProduction.findById.mockResolvedValue(batch);
-    ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({ ...spec, effectiveDate: new Date(Date.now() + 86400000) }) });
+    mockSpec({ ...spec, effectiveDate: new Date(Date.now() + 86400000) });
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval')
       .set('x-user-id', 'qa-reviewer-2').set('x-user-name', 'QA Reviewer').send({ notes: 'Reviewed' });
     expect(res.status).toBe(409);
