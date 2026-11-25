@@ -1479,14 +1479,16 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
     if (batch.status === 'cancelled' || batch.status === 'rejected' || batch.releasedBy) {
       return res.status(409).json({ error: 'QC test results cannot be added to cancelled, rejected or released batches' });
     }
-    if (batch.status !== 'completed') {
-      return res.status(409).json({ error: 'Specification-linked finished-product QC testing is available only after batch completion', code: 'BATCH_COMPLETION_REQUIRED' });
+    const isQcRetestHold = batch.status === 'qc_hold' && batch.qcStatus === 'rejected';
+    if (batch.status !== 'completed' && !isQcRetestHold) {
+      return res.status(409).json({ error: 'Specification-linked finished-product QC testing is available only after batch completion or an authorised retest following closed CAPA', code: 'BATCH_COMPLETION_REQUIRED' });
     }
     const tests = req.body.tests;
     if (!Array.isArray(tests) || tests.length === 0) {
       return res.status(400).json({ error: 'At least one actual QC test result is required' });
     }
     const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
+    const DeviationCapa = require('../../models/DeviationCapa');
     const specificationId = batch.qcSpecificationId || req.body.qcSpecificationId;
     if (!specificationId) {
       return res.status(409).json({ error: 'Select an approved product-specific quality specification before recording QC tests' });
@@ -1499,7 +1501,21 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
     }
     const specTests = new Map((spec.tests || []).map(test => [String(test.code || '').trim().toLowerCase(), test]));
     if (!specTests.size) return res.status(409).json({ error: 'Approved product quality specification has no test requirements' });
-    const existingCodes = new Set((batch.qcTests || []).map(test => String(test.code || '').trim().toLowerCase()));
+    const latestTestsByCode = new Map();
+    for (const recordedTest of (batch.qcTests || [])) {
+      latestTestsByCode.set(String(recordedTest.code || '').trim().toLowerCase(), recordedTest);
+    }
+    const unresolvedFailures = Array.from(latestTestsByCode.values())
+      .filter(test => String(test.status || '').toLowerCase() === 'fail');
+    for (const failedTest of unresolvedFailures) {
+      if (!failedTest.deviationCapaId) {
+        return res.status(409).json({ error: 'QC retest is blocked because the failed result has no linked Deviation/CAPA record', code: 'QC_RETEST_CAPA_REQUIRED' });
+      }
+      const deviation = await DeviationCapa.findById(failedTest.deviationCapaId).lean();
+      if (!deviation || deviation.status !== 'closed') {
+        return res.status(409).json({ error: 'QC retest is blocked until every failed-test Deviation/CAPA is independently verified and closed', code: 'QC_RETEST_CAPA_OPEN' });
+      }
+    }
     const submittedCodes = new Set();
     const normalized = [];
     for (const item of tests) {
@@ -1507,8 +1523,9 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
       const key = code.toLowerCase();
       const specTest = specTests.get(key);
       if (!code || !specTest) return res.status(400).json({ error: 'Every QC test code must exist in the approved product specification', code });
-      if (submittedCodes.has(key) || existingCodes.has(key)) {
-        return res.status(409).json({ error: 'A QC result for test ' + code + ' is already recorded; use the controlled QC correction workflow rather than overwriting test history' });
+      const previousAttempt = latestTestsByCode.get(key);
+      if (submittedCodes.has(key) || (previousAttempt && String(previousAttempt.status || '').toLowerCase() !== 'fail')) {
+        return res.status(409).json({ error: 'A QC result for test ' + code + ' is already recorded; only a failed test with a closed linked CAPA may be retested' });
       }
       submittedCodes.add(key);
       const status = String(item.status || 'pending').toLowerCase();
@@ -1534,7 +1551,9 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
         testedBy: req.user.id,
         testedByName: req.user.name,
         testedAt: new Date(),
-        remarks: String(item.remarks || '').trim()
+        remarks: String(item.remarks || '').trim(),
+        attemptNo: previousAttempt ? Number(previousAttempt.attemptNo || 1) + 1 : 1,
+        retestOf: previousAttempt && previousAttempt._id ? previousAttempt._id : null
       });
     }
 
@@ -1542,7 +1561,8 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
       const current = await BatchProduction.findOne({
         _id: batch._id,
         updatedAt: batch.updatedAt,
-        status: 'completed',
+        status: batch.status,
+        qcStatus: batch.qcStatus,
         releasedBy: null
       }).session(session);
       if (!current) {
@@ -1560,19 +1580,45 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
           statusCode: 409, code: 'QC_SPECIFICATION_CONFLICT'
         });
       }
-      const currentCodes = new Set((current.qcTests || []).map(test => String(test.code || '').trim().toLowerCase()));
-      if (normalized.some(test => currentCodes.has(String(test.code || '').trim().toLowerCase()))) {
-        throw Object.assign(new Error('A QC result was recorded concurrently. Reload the batch before submitting another result.'), {
-          statusCode: 409, code: 'QC_TEST_CONFLICT'
-        });
+      const currentLatestByCode = new Map();
+      for (const recordedTest of (current.qcTests || [])) {
+        currentLatestByCode.set(String(recordedTest.code || '').trim().toLowerCase(), recordedTest);
+      }
+      for (const failedTest of Array.from(currentLatestByCode.values()).filter(test => String(test.status || '').toLowerCase() === 'fail')) {
+        if (!failedTest.deviationCapaId) {
+          throw Object.assign(new Error('QC retest is blocked because a failed result has no linked Deviation/CAPA record.'), {
+            statusCode: 409, code: 'QC_RETEST_CAPA_REQUIRED'
+          });
+        }
+        const deviation = await DeviationCapa.findById(failedTest.deviationCapaId).session(session).lean();
+        if (!deviation || deviation.status !== 'closed') {
+          throw Object.assign(new Error('QC retest is blocked until every failed-test Deviation/CAPA is independently verified and closed.'), {
+            statusCode: 409, code: 'QC_RETEST_CAPA_OPEN'
+          });
+        }
+      }
+      for (const test of normalized) {
+        const key = String(test.code || '').trim().toLowerCase();
+        const previousAttempt = currentLatestByCode.get(key);
+        if (previousAttempt && String(previousAttempt.status || '').toLowerCase() !== 'fail') {
+          throw Object.assign(new Error('A QC result was recorded concurrently. Reload the batch before submitting another result.'), {
+            statusCode: 409, code: 'QC_TEST_CONFLICT'
+          });
+        }
+        if (previousAttempt) {
+          test.attemptNo = Number(previousAttempt.attemptNo || 1) + 1;
+          test.retestOf = previousAttempt._id || null;
+        }
       }
 
       current.qcSpecificationId = currentSpec._id;
       current.qcSpecificationVersion = currentSpec.specificationVersion || '';
       current.qcTests = (current.qcTests || []).concat(normalized);
-      const allResults = new Map(current.qcTests.map(test => [String(test.code || '').trim().toLowerCase(), test]));
+      const allResults = new Map();
+      for (const test of current.qcTests) allResults.set(String(test.code || '').trim().toLowerCase(), test);
+      const latestResults = Array.from(allResults.values());
       const mandatory = (currentSpec.tests || []).filter(test => test.mandatory !== false);
-      const failed = current.qcTests.some(test => String(test.status || '').toLowerCase() === 'fail');
+      const failed = latestResults.some(test => String(test.status || '').toLowerCase() === 'fail');
       const mandatoryPassed = mandatory.length > 0 && mandatory.every(test =>
         String((allResults.get(String(test.code || '').trim().toLowerCase()) || {}).status || '').toLowerCase() === 'pass'
       );
@@ -1609,6 +1655,7 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
           if (deviation) createdDeviations.push(deviation);
         }
       } else if (mandatoryPassed) {
+        current.status = 'completed';
         current.qcStatus = 'pending_qa_review';
         current.qcPassedByUser = req.user.id;
         current.qcPassedBy = req.user.name;
@@ -1617,6 +1664,7 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
         current.qcApprovedAt = null;
         current.qcApprovalNotes = '';
       } else {
+        current.status = 'completed';
         current.qcStatus = 'pending';
         current.qcPassedByUser = null;
         current.qcPassedBy = '';
@@ -1675,13 +1723,15 @@ router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), async (re
     if (String(batch.qcSpecificationVersion || '') !== String(spec.specificationVersion || '')) {
       return res.status(409).json({ error: 'The batch QC specification version does not match the approved specification record' });
     }
-    const results = new Map((batch.qcTests || []).map(test => [String(test.code || '').trim().toLowerCase(), test]));
+    const results = new Map();
+    for (const test of (batch.qcTests || [])) results.set(String(test.code || '').trim().toLowerCase(), test);
+    const latestResults = Array.from(results.values());
     const mandatory = (spec.tests || []).filter(test => test.mandatory !== false);
     const allPassed = mandatory.length > 0 && mandatory.every(test => {
       const result = results.get(String(test.code || '').trim().toLowerCase());
       return result && result.status === 'pass' && (String(result.result || '').trim() || Number.isFinite(result.numericResult));
     });
-    if (!allPassed || (batch.qcTests || []).some(test => test.status === 'fail')) {
+    if (!allPassed || latestResults.some(test => test.status === 'fail')) {
       return res.status(409).json({ error: 'All mandatory tests must have actual passing results and no recorded test may have failed' });
     }
 
@@ -1707,13 +1757,15 @@ router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), async (re
           statusCode: 409, code: 'QC_SPECIFICATION_CONFLICT'
         });
       }
-      const currentResults = new Map((current.qcTests || []).map(test => [String(test.code || '').trim().toLowerCase(), test]));
+      const currentResults = new Map();
+      for (const test of (current.qcTests || [])) currentResults.set(String(test.code || '').trim().toLowerCase(), test);
+      const currentLatestResults = Array.from(currentResults.values());
       const currentMandatory = (currentSpec.tests || []).filter(test => test.mandatory !== false);
       const currentAllPassed = currentMandatory.length > 0 && currentMandatory.every(test => {
         const result = currentResults.get(String(test.code || '').trim().toLowerCase());
         return result && result.status === 'pass' && (String(result.result || '').trim() || Number.isFinite(result.numericResult));
       });
-      if (!currentAllPassed || (current.qcTests || []).some(test => test.status === 'fail')) {
+      if (!currentAllPassed || currentLatestResults.some(test => test.status === 'fail')) {
         throw Object.assign(new Error('QC results changed during QA disposition review; all mandatory tests must still pass.'), {
           statusCode: 409, code: 'QC_APPROVAL_CONFLICT'
         });
@@ -1773,9 +1825,12 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
     const mandatory = (spec.tests || []).filter(t => t.mandatory !== false);
     if (!mandatory.length) return res.status(400).json({ error: 'Approved product quality specification has no mandatory test requirements' });
     const results = batch.qcTests || [];
-    if (results.some(test => String(test.status || '').toLowerCase() === 'fail')) return res.status(400).json({ error: 'A failed finished-product QC test prevents market release; investigate the deviation and document disposition' });
+    const latestResultsByCode = new Map();
+    for (const test of results) latestResultsByCode.set(String(test.code || '').trim().toLowerCase(), test);
+    const latestResults = Array.from(latestResultsByCode.values());
+    if (latestResults.some(test => String(test.status || '').toLowerCase() === 'fail')) return res.status(400).json({ error: 'A failed latest finished-product QC test prevents market release; investigate and close its linked Deviation/CAPA before retesting' });
     const missing = mandatory.filter(t => {
-      const result = results.find(x => String(x.code) === String(t.code));
+      const result = latestResultsByCode.get(String(t.code || '').trim().toLowerCase());
       return !result || String(result.status || '').toLowerCase() !== 'pass' ||
         !result.testedBy || !result.testedByName || !result.testedAt ||
         ((result.result === undefined || result.result === null || String(result.result).trim() === '') &&
@@ -2365,7 +2420,7 @@ router.get('/:id/coa', authorize('manufacturing:view'), async (req, res) => {
       };
     });
     const requiredCodes = new Set(requiredTests.map(test => String(test.code || '').trim().toLowerCase()));
-    const additionalResults = recordedTests
+    const additionalResults = Array.from(recordedByCode.values())
       .filter(test => !requiredCodes.has(String(test.code || '').trim().toLowerCase()))
       .map(test => ({
         code: test.code, parameter: test.name, category: test.category || '',

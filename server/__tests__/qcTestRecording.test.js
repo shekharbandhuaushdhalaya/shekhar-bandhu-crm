@@ -119,6 +119,57 @@ describe('Product-specific QC test recording and independent QA disposition', ()
     expect(generateAtomicDocumentNumber).toHaveBeenCalledWith('deviationNo_DEV', 'DEV-', 5, expect.any(Object));
   });
 
+  test('blocks retesting a failed QC parameter until its linked CAPA is closed', async () => {
+    const batch = makeBatch({
+      status: 'qc_hold',
+      qcStatus: 'rejected',
+      qcTests: [{
+        _id: 'qc-fail-1', code: 'IDENTITY', result: 'Nonconforming', status: 'fail',
+        attemptNo: 1, deviationCapaId: 'deviation-1'
+      }]
+    });
+    mockBatch(batch);
+    DeviationCapa.findById.mockReturnValue({
+      session: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue({ _id: 'deviation-1', status: 'open' })
+    });
+    const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
+      .send({ qcSpecificationId: specId, tests: [{ code: 'IDENTITY', result: 'Conforms', status: 'pass' }] });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('QC_RETEST_CAPA_OPEN');
+    expect(batch.qcTests).toHaveLength(1);
+  });
+
+  test('records a new QC retest attempt after CAPA closure without deleting the failed history', async () => {
+    const batch = makeBatch({
+      status: 'qc_hold',
+      qcStatus: 'rejected',
+      qcTests: [
+        {
+          _id: 'qc-fail-1', code: 'IDENTITY', result: 'Nonconforming', status: 'fail',
+          attemptNo: 1, deviationCapaId: 'deviation-1'
+        },
+        { _id: 'qc-pass-2', code: 'MOISTURE', numericResult: 4.2, status: 'pass', attemptNo: 1 }
+      ]
+    });
+    mockBatch(batch);
+    DeviationCapa.findById.mockReturnValue({
+      session: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue({ _id: 'deviation-1', status: 'closed' })
+    });
+    const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
+      .send({ qcSpecificationId: specId, tests: [{ code: 'IDENTITY', result: 'Conforms after CAPA', status: 'pass' }] });
+    expect(res.status).toBe(200);
+    expect(batch.status).toBe('completed');
+    expect(batch.qcStatus).toBe('pending_qa_review');
+    expect(batch.qcTests).toHaveLength(3);
+    expect(batch.qcTests[2].attemptNo).toBe(2);
+    expect(batch.qcTests[2].retestOf).toBe('qc-fail-1');
+    expect(batch.qcTests[0].status).toBe('fail');
+    expect(batch.qcTests[2].status).toBe('pass');
+    expect(DeviationCapa.create).not.toHaveBeenCalled();
+  });
+
   test('rejects a QC result submission when the batch changes after the analyst read it', async () => {
     const batch = makeBatch();
     mockBatch(batch);
@@ -166,7 +217,8 @@ describe('Product-specific QC test recording and independent QA disposition', ()
   test('requires an independent QA reviewer to approve the completed analyst disposition', async () => {
     const batch = makeBatch({ qcStatus: 'pending_qa_review', qcSpecificationId: specId, qcSpecificationVersion: '2.1',
       qcPassedByUser: 'qc-analyst-1', qcTests: [
-        { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
+        { _id: 'qc-fail-1', code: 'IDENTITY', result: 'Nonconforming', status: 'fail', attemptNo: 1, deviationCapaId: 'deviation-1' },
+        { _id: 'qc-retest-1', code: 'IDENTITY', result: 'Conforms after CAPA', status: 'pass', attemptNo: 2, retestOf: 'qc-fail-1' },
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
     mockBatch(batch);

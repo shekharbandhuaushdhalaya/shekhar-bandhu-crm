@@ -193,7 +193,9 @@ const batchProductionSchema = new mongoose.Schema({
     specification: String, unit: String, methodReference: String, result: String, numericResult: Number,
     status: { type: String, enum: ['not_tested','pending','pass','fail'], default: 'not_tested' },
     testedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, testedByName: String, testedAt: Date, remarks: String,
-    deviationCapaId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeviationCapa', default: null }
+    deviationCapaId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeviationCapa', default: null },
+    attemptNo: { type: Number, default: 1, min: 1 },
+    retestOf: { type: mongoose.Schema.Types.ObjectId, default: null }
   }],
   qcParameters: {
     organoleptic: { type: String, default: '' },
