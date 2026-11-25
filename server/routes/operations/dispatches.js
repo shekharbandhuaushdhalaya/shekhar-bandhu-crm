@@ -124,12 +124,22 @@ router.patch('/:id', authorize('dispatch:edit'), validate(schemas.dispatchSchema
       if (['damaged', 'shortage', 'refused'].includes(pod.condition) && !String(pod.notes || '').trim()) return res.status(400).json({ error: 'Delivery exception notes are required', code: 'POD_EXCEPTION_NOTES_REQUIRED' });
     }
     if (dispatch.status === 'delivered' && req.body.proofOfDelivery) return res.status(409).json({ error: 'Proof of delivery is immutable after delivery is recorded', code: 'POD_IMMUTABLE' });
-    Object.assign(dispatch, logisticsFields(req.body));
-    if (requestedStatus === 'delivered' && !dispatch.deliveredAt) dispatch.deliveredAt = pod.receivedAt || new Date();
-    await dispatch.save();
-    await recomputeOrderLogisticsFromChallan(dispatch.challanId);
-    if (req.io) req.io.emit('dispatch_updated', { type: 'updated', id: dispatch._id });
-    res.json(dispatch);
+    const update = logisticsFields(req.body);
+    if (requestedStatus === 'delivered' && !dispatch.deliveredAt) update.deliveredAt = pod.receivedAt || new Date();
+    const filter = { _id: dispatch._id, status: dispatch.status };
+    if (dispatch.updatedAt) filter.updatedAt = dispatch.updatedAt;
+    const updated = await Dispatch.findOneAndUpdate(
+      filter,
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(409).json({
+      error: 'Dispatch changed while this update was being prepared; reload the current shipment before retrying',
+      code: 'DISPATCH_UPDATE_CONFLICT'
+    });
+    await recomputeOrderLogisticsFromChallan(updated.challanId);
+    if (req.io) req.io.emit('dispatch_updated', { type: 'updated', id: updated._id });
+    res.json(updated);
   } catch (error) { res.status(400).json({ error: error.message, code: error.code || 'DISPATCH_UPDATE_FAILED' }); }
 });
 

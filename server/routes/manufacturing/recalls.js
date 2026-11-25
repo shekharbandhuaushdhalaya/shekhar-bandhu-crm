@@ -196,7 +196,9 @@ router.get('/:id/audit-report', authorize('manufacturing:view'), async (req, res
         recalledQty: recalled,
         unrecoveredQty: Math.max(0, totalAffected - recalled),
         reconciliationPercentage: reconciliationPct,
-        reconciliationStatus: totalAffected > 0 ? 'distribution_quantity_reconciled' : 'no_distributed_quantity_identified',
+        reconciliationStatus: totalAffected <= 0 ? 'no_distributed_quantity_identified' :
+          recalled > totalAffected ? 'over_recovered' :
+            recalled === totalAffected ? 'fully_recovered' : 'partially_recovered',
         totalCustomersNotified: `${notifiedCount} of ${(recall.affectedCustomers || []).length}`
       },
       affectedDistributionList: recall.affectedCustomers || []

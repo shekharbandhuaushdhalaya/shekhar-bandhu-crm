@@ -194,6 +194,12 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - Sales FEFO allocation now orders dated expiries ahead of lots with unknown expiry dates, retains exact inventory-entry references on Challans and Dispatches, and keeps stock posting transactional and idempotent.
 - The above foundations are not a blanket completion claim for the functional IDs. Remaining phases require end-to-end UAT and evidence-based closure.
 
+- Purchase-order approval now rechecks current material-specific supplier qualification inside a transaction and uses a conditional state/version update so concurrent approvers cannot both approve a stale draft.
+- Purchase-requisition approval and rejection now use conditional single-winner state transitions; stale concurrent reviewers receive a conflict rather than overwriting a completed decision.
+- Recall reports are explicitly internal records, never labelled as official statutory submissions; firm, manufacturing-licence and GMP identifiers are included only when actually configured, and zero traced distribution is not reported as 100% recovery.
+- Recall customer notification now captures the affected invoice, notification channel, evidence reference, authenticated recorder and timestamp. Recall completion/closure requires every affected invoice to have notification evidence, full quantity reconciliation and substantive closure notes; over-recovery and invalid status transitions are blocked.
+- Dispatch status and proof-of-delivery updates now use optimistic conditional writes against the previously read status/version, preventing concurrent logistics updates from silently overwriting one another.
+
 ### Next verification batch
 - Execute web/mobile UAT for incoming material specification authoring/approval, quarantine registration, incoming inspection and independent disposition, plus finished-product QC, CAPA retest, QA approval and market release. Verify role permissions, evidence capture and blocked paths against licensed product specifications.
 - Add failure-injection coverage for production-house warehouse creation; receipt/Challan rollback and idempotent service retry are now covered by MongoDB replica-set integration tests.

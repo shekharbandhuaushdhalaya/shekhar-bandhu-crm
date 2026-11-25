@@ -233,7 +233,7 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
       expect(mockSave).toHaveBeenCalled();
     });
 
-    test('GET /api/recalls/:id/audit-report generates official AYUSH Drug Inspector audit report JSON', async () => {
+    test('GET /api/recalls/:id/audit-report generates an internal traceability report without claiming statutory status', async () => {
       Recall.findById.mockReturnValue({
         lean: jest.fn().mockResolvedValue({
           _id: 'recall_1',
@@ -268,6 +268,7 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
       expect(res.body.firmDetails.gmpCertNo).toBeUndefined();
       expect(res.body.reconciliationMetrics.reconciliationPercentage).toBe(95);
       expect(res.body.reconciliationMetrics.unrecoveredQty).toBe(50);
+      expect(res.body.reconciliationMetrics.reconciliationStatus).toBe('partially_recovered');
     });
 
 
