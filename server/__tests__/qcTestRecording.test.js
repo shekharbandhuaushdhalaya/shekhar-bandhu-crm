@@ -20,7 +20,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
   const specId = 'spec-qc-1';
   const makeBatch = (overrides = {}) => ({
     _id: 'batch-qc-1', productId, status: 'completed',
-    qcSpecificationId: null, qcTests: [], qcStatus: 'pending',
+    qcSpecificationId: null, qcTests: [], qcStatus: 'pending', updatedAt: new Date(),
     save: jest.fn().mockResolvedValue(true), ...overrides
   });
   const spec = {
@@ -34,7 +34,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
     ]
   };
   const mockBatch = batch => {
-    mockBatch(batch);
+    BatchProduction.findById.mockResolvedValue(batch);
     BatchProduction.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(batch) });
   };
   const mockSpec = value => ProductQualitySpecification.findById.mockReturnValue({
@@ -59,7 +59,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
 
   test('records only actual values and derives pending status until every mandatory test passes', async () => {
     const batch = makeBatch();
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
       .send({ qcSpecificationId: specId, tests: [{ code: 'IDENTITY', result: 'Conforms', status: 'pass' }] });
     expect(res.status).toBe(200);
@@ -77,7 +77,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
 
   test('approves QC disposition only when all mandatory tests are recorded as passed', async () => {
     const batch = makeBatch();
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
       .send({ qcSpecificationId: specId, tests: [
         { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
@@ -91,7 +91,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
 
   test('puts a batch on QC hold when any recorded test fails', async () => {
     const batch = makeBatch();
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
       .send({ qcSpecificationId: specId, tests: [{ code: 'IDENTITY', result: 'Does not conform', status: 'fail' }] });
     expect(res.status).toBe(200);
@@ -113,7 +113,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
 
   test('rejects unapproved, wrong-product or ineffective specifications', async () => {
     const batch = makeBatch();
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     mockSpec({ ...spec, status: 'draft' });
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
       .send({ qcSpecificationId: specId, tests: [{ code: 'IDENTITY', result: 'Conforms', status: 'pass' }] });
@@ -123,7 +123,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
 
   test('rejects test codes outside the approved specification and duplicate result overwrites', async () => {
     const batch = makeBatch();
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
       .send({ qcSpecificationId: specId, tests: [{ code: 'MADE_UP', result: 'PASS', status: 'pass' }] });
     expect(res.status).toBe(400);
@@ -137,7 +137,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
 
   test('requires an actual result value even when a pass status is supplied', async () => {
     const batch = makeBatch();
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-tests')
       .send({ qcSpecificationId: specId, tests: [{ code: 'IDENTITY', status: 'pass' }] });
     expect(res.status).toBe(400);
@@ -150,7 +150,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
         { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     const self = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval').send({ notes: 'Reviewed results' });
     expect(self.status).toBe(409);
     expect(batch.save).not.toHaveBeenCalled();
@@ -162,7 +162,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
         { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     mockSpec({ ...spec, productId: 'different-product' });
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval')
       .set('x-user-id', 'qa-reviewer-2').set('x-user-name', 'QA Reviewer').send({ notes: 'Reviewed' });
@@ -176,11 +176,32 @@ describe('Product-specific QC test recording and independent QA disposition', ()
         { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     mockSpec({ ...spec, effectiveDate: new Date(Date.now() + 86400000) });
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval')
       .set('x-user-id', 'qa-reviewer-2').set('x-user-name', 'QA Reviewer').send({ notes: 'Reviewed' });
     expect(res.status).toBe(409);
+    expect(batch.save).not.toHaveBeenCalled();
+  });
+
+  test('rejects QA approval when the batch changes after the reviewer read it', async () => {
+    const batch = makeBatch({
+      qcStatus: 'pending_qa_review',
+      qcSpecificationId: specId,
+      qcSpecificationVersion: '2.1',
+      qcPassedByUser: 'qc-analyst-1',
+      qcTests: [
+        { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
+        { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
+      ]
+    });
+    mockBatch(batch);
+    BatchProduction.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(null) });
+    const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval')
+      .set('x-user-id', 'qa-reviewer-2').set('x-user-name', 'QA Reviewer')
+      .send({ notes: 'Reviewed latest QC evidence' });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('QC_APPROVAL_CONFLICT');
     expect(batch.save).not.toHaveBeenCalled();
   });
 
@@ -190,7 +211,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
         { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
       ] });
-    BatchProduction.findById.mockResolvedValue(batch);
+    mockBatch(batch);
     ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(spec) });
     const res = await request(app).patch('/api/batch-productions/batch-qc-1/qc-approval')
       .set('x-user-id', 'qa-reviewer-2').set('x-user-name', 'QA Reviewer')
