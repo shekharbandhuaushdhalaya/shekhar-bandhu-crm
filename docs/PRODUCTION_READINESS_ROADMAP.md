@@ -164,6 +164,7 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - Purchase requisition, quotation, PO/GRN, inventory ledger, stocktake, dispatch, batch genealogy, QC specification/quarantine, deviation/CAPA, stability, retention-sample and recall foundations exist in the repository.
 - Supplier-return backend lifecycle exists (request, independent approval/rejection, dispatch, resolution). This delivery completes the corresponding GRN-screen actions and adds visible evidence for each state.
 - Incoming QC inspection now pins the approved material specification/version and requires every mandatory test; its regression fixture correction is included in this delivery.
+- Incoming QC inspection result sets are now immutable after first recording and use an atomic timestamp-checked update, preventing concurrent analysts from replacing batch-linked test evidence.
 - Manufacturing line-clearance now has separate submit and independent verify steps; production cannot self-clear a line, and verified records cannot be overwritten.
 - BMR presentation removes default licence identifiers, shelf-life values, generic QC limits and placeholder signatories; recorded test results are shown with their actual statuses, and missing data is not presented as a pass.
 - Filling and packing stage starts now require their own complete, independently verified line-clearance records; BMR completeness also reports missing clearances for each production phase.

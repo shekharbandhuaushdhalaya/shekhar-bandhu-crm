@@ -144,6 +144,12 @@ router.patch('/:id/inspection', authorize('quality:approve'), async (req, res) =
     const lot = await RawMaterialQuarantine.findById(req.params.id);
     if (!lot) return res.status(404).json({ error: 'Quarantine lot not found' });
     if (lot.quarantineStatus !== 'under_testing') return res.status(409).json({ error: 'Inspection results can only be recorded while the lot is under testing' });
+    if (lot.inspectionRecordedAt || (Array.isArray(lot.inspectionResults) && lot.inspectionResults.length)) {
+      return res.status(409).json({
+        error: 'Incoming inspection results are already recorded and cannot be overwritten; use the controlled QC correction/deviation workflow',
+        code: 'INCOMING_QC_RESULTS_IMMUTABLE'
+      });
+    }
     const specificationTests = Array.isArray(lot.qcSpecificationTests) ? lot.qcSpecificationTests : [];
     if (!lot.qcSpecificationId || !lot.qcSpecificationVersion || !specificationTests.length) {
       return res.status(409).json({ error: 'Quarantine lot has no pinned approved incoming QC specification; re-register it against an approved specification' });
@@ -163,18 +169,31 @@ router.patch('/:id/inspection', authorize('quality:approve'), async (req, res) =
     const submittedCodes = new Set(inspectionResults.map(result => String(result.testCode).trim().toUpperCase()));
     const missingMandatory = mandatoryCodes.filter(code => !submittedCodes.has(code));
     if (missingMandatory.length) return res.status(400).json({ error: 'All mandatory specification tests must be recorded: ' + missingMandatory.join(', ') });
-    lot.inspectionResults = inspectionResults.map(result => ({
+    const recordedAt = new Date();
+    const recordedResults = inspectionResults.map(result => ({
       testCode: String(result.testCode).trim().toUpperCase(), testName: String(result.testName).trim(),
       methodReference: String(result.methodReference).trim(), specification: String(result.specification).trim(),
       result: String(result.result).trim(), unit: String(result.unit || '').trim(), outcome: result.outcome,
       evidenceRef: String(result.evidenceRef || '').trim()
     }));
-    lot.inspectionRecordedByUserId = actorId;
-    lot.inspectionRecordedByName = actorName;
-    lot.inspectionRecordedAt = new Date();
-    await lot.save();
-    await logAction({ action: 'RAW_MATERIAL_INCOMING_INSPECTION_RECORDED', description: 'Recorded incoming inspection results for ' + lot.quarantineLotNo, details: { quarantineLotId: lot._id, rawMaterialEntryId: lot.rawMaterialEntryId, testCodes: [...seen] }, req });
-    res.json(lot);
+    const filter = { _id: lot._id, quarantineStatus: 'under_testing', inspectionRecordedAt: null };
+    // Timestamps are always present on persisted quarantine records. Including the
+    // observed version prevents a competing analyst from overwriting a newer edit.
+    if (lot.updatedAt) filter.updatedAt = lot.updatedAt;
+    const recordedLot = await RawMaterialQuarantine.findOneAndUpdate(filter, {
+      $set: {
+        inspectionResults: recordedResults,
+        inspectionRecordedByUserId: actorId,
+        inspectionRecordedByName: actorName,
+        inspectionRecordedAt: recordedAt
+      }
+    }, { new: true, runValidators: true });
+    if (!recordedLot) return res.status(409).json({
+      error: 'Quarantine lot changed or inspection results were recorded by another analyst; reload the lot before retrying',
+      code: 'INCOMING_QC_CONCURRENT_UPDATE'
+    });
+    await logAction({ action: 'RAW_MATERIAL_INCOMING_INSPECTION_RECORDED', description: 'Recorded incoming inspection results for ' + recordedLot.quarantineLotNo, details: { quarantineLotId: recordedLot._id, rawMaterialEntryId: recordedLot.rawMaterialEntryId, testCodes: [...seen] }, req });
+    res.json(recordedLot);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

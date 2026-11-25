@@ -65,6 +65,102 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
     GoodsReceivedNote.findOne = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue({ grnNo: 'GRN-00001', status: 'verified' }) });
   });
 
+  describe('Immutable incoming QC inspection recording', () => {
+    const validResult = {
+      testCode: 'IDENTITY',
+      testName: 'Identity',
+      methodReference: 'API method',
+      specification: 'Conforms',
+      result: 'Conforms to reference standard',
+      unit: '',
+      outcome: 'pass',
+      evidenceRef: 'LAB-RAW-001'
+    };
+
+    test('records specification-matched results once with analyst identity and timestamp', async () => {
+      const lot = {
+        _id: 'quarantine-inspection-1',
+        quarantineLotNo: 'QRM-INSPECT-001',
+        rawMaterialEntryId: 'entry-inspection-1',
+        quarantineStatus: 'under_testing',
+        qcSpecificationId: 'spec-1',
+        qcSpecificationVersion: '1.0',
+        qcSpecificationTests: [{
+          code: 'IDENTITY', name: 'Identity', methodReference: 'API method',
+          specification: 'Conforms', unit: '', mandatory: true
+        }],
+        inspectionResults: [],
+        inspectionRecordedAt: null,
+        updatedAt: new Date('2026-11-25T10:00:00.000Z')
+      };
+      const saved = { ...lot, inspectionResults: [validResult], inspectionRecordedByUserId: '507f1f77bcf86cd799439011', inspectionRecordedByName: 'QC Manager', inspectionRecordedAt: new Date() };
+      RawMaterialQuarantine.findById.mockResolvedValue(lot);
+      RawMaterialQuarantine.findOneAndUpdate.mockResolvedValue(saved);
+
+      const res = await request(app)
+        .patch('/api/manufacturing/quarantine/quarantine-inspection-1/inspection')
+        .send({ inspectionResults: [validResult] });
+
+      expect(res.status).toBe(200);
+      expect(RawMaterialQuarantine.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          _id: lot._id,
+          quarantineStatus: 'under_testing',
+          inspectionRecordedAt: null,
+          updatedAt: lot.updatedAt
+        }),
+        { $set: expect.objectContaining({
+          inspectionResults: [expect.objectContaining({ testCode: 'IDENTITY', result: 'Conforms to reference standard', evidenceRef: 'LAB-RAW-001' })],
+          inspectionRecordedByUserId: '507f1f77bcf86cd799439011',
+          inspectionRecordedByName: 'QC Manager',
+          inspectionRecordedAt: expect.any(Date)
+        }) },
+        { new: true, runValidators: true }
+      );
+    });
+
+    test('does not permit overwriting previously recorded incoming QC results', async () => {
+      RawMaterialQuarantine.findById.mockResolvedValue({
+        _id: 'quarantine-inspection-2',
+        quarantineStatus: 'under_testing',
+        qcSpecificationId: 'spec-1',
+        qcSpecificationVersion: '1.0',
+        qcSpecificationTests: [{ code: 'IDENTITY', name: 'Identity', methodReference: 'API method', specification: 'Conforms', unit: '', mandatory: true }],
+        inspectionResults: [validResult],
+        inspectionRecordedAt: new Date()
+      });
+
+      const res = await request(app)
+        .patch('/api/manufacturing/quarantine/quarantine-inspection-2/inspection')
+        .send({ inspectionResults: [validResult] });
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('INCOMING_QC_RESULTS_IMMUTABLE');
+      expect(RawMaterialQuarantine.findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
+    test('returns a conflict when another analyst records results after the initial read', async () => {
+      RawMaterialQuarantine.findById.mockResolvedValue({
+        _id: 'quarantine-inspection-3',
+        quarantineStatus: 'under_testing',
+        qcSpecificationId: 'spec-1',
+        qcSpecificationVersion: '1.0',
+        qcSpecificationTests: [{ code: 'IDENTITY', name: 'Identity', methodReference: 'API method', specification: 'Conforms', unit: '', mandatory: true }],
+        inspectionResults: [],
+        inspectionRecordedAt: null,
+        updatedAt: new Date('2026-11-25T10:00:00.000Z')
+      });
+      RawMaterialQuarantine.findOneAndUpdate.mockResolvedValue(null);
+
+      const res = await request(app)
+        .patch('/api/manufacturing/quarantine/quarantine-inspection-3/inspection')
+        .send({ inspectionResults: [validResult] });
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('INCOMING_QC_CONCURRENT_UPDATE');
+    });
+  });
+
   describe('Quarantine Release Updates Linked RawMaterialEntry qcStatus', () => {
     test('POST /api/manufacturing/quarantine logs quarantine lot and links matching RawMaterialEntry', async () => {
       RawMaterialEntry.findById.mockResolvedValue({
