@@ -8,7 +8,10 @@ let timer = null;
 let running = false;
 function registerJobHandler(type, handler) { handlers.set(type, handler); }
 async function enqueue(type, payload = {}, options = {}) {
-  return Job.create({ type, payload, firmId: options.firmId || null, runAt: options.runAt || new Date(), maxAttempts: options.maxAttempts || 5 });
+  if (!options.firmId) {
+    throw new Error('Tenant-scoped jobs require a firmId');
+  }
+  return Job.create({ type, payload, firmId: options.firmId, runAt: options.runAt || new Date(), maxAttempts: options.maxAttempts || 5 });
 }
 async function processOne() {
   const now = new Date();
@@ -18,6 +21,21 @@ async function processOne() {
     { sort: { runAt: 1, createdAt: 1 }, new: true }
   );
   if (!job) return false;
+
+  // Older or manually inserted jobs may predate the enqueue guard. Never run a
+  // tenant-scoped handler without a firm context, because tenant model filters
+  // intentionally fail open when no AsyncLocalStorage firm is present.
+  if (!job.firmId) {
+    await Job.updateOne({ _id: job._id }, {
+      $set: {
+        status: 'dead',
+        lastError: 'Tenant-scoped job is missing firmId',
+        lockedAt: null
+      }
+    });
+    return true;
+  }
+
   const handler = handlers.get(job.type);
   try {
     if (!handler) throw new Error(`No handler registered for job type: ${job.type}`);
@@ -36,4 +54,4 @@ function startWorker() {
   timer.unref?.();
 }
 function stopWorker() { if (timer) clearInterval(timer); timer = null; }
-module.exports = { enqueue, registerJobHandler, startWorker, stopWorker };
+module.exports = { enqueue, registerJobHandler, processOne, startWorker, stopWorker };
