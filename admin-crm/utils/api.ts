@@ -877,6 +877,10 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/purchase-requisitions${suffix}`);
     return res.json();
   }
+  async createPurchaseRequisition(data: { department: string; justification: string; requiredByDate?: string | null; items: Array<{ itemType: 'raw_material' | 'finished_product'; rawMaterialId?: string; productId?: string; name: string; qtyRequested: number; unit: string; estimatedUnitPrice?: number | null }> }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
   async submitPurchaseRequisition(id: string): Promise<any> {
     const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/submit`, { method: 'PATCH' });
     return res.json();

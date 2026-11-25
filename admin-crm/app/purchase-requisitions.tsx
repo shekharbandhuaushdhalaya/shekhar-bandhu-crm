@@ -36,6 +36,18 @@ export default function PurchaseRequisitionsScreen() {
   const [reviewBusy, setReviewBusy] = useState(false); const [quotes, setQuotes] = useState<any[]>([]);
   const [quotesBusy, setQuotesBusy] = useState(false); const [quoteNotes, setQuoteNotes] = useState('');
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const canCreate = permission.can('vendor:create');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createBusy, setCreateBusy] = useState(false);
+  const [department, setDepartment] = useState('');
+  const [justification, setJustification] = useState('');
+  const [itemId, setItemId] = useState('');
+  const [itemName, setItemName] = useState('');
+  const [itemUnit, setItemUnit] = useState('');
+  const [itemQty, setItemQty] = useState('');
+  const [itemType, setItemType] = useState<'raw_material' | 'finished_product'>('raw_material');
+  const [draftLines, setDraftLines] = useState<any[]>([]);
+  const [createError, setCreateError] = useState('');
 
   const load = useCallback(async (refresh = false) => {
     if (!canView) { setLoading(false); return; }
@@ -58,11 +70,28 @@ export default function PurchaseRequisitionsScreen() {
     catch (e: any) { setError(e?.message || 'Unable to load supplier quotations'); }
     finally { setQuotesBusy(false); }
   };
+  const openCreate = () => { setDepartment(''); setJustification(''); setItemId(''); setItemName(''); setItemUnit(''); setItemQty(''); setDraftLines([]); setCreateError(''); setCreateOpen(true); };
+  const addDraftLine = () => {
+    const qty = Number(itemQty);
+    if (!itemId.trim() || !itemName.trim() || !itemUnit.trim() || !Number.isFinite(qty) || qty <= 0) { setCreateError('Catalogue ID, item name, unit and a positive quantity are required.'); return; }
+    const duplicate = draftLines.some(line => String(line.rawMaterialId || line.productId) === itemId.trim());
+    if (duplicate) { setCreateError('This catalogue item is already on the requisition.'); return; }
+    setDraftLines([...draftLines, { itemType, rawMaterialId: itemType === 'raw_material' ? itemId.trim() : undefined, productId: itemType === 'finished_product' ? itemId.trim() : undefined, name: itemName.trim(), unit: itemUnit.trim(), qtyRequested: qty }]);
+    setItemId(''); setItemName(''); setItemUnit(''); setItemQty(''); setCreateError('');
+  };
+  const saveDraft = async () => {
+    if (!department.trim() || !justification.trim() || draftLines.length === 0) { setCreateError('Department, justification and at least one item are required.'); return; }
+    setCreateBusy(true); setCreateError('');
+    try { await api.createPurchaseRequisition({ department: department.trim(), justification: justification.trim(), items: draftLines }); setCreateOpen(false); await load(true); }
+    catch (e: any) { setCreateError(e?.message || 'Unable to save requisition draft'); }
+    finally { setCreateBusy(false); }
+  };
   const ownRequest = Boolean(user?.id && selected?.requestedByUserId && String(user.id) === String(selected.requestedByUserId));
   if (!canView && permission.permissions !== null) return <View style={styles.container}><PageHeader title="Purchase Requisitions" subtitle="You do not have permission to view requisitions." /></View>;
 
   return <View style={styles.container}>
     <PageHeader title="Purchase Requisitions" subtitle="Department requests, independent approval and supplier quotation review" />
+    {canCreate ? <Pressable onPress={openCreate} style={styles.primary}><Text style={styles.primaryText}>+ Create requisition</Text></Pressable> : null}
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
       {STATUSES.map(option => <Pressable key={option.value} onPress={() => setStatus(option.value)} style={[styles.chip, status === option.value && styles.chipActive]}><Text style={[styles.chipText, status === option.value && styles.chipTextActive]}>{option.label}</Text></Pressable>)}
     </ScrollView>
@@ -83,6 +112,26 @@ export default function PurchaseRequisitionsScreen() {
             </View>
           </Pressable>)}
       </ScrollView>}
+    <Modal visible={createOpen} animationType="slide" onRequestClose={() => setCreateOpen(false)}>
+      <View style={styles.modal}>
+        <View style={styles.modalHeader}><Text style={styles.modalTitle}>New purchase requisition</Text><Pressable onPress={() => setCreateOpen(false)}><Ionicons name="close" size={24} color={colors.text.primary} /></Pressable></View>
+        <ScrollView contentContainerStyle={styles.detail}>
+          <Text style={styles.section}>Department *</Text><TextInput value={department} onChangeText={setDepartment} placeholder="Department" placeholderTextColor={colors.text.muted} style={styles.input} />
+          <Text style={styles.section}>Business justification *</Text><TextInput value={justification} onChangeText={setJustification} multiline placeholder="Why are these items required?" placeholderTextColor={colors.text.muted} style={[styles.input, { minHeight: 84 }]} />
+          <Text style={styles.section}>Item type</Text><View style={styles.actions}><Pressable onPress={() => setItemType("raw_material")} style={styles.action}><Text style={styles.actionText}>Raw material</Text></Pressable><Pressable onPress={() => setItemType("finished_product")} style={styles.action}><Text style={styles.actionText}>Finished product</Text></Pressable></View>
+          <TextInput value={itemId} onChangeText={setItemId} placeholder="Catalogue record ID" placeholderTextColor={colors.text.muted} style={styles.input} />
+          <TextInput value={itemName} onChangeText={setItemName} placeholder="Catalogue item name" placeholderTextColor={colors.text.muted} style={styles.input} />
+          <TextInput value={itemUnit} onChangeText={setItemUnit} placeholder="Unit (kg, g, nos.)" placeholderTextColor={colors.text.muted} style={styles.input} />
+          <TextInput value={itemQty} onChangeText={setItemQty} keyboardType="decimal-pad" placeholder="Quantity required" placeholderTextColor={colors.text.muted} style={styles.input} />
+          <Pressable onPress={addDraftLine} style={styles.action}><Text style={styles.actionText}>Add line</Text></Pressable>
+          <Text style={styles.section}>Items ({draftLines.length})</Text>
+          {draftLines.map((line, index) => <View key={index} style={styles.line}><Text style={styles.body}>{line.name} · {line.qtyRequested} {line.unit}</Text><Pressable onPress={() => setDraftLines(draftLines.filter((_, i) => i !== index))}><Text style={styles.rejectText}>Remove</Text></Pressable></View>)}
+          {createError ? <Text style={styles.error}>{createError}</Text> : null}
+          <Pressable disabled={createBusy} onPress={saveDraft} style={styles.primary}>{createBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Save draft</Text>}</Pressable>
+          <Text style={styles.meta}>A saved requisition remains a draft. Only the requester can submit it; a different authorised reviewer must approve it.</Text>
+        </ScrollView>
+      </View>
+    </Modal>
     <Modal visible={Boolean(selected) && !quoteOpen && !rejectOpen} animationType="slide" onRequestClose={() => setSelected(null)}>
       <View style={styles.modal}><View style={styles.modalHeader}><Text style={styles.modalTitle}>{selected?.requisitionNo || 'Requisition'}</Text><Pressable onPress={() => setSelected(null)}><Ionicons name="close" size={24} color={colors.text.primary} /></Pressable></View>
         <ScrollView contentContainerStyle={styles.detail}><Text style={styles.section}>Department</Text><Text style={styles.body}>{selected?.department || '—'}</Text><Text style={styles.section}>Justification</Text><Text style={styles.body}>{selected?.justification || '—'}</Text><Text style={styles.section}>Requested items</Text>
