@@ -163,5 +163,6 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 
 - Purchase requisition, quotation, PO/GRN, inventory ledger, stocktake, dispatch, batch genealogy, QC specification/quarantine, deviation/CAPA, stability, retention-sample and recall foundations exist in the repository.
 - Supplier-return backend lifecycle exists (request, independent approval/rejection, dispatch, resolution). This delivery completes the corresponding GRN-screen actions and adds visible evidence for each state.
-- Incoming QC rejection now requires recorded failed inspection evidence and independent disposition; the regression tests are in the prior validated checkpoint.
+- Incoming QC inspection now pins the approved material specification/version and requires every mandatory test; its regression fixture correction is included in this delivery.
+- Manufacturing line-clearance now has separate submit and independent verify steps; production cannot self-clear a line, and verified records cannot be overwritten.
 - The above foundations are not a blanket completion claim for the functional IDs. Remaining phases require end-to-end UAT and evidence-based closure.
