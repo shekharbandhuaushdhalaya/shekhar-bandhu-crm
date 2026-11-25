@@ -88,7 +88,7 @@ function GstReturnsPage() {
               <Text style={[styles.tabBtnText, view === 'gstr1' && { color: '#fff', fontWeight: '700' }]}>GSTR-1 (Sales)</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tabBtn, view === 'gstr3b' && { backgroundColor: colors.primary }]} onPress={() => setView('gstr3b')}>
-              <Text style={[styles.tabBtnText, view === 'gstr3b' && { color: '#fff', fontWeight: '700' }]}>GSTR-3B (Summary & ITC)</Text>
+              <Text style={[styles.tabBtnText, view === 'gstr3b' && { color: '#fff', fontWeight: '700' }]}>GSTR-3B (Summary)</Text>
             </TouchableOpacity>
           </View>
 
@@ -433,19 +433,24 @@ function Gstr3bView({ data, colors, styles }: { data: any; colors: any; styles: 
         <InfoRow label="Net IGST Liability" value={`₹${(outward.igst || 0).toLocaleString('en-IN')}`} />
         <InfoRow label="Total Net Output Tax Liability" value={`₹${(outward.totalTax || 0).toLocaleString('en-IN')}`} isBold />
         <InfoRow label="Total Invoices Count" value={String(outward.invoiceCount || 0)} />
+        <InfoRow label="Sales / notes missing taxable base" value={String((outward.unquantifiedInvoiceBaseAmountCount || 0) + (outward.unquantifiedCreditDebitNoteBaseAmountCount || 0))} />
       </View>
 
       <View style={[styles.summaryCard, { backgroundColor: colors.bg.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg }]}>
-        <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>4. Eligible Input Tax Credit (ITC - Purchases)</Text>
+      <View style={{ padding: Spacing.md, marginBottom: Spacing.md, backgroundColor: colors.warning + '12', borderRadius: Radius.md, borderWidth: 1, borderColor: colors.warning }}>
+        <Text style={{ ...Typography.bodySm, color: colors.text.primary }}>Purchase GST shown here is recorded invoice tax only. It is not a determination of eligible ITC. Supplier filing status, invoice matching, blocked-credit rules and statutory conditions must be checked separately before any return is prepared or filed.</Text>
+      </View>
+        <Text style={{ ...Typography.h3, fontWeight: '800', color: colors.text.primary, marginBottom: 12 }}>4. Recorded Purchase GST (Eligibility Not Verified)</Text>
         <InfoRow label="Total Inward Taxable Value" value={`₹${(inward.taxableValue || 0).toLocaleString('en-IN')}`} />
-        <InfoRow label="ITC CGST" value={`₹${(inward.itcCGST || 0).toLocaleString('en-IN')}`} />
-        <InfoRow label="ITC SGST" value={`₹${(inward.itcSGST || 0).toLocaleString('en-IN')}`} />
-        <InfoRow label="ITC IGST" value={`₹${(inward.itcIGST || 0).toLocaleString('en-IN')}`} />
-        <InfoRow label="Total Claimable ITC" value={`₹${(inward.totalITC || 0).toLocaleString('en-IN')}`} isBold />
+        <InfoRow label="Recorded Purchase CGST" value={`₹${(inward.itcCGST || 0).toLocaleString('en-IN')}`} />
+        <InfoRow label="Recorded Purchase SGST" value={`₹${(inward.itcSGST || 0).toLocaleString('en-IN')}`} />
+        <InfoRow label="Recorded Purchase IGST" value={`₹${(inward.itcIGST || 0).toLocaleString('en-IN')}`} />
+        <InfoRow label="Total Recorded Purchase GST" value={`₹${(inward.totalITC || 0).toLocaleString('en-IN')}`} isBold />
+        <InfoRow label="Purchases / notes missing taxable base" value={String((inward.unquantifiedInvoiceBaseAmountCount || 0) + (inward.unquantifiedCreditDebitNoteBaseAmountCount || 0))} />
       </View>
 
       <View style={{ padding: Spacing.lg, backgroundColor: netPayable >= 0 ? colors.warning + '15' : colors.success + '15', borderRadius: Radius.lg, borderWidth: 1, borderColor: netPayable >= 0 ? colors.warning : colors.success }}>
-        <InfoRow label="Net Tax Payable (Outward Tax - Inward ITC)" value={`₹${netPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`} isBold />
+        <InfoRow label="Indicative Difference (Outward Tax - Recorded Purchase GST)" value={`₹${netPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`} isBold />
       </View>
     </View>
   );

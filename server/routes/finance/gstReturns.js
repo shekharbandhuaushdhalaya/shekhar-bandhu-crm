@@ -5,6 +5,46 @@ const { authorize } = require('../../middleware/authorize');
 
 const router = express.Router();
 
+function resolveGstPeriod(req, res) {
+  const current = new Date();
+  const monthValue = req.query.month;
+  const yearValue = req.query.year;
+  const monthText = monthValue === undefined ? String(current.getMonth() + 1) : String(monthValue);
+  const yearText = yearValue === undefined ? String(current.getFullYear()) : String(yearValue);
+  const month = /^\d{1,2}$/.test(monthText) ? Number(monthText) : NaN;
+  const year = /^\d{4}$/.test(yearText) ? Number(yearText) : NaN;
+
+  if (!Number.isInteger(month) || month < 1 || month > 12 ||
+      !Number.isInteger(year) || year < 2017 || year > 9999) {
+    res.status(400).json({
+      error: 'month must be 1–12 and year must be a four-digit year from 2017 onward',
+      code: 'GST_REPORT_PERIOD_INVALID'
+    });
+    return null;
+  }
+
+  return { month, year, start: new Date(year, month - 1, 1), end: new Date(year, month, 1) };
+}
+
+function sumRecordedBaseAmount(records) {
+  return records.reduce((result, record) => {
+    if (record.baseAmount === undefined || record.baseAmount === null ||
+        !Number.isFinite(Number(record.baseAmount)) || Number(record.baseAmount) < 0) {
+      result.unquantifiedCount += 1;
+      return result;
+    }
+    result.value += Number(record.baseAmount);
+    return result;
+  }, { value: 0, unquantifiedCount: 0 });
+}
+
+function recordedNoteBaseAmount(note) {
+  return note.baseAmount !== undefined && note.baseAmount !== null &&
+    Number.isFinite(Number(note.baseAmount)) && Number(note.baseAmount) >= 0
+    ? Number(note.baseAmount)
+    : 0;
+}
+
 function configuredFirmGstin(settings) {
   // `firmGstin` is the current SystemSettings field; accept the old alias
   // only for backward-compatible migrated settings, never a fabricated value.
@@ -14,12 +54,9 @@ function configuredFirmGstin(settings) {
 // GET /api/gst/gstr1 — GSTR-1 sales & Credit/Debit Notes summary (monthly)
 router.get('/gstr1', authorize('report:view'), async (req, res) => {
   try {
-    const { month, year } = req.query;
-    const m = month ? parseInt(month) : new Date().getMonth() + 1;
-    const y = year ? parseInt(year) : new Date().getFullYear();
-
-    const start = new Date(y, m - 1, 1);
-    const end = new Date(y, m, 1);
+    const period = resolveGstPeriod(req, res);
+    if (!period) return;
+    const { month: m, year: y, start, end } = period;
 
     const invoices = await Invoice.find({
       type: 'sale',
@@ -39,7 +76,8 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
     const b2c = invoices.filter(i => !i.gstin || !i.gstin.trim());
 
     // Calculate gross sales taxes
-    const grossBase = invoices.reduce((s, i) => s + (i.baseAmount || 0), 0);
+    const grossBaseResult = sumRecordedBaseAmount(invoices);
+    const grossBase = grossBaseResult.value;
     const grossCGST = invoices.reduce((s, i) => s + (i.cgst || 0), 0);
     const grossSGST = invoices.reduce((s, i) => s + (i.sgst || 0), 0);
     const grossIGST = invoices.reduce((s, i) => s + (i.igst || 0), 0);
@@ -48,12 +86,14 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
     const cnList = creditNotes.filter(n => n.type === 'credit_note');
     const dnList = creditNotes.filter(n => n.type === 'debit_note');
 
-    const cnBase = cnList.reduce((s, n) => s + (n.baseAmount || n.totalAmount || 0), 0);
+    const cnBaseResult = sumRecordedBaseAmount(cnList);
+    const cnBase = cnBaseResult.value;
     const cnCGST = cnList.reduce((s, n) => s + (n.cgst || 0), 0);
     const cnSGST = cnList.reduce((s, n) => s + (n.sgst || 0), 0);
     const cnIGST = cnList.reduce((s, n) => s + (n.igst || 0), 0);
 
-    const dnBase = dnList.reduce((s, n) => s + (n.baseAmount || n.totalAmount || 0), 0);
+    const dnBaseResult = sumRecordedBaseAmount(dnList);
+    const dnBase = dnBaseResult.value;
     const dnCGST = dnList.reduce((s, n) => s + (n.cgst || 0), 0);
     const dnSGST = dnList.reduce((s, n) => s + (n.sgst || 0), 0);
     const dnIGST = dnList.reduce((s, n) => s + (n.igst || 0), 0);
@@ -68,6 +108,7 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
       month: m,
       year: y,
       totalInvoices: invoices.length,
+      unquantifiedInvoiceBaseAmountCount: grossBaseResult.unquantifiedCount,
       totalTaxableValue: netBase,
       totalCGST: netCGST,
       totalSGST: netSGST,
@@ -78,6 +119,7 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
       table9B_CreditNotes: {
         count: cnList.length,
         baseAmount: cnBase,
+        unquantifiedBaseAmountCount: cnBaseResult.unquantifiedCount,
         cgst: cnCGST,
         sgst: cnSGST,
         igst: cnIGST,
@@ -88,7 +130,8 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
           partyName: n.partyName,
           invoiceNo: n.invoiceNo,
           reason: n.reason,
-          baseAmount: n.baseAmount || n.totalAmount || 0,
+          baseAmount: recordedNoteBaseAmount(n),
+          baseAmountMissing: n.baseAmount === undefined || n.baseAmount === null || !Number.isFinite(Number(n.baseAmount)),
           cgst: n.cgst || 0,
           sgst: n.sgst || 0,
           igst: n.igst || 0,
@@ -98,6 +141,7 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
       table9B_DebitNotes: {
         count: dnList.length,
         baseAmount: dnBase,
+        unquantifiedBaseAmountCount: dnBaseResult.unquantifiedCount,
         cgst: dnCGST,
         sgst: dnSGST,
         igst: dnIGST,
@@ -108,7 +152,8 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
           partyName: n.partyName,
           invoiceNo: n.invoiceNo,
           reason: n.reason,
-          baseAmount: n.baseAmount || n.totalAmount || 0,
+          baseAmount: recordedNoteBaseAmount(n),
+          baseAmountMissing: n.baseAmount === undefined || n.baseAmount === null || !Number.isFinite(Number(n.baseAmount)),
           cgst: n.cgst || 0,
           sgst: n.sgst || 0,
           igst: n.igst || 0,
@@ -121,6 +166,7 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
         customerName: i.customerName,
         gstin: i.gstin,
         taxableValue: i.baseAmount || 0,
+        taxableValueMissing: i.baseAmount === undefined || i.baseAmount === null || !Number.isFinite(Number(i.baseAmount)) || Number(i.baseAmount) < 0,
         cgst: i.cgst || 0,
         sgst: i.sgst || 0,
         igst: i.igst || 0,
@@ -163,12 +209,9 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
 // GET /api/gst/gstr3b — GSTR-3B summary (with Credit/Debit Note adjustments)
 router.get('/gstr3b', authorize('report:view'), async (req, res) => {
   try {
-    const { month, year } = req.query;
-    const m = month ? parseInt(month) : new Date().getMonth() + 1;
-    const y = year ? parseInt(year) : new Date().getFullYear();
-
-    const start = new Date(y, m - 1, 1);
-    const end = new Date(y, m, 1);
+    const period = resolveGstPeriod(req, res);
+    if (!period) return;
+    const { month: m, year: y, start, end } = period;
 
     const saleInvoices = await Invoice.find({
       type: 'sale',
@@ -195,7 +238,8 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
     }).lean();
 
     // Outward supplies (sales)
-    const grossSalesTaxable = saleInvoices.reduce((s, i) => s + (i.baseAmount || 0), 0);
+    const grossSalesBaseResult = sumRecordedBaseAmount(saleInvoices);
+    const grossSalesTaxable = grossSalesBaseResult.value;
     const grossSalesCGST = saleInvoices.reduce((s, i) => s + (i.cgst || 0), 0);
     const grossSalesSGST = saleInvoices.reduce((s, i) => s + (i.sgst || 0), 0);
     const grossSalesIGST = saleInvoices.reduce((s, i) => s + (i.igst || 0), 0);
@@ -204,12 +248,14 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
     const cnList = saleCreditNotes.filter(n => n.type === 'credit_note');
     const dnList = saleCreditNotes.filter(n => n.type === 'debit_note');
 
-    const cnBase = cnList.reduce((s, n) => s + (n.baseAmount || n.totalAmount || 0), 0);
+    const cnBaseResult = sumRecordedBaseAmount(cnList);
+    const cnBase = cnBaseResult.value;
     const cnCGST = cnList.reduce((s, n) => s + (n.cgst || 0), 0);
     const cnSGST = cnList.reduce((s, n) => s + (n.sgst || 0), 0);
     const cnIGST = cnList.reduce((s, n) => s + (n.igst || 0), 0);
 
-    const dnBase = dnList.reduce((s, n) => s + (n.baseAmount || n.totalAmount || 0), 0);
+    const dnBaseResult = sumRecordedBaseAmount(dnList);
+    const dnBase = dnBaseResult.value;
     const dnCGST = dnList.reduce((s, n) => s + (n.cgst || 0), 0);
     const dnSGST = dnList.reduce((s, n) => s + (n.sgst || 0), 0);
     const dnIGST = dnList.reduce((s, n) => s + (n.igst || 0), 0);
@@ -221,7 +267,8 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
     const outwardIGST = grossSalesIGST - cnIGST + dnIGST;
 
     // Inward supplies (purchases) for ITC
-    const grossInwardTaxable = purchaseInvoices.reduce((s, i) => s + (i.baseAmount || 0), 0);
+    const grossPurchaseBaseResult = sumRecordedBaseAmount(purchaseInvoices);
+    const grossInwardTaxable = grossPurchaseBaseResult.value;
     const grossInwardCGST = purchaseInvoices.reduce((s, i) => s + (i.cgst || 0), 0);
     const grossInwardSGST = purchaseInvoices.reduce((s, i) => s + (i.sgst || 0), 0);
     const grossInwardIGST = purchaseInvoices.reduce((s, i) => s + (i.igst || 0), 0);
@@ -229,12 +276,14 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
     const purchCNList = purchaseCreditNotes.filter(n => n.type === 'credit_note');
     const purchDNList = purchaseCreditNotes.filter(n => n.type === 'debit_note');
 
-    const purchCNBase = purchCNList.reduce((s, n) => s + (n.baseAmount || n.totalAmount || 0), 0);
+    const purchCNBaseResult = sumRecordedBaseAmount(purchCNList);
+    const purchCNBase = purchCNBaseResult.value;
     const purchCNCGST = purchCNList.reduce((s, n) => s + (n.cgst || 0), 0);
     const purchCNSGST = purchCNList.reduce((s, n) => s + (n.sgst || 0), 0);
     const purchCNIGST = purchCNList.reduce((s, n) => s + (n.igst || 0), 0);
 
-    const purchDNBase = purchDNList.reduce((s, n) => s + (n.baseAmount || n.totalAmount || 0), 0);
+    const purchDNBaseResult = sumRecordedBaseAmount(purchDNList);
+    const purchDNBase = purchDNBaseResult.value;
     const purchDNCGST = purchDNList.reduce((s, n) => s + (n.cgst || 0), 0);
     const purchDNSGST = purchDNList.reduce((s, n) => s + (n.sgst || 0), 0);
     const purchDNIGST = purchDNList.reduce((s, n) => s + (n.igst || 0), 0);
@@ -258,6 +307,8 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
         creditNoteDeduction: cnBase,
         debitNotesCount: dnList.length,
         debitNoteAddition: dnBase,
+        unquantifiedCreditDebitNoteBaseAmountCount: cnBaseResult.unquantifiedCount + dnBaseResult.unquantifiedCount,
+        unquantifiedInvoiceBaseAmountCount: grossSalesBaseResult.unquantifiedCount,
       },
       inwardSupplies: {
         taxableValue: inwardTaxable,
@@ -265,20 +316,31 @@ router.get('/gstr3b', authorize('report:view'), async (req, res) => {
         itcSGST: inwardSGST,
         itcIGST: inwardIGST,
         totalITC: inwardCGST + inwardSGST + inwardIGST,
+        totalRecordedPurchaseTax: inwardCGST + inwardSGST + inwardIGST,
+        itcEligibilityVerified: false,
         invoiceCount: purchaseInvoices.length,
+        unquantifiedCreditDebitNoteBaseAmountCount: purchCNBaseResult.unquantifiedCount + purchDNBaseResult.unquantifiedCount,
+        unquantifiedInvoiceBaseAmountCount: grossPurchaseBaseResult.unquantifiedCount,
       },
       netGSTPayable: (outwardCGST + outwardSGST + outwardIGST) - (inwardCGST + inwardSGST + inwardIGST),
+      indicativeTaxDifference: (outwardCGST + outwardSGST + outwardIGST) - (inwardCGST + inwardSGST + inwardIGST),
+      taxPayableVerified: false,
+      limitations: [
+        'This is a CRM preparation summary, not a filed return or portal-validated computation. The net tax difference is indicative only and is not a payment instruction.',
+        'Recorded purchase tax is not verified eligible input tax credit; supplier filing status, invoice matching, blocked-credit rules and other statutory conditions are not evaluated.',
+        'Credit/debit notes without a recorded taxable base are excluded from taxable-value adjustments and counted as unquantified.'
+      ],
     };
 
     if (req.query.format === 'csv') {
       let csv = 'GST Table Section,Taxable Value (₹),Integrated Tax IGST (₹),Central Tax CGST (₹),State Tax SGST (₹),Total GST (₹)\n';
       csv += `3.1 (a) Outward Taxable Supplies,${outwardTaxable.toFixed(2)},${outwardIGST.toFixed(2)},${outwardCGST.toFixed(2)},${outwardSGST.toFixed(2)},${(outwardIGST + outwardCGST + outwardSGST).toFixed(2)}\n`;
-      csv += `4 (A) Eligible ITC,${inwardTaxable.toFixed(2)},${inwardIGST.toFixed(2)},${inwardCGST.toFixed(2)},${inwardSGST.toFixed(2)},${(inwardIGST + inwardCGST + inwardSGST).toFixed(2)}\n`;
+      csv += `Recorded purchase GST (not eligibility-verified),${inwardTaxable.toFixed(2)},${inwardIGST.toFixed(2)},${inwardCGST.toFixed(2)},${inwardSGST.toFixed(2)},${(inwardIGST + inwardCGST + inwardSGST).toFixed(2)}\n`;
       
       const netIGST = outwardIGST - inwardIGST;
       const netCGST = outwardCGST - inwardCGST;
       const netSGST = outwardSGST - inwardSGST;
-      csv += `Net GST Payable/Refund,${(outwardTaxable - inwardTaxable).toFixed(2)},${netIGST.toFixed(2)},${netCGST.toFixed(2)},${netSGST.toFixed(2)},${(netIGST + netCGST + netSGST).toFixed(2)}\n`;
+      csv += `Indicative tax difference (before ITC eligibility review),${(outwardTaxable - inwardTaxable).toFixed(2)},${netIGST.toFixed(2)},${netCGST.toFixed(2)},${netSGST.toFixed(2)},${(netIGST + netCGST + netSGST).toFixed(2)}\n`;
       
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=GSTR3B_${y}_${m}.csv`);
@@ -352,15 +414,12 @@ router.post('/filing-status', authorize('invoice:finalize'), async (req, res) =>
   }
 });
 
-// GET /api/gst/gstr1/export-json — Produce official NIC portal compatible GSTR-1 JSON export
+// GET /api/gst/gstr1/export-json — Produce a B2B-only GSTR-1 JSON draft; it omits other return sections and is not filing-ready
 router.get('/gstr1/export-json', authorize('report:view'), async (req, res) => {
   try {
-    const { month, year } = req.query;
-    const m = month ? parseInt(month) : new Date().getMonth() + 1;
-    const y = year ? parseInt(year) : new Date().getFullYear();
-
-    const start = new Date(y, m - 1, 1);
-    const end = new Date(y, m, 1);
+    const period = resolveGstPeriod(req, res);
+    if (!period) return;
+    const { month: m, year: y, start, end } = period;
 
     const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
@@ -426,15 +485,12 @@ router.get('/gstr1/export-json', authorize('report:view'), async (req, res) => {
   }
 });
 
-// GET /api/gst/gstr3b/export-json — Produce official NIC portal compatible GSTR-3B JSON export
+// GET /api/gst/gstr3b/export-json — Produce a calculation draft only; purchase GST is not eligibility-verified ITC and is not filing-ready
 router.get('/gstr3b/export-json', authorize('report:view'), async (req, res) => {
   try {
-    const { month, year } = req.query;
-    const m = month ? parseInt(month) : new Date().getMonth() + 1;
-    const y = year ? parseInt(year) : new Date().getFullYear();
-
-    const start = new Date(y, m - 1, 1);
-    const end = new Date(y, m, 1);
+    const period = resolveGstPeriod(req, res);
+    if (!period) return;
+    const { month: m, year: y, start, end } = period;
 
     const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
