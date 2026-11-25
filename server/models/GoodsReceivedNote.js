@@ -38,6 +38,7 @@ const goodsReceivedNoteSchema = new mongoose.Schema({
   items: [grnItemSchema],
   status: { type: String, enum: ['draft', 'pending_verification', 'verified', 'rejected'], default: 'pending_verification' },
   receivedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  receivedByName: { type: String, default: '', trim: true },
   verifiedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   verifiedByName: { type: String, default: '', trim: true },
   verifiedAt: { type: Date, default: null },

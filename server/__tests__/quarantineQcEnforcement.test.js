@@ -122,6 +122,8 @@ describe('Task 2: Quarantine / QC Enforcement for Production & MRP', () => {
         batchNo: 'BATCH-2026-001',
         qty: 50,
         quarantineStatus: 'under_testing',
+        inspectionResults: [{ testCode: 'IDENTITY', outcome: 'pass', result: 'Conforms' }],
+        inspectionRecordedByUserId: 'qc-analyst-1',
         save: jest.fn().mockResolvedValue(true)
       };
 

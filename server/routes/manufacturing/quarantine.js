@@ -111,6 +111,46 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
   }
 });
 
+// PATCH /api/manufacturing/quarantine/:id/inspection — record actual incoming QC observations.
+router.patch('/:id/inspection', authorize('quality:approve'), async (req, res) => {
+  try {
+    const { inspectionResults } = req.body;
+    const actorId = req.user && (req.user.id || req.user._id);
+    const actorName = req.user && (req.user.name || req.user.email);
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated QC analyst identity is required' });
+    if (!Array.isArray(inspectionResults) || inspectionResults.length === 0) {
+      return res.status(400).json({ error: 'At least one actual incoming inspection result is required' });
+    }
+    const seen = new Set();
+    for (const result of inspectionResults) {
+      if (!result || !String(result.testCode || '').trim() || !String(result.testName || '').trim() ||
+          !String(result.methodReference || '').trim() || !String(result.specification || '').trim() ||
+          !String(result.result || '').trim() || !['pass', 'fail'].includes(result.outcome) ||
+          (result.evidenceRef !== undefined && String(result.evidenceRef).length > 500)) {
+        return res.status(400).json({ error: 'Each inspection result requires test code, name, method, specification, actual result and pass/fail outcome' });
+      }
+      const code = String(result.testCode).trim().toUpperCase();
+      if (seen.has(code)) return res.status(400).json({ error: 'Duplicate incoming inspection test code: ' + code });
+      seen.add(code);
+    }
+    const lot = await RawMaterialQuarantine.findById(req.params.id);
+    if (!lot) return res.status(404).json({ error: 'Quarantine lot not found' });
+    if (lot.quarantineStatus !== 'under_testing') return res.status(409).json({ error: 'Inspection results can only be recorded while the lot is under testing' });
+    lot.inspectionResults = inspectionResults.map(result => ({
+      testCode: String(result.testCode).trim().toUpperCase(), testName: String(result.testName).trim(),
+      methodReference: String(result.methodReference).trim(), specification: String(result.specification).trim(),
+      result: String(result.result).trim(), unit: String(result.unit || '').trim(), outcome: result.outcome,
+      evidenceRef: String(result.evidenceRef || '').trim()
+    }));
+    lot.inspectionRecordedByUserId = actorId;
+    lot.inspectionRecordedByName = actorName;
+    lot.inspectionRecordedAt = new Date();
+    await lot.save();
+    await logAction({ action: 'RAW_MATERIAL_INCOMING_INSPECTION_RECORDED', description: 'Recorded incoming inspection results for ' + lot.quarantineLotNo, details: { quarantineLotId: lot._id, rawMaterialEntryId: lot.rawMaterialEntryId, testCodes: [...seen] }, req });
+    res.json(lot);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // PATCH /api/manufacturing/quarantine/:id/release — evidence-backed QC disposition.
 router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
   try {
@@ -156,6 +196,17 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
         throw error;
       }
       if (quarantineStatus === 'released') {
+        if (!Array.isArray(currentLot.inspectionResults) || currentLot.inspectionResults.length === 0 ||
+            currentLot.inspectionResults.some(result => result.outcome !== 'pass')) {
+          const error = new Error('Incoming QC release requires recorded actual inspection results and every recorded test must pass');
+          error.code = 'QUARANTINE_INSPECTION_INCOMPLETE';
+          throw error;
+        }
+        if (!currentLot.inspectionRecordedByUserId || String(currentLot.inspectionRecordedByUserId) === String(req.user?.id || req.user?._id)) {
+          const error = new Error('Incoming QC analyst cannot independently approve their own inspection results');
+          error.code = 'QUARANTINE_INSPECTION_MAKER_CHECKER_REQUIRED';
+          throw error;
+        }
         const grnRefs = Array.isArray(entry.grnReferences) ? entry.grnReferences : [];
         const legacyGrnNo = !grnRefs.length && /^GRN-/i.test(String(entry.purchaseRef || '')) ? String(entry.purchaseRef) : '';
         const requiredGrnNos = grnRefs.map(ref => ref.grnNo).filter(Boolean);
@@ -197,7 +248,7 @@ router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
     const status = err.code === 'QUARANTINE_NOT_FOUND' ? 404 :
       ['QUARANTINE_ALREADY_DISPOSED','QUARANTINE_STOCK_ALREADY_DISPOSED','QUARANTINE_STOCK_QUANTITY_CONFLICT'].includes(err.code) ? 409 :
       ['QUARANTINE_STOCK_LINK_REQUIRED','QUARANTINE_STOCK_LINK_INVALID'].includes(err.code) ? 422 :
-      err.code === 'QUARANTINE_GRN_VERIFICATION_REQUIRED' ? 409 : 500;
+      ['QUARANTINE_GRN_VERIFICATION_REQUIRED','QUARANTINE_INSPECTION_INCOMPLETE','QUARANTINE_INSPECTION_MAKER_CHECKER_REQUIRED'].includes(err.code) ? 409 : 500;
     res.status(status).json({ error: err.message });
   }
 });
