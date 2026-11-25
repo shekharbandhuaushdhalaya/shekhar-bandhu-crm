@@ -127,6 +127,8 @@ async function createSalesOrder(payload, options = {}) {
     adminNotes: `${options.notePrefix || ''}${payload.notes || ''}`.trim(),
     approvalRequired: priced.approvalRequired,
     approvalStatus,
+    createdByUserId: payload.createdByUserId || null,
+    createdByName: payload.createdByName || '',
     pricingSummary: priced.pricingSummary,
   });
 

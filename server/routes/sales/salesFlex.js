@@ -42,7 +42,12 @@ router.get('/dashboard', authorize('report:view'), async (req, res) => {
 
 router.post('/orders', idempotency, authorize('order:create'), async (req, res) => {
   try {
-    const result = await createSalesOrder({ ...req.body, orderChannel: req.body.orderChannel || 'crm' });
+    const result = await createSalesOrder({
+      ...req.body,
+      orderChannel: req.body.orderChannel || 'crm',
+      createdByUserId: req.user?.id || req.user?._id || null,
+      createdByName: req.user?.name || req.user?.email || ''
+    });
     res.status(201).json(result);
   } catch (error) { res.status(error.status || 400).json({ error: error.message, code: error.code || 'ORDER_CREATE_FAILED' }); }
 });

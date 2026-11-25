@@ -202,6 +202,7 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - Dispatch status and proof-of-delivery updates now use optimistic conditional writes against the previously read status/version, preventing concurrent logistics updates from silently overwriting one another.
 
 - Bank reconciliation now distinguishes bank credits/receipts from debits/payments, uses actual statement references and ledger payment dates, excludes reversed payments, refuses ambiguous suggestions and prevents one payment being suggested against multiple statement lines. Suggestions do not alter the ledger. A separately permissioned confirmation action records the reviewed match, reviewer, timestamp and notes transactionally; a tenant-scoped unique index prevents one payment being reconciled to multiple bank lines.
+- CRM-created sales orders now retain creator identity. Order approval/rejection records the acting reviewer and uses conditional state/version updates; creators cannot approve or reject their own orders, rejection requires a substantive reason, and stale concurrent decisions return a conflict.
 
 ### Next verification batch
 - Execute web/mobile UAT for incoming material specification authoring/approval, quarantine registration, incoming inspection and independent disposition, plus finished-product QC, CAPA retest, QA approval and market release. Verify role permissions, evidence capture and blocked paths against licensed product specifications.
