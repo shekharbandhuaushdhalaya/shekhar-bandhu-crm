@@ -104,6 +104,8 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
     const netSGST = grossSGST - cnSGST + dnSGST;
     const netIGST = grossIGST - cnIGST + dnIGST;
 
+    const b2cBaseResult = sumRecordedBaseAmount(b2c);
+
     const summary = {
       month: m,
       year: y,
@@ -174,7 +176,8 @@ router.get('/gstr1', authorize('report:view'), async (req, res) => {
       })),
       b2c: {
         count: b2c.length,
-        totalTaxableValue: b2c.reduce((s, i) => s + (i.baseAmount || 0), 0),
+        totalTaxableValue: b2cBaseResult.value,
+        unquantifiedBaseAmountCount: b2cBaseResult.unquantifiedCount,
         totalGST: b2c.reduce((s, i) => s + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0), 0),
       },
     };

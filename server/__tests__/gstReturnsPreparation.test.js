@@ -58,6 +58,23 @@ describe('GST report preparation safeguards', () => {
   });
 
 
+  test('B2C taxable totals exclude negative bases and report them as unquantified', async () => {
+    Invoice.find.mockImplementation(query => query.type === 'sale'
+      ? queryResult([
+        { invoiceNo: 'S-B2B', date: new Date('2026-09-10'), amount: 1180, baseAmount: 1000, cgst: 90, sgst: 90, igst: 0, gstin: '09AAACG1234F1Z5' },
+        { invoiceNo: 'S-B2C-NEG', date: new Date('2026-09-11'), amount: 0, baseAmount: -5, cgst: 0, sgst: 0, igst: 0 }
+      ])
+      : queryResult([]));
+    CreditNote.find.mockReturnValue(queryResult([]));
+
+    const response = await request(app).get('/gstr1?month=9&year=2026');
+    expect(response.status).toBe(200);
+    expect(response.body.totalTaxableValue).toBe(1000);
+    expect(response.body.b2c).toMatchObject({
+      count: 1, totalTaxableValue: 0, unquantifiedBaseAmountCount: 1
+    });
+  });
+
   test('reports missing invoice taxable bases instead of silently treating them as zero', async () => {
     Invoice.find.mockImplementation(query => query.type === 'sale'
       ? queryResult([{ invoiceNo: 'S-MISSING', date: new Date('2026-09-10'), amount: 118, gstin: '09AAACG1234F1Z5' }])
