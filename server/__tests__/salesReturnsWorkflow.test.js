@@ -14,7 +14,6 @@ jest.mock('../services/salesReturnService', () => ({
 const SalesReturn = require('../models/SalesReturn');
 const service = require('../services/salesReturnService');
 const router = require('../routes/sales/salesReturns');
-const configuredPermissions = require('../middleware/authorize').authorize.mock.calls.map(([permission]) => permission);
 
 describe('Sales Return API lifecycle', () => {
   let app;
