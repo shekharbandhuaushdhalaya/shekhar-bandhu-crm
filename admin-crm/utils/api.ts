@@ -1077,6 +1077,30 @@ class ApiClient {
     return res.json();
   }
 
+  // --- Sales Returns ---
+  async getSalesReturns(status = 'all'): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (status !== 'all') params.set('status', status);
+    const res = await this.request(`${API_BASE}/sales-returns?${params.toString()}`);
+    return res.json();
+  }
+  async createSalesReturn(data: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/sales-returns`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async postSalesReturn(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/sales-returns/${id}/post`, { method: 'PATCH' });
+    return res.json();
+  }
+  async dispositionSalesReturnItem(id: string, itemIndex: number, data: { disposition: 'approved' | 'rejected'; notes: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/sales-returns/${id}/items/${itemIndex}/disposition`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async reverseSalesReturn(id: string, reason: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/sales-returns/${id}/reverse`, { method: 'PATCH', body: JSON.stringify({ reason }) });
+    return res.json();
+  }
+
   // --- GST Returns ---
   async getGstReturn(view: string, month: number, year: number): Promise<any> {
     const res = await this.request(`${API_BASE}/gst/${view}?month=${month}&year=${year}`);

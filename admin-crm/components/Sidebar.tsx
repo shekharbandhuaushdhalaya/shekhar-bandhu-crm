@@ -45,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Orders', route: 'orders', icon: 'globe-outline', activeIcon: 'globe' },
       { label: 'Quotations', route: 'quotations', icon: 'document-text-outline', activeIcon: 'document-text' },
       { label: 'Sales Invoices', route: 'invoices/sale', icon: 'receipt-outline', activeIcon: 'receipt' },
+      { label: 'Sales Returns', route: 'sales-returns', icon: 'return-up-back-outline', activeIcon: 'return-up-back', permission: 'invoice:view' },
       { label: 'Sales Workspace', route: 'sales-workspace', icon: 'options-outline', activeIcon: 'options' },
       { label: 'Sales Intelligence', route: 'sales-intelligence', icon: 'flash-outline', activeIcon: 'flash' },
     ],

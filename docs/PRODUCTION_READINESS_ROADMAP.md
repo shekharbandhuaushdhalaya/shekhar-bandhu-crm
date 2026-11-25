@@ -216,3 +216,4 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 
 
 - Sales returns now have an authenticated API lifecycle for draft creation from an authoritative posted Sale Challan, transactional posting, credit-note linkage, and reasoned reversal. Returned goods enter an explicit QC hold rather than being treated as immediately saleable; independent QA disposition transfers each return line from hold to approved/rejected stock with reviewer identity, timestamp, notes and balanced stock-ledger evidence. Return poster cannot approve the returned stock, and reversals retain actor/reason evidence.
+- Sales Returns now has a CRM workspace for selecting a posted Sale Challan and return line, creating a draft, posting it, recording independent per-line QA disposition and requesting reasoned reversal. The workspace refreshes server state after each mutation; API permissions and transactional services remain authoritative.

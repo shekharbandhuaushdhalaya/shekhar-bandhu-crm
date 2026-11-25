@@ -29,6 +29,7 @@ export const APP_ROUTES: RouteMetadata[] = [
   { path: '/parties/vendors',   title: 'Vendors',                    icon: 'business' },
   { path: '/products',          title: 'Products',                   icon: 'cube' },
   { path: '/invoices/sale',     title: 'Sales Invoices',             icon: 'document-text' },
+  { path: '/sales-returns',     title: 'Sales Returns & Returned Stock QA', icon: 'return-up-back', permission: 'invoice:view' },
   { path: '/invoices/purchase', title: 'Purchase Invoices',          icon: 'document-text', permission: 'invoice:view' },
   { path: '/inventories',       title: 'Inventories & Warehouses',   icon: 'layers' },
   { path: '/inventory-reconciliation', title: 'Inventory Reconciliation', icon: 'sync-outline' },
