@@ -105,6 +105,9 @@ describe('Material dispensing persistence and genealogy integration', () => {
           }]
         });
 
+      if (created.status !== 201) {
+        throw new Error('Material dispensing creation failed: ' + JSON.stringify(created.body));
+      }
       expect(created.status).toBe(201);
       expect(created.body.status).toBe('pending_verification');
       const dispensingId = created.body._id;
