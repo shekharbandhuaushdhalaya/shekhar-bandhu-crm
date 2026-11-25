@@ -75,7 +75,7 @@ describe('GST report preparation safeguards', () => {
     const response = await request(app).get('/gstr3b?month=9&year=2026');
     expect(response.status).toBe(200);
     expect(response.body.outwardSupplies).toMatchObject({
-      taxableValue: 1020, unquantifiedCreditDebitNoteBaseAmountCount: 1
+      taxableValue: 1020, unquantifiedCreditDebitNoteBaseAmountCount: 2
     });
     expect(response.body.inwardSupplies).toMatchObject({
       taxableValue: 450,
