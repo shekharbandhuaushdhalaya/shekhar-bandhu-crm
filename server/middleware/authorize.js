@@ -1,5 +1,6 @@
 const RolePermission = require('../models/RolePermission');
 const { hasPermission } = require('../utils/permissions');
+const { runWithTenant } = require('../utils/tenantContext');
 
 const permissionCache = new Map();
 const CACHE_TTL = 60 * 1000;
@@ -15,7 +16,12 @@ async function getRolePermissions(role, firmId = null) {
   if (permissionCache.has(key)) {
     return permissionCache.get(key);
   }
-  const result = await RolePermission.getEffectivePermissions(role);
+  // The cache is firm-keyed, so the database read must be scoped to that same
+  // firm even when this helper is called outside authenticated request context.
+  const loadPermissions = () => RolePermission.getEffectivePermissions(role);
+  const result = firmId
+    ? await runWithTenant({ firmId }, loadPermissions)
+    : await loadPermissions();
   const perms = result.permissions || [];
   permissionCache.set(key, perms);
   return perms;
