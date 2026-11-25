@@ -117,6 +117,10 @@ describe('Module 2: Ayurvedic Manufacturing & AYUSH / GMP Compliance', () => {
       const linkedEntry = { _id: 'entry-q101', rawMaterialId: 'rm-q101', batchNo: 'HERB-881', qty: 50, reservedQty: 0, qcStatus: 'under_test', save: jest.fn().mockResolvedValue(true) };
       RawMaterialEntry.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(linkedEntry) });
       RawMaterialQuarantine.findById.mockResolvedValue(mockLot);
+      RawMaterialQuarantine.findOneAndUpdate.mockImplementation(async (filter, update) => {
+        Object.assign(mockLot, update.$set);
+        return mockLot;
+      });
 
       const inspection = await request(app)
         .patch('/api/manufacturing/quarantine/q101/inspection')
