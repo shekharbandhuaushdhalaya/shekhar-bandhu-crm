@@ -2056,7 +2056,6 @@ export default function ManufacturingScreen() {
             onCancelProduction={handleCancelProduction}
             onQcSignOff={(batch) => {
               setSelectedBatchRun(batch);
-              setQcPassedBy('');
               setQcWasteQty('');
               setQcWasteReason('');
               setQcNotes('');
