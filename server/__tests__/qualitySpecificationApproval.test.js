@@ -20,7 +20,7 @@ describe('Product quality specification authoring and approval controls', () => 
   });
   beforeAll(() => {
     app = express(); app.use(express.json());
-    app.use((req, _res, next) => { req.user = { id: req.headers['x-user-id'] || 'author-1', name: req.headers['x-user-name'] || 'Author' }; next(); });
+    app.use((req, _res, next) => { req.user = { id: req.headers['x-user-id'] || 'author-1', name: req.headers['x-user-name'] || 'Author', role: 'admin' }; next(); });
     app.use('/api/manufacturing/quality-specifications', router);
   });
   beforeEach(() => {

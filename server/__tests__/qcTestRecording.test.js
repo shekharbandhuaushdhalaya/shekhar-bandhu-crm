@@ -122,7 +122,7 @@ describe('Product-specific QC test recording and independent QA disposition', ()
   });
 
   test('requires an independent QA reviewer to approve the completed analyst disposition', async () => {
-    const batch = makeBatch({ qcStatus: 'pending_qa_review', qcSpecificationId: specId,
+    const batch = makeBatch({ qcStatus: 'pending_qa_review', qcSpecificationId: specId, qcSpecificationVersion: '2.1',
       qcPassedByUser: 'qc-analyst-1', qcTests: [
         { code: 'IDENTITY', result: 'Conforms', status: 'pass' },
         { code: 'MOISTURE', numericResult: 4.2, status: 'pass' }
