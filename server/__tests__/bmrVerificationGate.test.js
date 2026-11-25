@@ -236,7 +236,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
         challanType: 'production_transfer',
         warehouseId: 'production-warehouse',
         warehouseName: 'Production House',
-        destinationWarehouseId: 'finished-warehouse',
+        destinationWarehouseId: '333333333333333333333333',
         destinationWarehouseName: 'Finished Goods'
       };
       BatchProduction.findById.mockResolvedValue(batch);
@@ -244,12 +244,12 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
 
       const res = await request(app)
         .patch('/api/batch-productions/batch-completed-retry/complete')
-        .send({ actualYieldQty: 100, warehouseId: 'finished-warehouse' });
+        .send({ actualYieldQty: 100, warehouseId: '333333333333333333333333' });
 
       expect(res.status).toBe(200);
       expect(res.body.batch._id).toBe('batch-completed-retry');
       expect(res.body.challan.challanNo).toBe('CH-00042');
-      expect(res.body.challan.destinationWarehouseId).toBe('finished-warehouse');
+      expect(res.body.challan.destinationWarehouseId).toBe('333333333333333333333333');
       expect(Challan.findById).toHaveBeenCalledWith('challan-existing-1');
       expect(Warehouse.findById).not.toHaveBeenCalled();
     });
@@ -294,6 +294,36 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       expect(res.body.missingEvidence).toContain('Independent operator and verifier evidence is missing: Mixing');
       expect(Warehouse.findById).not.toHaveBeenCalled();
       expect(batch.packagingDeducted).toBe(false);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('does not require in-house dispensing for vendor-packed packaging', async () => {
+      const batch = {
+        _id: 'batch-vendor-packed',
+        status: 'in_progress',
+        productId: '131313131313131313131313',
+        plannedQty: 100,
+        bomSnapshot: {
+          formulationBasis: 100,
+          ingredients: [{ rawMaterialId: 'packaging-material-1', itemType: 'packaging', qtyRequired: 1, stageName: 'Packaging & Labeling' }]
+        },
+        ingredientsConsumed: [],
+        stages: [],
+        packagingMode: 'packed_by_vendor',
+        packagingDeducted: false,
+        save: jest.fn()
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Product.find.mockResolvedValue([{ _id: '131313131313131313131313', name: 'Vendor Packed Product', mrp: 10 }]);
+      Warehouse.findById.mockResolvedValue(null);
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-vendor-packed/complete')
+        .send({ actualYieldQty: 100, warehouseId: '222222222222222222222222' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toContain('storage warehouse');
+      expect(Warehouse.findById).toHaveBeenCalled();
       expect(batch.save).not.toHaveBeenCalled();
     });
 

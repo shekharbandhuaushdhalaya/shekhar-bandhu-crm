@@ -1145,12 +1145,14 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     const formulaIngredients = Array.isArray(batch.bomSnapshot?.ingredients) ? batch.bomSnapshot.ingredients : [];
     const consumedLines = Array.isArray(batch.ingredientsConsumed) ? batch.ingredientsConsumed : [];
     const missingDispensing = formulaIngredients.filter(ingredient => {
+      // Vendor-packed packaging is not issued from this facility's stores.
+      if (ingredient.itemType === 'packaging' && batch.packagingMode !== 'self_packed') return false;
       const rawMaterialId = ingredient.rawMaterialId && ingredient.rawMaterialId._id
         ? String(ingredient.rawMaterialId._id) : String(ingredient.rawMaterialId || '');
       if (!rawMaterialId) return true;
       const stageName = String(ingredient.stageName || '').trim().toLowerCase();
       const expectedStageIndex = stageName
-        ? manufacturingStages.findIndex(stage => String(stage.name || '').trim().toLowerCase() === stageName)
+        ? (batch.stages || []).findIndex(stage => String(stage.name || '').trim().toLowerCase() === stageName)
         : 0;
       if (expectedStageIndex < 0) return true;
       return !consumedLines.some(consumed => {
