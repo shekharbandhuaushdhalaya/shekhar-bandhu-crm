@@ -1037,6 +1037,43 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       return res.status(400).json({ error: `Cannot complete batch. Pending stages: ${pending.join(', ')}` });
     }
 
+    // A batch may enter completion only when every critical stage has a complete,
+    // independently reviewed execution record. This mirrors the evidence required
+    // for eventual market release, so completion cannot create an unreleasable batch.
+    const criticalStages = (batch.stages || []).filter(stage =>
+      String(stage.name || '').trim().toLowerCase() !== 'qc testing'
+    );
+    const stageEvidenceIssues = [];
+    for (const stage of criticalStages) {
+      const label = String(stage.name || 'Unnamed stage');
+      if (!['completed', 'skipped'].includes(stage.status)) {
+        stageEvidenceIssues.push('Stage is not completed or formally skipped: ' + label);
+        continue;
+      }
+      const independentlyVerified = Boolean(stage.performedBy && stage.verifiedBy && stage.verifiedAt &&
+        String(stage.performedBy) !== String(stage.verifiedBy));
+      if (!independentlyVerified) {
+        stageEvidenceIssues.push('Independent operator and verifier evidence is missing: ' + label);
+      }
+      if (stage.status === 'skipped') {
+        if (!String(stage.notes || '').trim()) stageEvidenceIssues.push('Documented skip reason is missing: ' + label);
+        continue;
+      }
+      if (!stage.performedByName) stageEvidenceIssues.push('Operator identity is missing: ' + label);
+      if (!stage.isDualSigned) stageEvidenceIssues.push('Independent Chemist and QA signatures are missing: ' + label);
+      if (!stage.operatorTrainingRecordId) stageEvidenceIssues.push('Verified operator training evidence is missing: ' + label);
+      if (!stage.equipmentId || stage.equipmentCalibrationStatus !== 'valid') {
+        stageEvidenceIssues.push('Verified equipment calibration evidence is missing: ' + label);
+      }
+    }
+    if (stageEvidenceIssues.length) {
+      return res.status(400).json({
+        error: 'Critical manufacturing stage evidence must be complete before batch completion',
+        code: 'STAGE_EXECUTION_EVIDENCE_INCOMPLETE',
+        missingEvidence: stageEvidenceIssues
+      });
+    }
+
     const warehouse = await Warehouse.findById(warehouseId);
     if (!warehouse) {
       return res.status(404).json({ error: 'Finished-goods storage warehouse was not found.' });

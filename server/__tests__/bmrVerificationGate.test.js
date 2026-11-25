@@ -11,6 +11,7 @@ jest.mock('../models/LineClearance');
 jest.mock('../models/RetentionSample');
 jest.mock('../models/MaterialDispensing');
 jest.mock('../models/InventoryEntry');
+jest.mock('../models/Warehouse');
 jest.mock('../utils/withTransaction', () => ({
   withTransaction: jest.fn(async work => work({}))
 }));
@@ -29,6 +30,7 @@ const LineClearance = require('../models/LineClearance');
 const RetentionSample = require('../models/RetentionSample');
 const MaterialDispensing = require('../models/MaterialDispensing');
 const InventoryEntry = require('../models/InventoryEntry');
+const Warehouse = require('../models/Warehouse');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
 const ProductQualitySpecification = require('../models/ProductQualitySpecification');
@@ -214,6 +216,83 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
     expect(res.body.independentQaRelease).toBeNull();
     expect(res.body.missingEvidence).toContain('No specification-linked batch QC test results are recorded');
     expect(res.body.firmDetails).toBeUndefined();
+  });
+
+  describe('batch completion evidence gate', () => {
+    test('blocks completion before warehouse or packaging processing when critical stage evidence is incomplete', async () => {
+      const batch = {
+        _id: 'batch-completion-gate-1',
+        status: 'qc_hold',
+        productId: 'product-completion-1',
+        plannedQty: 100,
+        stages: [{
+          name: 'Mixing',
+          status: 'completed',
+          performedBy: 'operator-1',
+          performedByName: 'Operator One',
+          verifiedBy: null,
+          verifiedAt: null,
+          isDualSigned: false,
+          operatorTrainingRecordId: 'training-1',
+          equipmentId: 'equipment-1',
+          equipmentCalibrationStatus: 'valid'
+        }],
+        packagingMode: 'self_packed',
+        packagingDeducted: false,
+        save: jest.fn()
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Product.find.mockResolvedValue([{ _id: 'product-completion-1', name: 'Test Product', mrp: 10 }]);
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-completion-gate-1/complete')
+        .send({
+          actualYieldQty: 100,
+          qcPassedBy: 'QC Analyst',
+          warehouseId: 'warehouse-1'
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('STAGE_EXECUTION_EVIDENCE_INCOMPLETE');
+      expect(res.body.missingEvidence).toContain('Independent operator and verifier evidence is missing: Mixing');
+      expect(Warehouse.findById).not.toHaveBeenCalled();
+      expect(batch.packagingDeducted).toBe(false);
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('blocks skipped critical stages without a documented reason', async () => {
+      const batch = {
+        _id: 'batch-completion-gate-2',
+        status: 'qc_hold',
+        productId: 'product-completion-2',
+        plannedQty: 100,
+        stages: [{
+          name: 'Mixing',
+          status: 'skipped',
+          performedBy: 'operator-1',
+          verifiedBy: 'reviewer-1',
+          verifiedAt: new Date(),
+          notes: ''
+        }],
+        save: jest.fn()
+      };
+      BatchProduction.findById.mockResolvedValue(batch);
+      Product.find.mockResolvedValue([{ _id: 'product-completion-2', name: 'Test Product', mrp: 10 }]);
+
+      const res = await request(app)
+        .patch('/api/batch-productions/batch-completion-gate-2/complete')
+        .send({
+          actualYieldQty: 100,
+          qcPassedBy: 'QC Analyst',
+          warehouseId: 'warehouse-1'
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('STAGE_EXECUTION_EVIDENCE_INCOMPLETE');
+      expect(res.body.missingEvidence).toContain('Documented skip reason is missing: Mixing');
+      expect(Warehouse.findById).not.toHaveBeenCalled();
+      expect(batch.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('independent finished-batch QA release', () => {
