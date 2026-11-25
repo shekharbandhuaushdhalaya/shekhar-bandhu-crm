@@ -505,18 +505,35 @@ router.get('/gstr3b/export-json', authorize('report:view'), async (req, res) => 
       Invoice.find({ type: 'purchase', isFinalized: true, date: { $gte: start, $lt: end } }).lean()
     ]);
 
-    const salesBase = sales.reduce((s, i) => s + (i.baseAmount || 0), 0);
+    const salesBaseResult = sumRecordedBaseAmount(sales);
+    const purchaseBaseResult = sumRecordedBaseAmount(purchases);
+    if (salesBaseResult.unquantifiedCount || purchaseBaseResult.unquantifiedCount) {
+      return res.status(409).json({
+        error: 'Correct or complete every finalized invoice taxable base before generating this draft',
+        code: 'GST_EXPORT_UNQUANTIFIED_TAXABLE_BASE',
+        unquantifiedSalesInvoiceCount: salesBaseResult.unquantifiedCount,
+        unquantifiedPurchaseInvoiceCount: purchaseBaseResult.unquantifiedCount
+      });
+    }
+
+    const salesBase = salesBaseResult.value;
     const salesCGST = sales.reduce((s, i) => s + (i.cgst || 0), 0);
     const salesSGST = sales.reduce((s, i) => s + (i.sgst || 0), 0);
     const salesIGST = sales.reduce((s, i) => s + (i.igst || 0), 0);
 
-    const itcCGST = purchases.reduce((s, i) => s + (i.cgst || 0), 0);
-    const itcSGST = purchases.reduce((s, i) => s + (i.sgst || 0), 0);
-    const itcIGST = purchases.reduce((s, i) => s + (i.igst || 0), 0);
-
     const retPeriod = `${m.toString().padStart(2, '0')}${y}`;
 
+    // This is deliberately a partial preparation draft. Purchase GST is not
+    // mapped to the portal's eligible-ITC section because statutory eligibility
+    // and reconciliation are not verified by this CRM.
     const gstr3bExport = {
+      draftOnly: true,
+      filingReady: false,
+      limitations: [
+        'This partial draft excludes input tax credit because eligibility has not been verified.',
+        'Credit/debit note adjustments, reverse charge, exempt/nil-rated supplies and other statutory sections are not included.',
+        'Review and complete the return using verified source records and the GST portal or an authorised filing provider.'
+      ],
       gstin,
       ret_period: retPeriod,
       sec_sum: {
@@ -526,17 +543,6 @@ router.get('/gstr3b/export-json', authorize('report:view'), async (req, res) => 
           camt: salesCGST,
           samt: salesSGST,
           csamt: 0
-        },
-        itc_elg: {
-          itc_avl: [
-            {
-              ty: 'OTH',
-              iamt: itcIGST,
-              camt: itcCGST,
-              samt: itcSGST,
-              csamt: 0
-            }
-          ]
         }
       }
     };
