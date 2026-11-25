@@ -45,6 +45,7 @@ export default function IncomingQcScreen() {
   const canInspect = permission.can('quality:approve');
   const [lots, setLots] = useState<QuarantineLot[]>([]);
   const [entries, setEntries] = useState<RawEntry[]>([]);
+  const [materials, setMaterials] = useState<any[]>([]);
   const [specifications, setSpecifications] = useState<any[]>([]);
   const [specModal, setSpecModal] = useState(false);
   const [specMaterialId, setSpecMaterialId] = useState('');
@@ -70,14 +71,16 @@ export default function IncomingQcScreen() {
     if (refresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
-      const [nextLots, nextEntries, nextSpecs] = await Promise.all([
+      const [nextLots, nextEntries, nextSpecs, nextMaterials] = await Promise.all([
         api.getQuarantineLots(),
         api.getRawMaterialEntries(),
-        canViewSpecs ? api.getRawMaterialQualitySpecifications() : Promise.resolve([])
+        canViewSpecs ? api.getRawMaterialQualitySpecifications() : Promise.resolve([]),
+        api.getRawMaterials(undefined, true)
       ]);
       setLots(Array.isArray(nextLots) ? nextLots : []);
       setEntries(Array.isArray(nextEntries) ? nextEntries : []);
       setSpecifications(Array.isArray(nextSpecs) ? nextSpecs : []);
+      setMaterials(Array.isArray(nextMaterials) ? nextMaterials : []);
     } catch (err: any) {
       setError(err?.message || 'Unable to load incoming QC records');
     } finally {
@@ -93,15 +96,6 @@ export default function IncomingQcScreen() {
     Boolean(entry.expiryDate) && Boolean(entry.vendorName?.trim()) &&
     !lots.some(lot => String(lot.rawMaterialEntryId) === String(entry._id))
   ), [entries, lots]);
-
-  const materials = useMemo(() => {
-    const seen = new Set<string>();
-    return entries.map(entry => valueOf(entry.rawMaterialId)).filter((material: any) => {
-      if (!material?._id || seen.has(String(material._id))) return false;
-      seen.add(String(material._id));
-      return true;
-    });
-  }, [entries]);
 
   const openSpecModal = () => {
     setSpecMaterialId(specMaterialId || String(materials[0]?._id || ''));
