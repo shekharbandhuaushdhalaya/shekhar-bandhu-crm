@@ -74,17 +74,38 @@ describe('Independent supplier qualification verification', () => {
     expect(record.save).not.toHaveBeenCalled();
   });
 
-  test('allows a different reviewer to verify and records reviewer identity and timestamp', async () => {
+  test('allows a different reviewer through one atomic pending-state transition', async () => {
     VendorQualification.findById.mockResolvedValue({
       _id: 'qualification-1', qualificationStatus: 'pending_verification',
       proposedQualificationStatus: 'approved', auditedByUserId: 'auditor-1',
       documents: [{ name: 'GMP certificate', url: 'evidence://supplier/gmp' }],
-      nextAuditDue: new Date(Date.now() + 86400000),
-      save: jest.fn().mockResolvedValue(true)
+      nextAuditDue: new Date(Date.now() + 86400000)
+    });
+    VendorQualification.findOneAndUpdate.mockResolvedValue({
+      _id: 'qualification-1', qualificationStatus: 'approved',
+      verifiedByUserId: 'reviewer-2', verifiedAt: new Date()
     });
     const response = await request(app).patch('/api/vendor-qualifications/qualification-1/verify').set('x-user-id', 'reviewer-2').set('x-user-name', 'Independent Reviewer').send({ verificationNotes: 'Documents checked' });
     expect(response.status).toBe(200);
     expect(response.body.qualificationStatus).toBe('approved');
     expect(response.body.verifiedByUserId).toBe('reviewer-2');
+    expect(VendorQualification.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: 'qualification-1', qualificationStatus: 'pending_verification' }),
+      expect.objectContaining({ $set: expect.objectContaining({ verifiedByUserId: 'reviewer-2' }) }),
+      { new: true, runValidators: true }
+    );
+  });
+
+  test('returns conflict when another reviewer wins the concurrent verification race', async () => {
+    VendorQualification.findById.mockResolvedValue({
+      _id: 'qualification-1', qualificationStatus: 'pending_verification',
+      proposedQualificationStatus: 'approved', auditedByUserId: 'auditor-1',
+      documents: [{ name: 'GMP certificate', url: 'evidence://supplier/gmp' }],
+      nextAuditDue: new Date(Date.now() + 86400000)
+    });
+    VendorQualification.findOneAndUpdate.mockResolvedValue(null);
+    const response = await request(app).patch('/api/vendor-qualifications/qualification-1/verify').set('x-user-id', 'reviewer-2').send({ verificationNotes: 'Documents checked' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('SUPPLIER_QUALIFICATION_CONCURRENT_REVIEW');
   });
 });

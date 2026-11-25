@@ -195,6 +195,7 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - The above foundations are not a blanket completion claim for the functional IDs. Remaining phases require end-to-end UAT and evidence-based closure.
 
 - Purchase-order approval now rechecks current material-specific supplier qualification inside a transaction and uses a conditional state/version update so concurrent approvers cannot both approve a stale draft.
+- Supplier qualification verification now performs a conditional single-winner update from pending verification, preserving the independent reviewer identity and notes while preventing two reviewers from overwriting one another.
 - Purchase-requisition approval and rejection now use conditional single-winner state transitions; stale concurrent reviewers receive a conflict rather than overwriting a completed decision.
 - Recall reports are explicitly internal records, never labelled as official statutory submissions; firm, manufacturing-licence and GMP identifiers are included only when actually configured, and zero traced distribution is not reported as 100% recovery.
 - Recall customer notification now captures the affected invoice, notification channel, evidence reference, authenticated recorder and timestamp. Recall completion/closure requires every affected invoice to have notification evidence, full quantity reconciliation and substantive closure notes; over-recovery and invalid status transitions are blocked.

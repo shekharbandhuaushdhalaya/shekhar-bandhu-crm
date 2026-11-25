@@ -124,15 +124,26 @@ router.patch('/:id/verify', authorize('manufacturing:qcApprove'), async (req, re
     if (record.nextAuditDue && new Date(record.nextAuditDue) < today && record.proposedQualificationStatus === 'approved') {
       return res.status(409).json({ error: 'An expired supplier audit cannot be approved', code: 'SUPPLIER_AUDIT_EXPIRED' });
     }
-    record.qualificationStatus = record.proposedQualificationStatus;
-    record.verifiedByUserId = reviewerId;
-    record.verifiedByName = reviewerName;
-    record.verifiedAt = new Date();
-    record.verificationNotes = typeof req.body?.verificationNotes === 'string' ? req.body.verificationNotes.trim() : '';
-    if (!record.verificationNotes) return res.status(400).json({ error: 'Independent verification notes are required' });
-    await record.save();
-    req.io?.emit('vendor_qualification_updated', { type: 'verified', id: record._id });
-    return res.json(record);
+    const verificationNotes = typeof req.body?.verificationNotes === 'string' ? req.body.verificationNotes.trim() : '';
+    if (!verificationNotes) return res.status(400).json({ error: 'Independent verification notes are required' });
+
+    // Conditional pending-state update ensures that concurrent reviewers have one winner.
+    const verified = await VendorQualification.findOneAndUpdate(
+      { _id: record._id, qualificationStatus: 'pending_verification', auditedByUserId: { $ne: reviewerId } },
+      { $set: {
+        qualificationStatus: record.proposedQualificationStatus,
+        verifiedByUserId: reviewerId,
+        verifiedByName: reviewerName,
+        verifiedAt: new Date(),
+        verificationNotes
+      } },
+      { new: true, runValidators: true }
+    );
+    if (!verified) {
+      return res.status(409).json({ error: 'Supplier qualification was already verified or changed by another reviewer', code: 'SUPPLIER_QUALIFICATION_CONCURRENT_REVIEW' });
+    }
+    req.io?.emit('vendor_qualification_updated', { type: 'verified', id: verified._id });
+    return res.json(verified);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
