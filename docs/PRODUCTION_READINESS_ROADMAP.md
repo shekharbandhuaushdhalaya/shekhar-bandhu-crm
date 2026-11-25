@@ -167,6 +167,7 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - Incoming QC inspection result sets are now immutable after first recording and use an atomic timestamp-checked update, preventing concurrent analysts from replacing batch-linked test evidence.
 - The CRM now exposes a dedicated Incoming Material QC workspace: eligible unreserved stock entries can be registered into quarantine, actual results are entered against the pinned test methods/specifications, and an independent QA reviewer can release or reject the lot with a report reference and remarks.
 - The same workspace now supports material-specific incoming QC specification drafting and independent approval, including version, effective date, pharmacopoeial/house standard, monograph reference, mandatory test methods and acceptance criteria. Specifications can be created before the first stock receipt.
+- Manufacturing batches now expose the post-completion finished-product QC journey in the CRM: analysts record actual results against the pinned approved product specification, failed results open linked CAPAs, controlled retests preserve history, an independent QA reviewer records disposition notes, and a separately authorised releaser performs market release. The old completion action is no longer shown for QC-hold batches.
 - Quarantine registration is protected by a tenant-scoped unique stock-entry index; a concurrent duplicate registration returns a controlled conflict instead of creating multiple quarantine records for one received lot.
 - Quarantine lot metadata now derives from the linked material and stock-entry masters; supplier and expiry must be present on and match the source stock entry, and the unit must match the material master.
 - Manufacturing line-clearance now has separate submit and independent verify steps; production cannot self-clear a line, and verified records cannot be overwritten.
@@ -194,6 +195,6 @@ Supplier debit-note references are evidence only; they do not post accounting ad
 - The above foundations are not a blanket completion claim for the functional IDs. Remaining phases require end-to-end UAT and evidence-based closure.
 
 ### Next verification batch
-- Exercise the incoming material QC workspace and the manufacturing completion/post-completion QC journey on web and mobile, including maker-checker role combinations and rejected/failed-result paths.
+- Execute web/mobile UAT for incoming material specification authoring/approval, quarantine registration, incoming inspection and independent disposition, plus finished-product QC, CAPA retest, QA approval and market release. Verify role permissions, evidence capture and blocked paths against licensed product specifications.
 - Add failure-injection coverage for production-house warehouse creation; receipt/Challan rollback and idempotent service retry are now covered by MongoDB replica-set integration tests.
 - Complete an end-to-end material genealogy rehearsal from reserved raw-material lots through independently verified dispensing, finished-goods receipt, QC release and production-transfer posting.
