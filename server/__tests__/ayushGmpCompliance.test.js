@@ -25,7 +25,7 @@ jest.setTimeout(10000);
 
 jest.mock('../middleware/authorize', () => ({
   authorize: () => (req, res, next) => {
-    req.user = { id: 'usr1', name: 'QC Manager', role: 'admin', permissions: ['quality:view', 'quality:create', 'quality:approve', 'inventory:view', 'inventory:create'] };
+    req.user = { id: req.headers['x-user-id'] || 'usr1', name: req.headers['x-user-name'] || 'QC Manager', role: 'admin', permissions: ['quality:view', 'quality:create', 'quality:approve', 'inventory:view', 'inventory:create'] };
     next();
   },
 }));
@@ -112,8 +112,21 @@ describe('Module 2: Ayurvedic Manufacturing & AYUSH / GMP Compliance', () => {
       const RawMaterialEntry = require('../models/RawMaterialEntry');
       const linkedEntry = { _id: 'entry-q101', rawMaterialId: 'rm-q101', batchNo: 'HERB-881', qty: 50, reservedQty: 0, qcStatus: 'under_test', save: jest.fn().mockResolvedValue(true) };
       RawMaterialEntry.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(linkedEntry) });
-      RawMaterialQuarantine.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockLot) });
+      RawMaterialQuarantine.findById.mockResolvedValue(mockLot);
 
+      const inspection = await request(app)
+        .patch('/api/manufacturing/quarantine/q101/inspection')
+        .set('x-user-id', 'qc-analyst-17')
+        .set('x-user-name', 'Incoming QC Analyst')
+        .send({ inspectionResults: [{
+          testCode: 'IDENTITY', testName: 'Botanical identity', methodReference: 'Approved identity method',
+          specification: 'Conforms to approved raw-material specification', result: 'Conforms',
+          unit: '', outcome: 'pass', evidenceRef: 'LAB-OBS-44'
+        }] });
+      expect(inspection.status).toBe(200);
+      expect(mockLot.inspectionRecordedByUserId).toBe('qc-analyst-17');
+
+      RawMaterialQuarantine.findById.mockReturnValue({ session: jest.fn().mockResolvedValue(mockLot) });
       const res = await request(app)
         .patch('/api/manufacturing/quarantine/q101/release')
         .send({ quarantineStatus: 'released', testReportNo: 'QC-REP-44', remarks: 'Conforms to approved specification' });
