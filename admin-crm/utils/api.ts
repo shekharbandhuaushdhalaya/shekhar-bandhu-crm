@@ -584,6 +584,10 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/vendors/${id}`, { method: 'DELETE' });
     return res.ok;
   }
+  async getSupplierScorecard(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-scorecards/${id}`);
+    return res.json();
+  }
 
   async verifyGSTIN(gstin: string): Promise<{ companyName: string; billingAddress: string; state: string; placeOfSupply: string }> {
     const res = await this.request(`${API_BASE}/parties/verify-gstin`, {
@@ -864,6 +868,131 @@ class ApiClient {
     return res.json();
   }
 
+
+  // --- Procurement requisitions and supplier quotations ---
+  async getPurchaseRequisitions(params: { status?: string; department?: string; mine?: boolean; page?: number; limit?: number } = {}): Promise<any> {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.department) query.set('department', params.department);
+    if (params.mine) query.set('mine', 'true');
+    if (params.page !== undefined) query.set('page', String(params.page));
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    const suffix = query.toString() ? '?' + query.toString() : '';
+    const res = await this.request(`${API_BASE}/purchase-requisitions${suffix}`);
+    return res.json();
+  }
+  async createPurchaseRequisition(data: { department: string; justification: string; requiredByDate?: string | null; items: Array<{ itemType: 'raw_material' | 'finished_product'; rawMaterialId?: string; productId?: string; name: string; qtyRequested: number; unit: string; estimatedUnitPrice?: number | null }> }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async submitPurchaseRequisition(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/submit`, { method: 'PATCH' });
+    return res.json();
+  }
+  async approvePurchaseRequisition(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/approve`, { method: 'PATCH' });
+    return res.json();
+  }
+  async rejectPurchaseRequisition(id: string, reason: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) });
+    return res.json();
+  }
+  async getSupplierQuotations(requisitionId: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${requisitionId}/quotations`);
+    return res.json();
+  }
+  async selectSupplierQuotation(requisitionId: string, quotationId: string, reviewNotes: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${requisitionId}/quotations/${quotationId}/select`, { method: 'PATCH', body: JSON.stringify({ reviewNotes }) });
+    return res.json();
+  }
+
+  async getRawMaterialQualitySpecifications(rawMaterialId?: string): Promise<any[]> {
+    const suffix = rawMaterialId ? `?rawMaterialId=${encodeURIComponent(rawMaterialId)}` : '';
+    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications${suffix}`);
+    return res.json();
+  }
+  async createRawMaterialQualitySpecification(data: {
+    rawMaterialId: string; pharmacopoeialStandard: string; monographReference?: string;
+    specificationVersion: string; effectiveDate: string; tests: Array<{
+      code: string; name: string; category?: string; specification: string;
+      unit?: string; methodReference: string; mandatory?: boolean;
+    }>; sourceNote?: string;
+  }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async approveRawMaterialQualitySpecification(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications/${id}/approve`, { method: 'PATCH' });
+    return res.json();
+  }
+
+  async getQuarantineLots(status?: string): Promise<any[]> {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : '';
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine${suffix}`);
+    return res.json();
+  }
+  async registerQuarantineLot(data: {
+    herbName: string; botanicalName?: string; batchNo: string; supplierName: string;
+    qty: number; unit: string; expiryDate: string; rawMaterialId: string; rawMaterialEntryId: string;
+  }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async recordIncomingInspection(id: string, inspectionResults: Array<{
+    testCode: string; testName: string; methodReference: string; specification: string;
+    result: string; unit?: string; outcome: 'pass' | 'fail'; evidenceRef?: string;
+  }>): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine/${id}/inspection`, { method: 'PATCH', body: JSON.stringify({ inspectionResults }) });
+    return res.json();
+  }
+  async disposeQuarantineLot(id: string, data: {
+    quarantineStatus: 'released' | 'rejected'; testReportNo: string; remarks: string;
+  }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine/${id}/release`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+
+  async getGoodsReceivedNotes(params: { search?: string; status?: string; page?: number; limit?: number; poId?: string; vendorId?: string } = {}): Promise<{ items: any[]; page: number; limit: number; total: number; totalPages: number }> {
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.status) query.set('status', params.status);
+    if (params.page !== undefined) query.set('page', String(params.page));
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.poId) query.set('poId', params.poId);
+    if (params.vendorId) query.set('vendorId', params.vendorId);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    const res = await this.request(`${API_BASE}/purchase-orders/grn${suffix}`);
+    return res.json();
+  }
+  async getGoodsReceivedNote(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}`);
+    return res.json();
+  }
+  async verifyGoodsReceivedNote(id: string, data: { decision: 'verified' | 'rejected'; verificationNotes: string; rejectionReason?: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/verify`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async getSupplierReturnsForGrn(id: string): Promise<any[]> {
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/supplier-returns`);
+    return res.json();
+  }
+  async createSupplierReturnForGrn(id: string, data: { itemIndex: number; qty: number; reason: string; resolutionType: 'return_to_supplier' | 'replacement_requested' | 'debit_note_requested' }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/supplier-returns`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async reviewSupplierReturn(id: string, data: { decision: 'approved' | 'rejected'; reviewNotes: string; rejectionReason?: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/approve`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async dispatchSupplierReturn(id: string, dispatchRef: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/dispatch`, { method: 'PATCH', body: JSON.stringify({ dispatchRef }) });
+    return res.json();
+  }
+  async resolveSupplierReturn(id: string, data: { supplierReference: string; replacementBatchNo?: string; supplierDebitNoteDate?: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/resolve`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+
   // No generic getInvoice as backend doesn't support it
 
   async createSaleInvoice(data: Partial<Invoice>): Promise<Invoice> {
@@ -945,6 +1074,30 @@ class ApiClient {
   }
   async cancelCreditNote(id: string): Promise<CreditNote> {
     const res = await this.request(`${API_BASE}/credit-notes/${id}/cancel`, { method: 'PATCH' });
+    return res.json();
+  }
+
+  // --- Sales Returns ---
+  async getSalesReturns(status = 'all'): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (status !== 'all') params.set('status', status);
+    const res = await this.request(`${API_BASE}/sales-returns?${params.toString()}`);
+    return res.json();
+  }
+  async createSalesReturn(data: any): Promise<any> {
+    const res = await this.request(`${API_BASE}/sales-returns`, { method: 'POST', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async postSalesReturn(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/sales-returns/${id}/post`, { method: 'PATCH' });
+    return res.json();
+  }
+  async dispositionSalesReturnItem(id: string, itemIndex: number, data: { disposition: 'approved' | 'rejected'; notes: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/sales-returns/${id}/items/${itemIndex}/disposition`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async reverseSalesReturn(id: string, reason: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/sales-returns/${id}/reverse`, { method: 'PATCH', body: JSON.stringify({ reason }) });
     return res.json();
   }
 
@@ -1055,8 +1208,8 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/payments`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey || createMutationKey('payment') }, body: JSON.stringify(data) });
     return res.json();
   }
-  async deletePayment(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/payments/${id}`, { method: 'DELETE' });
+  async deletePayment(id: string, reason = ''): Promise<boolean> {
+    const res = await this.request(`${API_BASE}/payments/${id}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
     return res.ok;
   }
 
@@ -1215,12 +1368,42 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
     return res.json();
   }
-  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; lossReason?: string; actualYieldQty?: number; stageIngredients?: { rawMaterialId: string; qtyNeeded: number; wastage?: number; itemType?: string; lossReason?: string }[]; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[] }): Promise<BatchProduction> {
+  async getMaterialDispensings(id: string): Promise<any[]> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/dispensings`);
+    return res.json();
+  }
+  async createMaterialDispensing(id: string, stageIndex: number, items: any[]): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/dispensings`, {
+      method: 'POST', body: JSON.stringify({ stageIndex, items })
+    });
+    return res.json();
+  }
+  async verifyMaterialDispensing(id: string, dispensingId: string, notes = ''): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/dispensings/${dispensingId}/verify`, {
+      method: 'PATCH', body: JSON.stringify({ notes })
+    });
+    return res.json();
+  }
+  async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; lossReason?: string; actualYieldQty?: number; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[] }): Promise<BatchProduction> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', body: JSON.stringify(data) });
     return res.json();
   }
   async completeBatchProduction(id: string, data: { actualYieldQty: number; wasteQty?: number; wasteReason?: string; qcNotes: string; qcPassedBy: string; packing?: number; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[]; warehouseId: string; qcStatus?: string; organoleptic?: string; moistureContent?: number | null; ashValue?: number | null; pHValue?: number | null; disintegrationTime?: number | null; heavyMetals?: string; microbialLimit?: string; labReportRef?: string; jobWorkerCertificateRef?: string; coaDocumentRef?: string; jobWorkCharges?: number }): Promise<any> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/complete`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async recordBatchQcTests(id: string, data: { qcSpecificationId?: string; tests: Array<{
+    code: string; result?: string; numericResult?: number; status: 'pass' | 'fail'; remarks?: string;
+  }> }): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/qc-tests`, { method: 'PATCH', body: JSON.stringify(data) });
+    return res.json();
+  }
+  async approveBatchQcDisposition(id: string, notes: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/qc-approval`, { method: 'PATCH', body: JSON.stringify({ notes }) });
+    return res.json();
+  }
+  async releaseBatchProduction(id: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/release`, { method: 'PATCH' });
     return res.json();
   }
   async cancelBatchProduction(id: string): Promise<BatchProduction> {
@@ -1308,6 +1491,18 @@ class ApiClient {
     return res.json();
   }
   async getManufacturingDeviations(): Promise<any[]> { const res=await this.request(`${API_BASE}/manufacturing/deviations`); return res.json(); }
+  async resolveManufacturingDeviation(id: string, data: { rootCause: string; correctiveAction: string; preventiveAction: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/deviations/${id}/signoff`, {
+      method: 'PUT', body: JSON.stringify({ status: 'resolved', ...data })
+    });
+    return res.json();
+  }
+  async verifyManufacturingDeviationClosure(id: string, data: { effectivenessCheck: string; effectivenessEvidenceRef: string }): Promise<any> {
+    const res = await this.request(`${API_BASE}/manufacturing/deviations/${id}/verify-closure`, {
+      method: 'PATCH', body: JSON.stringify(data)
+    });
+    return res.json();
+  }
   async getStabilityStudies(): Promise<any[]> { const res=await this.request(`${API_BASE}/stability-studies`); return res.json(); }
   async getRecalls(): Promise<any[]> { const res=await this.request(`${API_BASE}/recalls`); return res.json(); }
   async getVendorQualifications(): Promise<any[]> { const res=await this.request(`${API_BASE}/vendor-qualifications`); return res.json(); }

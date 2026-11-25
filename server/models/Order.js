@@ -62,8 +62,14 @@ const orderSchema = new mongoose.Schema({
     default: 'none'
   },
   approvalRequired: { type: Boolean, default: false },
+  createdByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  createdByName: { type: String, default: '' },
   approvedBy: { type: String, default: '' },
+  approvedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   approvedAt: { type: Date, default: null },
+  rejectedBy: { type: String, default: '' },
+  rejectedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  rejectedAt: { type: Date, default: null },
   rejectionReason: { type: String, default: '' }
 }, { timestamps: true });
 

@@ -23,6 +23,8 @@ const stageSchema = new mongoose.Schema({
   completedBy: { type: String, default: '' },
   performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   performedByName: { type: String, default: '' },
+  operatorTrainingRecordId: { type: mongoose.Schema.Types.ObjectId, ref: 'TrainingRecord', default: null },
+  operatorTrainingTopic: { type: String, default: '' },
   verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   verifiedByName: { type: String, default: '' },
   verifiedAt: { type: Date, default: null },
@@ -87,10 +89,12 @@ const batchProductionSchema = new mongoose.Schema({
     recipeName: { type: String, default: '' },
     recipeVersion: { type: String, default: '' },
     formulationBasis: { type: Number, default: 100 },
+    formulationBasisUnit: { type: String, default: 'ml', trim: true },
     ingredients: [{
       rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' },
       itemType: { type: String, default: 'formulation' },
       qtyRequired: { type: Number, default: 0 },
+      qtyRequiredForBatch: { type: Number, default: null },
       stageName: { type: String, default: '', trim: true }
     }],
     overheadCost: { type: Number, default: 0 },
@@ -126,7 +130,11 @@ const batchProductionSchema = new mongoose.Schema({
         required: true,
       },
       qtyConsumed: { type: Number, required: true },
+      qtyWasted: { type: Number, default: 0 },
+      wastageReason: { type: String, default: '' },
       batchNo: { type: String, required: true },
+      stageIndex: { type: Number, default: null },
+      dispensingNo: { type: String, default: '' },
     }
   ],
   ingredientsReserved: [
@@ -170,17 +178,24 @@ const batchProductionSchema = new mongoose.Schema({
   qcNotes: { type: String, default: '' },
   qcPassedBy: { type: String, default: '' },
   qcPassedByUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  qcApprovedByUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  qcApprovedByName: { type: String, default: '' },
+  qcApprovedAt: { type: Date, default: null },
+  qcApprovalNotes: { type: String, default: '' },
   releasedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   releasedByName: { type: String, default: '' },
   releasedAt: { type: Date, default: null },
-  qcStatus: { type: String, enum: ['approved', 'rejected'], default: 'approved' },
+  qcStatus: { type: String, enum: ['pending', 'pending_qa_review', 'approved', 'rejected'], default: 'pending' },
   qcSpecificationId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductQualitySpecification', default: null },
   qcSpecificationVersion: { type: String, default: '' },
   qcTests: [{
     code: { type: String, required: true }, name: { type: String, required: true }, category: String,
     specification: String, unit: String, methodReference: String, result: String, numericResult: Number,
     status: { type: String, enum: ['not_tested','pending','pass','fail'], default: 'not_tested' },
-    testedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, testedByName: String, testedAt: Date, remarks: String
+    testedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, testedByName: String, testedAt: Date, remarks: String,
+    deviationCapaId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeviationCapa', default: null },
+    attemptNo: { type: Number, default: 1, min: 1 },
+    retestOf: { type: mongoose.Schema.Types.ObjectId, default: null }
   }],
   qcParameters: {
     organoleptic: { type: String, default: '' },
@@ -228,7 +243,11 @@ const batchProductionSchema = new mongoose.Schema({
     auditStatus: { type: String, enum: ['passed', 'flagged', 'pending'], default: 'pending' },
     reconciled: { type: Boolean, default: false },
     reconciledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    reconciledByName: { type: String, default: '' },
     reconciledAt: { type: Date, default: null },
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    verifiedByName: { type: String, default: '' },
+    verifiedAt: { type: Date, default: null },
     discrepancyNote: { type: String, default: '' }
   }],
   rawMaterialCost: { type: Number, default: 0 },

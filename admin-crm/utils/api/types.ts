@@ -485,9 +485,11 @@ export type RawMaterial = {
 
 export type RawMaterialEntry = {
   _id: string;
-  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string; category?: string };
+  rawMaterialId: string | { _id: string; name: string; sku: string; unit: string; category?: string; botanicalName?: string };
   batchNo: string;
   qty: number;
+  reservedQty?: number;
+  qcStatus?: 'under_test' | 'approved' | 'rejected';
   purchaseRate: number;
   vendorId?: string;
   vendorName?: string;

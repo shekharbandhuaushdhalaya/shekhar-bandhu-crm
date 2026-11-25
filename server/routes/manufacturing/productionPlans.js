@@ -52,6 +52,7 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
 
     // Aggregate total raw material requirements across all planned batches
     const rawMaterialNeeds = new Map(); // rawMaterialId -> totalNeeded
+    const pinnedBatches = [];
 
     for (const pb of plannedBatches) {
       const bom = await BillOfMaterials.findOne({ productId: pb.productId, isActive: true })
@@ -63,11 +64,10 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       if (!Array.isArray(bom.ingredients) || bom.ingredients.length === 0) {
         return res.status(400).json({ error: `Active recipe for ${pb.productName || pb.productId} has no ingredients` });
       }
-      const yieldSize = Number(bom.batchYieldQty) || 100;
-      if (yieldSize <= 0) {
-        return res.status(400).json({ error: `Active recipe for ${pb.productName || pb.productId} has an invalid batch yield` });
-      }
-      const multiplier = Number(pb.plannedQty) / yieldSize;
+      const basis = Number(bom.formulationBasis) || 100;
+      if (!Number.isFinite(basis) || basis <= 0) return res.status(400).json({ error: 'Active recipe has an invalid formulation basis' });
+      const multiplier = Number(pb.plannedQty) / basis;
+      pinnedBatches.push({ ...pb, bomId: bom._id, bomSnapshot: { recipeName: bom.recipeName, recipeUpdatedAt: bom.updatedAt, formulationBasis: basis, formulationBasisUnit: bom.formulationBasisUnit || '', formulationStandardRef: bom.formulationStandardRef || '', ingredients: bom.ingredients.map(ing => ({ rawMaterialId: ing.rawMaterialId, qtyRequired: Number(ing.qtyRequired), itemType: ing.itemType || 'formulation', stageName: ing.stageName || '', isPrintedMaterial: Boolean(ing.isPrintedMaterial) })), stages: (bom.stages || []).map(stage => ({ name: stage.name, targetDurationHours: stage.targetDurationHours || 8 })), overheadCost: Number(bom.overheadCost || 0) } });
       for (const ing of bom.ingredients) {
         const rmId = ing.rawMaterialId ? ing.rawMaterialId.toString() : null;
         if (!rmId) continue;
@@ -114,7 +114,7 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
       manufacturingUnitName,
       startDate: parsedStartDate,
       endDate: parsedEndDate,
-      plannedBatches,
+      plannedBatches: pinnedBatches,
       rawMaterialSufficiencyStatus: shortageDetected ? 'shortage_detected' : 'sufficient',
       shortageDetails,
       status: 'draft',
@@ -129,60 +129,117 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
   }
 });
 
-// PATCH /api/production-plans/:id/status — Update plan status
+// PATCH /api/production-plans/:id/status — Update plan status with atomic material reservation
 router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) => {
+  const { withTransaction } = require('../../utils/withTransaction');
   try {
     const { status } = req.body;
     const allowedStatuses = ['draft', 'approved', 'in_production', 'completed', 'cancelled'];
     if (!allowedStatuses.includes(status)) return res.status(400).json({ error: 'Invalid production plan status' });
-    const plan = await ProductionPlan.findById(req.params.id);
-    if (!plan) return res.status(404).json({ error: 'Production plan not found' });
     const transitions = { draft: ['approved', 'cancelled'], approved: ['in_production', 'cancelled'], in_production: ['completed', 'cancelled'], completed: [], cancelled: [] };
-    if (!(transitions[plan.status] || []).includes(status)) return res.status(409).json({ error: 'Invalid production plan transition: ' + plan.status + ' -> ' + status, code: 'INVALID_PLAN_TRANSITION' });
-    if (status === 'approved') {
-      const approverId = req.user?.id;
-      if (!approverId) return res.status(403).json({ error: 'Authenticated approver identity is required' });
-      if (plan.createdByUserId && String(plan.createdByUserId) === String(approverId)) return res.status(403).json({ error: 'The plan creator cannot approve their own production plan', code: 'PLAN_MAKER_CHECKER_REQUIRED' });
-      // Draft-time stock checks become stale. Recompute from live approved, unexpired stock.
-      const warehouse = await resolveManufacturingWarehouse(plan.manufacturingUnitId);
-      if (!warehouse?._id) return res.status(409).json({ error: 'Manufacturing warehouse could not be resolved', code: 'PLAN_WAREHOUSE_UNAVAILABLE' });
-      const needs = new Map();
-      for (const batch of plan.plannedBatches || []) {
-        const bom = await BillOfMaterials.findOne({ productId: batch.productId, isActive: true }).sort({ isDefault: -1, updatedAt: -1 }).lean();
-        if (!bom || !Array.isArray(bom.ingredients) || !bom.ingredients.length) return res.status(409).json({ error: 'An active, non-empty recipe is required for ' + (batch.productName || batch.productId), code: 'PLAN_RECIPE_UNAVAILABLE' });
-        const basis = Number(bom.formulationBasis) || 100;
-        if (!Number.isFinite(basis) || basis <= 0) return res.status(409).json({ error: 'Recipe formulation basis is invalid', code: 'PLAN_RECIPE_INVALID' });
-        for (const ingredient of bom.ingredients) {
-          if (!ingredient.rawMaterialId) continue;
-          const perBasis = Number(ingredient.qtyRequired);
-          if (!Number.isFinite(perBasis) || perBasis < 0) return res.status(409).json({ error: 'Recipe contains an invalid ingredient quantity', code: 'PLAN_RECIPE_INVALID' });
-          const id = String(ingredient.rawMaterialId);
-          needs.set(id, (needs.get(id) || 0) + perBasis * Number(batch.plannedQty) / basis);
-        }
-      }
-      const shortages = [];
-      for (const [rawMaterialId, requiredQty] of needs) {
-        const [material, entries] = await Promise.all([
-          RawMaterial.findById(rawMaterialId).select('name').lean(),
-          RawMaterialEntry.find({ warehouseId: warehouse._id, rawMaterialId, qcStatus: 'approved', $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }] }).select('qty reservedQty').lean()
-        ]);
-        const availableQty = entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0)), 0);
-        if (availableQty + 1e-9 < requiredQty) shortages.push({ rawMaterialName: material?.name || 'Raw Material', requiredQty: Number(requiredQty.toFixed(3)), availableQty: Number(availableQty.toFixed(3)), shortageQty: Number((requiredQty - availableQty).toFixed(3)) });
-      }
-      plan.rawMaterialSufficiencyStatus = shortages.length ? 'shortage_detected' : 'sufficient';
-      plan.shortageDetails = shortages;
-      if (shortages.length) {
-        await plan.save();
-        return res.status(409).json({ error: 'Live raw-material availability is insufficient; the plan remains unapproved', code: 'PLAN_MATERIALS_NOT_SUFFICIENT', shortageDetails: shortages });
-      }
-      plan.approvedByUserId = approverId;
-      plan.approvedByName = req.user?.name || req.user?.email || 'Approver';
-      plan.approvedAt = new Date();
-    }
-    plan.status = status;
-    await plan.save();
-    res.json(plan);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+    const updated = await withTransaction(async session => {
+      const plan = await ProductionPlan.findById(req.params.id).session(session);
+      if (!plan) { const e = new Error('Production plan not found'); e.code = 'PLAN_NOT_FOUND'; throw e; }
+      if (!(transitions[plan.status] || []).includes(status)) { const e = new Error('Invalid production plan transition: ' + plan.status + ' -> ' + status); e.code = 'INVALID_PLAN_TRANSITION'; throw e; }
 
+      if (status === 'approved') {
+        const approverId = req.user?.id;
+        if (!approverId) { const e = new Error('Authenticated approver identity is required'); e.code = 'APPROVER_REQUIRED'; throw e; }
+        if (plan.createdByUserId && String(plan.createdByUserId) === String(approverId)) { const e = new Error('The plan creator cannot approve their own production plan'); e.code = 'PLAN_MAKER_CHECKER_REQUIRED'; throw e; }
+        const warehouse = await resolveManufacturingWarehouse(plan.manufacturingUnitId);
+        if (!warehouse?._id) { const e = new Error('Manufacturing warehouse could not be resolved'); e.code = 'PLAN_WAREHOUSE_UNAVAILABLE'; throw e; }
+
+        const needs = new Map();
+        for (const batch of plan.plannedBatches || []) {
+          const snapshot = batch.bomSnapshot;
+          if (!batch.bomId || !snapshot || !Array.isArray(snapshot.ingredients) || !snapshot.ingredients.length) { const error = new Error('This production plan has no pinned formula snapshot. Recreate the draft before approval.'); error.code = 'PLAN_RECIPE_SNAPSHOT_REQUIRED'; throw error; }
+          const basis = Number(snapshot.formulationBasis);
+          if (!Number.isFinite(basis) || basis <= 0) { const error = new Error('Pinned recipe formulation basis is invalid'); error.code = 'PLAN_RECIPE_INVALID'; throw error; }
+          for (const ingredient of snapshot.ingredients) {
+            if (!ingredient.rawMaterialId) continue;
+            const perBasis = Number(ingredient.qtyRequired);
+            if (!Number.isFinite(perBasis) || perBasis < 0) { const e = new Error('Recipe contains an invalid ingredient quantity'); e.code = 'PLAN_RECIPE_INVALID'; throw e; }
+            const id = String(ingredient.rawMaterialId);
+            needs.set(id, (needs.get(id) || 0) + perBasis * Number(batch.plannedQty) / basis);
+          }
+        }
+
+        const reservations = [];
+        const shortages = [];
+        for (const [rawMaterialId, requiredQty] of needs) {
+          const material = await RawMaterial.findById(rawMaterialId).select('name').session(session).lean();
+          let remaining = requiredQty;
+          const entries = await RawMaterialEntry.find({
+            warehouseId: warehouse._id, rawMaterialId, qcStatus: 'approved',
+            $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }]
+          }).sort({ expiryDate: 1, createdAt: 1, _id: 1 }).session(session).lean();
+          for (const entry of entries) {
+            if (remaining <= 1e-9) break;
+            const available = Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0));
+            const take = Math.min(remaining, available);
+            if (take <= 1e-9) continue;
+            const result = await RawMaterialEntry.updateOne({
+              _id: entry._id, qcStatus: 'approved', warehouseId: warehouse._id,
+              $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }],
+              $expr: { $gte: [{ $subtract: ['$qty', { $ifNull: ['$reservedQty', 0] }] }, take] }
+            }, { $inc: { reservedQty: take } }, { session });
+            if (result.modifiedCount !== 1) continue;
+            reservations.push({ rawMaterialId, rawMaterialEntryId: entry._id, batchNo: entry.batchNo, qty: take });
+            remaining -= take;
+          }
+          if (remaining > 1e-6) shortages.push({
+            rawMaterialName: material?.name || 'Raw Material',
+            requiredQty: Number(requiredQty.toFixed(3)),
+            availableQty: Number((requiredQty - remaining).toFixed(3)),
+            shortageQty: Number(remaining.toFixed(3))
+          });
+        }
+        if (shortages.length) {
+          const e = new Error('Live raw-material availability is insufficient; no stock was reserved and the plan remains unapproved');
+          e.code = 'PLAN_MATERIALS_NOT_SUFFICIENT';
+          e.shortageDetails = shortages;
+          throw e;
+        }
+        plan.materialReservations = reservations;
+        plan.rawMaterialSufficiencyStatus = 'sufficient';
+        plan.shortageDetails = [];
+        plan.approvedByUserId = approverId;
+        plan.approvedByName = req.user?.name || req.user?.email || 'Approver';
+        plan.approvedAt = new Date();
+      }
+
+      if (status === 'cancelled' && Array.isArray(plan.materialReservations) && plan.materialReservations.length) {
+        for (const reservation of plan.materialReservations) {
+          const result = await RawMaterialEntry.updateOne({
+            _id: reservation.rawMaterialEntryId, reservedQty: { $gte: reservation.qty }
+          }, { $inc: { reservedQty: -reservation.qty } }, { session });
+          if (result.modifiedCount !== 1) {
+            const e = new Error('Could not safely release a production reservation; investigate stock ledger before retrying');
+            e.code = 'RESERVATION_RELEASE_CONFLICT';
+            throw e;
+          }
+        }
+        plan.materialReservations = [];
+      }
+      plan.status = status;
+      await plan.save({ session });
+      return plan;
+    });
+    res.json(updated);
+  } catch (err) {
+    if (err.code === 'PLAN_MATERIALS_NOT_SUFFICIENT') {
+      const plan = await ProductionPlan.findById(req.params.id);
+      if (plan && plan.status === 'draft') {
+        plan.rawMaterialSufficiencyStatus = 'shortage_detected';
+        plan.shortageDetails = err.shortageDetails || [];
+        await plan.save();
+      }
+      return res.status(409).json({ error: err.message, code: err.code, shortageDetails: err.shortageDetails || [] });
+    }
+    const statusCode = err.code === 'PLAN_NOT_FOUND' ? 404
+      : ['INVALID_PLAN_TRANSITION', 'PLAN_MAKER_CHECKER_REQUIRED', 'PLAN_WAREHOUSE_UNAVAILABLE', 'PLAN_RECIPE_UNAVAILABLE', 'PLAN_RECIPE_SNAPSHOT_REQUIRED', 'PLAN_RECIPE_INVALID', 'RESERVATION_RELEASE_CONFLICT'].includes(err.code) ? 409
+      : err.code === 'APPROVER_REQUIRED' ? 403 : 500;
+    res.status(statusCode).json({ error: err.message, code: err.code });
+  }
+});
 module.exports = router;

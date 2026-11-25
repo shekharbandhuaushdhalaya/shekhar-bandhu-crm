@@ -14,9 +14,15 @@ const lineClearanceSchema = new mongoose.Schema({
     areaVisuallyInspected: { type: Boolean, default: false }
   },
   notes: { type: String, default: '' },
-  clearedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  submittedByName: { type: String, default: '' },
+  submittedAt: { type: Date, default: null },
+  clearedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   clearedByName: { type: String, default: '' },
-  clearedAt: { type: Date, default: Date.now }
+  clearedAt: { type: Date, default: null },
+  verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  verifiedByName: { type: String, default: '' },
+  verifiedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 lineClearanceSchema.index({ batchId: 1, phase: 1 }, { unique: true });

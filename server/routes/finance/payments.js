@@ -8,8 +8,13 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { createPaymentAndAllocate, allocateExistingPayment, reversePayment } = require('../../services/paymentPostingService');
 const idempotency = require('../../middleware/requiredIdempotency');
+const { getInvoiceAgeMetrics } = require('../../services/invoiceAgingService');
 
 const router = express.Router();
+
+function escapeRegex(value) {
+  return String(value || '').slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 // GET /api/payments — List payments with optional filters
 router.get('/', authorize('payment:view'), async (req, res) => {
@@ -19,8 +24,8 @@ router.get('/', authorize('payment:view'), async (req, res) => {
 
     if (search) {
       filter.$or = [
-        { partyName: { $regex: search, $options: 'i' } },
-        { referenceNo: { $regex: search, $options: 'i' } }
+        { partyName: { $regex: escapeRegex(search), $options: 'i' } },
+        { referenceNo: { $regex: escapeRegex(search), $options: 'i' } }
       ];
     }
     if (type && type !== 'all') filter.type = type;
@@ -31,7 +36,7 @@ router.get('/', authorize('payment:view'), async (req, res) => {
       if (mongoose.Types.ObjectId.isValid(partyId)) {
         filter.partyId = partyId;
       } else {
-        filter.partyName = { $regex: partyId, $options: 'i' };
+        filter.partyName = { $regex: escapeRegex(partyId), $options: 'i' };
       }
     }
 
@@ -59,7 +64,13 @@ router.post('/', idempotency, authorize('payment:create'), validate(schemas.paym
     if (mode === 'cash' && (!req.user || !req.user.canAccessCash)) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to perform cash transactions.' });
     }
-    const { payment } = await createPaymentAndAllocate({ paymentData: req.body, allocations });
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated payment creator identity is required' });
+    const { payment } = await createPaymentAndAllocate({
+      paymentData: { ...req.body, createdByUserId: actorId, createdByName: actorName },
+      allocations
+    });
     if (req.io) {
       req.io.emit('payment_updated', { type: 'created', id: payment._id });
       if (payment.allocations?.length) req.io.emit('invoice_updated', { type: 'payment_allocated', paymentId: payment._id });
@@ -77,7 +88,7 @@ router.post('/', idempotency, authorize('payment:create'), validate(schemas.paym
   }
 });
 
-// DELETE /api/payments/:id — controlled payment reversal
+// DELETE /api/payments/:id — controlled, reasoned, maker-checker payment reversal
 router.delete('/:id', authorize('payment:create'), async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
@@ -85,16 +96,22 @@ router.delete('/:id', authorize('payment:create'), async (req, res) => {
     if (payment.mode === 'cash' && (!req.user || !req.user.canAccessCash)) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to reverse cash transactions.' });
     }
-    const reversed = await reversePayment(req.params.id, req.user?.id || null);
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    const reason = String(req.body?.reason || '').trim();
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated payment reversal identity is required' });
+    if (reason.length < 10) return res.status(400).json({ error: 'A substantive payment reversal reason of at least 10 characters is required', code: 'PAYMENT_REVERSAL_REASON_REQUIRED' });
+    const reversed = await reversePayment(req.params.id, { id: actorId, name: actorName }, reason);
     if (req.io) {
       req.io.emit('payment_updated', { id: req.params.id, type: 'reversed' });
       if (reversed.allocations?.length) req.io.emit('invoice_updated', { type: 'payment_reversed', paymentId: req.params.id });
     }
     const { logAction } = require('../../utils/auditLogger');
-    await logAction({ action: 'REVERSE_PAYMENT', description: `Reversed payment ${req.params.id}`, details: { id: req.params.id }, req });
+    await logAction({ action: 'REVERSE_PAYMENT', description: `Reversed payment ${req.params.id}: ${reason}`, details: { id: req.params.id, reason }, req });
     res.json({ message: 'Payment reversed and balances restored' });
   } catch (err) {
-    res.status(err.code === 'PAYMENT_NOT_FOUND' ? 404 : 400).json({ error: err.message, code: err.code || 'PAYMENT_REVERSAL_FAILED' });
+    const status = err.code === 'PAYMENT_NOT_FOUND' ? 404 : err.code === 'PAYMENT_REVERSAL_MAKER_CHECKER_REQUIRED' ? 403 : 400;
+    res.status(status).json({ error: err.message, code: err.code || 'PAYMENT_REVERSAL_FAILED' });
   }
 });
 
@@ -110,6 +127,7 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
 
     const now = new Date();
     const brackets = {
+      notDue: 0,
       b0_30: 0,
       b31_60: 0,
       b61_90: 0,
@@ -125,30 +143,17 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
 
       brackets.totalOutstanding += outstanding;
 
-      const baseDate = inv.dueDate ? new Date(inv.dueDate) : new Date(inv.date || inv.createdAt);
-      const diffTime = now.getTime() - baseDate.getTime();
-      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-
-      let bracket = '0-30';
-      if (diffDays <= 30) {
-        brackets.b0_30 += outstanding;
-        bracket = '0-30';
-      } else if (diffDays <= 60) {
-        brackets.b31_60 += outstanding;
-        bracket = '31-60';
-      } else if (diffDays <= 90) {
-        brackets.b61_90 += outstanding;
-        bracket = '61-90';
-      } else {
-        brackets.b90_plus += outstanding;
-        bracket = '90+';
-      }
+      const age = getInvoiceAgeMetrics(inv, now);
+      const diffDays = age.daysOverdue;
+      const bracket = age.label;
+      brackets[age.bucket] += outstanding;
 
       const custName = inv.customerName || 'Walk-in Customer';
       if (!customerMap[custName]) {
         customerMap[custName] = {
           customerName: custName,
           totalOutstanding: 0,
+          notDue: 0,
           b0_30: 0,
           b31_60: 0,
           b61_90: 0,
@@ -157,10 +162,11 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
         };
       }
       customerMap[custName].totalOutstanding += outstanding;
-      if (bracket === '0-30') customerMap[custName].b0_30 += outstanding;
-      else if (bracket === '31-60') customerMap[custName].b31_60 += outstanding;
-      else if (bracket === '61-90') customerMap[custName].b61_90 += outstanding;
-      else customerMap[custName].b90_plus += outstanding;
+      if (age.bucket === 'notDue') customerMap[custName].notDue += outstanding;
+      else if (age.bucket === 'b0_30') customerMap[custName].b0_30 += outstanding;
+      else if (age.bucket === 'b31_60') customerMap[custName].b31_60 += outstanding;
+      else if (age.bucket === 'b61_90') customerMap[custName].b61_90 += outstanding;
+      else if (age.bucket === 'b90_plus') customerMap[custName].b90_plus += outstanding;
 
       customerMap[custName].invoices.push({
         _id: inv._id,
@@ -170,8 +176,8 @@ router.get(['/ageing', '/receivables/ageing'], authorize('payment:view'), async 
         amount: inv.amount,
         amountPaid: inv.amountPaid || 0,
         balanceDue: outstanding,
-        daysOld: diffDays,
-        daysOverdue: diffDays,
+        daysOld: age.daysOld,
+        daysOverdue: age.daysOverdue,
         bracket
       });
     });
@@ -197,6 +203,7 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
 
     const now = new Date();
     const brackets = {
+      notDue: 0,
       b0_30: 0,
       b31_60: 0,
       b61_90: 0,
@@ -213,34 +220,22 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
 
       brackets.totalOutstanding += outstanding;
 
-      const baseDate = inv.dueDate ? new Date(inv.dueDate) : new Date(inv.date || inv.createdAt);
-      const diffTime = now.getTime() - baseDate.getTime();
-      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-
-      let bracket = '0-30';
-      if (diffDays <= 30) {
-        brackets.b0_30 += outstanding;
-        bracket = '0-30';
-      } else if (diffDays <= 60) {
-        brackets.b31_60 += outstanding;
-        bracket = '31-60';
-      } else if (diffDays <= 90) {
-        brackets.b61_90 += outstanding;
-        bracket = '61-90';
-      } else {
-        brackets.b90_plus += outstanding;
-        bracket = '90+';
-      }
+      const age = getInvoiceAgeMetrics(inv, now);
+      const diffDays = age.daysOverdue;
+      const bracket = age.label;
+      brackets[age.bucket] += outstanding;
 
       const vName = inv.partyName || inv.vendorName || inv.supplierName || 'Vendor';
       if (!vendorMap[vName]) {
         vendorMap[vName] = {
           vendorName: vName,
           totalOutstanding: 0,
+          notDue: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0,
           invoices: []
         };
       }
       vendorMap[vName].totalOutstanding += outstanding;
+      vendorMap[vName][age.bucket] += outstanding;
       vendorMap[vName].invoices.push({
         _id: inv._id,
         invoiceNo: inv.invoiceNo,
@@ -249,8 +244,8 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
         amount: totalAmt,
         amountPaid: inv.amountPaid || 0,
         balanceDue: outstanding,
-        daysOld: diffDays,
-        daysOverdue: diffDays,
+        daysOld: age.daysOld,
+        daysOverdue: age.daysOverdue,
         bracket
       });
     });

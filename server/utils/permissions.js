@@ -1,7 +1,7 @@
 const PERMISSIONS = {
   product:       ['view', 'create', 'edit', 'delete', 'viewPricing', 'editPricing'],
   inventory:     ['view', 'create', 'edit', 'delete', 'viewValue'],
-  vendor:        ['view', 'create', 'edit', 'delete'],
+  vendor:        ['view', 'create', 'edit', 'delete', 'approve'],
   customer:      ['view', 'create', 'edit', 'delete'],
   invoice:       ['view', 'create', 'edit', 'delete', 'finalize', 'markPaid'],
   order:         ['view', 'create', 'edit', 'approve', 'cancel', 'fulfill'],
@@ -56,7 +56,7 @@ function getDefaultPermissionsForRole(role) {
       return [
         'product:view', 'product:create', 'product:edit', 'product:viewPricing', 'product:editPricing',
         'inventory:view', 'inventory:create', 'inventory:edit', 'inventory:viewValue',
-        'vendor:view', 'vendor:create', 'vendor:edit',
+        'vendor:view', 'vendor:create', 'vendor:edit', 'vendor:approve',
         'customer:view', 'customer:create', 'customer:edit',
         'invoice:view', 'invoice:create', 'invoice:edit', 'invoice:finalize', 'invoice:markPaid',
         'order:view', 'order:create', 'order:edit', 'order:approve', 'order:cancel', 'order:fulfill',

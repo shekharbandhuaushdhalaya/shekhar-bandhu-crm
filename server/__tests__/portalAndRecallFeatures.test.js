@@ -76,6 +76,7 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Recall.findOneAndUpdate = jest.fn().mockImplementation(async (_filter, update) => ({ ...update.$set }));
     RolePermission.getEffectivePermissions.mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
   });
 
@@ -233,7 +234,7 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
       expect(mockSave).toHaveBeenCalled();
     });
 
-    test('GET /api/recalls/:id/audit-report generates official AYUSH Drug Inspector audit report JSON', async () => {
+    test('GET /api/recalls/:id/audit-report generates an internal traceability report without claiming statutory status', async () => {
       Recall.findById.mockReturnValue({
         lean: jest.fn().mockResolvedValue({
           _id: 'recall_1',
@@ -261,10 +262,162 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
 
       const res = await request(app).get('/api/recalls/recall_1/audit-report');
       expect(res.status).toBe(200);
-      expect(res.body.title).toContain('AYUSH DRUG INSPECTOR BATCH RECALL AUDIT REPORT');
+      expect(res.body.title).toContain('Internal batch recall traceability and effectiveness report');
+      expect(res.body.reportStatus).toBe('INTERNAL_RECORD_NOT_A_STATUTORY_SUBMISSION');
       expect(res.body.firmDetails.name).toBe('SHEKHAR BANDHU AUSHADHALAYA');
+      expect(res.body.firmDetails.licenseNo).toBe('AYUSH-1983-UP');
+      expect(res.body.firmDetails.gmpCertNo).toBeUndefined();
       expect(res.body.reconciliationMetrics.reconciliationPercentage).toBe(95);
       expect(res.body.reconciliationMetrics.unrecoveredQty).toBe(50);
+      expect(res.body.reconciliationMetrics.reconciliationStatus).toBe('partially_recovered');
+    });
+
+
+    test('requires traceable notification evidence for an affected invoice', async () => {
+      const recall = { _id: 'recall_notify', updatedAt: new Date('2026-11-25T10:00:00Z'), affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }] };
+      Recall.findById.mockResolvedValue(recall);
+      const missing = await request(app).patch('/api/recalls/recall_notify/notify-customer').send({ invoiceNo: 'INV-1' });
+      expect(missing.status).toBe(400);
+      expect(Recall.findOneAndUpdate).not.toHaveBeenCalled();
+      const recorded = await request(app).patch('/api/recalls/recall_notify/notify-customer').send({
+        invoiceNo: 'INV-1', notificationMethod: 'email', notificationReference: 'mail-log-2026-001'
+      });
+      expect(recorded.status).toBe(200);
+      expect(Recall.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: 'recall_notify', updatedAt: recall.updatedAt,
+          affectedCustomers: { $elemMatch: { invoiceNo: 'INV-1', notified: { $ne: true } } } }),
+        expect.objectContaining({ $set: expect.objectContaining({
+          'affectedCustomers.$.notified': true,
+          'affectedCustomers.$.notifiedByName': 'Test User',
+          'affectedCustomers.$.notificationMethod': 'email',
+          'affectedCustomers.$.notificationReference': 'mail-log-2026-001'
+        }) }),
+        { new: true, runValidators: true }
+      );
+    });
+
+    test('blocks recall completion until notification and full recovery evidence are reconciled', async () => {
+      const recall = {
+        _id: 'recall_close', updatedAt: new Date('2026-11-25T10:00:00Z'), status: 'in_progress', totalAffectedQty: 100,
+        recalledQty: 90, closureNotes: '',
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }],
+        save: jest.fn()
+      };
+      Recall.findById.mockResolvedValue(recall);
+      const incomplete = await request(app).patch('/api/recalls/recall_close/status').send({
+        status: 'completed', recalledQty: 100, closureNotes: 'Closure reviewed and approved'
+      });
+      expect(incomplete.status).toBe(409);
+      expect(incomplete.body.code).toBe('RECALL_EFFECTIVENESS_EVIDENCE_INCOMPLETE');
+      expect(recall.save).not.toHaveBeenCalled();
+    });
+
+    test('prevents the recall initiator from independently closing a fully reconciled recall', async () => {
+      const recall = {
+        _id: 'recall_maker_checker', updatedAt: new Date('2026-11-25T10:00:00Z'),
+        initiatedByUserId: '507f1f77bcf86cd799439011', status: 'in_progress',
+        totalAffectedQty: 100, recalledQty: 100,
+        closureNotes: 'All affected stock accounted for and reviewed',
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: true }]
+      };
+      Recall.findById.mockResolvedValue(recall);
+      const response = await request(app).patch('/api/recalls/recall_maker_checker/status').send({
+        status: 'completed', recalledQty: 100,
+        closureNotes: 'All affected stock accounted for and reviewed'
+      });
+      expect(response.status).toBe(403);
+      expect(response.body.code).toBe('RECALL_MAKER_CHECKER_REQUIRED');
+      expect(Recall.findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
+    test('returns a conflict when recall closure evidence changes concurrently', async () => {
+      const recall = {
+        _id: 'recall_stale_close', updatedAt: new Date('2026-11-25T10:00:00Z'),
+        initiatedByUserId: '507f191e810c19729de860ea', status: 'in_progress',
+        totalAffectedQty: 100, recalledQty: 100,
+        closureNotes: 'All affected stock accounted for and reviewed',
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: true }]
+      };
+      Recall.findById.mockResolvedValue(recall);
+      Recall.findOneAndUpdate.mockResolvedValue(null);
+      const response = await request(app).patch('/api/recalls/recall_stale_close/status').send({
+        status: 'completed', recalledQty: 100,
+        closureNotes: 'All affected stock accounted for and reviewed'
+      });
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe('RECALL_UPDATE_CONFLICT');
+    });
+
+    test('allows an independent reviewer to complete a fully reconciled recall and records reviewer evidence', async () => {
+      const recall = {
+        _id: 'recall_valid_close', updatedAt: new Date('2026-11-25T10:00:00Z'),
+        initiatedByUserId: '507f191e810c19729de860ea', status: 'in_progress',
+        totalAffectedQty: 100, recalledQty: 100,
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: true }]
+      };
+      Recall.findById.mockResolvedValue(recall);
+      const response = await request(app).patch('/api/recalls/recall_valid_close/status').send({
+        status: 'completed', recalledQty: 100,
+        closureNotes: 'All affected quantities reconciled and customer notifications evidenced'
+      });
+      expect(response.status).toBe(200);
+      expect(Recall.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: recall._id, updatedAt: recall.updatedAt, status: 'in_progress' }),
+        expect.objectContaining({ $set: expect.objectContaining({
+          status: 'completed',
+          recalledQty: 100,
+          statusUpdatedByUserId: '507f1f77bcf86cd799439011',
+          statusUpdatedByName: 'Test User',
+          statusUpdatedAt: expect.any(Date)
+        }) }),
+        { new: true, runValidators: true }
+      );
+    });
+
+    test('returns a conflict when customer notification loses a concurrent update race', async () => {
+      const recall = {
+        _id: 'recall_notify_race', updatedAt: new Date('2026-11-25T10:00:00Z'),
+        affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }]
+      };
+      Recall.findById.mockResolvedValue(recall);
+      Recall.findOneAndUpdate.mockResolvedValue(null);
+      const response = await request(app).patch('/api/recalls/recall_notify_race/notify-customer').send({
+        invoiceNo: 'INV-1', notificationMethod: 'email', notificationReference: 'mail-log-race-001'
+      });
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe('RECALL_UPDATE_CONFLICT');
+      expect(Recall.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ updatedAt: recall.updatedAt,
+          affectedCustomers: { $elemMatch: { invoiceNo: 'INV-1', notified: { $ne: true } } } }),
+        expect.any(Object),
+        { new: true, runValidators: true }
+      );
+    });
+
+    test('rejects recalled quantities above the traced distributed quantity', async () => {
+      const recall = {
+        _id: 'recall_qty', updatedAt: new Date('2026-11-25T10:00:00Z'), status: 'in_progress', totalAffectedQty: 100,
+        recalledQty: 0, affectedCustomers: [], save: jest.fn()
+      };
+      Recall.findById.mockResolvedValue(recall);
+      const response = await request(app).patch('/api/recalls/recall_qty/status').send({ recalledQty: 101 });
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('INVALID_RECALL_RECONCILIATION');
+      expect(recall.save).not.toHaveBeenCalled();
+    });
+
+    test('does not invent firm identity, licence or GMP certificate values when configuration is absent', async () => {
+      Recall.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({
+        _id: 'recall_2', recallNo: 'REC-2026-002', batchNo: 'B-2026-89',
+        productName: 'Test formulation', severity: 'class_II', reason: 'Investigation',
+        totalAffectedQty: 0, recalledQty: 0, status: 'initiated', affectedCustomers: []
+      }) });
+      SystemSettings.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({}) });
+      const res = await request(app).get('/api/recalls/recall_2/audit-report');
+      expect(res.status).toBe(200);
+      expect(res.body.firmDetails).toEqual({});
+      expect(res.body.reconciliationMetrics.reconciliationPercentage).toBeNull();
+      expect(res.body.reconciliationMetrics.reconciliationStatus).toBe('no_distributed_quantity_identified');
     });
   });
 });

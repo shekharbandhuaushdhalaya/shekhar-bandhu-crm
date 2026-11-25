@@ -10,6 +10,7 @@ const schemas = require('../../validation/schemas');
 const router = express.Router();
 const { withTransaction } = require('../../utils/withTransaction');
 const { logAction } = require('../../utils/auditLogger');
+const RawMaterialQuarantine = require('../../models/RawMaterialQuarantine');
 const { getFirmId } = require('../../utils/tenantContext');
 
 const { getBotanicalInfo, resolveHerbDetails } = require('../../utils/botanicalLookup');
@@ -470,26 +471,18 @@ router.post('/entries', idempotency, authorize('manufacturing:create'), validate
   }
 });
 
-// PATCH /api/raw-materials/entries/:id/qc-status — Quality control approval for raw material stock entries
+// PATCH /api/raw-materials/entries/:id/qc-status — legacy endpoint retired to prevent QC bypass.
 router.patch('/entries/:id/qc-status', authorize('manufacturing:qcApprove'), async (req, res) => {
   try {
-    const { qcStatus } = req.body;
-    if (!['under_test', 'approved', 'rejected'].includes(qcStatus)) {
-      return res.status(400).json({ error: 'qcStatus must be under_test, approved, or rejected' });
-    }
-
-    const entry = await RawMaterialEntry.findById(req.params.id);
+    const entry = await RawMaterialEntry.findById(req.params.id).select('_id qcStatus');
     if (!entry) return res.status(404).json({ error: 'Raw material entry not found' });
-
-    entry.qcStatus = qcStatus;
-    await entry.save();
-    await logAction({ action: 'RAW_MATERIAL_QC_STATUS_CHANGED', description: `Set raw-material batch ${entry.batchNo} QC status to ${qcStatus}`, details: { id: entry._id, qcStatus }, req });
-
-    if (req.io) {
-      req.io.emit('raw_material_updated', { type: 'qc_status_changed', id: entry._id, qcStatus });
-    }
-
-    res.json(entry);
+    const quarantineLot = await RawMaterialQuarantine.findOne({ rawMaterialEntryId: entry._id }).select('_id quarantineStatus');
+    return res.status(409).json({
+      error: 'Direct stock QC decisions are disabled. Register the complete stock entry in quarantine and record the evidence-backed disposition there.',
+      code: 'QUARANTINE_WORKFLOW_REQUIRED',
+      quarantineLotId: quarantineLot ? quarantineLot._id : null,
+      quarantineStatus: quarantineLot ? quarantineLot.quarantineStatus : null
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

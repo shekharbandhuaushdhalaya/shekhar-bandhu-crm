@@ -1,7 +1,6 @@
 const RawMaterial = require('../models/RawMaterial');
 const RawMaterialEntry = require('../models/RawMaterialEntry');
 const BillOfMaterials = require('../models/BillOfMaterials');
-const { resolveManufacturingWarehouse } = require('./manufacturingWarehouseService');
 
 /**
  * Parses size strings like "200ml", "450 ml", "1 L", "500g" to numeric value in ml/grams.
@@ -24,113 +23,12 @@ function getSizeInMl(sizeStr) {
 /**
  * Consume raw material starting from batch's ingredientsReserved, falling back to FEFO over available stock.
  */
-async function consumeFromReservation(batch, rawMaterialId, qtyNeeded, session) {
-  if (!qtyNeeded || qtyNeeded <= 0) return 0;
-  let needed = Number(qtyNeeded);
-  let totalConsumed = 0;
-
-  const targetIdStr = rawMaterialId.toString();
-
-  if (batch.ingredientsReserved && batch.ingredientsReserved.length > 0) {
-    for (const res of batch.ingredientsReserved) {
-      if (needed <= 0.0001) break;
-      if (!res.rawMaterialId || res.rawMaterialId.toString() !== targetIdStr) continue;
-      if ((res.qtyReserved || 0) <= 0.0001) continue;
-
-      const draw = Math.min(needed, res.qtyReserved);
-      const drawVal = Number(draw.toFixed(2));
-      if (drawVal <= 0) continue;
-
-      let query = RawMaterialEntry.findById(res.rawMaterialEntryId);
-      if (session) query = query.session(session);
-      const entry = await query;
-
-      if (!entry) throw new Error('Reserved raw-material lot no longer exists; resolve the reservation before continuing');
-      if (entry.qcStatus !== 'approved' || (entry.expiryDate && new Date(entry.expiryDate) <= new Date())) throw new Error('Reserved raw-material lot ' + entry.batchNo + ' is no longer eligible for use');
-      {
-        entry.reservedQty = Math.max(0, Number(((entry.reservedQty || 0) - drawVal).toFixed(2)));
-        entry.qty = Math.max(0, Number(((entry.qty || 0) - drawVal).toFixed(2)));
-        await entry.save(session ? { session } : undefined);
-
-        batch.rawMaterialCost = Number(((batch.rawMaterialCost || 0) + drawVal * (entry.purchaseRate || 0)).toFixed(2));
-
-        const existingConsumed = batch.ingredientsConsumed.find(
-          c => c.rawMaterialEntryId?.toString() === entry._id.toString()
-        );
-        if (existingConsumed) {
-          existingConsumed.qtyConsumed = Number((existingConsumed.qtyConsumed + drawVal).toFixed(2));
-        } else {
-          batch.ingredientsConsumed.push({
-            rawMaterialId: entry.rawMaterialId,
-            rawMaterialEntryId: entry._id,
-            qtyConsumed: drawVal,
-            batchNo: entry.batchNo
-          });
-        }
-
-        res.qtyReserved = Number((res.qtyReserved - drawVal).toFixed(2));
-        needed = Number((needed - drawVal).toFixed(2));
-        totalConsumed = Number((totalConsumed + drawVal).toFixed(2));
-      }
-    }
-
-    batch.ingredientsReserved = batch.ingredientsReserved.filter(r => (r.qtyReserved || 0) > 0.0001);
-  }
-
-  if (needed > 0.0001) {
-    const manufacturingWarehouse = await resolveManufacturingWarehouse(batch.manufacturingUnitId, session);
-    let query = RawMaterialEntry.find({
-      rawMaterialId,
-      warehouseId: manufacturingWarehouse._id,
-      qcStatus: 'approved',
-      $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }]
-    });
-    if (session) query = query.session(session);
-    const entries = await query;
-
-    entries.sort((a, b) => {
-      if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
-      if (a.expiryDate && !b.expiryDate) return -1;
-      if (!a.expiryDate && b.expiryDate) return 1;
-      return new Date(a.createdAt) - new Date(b.createdAt);
-    });
-
-    for (const entry of entries) {
-      if (needed <= 0.0001) break;
-      const avail = Math.max(0, (entry.qty || 0) - (entry.reservedQty || 0));
-      if (avail <= 0.0001) continue;
-
-      const deduct = Math.min(needed, avail);
-      const deductVal = Number(deduct.toFixed(2));
-      if (deductVal <= 0) continue;
-
-      entry.qty = Math.max(0, Number((entry.qty - deductVal).toFixed(2)));
-      await entry.save(session ? { session } : undefined);
-
-      batch.rawMaterialCost = Number(((batch.rawMaterialCost || 0) + deductVal * (entry.purchaseRate || 0)).toFixed(2));
-
-      const existingConsumed = batch.ingredientsConsumed.find(
-        c => c.rawMaterialEntryId?.toString() === entry._id.toString()
-      );
-      if (existingConsumed) {
-        existingConsumed.qtyConsumed = Number((existingConsumed.qtyConsumed + deductVal).toFixed(2));
-      } else {
-        batch.ingredientsConsumed.push({
-          rawMaterialId: entry.rawMaterialId,
-          rawMaterialEntryId: entry._id,
-          qtyConsumed: deductVal,
-          batchNo: entry.batchNo
-        });
-      }
-
-      needed = Number((needed - deductVal).toFixed(2));
-      totalConsumed = Number((totalConsumed + deductVal).toFixed(2));
-    }
-  }
-
-  return totalConsumed;
+async function consumeFromReservation() {
+  throw Object.assign(
+    new Error('MATERIAL_DISPENSING_REQUIRED: raw-material stock can only be issued through independently verified batch material dispensing'),
+    { code: 'MATERIAL_DISPENSING_REQUIRED' }
+  );
 }
-
 /**
  * Release all remaining unconsumed ingredientsReserved on batch.
  */
@@ -150,56 +48,42 @@ async function releaseAllReservations(batch, session) {
 }
 
 /**
- * Auto-deduct packaging materials (bottles, labels, boxes) when reaching packaging stage or completion.
+ * Verify that packaging material has already been issued through the independently
+ * verified dispensing workflow. This helper must never deduct stock itself.
  */
 async function deductPackagingMaterials(batch, outputQtyOrYields) {
   if (batch.packagingDeducted) return;
-
-  let itemsToProcess = [];
-  if (Array.isArray(outputQtyOrYields)) {
-    itemsToProcess = outputQtyOrYields;
-  } else {
-    itemsToProcess = [{
-      productId: batch.productId.toString(),
-      actualYieldQty: Number(outputQtyOrYields) || 0
-    }];
+  if (!batch.bomSnapshot || !Array.isArray(batch.bomSnapshot.ingredients)) {
+    throw new Error('BATCH_BOM_SNAPSHOT_REQUIRED: packaging reconciliation requires the batch-pinned formula snapshot');
   }
-
-  for (const item of itemsToProcess) {
-    const qty = Number(item.actualYieldQty);
-    if (qty <= 0) continue;
-
-    let bom = await BillOfMaterials.findOne({ productId: item.productId, isActive: true });
-    if (!bom) {
-      bom = await BillOfMaterials.findById(batch.bomId);
+  const itemsToProcess = Array.isArray(outputQtyOrYields)
+    ? outputQtyOrYields
+    : [{ actualYieldQty: Number(outputQtyOrYields) || 0 }];
+  const totalActualOutput = itemsToProcess.reduce((sum, item) => sum + Math.max(0, Number(item.actualYieldQty) || 0), 0);
+  if (totalActualOutput <= 0) throw new Error('ACTUAL_PACKAGING_OUTPUT_REQUIRED: record actual packed output before packaging reconciliation');
+  const packagingIngredients = batch.bomSnapshot.ingredients.filter(ingredient =>
+    ingredient.itemType === 'packaging'
+  );
+  for (const ingredient of packagingIngredients) {
+    const requiredQty = Number(ingredient.qtyRequired || 0) * totalActualOutput;
+    const stageName = String(ingredient.stageName || '').trim().toLowerCase();
+    const stageIndex = stageName
+      ? (batch.stages || []).findIndex(stage => String(stage.name || '').trim().toLowerCase() === stageName)
+      : -1;
+    if (stageIndex < 0) {
+      throw new Error('PACKAGING_STAGE_ASSIGNMENT_REQUIRED: packaging material ' +
+        String(ingredient.rawMaterialId) + ' must be assigned to a batch manufacturing stage before reconciliation');
     }
-    if (!bom) continue;
-
-    const pkgIngs = bom.ingredients.filter(ing => ing.itemType === 'packaging');
-
-    for (const ing of bom.ingredients) {
-      if (ing.itemType !== 'packaging') {
-        const rm = await RawMaterial.findById(ing.rawMaterialId);
-        if (rm && (rm.materialType === 'packaging' || (rm.materialType === 'packaging' || rm.category === 'Packaging' || rm.category === 'Packaging Material') || rm.category === 'Packaging Material') && !pkgIngs.some(p => p.rawMaterialId.toString() === ing.rawMaterialId.toString())) {
-          pkgIngs.push(ing);
-        }
-      }
-    }
-
-    if (!pkgIngs || pkgIngs.length === 0) continue;
-
-    for (const ing of pkgIngs) {
-      if (batch.ingredientsConsumed.some(c => c.rawMaterialId?.toString() === ing.rawMaterialId?.toString())) {
-        continue;
-      }
-      const qtyNeeded = ing.qtyRequired * qty;
-      const rm = await RawMaterial.findById(ing.rawMaterialId);
-      if (!rm) continue;
-
-      await consumeFromReservation(batch, ing.rawMaterialId, qtyNeeded);
+    const dispensedQty = (batch.ingredientsConsumed || [])
+      .filter(consumed => String(consumed.rawMaterialId) === String(ingredient.rawMaterialId) &&
+        Number(consumed.stageIndex) === stageIndex && Boolean(consumed.dispensingNo))
+      .reduce((sum, consumed) => sum + Number(consumed.qtyConsumed || 0), 0);
+    if (dispensedQty + 0.0001 < requiredQty) {
+      throw new Error('PACKAGING_DISPENSING_REQUIRED: packaging material ' + String(ingredient.rawMaterialId) +
+        ' requires ' + requiredQty.toFixed(2) + ' units verified through the independent dispensing workflow; ' +
+        dispensedQty.toFixed(2) + ' verified');
     }
   }
-
   batch.packagingDeducted = true;
 }
 

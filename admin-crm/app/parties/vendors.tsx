@@ -43,6 +43,24 @@ function VendorDetailModal({ vendor, visible, onClose, onDeleted, onEdit }: { ve
   const { user } = useAuth();
   const perm = usePermission();
   const canAccessCash = user?.canAccessCash ?? false;
+  const [scorecard, setScorecard] = useState<any>(null);
+  const [scorecardLoading, setScorecardLoading] = useState(false);
+  const [scorecardError, setScorecardError] = useState('');
+
+  useEffect(() => {
+    if (!visible || !vendor?._id) return;
+    let active = true;
+    setScorecardLoading(true);
+    setScorecardError('');
+    api.getSupplierScorecard(vendor._id).then((result: any) => {
+      if (active) setScorecard(result?.scorecard || null);
+    }).catch((error: any) => {
+      if (active) setScorecardError(error?.message || 'Unable to load supplier performance evidence');
+    }).finally(() => {
+      if (active) setScorecardLoading(false);
+    });
+    return () => { active = false; };
+  }, [visible, vendor?._id]);
 
   if (!vendor) return null;
 
@@ -210,6 +228,60 @@ function VendorDetailModal({ vendor, visible, onClose, onDeleted, onEdit }: { ve
               </View>
             </View>
           </View>
+
+
+          <View style={styles.infoSectionHeader}>
+            <Text style={styles.infoSectionTitle}>Supplier Performance — Last 12 Months</Text>
+          </View>
+          {scorecardLoading ? (
+            <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.infoLabel}>Loading verified PO, GRN, return and qualification metrics…</Text>
+            </View>
+          ) : scorecardError ? (
+            <Text style={styles.infoValue}>{scorecardError}</Text>
+          ) : scorecard ? (
+            <View style={{ gap: 10, marginTop: 8 }}>
+              <View style={styles.infoItem}>
+                <Ionicons name="cart-outline" size={16} color={colors.primary} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>Purchase orders / value</Text>
+                  <Text style={styles.infoValue}>{scorecard.purchaseOrderCount} orders · ₹{Number(scorecard.totalPurchaseOrderValue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Text>
+                </View>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="time-outline" size={16} color={colors.info} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>On-time delivery (fully accepted orders with promised dates)</Text>
+                  <Text style={styles.infoValue}>{scorecard.onTimeDeliveryRate == null ? 'Insufficient verified history' : scorecard.onTimeDeliveryRate + '%'} · {scorecard.onTimeDeliveryCount} on time / {scorecard.lateDeliveryCount} late</Text>
+                </View>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="flask-outline" size={16} color={colors.success} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>GRN acceptance rate</Text>
+                  <Text style={styles.infoValue}>{scorecard.acceptanceRate == null ? 'No receipt data' : scorecard.acceptanceRate + '%'} · Accepted {scorecard.acceptedQuantity} / Received {scorecard.receivedQuantity}</Text>
+                </View>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="alert-circle-outline" size={16} color={colors.warning} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>Rejected quantity / supplier returns</Text>
+                  <Text style={styles.infoValue}>Rejected {scorecard.rejectedQuantity} · Returned {scorecard.supplierReturnQuantity} ({scorecard.supplierReturnRate == null ? 'n/a' : scorecard.supplierReturnRate + '%'} of received)</Text>
+                </View>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} style={styles.infoIcon} />
+                <View>
+                  <Text style={styles.infoLabel}>Current raw-material qualification coverage</Text>
+                  <Text style={styles.infoValue}>{scorecard.currentQualificationCoverage == null ? 'No raw-material qualification basis' : scorecard.currentQualificationCoverage + '%'} · {scorecard.currentlyQualifiedRawMaterials} / {scorecard.rawMaterialsOnPurchaseOrders} materials</Text>
+                </View>
+              </View>
+              <Text style={styles.infoLabel}>Evidence-based indicators only. No composite supplier rating is inferred from missing or incomplete records.</Text>
+            </View>
+          ) : (
+            <Text style={styles.infoLabel}>Supplier performance data is not available.</Text>
+          )}
 
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 16 }}>
             <TouchableOpacity style={styles.editBtn} onPress={onEdit}>

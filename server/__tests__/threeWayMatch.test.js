@@ -35,7 +35,7 @@ describe('Procurement PO, GRN, and 3-Way Match Models', () => {
     const invoiceTotalAmount = 39200;
 
     const qtyMatch = grnQtyAccepted >= poQtyOrdered && invoiceQtyBilled === grnQtyAccepted;
-    const amountMatch = Math.abs(poTotalAmount - invoiceTotalAmount) <= 10;
+    const amountMatch = Math.abs(poTotalAmount - invoiceTotalAmount) <= 0.01;
 
     expect(qtyMatch).toBe(true);
     expect(amountMatch).toBe(true);

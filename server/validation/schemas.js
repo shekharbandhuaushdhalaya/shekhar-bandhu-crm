@@ -490,23 +490,9 @@ const batchCompleteSchema = z.object({
   wasteQty: z.number().int().min(0).default(0),
   wasteReason: z.string().default(''),
   qcNotes: z.string().default(''),
-  qcPassedBy: z.string().default(''),
   packing: z.number().int().min(1).default(1),
   yields: z.array(yieldItemSchema).optional(),
-  qcStatus: z.enum(['approved', 'rejected']).default('approved'),
-  organoleptic: z.string().optional(),
-  moistureContent: z.number().nullable().optional(),
-  moistureLimit: z.string().optional(),
-  ashValue: z.number().nullable().optional(),
-  ashValueLimit: z.string().optional(),
-  pHValue: z.number().nullable().optional(),
-  pHLimit: z.string().optional(),
-  disintegrationTime: z.number().nullable().optional(),
-  disintegrationLimit: z.string().optional(),
-  heavyMetals: z.string().optional(),
-  microbialLimit: z.string().optional(),
-  labReportRef: z.string().optional(),
-  testStandardRef: z.string().optional(),
+  qcStatus: z.enum(['pending', 'approved', 'rejected']).default('pending'),
   warehouseId: objectId,
   jobWorkerCertificateRef: z.string().optional().default(''),
   coaDocumentRef: z.string().optional().default(''),
@@ -852,6 +838,8 @@ const poItemInputSchema = z.object({
 });
 
 const purchaseOrderSchema = z.object({
+  requisitionId: objectId.optional(),
+  procurementExceptionReason: z.string().optional().default(''),
   vendorId: objectId,
   vendorName: z.string().optional().default(''),
   items: z.array(poItemInputSchema).min(1, 'At least one item required'),
@@ -865,7 +853,13 @@ const grnItemInputSchema = z.object({
   qtyReceived: z.number().positive(),
   qtyAccepted: z.number().nonnegative(),
   qtyRejected: z.number().nonnegative().optional().default(0),
-  batchNo: z.string().min(1, 'Batch number is required'),
+  batchNo: z.string().min(1, 'Supplier batch number is required'),
+  supplierCoaRef: z.string().trim().max(500).optional().default(''),
+  supplierCoaNo: z.string().trim().max(120).optional().default(''),
+  supplierCoaDate: z.string().or(z.date()).optional(),
+  supplierCoaLabName: z.string().trim().max(200).optional().default(''),
+  supplierCoaBatchNo: z.string().trim().max(120).optional().default(''),
+  supplierCoaDocumentRef: z.string().trim().max(500).optional().default(''),
   mfgDate: z.string().or(z.date()).optional(),
   expiryDate: z.string().or(z.date()).optional(),
   rejectionReason: z.string().optional().default('')
@@ -875,7 +869,36 @@ const grnSchema = z.object({
   poId: objectId,
   warehouseId: objectId,
   items: z.array(grnItemInputSchema).min(1, 'At least one GRN item required'),
-  notes: z.string().optional().default('')
+  notes: z.string().optional().default(''),
+  gateEntryNo: z.string().trim().max(80).optional().default(''),
+  vehicleNo: z.string().trim().max(40).optional().default(''),
+  driverName: z.string().trim().max(120).optional().default(''),
+  transporterName: z.string().trim().max(160).optional().default(''),
+  eWayBillNo: z.string().trim().max(80).optional().default(''),
+  gateInAt: z.string().or(z.date()).optional(),
+  grossWeight: z.number().nonnegative().optional(),
+  tareWeight: z.number().nonnegative().optional(),
+  netWeight: z.number().nonnegative().optional(),
+  weightUnit: z.enum(['kg', 'g', 'mt']).optional().default('kg'),
+  weighmentSlipRef: z.string().trim().max(500).optional().default('')
+}).superRefine((value, ctx) => {
+  const weights = [value.grossWeight, value.tareWeight, value.netWeight];
+  const hasAnyWeight = weights.some(weight => weight !== undefined);
+  if (hasAnyWeight && weights.some(weight => weight === undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['grossWeight'], message: 'Gross, tare and net weights must be supplied together' });
+    return;
+  }
+  if (hasAnyWeight) {
+    if (value.grossWeight < value.tareWeight) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['grossWeight'], message: 'Gross weight cannot be less than tare weight' });
+    }
+    if (Math.abs((value.grossWeight - value.tareWeight) - value.netWeight) > 0.001) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['netWeight'], message: 'Net weight must equal gross weight minus tare weight' });
+    }
+    if (!value.weighmentSlipRef.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['weighmentSlipRef'], message: 'Weighment slip reference is required when weights are recorded' });
+    }
+  }
 });
 
 // ── Manufacturing Structural & GMP Compliance Schemas ─────────
@@ -893,8 +916,7 @@ const equipmentSchema = z.object({
   name: z.string().min(1),
   category: z.enum(['mixer', 'drier', 'pulverizer', 'tableting', 'filling', 'packaging', 'qc_instrument', 'other']),
   manufacturingUnitId: objectId,
-  calibrationDueDate: z.string().or(z.date()).optional().nullable(),
-  lastMaintenanceDate: z.string().or(z.date()).optional().nullable(),
+  calibrationFrequencyDays: z.number().int().positive().optional(),
   notes: z.string().optional().default('')
 });
 
@@ -983,6 +1005,39 @@ const dispatchSchema = z.object({
   status: z.enum(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned']).default('dispatched'),
 });
 
+// PATCH /api/dispatches/:id — no defaults on partial updates. In particular,
+// source fields stay visible to the route's immutable-source guard.
+const dispatchUpdateSchema = z.object({
+  dispatchNo: z.string().optional(),
+  invoiceId: objectId.optional(),
+  invoiceNo: z.string().optional(),
+  challanId: objectId.optional(),
+  challanNo: z.string().optional(),
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
+  shippingAddress: z.string().optional(),
+  items: z.array(z.object({
+    productId: objectId.optional(),
+    name: z.string().min(1),
+    qty: z.number().nonnegative(),
+    packing: z.number().int().min(1).optional(),
+    batchNo: z.string().optional(),
+  })).optional(),
+  transporter: z.string().optional(),
+  lrNo: z.string().optional(),
+  vehicleNo: z.string().optional(),
+  courierName: z.string().optional(),
+  trackingId: z.string().optional(),
+  trackingUrl: z.string().optional(),
+  totalBoxes: z.number().nonnegative().optional(),
+  totalWeight: z.string().optional(),
+  freightCharge: z.number().nonnegative().optional(),
+  status: z.enum(['pending', 'dispatched', 'in_transit', 'out_for_delivery', 'delivered', 'returned']).optional(),
+  notes: z.string().optional(),
+  dispatchDate: z.string().or(z.date()).optional(),
+  proofOfDelivery: dispatchSchema.shape.proofOfDelivery,
+}).strict();
+
 // ── ManufacturingUnit ────────────────────────────────────────
 const manufacturingUnitSchema = z.object({
   name: z.string().min(1, 'Manufacturing unit name required'),
@@ -1041,6 +1096,7 @@ const batchStageUpdateSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'completed', 'skipped', 'failed']).optional(),
   notes: z.string().optional(),
   completedBy: z.string().optional(),
+  equipmentId: objectId.optional().nullable(),
   inputQty: z.number().min(0).optional(),
   outputQty: z.number().min(0).optional(),
   actualYieldQty: z.number().min(0).optional(),
@@ -1122,6 +1178,7 @@ module.exports = {
   campaignSchema,
   complaintSchema,
   dispatchSchema,
+  dispatchUpdateSchema,
   systemSettingsSchema,
   rbacPermissionsSchema,
   querySubmitSchema,

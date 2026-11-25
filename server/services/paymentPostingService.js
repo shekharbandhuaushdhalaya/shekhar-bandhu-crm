@@ -138,11 +138,18 @@ async function allocateExistingPayment({ paymentId, allocations = [] }) {
   });
 }
 
-async function reversePayment(paymentId, actorId = null) {
+async function reversePayment(paymentId, actor = {}, reason = '') {
+  const reversalReason = String(reason || '').trim();
+  if (!actor.id || !actor.name || reversalReason.length < 10) {
+    throw paymentError('PAYMENT_REVERSAL_EVIDENCE_REQUIRED', 'Authenticated reversal identity and a substantive reason are required');
+  }
   return withTransaction(async session => {
     const payment = await Payment.findById(paymentId).session(session);
     if (!payment) throw paymentError('PAYMENT_NOT_FOUND', 'Payment not found');
     if (payment.status === 'reversed') throw paymentError('PAYMENT_ALREADY_REVERSED', 'Payment has already been reversed');
+    if (payment.createdByUserId && String(payment.createdByUserId) === String(actor.id)) {
+      throw paymentError('PAYMENT_REVERSAL_MAKER_CHECKER_REQUIRED', 'The payment creator cannot independently reverse the same payment');
+    }
     for (const alloc of payment.allocations || []) {
       const invoice = await Invoice.findById(alloc.invoiceId).session(session);
       if (!invoice) continue;
@@ -159,7 +166,9 @@ async function reversePayment(paymentId, actorId = null) {
     // represented as a state transition rather than destructive deletion.
     payment.status = 'reversed';
     payment.reversedAt = new Date();
-    payment.reversedBy = actorId || null;
+    payment.reversedBy = actor.id;
+    payment.reversedByName = actor.name;
+    payment.reversalReason = reversalReason.slice(0, 1000);
     await payment.save({ session });
     return payment;
   });

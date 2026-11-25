@@ -27,14 +27,15 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
 
   const handlePrintPdf = () => {
     if (Platform.OS === 'web' && bmrReport) {
-      const header = bmrReport.ayushHeader || {};
+      const header = bmrReport.organizationDetails || bmrReport.ayushHeader || {};
+      const manufacturingLineClearance = (bmrReport.lineClearance || []).find((record: any) => record.phase === 'manufacturing' && record.cleared === true);
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(`
           <!DOCTYPE html>
           <html>
           <head>
-            <title>BMR_${bmrReport.batchNo}_AYUSH_GMP</title>
+            <title>INTERNAL_BMR_${bmrReport.batchNo}</title>
             <style>
               body { font-family: 'Arial', sans-serif; padding: 20px; color: #111; font-size: 12px; }
               .header { text-align: center; border-bottom: 2px solid #1b4d3e; padding-bottom: 10px; margin-bottom: 15px; }
@@ -57,12 +58,12 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               <h1 class="firm-title">${header.firmName || FIRM_DETAILS.name}</h1>
               <div class="firm-subtitle">${header.firmAddress || FIRM_DETAILS.address}</div>
               <div class="lic-badges">
-                <span class="lic-badge">AYUSH Mfg Lic No: ${header.manufacturingLicenseNo || 'AYUSH-1983-UP'}</span>
-                <span class="lic-badge">AYUSH GMP Cert: ${header.gmpCertificateNo || 'GMP-AYUSH-2026-VNS'}</span>
-                <span class="lic-badge">Dosage Category: ${bmrReport.productCategory || 'Ayurvedic Medicine'}</span>
+                <span class="lic-badge">AYUSH Mfg Lic No: ${header.manufacturingLicenseNo || 'Not recorded'}</span>
+                <span class="lic-badge">AYUSH GMP Cert: ${header.gmpCertificateNo || 'Not recorded'}</span>
+                <span class="lic-badge">Dosage Category: ${bmrReport.productCategory || bmrReport.productDetails?.category || 'Not recorded'}</span>
               </div>
-              <h3 style="margin-top:12px; margin-bottom:0; letter-spacing:1px; color:#333;">BATCH MANUFACTURING RECORD (BMR)</h3>
-              <div style="font-size:10px; color:#666;">Schedule T — Drugs & Cosmetics Act Compliance Audit</div>
+              <h3 style="margin-top:12px; margin-bottom:0; letter-spacing:1px; color:#333;">INTERNAL BATCH MANUFACTURING RECORD (BMR)</h3>
+              <div style="font-size:10px; color:#666;">Internal record only — confirm applicable licence and Schedule T requirements with authorised QA.</div>
             </div>
 
             <div class="section-title">I. BATCH IDENTIFICATION & REGULATORY METADATA</div>
@@ -72,9 +73,9 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               <div><strong>Planned Batch Qty:</strong> ${bmrReport.plannedQty} units</div>
               <div><strong>Actual Packaged Yield:</strong> ${bmrReport.actualYieldQty} units</div>
               <div><strong>Mfg Date:</strong> ${fmtDate(bmrReport.mfgDate)}</div>
-              <div><strong>Expiry Date:</strong> ${fmtDate(bmrReport.expiryDate)} (${bmrReport.shelfLifeMonths || 36} Months)</div>
+              <div><strong>Expiry Date:</strong> ${fmtDate(bmrReport.expiryDate)} (${bmrReport.shelfLifeMonths ? bmrReport.shelfLifeMonths + ' Months' : 'Not recorded'})</div>
               <div><strong>Pre-BMR Approval:</strong> ${bmrReport.bmrApprovedByName ? `${bmrReport.bmrApprovedByName} (${fmtDateTime(bmrReport.bmrApprovedAt)})` : 'Pending'}</div>
-              <div><strong>Line Clearance:</strong> ${bmrReport.lineClearance ? `${bmrReport.lineClearance.clearedByName} (${fmtDateTime(bmrReport.lineClearance.clearedAt)})` : 'Pending'}</div>
+              <div><strong>Line Clearance:</strong> ${manufacturingLineClearance ? `${manufacturingLineClearance.clearedByName} (${fmtDateTime(manufacturingLineClearance.clearedAt)})` : 'Pending'}</div>
             </div>
 
             <div class="section-title">II. BOTANICAL RAW MATERIALS & MASTER RECIPE TRACEABILITY</div>
@@ -148,30 +149,29 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                 </tr>
               </thead>
               <tbody>
-                ${bmrReport.qcParameters ? `
-                  <tr><td>Organoleptic Evaluation</td><td>Standard</td><td>${bmrReport.qcParameters.organoleptic || 'Complies'}</td><td>PASS</td></tr>
-                  <tr><td>Moisture Content (LOD)</td><td>${bmrReport.qcParameters.moistureLimit || 'NMT 10% w/w'}</td><td>${bmrReport.qcParameters.moistureContent !== null ? `${bmrReport.qcParameters.moistureContent}% w/w` : 'N/A'}</td><td>PASS</td></tr>
-                  <tr><td>Total Ash Value</td><td>${bmrReport.qcParameters.ashValueLimit || 'NMT 5% w/w'}</td><td>${bmrReport.qcParameters.ashValue !== null ? `${bmrReport.qcParameters.ashValue}% w/w` : 'N/A'}</td><td>PASS</td></tr>
-                  <tr><td>pH Value (1% w/v)</td><td>${bmrReport.qcParameters.pHLimit || '4.0 - 7.0'}</td><td>${bmrReport.qcParameters.pHValue !== null ? bmrReport.qcParameters.pHValue : 'N/A'}</td><td>PASS</td></tr>
-                  <tr><td>Disintegration Time</td><td>${bmrReport.qcParameters.disintegrationLimit || 'NMT 30 mins'}</td><td>${bmrReport.qcParameters.disintegrationTime !== null ? `${bmrReport.qcParameters.disintegrationTime} mins` : 'N/A'}</td><td>PASS</td></tr>
-                  <tr><td>Heavy Metals (Pb, Cd, Hg, As)</td><td>Within API Limits</td><td>${bmrReport.qcParameters.heavyMetals || 'Complies'}</td><td>PASS</td></tr>
-                  <tr><td>Microbial Limit Test</td><td>Within API Limits</td><td>${bmrReport.qcParameters.microbialLimit || 'Complies'}</td><td>PASS</td></tr>
-                ` : '<tr><td colspan="4">QC parameters pending analysis</td></tr>'}
+                ${(bmrReport.qcTests || []).length ? (bmrReport.qcTests || []).map((test: any) => `
+                  <tr>
+                    <td>${test.name || test.code || 'Unnamed test'}</td>
+                    <td>${test.specification || 'Not recorded'}</td>
+                    <td>${test.result ?? test.numericResult ?? 'Not recorded'} ${test.unit || ''}</td>
+                    <td>${String(test.status || 'not_tested').replace('_', ' ').toUpperCase()}</td>
+                  </tr>
+                `).join('') : '<tr><td colspan="4">No specification-linked QC test results are recorded. No pass is implied.</td></tr>'}
               </tbody>
             </table>
 
             <div class="sig-grid">
               <div class="sig-box">
                 <div>Manufacturing Chemist</div>
-                <div style="font-size:10px; font-weight:normal; color:#555; margin-top:4px;">${bmrReport.bmrApprovedByName || 'Authorized Manufacturing In-Charge'}</div>
+                <div style="font-size:10px; font-weight:normal; color:#555; margin-top:4px;">${bmrReport.bmrApprovedByName || 'Not recorded'}</div>
               </div>
               <div class="sig-box">
                 <div>Analytical Chemist (QC)</div>
-                <div style="font-size:10px; font-weight:normal; color:#555; margin-top:4px;">${bmrReport.qcPassedBy || 'Authorized QC Inspector'}</div>
+                <div style="font-size:10px; font-weight:normal; color:#555; margin-top:4px;">${bmrReport.qcPassedBy || 'Not recorded'}</div>
               </div>
               <div class="sig-box">
                 <div>Quality Assurance (QA Releaser)</div>
-                <div style="font-size:10px; font-weight:normal; color:#555; margin-top:4px;">${bmrReport.releasedByName || 'Authorized QA Manager'}</div>
+                <div style="font-size:10px; font-weight:normal; color:#555; margin-top:4px;">${bmrReport.releasedByName || 'Not recorded'}</div>
               </div>
             </div>
             <script>window.onload = function() { window.print(); };</script>
@@ -185,7 +185,8 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
     }
   };
 
-  const header = bmrReport?.ayushHeader || {};
+  const header = bmrReport?.organizationDetails || bmrReport?.ayushHeader || {};
+  const manufacturingLineClearance = (bmrReport?.lineClearance || []).find((record: any) => record.phase === 'manufacturing' && record.cleared === true);
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -196,7 +197,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
             <View>
               <Text style={styles.modalTitle}>Batch Manufacturing Record (BMR)</Text>
               <Text style={{ ...Typography.caption, color: colors.text.secondary, marginTop: 2 }}>
-                AYUSH GMP (Schedule T) Quality Compliance Audit & Master Formula Record
+                Internal batch record preview — not a statutory form or certificate
               </Text>
             </View>
             <TouchableOpacity onPress={onClose}>
@@ -210,7 +211,8 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
             </View>
           ) : bmrReport ? (
             <ScrollView style={[styles.modalForm, { padding: 16 }]} contentContainerStyle={{ gap: 16 }}>
-              {/* Official Header Branding & AYUSH License Bar */}
+              {/* Organization details and configured licence references */}
+              <Text style={{ ...Typography.caption, color: colors.warning }}>{bmrReport.notice || 'Internal system-generated record only; not an official statutory form or certificate.'} Status: {bmrReport.documentStatus || 'DRAFT_INCOMPLETE'}</Text>
               <View style={{ alignItems: 'center', borderBottomWidth: 2, borderBottomColor: colors.primary, paddingBottom: 12, marginBottom: 4 }}>
                 <Text style={{ ...Typography.h2, fontWeight: '800', color: colors.primary }}>
                   {header.firmName || FIRM_DETAILS.name}
@@ -219,27 +221,27 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                   {header.firmAddress || FIRM_DETAILS.address}
                 </Text>
 
-                {/* AYUSH License Badges */}
+                {/* Configured licence references only; missing values remain explicit. */}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, justifyContent: 'center' }}>
                   <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 0.5, borderColor: colors.primary + '40' }}>
                     <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.primary }}>
-                       AYUSH Mfg Lic No: {header.manufacturingLicenseNo || 'AYUSH-1983-UP'}
+                       AYUSH Mfg Lic No: {header.manufacturingLicenseNo || 'Not recorded'}
                     </Text>
                   </View>
                   <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 0.5, borderColor: colors.success + '40' }}>
                     <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.success }}>
-                       AYUSH GMP Cert: {header.gmpCertificateNo || 'GMP-AYUSH-2026-VNS'}
+                       AYUSH GMP Cert: {header.gmpCertificateNo || 'Not recorded'}
                     </Text>
                   </View>
                   <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 0.5, borderColor: colors.border }}>
                     <Text style={{ ...Typography.eyebrow, fontWeight: '700', color: colors.text.secondary }}>
-                       Dosage Category: {bmrReport.productCategory || 'Ayurvedic Formulated Medicine'}
+                       Dosage Category: {bmrReport.productCategory || bmrReport.productDetails?.category || 'Not recorded'}
                     </Text>
                   </View>
                 </View>
 
                 <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginTop: 10 }}>
-                  OFFICIAL BATCH MANUFACTURING RECORD (BMR)
+                  INTERNAL BATCH MANUFACTURING RECORD (BMR)
                 </Text>
                 {bmrReport.bomSnapshot?.formulationStandardRef ? (
                   <Text style={{ ...Typography.caption, fontStyle: 'italic', color: colors.primary, marginTop: 2 }}>
@@ -261,9 +263,9 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                     { label: 'Product Name & SKU:', val: `${bmrReport.productName} (${bmrReport.productSku})` },
                     { label: 'Theoretical Planned Batch Qty:', val: `${bmrReport.plannedQty} units` },
                     { label: 'Actual Packaged Yield Output:', val: `${bmrReport.actualYieldQty} units`, valColor: colors.success },
-                    { label: 'Manufacturing & Expiry Dates:', val: `${fmtDate(bmrReport.mfgDate)}  ${fmtDate(bmrReport.expiryDate)} (${bmrReport.shelfLifeMonths || 36} Months Shelf-Life)` },
+                    { label: 'Manufacturing & Expiry Dates:', val: `${fmtDate(bmrReport.mfgDate)}  ${fmtDate(bmrReport.expiryDate)} (${bmrReport.shelfLifeMonths || 'Not recorded'} Months Shelf-Life)` },
                     { label: 'Pre-Execution BMR Approval:', val: bmrReport.bmrApprovedByName ? `${bmrReport.bmrApprovedByName} (${fmtDateTime(bmrReport.bmrApprovedAt)})` : 'Pending Pre-Approval' },
-                    { label: 'Line Clearance Verification:', val: bmrReport.lineClearance ? `${bmrReport.lineClearance.clearedByName} (${fmtDateTime(bmrReport.lineClearance.clearedAt)}) — Prev Batch: ${bmrReport.lineClearance.previousBatchNo || 'None'}` : 'Pending Line Clearance' },
+                    { label: 'Line Clearance Verification:', val: manufacturingLineClearance ? `${manufacturingLineClearance.clearedByName} (${fmtDateTime(manufacturingLineClearance.clearedAt)}) — Prev Batch: ${manufacturingLineClearance.previousBatchNo || 'None'}` : 'Pending Line Clearance' },
                     { label: 'Manufacturing Timeline:', val: `${fmtDate(bmrReport.startDate)}  ${bmrReport.endDate ? fmtDate(bmrReport.endDate) : 'Ongoing'}` }
                   ].map(({ label, val, valColor }) => (
                     <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -465,37 +467,25 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
                   <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
                     SECTION VII: QC LABORATORY PHYSICOCHEMICAL TESTING & LIMITS
                   </Text>
-                  <View style={{ backgroundColor: bmrReport.qcStatus === 'rejected' ? colors.danger : colors.success, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                  <View style={{ backgroundColor: bmrReport.qcStatus === 'rejected' ? colors.danger : (bmrReport.qcStatus === 'approved' ? colors.success : colors.warning), paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
                     <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: '#fff' }}>
-                      {bmrReport.qcStatus === 'rejected' ? 'REJECTED' : 'APPROVED'}
+                      {bmrReport.qcStatus === 'rejected' ? 'REJECTED' : (bmrReport.qcStatus === 'approved' ? 'APPROVED — REVIEW EVIDENCE' : 'PENDING / NOT RELEASED')}
                     </Text>
                   </View>
                 </View>
                 <View style={{ padding: 12, gap: 8 }}>
-                  {bmrReport.qcParameters && (
-                    <View style={{ backgroundColor: colors.bg.primary, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border, gap: 6, marginBottom: 4 }}>
-                      <Text style={{ ...Typography.eyebrow, fontWeight: '800', color: colors.text.secondary }}>
-                         PARAMETER SPECIFICATIONS VS OBSERVED TEST RESULTS
-                      </Text>
-                      <View style={{ gap: 4, marginTop: 4 }}>
-                        {[
-                          bmrReport.qcParameters.organoleptic && { label: 'Organoleptic Evaluation', val: bmrReport.qcParameters.organoleptic, limit: 'Standard' },
-                          bmrReport.qcParameters.moistureContent !== null && { label: 'Moisture Content (LOD)', val: `${bmrReport.qcParameters.moistureContent}% w/w`, limit: bmrReport.qcParameters.moistureLimit || 'NMT 10% w/w' },
-                          bmrReport.qcParameters.ashValue !== null && { label: 'Total Ash Value', val: `${bmrReport.qcParameters.ashValue}% w/w`, limit: bmrReport.qcParameters.ashValueLimit || 'NMT 5% w/w' },
-                          bmrReport.qcParameters.pHValue !== null && { label: 'pH Value (1% w/v)', val: `${bmrReport.qcParameters.pHValue}`, limit: bmrReport.qcParameters.pHLimit || '4.0 - 7.0' },
-                          bmrReport.qcParameters.disintegrationTime !== null && { label: 'Disintegration Time', val: `${bmrReport.qcParameters.disintegrationTime} mins`, limit: bmrReport.qcParameters.disintegrationLimit || 'NMT 30 mins' },
-                          bmrReport.qcParameters.heavyMetals && { label: 'Heavy Metals (Pb, Cd, Hg, As)', val: bmrReport.qcParameters.heavyMetals, limit: 'Within API Limits' },
-                          bmrReport.qcParameters.microbialLimit && { label: 'Microbial Limit Test', val: bmrReport.qcParameters.microbialLimit, limit: 'Within API Limits' },
-                        ].filter(Boolean).map((item: any) => (
-                          <View key={item.label} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ ...Typography.caption, color: colors.text.secondary }}>
-                              {item.label}: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{item.val}</Text>
-                            </Text>
-                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Limit: {item.limit}</Text>
-                          </View>
-                        ))}
-                      </View>
+                  {(bmrReport.qcTests || []).length > 0 ? (
+                    <View style={{ gap: 6 }}>
+                      {(bmrReport.qcTests || []).map((test: any, idx: number) => (
+                        <View key={test.code || idx} style={{ paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+                          <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>{test.name || test.code || 'Unnamed test'}</Text>
+                          <Text style={{ ...Typography.eyebrow, color: colors.text.secondary }}>Specification: {test.specification || 'Not recorded'} · Result: {test.result ?? test.numericResult ?? 'Not recorded'} {test.unit || ''}</Text>
+                          <Text style={{ ...Typography.eyebrow, color: test.status === 'pass' ? colors.success : (test.status === 'fail' ? colors.danger : colors.warning) }}>Status: {String(test.status || 'not_tested').replace('_', ' ').toUpperCase()} · Analyst: {test.testedByName || 'Not recorded'} · Tested: {fmtDateTime(test.testedAt)}</Text>
+                        </View>
+                      ))}
                     </View>
+                  ) : (
+                    <Text style={{ ...Typography.caption, color: colors.warning }}>No specification-linked QC test results are recorded. No test pass is implied.</Text>
                   )}
                   <Text style={{ ...Typography.caption, color: colors.text.primary }}>
                     <Text style={{ fontWeight: '700' }}>QC Inspector Remarks: </Text>{bmrReport.qcNotes}
@@ -507,20 +497,20 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: colors.bg.secondary, padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                   <Text style={{ ...Typography.caption, fontWeight: '800', color: colors.primary }}>
-                    SECTION VIII: STATUTORY MAKER-CHECKER & MARKET RELEASE SIGNATURES
+                    SECTION VIII: CONTROLLED REVIEW & MARKET RELEASE SIGNATURES
                   </Text>
                 </View>
                 <View style={{ padding: 12, gap: 10 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
                     <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Manufacturing Chemist Sign-Off:</Text>
                     <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
-                      {bmrReport.bmrApprovedByName || 'Authorized Manufacturing Chemist'}
+                      {bmrReport.bmrApprovedByName || 'Not recorded'}
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
                     <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Analytical Chemist (QC Inspection):</Text>
                     <Text style={{ ...Typography.caption, fontWeight: '700', color: colors.text.primary }}>
-                      {bmrReport.qcPassedBy || 'Authorized QC Inspector'}
+                      {bmrReport.qcPassedBy || 'Not recorded'}
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -545,7 +535,7 @@ export default function BMRReportModal({ visible, loadingBmr, bmrReport, onClose
             {bmrReport && (
               <TouchableOpacity style={styles.submitBtn} onPress={handlePrintPdf}>
                 <Ionicons name="print-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                <Text style={styles.submitBtnText}>Print Official BMR PDF</Text>
+                <Text style={styles.submitBtnText}>Print Internal BMR Record</Text>
               </TouchableOpacity>
             )}
           </View>

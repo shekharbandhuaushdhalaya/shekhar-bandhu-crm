@@ -30,6 +30,7 @@ import RawMaterialModal from './manufacturing/modals/RawMaterialModal';
 import BOMModal from './manufacturing/modals/BOMModal';
 import LaunchBatchModal from './manufacturing/modals/LaunchBatchModal';
 import QCSignoffModal from './manufacturing/modals/QCSignoffModal';
+import FinishedProductQcModal from './manufacturing/modals/FinishedProductQcModal';
 import BMRReportModal from './manufacturing/modals/BMRReportModal';
 import CoAModal from './manufacturing/modals/CoAModal';
 import PharmacopoeiaModal from './manufacturing/modals/PharmacopoeiaModal';
@@ -116,6 +117,8 @@ export default function ManufacturingScreen() {
   const [bomModalVisible, setBomModalVisible] = useState(false);
   const [productionModalVisible, setProductionModalVisible] = useState(false);
   const [qcModalVisible, setQcModalVisible] = useState(false);
+  const [qcWorkflowBatch, setQcWorkflowBatch] = useState<any>(null);
+  const [qcWorkflowVisible, setQcWorkflowVisible] = useState(false);
   const [genealogyModalVisible, setGenealogyModalVisible] = useState(false);
   const [genealogyData, setGenealogyData] = useState<any>(null);
   const [genealogyLoading, setGenealogyLoading] = useState(false);
@@ -138,8 +141,9 @@ export default function ManufacturingScreen() {
   const [stageNotes, setStageNotes] = useState('');
   const [stageModalVisible, setStageModalVisible] = useState(false);
   const [stageError, setStageError] = useState('');
-  interface StageIngredient { rawMaterialId: string; name: string; unit: string; qtyTheoretical: number; actualQty: string; wastage: string; itemType?: string; qtyRequiredPerUnit?: number; stockAvailable?: number; }
+  interface StageIngredient { rawMaterialId: string; rawMaterialEntryId?: string; lotNo?: string; qtyReserved?: number; name: string; unit: string; qtyTheoretical: number; actualQty: string; wastage: string; itemType?: string; qtyRequiredPerUnit?: number; stockAvailable?: number; }
   const [stageIngredients, setStageIngredients] = useState<StageIngredient[]>([]);
+  const [stageDispensings, setStageDispensings] = useState<any[]>([]);
   const [stageLossReason, setStageLossReason] = useState('');
   const [stageOutputYield, setStageOutputYield] = useState('');
   const [stageYields, setStageYields] = useState<{ productId: string; actualYieldQty: number; packing: number; size: string; productName?: string }[]>([]);
@@ -287,16 +291,6 @@ export default function ManufacturingScreen() {
   const [qcWasteQty, setQcWasteQty] = useState('');
   const [qcWasteReason, setQcWasteReason] = useState('');
   const [qcNotes, setQcNotes] = useState('');
-  const [qcPassedBy, setQcPassedBy] = useState('');
-  const [qcStatus, setQcStatus] = useState<'approved' | 'rejected'>('approved');
-  const [qcOrganoleptic, setQcOrganoleptic] = useState('');
-  const [qcMoisture, setQcMoisture] = useState('');
-  const [qcAsh, setQcAsh] = useState('');
-  const [qcPh, setQcPh] = useState('');
-  const [qcDisintegration, setQcDisintegration] = useState('');
-  const [qcHeavyMetals, setQcHeavyMetals] = useState('Pass');
-  const [qcMicrobial, setQcMicrobial] = useState('Pass');
-  const [qcLabReportRef, setQcLabReportRef] = useState('');
   const [qcJobWorkerCertificateRef, setQcJobWorkerCertificateRef] = useState('');
   const [qcCoaDocumentRef, setQcCoaDocumentRef] = useState('');
   const [qcJobWorkCharges, setQcJobWorkCharges] = useState('');
@@ -976,10 +970,6 @@ export default function ManufacturingScreen() {
       setQcError('Please enter a valid positive number for Actual Output Yield Size.');
       return;
     }
-    if (!qcPassedBy || !qcPassedBy.trim()) {
-      setQcError('QC Inspector Name is mandatory.');
-      return;
-    }
     if (!qcWarehouseId) {
       setQcError('Target Storage Warehouse selection is mandatory.');
       return;
@@ -1005,17 +995,7 @@ export default function ManufacturingScreen() {
         actualYieldQty: Number(qcYieldQty),
         packing: Number(qcPacking) || undefined,
         qcNotes: qcNotes.trim(),
-        qcPassedBy: qcPassedBy.trim(),
         yields: yieldsPayload,
-        qcStatus,
-        organoleptic: qcOrganoleptic.trim(),
-        moistureContent: qcMoisture ? parseFloat(qcMoisture) : null,
-        ashValue: qcAsh ? parseFloat(qcAsh) : null,
-        pHValue: qcPh ? parseFloat(qcPh) : null,
-        disintegrationTime: qcDisintegration ? parseInt(qcDisintegration) : null,
-        heavyMetals: qcHeavyMetals,
-        microbialLimit: qcMicrobial,
-        labReportRef: qcLabReportRef.trim(),
         warehouseId: qcWarehouseId,
         jobWorkerCertificateRef: selectedBatchRun.productionType === 'job_work' ? qcJobWorkerCertificateRef.trim() : '',
         coaDocumentRef: selectedBatchRun.productionType === 'job_work' ? qcCoaDocumentRef.trim() : '',
@@ -1035,16 +1015,6 @@ export default function ManufacturingScreen() {
       setQcWasteQty('');
       setQcWasteReason('');
       setQcNotes('');
-      setQcPassedBy('');
-      setQcStatus('approved');
-      setQcOrganoleptic('');
-      setQcMoisture('');
-      setQcAsh('');
-      setQcPh('');
-      setQcDisintegration('');
-      setQcHeavyMetals('Pass');
-      setQcMicrobial('Pass');
-      setQcLabReportRef('');
       setQcJobWorkerCertificateRef('');
       setQcCoaDocumentRef('');
       setQcJobWorkCharges('');
@@ -1082,15 +1052,18 @@ export default function ManufacturingScreen() {
     setStageNotes('');
     setStageError('');
     setStageLossReason('');
+    setStageDispensings([]);
+    api.getMaterialDispensings(batchId).then(records => {
+      setStageDispensings((records || []).filter((record: any) => Number(record.stageIndex) === idx));
+    }).catch((err: any) => showToast(err?.message || 'Unable to load material dispensing history.', 'error'));
+
     const batch = batches.find(b => b._id === batchId);
     if (batch) {
       const stage = batch.stages[idx];
       const stageName = stage.name;
-      
       const isPacking = stageName.trim().toLowerCase().includes('pack') || stageName.trim().toLowerCase().includes('label');
       setStageOutputYield(isPacking ? (batch.plannedQty ? batch.plannedQty.toString() : '10') : '');
 
-      // Load products for yield editor (packaging stage)
       if (isPacking) {
         api.getProducts().then(prods => setProductsForYield(prods || [])).catch((err: any) => {
           showToast(err?.message || 'Unable to load products for yield calculation.', 'error');
@@ -1098,21 +1071,17 @@ export default function ManufacturingScreen() {
       } else {
         setStageYields([]);
       }
-      
+
       const formulationBasis = (batch.bomSnapshot as any)?.formulationBasis || 100;
       const formulationBasisUnit = ((batch.bomSnapshot as any)?.formulationBasisUnit || 'ml').toLowerCase();
-      
-      // Compute initial yields for packaging stage — include ALL size variants of the batch's product
       const initialYields = (() => {
         if (!isPacking) return [];
-        // Collect all size variant product IDs for this batch's product
         const mainPid = typeof batch.productId === 'string' ? batch.productId : (batch.productId as any)?._id || '';
         const allVariantPids = new Set<string>();
         if (mainPid) {
           allVariantPids.add(mainPid);
           (products || []).forEach(p => { if (p.parentId === mainPid) allVariantPids.add(p._id); });
         }
-        // Build a map of productId → yield data from saved yields
         const yieldMap = new Map<string, { actualYieldQty: number; packing: number; size: string }>();
         if ((batch as any).yields && (batch as any).yields.length > 0) {
           (batch as any).yields.forEach((y: any) => {
@@ -1125,84 +1094,124 @@ export default function ManufacturingScreen() {
             yieldMap.set(pid, { actualYieldQty: y.plannedQty || 0, packing: 1, size: y.size || '' });
           });
         }
-        // Yield row for every variant (with data from map if available)
         return [...allVariantPids].map(pid => {
           const existing = yieldMap.get(pid);
           const prod = products.find(p => p._id === pid);
-          return {
-            productId: pid,
-            actualYieldQty: existing?.actualYieldQty || 0,
-            packing: existing?.packing || 1,
-            size: existing?.size || prod?.size || ''
-          };
+          return { productId: pid, actualYieldQty: existing?.actualYieldQty || 0, packing: existing?.packing || 1, size: existing?.size || prod?.size || '' };
         });
       })();
       setStageYields(initialYields);
 
-      let scale = 1;
-      let effectiveYields: any[] = [];
-      if (isPacking) {
-        effectiveYields = initialYields;
-      } else {
-        effectiveYields = (batch as any).plannedYields || [];
-      }
+      let scale = (batch.plannedQty || 0) / formulationBasis;
+      const effectiveYields: any[] = isPacking ? initialYields : ((batch as any).plannedYields || []);
       if (effectiveYields.length > 0 && !isPacking) {
-        // Only compute scale from plannedYields for non-packaging stages
         let totalBatchVolume = 0;
         let allHaveSizes = true;
         for (const y of effectiveYields) {
           const sizeMl = parseSizeMl(y.size || '');
-          if (sizeMl > 0) {
-            totalBatchVolume += sizeMl * (Number(y.plannedQty || y.actualYieldQty) || 0);
-          } else {
-            allHaveSizes = false;
-            break;
-          }
+          if (sizeMl > 0) totalBatchVolume += sizeMl * (Number(y.plannedQty || y.actualYieldQty) || 0);
+          else { allHaveSizes = false; break; }
         }
         if (allHaveSizes && totalBatchVolume > 0) {
           const totalInBasisUnit = formulationBasisUnit === 'l' ? totalBatchVolume / 1000 : totalBatchVolume;
           scale = totalInBasisUnit / formulationBasis;
-        } else {
-          scale = (batch.plannedQty || 0) / formulationBasis;
         }
-      } else {
-        scale = (batch.plannedQty || 0) / formulationBasis;
       }
 
-      // Stage-tied formulation ingredients
-      const ingredients = (batch.bomSnapshot?.ingredients || []).filter(
-        i => i.stageName && i.stageName.trim().toLowerCase() === stageName.trim().toLowerCase()
+      const ingredients = (batch.bomSnapshot?.ingredients || []).filter((ingredient: any) =>
+        ingredient.stageName && ingredient.stageName.trim().toLowerCase() === stageName.trim().toLowerCase() &&
+        (ingredient.itemType !== 'packaging' || (batch as any).packagingMode === 'self_packed')
       );
-      let computed = ingredients.map(i => {
-        const rmId = typeof i.rawMaterialId === 'string' ? i.rawMaterialId : (i.rawMaterialId as any)?._id || '';
-        const rm = materials.find(r => r._id === rmId);
-        const qtyTheoretical = parseFloat(((i.qtyRequired || 0) * scale).toFixed(3));
-        return {
-          rawMaterialId: rmId,
-          name: rm?.name || 'Unknown',
-          unit: rm?.unit || 'kg',
-          qtyTheoretical,
-          actualQty: qtyTheoretical.toString(),
-          wastage: '0',
-          itemType: i.itemType || 'formulation',
-          qtyRequiredPerUnit: i.qtyRequired || 0,
-          stockAvailable: (rm as any)?.stockLevel || 0,
-        };
+      const verifiedByMaterial = new Map<string, number>();
+      (batch.ingredientsConsumed || []).forEach((consumed: any) => {
+        if (consumed.stageIndex === null || consumed.stageIndex === undefined || Number(consumed.stageIndex) !== idx) return;
+        const rmId = typeof consumed.rawMaterialId === 'string' ? consumed.rawMaterialId : consumed.rawMaterialId?._id || '';
+        verifiedByMaterial.set(rmId, (verifiedByMaterial.get(rmId) || 0) + Number(consumed.qtyConsumed || 0));
       });
-
-      // Also include packaging materials (bottles, caps, labels) for packaging stages
-      if (isPacking && (batch as any).packagingMode === 'self_packed') {
-        const yieldsForPkg = initialYields.length > 0 ? initialYields : ((batch as any).plannedYields || []);
-        // Compute packaging per yield product using each product's BOM
-        const pkgFromYields = computePackagingFromYields(yieldsForPkg, batch, computed);
-        computed = pkgFromYields;
+      const requiredByMaterial = new Map<string, any>();
+      const totalOutputQty = initialYields.reduce((sum, yieldItem) => sum + Number(yieldItem.actualYieldQty || 0), 0) ||
+        Number((batch as any).actualYieldQty || batch.plannedQty || 0);
+      for (const ingredient of ingredients) {
+        const rawMaterialId = typeof ingredient.rawMaterialId === 'string'
+          ? ingredient.rawMaterialId
+          : ingredient.rawMaterialId?._id || '';
+        if (!rawMaterialId) continue;
+        const itemType = ingredient.itemType || 'formulation';
+        const requiredQty = itemType === 'packaging'
+          ? Number(ingredient.qtyRequired || 0) * totalOutputQty
+          : ((ingredient as any).qtyRequiredForBatch !== undefined && (ingredient as any).qtyRequiredForBatch !== null
+            ? Number((ingredient as any).qtyRequiredForBatch)
+            : Number(ingredient.qtyRequired || 0) * scale);
+        const existing = requiredByMaterial.get(rawMaterialId) || {
+          rawMaterialId, itemType, name: materials.find((material: any) => material._id === rawMaterialId)?.name || 'Unknown',
+          unit: materials.find((material: any) => material._id === rawMaterialId)?.unit || 'kg',
+          qtyRequiredPerUnit: Number(ingredient.qtyRequired || 0), requiredQty: 0
+        };
+        existing.requiredQty += requiredQty;
+        requiredByMaterial.set(rawMaterialId, existing);
       }
 
+      const computed: StageIngredient[] = [];
+      for (const required of requiredByMaterial.values()) {
+        let remaining = Math.max(0, required.requiredQty - (verifiedByMaterial.get(required.rawMaterialId) || 0));
+        const reservations = ((batch as any).ingredientsReserved || []).filter((reservation: any) => {
+          const reservedMaterialId = typeof reservation.rawMaterialId === 'string'
+            ? reservation.rawMaterialId : reservation.rawMaterialId?._id || '';
+          return reservedMaterialId === required.rawMaterialId &&
+            (!reservation.stageName || reservation.stageName.trim().toLowerCase() === stageName.trim().toLowerCase()) &&
+            Number(reservation.qtyReserved || 0) > 0.0001;
+        });
+        for (const reservation of reservations) {
+          if (remaining <= 0.0001) break;
+          const allocated = Math.min(remaining, Number(reservation.qtyReserved || 0));
+          if (allocated <= 0.0001) continue;
+          computed.push({
+            rawMaterialId: required.rawMaterialId,
+            rawMaterialEntryId: typeof reservation.rawMaterialEntryId === 'string'
+              ? reservation.rawMaterialEntryId : reservation.rawMaterialEntryId?._id || '',
+            lotNo: reservation.batchNo || '',
+            qtyReserved: Number(reservation.qtyReserved || 0),
+            name: required.name, unit: required.unit,
+            qtyTheoretical: Number(allocated.toFixed(3)),
+            actualQty: Number(allocated.toFixed(3)).toString(),
+            wastage: '0', itemType: required.itemType,
+            qtyRequiredPerUnit: required.qtyRequiredPerUnit,
+            stockAvailable: Number(reservation.qtyReserved || 0)
+          });
+          remaining = Number((remaining - allocated).toFixed(3));
+        }
+        if (remaining > 0.0001) {
+          computed.push({
+            rawMaterialId: required.rawMaterialId, rawMaterialEntryId: '',
+            lotNo: 'NO RESERVED LOT', qtyReserved: 0,
+            name: required.name, unit: required.unit,
+            qtyTheoretical: Number(remaining.toFixed(3)),
+            actualQty: Number(remaining.toFixed(3)).toString(),
+            wastage: '0', itemType: required.itemType,
+            qtyRequiredPerUnit: required.qtyRequiredPerUnit,
+            stockAvailable: 0
+          });
+        }
+      }
       setStageIngredients(computed);
     } else {
       setStageIngredients([]);
     }
     setStageModalVisible(true);
+  };
+
+  const handleVerifyMaterialDispensing = async (dispensingId: string) => {
+    if (!stageBatchId) return;
+    try {
+      await api.verifyMaterialDispensing(stageBatchId, dispensingId, stageNotes.trim());
+      showToast('Material dispensing independently verified.', 'success');
+      setStageModalVisible(false);
+      setStageDispensings([]);
+      setStageIngredients([]);
+      await loadData();
+    } catch (err: any) {
+      setStageError(err.message || 'Unable to verify material dispensing. The reviewer must be different from the dispensing operator.');
+    }
   };
 
   const handleSkipStage = (batchId: string, idx: number) => {
@@ -1213,6 +1222,7 @@ export default function ManufacturingScreen() {
     setStageNotes('');
     setStageError('');
     setStageIngredients([]);
+    setStageDispensings([]);
     setStageModalVisible(true);
   };
 
@@ -1224,6 +1234,7 @@ export default function ManufacturingScreen() {
     setStageNotes('');
     setStageError('');
     setStageIngredients([]);
+    setStageDispensings([]);
     setStageModalVisible(true);
   };
 
@@ -1301,13 +1312,46 @@ export default function ManufacturingScreen() {
       if (stageAction === 'skip') statusVal = 'skipped';
       if (stageAction === 'fail') statusVal = 'failed';
 
-      const siPayload = stageIngredients.map(si => ({
-        rawMaterialId: si.rawMaterialId,
-        qtyNeeded: parseFloat(si.actualQty) || si.qtyTheoretical,
-        wastage: parseFloat(si.wastage) || 0,
-        itemType: si.itemType || 'formulation',
-        lossReason: parseFloat(si.wastage) > 0 ? stageLossReason.trim() : '',
-      }));
+      if (stageAction === 'advance') {
+        const currentRecords = await api.getMaterialDispensings(stageBatchId);
+        const recordsForStage = (currentRecords || []).filter((record: any) => Number(record.stageIndex) === stageIndex);
+        setStageDispensings(recordsForStage);
+        const pendingRecords = recordsForStage.filter((record: any) => record.status === 'pending_verification');
+        if (pendingRecords.length > 0) {
+          setStageError('Material dispensing is awaiting independent verification. A different authorized user must verify the pending record before this stage can be completed.');
+          return;
+        }
+        if (stageIngredients.length > 0) {
+          const issueLines = stageIngredients.filter(si => (parseFloat(si.actualQty) || 0) > 0);
+          if (issueLines.length === 0) {
+            setStageError('Enter a positive weighed quantity for at least one reserved stock lot.');
+            return;
+          }
+          const missingLot = issueLines.find(si => !si.rawMaterialEntryId || !si.lotNo || si.lotNo === 'NO RESERVED LOT');
+          if (missingLot) {
+            setStageError('A required material has no eligible batch reservation. Resolve the reservation before dispensing.');
+            return;
+          }
+          const overReserved = issueLines.find(si => (parseFloat(si.actualQty) || 0) > Number(si.qtyReserved || 0) + 0.0001);
+          if (overReserved) {
+            setStageError('Weighed quantity exceeds the remaining reserved quantity for lot ' + (overReserved.lotNo || '') + '.');
+            return;
+          }
+          const items = issueLines.map(si => ({
+            rawMaterialId: si.rawMaterialId,
+            rawMaterialEntryId: si.rawMaterialEntryId,
+            qtyDispensed: Number((parseFloat(si.actualQty) || 0).toFixed(2)),
+            qtyWasted: Number((parseFloat(si.wastage) || 0).toFixed(2)),
+            wastageReason: (parseFloat(si.wastage) || 0) > 0 ? stageLossReason.trim() : '',
+            unit: si.unit
+          }));
+          await api.createMaterialDispensing(stageBatchId, stageIndex, items);
+          const refreshed = await api.getMaterialDispensings(stageBatchId);
+          setStageDispensings((refreshed || []).filter((record: any) => Number(record.stageIndex) === stageIndex));
+          showToast('Dispensing record submitted. Independent verification is required before stage completion.', 'success');
+          return;
+        }
+      }
       const yieldsPayload = stageYields.length > 0 ? stageYields.map(y => ({
         productId: y.productId,
         actualYieldQty: y.actualYieldQty,
@@ -1320,10 +1364,8 @@ export default function ManufacturingScreen() {
         notes: stageNotes.trim(),
         lossReason: stageLossReason.trim(),
         ...(isPacking && stageOutputYield && !yieldsPayload ? { actualYieldQty: parseFloat(stageOutputYield) || 0 } : {}),
-        ...(stageAction === 'advance' && siPayload.length > 0 ? { stageIngredients: siPayload } : {}),
         ...(stageAction === 'advance' && yieldsPayload ? { yields: yieldsPayload } : {}),
       });
-
       setStageAction(null);
       setStageBatchId(null);
       setStageIndex(null);
@@ -2017,12 +2059,15 @@ export default function ManufacturingScreen() {
             onCancelProduction={handleCancelProduction}
             onQcSignOff={(batch) => {
               setSelectedBatchRun(batch);
-              setQcPassedBy('');
               setQcWasteQty('');
               setQcWasteReason('');
               setQcNotes('');
               setQcError('');
               setQcModalVisible(true);
+            }}
+            onOpenQcWorkflow={(batch) => {
+              setQcWorkflowBatch(batch);
+              setQcWorkflowVisible(true);
             }}
             isIntegerQty={isIntegerQty}
             getStatusColor={getStatusColor}
@@ -2192,16 +2237,6 @@ export default function ManufacturingScreen() {
         qcWasteQty={qcWasteQty} setQcWasteQty={setQcWasteQty}
         qcWasteReason={qcWasteReason} setQcWasteReason={setQcWasteReason}
         qcNotes={qcNotes} setQcNotes={setQcNotes}
-        qcPassedBy={qcPassedBy} setQcPassedBy={setQcPassedBy}
-        qcStatus={qcStatus} setQcStatus={setQcStatus}
-        qcOrganoleptic={qcOrganoleptic} setQcOrganoleptic={setQcOrganoleptic}
-        qcMoisture={qcMoisture} setQcMoisture={setQcMoisture}
-        qcAsh={qcAsh} setQcAsh={setQcAsh}
-        qcPh={qcPh} setQcPh={setQcPh}
-        qcDisintegration={qcDisintegration} setQcDisintegration={setQcDisintegration}
-        qcHeavyMetals={qcHeavyMetals} setQcHeavyMetals={setQcHeavyMetals}
-        qcMicrobial={qcMicrobial} setQcMicrobial={setQcMicrobial}
-        qcLabReportRef={qcLabReportRef} setQcLabReportRef={setQcLabReportRef}
         qcJobWorkerCertificateRef={qcJobWorkerCertificateRef} setQcJobWorkerCertificateRef={setQcJobWorkerCertificateRef}
         qcCoaDocumentRef={qcCoaDocumentRef} setQcCoaDocumentRef={setQcCoaDocumentRef}
         qcJobWorkCharges={qcJobWorkCharges} setQcJobWorkCharges={setQcJobWorkCharges}
@@ -2214,6 +2249,18 @@ export default function ManufacturingScreen() {
         onAddQcYieldRow={handleAddQcYieldRow}
         onRemoveQcYieldRow={handleRemoveQcYieldRow}
         onQcYieldChange={handleQcYieldChange}
+      />
+
+      <FinishedProductQcModal
+        visible={qcWorkflowVisible}
+        batch={qcWorkflowBatch}
+        onClose={() => setQcWorkflowVisible(false)}
+        onCompleted={() => {
+          setQcWorkflowVisible(false);
+          setQcWorkflowBatch(null);
+          loadedRef.current.delete('batches');
+          fetchDataset('batches');
+        }}
       />
 
       <BMRReportModal
@@ -2258,13 +2305,13 @@ export default function ManufacturingScreen() {
       {/* ======================================================== */}
       <Modal visible={stageModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => { setStageModalVisible(false); setStageIngredients([]); setStageYields([]); setProductsForYield([]); setShowYieldProductPicker(false); }} />
+          <Pressable style={styles.modalBackdrop} onPress={() => { setStageModalVisible(false); setStageIngredients([]); setStageDispensings([]); setStageYields([]); setProductsForYield([]); setShowYieldProductPicker(false); }} />
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {stageAction === 'advance' ? 'Complete Manufacturing Stage' : 'Skip Manufacturing Stage'}
               </Text>
-              <TouchableOpacity onPress={() => { setStageModalVisible(false); setStageIngredients([]); setStageYields([]); setProductsForYield([]); setShowYieldProductPicker(false); }}>
+              <TouchableOpacity onPress={() => { setStageModalVisible(false); setStageIngredients([]); setStageDispensings([]); setStageYields([]); setProductsForYield([]); setShowYieldProductPicker(false); }}>
                 <Ionicons name="close" size={20} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
@@ -2462,12 +2509,13 @@ export default function ManufacturingScreen() {
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                           <View style={{ flex: 1 }}>
                             <Text style={{ ...Typography.body, fontWeight: '800', color: colors.text.primary }}>{si.name}</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Reserved lot: {si.lotNo || 'No reserved lot'} · Reserved: {si.qtyReserved || 0} {si.unit}</Text>
                             <Text style={{ ...Typography.caption, color: colors.text.muted, marginTop: 1 }}>
                               Formula standard: <Text style={{ fontWeight: '700', color: colors.primary }}>{theoretical.toFixed(3)} {si.unit}</Text>
                             </Text>
                             {si.stockAvailable !== undefined && (
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                                <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>In stock:</Text>
+                                <Text style={{ ...Typography.eyebrow, color: colors.text.muted }}>Reserved:</Text>
                                 <Text style={{ ...Typography.caption, fontWeight: '800', color: (si.stockAvailable || 0) >= theoretical ? colors.success : colors.danger }}>
                                   {si.stockAvailable} {si.unit}
                                 </Text>
@@ -2492,7 +2540,7 @@ export default function ManufacturingScreen() {
                         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
                           <View style={{ flex: 1 }}>
                             <Text style={{ ...Typography.caption, color: colors.text.muted, marginBottom: 4, fontWeight: '700' }}>
-                               Taken from Stock ({si.unit})
+                               Weighed / issued ({si.unit})
                             </Text>
                             <TextInput
                               style={[styles.input, { height: 44, marginBottom: 0, borderColor: isOverUsed ? colors.danger : colors.border, fontWeight: '700' }]}
@@ -2502,7 +2550,7 @@ export default function ManufacturingScreen() {
                               placeholderTextColor={colors.text.muted}
                               placeholder={theoretical.toFixed(3)}
                             />
-                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Deducted from inventory</Text>
+                            <Text style={{ ...Typography.eyebrow, color: colors.text.muted, marginTop: 2 }}>Submitted for independent stock issue</Text>
                             {isOverUsed && (
                               <Text style={{ ...Typography.eyebrow, color: colors.danger, marginTop: 2 }}> More than formula qty</Text>
                             )}
@@ -2553,11 +2601,28 @@ export default function ManufacturingScreen() {
                   )}
                 </View>
               )}
+              {stageAction === 'advance' && stageDispensings.length > 0 && (
+                <View style={{ marginTop: 12, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg.secondary }}>
+                  <Text style={{ ...Typography.bodySm, fontWeight: '800', color: colors.text.primary, marginBottom: 8 }}>Material dispensing history</Text>
+                  {stageDispensings.map((record: any) => (
+                    <View key={record._id} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <Text style={{ ...Typography.bodySm, fontWeight: '700', color: colors.text.primary }}>{record.dispensingNo} · {String(record.status || '').replace('_', ' ').toUpperCase()}</Text>
+                      <Text style={{ ...Typography.caption, color: colors.text.secondary }}>{(record.items || []).map((item: any) => item.materialName + ' ' + item.qtyDispensed + ' ' + item.unit + (item.lotNo ? ' · ' + item.lotNo : '')).join(', ')}</Text>
+                      {record.status === 'pending_verification' && (
+                        <TouchableOpacity style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }} onPress={() => handleVerifyMaterialDispensing(record._id)}>
+                          <Text style={{ ...Typography.caption, color: '#FFFFFF', fontWeight: '800' }}>Verify as independent reviewer</Text>
+                        </TouchableOpacity>
+                      )}
+                      {record.status === 'verified' && <Text style={{ ...Typography.caption, color: colors.success, marginTop: 4 }}>Verified by {record.verifiedByName || 'recorded reviewer'}</Text>}
+                    </View>
+                  ))}
+                </View>
+              )}
               {stageAction === 'advance' && stageIngredients.length === 0 && (
                 <View style={{ marginTop: 12, padding: 10, backgroundColor: colors.bg.secondary, borderRadius: 8, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                   <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
                   <Text style={{ ...Typography.bodySm, color: colors.text.secondary, flex: 1 }}>
-                    No specific ingredients assigned to this stage. Proceed to complete it.
+                    All required material quantities are already verified, or no materials are assigned to this stage. You may complete the stage.
                   </Text>
                 </View>
               )}
@@ -2571,7 +2636,7 @@ export default function ManufacturingScreen() {
                 onPress={handleSaveStageAction}
               >
                 <Text style={styles.submitBtnText}>
-                  {stageAction === 'advance' ? 'Complete Stage' : 'Skip Stage'}
+                  {stageAction === 'advance' ? (stageIngredients.length > 0 ? 'Submit Dispensing for Verification' : 'Complete Stage') : 'Skip Stage'}
                 </Text>
               </TouchableOpacity>
             </View>

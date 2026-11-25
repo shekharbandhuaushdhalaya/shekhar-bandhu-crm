@@ -71,8 +71,12 @@ const paymentSchema = new mongoose.Schema({
     default: 'active',
     index: true,
   },
+  createdByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  createdByName: { type: String, default: '' },
   reversedAt: { type: Date, default: null },
   reversedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  reversedByName: { type: String, default: '' },
+  reversalReason: { type: String, default: '', trim: true },
   allocations: [paymentAllocationSchema]
 }, { timestamps: true });
 

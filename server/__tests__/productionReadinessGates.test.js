@@ -23,7 +23,8 @@ describe('Production release-control defaults', () => {
       auditorName: 'Quality auditor',
       nextAuditDue: new Date(Date.now() + 86400000)
     });
-    expect(qualification.qualificationStatus).toBe('conditional');
+    expect(qualification.qualificationStatus).toBe('pending_verification');
+    expect(qualification.proposedQualificationStatus).toBe('conditional');
     expect(qualification.gmpComplianceScore).toBeNull();
     expect(qualification.auditedByUserId).toBeNull();
   });

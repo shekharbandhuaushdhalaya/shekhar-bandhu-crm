@@ -8,7 +8,12 @@ const affectedCustomerSchema = new mongoose.Schema({
   invoiceDate: { type: Date },
   suppliedQty: { type: Number, required: true },
   notified: { type: Boolean, default: false },
-  notifiedAt: { type: Date }
+  notifiedAt: { type: Date },
+  notifiedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  notifiedByName: { type: String, default: '' },
+  notificationMethod: { type: String, enum: ['email', 'phone', 'letter', 'portal', 'other', ''], default: '' },
+  notificationReference: { type: String, default: '', trim: true },
+  notificationNotes: { type: String, default: '', trim: true }
 }, { _id: false });
 
 const recallSchema = new mongoose.Schema({
@@ -23,6 +28,10 @@ const recallSchema = new mongoose.Schema({
   recalledQty: { type: Number, default: 0 },
   status: { type: String, enum: ['initiated', 'in_progress', 'completed', 'closed'], default: 'initiated' },
   initiatedBy: { type: String, default: 'System' },
+  initiatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  statusUpdatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  statusUpdatedByName: { type: String, default: '' },
+  statusUpdatedAt: { type: Date },
   closureNotes: { type: String, default: '' }
 }, { timestamps: true });
 

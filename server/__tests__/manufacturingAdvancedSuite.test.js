@@ -3,6 +3,7 @@ const request = require('supertest');
 
 // Mocks
 jest.mock('../models/BatchProduction');
+jest.mock('../models/RawMaterial');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/AuditLog');
 jest.mock('../models/RolePermission');
@@ -14,6 +15,7 @@ jest.mock('../models/Counter', () => ({
 }));
 
 const BatchProduction = require('../models/BatchProduction');
+const RawMaterial = require('../models/RawMaterial');
 const SystemSettings = require('../models/SystemSettings');
 const AuditLog = require('../models/AuditLog');
 const RolePermission = require('../models/RolePermission');
@@ -30,7 +32,7 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
     app = express();
     app.use(express.json());
     app.use((req, res, next) => {
-      req.user = { id: '507f1f77bcf86cd799439011', name: 'Dr. V. K. Sharma', role: 'admin' };
+      req.user = { id: req.headers['x-user-id'] || '507f1f77bcf86cd799439011', name: req.headers['x-user-name'] || 'Dr. V. K. Sharma', role: 'admin' };
       next();
     });
     app.use('/api/batch-productions', batchRouter);
@@ -42,98 +44,79 @@ describe('Features 10, 12, 13: Advanced AYUSH Manufacturing & Audit Suite', () =
   });
 
   // Feature 10 Tests
-  describe('Feature 10: Packing Material Reconciliation & Schedule T Audit', () => {
-    test('POST /api/batch-productions/:id/label-reconciliation passes compliant reconciliation', async () => {
-      const mockSave = jest.fn().mockResolvedValue(true);
-      const mockBatch = {
-        _id: 'batch_101',
-        batchNo: 'B-2026-101',
-        labelReconciliation: [],
+  describe('Feature 10: Internal Packaging Material Reconciliation', () => {
+    const makeBatch = (id) => {
+      const labelReconciliation = [];
+      labelReconciliation.id = (itemId) => labelReconciliation.find(item => item._id === itemId);
+      return {
+        _id: id,
+        batchNo: 'B-2026-' + id,
+        status: 'completed',
+        releasedBy: null,
+        bomSnapshot: { ingredients: [{ rawMaterialId: 'mat_1', itemType: 'packaging' }, { rawMaterialId: 'mat_2', itemType: 'packaging' }] },
+        ingredientsConsumed: [{ rawMaterialId: 'mat_1', qtyConsumed: 1000, dispensingNo: 'DSP-001' }, { rawMaterialId: 'mat_2', qtyConsumed: 1000, dispensingNo: 'DSP-002' }],
+        labelReconciliation,
         deviations: [],
-        save: mockSave
+        save: jest.fn().mockResolvedValue(true)
       };
-      BatchProduction.findById.mockResolvedValue(mockBatch);
+    };
 
+    beforeEach(() => {
+      RawMaterial.findById.mockImplementation(id => ({
+        lean: jest.fn().mockResolvedValue({ _id: id, name: id === 'mat_1' ? 'Printed Carton 100g' : 'AYUSH Hologram Labels' })
+      }));
+    });
+
+    test('submits reconciliation against verified dispensing quantities and waits for independent verification', async () => {
+      const mockBatch = makeBatch('batch_101');
+      BatchProduction.findById.mockResolvedValue(mockBatch);
       const res = await request(app)
         .post('/api/batch-productions/batch_101/label-reconciliation')
-        .send({
-          items: [
-            {
-              rawMaterialId: 'mat_1',
-              name: 'Printed Carton 100g',
-              qtyIssued: 1000,
-              qtyUsed: 995,
-              qtyDamaged: 5,
-              qtyReturnedToStore: 0
-            }
-          ]
-        });
+        .send({ items: [{ rawMaterialId: 'mat_1', qtyUsed: 995, qtyDamaged: 5, qtyReturnedToStore: 0 }] });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
-      expect(res.body.overallAuditStatus).toBe('PASSED');
-      expect(mockSave).toHaveBeenCalled();
+      expect(res.body.overallAuditStatus).toBe('PENDING_INDEPENDENT_VERIFICATION');
+      expect(mockBatch.labelReconciliation[0]).toMatchObject({
+        qtyIssued: 1000, qtyUsed: 995, qtyDamaged: 5, auditStatus: 'pending', reconciled: false
+      });
+      expect(mockBatch.save).toHaveBeenCalled();
     });
 
-    test('POST /api/batch-productions/:id/label-reconciliation flags discrepancy > 0.5% and logs quality deviation', async () => {
-      const mockSave = jest.fn().mockResolvedValue(true);
-      const mockBatch = {
-        _id: 'batch_102',
-        batchNo: 'B-2026-102',
-        labelReconciliation: [],
-        deviations: [],
-        save: mockSave
-      };
+    test('rejects caller-supplied issued quantity and materials not present in the pinned packaging formula', async () => {
+      const mockBatch = makeBatch('batch_102');
       BatchProduction.findById.mockResolvedValue(mockBatch);
-
-      const res = await request(app)
-        .post('/api/batch-productions/batch_102/label-reconciliation')
-        .send({
-          items: [
-            {
-              rawMaterialId: 'mat_2',
-              name: 'AYUSH Hologram Labels',
-              qtyIssued: 1000,
-              qtyUsed: 950,
-              qtyDamaged: 10,
-              qtyReturnedToStore: 0
-              // Unaccounted = 40 (4.0% discrepancy > 0.5%)
-            }
-          ]
-        });
-
-      expect(res.status).toBe(200);
-      expect(res.body.overallAuditStatus).toBe('FLAGGED_EXCEEDS_0.5_PERCENT');
-      expect(mockBatch.deviations).toHaveLength(1);
-      expect(mockBatch.deviations[0].description).toContain('Schedule T Packing Audit Alert');
-      expect(mockSave).toHaveBeenCalled();
+      const overIssue = await request(app).post('/api/batch-productions/batch_102/label-reconciliation')
+        .send({ items: [{ rawMaterialId: 'mat_1', qtyIssued: 5000, qtyUsed: 5000 }] });
+      expect(overIssue.status).toBe(400);
+      expect(mockBatch.labelReconciliation).toHaveLength(0);
+      const wrongMaterial = await request(app).post('/api/batch-productions/batch_102/label-reconciliation')
+        .send({ items: [{ rawMaterialId: 'unrelated', qtyUsed: 1 }] });
+      expect(wrongMaterial.status).toBe(400);
+      expect(mockBatch.save).not.toHaveBeenCalled();
     });
 
-    test('GET /api/batch-productions/:id/label-reconciliation-report generates official Schedule T audit JSON', async () => {
-      BatchProduction.findById.mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue({
-            _id: 'batch_101',
-            batchNo: 'B-2026-101',
-            productId: { name: 'Chyawanprash Special' },
-            labelReconciliation: [
-              { name: 'Printed Foil', qtyIssued: 500, qtyUsed: 498, discrepancyPct: 0.4, discrepancyFlagged: false }
-            ]
-          })
-        })
-      });
-
-      SystemSettings.findOne.mockReturnValue({
-        lean: jest.fn().mockResolvedValue({
-          firmName: 'SHEKHAR BANDHU AUSHADHALAYA'
-        })
-      });
-
-      const res = await request(app).get('/api/batch-productions/batch_101/label-reconciliation-report');
-      expect(res.status).toBe(200);
-      expect(res.body.title).toContain('AYUSH SCHEDULE T PACKING MATERIAL RECONCILIATION AUDIT REPORT');
-      expect(res.body.firmDetails.name).toBe('SHEKHAR BANDHU AUSHADHALAYA');
-      expect(res.body.auditSummary.auditResult).toContain('COMPLIANT');
+    test('requires independent reviewer and flags unaccounted quantities only after verification', async () => {
+      const mockBatch = makeBatch('batch_103');
+      BatchProduction.findById.mockResolvedValue(mockBatch);
+      const submitted = await request(app).post('/api/batch-productions/batch_103/label-reconciliation')
+        .send({ items: [{ rawMaterialId: 'mat_2', qtyUsed: 950, qtyDamaged: 10, qtyReturnedToStore: 0 }] });
+      expect(submitted.status).toBe(201);
+      const item = mockBatch.labelReconciliation[0];
+      item._id = 'reconciliation-item-1';
+      mockBatch.labelReconciliation.id = (itemId) => mockBatch.labelReconciliation.find(entry => entry._id === itemId);
+      const selfVerify = await request(app).patch('/api/batch-productions/batch_103/label-reconciliation/reconciliation-item-1/verify');
+      expect(selfVerify.status).toBe(409);
+      const verified = await request(app)
+        .patch('/api/batch-productions/batch_103/label-reconciliation/reconciliation-item-1/verify')
+        .set('x-user-id', 'independent-qa')
+        .set('x-user-name', 'Independent QA')
+        .send({ discrepancyNote: 'Investigate 40 labels not accounted for' });
+      expect(verified.status).toBe(200);
+      expect(verified.body.auditStatus).toBe('flagged');
+      expect(item).toMatchObject({ unaccountedQty: 40, discrepancyFlagged: true, reconciled: true, verifiedByName: 'Independent QA' });
+      expect(mockBatch.deviations).toHaveLength(1);
+      expect(mockBatch.deviations[0].description).toContain('Packaging material reconciliation discrepancy');
     });
   });
 

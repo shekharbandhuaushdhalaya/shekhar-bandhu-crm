@@ -32,55 +32,104 @@ router.get('/:batchNo', authorize('quality:view'), async (req, res) => {
   }
 });
 
-// POST /api/manufacturing/coa — Create CoA from an approved product-specific specification
+// POST /api/manufacturing/coa — Create an evidence-backed internal draft.
 router.post('/', authorize('quality:create'), async (req, res) => {
   try {
     const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
     const BatchProduction = require('../../models/BatchProduction');
     const { batchNo, productName, manufacturingDate, expiryDate, testingDate, specificationId, tests, remarks } = req.body;
+    if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated tester identity is required' });
+    if (!specificationId) return res.status(400).json({ error: 'An approved product-specific quality specification is required', code: 'COA_SPECIFICATION_REQUIRED' });
+    if (!batchNo || !productName || !manufacturingDate || !expiryDate || !testingDate) return res.status(400).json({ error: 'batchNo, productName, manufacturingDate, expiryDate and testingDate are required' });
+    const spec = await ProductQualitySpecification.findById(specificationId).lean();
+    if (!spec || spec.status !== 'approved') return res.status(400).json({ error: 'Only an approved product-specific QC specification can be used' });
+    if (!Array.isArray(spec.tests) || spec.tests.length === 0) return res.status(400).json({ error: 'The approved quality specification has no configured tests' });
+    const batch = await BatchProduction.findOne({ batchNo: batchNo.trim() });
+    if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
+    if (String(batch.productId) !== String(spec.productId)) return res.status(400).json({ error: 'QC specification does not belong to this batch product' });
 
-    if (!specificationId) return res.status(400).json({ error: 'An approved product-specific quality specification is required before a Certificate of Analysis can be created', code: 'COA_SPECIFICATION_REQUIRED' });
-
-    if (!batchNo || !productName || !manufacturingDate || !expiryDate) return res.status(400).json({ error:'batchNo, productName, manufacturingDate, expiryDate are required' });
-    const spec=await ProductQualitySpecification.findById(specificationId).lean();
-    if(!spec || spec.status!=='approved') return res.status(400).json({error:'Only an approved product-specific QC specification can be used for a CoA'});
-    const batch=await BatchProduction.findOne({batchNo:batchNo.trim()});
-    if(!batch) return res.status(404).json({error:'Batch production record not found'});
-    if(String(batch.productId)!==String(spec.productId)) return res.status(400).json({error:'QC specification does not belong to this batch product'});
-    const supplied=Array.isArray(tests)?tests:[];
-    const resultTests=spec.tests.map(t=>{
-      const r=supplied.find(x=>x.code===t.code) || {};
-      const status=['pass','fail','pending','not_tested'].includes(r.status)?r.status:'not_tested';
-      return {code:t.code,name:t.name,category:t.category,specification:t.specification,unit:t.unit,methodReference:t.methodReference,result:r.result ?? '',numericResult:r.numericResult ?? null,status,testedBy:req.user?.id||null,testedByName:req.user?.name||'',testedAt:r.testedAt?new Date(r.testedAt):(status==='pass'||status==='fail'?new Date():null),remarks:r.remarks||''};
+    const supplied = Array.isArray(tests) ? tests : [];
+    const resultTests = spec.tests.map(test => {
+      const recorded = supplied.find(item => item && item.code === test.code) || {};
+      const status = ['pass', 'fail', 'pending', 'not_tested'].includes(recorded.status) ? recorded.status : 'not_tested';
+      const hasResult = recorded.result !== undefined && recorded.result !== null && String(recorded.result).trim() !== '';
+      const testedAt = recorded.testedAt ? new Date(recorded.testedAt) : null;
+      const validTimestamp = testedAt && !Number.isNaN(testedAt.getTime());
+      return {
+        code: test.code, name: test.name, category: test.category, mandatory: test.mandatory !== false,
+        specification: test.specification, unit: test.unit, methodReference: test.methodReference,
+        result: hasResult ? String(recorded.result) : '',
+        numericResult: recorded.numericResult !== undefined && recorded.numericResult !== null && recorded.numericResult !== '' && Number.isFinite(Number(recorded.numericResult)) ? Number(recorded.numericResult) : null,
+        status: status === 'pass' && (!hasResult || !validTimestamp) ? 'pending' : status,
+        testedBy: ['pass', 'fail'].includes(status) ? req.user.id : null,
+        testedByName: ['pass', 'fail'].includes(status) ? req.user.name : '',
+        testedAt: validTimestamp ? testedAt : null, remarks: recorded.remarks || ''
+      };
     });
-    const missing=resultTests.filter((r,i)=>spec.tests[i].mandatory!==false && r.status!=='pass' && r.status!=='fail');
-    const failed=resultTests.filter(r=>r.status==='fail');
-    const allPassed=resultTests.length>0 && resultTests.every(r=>r.status==='pass' || (!spec.tests.find(t=>t.code===r.code)?.mandatory));
-    const overall=failed.length?'REJECTED':(allPassed?'APPROVED':'PENDING');
-    const coa=await CertificateOfAnalysis.create({coaNumber:await generateAtomicDocumentNumber('coaNumber', 'COA-', 6),batchNo:batchNo.trim(),productName:productName.trim(),manufacturingLicenseNo:req.body.manufacturingLicenseNo||'',gmpCertificateNo:req.body.gmpCertificateNo||'',pharmacopoeialStandard:spec.pharmacopoeialStandard,dosageForm:spec.dosageForm,specificationId,specificationVersion:spec.specificationVersion,specificationSource:spec.sourceNote||spec.monographReference||'',manufacturingDate:new Date(manufacturingDate),expiryDate:new Date(expiryDate),testingDate:testingDate?new Date(testingDate):new Date(),tests:resultTests,qcCompleted:allPassed||failed.length>0,overallResult:overall,status:overall==='APPROVED'?'draft':(overall==='REJECTED'?'rejected':'draft'),testedBy:req.user?.name||'QC Analyst',remarks:remarks||''});
-    if(missing.length) return res.status(400).json({error:'Mandatory QC tests are missing or not passed',tests:missing.map(x=>x.code),coa});
-    res.status(201).json(coa);
-  } catch(e){res.status(400).json({error:e.message});}
+    const mandatoryTests = resultTests.filter(test => test.mandatory);
+    const missingTests = mandatoryTests.filter(test => !test.result || !test.testedBy || !test.testedAt || !['pass', 'fail'].includes(test.status));
+    const failedTests = mandatoryTests.filter(test => test.status === 'fail');
+    const allPassed = mandatoryTests.length > 0 && missingTests.length === 0 && failedTests.length === 0 && mandatoryTests.every(test => test.status === 'pass');
+    const coa = await CertificateOfAnalysis.create({
+      coaNumber: await generateAtomicDocumentNumber('coaNumber', 'COA-', 6),
+      batchNo: batchNo.trim(), productName: productName.trim(),
+      manufacturingLicenseNo: '', gmpCertificateNo: '',
+      pharmacopoeialStandard: spec.pharmacopoeialStandard, specificationId: spec._id,
+      specificationVersion: spec.specificationVersion, specificationSource: spec.sourceNote || spec.monographReference || '',
+      dosageForm: spec.dosageForm, manufacturingDate: new Date(manufacturingDate),
+      expiryDate: new Date(expiryDate), testingDate: new Date(testingDate),
+      tests: resultTests, qcCompleted: missingTests.length === 0,
+      overallResult: failedTests.length ? 'REJECTED' : (allPassed ? 'APPROVED' : 'PENDING'),
+      status: 'draft', officialCertificate: false, documentType: 'INTERNAL_QC_RESULT_DRAFT',
+      testedBy: req.user.name, remarks: remarks || ''
+    });
+    const response = typeof coa.toObject === 'function' ? coa.toObject() : { ...coa };
+    response.evidenceComplete = missingTests.length === 0 && allPassed;
+    response.missingTests = missingTests.map(test => test.code);
+    return res.status(201).json(response);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
 });
 
-// PATCH /api/manufacturing/coa/:id/approve — Manually approve/reject CoA
+// PATCH /api/manufacturing/coa/:id/approve — Independent QA review of a manufacturer-issued CoA.
 router.patch('/:id/approve', authorize('quality:approve'), async (req, res) => {
   try {
     const { status, remarks } = req.body;
+    if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated QA reviewer identity is required' });
+    if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'An explicit approved or rejected disposition is required' });
     const coa = await CertificateOfAnalysis.findById(req.params.id);
     if (!coa) return res.status(404).json({ error: 'CoA not found' });
-
     if (status === 'approved') {
-      if (!coa.tests?.length || coa.tests.some(t => t.status !== 'pass')) return res.status(400).json({ error: 'CoA cannot be approved until every mandatory QC test is passed' });
+      const mandatoryTests = (coa.tests || []).filter(test => test.mandatory !== false);
+      if (!mandatoryTests.length || mandatoryTests.some(test => test.status !== 'pass' || !test.result || !test.testedAt || !test.testedBy)) {
+        return res.status(400).json({ error: 'CoA cannot be approved until every mandatory QC test has a result, tester identity, timestamp and PASS disposition' });
+      }
+      if (mandatoryTests.some(test => String(test.testedBy) === String(req.user.id))) {
+        return res.status(400).json({ error: 'Independent QA review is required; the tester cannot approve their own QC record' });
+      }
+      const settings = await SystemSettings.findOne().lean() || {};
+      const now = new Date();
+      if (!settings.manufacturingLicenseNo || !settings.gmpCertificateNo) {
+        return res.status(400).json({ error: 'Manufacturing licence and GMP certificate details must be configured before CoA approval' });
+      }
+      if (settings.licenceValidityType === 'unknown' ||
+          (settings.licenceValidityType === 'time_bound' && (!settings.licenseValidTill || new Date(settings.licenseValidTill) < now)) ||
+          !settings.gmpValidTill || new Date(settings.gmpValidTill) < now) {
+        return res.status(400).json({ error: 'Manufacturing licence or GMP certificate validity is missing, unknown, or expired' });
+      }
+      coa.manufacturingLicenseNo = settings.manufacturingLicenseNo;
+      coa.gmpCertificateNo = settings.gmpCertificateNo;
+      coa.officialCertificate = false;
+      coa.documentType = 'MANUFACTURER_QA_APPROVED_COA';
     }
-    coa.status = status || 'approved';
+    coa.status = status;
     coa.overallResult = status === 'rejected' ? 'REJECTED' : 'APPROVED';
-    coa.qaReviewedByUser = req.user?.id || null;
-    coa.qaReviewedByName = req.user?.name || '';
-    coa.approvedBy = req.user ? req.user.name : 'Chief Pharmacist';
+    coa.qaReviewedByUser = req.user.id;
+    coa.qaReviewedByName = req.user.name;
+    coa.approvedBy = req.user.name;
     coa.approvedAt = new Date();
     if (remarks) coa.remarks = remarks;
-
     await coa.save();
     res.json(coa);
   } catch (err) {

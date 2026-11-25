@@ -16,6 +16,8 @@ jest.mock('../models/RawMaterialEntry');
 jest.mock('../models/SystemSettings');
 jest.mock('../models/LineClearance');
 jest.mock('../models/RetentionSample');
+jest.mock('../models/MaterialDispensing');
+jest.mock('../models/DeviationCapa');
 jest.mock('../models/Product');
 jest.mock('../models/RolePermission');
 jest.mock('../models/PharmacopoeiaEntry');
@@ -49,6 +51,8 @@ const RawMaterialEntry = require('../models/RawMaterialEntry');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
 const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
+const MaterialDispensing = require('../models/MaterialDispensing');
+const DeviationCapa = require('../models/DeviationCapa');
 
 RolePermission.getEffectivePermissions = jest.fn().mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
 
@@ -76,6 +80,10 @@ describe('5 CRM Enhancements Integration Suite', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     RolePermission.getEffectivePermissions.mockResolvedValue({ permissions: ['*'], mfaPermissions: [] });
+    DeviationCapa.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([]),
+      session: jest.fn().mockReturnThis()
+    });
     if (PharmacopoeiaEntry.findOne) {
       PharmacopoeiaEntry.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({ verified: true, source: 'manual' }) });
     }
@@ -161,13 +169,14 @@ describe('5 CRM Enhancements Integration Suite', () => {
   });
 
   describe('4. Pharmacopoeia BMR Validation', () => {
-    test('GET /api/batch-productions/:id/bmr-report attaches pharmacopoeiaSpecs to raw materials', async () => {
+    test('GET /api/batch-productions/:id/bmr-report attaches only verified pharmacopoeia references to raw materials', async () => {
       const SystemSettings = require('../models/SystemSettings');
       const LineClearance = require('../models/LineClearance');
       const RetentionSample = require('../models/RetentionSample');
       const Product = require('../models/Product');
       const PharmacopoeiaEntry = require('../models/PharmacopoeiaEntry');
 
+      MaterialDispensing.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) });
       PharmacopoeiaEntry.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({ verified: true, source: 'manual' }) });
       SystemSettings.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({}) });
       LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
@@ -205,7 +214,8 @@ describe('5 CRM Enhancements Integration Suite', () => {
       if (res.status !== 200) console.log('BMR REPORT ERROR PAYLOAD:', res.body);
       expect(res.status).toBe(200);
       expect(res.body.ingredients).toHaveLength(1);
-      expect(res.body.ingredients[0].pharmacopoeiaSpecs).toBeDefined();
+      expect(res.body.ingredients[0].pharmacopoeiaReference).toEqual(expect.objectContaining({ verified: true, source: 'manual' }));
+      expect(res.body.ingredients[0].pharmacopoeialStandard).toBeNull();
     });
   });
 

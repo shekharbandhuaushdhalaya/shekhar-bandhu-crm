@@ -20,6 +20,8 @@ const schema = new mongoose.Schema({
   specificationVersion: { type: String, required: true, trim: true },
   effectiveDate: { type: Date, default: Date.now },
   status: { type: String, enum: ['draft','approved','superseded'], default: 'draft', index: true },
+  createdByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  createdByName: { type: String, default: '', trim: true },
   tests: { type: [testSchema], default: [] },
   approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   approvedByName: { type: String, default: '' },

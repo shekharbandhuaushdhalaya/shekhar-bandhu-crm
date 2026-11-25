@@ -11,7 +11,7 @@ const StockLedger = require('../../models/StockLedger');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
-const { getSizeInMl, consumeFromReservation, releaseAllReservations, deductPackagingMaterials, calculateAggregateMaterialSufficiency } = require('../../services/batchProductionService');
+const { getSizeInMl, releaseAllReservations, deductPackagingMaterials, calculateAggregateMaterialSufficiency } = require('../../services/batchProductionService');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const { resolveManufacturingWarehouse } = require('../../services/manufacturingWarehouseService');
 const { withTransaction } = require('../../utils/withTransaction');
@@ -19,6 +19,206 @@ const idempotency = require('../../middleware/requiredIdempotency');
 const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
+
+function getRetentionSampleIssues(batch, retentionSamples = [], now = new Date()) {
+  const productId = batch.productId && batch.productId._id ? batch.productId._id : batch.productId;
+  const validSample = retentionSamples.some(sample =>
+    String(sample.batchNo || '') === String(batch.batchNo || '') &&
+    String(sample.productId || '') === String(productId || '') &&
+    Number.isFinite(Number(sample.qtyRetained)) && Number(sample.qtyRetained) > 0 &&
+    Boolean(sample.retainedBy) && Boolean(sample.retainedAt) &&
+    Boolean(String(sample.storageLocation || '').trim()) &&
+    sample.status === 'stored' &&
+    sample.retentionUntil && new Date(sample.retentionUntil) > now
+  );
+  return validSample ? [] : [
+    'A current, stored retention sample matching the batch and product, with quantity, custodian, storage location and retention period, is required'
+  ];
+}
+
+function getPackagingReconciliationIssues(batch, dispensingRecords = []) {
+  if (batch.packagingMode !== 'self_packed') return [];
+  const formula = batch.bomSnapshot && Array.isArray(batch.bomSnapshot.ingredients)
+    ? batch.bomSnapshot.ingredients : [];
+  const packagingIngredients = formula.filter(item => item.itemType === 'packaging');
+  if (!packagingIngredients.length) {
+    return ['Self-packed batch has no packaging materials in its pinned formula snapshot'];
+  }
+  const records = Array.isArray(batch.labelReconciliation) ? batch.labelReconciliation : [];
+  const consumed = Array.isArray(batch.ingredientsConsumed) ? batch.ingredientsConsumed : [];
+  const issues = [];
+  for (const ingredient of packagingIngredients) {
+    const rawMaterialId = ingredient.rawMaterialId && ingredient.rawMaterialId._id
+      ? String(ingredient.rawMaterialId._id) : String(ingredient.rawMaterialId || '');
+    const record = records.find(item => String(item.rawMaterialId || '') === rawMaterialId);
+    if (!record) {
+      issues.push('Packaging material reconciliation is missing for formula material: ' + rawMaterialId);
+      continue;
+    }
+    const issuedFromGenealogy = consumed
+      .filter(item => String(item.rawMaterialId && item.rawMaterialId._id ? item.rawMaterialId._id : item.rawMaterialId) === rawMaterialId)
+      .reduce((sum, item) => sum + Number(item.qtyConsumed || 0), 0);
+    const qtyIssued = Number(record.qtyIssued);
+    const qtyUsed = Number(record.qtyUsed);
+    const qtyDamaged = Number(record.qtyDamaged);
+    const qtyReturned = Number(record.qtyReturnedToStore);
+    const qtyUnaccounted = Number(record.unaccountedQty);
+    const quantitiesValid = [qtyIssued, qtyUsed, qtyDamaged, qtyReturned, qtyUnaccounted]
+      .every(Number.isFinite) && qtyIssued > 0 && qtyUsed >= 0 && qtyDamaged >= 0 &&
+      qtyReturned >= 0 && qtyUnaccounted >= 0 &&
+      qtyUsed + qtyDamaged + qtyReturned <= qtyIssued + 0.0001;
+    const accountedUnissued = quantitiesValid
+      ? Math.max(0, qtyIssued - qtyUsed - qtyDamaged - qtyReturned) : NaN;
+    if (!record.reconciled || record.auditStatus !== 'passed' || record.discrepancyFlagged ||
+        !record.reconciledBy || !record.reconciledAt || !record.verifiedBy || !record.verifiedAt ||
+        String(record.reconciledBy) === String(record.verifiedBy) ||
+        !quantitiesValid || Math.abs(qtyIssued - issuedFromGenealogy) > 0.0001 ||
+        !Number.isFinite(accountedUnissued) || Math.abs(qtyUnaccounted - accountedUnissued) > 0.0001 ||
+        qtyUnaccounted > 0.01) {
+      issues.push('Independent packaging reconciliation is incomplete, unreconciled or discrepant for formula material: ' + rawMaterialId);
+    }
+  }
+  return issues;
+}
+
+function getMaterialGenealogyIssues(batch, dispensingRecords = []) {
+  const issues = [];
+  const formula = batch.bomSnapshot && batch.bomSnapshot.ingredients;
+  if (!Array.isArray(formula) || formula.length === 0) return ['Pinned, non-empty batch formula snapshot is missing'];
+  const consumed = Array.isArray(batch.ingredientsConsumed) ? batch.ingredientsConsumed : [];
+  const records = Array.isArray(dispensingRecords) ? dispensingRecords : [];
+  const verifiedRecords = new Map();
+  const verifiedItems = new Map();
+  const matchedVerifiedItems = new Set();
+  if (formula.some(item => item.itemType !== 'packaging') && records.length === 0) {
+    issues.push('No independently verified material dispensing records are recorded');
+  }
+  for (const record of records) {
+    const independent = record.status === 'verified' && record.dispensedBy && record.verifiedBy &&
+      String(record.dispensedBy) !== String(record.verifiedBy) && record.verifiedAt;
+    if (!independent) {
+      issues.push('Material dispensing record is not independently verified: ' + (record.dispensingNo || String(record._id || 'Unknown')));
+      continue;
+    }
+    const dispensingNo = String(record.dispensingNo || '');
+    const stageIndex = Number(record.stageIndex);
+    const stage = Number.isInteger(stageIndex) ? (batch.stages || [])[stageIndex] : null;
+    if (!dispensingNo || !record.batchNo || String(record.batchNo) !== String(batch.batchNo) ||
+        !stage || String(stage.name || '') !== String(record.stageName || '')) {
+      issues.push('Verified dispensing record has an invalid batch or manufacturing-stage reference: ' + (dispensingNo || String(record._id || 'Unknown')));
+    }
+    verifiedRecords.set(dispensingNo, record);
+    if (!Array.isArray(record.items) || record.items.length === 0) {
+      issues.push('Verified dispensing record has no material lines: ' + dispensingNo);
+      continue;
+    }
+    for (const item of record.items) {
+      const entryId = String(item.rawMaterialEntryId || '');
+      const materialId = item.rawMaterialId && item.rawMaterialId._id
+        ? String(item.rawMaterialId._id) : String(item.rawMaterialId || '');
+      const qtyDispensed = Number(item.qtyDispensed);
+      const qtyWasted = Number(item.qtyWasted || 0);
+      const wastageReason = String(item.wastageReason || '').trim();
+      if (!entryId || !materialId || !item.lotNo ||
+          !Number.isFinite(qtyDispensed) || qtyDispensed <= 0 ||
+          !Number.isFinite(qtyWasted) || qtyWasted < 0 || qtyWasted > qtyDispensed ||
+          (qtyWasted > 0 && !wastageReason)) {
+        issues.push('Verified dispensing record contains an incomplete or invalid weighed material line: ' + dispensingNo);
+        continue;
+      }
+      const key = dispensingNo + ':' + entryId;
+      if (verifiedItems.has(key)) {
+        issues.push('Verified dispensing record contains a duplicate stock-lot line: ' + key);
+        continue;
+      }
+      verifiedItems.set(key, {
+        materialId,
+        entryId,
+        lotNo: String(item.lotNo),
+        stageIndex,
+        qtyDispensed,
+        qtyWasted,
+        wastageReason
+      });
+    }
+  }
+  if (consumed.length === 0) issues.push('No actual raw-material consumption genealogy is recorded');
+  for (const item of consumed) {
+    const qty = Number(item.qtyConsumed), wasted = Number(item.qtyWasted || 0);
+    if (!item.rawMaterialId || !item.rawMaterialEntryId || !item.batchNo ||
+        !Number.isFinite(qty) || qty <= 0 || !Number.isInteger(Number(item.stageIndex)) || !item.dispensingNo) {
+      issues.push('A consumed material line is missing its stock lot, dispensing, stage or quantity evidence');
+      continue;
+    }
+    const dispensingNo = String(item.dispensingNo);
+    const entryId = String(item.rawMaterialEntryId);
+    const key = dispensingNo + ':' + entryId;
+    const verifiedItem = verifiedItems.get(key);
+    if (!verifiedRecords.has(dispensingNo) || !verifiedItem) {
+      issues.push('Consumed material line is not linked to an independently verified dispensing record: ' + String(item.rawMaterialId));
+    } else {
+      matchedVerifiedItems.add(key);
+      const materialId = item.rawMaterialId && item.rawMaterialId._id
+        ? String(item.rawMaterialId._id) : String(item.rawMaterialId);
+      if (materialId !== verifiedItem.materialId ||
+          Number(item.stageIndex) !== verifiedItem.stageIndex ||
+          String(item.batchNo) !== verifiedItem.lotNo) {
+        issues.push('Consumed material identity, stock lot or stage does not match its verified dispensing record: ' + String(item.rawMaterialId));
+      }
+      if (Math.abs(qty - verifiedItem.qtyDispensed) > 0.0001) {
+        issues.push('Consumed quantity does not reconcile with independently verified dispensing quantity: ' + String(item.rawMaterialId));
+      }
+      if (Math.abs(wasted - verifiedItem.qtyWasted) > 0.0001 ||
+          (verifiedItem.qtyWasted > 0 && String(item.wastageReason || '').trim() !== verifiedItem.wastageReason)) {
+        issues.push('Recorded wastage quantity or reason does not reconcile with independently verified dispensing evidence: ' + String(item.rawMaterialId));
+      }
+    }
+    if (!Number.isFinite(wasted) || wasted < 0 || wasted > qty ||
+        (wasted > 0 && !String(item.wastageReason || '').trim())) {
+      issues.push('Consumed material line has invalid or unexplained wastage: ' + String(item.rawMaterialId));
+    }
+  }
+  for (const key of verifiedItems.keys()) {
+    if (!matchedVerifiedItems.has(key)) {
+      issues.push('Verified dispensing line has no matching batch consumption record: ' + key);
+    }
+  }
+  const plannedQty = Number(batch.plannedQty), basis = Number(batch.bomSnapshot.formulationBasis || 100);
+  const required = new Map();
+  for (const ingredient of formula) {
+    if (ingredient.itemType === 'packaging') continue;
+    const materialId = ingredient.rawMaterialId && ingredient.rawMaterialId._id
+      ? String(ingredient.rawMaterialId._id) : String(ingredient.rawMaterialId || '');
+    if (!materialId) { issues.push('A formula ingredient is missing its raw-material identity'); continue; }
+    const stageName = String(ingredient.stageName || '').trim().toLowerCase();
+    const stageIndex = stageName
+      ? (batch.stages || []).findIndex(stage => String(stage.name || '').trim().toLowerCase() === stageName)
+      : 0;
+    if (stageIndex < 0) { issues.push('Formula ingredient has no matching manufacturing stage: ' + materialId); continue; }
+    const expected = ingredient.qtyRequiredForBatch !== undefined && ingredient.qtyRequiredForBatch !== null
+      ? Number(ingredient.qtyRequiredForBatch)
+      : Number(ingredient.qtyRequired || 0) * (basis > 0 ? plannedQty / basis : 0);
+    if (!Number.isFinite(expected) || expected <= 0) { issues.push('Formula ingredient has no valid positive batch quantity: ' + materialId); continue; }
+    const key = materialId + ':' + stageIndex;
+    const current = required.get(key) || { materialId, stageIndex, expected: 0 };
+    current.expected += expected;
+    required.set(key, current);
+  }
+  for (const line of required.values()) {
+    const actual = consumed.filter(item => {
+      const id = item.rawMaterialId && item.rawMaterialId._id
+        ? String(item.rawMaterialId._id) : String(item.rawMaterialId || '');
+      return id === line.materialId && Number(item.stageIndex) === line.stageIndex;
+    }).reduce((sum, item) => sum + (Number(item.qtyConsumed) || 0), 0);
+    if (actual + 0.0001 < line.expected) {
+      issues.push('Verified material consumption is below the pinned formula requirement for ' +
+        line.materialId + ' at stage ' + line.stageIndex + ' (required ' +
+        line.expected.toFixed(4) + ', recorded ' + actual.toFixed(4) + ')');
+    }
+  }
+  return [...new Set(issues)];
+}
+
 
 // POST /api/batch-productions/planning/aggregate-sufficiency — Aggregate raw material sufficiency across planned batches
 router.post('/planning/aggregate-sufficiency', authorize('manufacturing:view'), async (req, res) => {
@@ -238,71 +438,86 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
       // formulationBasis defaults to 100 for backwards compatibility.
       const FORMULATION_BASIS = bom.formulationBasis || 100;
       const FORMULATION_BASIS_UNIT = (bom.formulationBasisUnit || 'ml').toLowerCase();
-      const immediateDeductGroup = [];
+      const defaultStages = [
+        { name: 'Raw Material Verification & Weighing', targetDurationHours: 2 },
+        { name: 'Primary Processing (Swasan/Mardan)', targetDurationHours: 4 },
+        { name: 'Mixing & Blending', targetDurationHours: 4 },
+        { name: 'Forming (Vati/Gutika)', targetDurationHours: 4 },
+        { name: 'Drying', targetDurationHours: 8 },
+        { name: 'QC Testing', targetDurationHours: 4 },
+        { name: 'Packaging & Labeling', targetDurationHours: 4 }
+      ];
+      const customStages = bom.stages && bom.stages.length > 0 ? bom.stages : defaultStages;
+      const firstStageName = customStages[0] && customStages[0].name
+        ? customStages[0].name
+        : 'Raw Material Verification & Weighing';
+      const packagingStage = customStages.find(stage => /pack|label/i.test(stage.name || '')) || customStages[customStages.length - 1];
+      const packagingStageName = packagingStage && packagingStage.name ? packagingStage.name : firstStageName;
       const blockGroup = [];
+      const ingredientSnapshots = [];
 
-      if (!isDirectPurchase) {
-        for (const ing of bom.ingredients) {
-          const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
-          if (!rm) continue;
+      for (const ing of (bom.ingredients || [])) {
+        if (!ing.rawMaterialId) throw new Error('Every BOM ingredient must reference a raw material');
+        const rm = await RawMaterial.findById(ing.rawMaterialId).session(session);
+        if (!rm) throw new Error('Raw material referenced by BOM was not found: ' + String(ing.rawMaterialId));
 
-          const isPackaging = ing.itemType === 'packaging' || (rm.materialType === 'packaging' || (rm.materialType === 'packaging' || rm.category === 'Packaging' || rm.category === 'Packaging Material') || rm.category === 'Packaging Material');
-          const hasStage = ing.stageName && ing.stageName.trim().length > 0;
+        const isPackaging = ing.itemType === 'packaging' ||
+          rm.materialType === 'packaging' ||
+          rm.category === 'Packaging' ||
+          rm.category === 'Packaging Material';
+        const stageName = ing.stageName && ing.stageName.trim()
+          ? ing.stageName.trim()
+          : (isPackaging ? packagingStageName : firstStageName);
+        let qtyNeeded = 0;
 
-          let qtyNeeded = 0;
-          if (isPackaging) {
-            qtyNeeded = ing.qtyRequired * valPlanned;
-          } else {
-            if (effectiveYields) {
-              let totalBatchVolume = 0;
-              let allHaveSizes = true;
-              for (const y of effectiveYields) {
-                const sizeMl = getSizeInMl(y.size || '');
-                if (sizeMl > 0) {
-                  totalBatchVolume += sizeMl * Number(y.plannedQty);
-                } else {
-                  allHaveSizes = false;
-                  break;
-                }
-              }
-              if (allHaveSizes && totalBatchVolume > 0) {
-                const totalInBasisUnit = FORMULATION_BASIS_UNIT === 'l' ? totalBatchVolume / 1000 : totalBatchVolume;
-                qtyNeeded = ing.qtyRequired * (totalInBasisUnit / FORMULATION_BASIS);
-              } else {
-                const totalPcs = effectiveYields.reduce((s, y) => s + Number(y.plannedQty), 0);
-                qtyNeeded = ing.qtyRequired * (totalPcs / FORMULATION_BASIS);
-              }
-            } else {
-              qtyNeeded = ing.qtyRequired * (valPlanned / FORMULATION_BASIS);
-            }
+        if (isPackaging) {
+          qtyNeeded = Number(ing.qtyRequired || 0) * valPlanned;
+        } else if (effectiveYields) {
+          let totalBatchVolume = 0;
+          let allHaveSizes = true;
+          for (const y of effectiveYields) {
+            const sizeMl = getSizeInMl(y.size || '');
+            if (sizeMl > 0) totalBatchVolume += sizeMl * Number(y.plannedQty);
+            else { allHaveSizes = false; break; }
           }
+          if (allHaveSizes && totalBatchVolume > 0) {
+            const totalInBasisUnit = FORMULATION_BASIS_UNIT === 'l' ? totalBatchVolume / 1000 : totalBatchVolume;
+            qtyNeeded = Number(ing.qtyRequired || 0) * (totalInBasisUnit / FORMULATION_BASIS);
+          } else {
+            const totalPcs = effectiveYields.reduce((sum, y) => sum + Number(y.plannedQty), 0);
+            qtyNeeded = Number(ing.qtyRequired || 0) * (totalPcs / FORMULATION_BASIS);
+          }
+        } else {
+          qtyNeeded = Number(ing.qtyRequired || 0) * (valPlanned / FORMULATION_BASIS);
+        }
 
-          qtyNeeded = Number(qtyNeeded.toFixed(2));
-          if (qtyNeeded <= 0) continue;
-
-          const itemSpec = {
+        qtyNeeded = Number(qtyNeeded.toFixed(2));
+        ingredientSnapshots.push({
+          rawMaterialId: ing.rawMaterialId,
+          itemType: ing.itemType || (isPackaging ? 'packaging' : 'formulation'),
+          qtyRequired: Number(ing.qtyRequired || 0),
+          qtyRequiredForBatch: qtyNeeded,
+          stageName
+        });
+        if (!isDirectPurchase && qtyNeeded > 0) {
+          blockGroup.push({
             rawMaterialId: ing.rawMaterialId,
             rmName: rm.name,
             unit: rm.unit || 'Kg',
             qtyNeeded,
-            stageName: ing.stageName || ''
-          };
-
-          if (!isPackaging && !hasStage) {
-            immediateDeductGroup.push(itemSpec);
-          } else {
-            blockGroup.push(itemSpec);
-          }
+            stageName
+          });
         }
       }
 
+      // All raw materials, including previously "immediate" untagged ingredients,
+      // remain reserved until weighed and independently verified through dispensing.
       const ingredientsConsumed = [];
       const ingredientsReserved = [];
       let rawMaterialCost = 0;
 
       if (!isDirectPurchase) {
-        // 1. Immediate-deduct group (no stage tag, not packaging)
-        for (const item of immediateDeductGroup) {
+        for (const item of blockGroup) {
           const entries = await RawMaterialEntry.find({
             rawMaterialId: item.rawMaterialId,
             warehouseId: manufacturingWarehouse._id,
@@ -317,79 +532,35 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
             return new Date(a.createdAt) - new Date(b.createdAt);
           });
 
-          const totalAvailable = entries.reduce((acc, e) => acc + Math.max(0, (e.qty || 0) - (e.reservedQty || 0)), 0);
-          if (totalAvailable < item.qtyNeeded) {
-            throw new Error(`Insufficient available stock for raw material: ${item.rmName}. Needed: ${item.qtyNeeded.toFixed(2)} ${item.unit}, Available: ${totalAvailable.toFixed(2)} ${item.unit} (excluding stock reserved for other runs)`);
+          const totalAvailable = entries.reduce((sum, entry) =>
+            sum + Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0)), 0);
+          if (totalAvailable + 0.0001 < item.qtyNeeded) {
+            throw new Error('Insufficient available stock for raw material: ' + item.rmName +
+              '. Needed: ' + item.qtyNeeded.toFixed(2) + ' ' + item.unit +
+              ', Available: ' + totalAvailable.toFixed(2) + ' ' + item.unit +
+              ' (excluding stock reserved for other runs)');
           }
 
           let needed = item.qtyNeeded;
           for (const entry of entries) {
             if (needed <= 0.0001) break;
-            const avail = Math.max(0, (entry.qty || 0) - (entry.reservedQty || 0));
-            if (avail <= 0.0001) continue;
-
-            const deduct = Math.min(needed, avail);
-            const deductVal = Number(deduct.toFixed(2));
-            if (deductVal <= 0) continue;
-
-            entry.qty = Math.max(0, Number((entry.qty - deductVal).toFixed(2)));
-            entry.usedQty = Number(((entry.usedQty || 0) + deductVal).toFixed(2));
-            entry.issuedQty = Number(((entry.issuedQty || 0) + deductVal).toFixed(2));
+            const available = Math.max(0, Number(entry.qty || 0) - Number(entry.reservedQty || 0));
+            if (available <= 0.0001) continue;
+            const reserve = Number(Math.min(needed, available).toFixed(2));
+            if (reserve <= 0) continue;
+            entry.reservedQty = Number((Number(entry.reservedQty || 0) + reserve).toFixed(2));
             await entry.save({ session });
-
-            rawMaterialCost += deductVal * (entry.purchaseRate || 0);
-            ingredientsConsumed.push({
-              rawMaterialId: item.rawMaterialId,
-              rawMaterialEntryId: entry._id,
-              qtyConsumed: deductVal,
-              batchNo: entry.batchNo
-            });
-            needed = Number((needed - deductVal).toFixed(2));
-          }
-        }
-
-        // 2. Block group (has stage tag OR is packaging)
-        for (const item of blockGroup) {
-          const entries = await RawMaterialEntry.find({
-            rawMaterialId: item.rawMaterialId,
-            warehouseId: manufacturingWarehouse._id,
-            qcStatus: 'approved'
-          }).session(session);
-
-          entries.sort((a, b) => {
-            if (a.expiryDate && b.expiryDate) return new Date(a.expiryDate) - new Date(b.expiryDate);
-            if (a.expiryDate && !b.expiryDate) return -1;
-            if (!a.expiryDate && b.expiryDate) return 1;
-            return new Date(a.createdAt) - new Date(b.createdAt);
-          });
-
-          const totalAvailable = entries.reduce((acc, e) => acc + Math.max(0, (e.qty || 0) - (e.reservedQty || 0)), 0);
-          if (totalAvailable < item.qtyNeeded) {
-            throw new Error(`Insufficient available stock for raw material: ${item.rmName}. Needed: ${item.qtyNeeded.toFixed(2)} ${item.unit}, Available: ${totalAvailable.toFixed(2)} ${item.unit} (excluding stock reserved for other runs)`);
-          }
-
-          let needed = item.qtyNeeded;
-          for (const entry of entries) {
-            if (needed <= 0.0001) break;
-            const avail = Math.max(0, (entry.qty || 0) - (entry.reservedQty || 0));
-            if (avail <= 0.0001) continue;
-
-            const block = Math.min(needed, avail);
-            const blockVal = Number(block.toFixed(2));
-            if (blockVal <= 0) continue;
-
-            entry.reservedQty = Number(((entry.reservedQty || 0) + blockVal).toFixed(2));
-            entry.issuedQty = Number(((entry.issuedQty || 0) + blockVal).toFixed(2));
-            await entry.save({ session });
-
             ingredientsReserved.push({
               rawMaterialId: item.rawMaterialId,
               rawMaterialEntryId: entry._id,
-              qtyReserved: blockVal,
+              qtyReserved: reserve,
               batchNo: entry.batchNo,
-              stageName: item.stageName || ''
+              stageName: item.stageName
             });
-            needed = Number((needed - blockVal).toFixed(2));
+            needed = Number((needed - reserve).toFixed(2));
+          }
+          if (needed > 0.0001) {
+            throw new Error('Unable to reserve the full required quantity for raw material: ' + item.rmName);
           }
         }
       }
@@ -398,21 +569,8 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
       const overheadScale = valPlanned / FORMULATION_BASIS;
       const computedOverhead = (bom.overheadCost || 0) * overheadScale;
 
-      // Configure Custom Stages or fallback to default manufacturing stages
-      const customStages = bom.stages && bom.stages.length > 0
-        ? bom.stages
-        : [
-          { name: 'Raw Material Verification & Weighing', targetDurationHours: 2 },
-          { name: 'Primary Processing (Swasan/Mardan)', targetDurationHours: 4 },
-          { name: 'Mixing & Blending', targetDurationHours: 4 },
-          { name: 'Forming (Vati/Gutika)', targetDurationHours: 4 },
-          { name: 'Drying', targetDurationHours: 8 },
-          { name: 'QC Testing', targetDurationHours: 4 },
-          { name: 'Packaging & Labeling', targetDurationHours: 4 }
-        ];
-
       const batchStages = customStages.map((st, i) => {
-        const startedAt = i === 0 ? new Date() : null;
+        const startedAt = null;
         const targetDurationHours = st.targetDurationHours || (st.targetDurationDays ? st.targetDurationDays * 24 : 8);
         let targetCompletionDate = null;
         if (startedAt) {
@@ -422,7 +580,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
           name: st.name,
           targetDurationDays: Math.ceil(targetDurationHours / 24),  // legacy field
           targetDurationHours,
-          status: i === 0 ? 'in_progress' : 'pending',
+          status: 'pending',
           startedAt,
           targetCompletionDate
         };
@@ -437,12 +595,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
           recipeVersion: bom.recipeVersion || `v${bom.__v || 0}`,
           formulationBasis: bom.formulationBasis || 100,
           formulationBasisUnit: bom.formulationBasisUnit || 'ml',
-          ingredients: (bom.ingredients || []).map(i => ({
-            rawMaterialId: i.rawMaterialId,
-            itemType: i.itemType || 'formulation',
-            qtyRequired: i.qtyRequired || 0,
-            stageName: i.stageName || ''
-          })),
+          ingredients: ingredientSnapshots,
           overheadCost: bom.overheadCost || 0,
           stages: (bom.stages || []).map(s => ({ name: s.name, targetDurationHours: s.targetDurationHours || (s.targetDurationDays ? s.targetDurationDays * 24 : 8) }))
         },
@@ -450,7 +603,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
         manufacturingUnitName: mfgUnit.name,
         plannedQty: valPlanned,
         plannedYields: effectiveYields || [],
-        status: 'in_progress',
+        status: 'draft',
         stages: batchStages,
         ingredientsConsumed,
         ingredientsReserved,
@@ -471,7 +624,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
 
     if (req.io) {
       req.io.emit('mfg_batch_created', newBatch);
-      req.io.emit('inventory_updated', { type: 'raw_material_deduction', batchNo: newBatch.batchNo });
+      req.io.emit('inventory_updated', { type: 'raw_material_reserved', batchNo: newBatch.batchNo });
     }
 
     res.status(201).json(newBatch);
@@ -480,48 +633,85 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
   }
 });
 
-// POST /api/batch-productions/:id/line-clearance — Record pre-batch line clearance
+// POST /api/batch-productions/:id/line-clearance — Submit checklist for independent verification.
 router.post('/:id/line-clearance', authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { previousBatchNo, checklist, notes, phase = 'manufacturing' } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
-
-    if (!checklist || !checklist.equipmentCleaned || !checklist.previousMaterialsRemoved || !checklist.previousLabelsDocumentsRemoved || !checklist.areaVisuallyInspected) {
-      return res.status(400).json({ error: 'All 4 line clearance checklist items must be verified true before clearing line' });
+    if (batch.releasedBy || ['cancelled', 'rejected'].includes(batch.status)) {
+      return res.status(409).json({ error: 'Released, cancelled or rejected batch line-clearance records are immutable' });
     }
-
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated line-clearance operator identity is required' });
+    }
+    if (!['manufacturing','filling','packing'].includes(phase)) {
+      return res.status(400).json({ error: 'phase must be manufacturing, filling or packing' });
+    }
+    if (!checklist || !checklist.equipmentCleaned || !checklist.previousMaterialsRemoved ||
+      !checklist.previousLabelsDocumentsRemoved || !checklist.areaVisuallyInspected) {
+      return res.status(400).json({ error: 'All 4 line-clearance checklist items must be verified true before submission' });
+    }
     const LineClearance = require('../../models/LineClearance');
-    if (!['manufacturing','filling','packing'].includes(phase)) return res.status(400).json({ error: 'phase must be manufacturing, filling or packing' });
-    let record = await LineClearance.findOne({ batchId: batch._id, phase });
-    if (record) {
-      record.phase = phase;
-      record.cleared = true;
-      record.checklist = checklist;
-      record.notes = notes || '';
-      record.clearedBy = req.user ? req.user.id : null;
-      record.clearedByName = req.user ? req.user.name : 'Line Inspector';
-      record.clearedAt = new Date();
-      await record.save();
-    } else {
-      record = await LineClearance.create({
-        batchId: batch._id,
-        phase,
-        cleared: true,
-        manufacturingUnitId: batch.manufacturingUnitId,
-        previousBatchNo: previousBatchNo || '',
-        checklist,
-        notes: notes || '',
-        clearedBy: req.user ? req.user.id : null,
-        clearedByName: req.user ? req.user.name : 'Line Inspector',
-        clearedAt: new Date()
-      });
+    const existing = await LineClearance.findOne({ batchId: batch._id, phase });
+    if (existing) {
+      return res.status(409).json({ error: 'A line-clearance record already exists for this batch phase; do not overwrite the submitted or verified record' });
     }
+    const record = await LineClearance.create({
+      batchId: batch._id, phase, cleared: false,
+      manufacturingUnitId: batch.manufacturingUnitId,
+      previousBatchNo: previousBatchNo || '',
+      checklist: {
+        equipmentCleaned: checklist.equipmentCleaned === true,
+        previousMaterialsRemoved: checklist.previousMaterialsRemoved === true,
+        previousLabelsDocumentsRemoved: checklist.previousLabelsDocumentsRemoved === true,
+        areaVisuallyInspected: checklist.areaVisuallyInspected === true
+      },
+      notes: String(notes || '').trim(),
+      submittedBy: req.user.id, submittedByName: req.user.name, submittedAt: new Date()
+    });
+    if (req.io) req.io.emit('line_clearance_updated', record);
+    res.status(201).json({ record, status: 'PENDING_INDEPENDENT_VERIFICATION',
+      message: 'Line-clearance checklist submitted. Production cannot start until an independent verifier signs it.' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
-    if (req.io) {
-      req.io.emit('line_clearance_updated', record);
+// PATCH /api/batch-productions/:id/line-clearance/:clearanceId/verify — Independent line-clearance signoff.
+router.patch('/:id/line-clearance/:clearanceId/verify', authorize('manufacturing:complete'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    if (batch.releasedBy) return res.status(409).json({ error: 'Released batch line-clearance records are immutable' });
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated independent line-clearance verifier identity is required' });
     }
-    res.status(201).json(record);
+    const LineClearance = require('../../models/LineClearance');
+    const record = await LineClearance.findById(req.params.clearanceId);
+    if (!record || String(record.batchId) !== String(batch._id)) {
+      return res.status(404).json({ error: 'Line-clearance record not found for this batch' });
+    }
+    if (record.cleared || record.verifiedAt) {
+      return res.status(409).json({ error: 'Line-clearance record has already been independently verified' });
+    }
+    if (!record.submittedBy || String(record.submittedBy) === String(req.user.id)) {
+      return res.status(409).json({ error: 'The line-clearance operator cannot independently verify their own checklist' });
+    }
+    const c = record.checklist || {};
+    if (!c.equipmentCleaned || !c.previousMaterialsRemoved || !c.previousLabelsDocumentsRemoved || !c.areaVisuallyInspected) {
+      return res.status(400).json({ error: 'All four line-clearance checklist items must be true before verification' });
+    }
+    record.cleared = true;
+    record.clearedBy = req.user.id;
+    record.clearedByName = req.user.name;
+    record.clearedAt = new Date();
+    record.verifiedBy = req.user.id;
+    record.verifiedByName = req.user.name;
+    record.verifiedAt = new Date();
+    await record.save();
+    if (req.io) req.io.emit('line_clearance_updated', record);
+    res.json({ success: true, record, status: 'VERIFIED' });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -532,6 +722,11 @@ router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), async (r
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated BMR approver identity is required' });
+    if (batch.status !== 'draft') return res.status(409).json({ error: 'Pre-execution BMR approval is only allowed while the batch remains in draft status' });
+    if (!batch.bomSnapshot || !Array.isArray(batch.bomSnapshot.ingredients) || batch.bomSnapshot.ingredients.length === 0) {
+      return res.status(409).json({ error: 'A pinned, non-empty batch formula snapshot is required before BMR approval' });
+    }
 
     const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
     const RawMaterial = require('../../models/RawMaterial');
@@ -588,14 +783,14 @@ router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), async (r
       });
     }
 
-    batch.bmrApprovedBy = req.user ? req.user.id : null;
-    batch.bmrApprovedByName = req.user ? req.user.name : 'Authorized Approver';
+    batch.bmrApprovedBy = req.user.id;
+    batch.bmrApprovedByName = req.user.name;
     batch.bmrApprovedAt = new Date();
 
     if (unverifiedIngredients.length > 0) {
       batch.bmrUnverifiedAcknowledged = true;
-      batch.bmrUnverifiedAcknowledgedBy = req.user ? req.user.id : null;
-      batch.bmrUnverifiedAcknowledgedByName = req.user ? req.user.name : 'Authorized Approver';
+      batch.bmrUnverifiedAcknowledgedBy = req.user.id;
+      batch.bmrUnverifiedAcknowledgedByName = req.user.name;
       batch.bmrUnverifiedAcknowledgedAt = new Date();
     }
 
@@ -633,15 +828,55 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
       return res.status(400).json({ error: 'Invalid stage index' });
     }
 
-    // Gate Stage 1 start on Line Clearance & BMR Approval
-    if (stageIndex === 0 && (status === 'in_progress' || !status)) {
+    const stageNameForClearance = String(batch.stages[stageIndex].name || '').toLowerCase();
+    if (status && status !== 'pending' && stageIndex > 0) {
+      const previousStage = batch.stages[stageIndex - 1];
+      const previousDispositionRecorded = ['completed', 'skipped'].includes(previousStage.status);
+      const independentlyVerified = previousStage.verifiedBy && previousStage.verifiedAt &&
+        previousStage.performedBy && String(previousStage.verifiedBy) !== String(previousStage.performedBy);
+      if (!previousDispositionRecorded || !independentlyVerified) {
+        return res.status(409).json({
+          error: 'The preceding manufacturing stage must be completed or formally skipped and independently verified before this stage can start',
+          code: 'PREVIOUS_STAGE_VERIFICATION_REQUIRED',
+          previousStageIndex: stageIndex - 1
+        });
+      }
+    }
+    if (status === 'skipped' && !String(notes || '').trim()) {
+      return res.status(400).json({ error: 'A documented reason is required when a manufacturing stage is skipped', code: 'STAGE_SKIP_REASON_REQUIRED' });
+    }
+    const requiredClearancePhase = stageNameForClearance.includes('filling') ? 'filling' :
+      (stageNameForClearance.includes('packaging') || stageNameForClearance.includes('label')) ? 'packing' : null;
+    if (requiredClearancePhase && batch.stages[stageIndex].status === 'pending' && status !== 'pending') {
+      const LineClearance = require('../../models/LineClearance');
+      const phaseClearance = await LineClearance.findOne({ batchId: batch._id, phase: requiredClearancePhase });
+      const c = phaseClearance && phaseClearance.checklist;
+      const complete = Boolean(phaseClearance && phaseClearance.cleared === true && phaseClearance.submittedBy &&
+        phaseClearance.verifiedBy && String(phaseClearance.submittedBy) !== String(phaseClearance.verifiedBy) &&
+        phaseClearance.verifiedAt && phaseClearance.clearedBy && phaseClearance.clearedAt && c &&
+        c.equipmentCleaned && c.previousMaterialsRemoved && c.previousLabelsDocumentsRemoved && c.areaVisuallyInspected);
+      if (!complete) return res.status(409).json({
+        error: 'A completed, independently verified ' + requiredClearancePhase + ' line-clearance checklist is required before this stage can start',
+        code: 'STAGE_LINE_CLEARANCE_REQUIRED', phase: requiredClearancePhase
+      });
+    }
+
+    // A newly created batch stays in draft until both pre-execution BMR approval
+    // and a complete, independently recorded manufacturing line clearance exist.
+    if (stageIndex === 0 && batch.stages[0].status === 'pending' && status !== 'pending') {
       const LineClearance = require('../../models/LineClearance');
       const clearance = await LineClearance.findOne({ batchId: batch._id, phase: 'manufacturing' });
-      if (!clearance) {
-        return res.status(400).json({ error: 'Line clearance required before starting production' });
+      const checklist = clearance && clearance.checklist;
+      const clearanceComplete = Boolean(clearance && clearance.cleared === true &&
+        clearance.submittedBy && clearance.verifiedBy && String(clearance.submittedBy) !== String(clearance.verifiedBy) &&
+        clearance.verifiedAt && clearance.clearedBy && clearance.clearedAt && checklist &&
+        checklist.equipmentCleaned && checklist.previousMaterialsRemoved &&
+        checklist.previousLabelsDocumentsRemoved && checklist.areaVisuallyInspected);
+      if (!clearanceComplete) {
+        return res.status(400).json({ error: 'A completed, signed manufacturing line-clearance checklist is required before starting production' });
       }
-      if (!batch.bmrApprovedBy) {
-        return res.status(400).json({ error: 'BMR pre-execution approval required before starting production' });
+      if (!batch.bmrApprovedBy || !batch.bmrApprovedByName || !batch.bmrApprovedAt) {
+        return res.status(400).json({ error: 'Authenticated pre-execution BMR approval is required before starting production' });
       }
     }
 
@@ -652,20 +887,54 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
 
     const currentStage = batch.stages[stageIndex];
     const newStatus = status || 'completed';
+    if (req.body.equipmentId !== undefined) currentStage.equipmentId = req.body.equipmentId;
+
+    if (['completed', 'skipped', 'failed'].includes(newStatus)) {
+      if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated operator identity is required to record a manufacturing stage disposition' });
+      const TrainingRecord = require('../../models/TrainingRecord');
+      const now = new Date();
+      const training = await TrainingRecord.findOne({
+        userId: req.user.id,
+        $or: [{ topic: currentStage.name }, { topic: /GMP|Good Manufacturing Practice/i }],
+        trainedOn: { $lte: now }, validUntil: { $gt: now },
+        trainedBy: { $nin: ['', null] }, certificateRef: { $nin: ['', null] },
+        status: 'verified', verifiedBy: { $ne: req.user.id }, verifiedAt: { $ne: null }
+      }).lean();
+      if (!training) return res.status(400).json({ error: 'Current, independently verified, relevant GMP or stage-specific training evidence is required before this operator can complete the stage' });
+      currentStage.operatorTrainingRecordId = training._id;
+      currentStage.operatorTrainingTopic = training.topic;
+      if (currentStage.equipmentId) {
+        const Equipment = require('../../models/Equipment');
+        const equipment = await Equipment.findById(currentStage.equipmentId).lean();
+        if (!equipment || equipment.status !== 'active') return res.status(400).json({ error: 'Selected equipment is unavailable or not active' });
+        const latestCalibration = (equipment.calibrationLogs || []).slice().sort((x, y) => new Date(y.calibratedOn || 0) - new Date(x.calibratedOn || 0))[0];
+        if (!latestCalibration || latestCalibration.status !== 'verified' || !latestCalibration.verifiedBy ||
+            !latestCalibration.verifiedAt || String(latestCalibration.calibratedByUser) === String(latestCalibration.verifiedBy) ||
+            !latestCalibration.certificateNo || !latestCalibration.certificateRef || !latestCalibration.calibratedByUser ||
+            !latestCalibration.nextDue || new Date(latestCalibration.nextDue) <= now ||
+            !equipment.calibrationDueDate || new Date(equipment.calibrationDueDate) <= now) {
+          return res.status(400).json({ error: 'Current, independently verified calibration certificate evidence is required before this stage can be completed' });
+        }
+        currentStage.equipmentName = equipment.name;
+        currentStage.equipmentCalibrationStatus = 'valid';
+        currentStage.equipmentCalibrationCertificateNo = latestCalibration.certificateNo;
+      }
+    }
 
     if (newStatus === 'in_progress') {
       currentStage.startedAt = currentStage.startedAt || new Date();
     }
     if (newStatus === 'completed' || newStatus === 'skipped' || newStatus === 'failed') {
       currentStage.completedAt = new Date();
-      currentStage.completedBy = completedBy || (req.user ? req.user.name : '');
-      currentStage.performedBy = req.user ? req.user.id : null;
-      currentStage.performedByName = req.user ? req.user.name : (completedBy || '');
+      currentStage.completedBy = req.user.name;
+      currentStage.performedBy = req.user.id;
+      currentStage.performedByName = req.user.name;
     }
     if (notes !== undefined) {
       currentStage.notes = notes;
     }
     currentStage.status = newStatus;
+    if (stageIndex === 0 && newStatus !== 'pending') batch.status = 'in_progress';
 
     if (req.body.actualYieldQty !== undefined) {
       const actualYieldVal = Number(req.body.actualYieldQty);
@@ -706,47 +975,35 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
       batch.variancePercent = -100;
       batch.endDate = new Date();
       batch.qcNotes = `Batch failed at stage [${currentStage.name}]${notes ? ` — Reason: ${notes}` : ''}. QC Inspector / Operator: ${completedBy || 'Operator'}`;
-    } else if ((newStatus === 'completed' || newStatus === 'skipped') && stageIndex + 1 < batch.stages.length) {
-      const nextStage = batch.stages[stageIndex + 1];
-      if (nextStage.status === 'pending') {
-        nextStage.status = 'in_progress';
-        const started = new Date();
-        nextStage.startedAt = started;
-        const durationHours = nextStage.targetDurationHours || (nextStage.targetDurationDays ? nextStage.targetDurationDays * 24 : 8);
-        nextStage.targetCompletionDate = new Date(started.getTime() + durationHours * 60 * 60 * 1000);
-      }
     }
 
-    // Deduct stage-tied ingredients from inventory (FIFO) when stage is completed
-    // Guard: skip if already deducted to prevent double-deduction on re-completion
-    if (!currentStage.ingredientsDeducted) {
-      const stageIngredients = req.body.stageIngredients;
-      if (newStatus === 'completed' && stageIngredients && stageIngredients.length > 0) {
-        let totalInputQty = 0;
-        let totalLossQty = 0;
-        const lossReasons = [];
-        for (const si of stageIngredients) {
-          const qtyNeeded = Number(si.qtyNeeded) || 0;
-          const wastage = Number(si.wastage) || 0;
-          const totalDeductQty = qtyNeeded + wastage;
-          if (totalDeductQty > 0) {
-            await consumeFromReservation(batch, si.rawMaterialId, totalDeductQty);
-          }
-
-          totalInputQty += qtyNeeded;
-          totalLossQty += wastage;
-          if (wastage > 0) {
-            lossReasons.push({ rawMaterialId: si.rawMaterialId, qty: wastage, reason: si.lossReason || '' });
-          }
+    // Stock is issued only through the independently verified dispensing workflow.
+    if (Array.isArray(req.body.stageIngredients) && req.body.stageIngredients.length > 0) {
+      return res.status(409).json({ error: 'Direct stage material deduction is disabled. Create and independently verify a material dispensing record first.' });
+    }
+    if (newStatus === 'completed' && batch.bomSnapshot && Array.isArray(batch.bomSnapshot.ingredients)) {
+      const basis = Number(batch.bomSnapshot.formulationBasis || 100);
+      const multiplier = basis > 0 ? Number(batch.plannedQty || 0) / basis : 0;
+      const requiredLines = batch.bomSnapshot.ingredients.filter(ingredient =>
+        ingredient.itemType !== 'packaging' &&
+        (ingredient.stageName ? ingredient.stageName === currentStage.name : stageIndex === 0));
+      for (const ingredient of requiredLines) {
+        const requiredQty = ingredient.qtyRequiredForBatch !== undefined && ingredient.qtyRequiredForBatch !== null
+          ? Number(ingredient.qtyRequiredForBatch)
+          : Number(ingredient.qtyRequired || 0) * multiplier;
+        const consumedQty = (batch.ingredientsConsumed || [])
+          .filter(item => String(item.rawMaterialId) === String(ingredient.rawMaterialId) &&
+            Number.isInteger(item.stageIndex) && Number(item.stageIndex) === stageIndex)
+          .reduce((sum, item) => sum + Number(item.qtyConsumed || 0), 0);
+        if (consumedQty + 0.0001 < requiredQty) {
+          return res.status(409).json({
+            error: 'Required materials must be dispensed and independently verified before this manufacturing stage can be completed',
+            code: 'MATERIAL_DISPENSING_REQUIRED',
+            rawMaterialId: ingredient.rawMaterialId,
+            requiredQty: Number(requiredQty.toFixed(2)),
+            verifiedDispensedQty: Number(consumedQty.toFixed(2))
+          });
         }
-
-        currentStage.inputQty = (currentStage.inputQty || 0) + totalInputQty;
-        currentStage.lossQty = (currentStage.lossQty || 0) + totalLossQty;
-        currentStage.outputQty = Math.max(0, currentStage.inputQty - currentStage.lossQty);
-        currentStage.lossPercent = currentStage.inputQty > 0 ? Number(((currentStage.lossQty / currentStage.inputQty) * 100).toFixed(2)) : 0;
-        if (req.body.lossReason) currentStage.lossReason = req.body.lossReason;
-        if (lossReasons.length > 0) currentStage.lossItems = lossReasons;
-        currentStage.ingredientsDeducted = true;
       }
     }
 
@@ -796,19 +1053,20 @@ router.patch('/:id/stage/:stageIndex/verify', authorize('manufacturing:verify'),
     }
 
     const stage = batch.stages[stageIndex];
-    if (stage.status !== 'completed') {
-      return res.status(400).json({ error: 'Stage must be completed before verification' });
+    if (!['completed', 'skipped'].includes(stage.status)) {
+      return res.status(400).json({ error: 'Stage must be completed or formally skipped before verification' });
     }
 
-    const userId = req.user ? req.user.id.toString() : null;
+    if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated verifier identity is required' });
+    const userId = req.user.id.toString();
     const performedById = stage.performedBy ? stage.performedBy.toString() : null;
 
     if (userId && performedById && userId === performedById) {
       return res.status(400).json({ error: 'Performer cannot verify their own stage — 4-eye verification required' });
     }
 
-    stage.verifiedBy = req.user ? req.user.id : null;
-    stage.verifiedByName = req.user ? req.user.name : 'Verifier';
+    stage.verifiedBy = req.user.id;
+    stage.verifiedByName = req.user.name;
     stage.verifiedAt = new Date();
 
     await batch.save();
@@ -829,38 +1087,61 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       wasteQty,
       wasteReason,
       qcNotes,
-      qcPassedBy,
       packing,
       yields,
       qcStatus,
-      organoleptic,
-      moistureContent,
-      ashValue,
-      pHValue,
-      disintegrationTime,
-      heavyMetals,
-      microbialLimit,
-      labReportRef,
       warehouseId,
       jobWorkerCertificateRef,
       coaDocumentRef,
       jobWorkCharges
     } = req.body;
 
-    if (actualYieldQty === undefined || !qcPassedBy) {
-      return res.status(400).json({ error: 'Actual yield quantity and QC inspector name are required' });
+    if (actualYieldQty === undefined) {
+      return res.status(400).json({ error: 'Actual yield quantity is required' });
     }
 
     const valYield = Number(actualYieldQty);
-    if (isNaN(valYield) || valYield < 0) {
-      return res.status(400).json({ error: 'Actual yield must be a positive number' });
+    if (!Number.isFinite(valYield) || valYield <= 0) {
+      return res.status(400).json({ error: 'Actual yield must be a finite positive number' });
     }
 
     let batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
 
-    if (batch.status === 'completed' || batch.status === 'rejected') {
-      return res.status(400).json({ error: 'Batch is already completed or rejected' });
+    // A client may retry after the completion transaction committed but the
+    // response was lost. Return the authoritative existing transfer instead of
+    // treating a successful completion as a failed retry.
+    if (batch.status === 'completed') {
+      if (!batch.productionTransferChallanId) {
+        return res.status(409).json({
+          error: 'Batch is completed but has no linked production-transfer Challan',
+          code: 'COMPLETED_BATCH_TRANSFER_MISSING'
+        });
+      }
+      const Challan = require('../../models/Challan');
+      const existingChallan = await Challan.findById(batch.productionTransferChallanId).lean();
+      if (!existingChallan) {
+        return res.status(409).json({
+          error: 'The completed batch transfer Challan could not be found; reconcile the batch before retrying',
+          code: 'COMPLETED_BATCH_TRANSFER_MISSING'
+        });
+      }
+      return res.json({
+        batch,
+        challan: {
+          _id: existingChallan._id,
+          challanNo: existingChallan.challanNo,
+          status: existingChallan.status,
+          challanType: existingChallan.challanType,
+          sourceWarehouseId: existingChallan.warehouseId,
+          sourceWarehouseName: existingChallan.warehouseName,
+          destinationWarehouseId: existingChallan.destinationWarehouseId,
+          destinationWarehouseName: existingChallan.destinationWarehouseName
+        }
+      });
+    }
+    if (batch.status === 'rejected') {
+      return res.status(400).json({ error: 'Rejected batch cannot be completed' });
     }
     if (batch.status === 'cancelled') {
       return res.status(400).json({ error: 'Cannot complete a cancelled batch' });
@@ -879,6 +1160,29 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
         packing: packing || 1
       }]);
 
+    const splitYieldTotal = yieldsList.reduce((sum, item) => sum + Number(item.actualYieldQty || 0), 0);
+    if (!Number.isFinite(splitYieldTotal) || Math.abs(splitYieldTotal - valYield) > 0.0001) {
+      return res.status(400).json({
+        error: 'The sum of size-wise actual yields must equal the batch actual yield',
+        code: 'YIELD_SPLIT_MISMATCH',
+        actualYieldQty: valYield,
+        splitYieldTotal
+      });
+    }
+    // Yield variance is a performance measure, not proof that material was
+    // physically discarded. Use only explicitly recorded wastage (from this
+    // request or an earlier batch-stage record) for the waste register.
+    const enteredWaste = wasteQty !== undefined ? Number(wasteQty) : Number(batch.wasteQty || 0);
+    const enteredWasteReason = wasteReason !== undefined
+      ? String(wasteReason || '').trim()
+      : String(batch.wasteReason || '').trim();
+    if (!Number.isFinite(enteredWaste) || enteredWaste < 0) {
+      return res.status(400).json({ error: 'Waste quantity must be a finite, non-negative number', code: 'INVALID_WASTE_QUANTITY' });
+    }
+    if (enteredWaste > 0 && !enteredWasteReason) {
+      return res.status(400).json({ error: 'A documented reason is required when waste quantity is recorded', code: 'WASTE_REASON_REQUIRED' });
+    }
+
     // Validate products exist
     const Product = require('../../models/Product');
     const productIds = yieldsList.map(y => y.productId);
@@ -896,7 +1200,106 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       }
     }
 
-    // Ensure packaging materials are deducted if not already deducted during stage advance
+    // Finished-product QC is a separate post-completion workflow.
+    const manufacturingStages = (batch.stages || []).filter(stage => String(stage.name || '').trim().toLowerCase() !== 'qc testing');
+    const allDone = manufacturingStages.every(s => s.status === 'completed' || s.status === 'skipped');
+    if (!allDone) {
+      const pending = manufacturingStages.filter(s => s.status === 'pending' || s.status === 'in_progress').map(s => s.name);
+      return res.status(400).json({ error: `Cannot complete batch. Pending stages: ${pending.join(', ')}` });
+    }
+
+    // A batch may enter completion only when every critical stage has a complete,
+    // independently reviewed execution record. This mirrors the evidence required
+    // for eventual market release, so completion cannot create an unreleasable batch.
+    const criticalStages = manufacturingStages;
+    const stageEvidenceIssues = [];
+    for (const stage of criticalStages) {
+      const label = String(stage.name || 'Unnamed stage');
+      if (!['completed', 'skipped'].includes(stage.status)) {
+        stageEvidenceIssues.push('Stage is not completed or formally skipped: ' + label);
+        continue;
+      }
+      const independentlyVerified = Boolean(stage.performedBy && stage.verifiedBy && stage.verifiedAt &&
+        String(stage.performedBy) !== String(stage.verifiedBy));
+      if (!independentlyVerified) {
+        stageEvidenceIssues.push('Independent operator and verifier evidence is missing: ' + label);
+      }
+      if (stage.status === 'skipped') {
+        if (!String(stage.notes || '').trim()) stageEvidenceIssues.push('Documented skip reason is missing: ' + label);
+        continue;
+      }
+      if (!stage.performedByName) stageEvidenceIssues.push('Operator identity is missing: ' + label);
+      if (!stage.isDualSigned) stageEvidenceIssues.push('Independent Chemist and QA signatures are missing: ' + label);
+      if (!stage.operatorTrainingRecordId) stageEvidenceIssues.push('Verified operator training evidence is missing: ' + label);
+      if (!stage.equipmentId || stage.equipmentCalibrationStatus !== 'valid') {
+        stageEvidenceIssues.push('Verified equipment calibration evidence is missing: ' + label);
+      }
+    }
+    if (stageEvidenceIssues.length) {
+      return res.status(400).json({
+        error: 'Critical manufacturing stage evidence must be complete before batch completion',
+        code: 'STAGE_EXECUTION_EVIDENCE_INCOMPLETE',
+        missingEvidence: stageEvidenceIssues
+      });
+    }
+
+    // QC approval is a separate, specification-driven workflow. Completion may
+    // record a pending disposition or a rejection, but cannot self-approve QC
+    // using legacy summary fields supplied in this request.
+    const qcDisposition = qcStatus || 'pending';
+    if (!['pending', 'approved', 'rejected'].includes(qcDisposition)) {
+      return res.status(400).json({ error: 'QC disposition must be pending, approved, or rejected' });
+    }
+    if (qcDisposition !== 'pending') {
+      return res.status(409).json({
+        error: 'Batch completion cannot approve or reject QC using legacy disposition fields; record actual specification-linked test results through the QC workflow',
+        code: 'SPECIFICATION_QC_DISPOSITION_REQUIRED',
+        nextStep: 'Record actual results through qc-tests; failed results place the batch on QC hold, while passing mandatory results require independent QA review'
+      });
+    }
+
+    // Never compensate for missing stage dispensing by silently deducting
+    // unverified raw-material stock during finished-goods receipt. Every
+    // formula line must already be linked to stage-level dispensing evidence.
+    const formulaIngredients = Array.isArray(batch.bomSnapshot?.ingredients) ? batch.bomSnapshot.ingredients : [];
+    const consumedLines = Array.isArray(batch.ingredientsConsumed) ? batch.ingredientsConsumed : [];
+    const missingDispensing = formulaIngredients.filter(ingredient => {
+      // Vendor-packed packaging is not issued from this facility's stores.
+      if (ingredient.itemType === 'packaging' && batch.packagingMode !== 'self_packed') return false;
+      const rawMaterialId = ingredient.rawMaterialId && ingredient.rawMaterialId._id
+        ? String(ingredient.rawMaterialId._id) : String(ingredient.rawMaterialId || '');
+      if (!rawMaterialId) return true;
+      const stageName = String(ingredient.stageName || '').trim().toLowerCase();
+      const expectedStageIndex = stageName
+        ? (batch.stages || []).findIndex(stage => String(stage.name || '').trim().toLowerCase() === stageName)
+        : 0;
+      if (expectedStageIndex < 0) return true;
+      return !consumedLines.some(consumed => {
+        const consumedMaterialId = consumed.rawMaterialId && consumed.rawMaterialId._id
+          ? String(consumed.rawMaterialId._id) : String(consumed.rawMaterialId || '');
+        return consumedMaterialId === rawMaterialId &&
+          Number(consumed.stageIndex) === expectedStageIndex &&
+          Boolean(String(consumed.dispensingNo || '').trim());
+      });
+    });
+    if (missingDispensing.length > 0) {
+      return res.status(409).json({
+        error: 'Every formula material must be issued through the independently verified dispensing workflow before batch completion',
+        code: 'MATERIAL_DISPENSING_REQUIRED',
+        missingMaterials: missingDispensing.map(item => ({
+          rawMaterialId: item.rawMaterialId && item.rawMaterialId._id ? item.rawMaterialId._id : item.rawMaterialId,
+          stageName: item.stageName || ''
+        }))
+      });
+    }
+
+    const warehouse = await Warehouse.findById(warehouseId);
+    if (!warehouse) {
+      return res.status(404).json({ error: 'Finished-goods storage warehouse was not found.' });
+    }
+
+    // Do not consume packaging stock until all preconditions above have passed.
+    // A rejected completion attempt must leave packaging inventory untouched.
     if (!batch.packagingDeducted) {
       if (batch.packagingMode === 'self_packed') {
         await deductPackagingMaterials(batch, yieldsList);
@@ -905,129 +1308,22 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       }
     }
 
-    const allDone = batch.stages.every(s => s.status === 'completed' || s.status === 'skipped');
-    if (!allDone) {
-      const pending = batch.stages.filter(s => s.status === 'pending' || s.status === 'in_progress').map(s => s.name);
-      return res.status(400).json({ error: `Cannot complete batch. Pending stages: ${pending.join(', ')}` });
-    }
-
-    const warehouse = await Warehouse.findById(warehouseId);
-    if (!warehouse) {
-      return res.status(404).json({ error: 'Finished goods storage warehouse was not found.' });
-    }
-
-    // Save QC parameters
-    batch.qcStatus = qcStatus || 'approved';
-    batch.qcPassedByUser = req.user ? req.user.id : null;
-    batch.qcPassedBy = (req.user ? req.user.name : '') || qcPassedBy.trim();
+    // Persist only the pending or rejected disposition validated above.
+    batch.qcStatus = qcDisposition;
+    batch.qcPassedByUser = qcDisposition === 'pending' ? null : req.user.id;
+    batch.qcPassedBy = qcDisposition === 'pending' ? '' : req.user.name;
     batch.jobWorkerCertificateRef = jobWorkerCertificateRef || '';
     batch.coaDocumentRef = coaDocumentRef || '';
     batch.jobWorkCharges = Number(jobWorkCharges) || 0;
-    batch.qcParameters = {
-      organoleptic: organoleptic || '',
-      moistureContent: moistureContent !== undefined ? moistureContent : null,
-      moistureLimit: req.body.moistureLimit || '',
-      ashValue: ashValue !== undefined ? ashValue : null,
-      ashValueLimit: req.body.ashValueLimit || '',
-      pHValue: pHValue !== undefined ? pHValue : null,
-      pHLimit: req.body.pHLimit || '',
-      disintegrationTime: disintegrationTime !== undefined ? disintegrationTime : null,
-      disintegrationLimit: req.body.disintegrationLimit || '',
-      heavyMetals: heavyMetals || '',
-      microbialLimit: microbialLimit || '',
-      labReportRef: labReportRef || '',
-      testStandardRef: req.body.testStandardRef || ''
-    };
+    // Completion is not a QC test event. Actual results are recorded only through
+    // the specification-linked QC workflow with analyst identity and timestamp.
+    batch.qcParameters = {};
 
     // Calculate yield variance
     const plannedQtyVal = batch.plannedQty || 1;
     const varianceVal = Number((((valYield - plannedQtyVal) / plannedQtyVal) * 100).toFixed(2));
 
-    if (qcStatus === 'approved') {
-      const SystemSettings = require('../../models/SystemSettings');
-      const settings = await SystemSettings.findOne().lean();
-      const tolerance = settings ? (settings.yieldVarianceTolerancePercent || 5) : 5;
-
-      const varianceExceeded = Math.abs(varianceVal) > tolerance;
-
-      let qcLimitBreached = false;
-      if (moistureContent !== null && moistureContent !== undefined && req.body.moistureLimit) {
-        const match = req.body.moistureLimit.match(/NMT\s*(\d+(?:\.\d+)?)/i);
-        if (match && moistureContent > parseFloat(match[1])) qcLimitBreached = true;
-      }
-
-      if (varianceExceeded || qcLimitBreached) {
-        const hasValidDeviation = batch.deviations && batch.deviations.some(d => d.rootCause && d.correctiveAction);
-        if (!hasValidDeviation) {
-          return res.status(400).json({
-            error: `Out-of-tolerance result (Variance: ${varianceVal}%, Tolerance: ±${tolerance}%) requires a populated deviation record (root cause & corrective action) before approval.`
-          });
-        }
-      }
-
-      // Label reconciliation check for printed BOM ingredients
-      if (batch.bomSnapshot && batch.bomSnapshot.ingredients) {
-        const printedIngs = batch.bomSnapshot.ingredients.filter(i => i.isPrintedMaterial);
-        if (printedIngs.length > 0) {
-          for (const ing of printedIngs) {
-            const rec = (batch.labelReconciliation || []).find(r => r.rawMaterialId.toString() === ing.rawMaterialId.toString());
-            if (!rec) {
-              return res.status(400).json({ error: `Label & printed packaging reconciliation required for material ID ${ing.rawMaterialId}` });
-            }
-            const validSum = Math.abs(rec.qtyIssued - (rec.qtyUsed + rec.qtyDamaged + rec.qtyReturnedToStore)) <= 0.01;
-            if (!validSum && !rec.discrepancyNote) {
-              return res.status(400).json({ error: `Discrepancy in label reconciliation for "${rec.name}": Issued ${rec.qtyIssued} vs Sum ${rec.qtyUsed + rec.qtyDamaged + rec.qtyReturnedToStore}. Provide a discrepancy note.` });
-            }
-          }
-        }
-      }
-
-      // Retention sample check
-      const RetentionSample = require('../../models/RetentionSample');
-      const sampleCount = await RetentionSample.countDocuments({ batchId: batch._id });
-      if (sampleCount === 0) {
-        return res.status(400).json({ error: 'At least one reference/retention sample record is required before batch QC approval' });
-      }
-    }
-
     const totalCost = batch.rawMaterialCost + (batch.overheadCost || 0) + batch.jobWorkCharges;
-
-    if (qcStatus === 'rejected') {
-      // Rejection logic: No stock added, full planned quantity is waste
-      batch.actualYieldQty = 0;
-      batch.wasteQty = batch.plannedQty;
-      batch.wasteReason = wasteReason || 'Failed Quality Control (QC) specifications';
-      batch.variancePercent = -100;
-      batch.unitProductionCost = 0;
-      batch.qcNotes = `${qcNotes ? qcNotes.trim() + '\n\n' : ''}BATCH REJECTED by QC Inspector: ${qcPassedBy.trim()}. QC Parameters failed specifications.`;
-      batch.qcPassedBy = qcPassedBy.trim();
-      batch.status = 'rejected';
-      batch.endDate = new Date();
-
-      const qcStage = batch.stages.find(s => s.name.toLowerCase().includes('qc'));
-      if (qcStage && qcStage.status !== 'completed') {
-        qcStage.status = 'completed';
-        qcStage.completedAt = new Date();
-        qcStage.completedBy = qcPassedBy.trim();
-        qcStage.notes = 'QC Failed - Batch Rejected';
-      }
-      const packagingStage = batch.stages.find(s => s.name.toLowerCase().includes('packaging') || s.name.toLowerCase().includes('label'));
-      if (packagingStage && packagingStage.status !== 'completed') {
-        packagingStage.status = 'skipped';
-        packagingStage.completedAt = new Date();
-        packagingStage.completedBy = qcPassedBy.trim();
-        packagingStage.notes = 'Skipped due to QC failure';
-      }
-
-      await batch.save();
-      if (req.io) {
-        req.io.emit('mfg_batch_completed', batch);
-        req.io.emit('inventory_updated', { type: 'batch_rejected', batchNo: batch.batchNo });
-      }
-      return res.json(batch);
-    }
-
-
 
     // Persist actual yields on batch document
     batch.yields = yieldsList.map(y => ({
@@ -1129,49 +1425,23 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     // atomically after all batch validation/cost/backfill work is complete.
     let challan = null;
 
-    const valWaste = wasteQty !== undefined ? Number(wasteQty) : Math.max(0, batch.plannedQty - valYield);
+    const valWaste = enteredWaste;
     const variancePct = batch.plannedQty > 0 ? Number((((valYield - batch.plannedQty) / batch.plannedQty) * 100).toFixed(2)) : 0;
 
     batch.actualYieldQty = valYield;
     batch.wasteQty = valWaste;
-    batch.wasteReason = wasteReason || '';
+    batch.wasteReason = valWaste > 0 ? enteredWasteReason : '';
     batch.variancePercent = variancePct;
     batch.unitProductionCost = valYield > 0 ? Number((totalCost / valYield).toFixed(2)) : 0;
 
     const splitSummary = createdEntries.map(e => `${e.name} (${e.size}): ${e.qty} units (${e.boxes} boxes @ ₹${e.unitCost}/unit)`).join('\n');
     batch.qcNotes = `${qcNotes ? qcNotes.trim() + '\n\n' : ''}Packaging Split Inward:\n${splitSummary}`;
-    batch.qcPassedBy = qcPassedBy.trim();
     batch.status = 'completed';
     batch.endDate = now;
     batch.mfgDate = now;
 
-    const qcStage = batch.stages.find(s => s.name.toLowerCase().includes('qc'));
-    if (qcStage && qcStage.status !== 'completed') {
-      qcStage.status = 'completed';
-      qcStage.completedAt = new Date();
-      qcStage.completedBy = qcPassedBy.trim();
-    }
-    const packagingStage = batch.stages.find(s => s.name.toLowerCase().includes('packaging') || s.name.toLowerCase().includes('label'));
-    if (packagingStage && packagingStage.status !== 'completed') {
-      packagingStage.status = 'completed';
-      packagingStage.completedAt = new Date();
-      packagingStage.completedBy = qcPassedBy.trim();
-    }
-
-    // Backfill: deduct any stage-tied ingredients missed during stage advancement
-    // (covers both formulation and packaging that fell through due to the stageName filter bug)
-    const backfillIngs = (batch.bomSnapshot?.ingredients || []).filter(i => {
-      const hasStage = i.stageName && i.stageName.trim().length > 0;
-      const alreadyConsumed = batch.ingredientsConsumed.some(
-        c => c.rawMaterialId?.toString() === i.rawMaterialId?.toString()
-      );
-      return hasStage && !alreadyConsumed;
-    });
-    let backfillWarehouseId = null;
-    if (backfillIngs.length > 0) {
-      const manufacturingWarehouseForMaterials = await resolveManufacturingWarehouse(batch.manufacturingUnitId);
-      backfillWarehouseId = manufacturingWarehouseForMaterials._id;
-    }
+    // Preserve manufacturing stage evidence exactly as recorded. QC tests and
+    // review occur after completion; skipped stages retain their formal disposition.
 
     const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
     const challanNo = await generateAtomicDocumentNumber('productionTransferChallanNo', 'CH', 5);
@@ -1182,11 +1452,9 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
       destinationWarehouse: warehouse,
       challanNo,
       now,
+      expectedUpdatedAt: batch.updatedAt || null,
       userId: req.user ? req.user.id : null,
-      createdBy: qcPassedBy || (req.user ? req.user.name : 'System'),
-      backfillIngredients: backfillIngs,
-      backfillWarehouseId
-    });
+      createdBy: req.user && req.user.name ? req.user.name : 'System'    });
     batch = completed.batch;
     challan = completed.challan;
     if (req.io) {
@@ -1195,42 +1463,462 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
     }
     res.json({ batch, challan: { _id: challan._id, challanNo: challan.challanNo, status: challan.status, challanType: challan.challanType, sourceWarehouseId: challan.warehouseId, sourceWarehouseName: challan.warehouseName, destinationWarehouseId: challan.destinationWarehouseId, destinationWarehouseName: challan.destinationWarehouseName } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const statusCode = err.statusCode || (err.code === 'BATCH_CHANGED_DURING_COMPLETION' ? 409 : 500);
+    res.status(statusCode).json({
+      error: err.message,
+      ...(err.code ? { code: err.code } : {})
+    });
   }
 });
 
 // PATCH /api/batch-productions/:id/release — Market release approval separate from QC inspection
-router.patch('/:id/release', authorize('manufacturing:release'), async (req, res) => {
+// PATCH /api/batch-productions/:id/qc-tests — Record actual results against the pinned approved product specification.
+router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated QC analyst identity is required to record test results' });
+    }
+    if (batch.status === 'cancelled' || batch.status === 'rejected' || batch.releasedBy) {
+      return res.status(409).json({ error: 'QC test results cannot be added to cancelled, rejected or released batches' });
+    }
+    const isQcRetestHold = batch.status === 'qc_hold' && batch.qcStatus === 'rejected';
+    if (batch.status !== 'completed' && !isQcRetestHold) {
+      return res.status(409).json({ error: 'Specification-linked finished-product QC testing is available only after batch completion or an authorised retest following closed CAPA', code: 'BATCH_COMPLETION_REQUIRED' });
+    }
+    const tests = req.body.tests;
+    if (!Array.isArray(tests) || tests.length === 0) {
+      return res.status(400).json({ error: 'At least one actual QC test result is required' });
+    }
+    const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
+    const DeviationCapa = require('../../models/DeviationCapa');
+    const specificationId = batch.qcSpecificationId || req.body.qcSpecificationId;
+    if (!specificationId) {
+      return res.status(409).json({ error: 'Select an approved product-specific quality specification before recording QC tests' });
+    }
+    const spec = await ProductQualitySpecification.findById(specificationId).lean();
+    const productId = batch.productId && batch.productId._id ? batch.productId._id : batch.productId;
+    if (!spec || spec.status !== 'approved' || String(spec.productId) !== String(productId) ||
+      !spec.approvedBy || !spec.approvedAt || (spec.effectiveDate && new Date(spec.effectiveDate) > new Date())) {
+      return res.status(409).json({ error: 'QC tests require an effective, approved specification for this exact product' });
+    }
+    const specTests = new Map((spec.tests || []).map(test => [String(test.code || '').trim().toLowerCase(), test]));
+    if (!specTests.size) return res.status(409).json({ error: 'Approved product quality specification has no test requirements' });
+    const latestTestsByCode = new Map();
+    for (const recordedTest of (batch.qcTests || [])) {
+      latestTestsByCode.set(String(recordedTest.code || '').trim().toLowerCase(), recordedTest);
+    }
+    const unresolvedFailures = Array.from(latestTestsByCode.values())
+      .filter(test => String(test.status || '').toLowerCase() === 'fail');
+    for (const failedTest of unresolvedFailures) {
+      if (!failedTest.deviationCapaId) {
+        return res.status(409).json({ error: 'QC retest is blocked because the failed result has no linked Deviation/CAPA record', code: 'QC_RETEST_CAPA_REQUIRED' });
+      }
+      const deviation = await DeviationCapa.findById(failedTest.deviationCapaId).lean();
+      if (!deviation || deviation.status !== 'closed') {
+        return res.status(409).json({ error: 'QC retest is blocked until every failed-test Deviation/CAPA is independently verified and closed', code: 'QC_RETEST_CAPA_OPEN' });
+      }
+    }
+    const submittedCodes = new Set();
+    const normalized = [];
+    for (const item of tests) {
+      const code = String(item.code || '').trim();
+      const key = code.toLowerCase();
+      const specTest = specTests.get(key);
+      if (!code || !specTest) return res.status(400).json({ error: 'Every QC test code must exist in the approved product specification', code });
+      const previousAttempt = latestTestsByCode.get(key);
+      if (submittedCodes.has(key) || (previousAttempt && String(previousAttempt.status || '').toLowerCase() !== 'fail')) {
+        return res.status(409).json({ error: 'A QC result for test ' + code + ' is already recorded; only a failed test with a closed linked CAPA may be retested' });
+      }
+      submittedCodes.add(key);
+      const status = String(item.status || 'pending').toLowerCase();
+      if (!['pending', 'pass', 'fail'].includes(status)) {
+        return res.status(400).json({ error: 'QC test status must be pending, pass or fail', code });
+      }
+      const hasTextResult = item.result !== undefined && item.result !== null && String(item.result).trim() !== '';
+      const hasNumericResult = item.numericResult !== undefined && item.numericResult !== null &&
+        Number.isFinite(Number(item.numericResult));
+      if (!hasTextResult && !hasNumericResult) {
+        return res.status(400).json({ error: 'An actual text or numeric result is required for QC test ' + code });
+      }
+      normalized.push({
+        code: specTest.code,
+        name: specTest.name,
+        category: specTest.category || 'other',
+        specification: specTest.specification,
+        unit: specTest.unit || '',
+        methodReference: specTest.methodReference || '',
+        result: hasTextResult ? String(item.result).trim() : '',
+        numericResult: hasNumericResult ? Number(item.numericResult) : null,
+        status,
+        testedBy: req.user.id,
+        testedByName: req.user.name,
+        testedAt: new Date(),
+        remarks: String(item.remarks || '').trim(),
+        attemptNo: previousAttempt ? Number(previousAttempt.attemptNo || 1) + 1 : 1,
+        retestOf: previousAttempt && previousAttempt._id ? previousAttempt._id : null
+      });
+    }
 
+    const outcome = await withTransaction(async session => {
+      const current = await BatchProduction.findOne({
+        _id: batch._id,
+        updatedAt: batch.updatedAt,
+        status: batch.status,
+        qcStatus: batch.qcStatus,
+        releasedBy: null
+      }).session(session);
+      if (!current) {
+        throw Object.assign(new Error('Batch changed while QC results were being recorded. Reload the batch and review its latest QC history.'), {
+          statusCode: 409, code: 'QC_TEST_CONFLICT'
+        });
+      }
+      const currentSpec = await ProductQualitySpecification.findById(spec._id).session(session).lean();
+      if (!currentSpec || currentSpec.status !== 'approved' ||
+          String(currentSpec.productId) !== String(productId) ||
+          String(currentSpec.specificationVersion || '') !== String(spec.specificationVersion || '') ||
+          !currentSpec.approvedBy || !currentSpec.approvedAt ||
+          (currentSpec.effectiveDate && new Date(currentSpec.effectiveDate) > new Date())) {
+        throw Object.assign(new Error('The approved QC specification changed while results were being recorded. Reload and retry against the current approved version.'), {
+          statusCode: 409, code: 'QC_SPECIFICATION_CONFLICT'
+        });
+      }
+      const currentLatestByCode = new Map();
+      for (const recordedTest of (current.qcTests || [])) {
+        currentLatestByCode.set(String(recordedTest.code || '').trim().toLowerCase(), recordedTest);
+      }
+      for (const failedTest of Array.from(currentLatestByCode.values()).filter(test => String(test.status || '').toLowerCase() === 'fail')) {
+        if (!failedTest.deviationCapaId) {
+          throw Object.assign(new Error('QC retest is blocked because a failed result has no linked Deviation/CAPA record.'), {
+            statusCode: 409, code: 'QC_RETEST_CAPA_REQUIRED'
+          });
+        }
+        const deviation = await DeviationCapa.findById(failedTest.deviationCapaId).session(session).lean();
+        if (!deviation || deviation.status !== 'closed') {
+          throw Object.assign(new Error('QC retest is blocked until every failed-test Deviation/CAPA is independently verified and closed.'), {
+            statusCode: 409, code: 'QC_RETEST_CAPA_OPEN'
+          });
+        }
+      }
+      for (const test of normalized) {
+        const key = String(test.code || '').trim().toLowerCase();
+        const previousAttempt = currentLatestByCode.get(key);
+        if (previousAttempt && String(previousAttempt.status || '').toLowerCase() !== 'fail') {
+          throw Object.assign(new Error('A QC result was recorded concurrently. Reload the batch before submitting another result.'), {
+            statusCode: 409, code: 'QC_TEST_CONFLICT'
+          });
+        }
+        if (previousAttempt) {
+          test.attemptNo = Number(previousAttempt.attemptNo || 1) + 1;
+          test.retestOf = previousAttempt._id || null;
+        }
+      }
+
+      current.qcSpecificationId = currentSpec._id;
+      current.qcSpecificationVersion = currentSpec.specificationVersion || '';
+      current.qcTests = (current.qcTests || []).concat(normalized);
+      const allResults = new Map();
+      for (const test of current.qcTests) allResults.set(String(test.code || '').trim().toLowerCase(), test);
+      const latestResults = Array.from(allResults.values());
+      const mandatory = (currentSpec.tests || []).filter(test => test.mandatory !== false);
+      const failed = latestResults.some(test => String(test.status || '').toLowerCase() === 'fail');
+      const mandatoryPassed = mandatory.length > 0 && mandatory.every(test =>
+        String((allResults.get(String(test.code || '').trim().toLowerCase()) || {}).status || '').toLowerCase() === 'pass'
+      );
+      const createdDeviations = [];
+      if (failed) {
+        const DeviationCapa = require('../../models/DeviationCapa');
+        current.qcStatus = 'rejected';
+        current.qcPassedByUser = req.user.id;
+        current.qcPassedBy = req.user.name;
+        current.status = 'qc_hold';
+        for (let index = 0; index < normalized.length; index += 1) {
+          const failedTest = normalized[index];
+          if (String(failedTest.status || '').toLowerCase() !== 'fail') continue;
+          const qcTestRecord = current.qcTests[current.qcTests.length - normalized.length + index];
+          const deviationNo = await generateAtomicDocumentNumber('deviationNo_DEV', 'DEV-', 5, session);
+          const resultText = failedTest.result || String(failedTest.numericResult);
+          const [deviation] = await DeviationCapa.create([{
+            deviationNo,
+            batchId: current._id,
+            batchNo: current.batchNo,
+            deviationType: 'qc_failure',
+            description: 'Finished-product QC test ' + failedTest.code + ' failed against approved specification ' +
+              (currentSpec.specificationVersion || '') + '. Recorded result: ' + resultText +
+              (failedTest.unit ? ' ' + failedTest.unit : '') + '. Specification: ' + (failedTest.specification || ''),
+            reportedBy: req.user.name,
+            reportedByUser: req.user.id,
+            sourceTestCode: failedTest.code,
+            sourceQcTestId: qcTestRecord && qcTestRecord._id ? qcTestRecord._id : null,
+            sourceSpecificationId: currentSpec._id,
+            sourceSpecificationVersion: currentSpec.specificationVersion || '',
+            status: 'open'
+          }], { session });
+          if (deviation && qcTestRecord) qcTestRecord.deviationCapaId = deviation._id;
+          if (deviation) createdDeviations.push(deviation);
+        }
+      } else if (mandatoryPassed) {
+        current.status = 'completed';
+        current.qcStatus = 'pending_qa_review';
+        current.qcPassedByUser = req.user.id;
+        current.qcPassedBy = req.user.name;
+        current.qcApprovedByUser = null;
+        current.qcApprovedByName = '';
+        current.qcApprovedAt = null;
+        current.qcApprovalNotes = '';
+      } else {
+        current.status = 'completed';
+        current.qcStatus = 'pending';
+        current.qcPassedByUser = null;
+        current.qcPassedBy = '';
+        current.qcApprovedByUser = null;
+        current.qcApprovedByName = '';
+        current.qcApprovedAt = null;
+        current.qcApprovalNotes = '';
+      }
+      await current.save({ session });
+      return { batch: current, mandatoryTests: mandatory.length, mandatoryPassed, failed, createdDeviations };
+    });
+    if (req.io) req.io.emit('mfg_batch_updated', outcome.batch);
+    res.json({
+      batch: outcome.batch,
+      qcStatus: outcome.batch.qcStatus,
+      mandatoryTests: outcome.mandatoryTests,
+      recordedTests: outcome.batch.qcTests.length,
+      mandatoryTestsPassed: outcome.mandatoryPassed,
+      deviationRequired: outcome.failed,
+      deviations: (outcome.createdDeviations || []).map(deviation => ({
+        id: deviation._id,
+        deviationNo: deviation.deviationNo,
+        sourceTestCode: deviation.sourceTestCode
+      })),
+      message: outcome.failed ? 'One or more recorded tests failed. Batch is on QC hold and requires deviation investigation.' :
+        (outcome.mandatoryPassed ? 'All mandatory tests are recorded as passed. Independent QA disposition approval is now required.' :
+          'QC results recorded. Remaining mandatory tests must be completed before QC approval.')
+    });
+  } catch (err) {
+    res.status(err.statusCode || 400).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
+  }
+});
+
+router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    const reviewerId = req.user?.id || req.user?._id;
+    const reviewerName = req.user?.name || req.user?.email;
+    const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() : '';
+    if (!reviewerId || !reviewerName) return res.status(401).json({ error: 'Authenticated QA reviewer identity is required' });
+    if (!notes) return res.status(400).json({ error: 'QA disposition review notes are required' });
+    if (batch.qcStatus !== 'pending_qa_review') return res.status(409).json({ error: 'Only QC dispositions pending QA review can be approved' });
+    if (!batch.qcPassedByUser || String(batch.qcPassedByUser) === String(reviewerId)) {
+      return res.status(409).json({ error: 'QC analyst cannot independently approve their own test disposition' });
+    }
+    if (batch.status !== 'completed' || batch.releasedBy) return res.status(409).json({ error: 'Only completed, unreleased batches can receive QA disposition approval' });
+    const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
+    const spec = await ProductQualitySpecification.findById(batch.qcSpecificationId).lean();
+    const batchProductId = batch.productId && batch.productId._id ? batch.productId._id : batch.productId;
+    if (!spec || spec.status !== 'approved' || !spec.approvedBy || !spec.approvedAt ||
+      String(spec.productId) !== String(batchProductId) ||
+      (spec.effectiveDate && new Date(spec.effectiveDate) > new Date())) {
+      return res.status(409).json({ error: 'An effective, approved specification with approval evidence for this exact product is required for QA disposition review' });
+    }
+    if (String(batch.qcSpecificationVersion || '') !== String(spec.specificationVersion || '')) {
+      return res.status(409).json({ error: 'The batch QC specification version does not match the approved specification record' });
+    }
+    const results = new Map();
+    for (const test of (batch.qcTests || [])) results.set(String(test.code || '').trim().toLowerCase(), test);
+    const latestResults = Array.from(results.values());
+    const mandatory = (spec.tests || []).filter(test => test.mandatory !== false);
+    const allPassed = mandatory.length > 0 && mandatory.every(test => {
+      const result = results.get(String(test.code || '').trim().toLowerCase());
+      return result && result.status === 'pass' && (String(result.result || '').trim() || Number.isFinite(result.numericResult));
+    });
+    if (!allPassed || latestResults.some(test => test.status === 'fail')) {
+      return res.status(409).json({ error: 'All mandatory tests must have actual passing results and no recorded test may have failed' });
+    }
+
+    const approvedBatch = await withTransaction(async session => {
+      const current = await BatchProduction.findOne({
+        _id: batch._id,
+        updatedAt: batch.updatedAt,
+        status: 'completed',
+        qcStatus: 'pending_qa_review',
+        releasedBy: null
+      }).session(session);
+      if (!current || !current.qcPassedByUser || String(current.qcPassedByUser) === String(reviewerId)) {
+        throw Object.assign(new Error('Batch QC evidence changed or was approved concurrently. Reload and review the latest QC results.'), {
+          statusCode: 409, code: 'QC_APPROVAL_CONFLICT'
+        });
+      }
+      const currentSpec = await ProductQualitySpecification.findById(current.qcSpecificationId).session(session).lean();
+      if (!currentSpec || currentSpec.status !== 'approved' || !currentSpec.approvedBy || !currentSpec.approvedAt ||
+          String(currentSpec.productId) !== String(batchProductId) ||
+          String(currentSpec.specificationVersion || '') !== String(batch.qcSpecificationVersion || '') ||
+          (currentSpec.effectiveDate && new Date(currentSpec.effectiveDate) > new Date())) {
+        throw Object.assign(new Error('The approved QC specification changed during QA disposition review. Reload and retry.'), {
+          statusCode: 409, code: 'QC_SPECIFICATION_CONFLICT'
+        });
+      }
+      const currentResults = new Map();
+      for (const test of (current.qcTests || [])) currentResults.set(String(test.code || '').trim().toLowerCase(), test);
+      const currentLatestResults = Array.from(currentResults.values());
+      const currentMandatory = (currentSpec.tests || []).filter(test => test.mandatory !== false);
+      const currentAllPassed = currentMandatory.length > 0 && currentMandatory.every(test => {
+        const result = currentResults.get(String(test.code || '').trim().toLowerCase());
+        return result && result.status === 'pass' && (String(result.result || '').trim() || Number.isFinite(result.numericResult));
+      });
+      if (!currentAllPassed || currentLatestResults.some(test => test.status === 'fail')) {
+        throw Object.assign(new Error('QC results changed during QA disposition review; all mandatory tests must still pass.'), {
+          statusCode: 409, code: 'QC_APPROVAL_CONFLICT'
+        });
+      }
+      current.qcStatus = 'approved';
+      current.qcApprovedByUser = reviewerId;
+      current.qcApprovedByName = reviewerName;
+      current.qcApprovedAt = new Date();
+      current.qcApprovalNotes = notes;
+      await current.save({ session });
+      return current;
+    });
+    req.io?.emit('mfg_batch_updated', approvedBatch);
+    return res.json({ batch: approvedBatch, message: 'Independent QA disposition approved; separate market release approval is still required' });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
+  }
+});
+
+router.patch('/:id/release', authorize('manufacturing:release'), async (req, res) => {
+  try {
+    let batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated independent QA releaser identity is required' });
+    }
     if (batch.status !== 'completed' || batch.qcStatus !== 'approved') {
       return res.status(400).json({ error: 'Batch must be completed and QC approved before market release' });
     }
-    if (!batch.bmrApprovedBy) return res.status(400).json({ error: 'BMR approval is required before market release' });
-    const criticalStages = (batch.stages || []).filter(s => s.name !== 'QC Testing');
+    if (!batch.bmrApprovedBy || !batch.bmrApprovedAt) {
+      return res.status(400).json({ error: 'Pre-execution BMR approval is required before market release' });
+    }
+    if (!batch.qcPassedByUser || !batch.qcPassedBy) {
+      return res.status(400).json({ error: 'Identified QC analyst disposition is required before market release' });
+    }
+    if (String(batch.qcPassedByUser) === String(req.user.id)) {
+      return res.status(409).json({ error: 'Independent QA release is required; the QC analyst cannot release the same batch' });
+    }
+    const criticalStages = (batch.stages || []).filter(s => String(s.name || '').trim().toLowerCase() !== 'qc testing');
     if (criticalStages.some(s => s.status !== 'completed' && s.status !== 'skipped')) return res.status(400).json({ error: 'All critical manufacturing stages must be completed or formally skipped before market release' });
+    if (criticalStages.some(s => ['completed', 'skipped'].includes(s.status) &&
+      (!s.performedBy || !s.verifiedBy || !s.verifiedAt || String(s.performedBy) === String(s.verifiedBy)))) {
+      return res.status(400).json({ error: 'Every completed or skipped critical manufacturing stage requires independent operator and verifier identities with verification timestamp before market release' });
+    }
+    if (criticalStages.some(s => s.status === 'skipped' && !String(s.notes || '').trim())) {
+      return res.status(400).json({ error: 'Every skipped critical manufacturing stage requires a documented reason before market release' });
+    }
     if (criticalStages.some(s => s.status === 'completed' && !s.isDualSigned)) return res.status(400).json({ error: 'Every completed critical manufacturing stage must have independent Chemist and QA signatures' });
     const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
     const LineClearance = require('../../models/LineClearance');
     const spec = batch.qcSpecificationId ? await ProductQualitySpecification.findById(batch.qcSpecificationId).lean() : null;
-    if (!spec || spec.status !== 'approved') return res.status(400).json({ error: 'An approved product-specific AYUSH QC specification is required before market release' });
+    const productId = batch.productId && batch.productId._id ? batch.productId._id : batch.productId;
+    if (!spec || spec.status !== 'approved' || String(spec.productId) !== String(productId) ||
+      !spec.approvedBy || !spec.approvedAt || (spec.effectiveDate && new Date(spec.effectiveDate) > new Date())) {
+      return res.status(400).json({ error: 'An effective, approved product-specific quality specification with approval evidence is required before market release' });
+    }
     const mandatory = (spec.tests || []).filter(t => t.mandatory !== false);
+    if (!mandatory.length) return res.status(400).json({ error: 'Approved product quality specification has no mandatory test requirements' });
     const results = batch.qcTests || [];
-    const missing = mandatory.filter(t => { const r = results.find(x => x.code === t.code); return !r || r.status !== 'pass'; });
-    if (missing.length) return res.status(400).json({ error: 'Mandatory QC tests are incomplete or not passed', tests: missing.map(t => t.code) });
+    const latestResultsByCode = new Map();
+    for (const test of results) latestResultsByCode.set(String(test.code || '').trim().toLowerCase(), test);
+    const latestResults = Array.from(latestResultsByCode.values());
+    if (latestResults.some(test => String(test.status || '').toLowerCase() === 'fail')) return res.status(400).json({ error: 'A failed latest finished-product QC test prevents market release; investigate and close its linked Deviation/CAPA before retesting' });
+    const missing = mandatory.filter(t => {
+      const result = latestResultsByCode.get(String(t.code || '').trim().toLowerCase());
+      return !result || String(result.status || '').toLowerCase() !== 'pass' ||
+        !result.testedBy || !result.testedByName || !result.testedAt ||
+        ((result.result === undefined || result.result === null || String(result.result).trim() === '') &&
+          (result.numericResult === undefined || result.numericResult === null));
+    });
+    if (missing.length) return res.status(400).json({
+      error: 'Mandatory QC tests must have passed with tester identity, timestamp and recorded result',
+      tests: missing.map(t => t.code)
+    });
+    const qaIsTestAnalyst = results.some(result => result.testedBy && String(result.testedBy) === String(req.user.id));
+    if (qaIsTestAnalyst) {
+      return res.status(409).json({ error: 'Independent QA release is required; a QC test analyst cannot release the same batch' });
+    }
     const clearances = await LineClearance.find({ batchId: batch._id }).lean();
+    const MaterialDispensing = require('../../models/MaterialDispensing');
+    const dispensingRecords = await MaterialDispensing.find({ batchId: batch._id }).lean();
+    const materialGenealogyIssues = getMaterialGenealogyIssues(batch, dispensingRecords);
+    if (materialGenealogyIssues.length) return res.status(400).json({
+      error: 'Batch material genealogy and formula reconciliation must be complete before market release',
+      code: 'MATERIAL_GENEALOGY_INCOMPLETE',
+      missingEvidence: materialGenealogyIssues
+    });
+    const RetentionSample = require('../../models/RetentionSample');
+    const retentionSamples = await RetentionSample.find({ batchId: batch._id }).lean();
+    const retentionIssues = getRetentionSampleIssues(batch, retentionSamples);
+    if (retentionIssues.length) return res.status(400).json({
+      error: 'Batch retention-sample evidence is incomplete',
+      code: 'RETENTION_SAMPLE_INCOMPLETE',
+      missingEvidence: retentionIssues
+    });
+    const packagingIssues = getPackagingReconciliationIssues(batch, dispensingRecords);
+    if (packagingIssues.length) return res.status(400).json({
+      error: 'Self-packed batch packaging reconciliation must pass independent verification before market release',
+      code: 'PACKAGING_RECONCILIATION_INCOMPLETE',
+      missingEvidence: packagingIssues
+    });
+    const DeviationCapa = require('../../models/DeviationCapa');
+    const openQcDeviations = await DeviationCapa.find({
+      batchId: batch._id, deviationType: 'qc_failure', status: { $ne: 'closed' }
+    }).lean();
+    if (openQcDeviations.length) return res.status(409).json({
+      error: 'Open QC failure Deviation/CAPA records must be independently verified and closed before market release',
+      code: 'QC_DEVIATION_OPEN',
+      deviations: openQcDeviations.map(deviation => ({
+        id: deviation._id, deviationNo: deviation.deviationNo, sourceTestCode: deviation.sourceTestCode || ''
+      }))
+    });
     for (const phase of ['manufacturing','filling','packing']) {
       const c = clearances.find(x => x.phase === phase);
-      if (!c || !c.cleared || !c.checklist?.equipmentCleaned || !c.checklist?.previousMaterialsRemoved || !c.checklist?.previousLabelsDocumentsRemoved || !c.checklist?.areaVisuallyInspected) return res.status(400).json({ error: `Approved ${phase} line clearance is required before market release` });
+      if (!c || !c.cleared || !c.submittedBy || !c.verifiedBy ||
+        String(c.submittedBy) === String(c.verifiedBy) || !c.verifiedAt || !c.clearedBy || !c.clearedAt ||
+        !c.checklist?.equipmentCleaned || !c.checklist?.previousMaterialsRemoved ||
+        !c.checklist?.previousLabelsDocumentsRemoved || !c.checklist?.areaVisuallyInspected) {
+        return res.status(400).json({ error: `Approved ${phase} line clearance with reviewer identity and timestamp is required before market release` });
+      }
     }
 
-    batch.releasedBy = req.user ? req.user.id : null;
-    batch.releasedByName = req.user ? req.user.name : 'Authorized Quality Releaser';
-    batch.releasedAt = new Date();
-
-    await batch.save();
+    if (batch.releasedBy) return res.status(409).json({ error: 'Batch has already received independent market release' });
+    const releasedAt = new Date();
+    batch = await withTransaction(async session => {
+      const current = await BatchProduction.findOne({
+        _id: batch._id, updatedAt: batch.updatedAt, status: 'completed', qcStatus: 'approved',
+        $or: [{ releasedBy: null }, { releasedBy: { $exists: false } }]
+      }).session(session);
+      if (!current) throw Object.assign(new Error('Batch was released or changed concurrently; refresh and retry'), { code: 'BATCH_RELEASE_CONFLICT' });
+      const openQcDeviationsInTransaction = await DeviationCapa.find({
+        batchId: current._id, deviationType: 'qc_failure', status: { $ne: 'closed' }
+      }).session(session).lean();
+      if (openQcDeviationsInTransaction.length) {
+        throw Object.assign(new Error('Open QC failure Deviation/CAPA records must be independently verified and closed before market release'), {
+          code: 'QC_DEVIATION_OPEN'
+        });
+      }
+      current.releasedBy = req.user.id;
+      current.releasedByName = req.user.name;
+      current.releasedAt = releasedAt;
+      await current.save({ session });
+      await InventoryEntry.updateMany(
+        { productionBatchId: current._id, marketReleased: false },
+        { $set: { marketReleased: true, marketReleasedAt: releasedAt, marketReleasedBy: req.user.id } },
+        { session }
+      );
+      return current;
+    });
 
     if (req.io) {
       req.io.emit('mfg_batch_released', batch);
@@ -1238,7 +1926,7 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
 
     res.json(batch);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(['BATCH_RELEASE_CONFLICT', 'QC_DEVIATION_OPEN'].includes(err.code) ? 409 : 500).json({ error: err.message, code: err.code });
   }
 });
 
@@ -1376,7 +2064,7 @@ router.get('/genealogy/search', authorize('manufacturing:view'), async (req, res
           wasteQty: fb.wasteQty || 0,
           wasteReason: fb.wasteReason || '',
           variancePercent: fb.variancePercent || 0,
-          qcStatus: fb.qcStatus || 'approved',
+          qcStatus: fb.qcStatus || 'pending',
           qcParameters: fb.qcParameters || null,
           ingredients: enrichedIngredients
         }
@@ -1466,7 +2154,7 @@ router.get('/:id/genealogy', authorize('manufacturing:view'), async (req, res) =
       wasteQty: batch.wasteQty || 0,
       wasteReason: batch.wasteReason || '',
       variancePercent: batch.variancePercent || 0,
-      qcStatus: batch.qcStatus || 'approved',
+      qcStatus: batch.qcStatus || 'pending',
       qcParameters: batch.qcParameters || null,
       ingredients: enrichedIngredients
     });
@@ -1475,148 +2163,241 @@ router.get('/:id/genealogy', authorize('manufacturing:view'), async (req, res) =
   }
 });
 
-// GET /api/batch-productions/:id/bmr-report — Generate a compliance-friendly BMR
+// GET /api/batch-productions/:id/bmr-report — System-generated internal batch manufacturing record.
 router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id)
       .populate('productId')
       .populate('ingredientsConsumed.rawMaterialId')
       .lean();
-
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
 
     const RawMaterialEntry = require('../../models/RawMaterialEntry');
     const SystemSettings = require('../../models/SystemSettings');
     const LineClearance = require('../../models/LineClearance');
     const RetentionSample = require('../../models/RetentionSample');
-
-    const [settings, lineClearance, retentionSamples] = await Promise.all([
-      SystemSettings.findOne().lean(),
+    const MaterialDispensing = require('../../models/MaterialDispensing');
+    const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
+    const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
+    const DeviationCapa = require('../../models/DeviationCapa');
+    const settings = await SystemSettings.findOne().lean() || {};
+    const [lineClearance, retentionSamples, dispensingRecords, qualitySpecification, openQcDeviations] = await Promise.all([
       LineClearance.find({ batchId: batch._id }).lean(),
-      RetentionSample.find({ batchId: batch._id }).lean()
+      RetentionSample.find({ batchId: batch._id }).lean(),
+      MaterialDispensing.find({ batchId: batch._id }).sort({ stageIndex: 1, dispensedAt: 1 }).lean(),
+      batch.qcSpecificationId ? ProductQualitySpecification.findById(batch.qcSpecificationId).lean() : Promise.resolve(null),
+      DeviationCapa.find({ batchId: batch._id, deviationType: 'qc_failure', status: { $ne: 'closed' } }).lean()
     ]);
 
-    const sysSettings = settings || {};
-
-    const botanicalLookup = require('../../utils/botanicalLookup');
     const enrichedIngredients = [];
-    for (const ing of batch.ingredientsConsumed) {
-      const entry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).lean();
-      const rate = entry ? (entry.purchaseRate || 0) : 0;
+    const unverifiedIngredients = [];
+    const missingPharmacopoeiaReferences = [];
+    for (const ing of (batch.ingredientsConsumed || [])) {
+      const entry = ing.rawMaterialEntryId ? await RawMaterialEntry.findById(ing.rawMaterialEntryId).lean() : null;
       const rm = ing.rawMaterialId || {};
-      const botProfile = await botanicalLookup.getBotanicalProfile(rm.name || '');
-
+      let pharmacopoeiaEntry = null;
+      if (rm.name) {
+        const escapedName = rm.name.trim().replace(/[.*+?^{}()|[\]\\]/g, '\\$&');
+        const escapedBot = (rm.botanicalName || '').trim().replace(/[.*+?^{}()|[\]\\]/g, '\\$&');
+        const searchConds = [{ ayurvedicName: new RegExp('^' + escapedName + '$', 'i') }];
+        if (escapedBot) searchConds.push({ botanicalName: new RegExp('^' + escapedBot + '$', 'i') });
+        pharmacopoeiaEntry = await PharmacopoeiaEntry.findOne({ $or: searchConds }).lean();
+      }
+      const referenceVerified = Boolean(pharmacopoeiaEntry && pharmacopoeiaEntry.verified === true);
+      if (!pharmacopoeiaEntry) {
+        missingPharmacopoeiaReferences.push({ rawMaterialId: rm._id || ing.rawMaterialId || null, name: rm.name || null });
+      } else if (!referenceVerified) {
+        unverifiedIngredients.push({
+          rawMaterialId: rm._id || ing.rawMaterialId || null,
+          name: rm.name || null,
+          botanicalName: pharmacopoeiaEntry.botanicalName || rm.botanicalName || null,
+          monographRef: pharmacopoeiaEntry.monographRef || rm.monographRef || null,
+          source: pharmacopoeiaEntry.source || null
+        });
+      }
+      const purchaseRate = entry && Number.isFinite(Number(entry.purchaseRate)) ? Number(entry.purchaseRate) : null;
       enrichedIngredients.push({
-        name: rm.name || 'Unknown Material',
-        botanicalName: rm.botanicalName || botProfile.latinName || '',
-        partUsed: rm.partUsed || botProfile.partUsed || '',
-        pharmacopoeialStandard: rm.pharmacopoeialStandard || botProfile.standard || 'API',
-        monographRef: rm.monographRef || botProfile.monographRef || '',
-        pharmacopoeiaSpecs: {
-          standard: botProfile.standard || 'API',
-          latinName: botProfile.latinName || '',
-          ashValue: botProfile.ashValue || null,
-          extractiveValue: botProfile.extractiveValue || null
-        },
-        isScheduleE1: Boolean(rm.isScheduleE1),
-        code: rm.sku || rm.code || 'N/A',
-        batchNo: ing.batchNo,
-        qtyConsumed: ing.qtyConsumed,
-        unit: rm.unit || 'kg',
-        purchaseRate: rate,
-        itemCost: Number((ing.qtyConsumed * rate).toFixed(2))
+        name: rm.name || null,
+        botanicalName: rm.botanicalName || (referenceVerified ? pharmacopoeiaEntry.botanicalName : null),
+        partUsed: rm.partUsed || (referenceVerified ? pharmacopoeiaEntry.partUsed || null : null),
+        pharmacopoeialStandard: rm.pharmacopoeialStandard || (referenceVerified ? pharmacopoeiaEntry.pharmacopoeialStandard || null : null),
+        monographRef: rm.monographRef || (referenceVerified ? pharmacopoeiaEntry.monographRef || null : null),
+        pharmacopoeiaReference: pharmacopoeiaEntry ? {
+          source: pharmacopoeiaEntry.source || null,
+          verified: referenceVerified,
+          standard: referenceVerified ? pharmacopoeiaEntry.pharmacopoeialStandard || null : null,
+          monographRef: pharmacopoeiaEntry.monographRef || null
+        } : null,
+        isScheduleE1: rm.isScheduleE1 === true,
+        code: rm.sku || rm.code || null,
+        rawMaterialId: rm._id || ing.rawMaterialId || null,
+        rawMaterialEntryId: ing.rawMaterialEntryId || null,
+        stockLotNo: entry ? entry.batchNo || null : ing.batchNo || null,
+        batchNo: ing.batchNo || (entry ? entry.batchNo || null : null),
+        qtyConsumed: Number.isFinite(Number(ing.qtyConsumed)) ? Number(ing.qtyConsumed) : null,
+        qtyWasted: Number.isFinite(Number(ing.qtyWasted)) ? Number(ing.qtyWasted) : 0,
+        wastageReason: ing.wastageReason || null,
+        unit: rm.unit || null,
+        purchaseRate,
+        itemCost: purchaseRate === null ? null : Number((Number(ing.qtyConsumed || 0) * purchaseRate).toFixed(2)),
+        stageIndex: ing.stageIndex ?? null,
+        dispensingNo: ing.dispensingNo || null
       });
     }
 
-    const productPopulated = batch.productId ? batch.productId : null;
-
-    // Fetch product names for plannedYields / yields if productId is not populated
+    const product = batch.productId || null;
     const yieldProdIds = new Set();
-    if (batch.plannedYields) batch.plannedYields.forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
-    if (batch.yields) batch.yields.forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
-    const yieldProducts = yieldProdIds.size > 0 ? await Product.find({ _id: { $in: [...yieldProdIds] } }).select('name size sku category').lean() : [];
+    (batch.plannedYields || []).forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
+    (batch.yields || []).forEach(y => { if (y.productId) yieldProdIds.add(y.productId.toString()); });
+    const yieldProducts = yieldProdIds.size > 0
+      ? await Product.find({ _id: { $in: [...yieldProdIds] } }).select('name size sku category').lean()
+      : [];
     const yieldProdMap = {};
     yieldProducts.forEach(p => { yieldProdMap[p._id.toString()] = p; });
 
-    const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
-    const unverifiedIngredients = [];
-
-    for (const ing of enrichedIngredients) {
-      if (ing.name) {
-        const escapedName = ing.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const escapedBot = (ing.botanicalName || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const searchConds = [{ ayurvedicName: new RegExp(`^${escapedName}$`, 'i') }];
-        if (escapedBot) searchConds.push({ botanicalName: new RegExp(`^${escapedBot}$`, 'i') });
-        const pEntry = await PharmacopoeiaEntry.findOne({ $or: searchConds }).lean();
-        if (pEntry && pEntry.verified === false) {
-          unverifiedIngredients.push({
-            name: ing.name,
-            botanicalName: ing.botanicalName || pEntry.botanicalName || '',
-            monographRef: ing.monographRef || pEntry.monographRef || '',
-            source: pEntry.source || 'AI-generated'
-          });
+    const mandatoryQcTests = qualitySpecification && qualitySpecification.status === 'approved'
+      ? (qualitySpecification.tests || []).filter(test => test.mandatory !== false)
+      : [];
+    const qcTests = batch.qcTests || [];
+    const qcTestsByCode = new Map(qcTests.map(test => [String(test.code || '').trim().toLowerCase(), test]));
+    const missingEvidence = [];
+    if (!batch.bomSnapshot || !Array.isArray(batch.bomSnapshot.ingredients) || batch.bomSnapshot.ingredients.length === 0) {
+      missingEvidence.push('Pinned batch formula snapshot is missing');
+    }
+    if (!batch.bmrApprovedBy || !batch.bmrApprovedByName || !batch.bmrApprovedAt) missingEvidence.push('Pre-execution BMR approval identity or timestamp is missing');
+    missingEvidence.push(...getMaterialGenealogyIssues(batch, dispensingRecords));
+    if (missingPharmacopoeiaReferences.length) missingEvidence.push('One or more consumed materials lack a pharmacopoeia reference record');
+    if (unverifiedIngredients.length) missingEvidence.push('One or more pharmacopoeia references are not verified');
+    if (!batch.stages || batch.stages.length === 0) missingEvidence.push('Manufacturing stage execution records are missing');
+    else {
+      for (const stage of batch.stages) {
+        if (!['completed', 'skipped'].includes(stage.status)) missingEvidence.push('Stage is not completed or formally skipped: ' + stage.name);
+        if (stage.status === 'completed' && (!stage.performedBy || !stage.performedByName)) missingEvidence.push('Stage operator identity is missing: ' + stage.name);
+        if (stage.status === 'completed' && (!stage.equipmentId || stage.equipmentCalibrationStatus !== 'valid')) missingEvidence.push('Verified equipment calibration evidence is missing: ' + stage.name);
+        if (['completed', 'skipped'].includes(stage.status) &&
+          (!stage.performedBy || !stage.verifiedBy || !stage.verifiedAt ||
+           String(stage.performedBy) === String(stage.verifiedBy))) {
+          missingEvidence.push('Independent four-eye stage verification is missing: ' + stage.name);
         }
+        if (stage.status === 'skipped' && !String(stage.notes || '').trim()) missingEvidence.push('Documented reason for skipped stage is missing: ' + stage.name);
+        if (stage.status === 'completed' && !stage.operatorTrainingRecordId) missingEvidence.push('Operator training evidence is missing: ' + stage.name);
       }
     }
-
+    for (const phase of ['manufacturing', 'filling', 'packing']) {
+      const verifiedClearance = lineClearance.some(record => record.phase === phase && record.cleared === true &&
+        record.submittedBy && record.verifiedBy && String(record.submittedBy) !== String(record.verifiedBy) &&
+        record.verifiedAt && record.clearedBy && record.clearedAt && record.checklist &&
+        record.checklist.equipmentCleaned && record.checklist.previousMaterialsRemoved &&
+        record.checklist.previousLabelsDocumentsRemoved && record.checklist.areaVisuallyInspected);
+      if (!verifiedClearance) missingEvidence.push('Verified ' + phase + ' line-clearance record is missing or incomplete');
+    }
+    if (!qualitySpecification || qualitySpecification.status !== 'approved' ||
+      String(qualitySpecification.productId) !== String(product ? product._id : batch.productId) ||
+      !qualitySpecification.approvedBy || !qualitySpecification.approvedAt ||
+      (qualitySpecification.effectiveDate && new Date(qualitySpecification.effectiveDate) > new Date())) {
+      missingEvidence.push('Effective, approved product-specific quality specification is missing');
+    }
+    if (!mandatoryQcTests.length) missingEvidence.push('Approved quality specification has no mandatory test requirements');
+    for (const specTest of mandatoryQcTests) {
+      const recorded = qcTestsByCode.get(String(specTest.code || '').trim().toLowerCase());
+      if (!recorded) missingEvidence.push('Mandatory finished-product QC test is not recorded: ' + specTest.code);
+      else if (!['pass', 'fail'].includes(String(recorded.status || '').toLowerCase()) ||
+        !recorded.testedBy || !recorded.testedByName || !recorded.testedAt ||
+        ((recorded.result === undefined || recorded.result === null || String(recorded.result).trim() === '') &&
+        (recorded.numericResult === undefined || recorded.numericResult === null))) {
+        missingEvidence.push('Finished-product QC test evidence is incomplete: ' + specTest.code);
+      }
+    }
+    if (batch.qcStatus !== 'approved') missingEvidence.push('Finished-product QC approval is not recorded');
+    if ((batch.qcTests || []).some(test => String(test.status || '').toLowerCase() === 'fail')) missingEvidence.push('One or more finished-product QC tests have failed');
+    if (!batch.releasedBy || !batch.releasedByName || !batch.releasedAt) missingEvidence.push('Independent finished-batch QA release is missing');
+    if (batch.actualYieldQty === undefined || batch.actualYieldQty === null) missingEvidence.push('Actual batch yield is not recorded');
+    if (Number(batch.wasteQty || 0) > 0 && !batch.wasteReason) missingEvidence.push('Recorded production wastage has no reason');
+    missingEvidence.push(...getRetentionSampleIssues(batch, retentionSamples));
+    missingEvidence.push(...getPackagingReconciliationIssues(batch, dispensingRecords));
+    for (const deviation of openQcDeviations) {
+      missingEvidence.push('Open QC failure Deviation/CAPA must be independently verified and closed before release: ' + deviation.deviationNo);
+    }
     const hasUnverifiedReferences = unverifiedIngredients.length > 0;
-
+    const bmrComplete = missingEvidence.length === 0;
     res.json({
-      batchNo: batch.batchNo,
+      documentType: 'system_generated_batch_manufacturing_record',
+      title: 'BATCH MANUFACTURING RECORD — INTERNAL SYSTEM-GENERATED RECORD',
+      notice: 'This is an internal system-generated batch record, not an official statutory form, government certificate, GMP certificate, or regulatory approval. Completeness reflects only evidence currently recorded in this system.',
+      officialStatutoryForm: false,
+      documentStatus: bmrComplete ? 'READY_FOR_QA_REVIEW' : 'DRAFT_INCOMPLETE',
+      bmrComplete,
+      missingEvidence,
+      generatedAt: new Date().toISOString(),
+      batchNo: batch.batchNo || null,
       hasUnverifiedReferences,
       unverifiedIngredients,
-      ayushHeader: {
-        firmName: sysSettings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
-        firmAddress: sysSettings.firmAddress || 'PILIKOTHI, VARANASI (U.P.)',
-        manufacturingLicenseNo: sysSettings.manufacturingLicenseNo || 'AYUSH-1983-UP',
-        gmpCertificateNo: sysSettings.gmpCertificateNo || 'GMP-AYUSH-2026-VNS',
-        stateUtCode: sysSettings.stateUtCode || 'UP'
+      missingPharmacopoeiaReferences,
+      organizationDetails: {
+        firmName: settings.firmName || null,
+        firmAddress: settings.firmAddress || null,
+        manufacturingLicenseNo: settings.manufacturingLicenseNo || null,
+        gmpCertificateNo: settings.gmpCertificateNo || null,
+        stateUtCode: settings.stateUtCode || null
       },
-      productName: productPopulated ? productPopulated.name : 'Unknown Product',
-      productSku: productPopulated ? productPopulated.sku : 'N/A',
-      productPrice: productPopulated ? productPopulated.price : 0,
-      productSize: productPopulated ? productPopulated.size : '',
-      productCategory: productPopulated ? (productPopulated.category || 'Ayurvedic Medicine') : 'Ayurvedic Medicine',
-      plannedQty: batch.plannedQty,
-      actualYieldQty: batch.actualYieldQty || 0,
+      productDetails: {
+        name: product ? product.name || null : null,
+        sku: product ? product.sku || null : null,
+        price: product && product.price !== undefined ? product.price : null,
+        size: product ? product.size || null : null,
+        category: product ? product.category || null : null
+      },
+      plannedQty: batch.plannedQty ?? null,
+      actualYieldQty: batch.actualYieldQty ?? null,
       mfgDate: batch.mfgDate || null,
       expiryDate: batch.expiryDate || null,
-      shelfLifeMonths: batch.shelfLifeMonths || null,
-      bmrApprovedBy: batch.bmrApprovedBy || null,
-      bmrApprovedByName: batch.bmrApprovedByName || '',
-      bmrApprovedAt: batch.bmrApprovedAt || null,
-      releasedBy: batch.releasedBy || null,
-      releasedByName: batch.releasedByName || '',
-      releasedAt: batch.releasedAt || null,
+      shelfLifeMonths: batch.shelfLifeMonths ?? null,
+      bmrApproval: {
+        userId: batch.bmrApprovedBy || null,
+        name: batch.bmrApprovedByName || null,
+        approvedAt: batch.bmrApprovedAt || null
+      },
+      independentQaRelease: batch.releasedBy && batch.releasedByName && batch.releasedAt
+        ? { userId: batch.releasedBy, name: batch.releasedByName, releasedAt: batch.releasedAt }
+        : null,
       plannedYields: (batch.plannedYields || []).map(y => ({
-        productId: y.productId ? y.productId.toString() : '',
-        plannedQty: y.plannedQty,
-        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || '') : ''),
-        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || '') : ''
+        productId: y.productId ? y.productId.toString() : null,
+        plannedQty: y.plannedQty ?? null,
+        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || null) : null),
+        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || null) : null
       })),
       yields: (batch.yields || []).map(y => ({
-        productId: y.productId ? y.productId.toString() : '',
-        actualYieldQty: y.actualYieldQty,
-        packing: y.packing || 1,
-        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || '') : ''),
-        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || '') : ''
+        productId: y.productId ? y.productId.toString() : null,
+        actualYieldQty: y.actualYieldQty ?? null,
+        packing: y.packing ?? null,
+        size: y.size || (y.productId ? (yieldProdMap[y.productId.toString()]?.size || null) : null),
+        productName: y.productId ? (yieldProdMap[y.productId.toString()]?.name || null) : null
       })),
-      wasteQty: batch.wasteQty || 0,
-      wasteReason: batch.wasteReason || '',
-      variancePercent: batch.variancePercent || 0,
-      status: batch.status,
-      startDate: batch.startDate,
-      endDate: batch.endDate,
-      qcNotes: batch.qcNotes || 'N/A',
-      qcPassedBy: batch.qcPassedBy || 'N/A',
-      qcStatus: batch.qcStatus || 'approved',
+      wasteQty: batch.wasteQty ?? null,
+      wasteReason: batch.wasteReason || null,
+      variancePercent: batch.variancePercent ?? null,
+      batchStatus: batch.status || null,
+      startDate: batch.startDate || null,
+      endDate: batch.endDate || null,
+      qcNotes: batch.qcNotes || null,
+      qcPassedBy: batch.qcPassedBy || null,
+      qcStatus: batch.qcStatus || null,
       qcParameters: batch.qcParameters || null,
-      rawMaterialCost: batch.rawMaterialCost || 0,
-      overheadCost: batch.overheadCost || 0,
-      unitProductionCost: batch.unitProductionCost || 0,
+      qcSpecification: qualitySpecification ? {
+        id: qualitySpecification._id,
+        version: qualitySpecification.specificationVersion || null,
+        status: qualitySpecification.status || null,
+        approvedBy: qualitySpecification.approvedBy || null,
+        approvedAt: qualitySpecification.approvedAt || null
+      } : null,
+      qcTests,
+      rawMaterialCost: batch.rawMaterialCost ?? null,
+      overheadCost: batch.overheadCost ?? null,
+      unitProductionCost: batch.unitProductionCost ?? null,
       stages: batch.stages || [],
       ingredients: enrichedIngredients,
       bomSnapshot: batch.bomSnapshot || null,
+      materialDispensingRecords: dispensingRecords || [],
       lineClearance: lineClearance || [],
       labelReconciliation: batch.labelReconciliation || [],
       retentionSamples: retentionSamples || []
@@ -1626,63 +2407,115 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
   }
 });
 
-// GET /api/batch-productions/:id/coa — Auto-generate Certificate of Analysis (CoA) document JSON
+// GET /api/batch-productions/:id/coa — evidence-based internal QC summary, never an official certificate.
 router.get('/:id/coa', authorize('manufacturing:view'), async (req, res) => {
   try {
-    const batch = await BatchProduction.findById(req.params.id)
-      .populate('productId')
-      .lean();
-
+    const batch = await BatchProduction.findById(req.params.id).populate('productId').lean();
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
-
-    const SystemSettings = require('../../models/SystemSettings');
-    const settings = await SystemSettings.findOne().lean() || {};
-
+    const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
     const product = batch.productId || {};
-    const qc = batch.qcParameters || {};
-
-    const testResults = [
-      { parameter: 'Organoleptic Evaluation', specification: 'Standard', result: qc.organoleptic || 'Complies', status: 'PASS' },
-      { parameter: 'Moisture Content', specification: qc.moistureLimit || 'NMT 10% w/w', result: qc.moistureContent !== null && qc.moistureContent !== undefined ? `${qc.moistureContent}% w/w` : 'N/A', status: 'PASS' },
-      { parameter: 'Total Ash Value', specification: qc.ashValueLimit || 'NMT 5% w/w', result: qc.ashValue !== null && qc.ashValue !== undefined ? `${qc.ashValue}% w/w` : 'N/A', status: 'PASS' },
-      { parameter: 'pH Value (1% w/v soln)', specification: qc.pHLimit || '4.0 - 7.0', result: qc.pHValue !== null && qc.pHValue !== undefined ? `${qc.pHValue}` : 'N/A', status: 'PASS' },
-      { parameter: 'Disintegration Time', specification: qc.disintegrationLimit || 'NMT 30 mins', result: qc.disintegrationTime !== null && qc.disintegrationTime !== undefined ? `${qc.disintegrationTime} mins` : 'N/A', status: 'PASS' },
-      { parameter: 'Heavy Metals (Pb, Cd, As, Hg)', specification: 'Within API limits', result: qc.heavyMetals || 'Complies', status: 'PASS' },
-      { parameter: 'Microbial Limit Test', specification: 'Within API limits', result: qc.microbialLimit || 'Complies', status: 'PASS' }
-    ];
-
-    const coaDocument = {
-      title: 'CERTIFICATE OF ANALYSIS (CoA)',
-      firmDetails: {
-        name: settings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
-        address: settings.firmAddress || 'VARANASI (U.P.)',
-        licenseNo: settings.manufacturingLicenseNo || 'N/A',
-        gmpCertNo: settings.gmpCertificateNo || 'N/A'
-      },
+    const approvedSpec = batch.qcSpecificationId
+      ? await ProductQualitySpecification.findById(batch.qcSpecificationId).lean()
+      : null;
+    const now = new Date();
+    const specMatchesProduct = Boolean(approvedSpec &&
+      String(approvedSpec.productId) === String(product._id || batch.productId));
+    const specApproved = Boolean(specMatchesProduct && approvedSpec.status === 'approved' &&
+      approvedSpec.approvedBy && approvedSpec.approvedAt &&
+      (!approvedSpec.effectiveDate || new Date(approvedSpec.effectiveDate) <= now));
+    const requiredTests = specApproved && Array.isArray(approvedSpec.tests)
+      ? approvedSpec.tests.filter(test => test.mandatory !== false)
+      : [];
+    const recordedTests = Array.isArray(batch.qcTests) ? batch.qcTests : [];
+    const recordedByCode = new Map(recordedTests.map(test => [String(test.code || '').trim().toLowerCase(), test]));
+    const requiredResults = requiredTests.map(specTest => {
+      const recorded = recordedByCode.get(String(specTest.code || '').trim().toLowerCase());
+      if (!recorded) return {
+        code: specTest.code, parameter: specTest.name, category: specTest.category || '',
+        specification: specTest.specification || '', methodReference: specTest.methodReference || '',
+        unit: specTest.unit || '', result: null, numericResult: null, status: 'NOT_RECORDED',
+        testedBy: null, testedByUser: null, testedAt: null, remarks: ''
+      };
+      return {
+        code: recorded.code, parameter: recorded.name, category: recorded.category || specTest.category || '',
+        specification: specTest.specification || '', methodReference: specTest.methodReference || recorded.methodReference || '',
+        result: recorded.result === undefined ? null : recorded.result,
+        numericResult: recorded.numericResult === undefined ? null : recorded.numericResult,
+        unit: recorded.unit || specTest.unit || '',
+        status: String(recorded.status || 'not_tested').toLowerCase(),
+        testedBy: recorded.testedByName || null, testedByUser: recorded.testedBy || null,
+        testedAt: recorded.testedAt || null, remarks: recorded.remarks || ''
+      };
+    });
+    const requiredCodes = new Set(requiredTests.map(test => String(test.code || '').trim().toLowerCase()));
+    const additionalResults = Array.from(recordedByCode.values())
+      .filter(test => !requiredCodes.has(String(test.code || '').trim().toLowerCase()))
+      .map(test => ({
+        code: test.code, parameter: test.name, category: test.category || '',
+        specification: test.specification || '', methodReference: test.methodReference || '',
+        result: test.result === undefined ? null : test.result,
+        numericResult: test.numericResult === undefined ? null : test.numericResult,
+        unit: test.unit || '', status: String(test.status || 'not_tested').toLowerCase(),
+        testedBy: test.testedByName || null, testedByUser: test.testedBy || null,
+        testedAt: test.testedAt || null, remarks: test.remarks || ''
+      }));
+    const testResults = requiredResults.concat(additionalResults);
+    const missingEvidence = [];
+    if (!approvedSpec || !specMatchesProduct || !specApproved) {
+      missingEvidence.push('An effective, approved product-specific quality specification with approval identity and timestamp is required');
+    }
+    if (specApproved && requiredTests.length === 0) {
+      missingEvidence.push('The approved quality specification contains no mandatory test requirements');
+    }
+    if (!testResults.length) missingEvidence.push('No specification-linked batch QC test results are recorded');
+    for (const test of requiredResults) {
+      const hasResult = test.result !== null && test.result !== undefined && String(test.result).trim() !== '';
+      if (test.status === 'NOT_RECORDED') missingEvidence.push('Required QC test not recorded: ' + test.code);
+      else if (!hasResult && (test.numericResult === null || test.numericResult === undefined)) missingEvidence.push('QC result value is missing: ' + test.code);
+      if (!['pass', 'fail'].includes(test.status)) missingEvidence.push('QC disposition is incomplete: ' + test.code);
+      if (!test.testedBy || !test.testedByUser || !test.testedAt) missingEvidence.push('QC tester identity or timestamp is missing: ' + test.code);
+    }
+    if (!batch.qcPassedBy || !batch.qcPassedByUser) missingEvidence.push('Identified QC analyst disposition is missing');
+    if (batch.qcStatus !== 'approved') missingEvidence.push('Batch QC disposition is not recorded as approved');
+    if (!batch.releasedBy || !batch.releasedByName || !batch.releasedAt) missingEvidence.push('Independent finished-batch QA release evidence is missing');
+    const hasFailedTest = testResults.some(test => test.status === 'fail') || batch.qcStatus === 'rejected';
+    const mandatoryTestsPassed = requiredResults.length > 0 && requiredResults.every(test => test.status === 'pass');
+    const qcEvidenceReady = specApproved && requiredTests.length > 0 && mandatoryTestsPassed &&
+      Boolean(batch.qcPassedBy && batch.qcPassedByUser) && batch.qcStatus === 'approved';
+    const qaReleaseRecorded = Boolean(batch.releasedBy && batch.releasedByName && batch.releasedAt);
+    const overallResult = hasFailedTest ? 'REJECTED' : (qcEvidenceReady && qaReleaseRecorded ? 'PASS' : 'PENDING');
+    res.json({
+      documentType: 'system_generated_qc_summary',
+      title: 'BATCH QC TEST SUMMARY — NOT A CERTIFICATE OF ANALYSIS',
+      notice: 'System-generated internal QC summary only. It is not a statutory Certificate of Analysis, laboratory certificate, government-issued certificate, or market-release authorisation.',
+      officialCertificate: false,
+      requiresAuthorisedQASignature: true,
+      documentStatus: hasFailedTest ? 'REJECTED' : (qcEvidenceReady ? (qaReleaseRecorded ? 'RELEASE_RECORDED' : 'READY_FOR_QA_REVIEW') : 'INCOMPLETE'),
+      overallResult,
+      qcEvidenceReady,
+      qaReleaseRecorded,
+      missingEvidence,
       batchDetails: {
-        batchNo: batch.batchNo,
-        productName: product.name || 'Ayurvedic Medicine',
-        productSku: product.sku || 'N/A',
-        spcCode: product.specificProductCode || 'N/A',
-        batchSize: `${batch.actualYieldQty || batch.plannedQty} units`,
-        mfgDate: batch.mfgDate ? new Date(batch.mfgDate).toLocaleDateString('en-IN') : 'N/A',
-        expiryDate: batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString('en-IN') : 'N/A',
-        testingDate: batch.endDate ? new Date(batch.endDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
-        testStandardRef: qc.testStandardRef || 'As per Pharmacopoeial API Standards'
+        batchNo: batch.batchNo || null,
+        productName: product.name || null,
+        productSku: product.sku || null,
+        plannedQuantity: batch.plannedQty ?? null,
+        actualYieldQuantity: batch.actualYieldQty ?? null,
+        manufacturingDate: batch.mfgDate || null,
+        expiryDate: batch.expiryDate || null,
+        specificationId: batch.qcSpecificationId || null,
+        specificationVersion: specApproved ? approvedSpec.specificationVersion : null,
+        pharmacopoeialStandard: specApproved ? approvedSpec.pharmacopoeialStandard : null,
+        monographReference: specApproved ? approvedSpec.monographReference || null : null
       },
       testResults,
-      overallResult: batch.qcStatus === 'rejected' ? 'REJECTED' : 'APPROVED & PASSED',
-      inspectorSignature: {
-        name: batch.qcPassedBy || 'Authorized Quality Analyst',
-        timestamp: batch.endDate ? new Date(batch.endDate).toISOString() : new Date().toISOString()
-      },
-      marketReleaserSignature: {
-        name: batch.releasedByName || 'Authorized Quality Releaser',
-        timestamp: batch.releasedAt ? new Date(batch.releasedAt).toISOString() : null
-      }
-    };
-
-    res.json(coaDocument);
+      recordedQcDisposition: batch.qcStatus || null,
+      qcAnalyst: batch.qcPassedBy ? { name: batch.qcPassedBy, userId: batch.qcPassedByUser || null } : null,
+      independentQaRelease: qaReleaseRecorded
+        ? { userId: batch.releasedBy, name: batch.releasedByName, releasedAt: batch.releasedAt }
+        : null,
+      generatedAt: new Date().toISOString()
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1750,7 +2583,7 @@ router.get('/analytics/yield-variance', authorize('manufacturing:view'), async (
         varianceQty: actual - planned,
         yieldEfficiencyPercent: yieldEfficiency,
         processLossPercent: Math.max(0, processLossPercent),
-        qcStatus: b.qcStatus || 'approved',
+        qcStatus: b.qcStatus || 'pending',
         unitProductionCost: b.unitProductionCost || 0
       };
     });
@@ -1769,71 +2602,79 @@ router.get('/analytics/yield-variance', authorize('manufacturing:view'), async (
 
 // ─── FEATURE 10: Packing Material Reconciliation & Schedule T Audit ───
 
-// POST /api/batch-productions/:id/label-reconciliation — Record packaging label reconciliation & audit check
+// POST /api/batch-productions/:id/label-reconciliation — Submit packaging reconciliation for independent verification.
 router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async (req, res) => {
   try {
-    const { items } = req.body; // array of { rawMaterialId, name, qtyIssued, qtyUsed, qtyDamaged, qtyReturnedToStore, discrepancyNote }
+    const { items } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
-
+    if (batch.releasedBy || ['cancelled', 'rejected'].includes(batch.status)) {
+      return res.status(409).json({ error: 'Released, cancelled or rejected batch packaging records cannot be changed' });
+    }
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated packaging reconciliation operator identity is required' });
+    }
+    if (!batch.bomSnapshot || !Array.isArray(batch.bomSnapshot.ingredients)) {
+      return res.status(409).json({ error: 'A pinned batch formula snapshot is required for packaging reconciliation' });
+    }
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Reconciliation items array is required' });
     }
-
-    let overallFlagged = false;
-    const reconciledItems = items.map(item => {
-      const issued = Number(item.qtyIssued || 0);
-      const used = Number(item.qtyUsed || 0);
+    const packagingIds = new Set(batch.bomSnapshot.ingredients
+      .filter(ingredient => ingredient.itemType === 'packaging')
+      .map(ingredient => String(ingredient.rawMaterialId)));
+    const submittedIds = new Set();
+    const reconciledItems = [];
+    for (const item of items) {
+      const rawMaterialId = String(item.rawMaterialId || '');
+      if (!rawMaterialId || !packagingIds.has(rawMaterialId)) {
+        return res.status(400).json({ error: 'Only packaging materials present in the pinned batch formula can be reconciled', rawMaterialId });
+      }
+      if (submittedIds.has(rawMaterialId) || (batch.labelReconciliation || []).some(existing => String(existing.rawMaterialId) === rawMaterialId)) {
+        return res.status(409).json({ error: 'Packaging material already has a reconciliation record; use a controlled correction workflow instead of overwriting it', rawMaterialId });
+      }
+      submittedIds.add(rawMaterialId);
+      const issued = (batch.ingredientsConsumed || [])
+        .filter(consumed => String(consumed.rawMaterialId) === rawMaterialId && Boolean(consumed.dispensingNo))
+        .reduce((sum, consumed) => sum + Number(consumed.qtyConsumed || 0), 0);
+      if (issued <= 0) {
+        return res.status(409).json({ error: 'Packaging material must have independently verified dispensing before reconciliation', rawMaterialId });
+      }
+      const used = Number(item.qtyUsed);
       const damaged = Number(item.qtyDamaged || 0);
       const returned = Number(item.qtyReturnedToStore || 0);
-      const unaccounted = Math.max(0, issued - (used + damaged + returned));
-      const discrepancyPct = issued > 0 ? Number(((unaccounted / issued) * 100).toFixed(2)) : 0;
-      const isFlagged = discrepancyPct > 0.5;
-
-      if (isFlagged) overallFlagged = true;
-
-      return {
-        rawMaterialId: item.rawMaterialId,
-        name: item.name,
-        qtyIssued: issued,
-        qtyUsed: used,
-        qtyDamaged: damaged,
-        qtyReturnedToStore: returned,
-        unaccountedQty: unaccounted,
-        discrepancyPct,
-        discrepancyFlagged: isFlagged,
-        auditStatus: isFlagged ? 'flagged' : 'passed',
-        reconciled: true,
-        reconciledBy: req.user ? req.user.id : null,
-        reconciledAt: new Date(),
-        discrepancyNote: item.discrepancyNote || (isFlagged ? `Flagged: ${discrepancyPct}% discrepancy exceeds 0.5% Schedule T limit` : 'Pass')
-      };
-    });
-
-    batch.labelReconciliation = reconciledItems;
-
-    if (overallFlagged) {
-      batch.deviations.push({
-        type: 'process_loss',
-        description: `Schedule T Packing Audit Alert: Label reconciliation discrepancy exceeds 0.5% threshold on batch ${batch.batchNo}`,
-        detectedAt: new Date(),
-        status: 'open'
-      });
-
-      if (req.io) {
-        req.io.emit('quality_alert', {
-          type: 'label_reconciliation_discrepancy',
-          batchId: batch._id,
-          batchNo: batch.batchNo
-        });
+      if (![used, damaged, returned].every(Number.isFinite) || used < 0 || damaged < 0 || returned < 0) {
+        return res.status(400).json({ error: 'Used, damaged and returned quantities must be valid non-negative numbers', rawMaterialId });
       }
+      if (used + damaged + returned > issued + 0.0001) {
+        return res.status(400).json({ error: 'Accounted packaging quantity cannot exceed independently verified issued quantity', rawMaterialId, issued });
+      }
+      const material = await RawMaterial.findById(rawMaterialId).lean();
+      if (!material) return res.status(404).json({ error: 'Packaging material not found', rawMaterialId });
+      reconciledItems.push({
+        rawMaterialId,
+        name: material.name,
+        qtyIssued: Number(issued.toFixed(4)),
+        qtyUsed: Number(used.toFixed(4)),
+        qtyDamaged: Number(damaged.toFixed(4)),
+        qtyReturnedToStore: Number(returned.toFixed(4)),
+        unaccountedQty: Number(Math.max(0, issued - used - damaged - returned).toFixed(4)),
+        discrepancyPct: Number((Math.max(0, issued - used - damaged - returned) / issued * 100).toFixed(2)),
+        discrepancyFlagged: issued - used - damaged - returned > 0.01,
+        auditStatus: 'pending',
+        reconciled: false,
+        reconciledBy: req.user.id,
+        reconciledByName: req.user.name,
+        reconciledAt: new Date(),
+        discrepancyNote: String(item.discrepancyNote || '').trim()
+      });
     }
-
+    batch.labelReconciliation = (batch.labelReconciliation || []).concat(reconciledItems);
     await batch.save();
-    res.json({
+    res.status(201).json({
       success: true,
       batchId: batch._id,
-      overallAuditStatus: overallFlagged ? 'FLAGGED_EXCEEDS_0.5_PERCENT' : 'PASSED',
+      overallAuditStatus: 'PENDING_INDEPENDENT_VERIFICATION',
       reconciledItems: batch.labelReconciliation
     });
   } catch (err) {
@@ -1841,36 +2682,96 @@ router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async 
   }
 });
 
-// GET /api/batch-productions/:id/label-reconciliation-report — Official AYUSH Schedule T Audit Report JSON
+// PATCH /api/batch-productions/:id/label-reconciliation/:itemId/verify — Independent verification of packaging reconciliation.
+router.patch('/:id/label-reconciliation/:itemId/verify', authorize('manufacturing:complete'), async (req, res) => {
+  try {
+    const batch = await BatchProduction.findById(req.params.id);
+    if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
+    if (batch.releasedBy) return res.status(409).json({ error: 'Released batch packaging reconciliation is immutable' });
+    if (!req.user || !req.user.id || !req.user.name) {
+      return res.status(401).json({ error: 'Authenticated independent verifier identity is required' });
+    }
+    const item = (batch.labelReconciliation || []).id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Packaging reconciliation item not found' });
+    if (item.reconciled && item.auditStatus !== 'pending') {
+      return res.status(409).json({ error: 'Packaging reconciliation has already been independently verified' });
+    }
+    if (String(item.reconciledBy) === String(req.user.id)) {
+      return res.status(409).json({ error: 'The reconciliation operator cannot independently verify the same record' });
+    }
+    const issued = Number(item.qtyIssued || 0);
+    const accounted = Number(item.qtyUsed || 0) + Number(item.qtyDamaged || 0) + Number(item.qtyReturnedToStore || 0);
+    if (!Number.isFinite(issued) || issued <= 0 || accounted > issued + 0.0001) {
+      return res.status(409).json({ error: 'Packaging reconciliation quantities are invalid and cannot be verified' });
+    }
+    const unaccounted = Math.max(0, issued - accounted);
+    const flagged = unaccounted > 0.01;
+    const discrepancyNote = String(req.body.discrepancyNote || item.discrepancyNote || '').trim();
+    if (flagged && !discrepancyNote) {
+      return res.status(400).json({ error: 'A discrepancy investigation note is required when packaging quantity remains unaccounted' });
+    }
+    item.unaccountedQty = Number(unaccounted.toFixed(4));
+    item.discrepancyPct = Number((unaccounted / issued * 100).toFixed(2));
+    item.discrepancyFlagged = flagged;
+    item.auditStatus = flagged ? 'flagged' : 'passed';
+    item.reconciled = true;
+    item.verifiedBy = req.user.id;
+    item.verifiedByName = req.user.name;
+    item.verifiedAt = new Date();
+    item.discrepancyNote = discrepancyNote;
+    if (flagged) {
+      batch.deviations.push({
+        type: 'process_loss',
+        description: 'Packaging material reconciliation discrepancy on batch ' + batch.batchNo + ' for material ' + item.name,
+        detectedAt: new Date(),
+        status: 'open'
+      });
+      if (req.io) req.io.emit('quality_alert', {
+        type: 'label_reconciliation_discrepancy', batchId: batch._id, batchNo: batch.batchNo
+      });
+    }
+    await batch.save();
+    res.json({
+      success: true,
+      batchId: batch._id,
+      auditStatus: item.auditStatus,
+      reconciled: item.reconciled,
+      verifiedBy: item.verifiedByName,
+      verifiedAt: item.verifiedAt
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/batch-productions/:id/label-reconciliation-report — Internal packaging reconciliation record
 router.get('/:id/label-reconciliation-report', authorize('manufacturing:view'), async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id).populate('productId', 'name sku').lean();
     if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
-
     const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne().lean() || {};
-
     const items = batch.labelReconciliation || [];
-    const hasFlagged = items.some(i => i.discrepancyFlagged);
-
+    const hasFlagged = items.some(item => item.discrepancyFlagged || item.auditStatus === 'flagged');
+    const allReconciled = items.length > 0 && items.every(item => item.reconciled && item.auditStatus === 'passed');
     res.json({
-      title: `AYUSH SCHEDULE T PACKING MATERIAL RECONCILIATION AUDIT REPORT — BATCH ${batch.batchNo}`,
+      documentType: 'INTERNAL_PACKAGING_MATERIAL_RECONCILIATION',
+      title: 'Packaging Material Reconciliation Record',
+      notice: 'System-generated internal record. It is not an official AYUSH, Schedule T, government, or regulatory audit certificate.',
+      officialRegulatoryReport: false,
       firmDetails: {
-        name: settings.firmName || 'SHEKHAR BANDHU AUSHADHALAYA',
-        gmpCertNo: settings.gmpCertificateNo || 'GMP-AYUSH-2026-VNS',
-        licenseNo: settings.manufacturingLicenseNo || 'AYUSH-1983-UP'
+        name: settings.firmName || null, address: settings.firmAddress || null,
+        manufacturingLicenseNo: settings.manufacturingLicenseNo || null,
+        gmpCertificateNo: settings.gmpCertificateNo || null
       },
       batchDetails: {
-        batchNo: batch.batchNo,
-        productName: batch.productId ? batch.productId.name : 'N/A',
-        status: batch.status,
-        mfgDate: batch.mfgDate,
-        expiryDate: batch.expiryDate
+        batchNo: batch.batchNo || null, productName: batch.productId ? batch.productId.name : null,
+        status: batch.status || null, manufacturingDate: batch.mfgDate || null, expiryDate: batch.expiryDate || null
       },
       auditSummary: {
         totalPackagingItems: items.length,
-        auditResult: hasFlagged ? 'REJECTED / FLAGGED (DISCREPANCY > 0.5%)' : 'COMPLIANT (SCHEDULE T PASSED)',
-        maxDiscrepancyPct: items.length > 0 ? Math.max(...items.map(i => i.discrepancyPct || 0)) : 0
+        auditResult: hasFlagged ? 'FLAGGED_REQUIRES_INVESTIGATION' : (allReconciled ? 'RECONCILED' : 'INCOMPLETE'),
+        maxDiscrepancyPct: items.length > 0 ? Math.max(...items.map(item => item.discrepancyPct || 0)) : null
       },
       reconciliationItems: items
     });

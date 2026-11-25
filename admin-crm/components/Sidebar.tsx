@@ -45,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Orders', route: 'orders', icon: 'globe-outline', activeIcon: 'globe' },
       { label: 'Quotations', route: 'quotations', icon: 'document-text-outline', activeIcon: 'document-text' },
       { label: 'Sales Invoices', route: 'invoices/sale', icon: 'receipt-outline', activeIcon: 'receipt' },
+      { label: 'Sales Returns', route: 'sales-returns', icon: 'return-up-back-outline', activeIcon: 'return-up-back', permission: 'invoice:view' },
       { label: 'Sales Workspace', route: 'sales-workspace', icon: 'options-outline', activeIcon: 'options' },
       { label: 'Sales Intelligence', route: 'sales-intelligence', icon: 'flash-outline', activeIcon: 'flash' },
     ],
@@ -71,6 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Inventories & Warehouses', route: 'inventories', icon: 'home-outline', activeIcon: 'home' },
       { label: 'Delivery Challans', route: 'stockmovements', icon: 'swap-horizontal-outline', activeIcon: 'swap-horizontal', permission: 'stockmovement:view' },
       { label: 'Manufacturing & BMR', route: 'manufacturing', icon: 'hammer-outline', activeIcon: 'hammer' },
+      { label: 'Incoming Material QC', route: 'incoming-qc', icon: 'flask-outline', activeIcon: 'flask', permission: 'manufacturing:view' },
       { label: 'Inventory Reconciliation', route: 'inventory-reconciliation', icon: 'git-compare-outline', activeIcon: 'git-compare', permission: 'inventory:view' },
       { label: 'GMP & Compliance', route: 'compliance', icon: 'shield-checkmark-outline', activeIcon: 'shield-checkmark', permission: 'quality:view' },
     ],
@@ -82,6 +84,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Vendors', route: 'parties/vendors', icon: 'storefront-outline', activeIcon: 'storefront' },
       { label: 'Purchase Invoices', route: 'invoices/purchase', icon: 'download-outline', activeIcon: 'download', permission: 'invoice:view' },
+      { label: 'Goods Received Notes', route: 'grn', icon: 'receipt-outline', activeIcon: 'receipt', permission: 'vendor:view' },
+      { label: 'Purchase Requisitions', route: 'purchase-requisitions', icon: 'clipboard-outline', activeIcon: 'clipboard', permission: 'vendor:view' },
     ],
   },
   {

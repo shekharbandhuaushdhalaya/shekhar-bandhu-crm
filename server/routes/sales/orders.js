@@ -122,33 +122,71 @@ router.put('/:id', authorize('order:edit'), validate(schemas.orderSchema.partial
 
 router.patch('/:id/approve', authorize('order:approve'), async (req, res) => {
   try {
+    const approverId = req.user?.id || req.user?._id;
+    const approverName = req.user?.name || req.user?.email;
+    if (!approverId || !approverName) return res.status(403).json({ error: 'Authenticated approver identity is required' });
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (order.status === 'cancelled') return res.status(409).json({ error: 'Cancelled orders cannot be approved' });
-    order.approvalStatus = 'approved';
-    order.approvedBy = req.user?.name || req.user?.email || 'User';
-    order.approvedAt = new Date();
-    order.rejectionReason = '';
-    if (order.status === 'pending') order.status = 'processing';
-    await order.save();
-    if (req.io) req.io.emit('order_updated', { type: 'approved', id: order._id });
-    res.json(order);
+    if (order.status === 'cancelled' || ['approved', 'rejected'].includes(order.approvalStatus)) {
+      return res.status(409).json({ error: 'Order approval is already closed or the order is cancelled', code: 'ORDER_APPROVAL_STATE_CONFLICT' });
+    }
+    if (order.createdByUserId && String(order.createdByUserId) === String(approverId)) {
+      return res.status(403).json({ error: 'Order creator cannot approve their own order', code: 'ORDER_MAKER_CHECKER_REQUIRED' });
+    }
+    const filter = {
+      _id: order._id,
+      status: order.status,
+      approvalStatus: order.approvalStatus || 'none'
+    };
+    if (order.updatedAt) filter.updatedAt = order.updatedAt;
+    const update = {
+      approvalStatus: 'approved',
+      approvedBy: approverName,
+      approvedByUserId: approverId,
+      approvedAt: new Date(),
+      rejectionReason: ''
+    };
+    if (order.status === 'pending') update.status = 'processing';
+    const approved = await Order.findOneAndUpdate(
+      filter, { $set: update }, { new: true, runValidators: true }
+    );
+    if (!approved) return res.status(409).json({ error: 'Order changed while approval was being prepared; reload and review it again', code: 'ORDER_APPROVAL_CONCURRENT_UPDATE' });
+    if (req.io) req.io.emit('order_updated', { type: 'approved', id: approved._id });
+    res.json(approved);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 router.patch('/:id/reject', authorize('order:approve'), async (req, res) => {
   try {
+    const reviewerId = req.user?.id || req.user?._id;
+    const reviewerName = req.user?.name || req.user?.email;
+    const reason = String(req.body.reason || '').trim();
+    if (!reviewerId || !reviewerName) return res.status(403).json({ error: 'Authenticated reviewer identity is required' });
+    if (reason.length < 10) return res.status(400).json({ error: 'A substantive rejection reason of at least 10 characters is required' });
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status === 'cancelled' || ['approved', 'rejected'].includes(order.approvalStatus)) {
+      return res.status(409).json({ error: 'Order approval is already closed or the order is cancelled', code: 'ORDER_APPROVAL_STATE_CONFLICT' });
+    }
+    if (order.createdByUserId && String(order.createdByUserId) === String(reviewerId)) {
+      return res.status(403).json({ error: 'Order creator cannot reject their own order', code: 'ORDER_MAKER_CHECKER_REQUIRED' });
+    }
     if (await Challan.exists({ salesOrderId: order._id, status: 'finalized', inventoryPostingStatus: 'posted' })) {
       return res.status(409).json({ error: 'An order with posted Challans cannot be rejected. Reverse the dependent Challans first.', code: 'POSTED_CHALLAN_EXISTS' });
     }
-    order.approvalStatus = 'rejected';
-    order.rejectionReason = String(req.body.reason || '').slice(0, 500);
-    order.status = 'cancelled';
-    await order.save();
-    if (req.io) req.io.emit('order_updated', { type: 'rejected', id: order._id });
-    res.json(order);
+    const filter = { _id: order._id, status: order.status, approvalStatus: order.approvalStatus || 'none' };
+    if (order.updatedAt) filter.updatedAt = order.updatedAt;
+    const rejected = await Order.findOneAndUpdate(
+      filter,
+      { $set: {
+        approvalStatus: 'rejected', rejectionReason: reason.slice(0, 500),
+        status: 'cancelled', rejectedBy: reviewerName, rejectedByUserId: reviewerId, rejectedAt: new Date()
+      } },
+      { new: true, runValidators: true }
+    );
+    if (!rejected) return res.status(409).json({ error: 'Order changed while rejection was being prepared; reload and review it again', code: 'ORDER_REJECTION_CONCURRENT_UPDATE' });
+    if (req.io) req.io.emit('order_updated', { type: 'rejected', id: rejected._id });
+    res.json(rejected);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 

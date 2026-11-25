@@ -21,6 +21,12 @@ export default function ComplianceScreen() {
   const [loadError, setLoadError] = useState('');
   const [savingEquipment, setSavingEquipment] = useState(false);
   const [savingCalibration, setSavingCalibration] = useState(false);
+  const [deviationAction, setDeviationAction] = useState<{ id: string; mode: 'resolve' | 'close' } | null>(null);
+  const [savingDeviation, setSavingDeviation] = useState(false);
+  const [deviationForm, setDeviationForm] = useState({
+    rootCause: '', correctiveAction: '', preventiveAction: '',
+    effectivenessCheck: '', effectivenessEvidenceRef: ''
+  });
   const [data, setData] = useState<any>({ eq: [], dev: [], st: [], rec: [], vq: [], spec: [] });
   const [warehouses, setWarehouses] = useState<any[]>([]);
 
@@ -137,6 +143,54 @@ export default function ComplianceScreen() {
     ['Vendor Qualification', data.vq, 'vendors', 'shield-checkmark-outline', 'Approved Raw Material Supplier Audit Scorecards'],
     ['AYUSH QC Specifications', data.spec, 'specifications', 'ribbon-outline', 'Botanical Limits, Organoleptic & Heavy Metal Tests'],
   ];
+
+  const openDeviationAction = (item: any, mode: 'resolve' | 'close') => {
+    setDeviationForm({
+      rootCause: item.rootCause || '',
+      correctiveAction: item.correctiveAction || '',
+      preventiveAction: item.preventiveAction || '',
+      effectivenessCheck: item.effectivenessCheck || '',
+      effectivenessEvidenceRef: item.effectivenessEvidenceRef || ''
+    });
+    setDeviationAction({ id: item._id, mode });
+  };
+
+  const saveDeviationAction = async () => {
+    if (!deviationAction || savingDeviation) return;
+    if (deviationAction.mode === 'resolve' &&
+      (!deviationForm.rootCause.trim() || !deviationForm.correctiveAction.trim() || !deviationForm.preventiveAction.trim())) {
+      showToast('Root cause, corrective action and preventive action are all required.', 'info');
+      return;
+    }
+    if (deviationAction.mode === 'close' &&
+      (!deviationForm.effectivenessCheck.trim() || !deviationForm.effectivenessEvidenceRef.trim())) {
+      showToast('Effectiveness outcome and evidence reference are required.', 'info');
+      return;
+    }
+    setSavingDeviation(true);
+    try {
+      if (deviationAction.mode === 'resolve') {
+        await api.resolveManufacturingDeviation(deviationAction.id, {
+          rootCause: deviationForm.rootCause.trim(),
+          correctiveAction: deviationForm.correctiveAction.trim(),
+          preventiveAction: deviationForm.preventiveAction.trim()
+        });
+        showToast('CAPA resolution submitted for independent closure verification.', 'success');
+      } else {
+        await api.verifyManufacturingDeviationClosure(deviationAction.id, {
+          effectivenessCheck: deviationForm.effectivenessCheck.trim(),
+          effectivenessEvidenceRef: deviationForm.effectivenessEvidenceRef.trim()
+        });
+        showToast('CAPA effectiveness independently verified and deviation closed.', 'success');
+      }
+      setDeviationAction(null);
+      await load();
+    } catch (err: any) {
+      showToast(err.message || 'Unable to update deviation CAPA.', 'error');
+    } finally {
+      setSavingDeviation(false);
+    }
+  };
 
   const renderActiveCategoryDetails = () => {
     if (!activeCategory) return null;
@@ -258,7 +312,41 @@ export default function ComplianceScreen() {
                       </View>
                     )}
 
-                    {activeCategory !== 'equipment' && (
+                    {activeCategory === 'deviations' ? (
+                      <View>
+                        <View style={styles.detailHeader}>
+                          <Text style={[styles.itemTitle, { color: colors.text.primary }]}>{item.deviationNo || `Deviation #${idx + 1}`}</Text>
+                          <StatusPill label={<>{String(item.status || 'open').replace('_', ' ').toUpperCase()}</>} textStyle={[styles.statusBadgeText, { color: item.status === 'closed' ? colors.success : item.status === 'resolved' ? colors.primary : colors.warning }]} />
+                        </View>
+                        <Text style={[styles.itemDetailText, { color: colors.text.secondary, marginTop: 4 }]}>
+                          Batch: <Text style={{ fontWeight: '700', color: colors.text.primary }}>{item.batchNo || 'Not linked'}</Text>
+                          {item.stageName ? ` · Stage: ${item.stageName}` : ''}
+                        </Text>
+                        <Text style={[styles.itemDetailText, { color: colors.text.secondary, marginTop: 4 }]}>{item.description || 'No deviation description recorded'}</Text>
+                        <Text style={[styles.itemDetailText, { color: colors.text.secondary, marginTop: 4 }]}>
+                          Reported by: {item.reportedBy || 'Not recorded'}{item.signedOffByName ? ` · Resolved by: ${item.signedOffByName}` : ''}
+                        </Text>
+                        {item.rootCause ? <Text style={[styles.itemDetailText, { color: colors.text.secondary, marginTop: 4 }]}>Root cause: {item.rootCause}</Text> : null}
+                        {item.correctiveAction ? <Text style={[styles.itemDetailText, { color: colors.text.secondary, marginTop: 4 }]}>Corrective: {item.correctiveAction}</Text> : null}
+                        {item.preventiveAction ? <Text style={[styles.itemDetailText, { color: colors.text.secondary, marginTop: 4 }]}>Preventive: {item.preventiveAction}</Text> : null}
+                        {item.status !== 'closed' && (
+                          <TouchableOpacity
+                            style={[styles.miniActionBtn, { backgroundColor: colors.primary, alignSelf: 'flex-start', marginTop: 10 }]}
+                            onPress={() => openDeviationAction(item, item.status === 'resolved' ? 'close' : 'resolve')}
+                          >
+                            <Ionicons name={item.status === 'resolved' ? 'shield-checkmark-outline' : 'clipboard-outline'} size={14} color="#fff" />
+                            <Text style={{ ...Typography.bodySm, color: '#fff', fontWeight: '700' }}>
+                              {item.status === 'resolved' ? 'Verify effectiveness & close' : 'Record CAPA resolution'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        {item.status === 'closed' && (
+                          <Text style={{ ...Typography.caption, color: colors.success, marginTop: 8 }}>
+                            Closed by independent verifier: {item.closureVerifiedByName || 'Identity not available'}
+                          </Text>
+                        )}
+                      </View>
+                    ) : activeCategory !== 'equipment' ? (
                       <View>
                         <Text style={[styles.itemTitle, { color: colors.text.primary }]}>
                           {item.name || item.title || item.code || item.productName || `Record #${idx + 1}`}
@@ -267,7 +355,7 @@ export default function ComplianceScreen() {
                           {item.notes || item.reason || item.description || item.status || 'Connected GMP Quality Record'}
                         </Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                 ))
               )}
@@ -500,6 +588,60 @@ export default function ComplianceScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={handleCalibrateSubmit} disabled={savingCalibration}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{savingCalibration ? 'Saving…' : 'Save Calibration Log'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!deviationAction} animationType="fade" transparent onRequestClose={() => setDeviationAction(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.bg.card }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+                {deviationAction?.mode === 'close' ? 'Verify CAPA Effectiveness' : 'Resolve Deviation CAPA'}
+              </Text>
+              <TouchableOpacity onPress={() => setDeviationAction(null)}>
+                <Ionicons name="close" size={22} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ padding: 16 }}>
+              {deviationAction?.mode === 'resolve' ? (
+                <>
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Root Cause *</Text>
+                    <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text.primary, minHeight: 72 }]} multiline value={deviationForm.rootCause} onChangeText={v => setDeviationForm(prev => ({ ...prev, rootCause: v }))} placeholder="Document the investigated root cause" placeholderTextColor={colors.text.muted} />
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Corrective Action *</Text>
+                    <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text.primary, minHeight: 72 }]} multiline value={deviationForm.correctiveAction} onChangeText={v => setDeviationForm(prev => ({ ...prev, correctiveAction: v }))} placeholder="Describe action taken to correct this event" placeholderTextColor={colors.text.muted} />
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Preventive Action *</Text>
+                    <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text.primary, minHeight: 72 }]} multiline value={deviationForm.preventiveAction} onChangeText={v => setDeviationForm(prev => ({ ...prev, preventiveAction: v }))} placeholder="Describe action to prevent recurrence" placeholderTextColor={colors.text.muted} />
+                  </View>
+                  <Text style={{ ...Typography.caption, color: colors.text.secondary }}>Resolution requires a reviewer different from the original deviation reporter. Closure remains a separate QA verification step.</Text>
+                </>
+              ) : (
+                <>
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Effectiveness Check Outcome *</Text>
+                    <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text.primary, minHeight: 72 }]} multiline value={deviationForm.effectivenessCheck} onChangeText={v => setDeviationForm(prev => ({ ...prev, effectivenessCheck: v }))} placeholder="Record the actual effectiveness observation" placeholderTextColor={colors.text.muted} />
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.text.primary }]}>Supporting Evidence Reference *</Text>
+                    <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text.primary }]} value={deviationForm.effectivenessEvidenceRef} onChangeText={v => setDeviationForm(prev => ({ ...prev, effectivenessEvidenceRef: v }))} placeholder="Document ID, attachment reference or controlled record ID" placeholderTextColor={colors.text.muted} />
+                  </View>
+                  <Text style={{ ...Typography.caption, color: colors.text.secondary }}>The reporter and CAPA resolution signatory cannot verify closure. Enter a real evidence reference; no evidence is generated automatically.</Text>
+                </>
+              )}
+            </ScrollView>
+            <View style={styles.modalFooterRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setDeviationAction(null)}>
+                <Text style={{ color: colors.text.secondary, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalSubmitBtn, { backgroundColor: colors.primary }]} onPress={saveDeviationAction} disabled={savingDeviation}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{savingDeviation ? 'Saving…' : deviationAction?.mode === 'close' ? 'Verify & Close' : 'Submit Resolution'}</Text>
               </TouchableOpacity>
             </View>
           </View>

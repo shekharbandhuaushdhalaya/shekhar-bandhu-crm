@@ -4,6 +4,7 @@ const Customer = require('../models/Customer');
 const Product = require('../models/Product');
 const Warehouse = require('../models/Warehouse');
 const InventoryEntry = require('../models/InventoryEntry');
+const BatchProduction = require('../models/BatchProduction');
 const { generateAtomicDocumentNumber, getNextSequenceValue } = require('../utils/documentCounter');
 const { priceOrderItems, evaluateOrderApproval, money } = require('./salesPricingService');
 
@@ -126,6 +127,8 @@ async function createSalesOrder(payload, options = {}) {
     adminNotes: `${options.notePrefix || ''}${payload.notes || ''}`.trim(),
     approvalRequired: priced.approvalRequired,
     approvalStatus,
+    createdByUserId: payload.createdByUserId || null,
+    createdByName: payload.createdByName || '',
     pricingSummary: priced.pricingSummary,
   });
 
@@ -136,6 +139,40 @@ async function createSalesOrder(payload, options = {}) {
     credit: priced.credit,
     policy: priced.policy,
   };
+}
+
+
+function sortInventoryEntriesFefo(entries = []) {
+  const time = value => {
+    const parsed = value ? new Date(value).getTime() : Number.NaN;
+    return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+  };
+  return [...entries].sort((a, b) =>
+    time(a.expiryDate) - time(b.expiryDate) ||
+    time(a.mfgDate) - time(b.mfgDate) ||
+    time(a.createdAt) - time(b.createdAt)
+  );
+}
+
+async function assertMarketReleasedEntry(entry) {
+  if (entry.marketReleased === false) {
+    throw salesOrderError('PRODUCTION_BATCH_NOT_RELEASED', `Production batch ${entry.batchNo || ''} has not received independent market release`.trim(), 409);
+  }
+  let batch = null;
+  if (entry.productionBatchId) {
+    batch = await BatchProduction.findById(entry.productionBatchId).select('batchNo status qcStatus releasedBy releasedAt').lean();
+  } else if (entry.manufacturingUnitId || entry.vendorName === 'In-House Production') {
+    batch = await BatchProduction.findOne({
+      batchNo: entry.batchNo,
+      ...(entry.manufacturingUnitId ? { manufacturingUnitId: entry.manufacturingUnitId } : {})
+    }).select('batchNo status qcStatus releasedBy releasedAt').lean();
+    if (!batch) {
+      throw salesOrderError('PRODUCTION_BATCH_RELEASE_UNVERIFIED', `Cannot verify market release for in-house production lot ${entry.batchNo || '(no batch number)'}`, 409);
+    }
+  }
+  if (batch && (batch.status !== 'completed' || batch.qcStatus !== 'approved' || !batch.releasedBy || !batch.releasedAt)) {
+    throw salesOrderError('PRODUCTION_BATCH_NOT_RELEASED', `Production batch ${batch.batchNo} has not received independent market release`, 409);
+  }
 }
 
 const nonExpiredFilter = () => ({
@@ -210,6 +247,7 @@ async function resolveRequestedLots({ order, orderItem, requestRow, warehouse })
     productId: product._id,
     packing,
     qcStatus: 'approved',
+    marketReleased: { $ne: false },
     qtyBoxes: { $gt: 0 },
     ...nonExpiredFilter(),
   };
@@ -220,7 +258,8 @@ async function resolveRequestedLots({ order, orderItem, requestRow, warehouse })
     if (!entry || Number(entry.qtyBoxes || 0) < qty) {
       throw salesOrderError('BATCH_STOCK_UNAVAILABLE', `${orderItem.name}: selected stock slot is unavailable or insufficient`, 409);
     }
-    lots.push({ ...base, qty, batchNo: entry.batchNo || '', vendorId: entry.vendorId || '', vendorName: entry.vendorName || '' });
+    await assertMarketReleasedEntry(entry);
+    lots.push({ ...base, qty, inventoryEntryId: entry._id, batchNo: entry.batchNo || '', vendorId: entry.vendorId || '', vendorName: entry.vendorName || '' });
   } else if (requestRow.batchNo) {
     const batchFilter = { ...commonFilter, batchNo: requestRow.batchNo };
     if (requestRow.vendorId) batchFilter.vendorId = requestRow.vendorId;
@@ -230,18 +269,20 @@ async function resolveRequestedLots({ order, orderItem, requestRow, warehouse })
       throw salesOrderError('BATCH_AMBIGUOUS', `${orderItem.name}: batch ${requestRow.batchNo} exists in more than one stock slot; select the exact lot`, 409);
     }
     const entry = matches[0];
+    await assertMarketReleasedEntry(entry);
     if (Number(entry.qtyBoxes || 0) < qty) {
       throw salesOrderError('BATCH_STOCK_UNAVAILABLE', `${orderItem.name}: selected batch has only ${entry.qtyBoxes} boxes`, 409);
     }
-    lots.push({ ...base, qty, batchNo: entry.batchNo || '', vendorId: entry.vendorId || '', vendorName: entry.vendorName || '' });
+    lots.push({ ...base, qty, inventoryEntryId: entry._id, batchNo: entry.batchNo || '', vendorId: entry.vendorId || '', vendorName: entry.vendorName || '' });
   } else {
-    const entries = await InventoryEntry.find(commonFilter).sort({ expiryDate: 1, mfgDate: 1, createdAt: 1 }).lean();
+    const entries = sortInventoryEntriesFefo(await InventoryEntry.find(commonFilter).lean());
     let remaining = qty;
     for (const entry of entries) {
       if (remaining <= 0) break;
       const take = Math.min(remaining, Number(entry.qtyBoxes || 0));
       if (!(take > 0)) continue;
-      lots.push({ ...base, qty: take, batchNo: entry.batchNo || '', vendorId: entry.vendorId || '', vendorName: entry.vendorName || '' });
+      await assertMarketReleasedEntry(entry);
+      lots.push({ ...base, qty: take, inventoryEntryId: entry._id, batchNo: entry.batchNo || '', vendorId: entry.vendorId || '', vendorName: entry.vendorName || '' });
       remaining -= take;
     }
     if (remaining > 0.0001) {
@@ -308,4 +349,6 @@ module.exports = {
   createDraftFulfillment,
   resolvePricedRows,
   salesOrderError,
+  sortInventoryEntriesFefo,
+  assertMarketReleasedEntry,
 };
