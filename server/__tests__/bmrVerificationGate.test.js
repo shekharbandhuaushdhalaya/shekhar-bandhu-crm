@@ -10,6 +10,10 @@ jest.mock('../models/ProductQualitySpecification');
 jest.mock('../models/LineClearance');
 jest.mock('../models/RetentionSample');
 jest.mock('../models/MaterialDispensing');
+jest.mock('../models/InventoryEntry');
+jest.mock('../utils/withTransaction', () => ({
+  withTransaction: jest.fn(async work => work({}))
+}));
 jest.mock('../models/Product');
 jest.mock('../models/RolePermission');
 jest.mock('../utils/botanicalLookup', () => ({
@@ -24,6 +28,7 @@ const SystemSettings = require('../models/SystemSettings');
 const LineClearance = require('../models/LineClearance');
 const RetentionSample = require('../models/RetentionSample');
 const MaterialDispensing = require('../models/MaterialDispensing');
+const InventoryEntry = require('../models/InventoryEntry');
 const Product = require('../models/Product');
 const RolePermission = require('../models/RolePermission');
 const ProductQualitySpecification = require('../models/ProductQualitySpecification');
@@ -271,6 +276,8 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
       LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
       mockVerifiedDispensing();
+      BatchProduction.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(batch) });
+      InventoryEntry.updateMany.mockResolvedValue({ modifiedCount: 1 });
       const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
 
       expect(res.status).toBe(200);

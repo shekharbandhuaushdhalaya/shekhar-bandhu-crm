@@ -163,7 +163,7 @@ describe('Manufacturing stage qualification and equipment controls', () => {
 
   test('allows a filling stage to start only after a complete independent clearance', async () => {
     const batch = { _id: 'batch-filling-clearance-valid', status: 'in_progress', stages: [
-      { name: 'Mixing', status: 'completed' }, { name: 'Filling', status: 'pending' }
+      { name: 'Mixing', status: 'completed', performedBy: 'mixing-operator', verifiedBy: 'mixing-reviewer', verifiedAt: new Date() }, { name: 'Filling', status: 'pending' }
     ], save: jest.fn().mockResolvedValue(true) };
     BatchProduction.findById.mockResolvedValue(batch);
     LineClearance.findOne.mockResolvedValue({
