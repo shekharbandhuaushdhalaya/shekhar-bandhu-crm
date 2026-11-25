@@ -20,6 +20,67 @@ const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
 
+function getRetentionSampleIssues(batch, retentionSamples = [], now = new Date()) {
+  const productId = batch.productId && batch.productId._id ? batch.productId._id : batch.productId;
+  const validSample = retentionSamples.some(sample =>
+    String(sample.batchNo || '') === String(batch.batchNo || '') &&
+    String(sample.productId || '') === String(productId || '') &&
+    Number.isFinite(Number(sample.qtyRetained)) && Number(sample.qtyRetained) > 0 &&
+    Boolean(sample.retainedBy) && Boolean(sample.retainedAt) &&
+    Boolean(String(sample.storageLocation || '').trim()) &&
+    sample.status === 'stored' &&
+    sample.retentionUntil && new Date(sample.retentionUntil) > now
+  );
+  return validSample ? [] : [
+    'A current, stored retention sample matching the batch and product, with quantity, custodian, storage location and retention period, is required'
+  ];
+}
+
+function getPackagingReconciliationIssues(batch, dispensingRecords = []) {
+  if (batch.packagingMode !== 'self_packed') return [];
+  const formula = batch.bomSnapshot && Array.isArray(batch.bomSnapshot.ingredients)
+    ? batch.bomSnapshot.ingredients : [];
+  const packagingIngredients = formula.filter(item => item.itemType === 'packaging');
+  if (!packagingIngredients.length) {
+    return ['Self-packed batch has no packaging materials in its pinned formula snapshot'];
+  }
+  const records = Array.isArray(batch.labelReconciliation) ? batch.labelReconciliation : [];
+  const consumed = Array.isArray(batch.ingredientsConsumed) ? batch.ingredientsConsumed : [];
+  const issues = [];
+  for (const ingredient of packagingIngredients) {
+    const rawMaterialId = ingredient.rawMaterialId && ingredient.rawMaterialId._id
+      ? String(ingredient.rawMaterialId._id) : String(ingredient.rawMaterialId || '');
+    const record = records.find(item => String(item.rawMaterialId || '') === rawMaterialId);
+    if (!record) {
+      issues.push('Packaging material reconciliation is missing for formula material: ' + rawMaterialId);
+      continue;
+    }
+    const issuedFromGenealogy = consumed
+      .filter(item => String(item.rawMaterialId && item.rawMaterialId._id ? item.rawMaterialId._id : item.rawMaterialId) === rawMaterialId)
+      .reduce((sum, item) => sum + Number(item.qtyConsumed || 0), 0);
+    const qtyIssued = Number(record.qtyIssued);
+    const qtyUsed = Number(record.qtyUsed);
+    const qtyDamaged = Number(record.qtyDamaged);
+    const qtyReturned = Number(record.qtyReturnedToStore);
+    const qtyUnaccounted = Number(record.unaccountedQty);
+    const quantitiesValid = [qtyIssued, qtyUsed, qtyDamaged, qtyReturned, qtyUnaccounted]
+      .every(Number.isFinite) && qtyIssued > 0 && qtyUsed >= 0 && qtyDamaged >= 0 &&
+      qtyReturned >= 0 && qtyUnaccounted >= 0 &&
+      qtyUsed + qtyDamaged + qtyReturned <= qtyIssued + 0.0001;
+    const accountedUnissued = quantitiesValid
+      ? Math.max(0, qtyIssued - qtyUsed - qtyDamaged - qtyReturned) : NaN;
+    if (!record.reconciled || record.auditStatus !== 'passed' || record.discrepancyFlagged ||
+        !record.reconciledBy || !record.reconciledAt || !record.verifiedBy || !record.verifiedAt ||
+        String(record.reconciledBy) === String(record.verifiedBy) ||
+        !quantitiesValid || Math.abs(qtyIssued - issuedFromGenealogy) > 0.0001 ||
+        !Number.isFinite(accountedUnissued) || Math.abs(qtyUnaccounted - accountedUnissued) > 0.0001 ||
+        qtyUnaccounted > 0.01) {
+      issues.push('Independent packaging reconciliation is incomplete, unreconciled or discrepant for formula material: ' + rawMaterialId);
+    }
+  }
+  return issues;
+}
+
 function getMaterialGenealogyIssues(batch, dispensingRecords = []) {
   const issues = [];
   const formula = batch.bomSnapshot && batch.bomSnapshot.ingredients;
@@ -1655,6 +1716,20 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
       code: 'MATERIAL_GENEALOGY_INCOMPLETE',
       missingEvidence: materialGenealogyIssues
     });
+    const RetentionSample = require('../../models/RetentionSample');
+    const retentionSamples = await RetentionSample.find({ batchId: batch._id }).lean();
+    const retentionIssues = getRetentionSampleIssues(batch, retentionSamples);
+    if (retentionIssues.length) return res.status(400).json({
+      error: 'Batch retention-sample evidence is incomplete',
+      code: 'RETENTION_SAMPLE_INCOMPLETE',
+      missingEvidence: retentionIssues
+    });
+    const packagingIssues = getPackagingReconciliationIssues(batch, dispensingRecords);
+    if (packagingIssues.length) return res.status(400).json({
+      error: 'Self-packed batch packaging reconciliation must pass independent verification before market release',
+      code: 'PACKAGING_RECONCILIATION_INCOMPLETE',
+      missingEvidence: packagingIssues
+    });
     for (const phase of ['manufacturing','filling','packing']) {
       const c = clearances.find(x => x.phase === phase);
       if (!c || !c.cleared || !c.submittedBy || !c.verifiedBy ||
@@ -2076,11 +2151,8 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
     if (!batch.releasedBy || !batch.releasedByName || !batch.releasedAt) missingEvidence.push('Independent finished-batch QA release is missing');
     if (batch.actualYieldQty === undefined || batch.actualYieldQty === null) missingEvidence.push('Actual batch yield is not recorded');
     if (Number(batch.wasteQty || 0) > 0 && !batch.wasteReason) missingEvidence.push('Recorded production wastage has no reason');
-    if (!retentionSamples.length) missingEvidence.push('Batch retention-sample record is missing');
-    if (batch.packagingMode === 'self_packed' && (!batch.labelReconciliation || !batch.labelReconciliation.length ||
-      batch.labelReconciliation.some(item => !item.reconciled || item.auditStatus !== 'passed'))) {
-      missingEvidence.push('Self-packed batch packaging reconciliation is missing or incomplete');
-    }
+    missingEvidence.push(...getRetentionSampleIssues(batch, retentionSamples));
+    missingEvidence.push(...getPackagingReconciliationIssues(batch, dispensingRecords));
     const hasUnverifiedReferences = unverifiedIngredients.length > 0;
     const bmrComplete = missingEvidence.length === 0;
     res.json({

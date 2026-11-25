@@ -581,6 +581,29 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       phase, cleared: true, submittedBy: 'line-operator', submittedAt: new Date(), clearedBy: 'clearance-reviewer', clearedAt: new Date(), verifiedBy: 'clearance-reviewer', verifiedAt: new Date(),
       checklist: { equipmentCleaned: true, previousMaterialsRemoved: true, previousLabelsDocumentsRemoved: true, areaVisuallyInspected: true }
     }));
+    const mockRetentionSample = () => RetentionSample.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([{
+        batchNo: 'BATCH-RELEASE-1',
+        productId: 'product-release-1',
+        qtyRetained: 2,
+        storageLocation: 'QC Retention Shelf A',
+        retainedBy: 'qc-custodian-1',
+        retainedAt: new Date(),
+        retentionUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        status: 'stored'
+      }])
+    });
+    const mockVerifiedDispensingWithPackaging = () => MaterialDispensing.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([{
+        dispensingNo: 'DSP-1', batchNo: 'BATCH-RELEASE-1', stageIndex: 0, stageName: 'Mixing',
+        status: 'verified', dispensedBy: 'material-operator',
+        verifiedBy: 'material-reviewer', verifiedAt: new Date(),
+        items: [
+          { rawMaterialEntryId: 'entry-1', rawMaterialId: 'rm-1', lotNo: 'LOT-1', qtyDispensed: 10, qtyWasted: 0 },
+          { rawMaterialEntryId: 'entry-pack-1', rawMaterialId: 'pack-1', lotNo: 'PACK-LOT-1', qtyDispensed: 10, qtyWasted: 0 }
+        ]
+      }])
+    });
     const approvedSpec = {
       _id: 'spec-release-1', productId: 'product-release-1', status: 'approved',
       approvedBy: 'spec-approver', approvedAt: new Date(), tests: [{ code: 'IDENTITY', mandatory: true }]
@@ -632,6 +655,7 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
       LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
       mockVerifiedDispensing();
+      mockRetentionSample();
       BatchProduction.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(batch) });
       InventoryEntry.updateMany.mockResolvedValue({ modifiedCount: 1 });
       const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
@@ -641,6 +665,46 @@ describe('BMR Pharmacopoeia Verification Gate Suite', () => {
       expect(batch.releasedByName).toBe('Independent QA Reviewer');
       expect(batch.releasedAt).toBeInstanceOf(Date);
       expect(batch.save).toHaveBeenCalled();
+    });
+
+    test('blocks market release when no current stored retention sample exists', async () => {
+      const batch = makeReleaseBatch();
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      mockVerifiedDispensing();
+      RetentionSample.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('RETENTION_SAMPLE_INCOMPLETE');
+      expect(res.body.missingEvidence[0]).toContain('current, stored retention sample');
+      expect(batch.save).not.toHaveBeenCalled();
+    });
+
+    test('blocks market release of self-packed batches without a passed reconciliation for every formula packaging material', async () => {
+      const batch = makeReleaseBatch();
+      batch.packagingMode = 'self_packed';
+      batch.bomSnapshot.ingredients.push({
+        rawMaterialId: 'pack-1', itemType: 'packaging', qtyRequired: 1, stageName: 'Mixing'
+      });
+      batch.ingredientsConsumed.push({
+        rawMaterialId: 'pack-1', rawMaterialEntryId: 'entry-pack-1', qtyConsumed: 10,
+        qtyWasted: 0, batchNo: 'PACK-LOT-1', stageIndex: 0, dispensingNo: 'DSP-1'
+      });
+      BatchProduction.findById.mockResolvedValue(batch);
+      ProductQualitySpecification.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(approvedSpec) });
+      LineClearance.find.mockReturnValue({ lean: jest.fn().mockResolvedValue(makeClearances()) });
+      mockVerifiedDispensingWithPackaging();
+      mockRetentionSample();
+
+      const res = await request(app).patch('/api/batch-productions/batch-release-1/release').set('x-test-user', 'qa-reviewer-1').send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('PACKAGING_RECONCILIATION_INCOMPLETE');
+      expect(res.body.missingEvidence.some(item => item.includes('reconciliation is missing'))).toBe(true);
+      expect(batch.save).not.toHaveBeenCalled();
     });
 
     test('blocks release when formula material consumption is missing or short', async () => {
