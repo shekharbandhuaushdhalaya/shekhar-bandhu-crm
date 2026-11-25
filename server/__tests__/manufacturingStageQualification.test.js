@@ -96,9 +96,48 @@ describe('Manufacturing stage qualification and equipment controls', () => {
     expect(batch.save).toHaveBeenCalled();
   });
 
+  test('does not start the next stage until the previous stage is independently verified', async () => {
+    const batch = { _id: 'batch-stage-sequence-1', status: 'in_progress', stages: [
+      { name: 'Mixing', status: 'completed', performedBy: 'operator-1' },
+      { name: 'Drying', status: 'pending' }
+    ], save: jest.fn() };
+    BatchProduction.findById.mockResolvedValue(batch);
+    const res = await request(app).patch('/api/batch-productions/batch-stage-sequence-1/stage/1')
+      .send({ status: 'in_progress' });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('PREVIOUS_STAGE_VERIFICATION_REQUIRED');
+    expect(batch.stages[1].status).toBe('pending');
+    expect(batch.save).not.toHaveBeenCalled();
+  });
+
+  test('requires a reason when a stage is formally skipped', async () => {
+    const batch = { _id: 'batch-stage-skip-1', status: 'in_progress', stages: [
+      { name: 'Optional Process', status: 'pending' }
+    ], save: jest.fn() };
+    BatchProduction.findById.mockResolvedValue(batch);
+    const res = await request(app).patch('/api/batch-productions/batch-stage-skip-1/stage/0')
+      .send({ status: 'skipped' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('STAGE_SKIP_REASON_REQUIRED');
+    expect(batch.save).not.toHaveBeenCalled();
+  });
+
+  test('does not automatically start the next stage when the current stage completes', async () => {
+    const batch = { _id: 'batch-stage-no-auto-advance', status: 'in_progress', stages: [
+      { name: 'Mixing', status: 'in_progress', performedBy: 'operator-1' },
+      { name: 'Drying', status: 'pending' }
+    ], save: jest.fn().mockResolvedValue(true) };
+    BatchProduction.findById.mockResolvedValue(batch);
+    const res = await request(app).patch('/api/batch-productions/batch-stage-no-auto-advance/stage/0')
+      .send({ status: 'completed' });
+    expect(res.status).toBe(200);
+    expect(batch.stages[1].status).toBe('pending');
+    expect(batch.save).toHaveBeenCalled();
+  });
+
   test('blocks a filling stage until its own line clearance is independently verified', async () => {
     const batch = { _id: 'batch-filling-clearance-1', status: 'in_progress', stages: [
-      { name: 'Mixing', status: 'completed' }, { name: 'Filling', status: 'pending' }
+      { name: 'Mixing', status: 'completed', performedBy: 'operator-before', verifiedBy: 'independent-verifier', verifiedAt: new Date() }, { name: 'Filling', status: 'pending' }
     ], save: jest.fn() };
     BatchProduction.findById.mockResolvedValue(batch);
     LineClearance.findOne.mockResolvedValue(null);
@@ -111,7 +150,7 @@ describe('Manufacturing stage qualification and equipment controls', () => {
 
   test('blocks a packing stage until its own line clearance is independently verified', async () => {
     const batch = { _id: 'batch-packing-clearance-1', status: 'in_progress', stages: [
-      { name: 'Drying', status: 'completed' }, { name: 'Packaging & Labeling', status: 'pending' }
+      { name: 'Drying', status: 'completed', performedBy: 'operator-before', verifiedBy: 'independent-verifier', verifiedAt: new Date() }, { name: 'Packaging & Labeling', status: 'pending' }
     ], save: jest.fn() };
     BatchProduction.findById.mockResolvedValue(batch);
     LineClearance.findOne.mockResolvedValue(null);

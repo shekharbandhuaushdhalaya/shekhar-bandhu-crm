@@ -706,6 +706,22 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
     }
 
     const stageNameForClearance = String(batch.stages[stageIndex].name || '').toLowerCase();
+    if (status && status !== 'pending' && stageIndex > 0) {
+      const previousStage = batch.stages[stageIndex - 1];
+      const previousDispositionRecorded = ['completed', 'skipped'].includes(previousStage.status);
+      const independentlyVerified = previousStage.verifiedBy && previousStage.verifiedAt &&
+        previousStage.performedBy && String(previousStage.verifiedBy) !== String(previousStage.performedBy);
+      if (!previousDispositionRecorded || !independentlyVerified) {
+        return res.status(409).json({
+          error: 'The preceding manufacturing stage must be completed or formally skipped and independently verified before this stage can start',
+          code: 'PREVIOUS_STAGE_VERIFICATION_REQUIRED',
+          previousStageIndex: stageIndex - 1
+        });
+      }
+    }
+    if (status === 'skipped' && !String(notes || '').trim()) {
+      return res.status(400).json({ error: 'A documented reason is required when a manufacturing stage is skipped', code: 'STAGE_SKIP_REASON_REQUIRED' });
+    }
     const requiredClearancePhase = stageNameForClearance.includes('filling') ? 'filling' :
       (stageNameForClearance.includes('packaging') || stageNameForClearance.includes('label')) ? 'packing' : null;
     if (requiredClearancePhase && batch.stages[stageIndex].status === 'pending' && status !== 'pending') {
@@ -836,15 +852,6 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
       batch.variancePercent = -100;
       batch.endDate = new Date();
       batch.qcNotes = `Batch failed at stage [${currentStage.name}]${notes ? ` — Reason: ${notes}` : ''}. QC Inspector / Operator: ${completedBy || 'Operator'}`;
-    } else if ((newStatus === 'completed' || newStatus === 'skipped') && stageIndex + 1 < batch.stages.length) {
-      const nextStage = batch.stages[stageIndex + 1];
-      if (nextStage.status === 'pending') {
-        nextStage.status = 'in_progress';
-        const started = new Date();
-        nextStage.startedAt = started;
-        const durationHours = nextStage.targetDurationHours || (nextStage.targetDurationDays ? nextStage.targetDurationDays * 24 : 8);
-        nextStage.targetCompletionDate = new Date(started.getTime() + durationHours * 60 * 60 * 1000);
-      }
     }
 
     // Stock is issued only through the independently verified dispensing workflow.
@@ -923,8 +930,8 @@ router.patch('/:id/stage/:stageIndex/verify', authorize('manufacturing:verify'),
     }
 
     const stage = batch.stages[stageIndex];
-    if (stage.status !== 'completed') {
-      return res.status(400).json({ error: 'Stage must be completed before verification' });
+    if (!['completed', 'skipped'].includes(stage.status)) {
+      return res.status(400).json({ error: 'Stage must be completed or formally skipped before verification' });
     }
 
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated verifier identity is required' });
@@ -1935,6 +1942,12 @@ router.get('/:id/bmr-report', authorize('manufacturing:view'), async (req, res) 
         if (!['completed', 'skipped'].includes(stage.status)) missingEvidence.push('Stage is not completed or formally skipped: ' + stage.name);
         if (stage.status === 'completed' && (!stage.performedBy || !stage.performedByName)) missingEvidence.push('Stage operator identity is missing: ' + stage.name);
         if (stage.status === 'completed' && (!stage.equipmentId || stage.equipmentCalibrationStatus !== 'valid')) missingEvidence.push('Verified equipment calibration evidence is missing: ' + stage.name);
+        if (['completed', 'skipped'].includes(stage.status) &&
+          (!stage.performedBy || !stage.verifiedBy || !stage.verifiedAt ||
+           String(stage.performedBy) === String(stage.verifiedBy))) {
+          missingEvidence.push('Independent four-eye stage verification is missing: ' + stage.name);
+        }
+        if (stage.status === 'skipped' && !String(stage.notes || '').trim()) missingEvidence.push('Documented reason for skipped stage is missing: ' + stage.name);
         if (stage.status === 'completed' && !stage.operatorTrainingRecordId) missingEvidence.push('Operator training evidence is missing: ' + stage.name);
       }
     }
