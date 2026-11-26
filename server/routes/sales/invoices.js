@@ -235,7 +235,9 @@ router.put('/:id', authorize('invoice:edit'), validate(schemas.invoiceSchema.par
 
 
     // Keep invoice type and number immutable during edits
-    const { type, invoiceNo, ...updateData } = req.body;
+    const { type, invoiceNo, ...submittedUpdateData } = req.body;
+    const { sanitizeInvoiceDraftUpdate } = require('../../utils/sanitizeInvoiceDraftUpdate');
+    const updateData = sanitizeInvoiceDraftUpdate(submittedUpdateData);
 
     if (!invoice.isFinalized) {
       const SystemSettings = require('../../models/SystemSettings');
