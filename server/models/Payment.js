@@ -6,7 +6,9 @@ const paymentAllocationSchema = new mongoose.Schema({
   invoiceNo: { type: String, default: '', trim: true },
   amountAllocated: { type: Number, min: 0 },
   amountApplied: { type: Number, min: 0 },
-  allocatedAt: { type: Date, default: Date.now }
+  allocatedAt: { type: Date, default: Date.now },
+  allocatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  allocatedByName: { type: String, default: '' }
 }, { _id: false });
 
 const paymentSchema = new mongoose.Schema({

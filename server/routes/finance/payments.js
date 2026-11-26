@@ -262,7 +262,10 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
 // POST /api/payments/allocate — Match an existing unallocated payment against owned finalized invoices
 router.post('/allocate', authorize('payment:create'), validate(schemas.paymentAllocateSchema), async (req, res) => {
   try {
-    const payment = await allocateExistingPayment({ paymentId: req.body.paymentId, allocations: req.body.allocations || [] });
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated payment allocation identity is required', code: 'PAYMENT_ALLOCATION_ACTOR_REQUIRED' });
+    const payment = await allocateExistingPayment({ paymentId: req.body.paymentId, allocations: req.body.allocations || [], actor: { id: actorId, name: actorName } });
     if (req.io) {
       req.io.emit('payment_updated', { type: 'allocated', id: payment._id });
       req.io.emit('invoice_updated', { type: 'allocate', paymentId: payment._id });

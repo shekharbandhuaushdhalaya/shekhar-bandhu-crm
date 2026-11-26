@@ -96,7 +96,7 @@ async function createPaymentInSession({ paymentData, allocations = [], session }
     invoice.payments = invoice.payments || [];
     invoice.payments.push({ paymentId: payment._id, amountAllocated: row.amount, amountApplied: row.amount, allocatedAt: new Date() });
     await invoice.save({ session });
-    payment.allocations.push({ invoiceId: invoice._id, invoiceNo: invoice.invoiceNo, amountAllocated: row.amount, amountApplied: row.amount, allocatedAt: new Date() });
+    payment.allocations.push({ invoiceId: invoice._id, invoiceNo: invoice.invoiceNo, amountAllocated: row.amount, amountApplied: row.amount, allocatedAt: new Date(), allocatedByUserId: paymentData.createdByUserId || null, allocatedByName: paymentData.createdByName || '' });
   }
   await payment.save({ session });
   adjustPartyBalance(party, { partyType: payment.partyType, type: payment.type, mode: payment.mode, amount });
@@ -108,7 +108,8 @@ async function createPaymentAndAllocate({ paymentData, allocations = [] }) {
   return withTransaction(session => createPaymentInSession({ paymentData, allocations, session }));
 }
 
-async function allocateExistingPayment({ paymentId, allocations = [] }) {
+async function allocateExistingPayment({ paymentId, allocations = [], actor = {} }) {
+  if (!actor.id || !actor.name) throw paymentError('PAYMENT_ALLOCATION_ACTOR_REQUIRED', 'Authenticated allocation reviewer identity is required');
   return withTransaction(async session => {
     const payment = await Payment.findById(paymentId).session(session);
     if (!payment) throw paymentError('PAYMENT_NOT_FOUND', 'Payment receipt record not found');
@@ -129,7 +130,7 @@ async function allocateExistingPayment({ paymentId, allocations = [] }) {
       invoice.payments.push({ paymentId: payment._id, amountAllocated: amount, amountApplied: amount, allocatedAt: new Date() });
       await invoice.save({ session });
       payment.allocations = payment.allocations || [];
-      payment.allocations.push({ invoiceId: invoice._id, invoiceNo: invoice.invoiceNo, amountAllocated: amount, amountApplied: amount, allocatedAt: new Date() });
+      payment.allocations.push({ invoiceId: invoice._id, invoiceNo: invoice.invoiceNo, amountAllocated: amount, amountApplied: amount, allocatedAt: new Date(), allocatedByUserId: actor.id, allocatedByName: actor.name });
       remaining = money(remaining - amount);
     }
     payment.unallocatedAmount = remaining;
