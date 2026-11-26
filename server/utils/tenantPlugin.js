@@ -49,13 +49,14 @@ module.exports = function tenantPlugin(schema) {
     });
   }
 
-  function rejectTenantOwnershipMutation(next) {
-    if (!getFirmId()) return next();
+  // Use promise-style query middleware. Besides reliably propagating errors, this
+  // ensures ownership checks run in the same async tenant context as query execution.
+  function rejectTenantOwnershipMutation() {
+    if (!getFirmId()) return;
     const update = this.getUpdate ? this.getUpdate() : null;
     if (updatesTenantOwnership(update)) {
-      return next(new Error('Tenant ownership is immutable; firmId updates are rejected'));
+      throw new Error('Tenant ownership is immutable; firmId updates are rejected');
     }
-    return next();
   }
 
   [
@@ -69,7 +70,7 @@ module.exports = function tenantPlugin(schema) {
 
   // Mongoose bulkWrite does not execute query middleware. Wrap it so tenant
   // scope and immutable ownership are enforced for every supported bulk operation.
-  schema.statics.bulkWrite = function (operations, options) {
+  schema.statics.bulkWrite = async function (operations, options) {
     const firmId = getFirmId();
     if (!firmId) return mongoose.Model.bulkWrite.call(this, operations, options);
     if (!Array.isArray(operations)) throw new Error('Tenant-scoped bulkWrite requires an operations array');
