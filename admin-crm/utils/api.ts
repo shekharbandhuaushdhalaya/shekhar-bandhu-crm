@@ -1486,30 +1486,30 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/manufacturing/quality-specifications${q}`); return res.json();
   }
   async createQualitySpecification(data: any): Promise<any> {
-    const res = await this.request(`${API_BASE}/manufacturing/quality-specifications`, { method:'POST', body:JSON.stringify(data) }); return res.json();
+    const res = await this.request(`${API_BASE}/manufacturing/quality-specifications`, { method:'POST', headers: { 'Idempotency-Key': createMutationKey('quality-specification-create') }, body:JSON.stringify(data) }); return res.json();
   }
   async approveQualitySpecification(id: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/manufacturing/quality-specifications/${id}/approve`, { method:'PATCH' }); return res.json();
+    const res = await this.request(`${API_BASE}/manufacturing/quality-specifications/${id}/approve`, { method:'PATCH', headers: { 'Idempotency-Key': createMutationKey(`quality-specification-approve-${id}`) } }); return res.json();
   }
   async getManufacturingEquipment(): Promise<any[]> { const res=await this.request(`${API_BASE}/manufacturing/equipment`); return res.json(); }
   async createManufacturingEquipment(data: any): Promise<any> {
-    const res = await this.request(`${API_BASE}/manufacturing/equipment`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/manufacturing/equipment`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('manufacturing-equipment-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async calibrateEquipment(id: string, data: any): Promise<any> {
-    const res = await this.request(`${API_BASE}/manufacturing/equipment/${id}/calibrate`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/manufacturing/equipment/${id}/calibrate`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`equipment-calibrate-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async getManufacturingDeviations(): Promise<any[]> { const res=await this.request(`${API_BASE}/manufacturing/deviations`); return res.json(); }
   async resolveManufacturingDeviation(id: string, data: { rootCause: string; correctiveAction: string; preventiveAction: string }): Promise<any> {
     const res = await this.request(`${API_BASE}/manufacturing/deviations/${id}/signoff`, {
-      method: 'PUT', body: JSON.stringify({ status: 'resolved', ...data })
+      method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`manufacturing-deviation-resolve-${id}`) }, body: JSON.stringify({ status: 'resolved', ...data })
     });
     return res.json();
   }
   async verifyManufacturingDeviationClosure(id: string, data: { effectivenessCheck: string; effectivenessEvidenceRef: string }): Promise<any> {
     const res = await this.request(`${API_BASE}/manufacturing/deviations/${id}/verify-closure`, {
-      method: 'PATCH', body: JSON.stringify(data)
+      method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`manufacturing-deviation-verify-${id}`) }, body: JSON.stringify(data)
     });
     return res.json();
   }
@@ -1545,7 +1545,7 @@ class ApiClient {
   }
   async importPharmacopoeiaToRawMaterials(data: { monographId?: string; importAll?: boolean }): Promise<any> {
     const res = await this.request(`${API_BASE}/pharmacopoeia/import-to-raw-materials`, {
-      method: 'POST', body: JSON.stringify(data)
+      method: 'POST', headers: { 'Idempotency-Key': createMutationKey('pharmacopoeia-import') }, body: JSON.stringify(data)
     });
     return res.json();
   }
@@ -1555,7 +1555,7 @@ class ApiClient {
   }
   async verifyPharmacopoeia(id: string, data?: any): Promise<any> {
     const res = await this.request(`${API_BASE}/pharmacopoeia/${id}/verify`, {
-      method: 'PUT', body: JSON.stringify(data || {})
+      method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`pharmacopoeia-verify-${id}`) }, body: JSON.stringify(data || {})
     });
     return res.json();
   }
@@ -1591,6 +1591,7 @@ class ApiClient {
   async createProductionPlansFromMRP(productIds?: string[]): Promise<{ message: string; count: number; plans: any[] }> {
     const res = await this.request(`${API_BASE}/analytics/material-requirements-plan/create-production-plans`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': createMutationKey('mrp-create-production-plans') },
       body: JSON.stringify({ productIds })
     });
     return res.json();
@@ -1743,7 +1744,7 @@ class ApiClient {
   async recordGstFiling(payload: { period: string, returnType: 'gstr1' | 'gstr3b', arn: string, url?: string, name?: string }): Promise<any> {
     const res = await this.request(`${API_BASE}/gst/filing-status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': createMutationKey('gst-filing-record') },
       body: JSON.stringify(payload)
     });
     return res.json();
@@ -1955,6 +1956,7 @@ class ApiClient {
   async updateTradeDiscountMatrix(matrix: Record<string, number>): Promise<any> {
     const res = await this.request(`${API_BASE}/customer-pricing/trade-matrix`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': createMutationKey('trade-discount-matrix-update') },
       body: JSON.stringify(matrix)
     });
     return res.json();
