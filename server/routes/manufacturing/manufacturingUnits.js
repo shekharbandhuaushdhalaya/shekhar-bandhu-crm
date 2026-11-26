@@ -4,6 +4,7 @@ const ManufacturingUnit = require('../../models/ManufacturingUnit');
 const { createManufacturingUnitWithWarehouse } = require('../../services/manufacturingUnitSetupService');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/manufacturing-units — Create a manufacturing unit and its production-house warehouse atomically
-router.post('/', authorize('manufacturing:create'), validate(schemas.manufacturingUnitSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), validate(schemas.manufacturingUnitSchema), idempotency, async (req, res) => {
   try {
     const { name, code, addressLine1, city, state, pincode, contactPerson, phone } = req.body;
 
@@ -57,7 +58,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.manufacturi
 });
 
 // PUT /api/manufacturing-units/:id — Update a manufacturing unit
-router.put('/:id', authorize('manufacturing:edit'), validate(schemas.manufacturingUnitSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('manufacturing:edit'), validate(schemas.manufacturingUnitSchema.partial()), idempotency, async (req, res) => {
   try {
     const { name, code, addressLine1, city, state, pincode, contactPerson, phone, isActive } = req.body;
     const updateFields = {};
@@ -85,7 +86,7 @@ router.put('/:id', authorize('manufacturing:edit'), validate(schemas.manufacturi
 });
 
 // DELETE /api/manufacturing-units/:id — Delete a manufacturing unit
-router.delete('/:id', authorize('manufacturing:delete'), async (req, res) => {
+router.delete('/:id', authorize('manufacturing:delete'), idempotency, async (req, res) => {
   try {
     // Check if any batches exist under this unit
     const BatchProduction = require('../../models/BatchProduction');

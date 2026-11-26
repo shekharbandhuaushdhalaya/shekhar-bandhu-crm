@@ -3,6 +3,7 @@ const InternalAudit = require('../../models/InternalAudit');
 const TrainingRecord = require('../../models/TrainingRecord');
 const User = require('../../models/User');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ router.get('/internal-audits', authorize('manufacturing:audit'), async (req, res
 });
 
 // POST /api/manufacturing/quality-audits/internal-audits — Schedule/create internal audit
-router.post('/internal-audits', authorize('manufacturing:audit'), async (req, res) => {
+router.post('/internal-audits', authorize('manufacturing:audit'), idempotency, async (req, res) => {
   try {
     const { manufacturingUnitId, scheduledDate, auditors, scope, findings } = req.body;
     if (!manufacturingUnitId || !scheduledDate) {
@@ -47,7 +48,7 @@ router.post('/internal-audits', authorize('manufacturing:audit'), async (req, re
 });
 
 // PATCH /api/manufacturing/quality-audits/internal-audits/:id — Update internal audit status/findings
-router.patch('/internal-audits/:id', authorize('manufacturing:audit'), async (req, res) => {
+router.patch('/internal-audits/:id', authorize('manufacturing:audit'), idempotency, async (req, res) => {
   try {
     const { status, completedDate, findings } = req.body;
 
@@ -84,7 +85,7 @@ router.get('/training-records', authorize('manufacturing:audit'), async (req, re
 });
 
 // POST /api/manufacturing/quality-audits/training-records — Log staff training session
-router.post('/training-records', authorize('manufacturing:audit'), async (req, res) => {
+router.post('/training-records', authorize('manufacturing:audit'), idempotency, async (req, res) => {
   try {
     const { userId, topic, trainedOn, trainedBy, validUntil, certificateRef } = req.body;
     if (!userId || !topic || !trainedOn) {

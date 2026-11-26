@@ -1,6 +1,7 @@
 const express = require('express');
 const DrugLicense = require('../../models/DrugLicense');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -27,7 +28,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/drug-licenses — Register a drug license
-router.post('/', authorize('manufacturing:create'), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), idempotency, async (req, res) => {
   try {
     const { licenseNo, title, licenseType = 'Ayush_Form_25D', issuingAuthority, state, issuedDate, expiryDate, notes } = req.body;
     if (!licenseNo || !title || !issuingAuthority || !expiryDate) {

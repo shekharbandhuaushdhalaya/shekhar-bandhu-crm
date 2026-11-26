@@ -69,7 +69,7 @@ router.get('/license-alerts', authorize('inventory:view'), async (req, res) => {
 });
 
 // POST /api/inventory/compliance/write-off — Write off expired or damaged stock
-router.post('/write-off', idempotency, authorize('inventory:edit'), async (req, res) => {
+router.post('/write-off', authorize('inventory:edit'), idempotency, async (req, res) => {
   try {
     const { productId, warehouseId, packing, batchNo, reason } = req.body;
     const qty = Number(req.body.qtyBoxes);

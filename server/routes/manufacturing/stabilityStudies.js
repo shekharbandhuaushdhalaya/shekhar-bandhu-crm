@@ -2,6 +2,7 @@ const express = require('express');
 const StabilityStudy = require('../../models/StabilityStudy');
 const Product = require('../../models/Product');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -27,7 +28,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/stability-studies — Create stability study
-router.post('/', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { productId, batchId, studyType, durationMonthsStudied, grantedShelfLifeYears, reportRef, notes } = req.body;
 
@@ -64,7 +65,7 @@ router.post('/', authorize('manufacturing:edit'), async (req, res) => {
 });
 
 // PATCH /api/stability-studies/:id/follow-up — Link real-time follow-up study
-router.patch('/:id/follow-up', authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/follow-up', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { realTimeFollowUpStudyId, reportSubmittedAt } = req.body;
 

@@ -29,7 +29,7 @@ async function gatewaySettings() {
   };
 }
 
-router.post('/create-order', authorize('payment:create'), async (req, res) => {
+router.post('/create-order', authorize('payment:create'), idempotency, async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ _id: req.body.invoiceId, type: 'sale', isFinalized: true });
     if (!invoice || !invoice.customerId) return res.status(404).json({ error: 'Finalized customer-linked Sale Invoice not found', code: 'INVALID_GATEWAY_INVOICE' });
