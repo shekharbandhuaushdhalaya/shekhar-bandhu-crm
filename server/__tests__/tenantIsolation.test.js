@@ -63,4 +63,54 @@ describe('tenant isolation regression', () => {
       sku: 'ILLEGAL-XTENANT-001'
     }))).rejects.toThrow('Cross-tenant write rejected');
   });
+
+  it('rejects tenant ownership changes through update queries', async () => {
+    const [firmA, firmB] = await Firm.create([
+      { name: 'Update Firm A', active: true },
+      { name: 'Update Firm B', active: true }
+    ]);
+    const product = await runWithTenant({ firmId: firmA._id }, () => Product.create({
+      name: 'Immutable Tenant Product', sku: 'IMMUTABLE-TENANT-001', stockLevel: 3
+    }));
+
+    await expect(runWithTenant({ firmId: firmA._id }, () => Product.updateOne(
+      { _id: product._id },
+      { $set: { firmId: firmB._id } }
+    ))).rejects.toThrow('Tenant ownership is immutable');
+
+    await expect(runWithTenant({ firmId: firmA._id }, () => Product.findOneAndUpdate(
+      { _id: product._id },
+      { $unset: { firmId: 1 } }
+    ))).rejects.toThrow('Tenant ownership is immutable');
+
+    const persisted = await runWithTenant({ firmId: firmA._id }, () => Product.findById(product._id).lean());
+    expect(String(persisted.firmId)).toBe(String(firmA._id));
+  });
+
+  it('scopes bulk writes and rejects bulk tenant ownership changes', async () => {
+    const [firmA, firmB] = await Firm.create([
+      { name: 'Bulk Firm A', active: true },
+      { name: 'Bulk Firm B', active: true }
+    ]);
+    const product = await runWithTenant({ firmId: firmA._id }, () => Product.create({
+      name: 'Bulk Tenant Product', sku: 'BULK-TENANT-001', stockLevel: 2
+    }));
+
+    await expect(runWithTenant({ firmId: firmA._id }, () => Product.bulkWrite([{
+      updateOne: {
+        filter: { _id: product._id },
+        update: { $set: { firmId: firmB._id } }
+      }
+    }]))).rejects.toThrow('Tenant ownership is immutable');
+
+    await runWithTenant({ firmId: firmA._id }, () => Product.bulkWrite([{
+      updateOne: {
+        filter: { _id: product._id },
+        update: { $inc: { stockLevel: 4 } }
+      }
+    }]));
+
+    const persisted = await runWithTenant({ firmId: firmA._id }, () => Product.findById(product._id).lean());
+    expect(persisted.stockLevel).toBe(6);
+  });
 });

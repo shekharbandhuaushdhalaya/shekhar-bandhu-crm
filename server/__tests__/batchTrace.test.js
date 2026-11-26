@@ -133,4 +133,44 @@ describe('Task 6 — Batch Recall Traceability Suite (Backward & Forward Trace)'
     expect(res.body.dispatchedTo[0].customerName).toBe('Kashi Pharma Distributors');
     expect(res.body.dispatchedTo[0].qtyDispatched).toBe(100);
   });
+
+  it('reports ambiguous raw-material lot genealogy instead of attributing an arbitrary supplier', async () => {
+    const product = await Product.create({
+      name: 'Ambiguous Trace Product', sku: 'TRACE-AMB-001', stockLevel: 0
+    });
+    const rawMaterial = await RawMaterial.create({
+      name: 'Trace Herb', sku: 'TRACE-HERB-001', unit: 'kg', category: 'Herb'
+    });
+    await RawMaterialEntry.create([
+      {
+        rawMaterialId: rawMaterial._id, batchNo: 'DUPLICATE-LOT-01',
+        initialQty: 10, qty: 8, vendorId: new mongoose.Types.ObjectId(),
+        vendorName: 'Supplier One'
+      },
+      {
+        rawMaterialId: rawMaterial._id, batchNo: 'DUPLICATE-LOT-01',
+        initialQty: 10, qty: 7, vendorId: new mongoose.Types.ObjectId(),
+        vendorName: 'Supplier Two'
+      }
+    ]);
+    const batchNo = 'FG-TRACE-AMB-001';
+    await BatchProduction.create({
+      batchNo, manufacturingUnitId: new mongoose.Types.ObjectId(),
+      plannedQty: 10, actualYieldQty: 10, productId: product._id,
+      productName: product.name, status: 'completed',
+      ingredientsConsumed: [{
+        rawMaterialId: rawMaterial._id, batchNo: 'DUPLICATE-LOT-01',
+        qtyConsumed: 2
+      }]
+    });
+
+    const response = await request(app).get(`/api/manufacturing/batch-trace/${batchNo}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.rawMaterialsUsed).toHaveLength(1);
+    expect(response.body.rawMaterialsUsed[0].vendorName).toBe('Unassigned');
+    expect(response.body.traceWarnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'RAW_MATERIAL_LOT_AMBIGUOUS' })
+    ]));
+  });
 });

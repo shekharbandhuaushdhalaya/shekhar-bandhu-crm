@@ -107,7 +107,7 @@ router.patch('/:id/complete', idempotency, authorize('inventory:edit'), async (r
             productId: product._id, productType: product.productType || '', size: product.size || '',
             colour: product.colour || '', shape: product.shape || '', weight: product.weight || '',
             hsnCode: product.hsnCode || '', vendorId: '', vendorName: '', packing: 1,
-            batchNo: item.batchNo || '', qcStatus: 'approved', qtyBoxes: 0,
+            batchNo: item.batchNo || '', qcStatus: 'under_test', marketReleased: false, qtyBoxes: 0,
           });
         }
         entry.qtyBoxes = countedQty;

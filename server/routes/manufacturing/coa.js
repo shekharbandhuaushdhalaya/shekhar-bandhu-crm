@@ -101,6 +101,16 @@ router.patch('/:id/approve', authorize('quality:approve'), async (req, res) => {
     const coa = await CertificateOfAnalysis.findById(req.params.id);
     if (!coa) return res.status(404).json({ error: 'CoA not found' });
     if (status === 'approved') {
+      const BatchProduction = require('../../models/BatchProduction');
+      const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
+      const batch = await BatchProduction.findOne({ batchNo: coa.batchNo });
+      if (!batch || batch.status !== 'completed' || batch.qcStatus !== 'approved' || !batch.releasedBy || !batch.releasedAt) {
+        return res.status(409).json({ error: 'CoA cannot be QA-approved before the linked finished-product batch has independent market release', code: 'COA_BATCH_NOT_RELEASED' });
+      }
+      const specification = await ProductQualitySpecification.findById(coa.specificationId).lean();
+      if (!specification || specification.status !== 'approved' || String(specification.productId) !== String(batch.productId)) {
+        return res.status(409).json({ error: 'The pinned product-specific QC specification is no longer approved for this batch', code: 'COA_SPECIFICATION_NOT_CURRENT' });
+      }
       const mandatoryTests = (coa.tests || []).filter(test => test.mandatory !== false);
       if (!mandatoryTests.length || mandatoryTests.some(test => test.status !== 'pass' || !test.result || !test.testedAt || !test.testedBy)) {
         return res.status(400).json({ error: 'CoA cannot be approved until every mandatory QC test has a result, tester identity, timestamp and PASS disposition' });

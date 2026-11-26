@@ -109,7 +109,7 @@ router.get('/consignment/dealer-stock', authorize('inventory:view'), async (req,
     const dealerWarehouses = await Warehouse.find(filter).lean();
     const dealerWhIds = dealerWarehouses.map(w => w._id);
 
-    const entries = await InventoryEntry.find({ warehouseId: { $in: dealerWhIds }, qtyBoxes: { $gt: 0 } })
+    const entries = await InventoryEntry.find({ warehouseId: { $in: dealerWhIds }, qtyBoxes: { $gt: 0 }, qcStatus: 'approved', marketReleased: { $ne: false } })
       .populate('productId', 'name sku price mrp category unit')
       .sort({ warehouseName: 1 })
       .lean();

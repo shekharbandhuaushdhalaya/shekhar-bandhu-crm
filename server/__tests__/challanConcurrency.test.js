@@ -127,6 +127,38 @@ describe('Challan concurrent posting', () => {
     });
   });
 
+  it('blocks generic transfers of finished goods held from market release', async () => {
+    const firm = await Firm.create({ name: 'Generic Transfer Release Gate Firm', active: true });
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const product = await Product.create({ name: 'Quarantined Finished Good', sku: 'FG-GENERIC-HOLD-001', stockLevel: 4 });
+      const source = await Warehouse.create({ name: 'Generic Transfer Source' });
+      const destination = await Warehouse.create({ name: 'Generic Transfer Destination' });
+      const batch = await BatchProduction.create({
+        batchNo: 'AY-GENERIC-HOLD-001', productId: product._id,
+        manufacturingUnitId: new mongoose.Types.ObjectId(), plannedQty: 4,
+        actualYieldQty: 4, status: 'completed', qcStatus: 'pending_qa_review'
+      });
+      await InventoryEntry.create({
+        warehouseId: source._id, warehouseName: source.name, productId: product._id,
+        qtyBoxes: 4, packing: 1, batchNo: batch.batchNo,
+        productionBatchId: batch._id, marketReleased: false, qcStatus: 'approved'
+      });
+      const challan = await Challan.create({
+        challanNo: 'CH-GENERIC-HOLD-001', challanType: 'transfer',
+        warehouseId: source._id, warehouseName: source.name,
+        destinationWarehouseId: destination._id, destinationWarehouseName: destination.name,
+        items: [{ productId: product._id, name: product.name, qty: 2, packing: 1, batchNo: batch.batchNo }],
+        status: 'draft'
+      });
+
+      await expect(postChallanInventory(challan, { createdBy: 'Generic Transfer Gate Test' }))
+        .rejects.toMatchObject({ code: 'FINISHED_GOODS_NOT_MARKET_RELEASED' });
+      expect((await InventoryEntry.findOne({ warehouseId: source._id, productId: product._id })).qtyBoxes).toBe(4);
+      expect(await InventoryEntry.countDocuments({ warehouseId: destination._id })).toBe(0);
+      expect(await StockLedger.countDocuments({ reference: challan.challanNo })).toBe(0);
+    });
+  });
+
   it('preserves the batch release state when released production stock is transferred', async () => {
     const firm = await Firm.create({ name: 'Production Release Posting Firm', active: true });
     await runWithTenant({ firmId: firm._id }, async () => {

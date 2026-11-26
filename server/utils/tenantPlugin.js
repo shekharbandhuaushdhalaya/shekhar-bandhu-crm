@@ -42,6 +42,62 @@ module.exports = function tenantPlugin(schema) {
     'updateMany', 'updateOne', 'replaceOne'
   ].forEach(hook => schema.pre(hook, addTenantFilter));
 
+  // Mongoose bulkWrite does not execute query middleware. Wrap it so tenant
+  // scope and immutable ownership are enforced for every supported bulk operation.
+  schema.statics.bulkWrite = function (operations, options) {
+    const firmId = getFirmId();
+    if (!firmId) return mongoose.Model.bulkWrite.call(this, operations, options);
+    if (!Array.isArray(operations)) throw new Error('Tenant-scoped bulkWrite requires an operations array');
+
+    const containsFirmId = value => {
+      if (!value || typeof value !== 'object') return false;
+      if (Array.isArray(value)) return value.some(containsFirmId);
+      return Object.entries(value).some(([key, nested]) =>
+        key === 'firmId' || key.startsWith('firmId.') || containsFirmId(nested) ||
+        (key === '$rename' && nested && Object.values(nested).some(target => String(target).startsWith('firmId')))
+      );
+    };
+    const scopedFilter = filter => ({ $and: [filter || {}, { firmId }] });
+
+    const scopedOperations = operations.map(operation => {
+      if (operation.insertOne) {
+        const document = { ...operation.insertOne.document };
+        if (document.firmId && String(document.firmId) !== String(firmId)) {
+          throw new Error('Cross-tenant write rejected');
+        }
+        document.firmId = firmId;
+        return { insertOne: { ...operation.insertOne, document } };
+      }
+      if (operation.updateOne || operation.updateMany) {
+        const key = operation.updateOne ? 'updateOne' : 'updateMany';
+        const item = operation[key];
+        if (Array.isArray(item.update) || containsFirmId(item.update)) {
+          throw new Error('Tenant ownership is immutable; firmId updates are rejected');
+        }
+        const update = { ...(item.update || {}) };
+        if (item.upsert) update.$setOnInsert = { ...(update.$setOnInsert || {}), firmId };
+        return { [key]: { ...item, filter: scopedFilter(item.filter), update } };
+      }
+      if (operation.replaceOne) {
+        const item = operation.replaceOne;
+        const replacement = { ...(item.replacement || {}) };
+        if (replacement.firmId && String(replacement.firmId) !== String(firmId)) {
+          throw new Error('Cross-tenant write rejected');
+        }
+        replacement.firmId = firmId;
+        return { replaceOne: { ...item, filter: scopedFilter(item.filter), replacement } };
+      }
+      if (operation.deleteOne || operation.deleteMany) {
+        const key = operation.deleteOne ? 'deleteOne' : 'deleteMany';
+        const item = operation[key];
+        return { [key]: { ...item, filter: scopedFilter(item.filter) } };
+      }
+      throw new Error('Unsupported bulkWrite operation in tenant context');
+    });
+
+    return mongoose.Model.bulkWrite.call(this, scopedOperations, options);
+  };
+
   schema.pre('aggregate', function () {
     const firmId = getFirmId();
     if (!firmId) return;
