@@ -461,41 +461,11 @@ function InvoiceDetailModal({ invoice, visible, onClose, onDeleted, onEdit, rawM
               </TouchableOpacity>
             )}
 
-            {/* Toggle Payment Status */}
+            {/* Payment status is driven by recorded payment allocations, not manual invoice edits. */}
             {invoice.isFinalized && invoice.status?.toLowerCase() !== 'paid' && (
-              <TouchableOpacity
-                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.success }]}
-                onPress={async () => {
-                  try {
-                    await api.updatePurchaseInvoice(invoice._id, { status: 'paid' });
-                    onDeleted(); // Reload parent
-                    onClose();
-                  } catch (err: any) {
-                    alert(err.message || 'Failed to update payment status');
-                  }
-                }}
-              >
-                <Ionicons name="cash-outline" size={18} color="#fff" />
-                <Text style={styles.printBtnText}>Mark Paid</Text>
-              </TouchableOpacity>
-            )}
-
-            {invoice.isFinalized && invoice.status?.toLowerCase() === 'paid' && (
-              <TouchableOpacity
-                style={[styles.printBtn, { flex: 1, minWidth: 140, marginTop: 0, backgroundColor: colors.warning }]}
-                onPress={async () => {
-                  try {
-                    await api.updatePurchaseInvoice(invoice._id, { status: 'pending' });
-                    onDeleted(); // Reload parent
-                    onClose();
-                  } catch (err: any) {
-                    alert(err.message || 'Failed to update payment status');
-                  }
-                }}
-              >
-                <Ionicons name="alert-circle-outline" size={18} color="#fff" />
-                <Text style={styles.printBtnText}>Mark Unpaid</Text>
-              </TouchableOpacity>
+              <Text style={{ ...Typography.caption, color: colors.text.secondary, alignSelf: 'center', paddingHorizontal: 8 }}>
+                Record supplier payments in the Payments module; the invoice balance updates from payment allocations.
+              </Text>
             )}
 
             {perm.can('invoice:delete') && invoice.status !== 'Cancelled' && (
