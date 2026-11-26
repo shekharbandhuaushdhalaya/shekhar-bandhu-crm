@@ -2,6 +2,7 @@ const express = require('express');
 const Invoice = require('../../models/Invoice');
 const CreditNote = require('../../models/CreditNote');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -377,7 +378,7 @@ router.get('/filing-status', authorize('report:view'), async (req, res) => {
 
 // POST /api/gst/filing-status — Record filing evidence after the external portal submission.
 // This endpoint records an operator assertion; it does not submit to or verify the GST portal.
-router.post('/filing-status', authorize('invoice:finalize'), async (req, res) => {
+router.post('/filing-status', authorize('invoice:finalize'), idempotency, async (req, res) => {
   try {
     const period = String(req.body.period || '').trim();
     const returnType = String(req.body.returnType || '').trim();

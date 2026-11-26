@@ -1,5 +1,6 @@
 const express = require('express');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const PharmacopoeiaEntry = require('../../models/PharmacopoeiaEntry');
 const { PHARMACOPOEIA_SEED_DATA } = require('../../utils/pharmacopoeiaSeedData');
 const router = express.Router();
@@ -205,7 +206,7 @@ router.get('/search', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/pharmacopoeia/seed — Trigger manual re-seeding / reset
-router.post('/seed', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/seed', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     await PharmacopoeiaEntry.deleteMany({});
     const inserted = await PharmacopoeiaEntry.insertMany(PHARMACOPOEIA_SEED_DATA);
@@ -216,7 +217,7 @@ router.post('/seed', authorize('manufacturing:edit'), async (req, res) => {
 });
 
 // POST /api/pharmacopoeia/import-to-raw-materials — Bulk/single import monographs into Raw Materials Master
-router.post('/import-to-raw-materials', authorize('manufacturing:create'), async (req, res) => {
+router.post('/import-to-raw-materials', authorize('manufacturing:create'), idempotency, async (req, res) => {
   try {
     const RawMaterial = require('../../models/RawMaterial');
     const { generateRawMaterialSku } = require('../../utils/skuGenerator');
@@ -294,7 +295,7 @@ router.get('/:id', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/pharmacopoeia — Create custom pharmacopoeia entry
-router.post('/', authorize('manufacturing:create'), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), idempotency, async (req, res) => {
   try {
     const { ayurvedicName, botanicalName } = req.body;
     if (!ayurvedicName || !botanicalName) {
@@ -308,7 +309,7 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
 });
 
 // PUT /api/pharmacopoeia/:id/verify — Approve and optionally update monograph fields
-router.put('/:id/verify', authorize('quality:approve'), async (req, res) => {
+router.put('/:id/verify', authorize('quality:approve'), idempotency, async (req, res) => {
   try {
     const updateData = { ...req.body, verified: true };
     const updated = await PharmacopoeiaEntry.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
@@ -320,7 +321,7 @@ router.put('/:id/verify', authorize('quality:approve'), async (req, res) => {
 });
 
 // PUT /api/pharmacopoeia/:id — Update pharmacopoeia entry
-router.put('/:id', authorize('manufacturing:edit'), async (req, res) => {
+router.put('/:id', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const updated = await PharmacopoeiaEntry.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!updated) return res.status(404).json({ error: 'Monograph not found' });
