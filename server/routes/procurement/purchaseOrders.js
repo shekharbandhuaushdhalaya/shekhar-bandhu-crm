@@ -11,6 +11,7 @@ const RawMaterial = require('../../models/RawMaterial');
 const RawMaterialEntry = require('../../models/RawMaterialEntry');
 const assertSupplierBatchCompatibility = require('../../utils/assertSupplierBatchCompatibility');
 const resolvePurchaseOrderItem = require('../../utils/resolvePurchaseOrderItem');
+const { hasBalancedGrnQuantities } = require('../../utils/grnQuantityBalance');
 const findDuplicatePurchaseOrderItemKeys = require('../../utils/findDuplicatePurchaseOrderItemKeys');
 const Product = require('../../models/Product');
 const InventoryEntry = require('../../models/InventoryEntry');
@@ -241,8 +242,8 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
         const received = Number(item.qtyReceived || 0);
         const accepted = Number(item.qtyAccepted || 0);
         const rejected = Number(item.qtyRejected || 0);
-        if (accepted + rejected !== received) {
-          throw Object.assign(new Error(`${item.name}: accepted + rejected quantity must equal received quantity`), { statusCode: 400 });
+        if (!hasBalancedGrnQuantities(received, accepted, rejected)) {
+          throw Object.assign(new Error(`${item.name}: accepted + rejected quantity must equal received quantity (within 0.0001 units)`), { statusCode: 400 });
         }
         if ((!item.rawMaterialId && !item.productId) || (item.rawMaterialId && item.productId)) {
           throw Object.assign(new Error(`${item.name}: exactly one rawMaterialId or productId is required`), { statusCode: 400 });
