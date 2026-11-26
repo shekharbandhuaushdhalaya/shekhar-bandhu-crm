@@ -108,7 +108,7 @@ router.post('/register', validate(schemas.userSchema), async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -201,7 +201,7 @@ router.post('/login', validate(schemas.loginSchema), async (req, res) => {
       req
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -261,7 +261,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -274,7 +274,7 @@ router.get('/users', authenticateToken, authorize('user:view'), async (req, res)
     const roleByUser = new Map(memberships.map(m => [String(m.userId), m.role]));
     res.json(users.map(u => ({ ...u, role: roleByUser.get(String(u._id)) || u.role, firmId: req.user.firmId })));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -294,7 +294,7 @@ router.put('/users/:id', authenticateToken, authorize('user:edit'), validate(sch
     const user = await User.findById(req.params.id).select('-password').lean();
     res.json({ ...user, role: membership.role, firmId: req.user.firmId });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -311,7 +311,7 @@ router.delete('/users/:id', authenticateToken, authorize('user:delete'), idempot
     if (!membership) return res.status(404).json({ error: 'User is not a member of the active firm' });
     res.json({ message: 'User removed from the active firm', userId: req.params.id, firmId: req.user.firmId });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -344,7 +344,7 @@ router.post('/whatsapp/send-otp', async (req, res) => {
 
     res.status(200).json({ message: 'Verification code sent to WhatsApp', ...(config.isProduction ? {} : { devOtp: code }) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -396,7 +396,7 @@ router.post('/whatsapp/verify-otp', async (req, res) => {
       customerName
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -427,7 +427,7 @@ router.put('/update-profile', authenticateToken, validate(schemas.updateProfileS
       req
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -459,7 +459,7 @@ router.put('/change-password', authenticateToken, validate(schemas.changePasswor
       req
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -490,7 +490,7 @@ router.post('/forgot-password', async (req, res) => {
 
     res.json({ message: 'If that email address is registered, a password reset code has been issued.', resetToken: `email:${user.email}`, ...(config.isProduction ? {} : { devOtp: code }) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -538,7 +538,7 @@ router.post('/reset-password', async (req, res) => {
       req
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -552,7 +552,7 @@ router.get('/sessions', authenticateToken, async (req, res) => {
     }).select('-tokenHash').sort({ lastUsedAt: -1, createdAt: -1 }).lean();
     res.json(sessions);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
@@ -568,7 +568,7 @@ router.delete('/sessions/:sessionId', authenticateToken, async (req, res) => {
 
     res.json({ message: 'Device session revoked successfully', sessionId: req.params.sessionId });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to complete authentication request' });
   }
 });
 
