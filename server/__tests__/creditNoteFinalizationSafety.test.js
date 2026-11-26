@@ -96,3 +96,64 @@ describe('Credit/debit note finalization accounting safeguards', () => {
     expect(note.save).toHaveBeenCalled();
   });
 });
+
+
+describe('Credit/debit note cancellation audit controls', () => {
+  let app;
+  let note;
+  let customer;
+
+  beforeAll(() => {
+    app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      req.user = { id: 'canceller-2', name: 'Independent Controller' };
+      next();
+    });
+    app.use('/api/credit-notes', router);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    customer = { _id: 'customer-1', regularBalance: 382, save: jest.fn().mockResolvedValue(true) };
+    note = {
+      _id: 'note-2', status: 'finalized', type: 'credit_note', partyType: 'Customer',
+      partyId: 'customer-1', partyName: 'Customer', reason: 'Commercial rate correction',
+      baseAmount: 100, cgst: 9, sgst: 9, igst: 0, totalAmount: 118,
+      finalizedBy: 'finalizer-1', save: jest.fn().mockResolvedValue(true)
+    };
+    CreditNote.findById = jest.fn(() => ({ session: jest.fn().mockResolvedValue(note) }));
+    Customer.findById = jest.fn(() => ({ session: jest.fn().mockResolvedValue(customer) }));
+    require('../models/SalesReturn').exists = jest.fn(() => ({ session: jest.fn().mockResolvedValue(null) }));
+  });
+
+  test('requires authenticated cancellation evidence', async () => {
+    const response = await request(app).patch('/api/credit-notes/note-2/cancel').send({});
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('NOTE_CANCELLATION_EVIDENCE_REQUIRED');
+    expect(customer.save).not.toHaveBeenCalled();
+  });
+
+  test('prevents the finalizer from independently cancelling the note', async () => {
+    note.finalizedBy = 'canceller-2';
+    const response = await request(app).patch('/api/credit-notes/note-2/cancel')
+      .send({ reason: 'Duplicate note was identified during review' });
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('NOTE_CANCELLATION_MAKER_CHECKER_REQUIRED');
+    expect(customer.save).not.toHaveBeenCalled();
+  });
+
+  test('records independent cancellation evidence and reverses the balance atomically', async () => {
+    const response = await request(app).patch('/api/credit-notes/note-2/cancel')
+      .send({ reason: 'Duplicate adjustment confirmed after independent review' });
+    expect(response.status).toBe(200);
+    expect(customer.regularBalance).toBe(500);
+    expect(customer.save).toHaveBeenCalled();
+    expect(note.status).toBe('cancelled');
+    expect(note.cancelledBy).toBe('canceller-2');
+    expect(note.cancelledByName).toBe('Independent Controller');
+    expect(note.cancelledAt).toBeInstanceOf(Date);
+    expect(note.cancellationReason).toBe('Duplicate adjustment confirmed after independent review');
+    expect(note.save).toHaveBeenCalled();
+  });
+});
