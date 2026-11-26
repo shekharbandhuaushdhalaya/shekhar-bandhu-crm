@@ -269,6 +269,8 @@ describe('GRN independent receipt and supplier-document verification', () => {
       receivedDate: new Date('2026-11-24'), verifiedAt: new Date('2026-11-25'),
       items: [{ rawMaterialId: 'raw-1', batchNo: 'NEW-LOT-1', qtyAccepted: 2 }]
     }) });
+    GoodsReceivedNote.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: 'replacement-grn-1', status: 'verified' });
+    SupplierReturn.find = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
     const resolved = await request(app).patch('/api/purchase-orders/supplier-returns/return-1/resolve').send({ supplierReference: 'SUP-ACK-1', replacementBatchNo: 'NEW-LOT-1' });
     expect(resolved.status).toBe(200);
     expect(resolved.body).toMatchObject({
