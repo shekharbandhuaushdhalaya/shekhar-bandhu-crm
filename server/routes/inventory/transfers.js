@@ -117,7 +117,7 @@ router.patch('/:id/reject', authorize('inventory:edit'), async (req, res) => {
 });
 
 // PATCH /api/inventory/transfers/:id/ship — create and post the authoritative Transfer Challan
-router.patch('/:id/ship', idempotency, authorize('inventory:edit'), async (req, res) => {
+router.patch('/:id/ship', authorize('inventory:edit'), idempotency, async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
     if (!transfer) return res.status(404).json({ error: 'Transfer not found', code: 'TRANSFER_NOT_FOUND' });
@@ -169,7 +169,7 @@ router.patch('/:id/ship', idempotency, authorize('inventory:edit'), async (req, 
 
 // PATCH /api/inventory/transfers/:id/receive — receipt only changes logistics status;
 // physical stock was already moved by the Transfer Challan at shipment/posting.
-router.patch('/:id/receive', idempotency, authorize('inventory:edit'), async (req, res) => {
+router.patch('/:id/receive', authorize('inventory:edit'), idempotency, async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
     if (!transfer) return res.status(404).json({ error: 'Transfer not found', code: 'TRANSFER_NOT_FOUND' });
@@ -184,7 +184,7 @@ router.patch('/:id/receive', idempotency, authorize('inventory:edit'), async (re
 });
 
 // PATCH /api/inventory/transfers/:id/cancel — pending requests cancel directly; posted transfers reverse their Challan
-router.patch('/:id/cancel', idempotency, authorize('inventory:edit'), async (req, res) => {
+router.patch('/:id/cancel', authorize('inventory:edit'), idempotency, async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
     if (!transfer) return res.status(404).json({ error: 'Transfer not found', code: 'TRANSFER_NOT_FOUND' });

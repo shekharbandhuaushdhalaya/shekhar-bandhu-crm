@@ -153,7 +153,7 @@ router.get('/consignment/dealer-stock', authorize('inventory:view'), async (req,
 });
 
 // POST /api/inventories/consignment/settle — returned goods use Transfer Challan; sold goods use Sale Challan.
-router.post('/consignment/settle', idempotency, authorize('inventory:edit', 'order:create', 'challan:create'), validate(schemas.consignmentSettleSchema), async (req, res) => {
+router.post('/consignment/settle', authorize('inventory:edit', 'order:create', 'challan:create'), validate(schemas.consignmentSettleSchema), idempotency, async (req, res) => {
   try {
     const { dealerWarehouseId, destinationWarehouseId, soldItems = [], returnedItems = [], notes } = req.body;
     if (soldItems.length && returnedItems.length) {

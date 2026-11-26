@@ -101,7 +101,7 @@ router.get('/consolidated', authorize('inventory:view'), async (req, res) => {
 });
 
 // POST /api/inventory-entries — Manual stock receipt. Inventory slot, aggregate stock and ledger post atomically.
-router.post('/', idempotency, authorize('inventory:create'), validate(schemas.inventoryEntrySchema), async (req, res) => {
+router.post('/', authorize('inventory:create'), validate(schemas.inventoryEntrySchema), idempotency, async (req, res) => {
   try {
     if (req.body.qcStatus && req.body.qcStatus !== 'under_test') {
       throw Object.assign(
@@ -153,7 +153,7 @@ router.post('/', idempotency, authorize('inventory:create'), validate(schemas.in
 });
 
 // PUT /api/inventory-entries/:id — Manual adjustment. Slot, aggregate stock and ledger post atomically.
-router.put('/:id', idempotency, authorize('inventory:edit'), validate(schemas.inventoryEntrySchema.partial()), async (req, res) => {
+router.put('/:id', authorize('inventory:edit'), validate(schemas.inventoryEntrySchema.partial()), idempotency, async (req, res) => {
   try {
     const result = await withTransaction(async (session) => {
       const { type, note, reference, createdBy, createdAt } = req.body;
