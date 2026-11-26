@@ -1,58 +1,95 @@
-/**
- * Migration: Fix data quality issues
- * 1. Set batchNo = '' on all InventoryEntry documents missing the field
- * 2. Fix packing = 0 entries (set to 1 as safe default)
- * 3. Fix packing = 0 entries in StockLedger
- */
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const mongoose = require('mongoose');
 const InventoryEntry = require('../models/InventoryEntry');
 const StockLedger = require('../models/StockLedger');
+const Firm = require('../models/Firm');
+const { runWithTenant } = require('../utils/tenantContext');
 
-async function main() {
-  await mongoose.connect(process.env.MONGODB_URI);
-  console.log('✅ Connected to MongoDB');
-
-  // 1. Fix InventoryEntry docs missing batchNo
-  const ieMissing = await InventoryEntry.updateMany(
-    { batchNo: { $exists: false } },
-    { $set: { batchNo: '' } }
-  );
-  console.log(`✅ InventoryEntry: ${ieMissing.modifiedCount} docs — set missing batchNo = ''`);
-
-  // 2. Fix docs where batchNo is null
-  const ieNull = await InventoryEntry.updateMany(
-    { batchNo: null },
-    { $set: { batchNo: '' } }
-  );
-  console.log(`✅ InventoryEntry: ${ieNull.modifiedCount} docs — replaced null batchNo with ''`);
-
-  // 3. Fix packing = 0 in InventoryEntry (set to 1)
-  const iePackZero = await InventoryEntry.updateMany(
-    { packing: 0 },
-    { $set: { packing: 1 } }
-  );
-  console.log(`✅ InventoryEntry: ${iePackZero.modifiedCount} docs — fixed packing 0 → 1`);
-
-  // 4. Fix packing = 0 in StockLedger
-  const slPackZero = await StockLedger.updateMany(
-    { packing: 0 },
-    { $set: { packing: 1 } }
-  );
-  console.log(`✅ StockLedger: ${slPackZero.modifiedCount} docs — fixed packing 0 → 1`);
-
-  // 5. Fix StockLedger docs missing batchNo
-  const slBatch = await StockLedger.updateMany(
-    { batchNo: { $exists: false } },
-    { $set: { batchNo: '' } }
-  );
-  console.log(`✅ StockLedger: ${slBatch.modifiedCount} docs — set missing batchNo = ''`);
-
-  await mongoose.disconnect();
-  console.log('✅ Migration complete');
+function validateMigrationConfig(env = process.env) {
+  const mongoUri = String(env.MONGODB_URI || '').trim();
+  if (!mongoUri) throw new Error('MONGODB_URI is required.');
+  const firmId = String(env.MIGRATION_FIRM_ID || '').trim();
+  if (!mongoose.Types.ObjectId.isValid(firmId)) {
+    throw new Error('MIGRATION_FIRM_ID must be a valid MongoDB ObjectId.');
+  }
+  const apply = env.MIGRATE_BATCH_DATA_APPLY === 'YES';
+  if (apply && env.MIGRATE_BATCH_DATA_CONFIRM !== 'YES') {
+    throw new Error('Applying batch data repairs requires MIGRATE_BATCH_DATA_CONFIRM=YES.');
+  }
+  return { mongoUri, firmId, apply };
 }
 
-main().catch(err => {
-  console.error('❌ Migration failed:', err);
-  process.exit(1);
-});
+async function migrate(env = process.env) {
+  const { mongoUri, firmId, apply } = validateMigrationConfig(env);
+  let failed = false;
+
+  try {
+    await mongoose.connect(mongoUri);
+    const firm = await Firm.findById(firmId).select('_id name').lean();
+    if (!firm) throw new Error('MIGRATION_FIRM_ID does not match an existing firm.');
+
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const repairs = [
+        {
+          label: 'InventoryEntry missing/null batchNo',
+          Model: InventoryEntry,
+          filter: { $or: [{ batchNo: { $exists: false } }, { batchNo: null }] },
+          update: { $set: { batchNo: '' } }
+        },
+        {
+          label: 'InventoryEntry packing = 0',
+          Model: InventoryEntry,
+          filter: { packing: 0 },
+          update: { $set: { packing: 1 } }
+        },
+        {
+          label: 'StockLedger missing/null batchNo',
+          Model: StockLedger,
+          filter: { $or: [{ batchNo: { $exists: false } }, { batchNo: null }] },
+          update: { $set: { batchNo: '' } }
+        },
+        {
+          label: 'StockLedger packing = 0',
+          Model: StockLedger,
+          filter: { packing: 0 },
+          update: { $set: { packing: 1 } }
+        }
+      ];
+
+      let totalCandidates = 0;
+      for (const repair of repairs) {
+        const count = await repair.Model.countDocuments(repair.filter);
+        totalCandidates += count;
+        console.log(`${repair.label}: ${count} candidate records.`);
+        if (apply && count > 0) {
+          const result = await repair.Model.updateMany(repair.filter, repair.update);
+          console.log(`${repair.label}: updated ${result.modifiedCount} records.`);
+        }
+      }
+
+      if (apply) {
+        console.log(`Batch data repairs applied for firm ${firm._id}: ${totalCandidates} candidate matches across ${repairs.length} repair rules.`);
+      } else {
+        console.log(`Dry run only for firm ${firm._id}: ${totalCandidates} candidate matches; no records changed. Review the counts, then set MIGRATE_BATCH_DATA_APPLY=YES and MIGRATE_BATCH_DATA_CONFIRM=YES to apply.`);
+      }
+    });
+  } catch (error) {
+    failed = true;
+    console.error('Batch data migration failed:', error.message);
+  } finally {
+    if (mongoose.connection.readyState !== 0) {
+      try {
+        await mongoose.disconnect();
+      } catch (error) {
+        failed = true;
+        console.error('Database disconnect failed:', error.message);
+      }
+    }
+  }
+
+  if (failed) process.exitCode = 1;
+}
+
+if (require.main === module) migrate();
+
+module.exports = { migrate, validateMigrationConfig };
