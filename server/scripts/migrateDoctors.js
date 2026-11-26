@@ -4,209 +4,151 @@ const Doctor = require('../models/Doctor');
 const Contact = require('../models/Contact');
 const Customer = require('../models/Customer');
 const MrVisit = require('../models/MrVisit');
+const Firm = require('../models/Firm');
+const { runWithTenant } = require('../utils/tenantContext');
 
-async function migrateDoctors() {
-  const MONGODB_URI = process.env.MONGODB_URI;
-  if (!MONGODB_URI) {
-    console.error('❌ MONGODB_URI is not set in environment or .env');
-    process.exit(1);
+function validateMigrationConfig(env = process.env) {
+  const mongoUri = String(env.MONGODB_URI || '').trim();
+  if (!mongoUri) throw new Error('MONGODB_URI is required.');
+  const firmId = String(env.MIGRATION_FIRM_ID || '').trim();
+  if (!mongoose.Types.ObjectId.isValid(firmId)) {
+    throw new Error('MIGRATION_FIRM_ID must be a valid MongoDB ObjectId.');
   }
+  const apply = env.MIGRATE_DOCTORS_APPLY === 'YES';
+  if (apply && env.MIGRATE_DOCTORS_CONFIRM !== 'YES') {
+    throw new Error('Applying doctor migration requires MIGRATE_DOCTORS_CONFIRM=YES.');
+  }
+  return { mongoUri, firmId, apply };
+}
+
+const doctorFieldFilter = [
+  { category: { $in: ['A', 'B', 'C'] } },
+  { specialty: { $ne: '', $exists: true } },
+  { birthday: { $ne: null } },
+  { anniversary: { $ne: null } },
+  { preferredTime: { $ne: '', $exists: true } },
+  { preferredVisitDay: { $ne: '', $exists: true } },
+  { monthlySampleQuota: { $ne: null } }
+];
+
+function hasName(record) {
+  return Boolean(record && typeof record.name === 'string' && record.name.trim());
+}
+
+function doctorPayload(record, source) {
+  const isCustomer = source === 'Customer';
+  const address = isCustomer && record.billingAddress ? record.billingAddress : {};
+  return {
+    name: record.name.trim(),
+    clinicName: String(record.company || '').trim(),
+    specialization: String(record.specialty || '').trim(),
+    category: ['A', 'B', 'C'].includes(record.category) ? record.category : '',
+    phone: record.phone || '',
+    email: record.email || '',
+    address: String(address.street || '').trim(),
+    city: String(address.city || record.city || '').trim(),
+    pincode: String(address.pin || '').trim(),
+    latitude: record.latitude,
+    longitude: record.longitude,
+    birthday: record.birthday || null,
+    anniversary: record.anniversary || null,
+    preferredTime: String(record.preferredTime || '').trim(),
+    preferredVisitDay: record.preferredVisitDay || '',
+    monthlySampleQuota: record.monthlySampleQuota ?? null,
+    assignedMrId: record.assignedMrId || null,
+    areaName: String(record.areaName || '').trim(),
+    linkedContactId: isCustomer ? null : record._id,
+    linkedCustomerId: isCustomer ? record._id : null,
+    notes: ''
+  };
+}
+
+async function migrateDoctors(env = process.env) {
+  const { mongoUri, firmId, apply } = validateMigrationConfig(env);
+  let failed = false;
+  let summary = { contactCandidates: 0, customerCandidates: 0, doctorsToCreate: 0, existingDoctors: 0, visitsToRepoint: 0, skipped: 0 };
 
   try {
-    console.log('🔌 Connecting to MongoDB for Doctor migration...');
-    await mongoose.connect(MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
+    await mongoose.connect(mongoUri);
+    const firm = await Firm.findById(firmId).select('_id name').lean();
+    if (!firm) throw new Error('MIGRATION_FIRM_ID does not match an existing firm.');
 
-    // 1. Gather all MrVisit records referencing Contact/Customer
-    const visits = await MrVisit.find({ doctorId: { $ne: null } }).lean();
-    const referencedContactIds = new Set();
-    const referencedCustomerIds = new Set();
+    await runWithTenant({ firmId: firm._id }, async () => {
+      const visits = await MrVisit.find({ doctorId: { $ne: null } }).lean();
+      const contactIds = new Set();
+      const customerIds = new Set();
+      for (const visit of visits) {
+        if (visit.doctorRefModel === 'Customer') customerIds.add(String(visit.doctorId));
+        else if (visit.doctorRefModel === 'Contact') contactIds.add(String(visit.doctorId));
+      }
 
-    visits.forEach(v => {
-      if (v.doctorId) {
-        if (v.doctorRefModel === 'Customer') {
-          referencedCustomerIds.add(v.doctorId.toString());
-        } else {
-          referencedContactIds.add(v.doctorId.toString());
+      const contactFilter = { $or: [{ _id: { $in: [...contactIds] } }, ...doctorFieldFilter] };
+      const customerFilter = { $or: [{ _id: { $in: [...customerIds] } }, ...doctorFieldFilter] };
+      const [contacts, customers] = await Promise.all([
+        Contact.find(contactFilter).lean(),
+        Customer.find(customerFilter).lean()
+      ]);
+      summary.contactCandidates = contacts.length;
+      summary.customerCandidates = customers.length;
+      summary.skipped = [...contacts, ...customers].filter(record => !hasName(record)).length;
+
+      const contactMap = new Map();
+      const customerMap = new Map();
+      for (const [records, source, map, linkField] of [
+        [contacts, 'Contact', contactMap, 'linkedContactId'],
+        [customers, 'Customer', customerMap, 'linkedCustomerId']
+      ]) {
+        for (const record of records) {
+          if (!hasName(record)) continue;
+          const existing = await Doctor.findOne({ [linkField]: record._id }).select('_id').lean();
+          if (existing) {
+            map.set(String(record._id), existing._id);
+            summary.existingDoctors += 1;
+            continue;
+          }
+          summary.doctorsToCreate += 1;
+          if (apply) {
+            const created = await Doctor.create(doctorPayload(record, source));
+            map.set(String(record._id), created._id);
+          }
         }
       }
+
+      if (apply) {
+        for (const visit of visits) {
+          const map = visit.doctorRefModel === 'Customer' ? customerMap : contactMap;
+          const doctorId = map.get(String(visit.doctorId));
+          if (!doctorId) continue;
+          await MrVisit.updateOne(
+            { _id: visit._id },
+            { $set: { doctorId, doctorRefModel: 'Doctor' } }
+          );
+          summary.visitsToRepoint += 1;
+        }
+      } else {
+        for (const visit of visits) {
+          const map = visit.doctorRefModel === 'Customer' ? customerMap : contactMap;
+          if (map.has(String(visit.doctorId)) || [...contacts, ...customers].some(record => String(record._id) === String(visit.doctorId) && hasName(record))) {
+            summary.visitsToRepoint += 1;
+          }
+        }
+      }
+
+      console.log(`${apply ? 'Doctor migration applied' : 'Doctor migration dry run'} for firm ${firm._id}:`, summary);
+      if (!apply) console.log('No records changed. Review counts, then set MIGRATE_DOCTORS_APPLY=YES and MIGRATE_DOCTORS_CONFIRM=YES to apply.');
     });
-
-    console.log(`🔍 Found ${visits.length} MrVisit records with doctorId (Contacts: ${referencedContactIds.size}, Customers: ${referencedCustomerIds.size})`);
-
-    // 2. Query Contacts & Customers with doctor fields or visit references
-    const doctorFieldFilter = [
-      { category: { $in: ['A', 'B', 'C'] } },
-      { specialty: { $ne: '', $exists: true } },
-      { birthday: { $ne: null } },
-      { anniversary: { $ne: null } },
-      { preferredTime: { $ne: '', $exists: true } },
-      { preferredVisitDay: { $ne: '', $exists: true } },
-      { monthlySampleQuota: { $ne: null } },
-    ];
-
-    const contactFilter = {
-      $or: [
-        { _id: { $in: Array.from(referencedContactIds) } },
-        ...doctorFieldFilter
-      ]
-    };
-
-    const customerFilter = {
-      $or: [
-        { _id: { $in: Array.from(referencedCustomerIds) } },
-        ...doctorFieldFilter
-      ]
-    };
-
-    const [contactsToMigrate, customersToMigrate] = await Promise.all([
-      Contact.find(contactFilter).lean(),
-      Customer.find(customerFilter).lean(),
-    ]);
-
-    console.log(`📋 Candidates for migration: ${contactsToMigrate.length} Contacts, ${customersToMigrate.length} Customers.`);
-
-    let createdCount = 0;
-    let existingCount = 0;
-    const skippedList = [];
-
-    // Map of old Contact/Customer ID -> new Doctor _id
-    const contactToDoctorMap = new Map();
-    const customerToDoctorMap = new Map();
-
-    // 3. Migrate Contacts to Doctor records
-    for (const c of contactsToMigrate) {
-      if (!c.name || !c.name.trim()) {
-        skippedList.push({ type: 'Contact', id: c._id, name: c.name || '(unnamed)', reason: 'Missing or empty name' });
-        continue;
-      }
-
-      let doctor = await Doctor.findOne({ linkedContactId: c._id });
-      if (doctor) {
-        existingCount++;
-        contactToDoctorMap.set(c._id.toString(), doctor._id);
-      } else {
-        doctor = await Doctor.create({
-          name: c.name.trim(),
-          clinicName: (c.company || '').trim(),
-          specialization: (c.specialty || '').trim(),
-          category: c.category || '',
-          phone: c.phone || '',
-          email: c.email || '',
-          address: '',
-          city: (c.city || '').trim(),
-          pincode: '',
-          latitude: c.latitude,
-          longitude: c.longitude,
-          birthday: c.birthday || null,
-          anniversary: c.anniversary || null,
-          preferredTime: (c.preferredTime || '').trim(),
-          preferredVisitDay: c.preferredVisitDay || '',
-          monthlySampleQuota: c.monthlySampleQuota || null,
-          assignedMrId: c.assignedMrId || null,
-          areaName: (c.areaName || '').trim(),
-          linkedContactId: c._id,
-          linkedCustomerId: null,
-          notes: '',
-        });
-        createdCount++;
-        contactToDoctorMap.set(c._id.toString(), doctor._id);
-      }
-    }
-
-    // 4. Migrate Customers to Doctor records
-    for (const cust of customersToMigrate) {
-      if (!cust.name || !cust.name.trim()) {
-        skippedList.push({ type: 'Customer', id: cust._id, name: cust.name || '(unnamed)', reason: 'Missing or empty name' });
-        continue;
-      }
-
-      let doctor = await Doctor.findOne({ linkedCustomerId: cust._id });
-      if (doctor) {
-        existingCount++;
-        customerToDoctorMap.set(cust._id.toString(), doctor._id);
-      } else {
-        const street = cust.billingAddress ? (cust.billingAddress.street || '') : '';
-        const city = cust.billingAddress && cust.billingAddress.city ? cust.billingAddress.city : (cust.city || '');
-        const pin = cust.billingAddress ? (cust.billingAddress.pin || '') : '';
-
-        doctor = await Doctor.create({
-          name: cust.name.trim(),
-          clinicName: (cust.company || '').trim(),
-          specialization: (cust.specialty || '').trim(),
-          category: cust.category || '',
-          phone: cust.phone || '',
-          email: cust.email || '',
-          address: street.trim(),
-          city: city.trim(),
-          pincode: pin.trim(),
-          latitude: cust.latitude,
-          longitude: cust.longitude,
-          birthday: cust.birthday || null,
-          anniversary: cust.anniversary || null,
-          preferredTime: (cust.preferredTime || '').trim(),
-          preferredVisitDay: cust.preferredVisitDay || '',
-          monthlySampleQuota: cust.monthlySampleQuota || null,
-          assignedMrId: cust.assignedMrId || null,
-          areaName: (cust.areaName || '').trim(),
-          linkedContactId: null,
-          linkedCustomerId: cust._id,
-          notes: '',
-        });
-        createdCount++;
-        customerToDoctorMap.set(cust._id.toString(), doctor._id);
-      }
-    }
-
-    // 5. Repoint MrVisit records
-    let repointedVisitsCount = 0;
-    for (const v of visits) {
-      const isCustomerRef = v.doctorRefModel === 'Customer';
-      const targetMap = isCustomerRef ? customerToDoctorMap : contactToDoctorMap;
-      const oldIdStr = v.doctorId ? v.doctorId.toString() : '';
-
-      const newDoctorId = targetMap.get(oldIdStr);
-      if (newDoctorId) {
-        await MrVisit.findByIdAndUpdate(v._id, {
-          doctorId: newDoctorId,
-          doctorRefModel: 'Doctor'
-        });
-        repointedVisitsCount++;
-      }
-    }
-
-    // 6. Log Summary
-    console.log('\n=================== MIGRATION SUMMARY ===================');
-    console.log(`✅ Doctor records created       : ${createdCount}`);
-    console.log(`ℹ️ Doctor records already existed: ${existingCount}`);
-    console.log(`🔄 MrVisit records repointed     : ${repointedVisitsCount}`);
-    console.log(`⚠️ Skipped records               : ${skippedList.length}`);
-    if (skippedList.length > 0) {
-      console.log('Skipped details:');
-      skippedList.forEach(item => {
-        console.log(`  - [${item.type}] ${item.name} (_id: ${item.id}): ${item.reason}`);
-      });
-    }
-    console.log('=========================================================\n');
-
-    return {
-      createdCount,
-      existingCount,
-      repointedVisitsCount,
-      skippedList
-    };
-
-  } catch (err) {
-    console.error('❌ Doctor migration failed:', err);
-    throw err;
+  } catch (error) {
+    failed = true;
+    console.error('Doctor migration failed:', error.message);
   } finally {
-    await mongoose.disconnect();
-    console.log('🔌 Disconnected from MongoDB');
+    if (mongoose.connection.readyState !== 0) {
+      try { await mongoose.disconnect(); }
+      catch (error) { failed = true; console.error('Database disconnect failed:', error.message); }
+    }
   }
+  if (failed) process.exitCode = 1;
+  return summary;
 }
 
-if (require.main === module) {
-  migrateDoctors().then(() => process.exit(0)).catch(() => process.exit(1));
-}
-
-module.exports = { migrateDoctors };
+if (require.main === module) migrateDoctors();
+module.exports = { migrateDoctors, validateMigrationConfig, doctorPayload };
