@@ -124,7 +124,7 @@ describe('Supplier return lifecycle', () => {
   test('closes a replacement request through a conditional update with supplier evidence', async () => {
     SupplierReturn.findById.mockResolvedValue({
       _id: 'return-5', returnNo: 'SR-5', status: 'dispatched', resolutionType: 'replacement_requested',
-      poId: 'po-5', vendorId: 'vendor-5', rawMaterialId: 'raw-5', qty: 2
+      grnId: 'original-grn-5', poId: 'po-5', vendorId: 'vendor-5', rawMaterialId: 'raw-5', qty: 2
     });
     GoodsReceivedNote.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({
       _id: 'replacement-grn-5', grnNo: 'GRN-REPL-5', status: 'verified',
