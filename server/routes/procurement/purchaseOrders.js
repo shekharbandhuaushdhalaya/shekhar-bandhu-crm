@@ -13,6 +13,7 @@ const assertSupplierBatchCompatibility = require('../../utils/assertSupplierBatc
 const resolvePurchaseOrderItem = require('../../utils/resolvePurchaseOrderItem');
 const { hasBalancedGrnQuantities } = require('../../utils/grnQuantityBalance');
 const findDuplicatePurchaseOrderItemKeys = require('../../utils/findDuplicatePurchaseOrderItemKeys');
+const calculatePurchaseInvoiceExpectedAmount = require('../../utils/calculatePurchaseInvoiceExpectedAmount');
 const Product = require('../../models/Product');
 const InventoryEntry = require('../../models/InventoryEntry');
 const StockLedger = require('../../models/StockLedger');
@@ -717,15 +718,20 @@ router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
     const hasAmbiguousPoItems = duplicatePoItemKeys.size > 0;
     const qtyMatch = lineMatches.length > 0 && lineMatches.every(line => line.receivedEnough && line.billedMatchesReceived && !line.ambiguousPoItem) && unlinkedInvoiceItems.length === 0;
     const priceAndTaxMatch = lineMatches.length > 0 && lineMatches.every(line => line.priceMatch && line.taxMatch && line.unitCompatible);
+    const expectedInvoiceAmount = calculatePurchaseInvoiceExpectedAmount(lineMatches, {
+      freightAmount: invoice.freightAmount,
+      cartageAmount: invoice.cartageAmount,
+      tcsAmount: invoice.tcsAmount
+    });
     const invoiceAmountExcludingRoundOff = Number(invoice.amount || 0) - Number(invoice.roundOff || 0);
-    const amountMatch = Math.abs(Number(po.totalAmount || 0) - invoiceAmountExcludingRoundOff) <= 0.01;
+    const amountMatch = Math.abs(expectedInvoiceAmount - invoiceAmountExcludingRoundOff) <= 0.01;
     const matchStatus = qtyMatch && priceAndTaxMatch && amountMatch && vendorMatches ? 'MATCHED' : 'DISCREPANCY_FOUND';
     const reasons = [];
     if (!vendorMatches) reasons.push('Supplier on invoice does not match the purchase order');
     if (hasAmbiguousPoItems) reasons.push('Purchase order contains duplicate material/product lines; accepted GRN quantities cannot be attributed to individual PO lines');
     if (!qtyMatch) reasons.push('One or more PO lines do not reconcile to accepted GRN and billed invoice quantities');
     if (!priceAndTaxMatch) reasons.push('One or more invoice line prices, GST rates or units differ from the purchase order');
-    if (!amountMatch) reasons.push('Purchase invoice amount differs from the PO total after round-off by more than ₹0.01');
+    if (!amountMatch) reasons.push('Purchase invoice amount differs from accepted GRN line value plus declared freight, cartage and TCS after round-off by more than ₹0.01');
     if (unlinkedInvoiceItems.length) reasons.push('Invoice contains lines without a raw-material or product reference');
 
     res.json({
@@ -734,6 +740,7 @@ router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
       invoiceNo: invoice.invoiceNo,
       poAmount: po.totalAmount,
       invoiceAmount: invoice.amount,
+      expectedInvoiceAmount: Number(expectedInvoiceAmount.toFixed(2)),
       vendorMatches,
       qtyMatch,
       amountMatch,
