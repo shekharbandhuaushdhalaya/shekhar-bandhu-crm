@@ -161,7 +161,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/raw-materials — Create raw material definition
-router.post('/', authorize('manufacturing:create'), validate(schemas.rawMaterialSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), validate(schemas.rawMaterialSchema), idempotency, async (req, res) => {
   try {
     const { name, unit, minReorder, category, materialType } = req.body;
     if (!name || !name.trim()) {
@@ -262,7 +262,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.rawMaterial
 });
 
 // PUT /api/raw-materials/:id — Update raw material definition
-router.put('/:id', authorize('manufacturing:edit'), validate(schemas.rawMaterialSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('manufacturing:edit'), validate(schemas.rawMaterialSchema.partial()), idempotency, async (req, res) => {
   try {
     const { name, unit, minReorder, category, materialType } = req.body;
 
@@ -335,7 +335,7 @@ router.put('/:id', authorize('manufacturing:edit'), validate(schemas.rawMaterial
 });
 
 // DELETE /api/raw-materials/:id — Delete raw material definition
-router.delete('/:id', authorize('manufacturing:delete'), async (req, res) => {
+router.delete('/:id', authorize('manufacturing:delete'), idempotency, async (req, res) => {
   try {
     const rawMaterial = await RawMaterial.findById(req.params.id);
     if (!rawMaterial) return res.status(404).json({ error: 'Raw material not found' });
@@ -400,7 +400,7 @@ router.get('/expiry-alerts', authorize('manufacturing:view'), async (req, res) =
 });
 
 // POST /api/raw-materials/entries — Inward a batch of raw material (Raw material stock entry)
-router.post('/entries', idempotency, authorize('manufacturing:create'), validate(schemas.rawMaterialEntrySchema), async (req, res) => {
+router.post('/entries', authorize('manufacturing:create'), validate(schemas.rawMaterialEntrySchema), idempotency, async (req, res) => {
   try {
     const { rawMaterialId, batchNo, qty, purchaseRate, vendorId, vendorName, expiryDate, warehouseId, manufacturingUnitId } = req.body;
     if (!rawMaterialId || !batchNo || qty === undefined || purchaseRate === undefined) {
@@ -472,7 +472,7 @@ router.post('/entries', idempotency, authorize('manufacturing:create'), validate
 });
 
 // PATCH /api/raw-materials/entries/:id/qc-status — legacy endpoint retired to prevent QC bypass.
-router.patch('/entries/:id/qc-status', authorize('manufacturing:qcApprove'), async (req, res) => {
+router.patch('/entries/:id/qc-status', authorize('manufacturing:qcApprove'), idempotency, async (req, res) => {
   try {
     const entry = await RawMaterialEntry.findById(req.params.id).select('_id qcStatus');
     if (!entry) return res.status(404).json({ error: 'Raw material entry not found' });
@@ -489,7 +489,7 @@ router.patch('/entries/:id/qc-status', authorize('manufacturing:qcApprove'), asy
 });
 
 // POST /api/raw-materials/entries/:id/clean — Record cleaning/pre‑processing loss for a stock entry
-router.post('/entries/:id/clean', authorize('manufacturing:edit'), validate(schemas.cleaningAdjustmentSchema), async (req, res) => {
+router.post('/entries/:id/clean', authorize('manufacturing:edit'), validate(schemas.cleaningAdjustmentSchema), idempotency, async (req, res) => {
   try {
     const entryId = req.params.id;
     const { cleanedQty, notes } = req.body;
@@ -527,7 +527,7 @@ router.post('/entries/:id/clean', authorize('manufacturing:edit'), validate(sche
 });
 
 // DELETE /api/raw-materials/entries/:id — Void/Delete a stock entry
-router.delete('/entries/:id', authorize('manufacturing:delete'), async (req, res) => {
+router.delete('/entries/:id', authorize('manufacturing:delete'), idempotency, async (req, res) => {
   try {
     const reason = String(req.body?.reason || '').trim();
     if (!reason) return res.status(400).json({ error: 'A reason is required when voiding a raw-material stock entry', code: 'ADJUSTMENT_REASON_REQUIRED' });
@@ -629,7 +629,7 @@ router.get('/purchases/list', authorize('manufacturing:view'), async (req, res) 
 });
 
 // POST /api/raw-materials/purchase — Create a bulk purchase (creates RawMaterialEntry records)
-router.post('/purchase', idempotency, authorize('manufacturing:create'), async (req, res) => {
+router.post('/purchase', authorize('manufacturing:create'), idempotency, async (req, res) => {
   try {
     const { vendorId, vendorName, date, items, warehouseId, manufacturingUnitId } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -688,7 +688,7 @@ router.post('/purchase', idempotency, authorize('manufacturing:create'), async (
 });
 
 // POST /api/raw-materials/:id/adjust-stock — Adjust raw material stock level with audit reason
-router.post('/:id/adjust-stock', idempotency, authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/adjust-stock', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { newStockLevel, reason, warehouseId, manufacturingUnitId } = req.body;
     if (newStockLevel === undefined || newStockLevel === null) {

@@ -4,6 +4,7 @@ const Challan = require('../../models/Challan');
 const Invoice = require('../../models/Invoice');
 const Dispatch = require('../../models/Dispatch');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { logAction } = require('../../utils/auditLogger');
@@ -84,7 +85,7 @@ router.get('/', authorize('order:view'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.patch('/:id/status', authorize('order:edit'), async (req, res) => {
+router.patch('/:id/status', authorize('order:edit'), idempotency, async (req, res) => {
   try {
     const { status } = req.body;
     if (['shipped','delivered'].includes(status)) return res.status(409).json({ error: 'Shipping and delivery status are controlled by Dispatch records.', code: 'DISPATCH_STATUS_AUTHORITY' });
@@ -100,7 +101,7 @@ router.patch('/:id/status', authorize('order:edit'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.put('/:id', authorize('order:edit'), validate(schemas.orderSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('order:edit'), validate(schemas.orderSchema.partial()), idempotency, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
@@ -120,7 +121,7 @@ router.put('/:id', authorize('order:edit'), validate(schemas.orderSchema.partial
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-router.patch('/:id/approve', authorize('order:approve'), async (req, res) => {
+router.patch('/:id/approve', authorize('order:approve'), idempotency, async (req, res) => {
   try {
     const approverId = req.user?.id || req.user?._id;
     const approverName = req.user?.name || req.user?.email;
@@ -156,7 +157,7 @@ router.patch('/:id/approve', authorize('order:approve'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.patch('/:id/reject', authorize('order:approve'), async (req, res) => {
+router.patch('/:id/reject', authorize('order:approve'), idempotency, async (req, res) => {
   try {
     const reviewerId = req.user?.id || req.user?._id;
     const reviewerName = req.user?.name || req.user?.email;
@@ -190,7 +191,7 @@ router.patch('/:id/reject', authorize('order:approve'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.patch('/:id/cancel', authorize('order:cancel'), async (req, res) => {
+router.patch('/:id/cancel', authorize('order:cancel'), idempotency, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });

@@ -3,6 +3,7 @@ const BillOfMaterials = require('../../models/BillOfMaterials');
 const Product = require('../../models/Product');
 const RawMaterial = require('../../models/RawMaterial');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const router = express.Router();
@@ -72,7 +73,7 @@ router.get('/:productId', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/bom — Configure a BOM formulation
-router.post('/', authorize('manufacturing:create'), validate(schemas.bomSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), validate(schemas.bomSchema), idempotency, async (req, res) => {
   try {
     const { productId, recipeName, isDefault, batchYieldSize, ingredients, isActive, productionNotes, overheadCost, stages, defaultProductionType, defaultJobWorkMode, defaultPackagingMode, defaultJobWorkerId, formulationBasis, formulationBasisUnit } = req.body;
     if (!productId || !batchYieldSize || !ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
@@ -210,7 +211,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.bomSchema),
 });
 
 // DELETE /api/bom/:id — Delete BOM formulation
-router.delete('/:id', authorize('manufacturing:delete'), async (req, res) => {
+router.delete('/:id', authorize('manufacturing:delete'), idempotency, async (req, res) => {
   try {
     const deleted = await BillOfMaterials.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Formulation not found' });

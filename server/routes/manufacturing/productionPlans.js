@@ -6,6 +6,7 @@ const { resolveManufacturingWarehouse } = require('../../services/manufacturingW
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const RawMaterial = require('../../models/RawMaterial');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/production-plans — Create new production plan & run aggregate raw material sufficiency check
-router.post('/', authorize('manufacturing:create'), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), idempotency, async (req, res) => {
   try {
     const { title, manufacturingUnitId, manufacturingUnitName, startDate, endDate, plannedBatches, notes } = req.body;
     if (!title || !manufacturingUnitId || !manufacturingUnitName || !plannedBatches || !Array.isArray(plannedBatches) || plannedBatches.length === 0) {
@@ -130,7 +131,7 @@ router.post('/', authorize('manufacturing:create'), async (req, res) => {
 });
 
 // PATCH /api/production-plans/:id/status — Update plan status with atomic material reservation
-router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/status', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   const { withTransaction } = require('../../utils/withTransaction');
   try {
     const { status } = req.body;
