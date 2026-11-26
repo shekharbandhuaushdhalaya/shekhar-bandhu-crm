@@ -31,16 +31,13 @@ describe('tenant-scoped idempotency', () => {
     }));
     expect(next).toHaveBeenCalledTimes(1);
     const body = { ok: true };
-    const sentJson = res.json;
-    const result = res.json(body);
+    const result = await res.json(body);
     expect(result).toBe(res);
-    await Promise.resolve();
-    await Promise.resolve();
     expect(IdempotencyKey.updateOne).toHaveBeenCalledWith(
       { _id: 'record-1', status: 'processing' },
       { $set: expect.objectContaining({ status: 'completed', response: body, completedAt: expect.any(Date) }) }
     );
-    expect(sentJson).toHaveBeenCalledWith(body);
+    expect(res.body).toEqual(body);
   });
 
   test('replays a completed request with the same fingerprint', async () => {
@@ -89,12 +86,10 @@ describe('tenant-scoped idempotency', () => {
     const failure = new Error('database unavailable');
     IdempotencyKey.updateOne.mockRejectedValueOnce(failure);
     await idempotency(req, res, next);
-    const sentJson = res.json;
-    res.json({ ok: true });
-    await Promise.resolve();
-    await Promise.resolve();
+    const originalJson = res.json;
+    await res.json({ ok: true });
     expect(next).toHaveBeenCalledWith(failure);
-    expect(sentJson).not.toHaveBeenCalledWith({ ok: true });
+    expect(originalJson).not.toHaveBeenCalledWith({ ok: true });
   });
 
   test('recovers a concurrent duplicate-key insert as in-progress or conflict', async () => {
