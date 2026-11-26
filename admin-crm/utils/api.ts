@@ -389,6 +389,7 @@ class ApiClient {
   async updateSystemSettings(data: any): Promise<any> {
     const res = await this.request(`${API_BASE}/system/settings`, {
       method: 'PUT',
+      headers: { 'Idempotency-Key': createMutationKey('system-settings-update') },
       body: JSON.stringify(data),
     });
     return res.json();
@@ -1467,7 +1468,7 @@ class ApiClient {
   }
   async createPaymentOrder(invoiceId: string): Promise<PaymentOrderResponse> {
     const res = await this.request(`${API_BASE}/payments/gateway/create-order`, {
-      method: 'POST', body: JSON.stringify({ invoiceId })
+      method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`gateway-create-order-${invoiceId}`) }, body: JSON.stringify({ invoiceId })
     });
     return res.json();
   }
