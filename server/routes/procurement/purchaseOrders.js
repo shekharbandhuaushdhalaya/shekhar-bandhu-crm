@@ -259,6 +259,12 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
           if (existing && existing.qcStatus !== 'under_test') {
             throw Object.assign(new Error(`${item.name}: batch ${item.batchNo} already has QC status ${existing.qcStatus}; receive it under a distinct batch/lot before new QC`), { statusCode: 409 });
           }
+          if (existing && String(existing.vendorId || '') !== String(po.vendorId || '')) {
+            throw Object.assign(new Error(item.name + ': supplier batch ' + item.batchNo + ' is already attributed to a different supplier; keep supplier lots separate'), {
+              statusCode: 409,
+              code: 'RAW_MATERIAL_SUPPLIER_BATCH_CONFLICT'
+            });
+          }
           if (existing) {
             existing.initialQty = Number(existing.initialQty || 0) + accepted;
             existing.qty = Number(existing.qty || 0) + accepted;
