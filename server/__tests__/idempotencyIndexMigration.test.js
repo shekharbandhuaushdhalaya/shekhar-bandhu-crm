@@ -40,6 +40,23 @@ describe('idempotency index migration safety', () => {
     expect(collection.calls.map(call => call[0])).toEqual(['createIndex', 'createIndex', 'dropIndex']);
   });
 
+  test('replaces the createdAt TTL so active processing records are retained', async () => {
+    const collection = collectionWith({
+      indexes: [
+        { name: 'idempotency_createdAt_ttl', key: { createdAt: 1 }, expireAfterSeconds: 86400 }
+      ]
+    });
+
+    await expect(migrateIdempotencyIndex(collection)).resolves.toMatchObject({
+      completedTtlIndex: COMPLETED_TTL_INDEX_NAME,
+      droppedCreatedAtTtlIndex: 'idempotency_createdAt_ttl'
+    });
+    expect(collection.calls.map(call => call[0])).toEqual(['createIndex', 'createIndex', 'dropIndex']);
+    expect(collection.calls[1][1]).toEqual({ completedAt: 1 });
+    expect(collection.calls[1][2]).toMatchObject({ expireAfterSeconds: 86400 });
+    expect(collection.calls[2][1]).toBe('idempotency_createdAt_ttl');
+  });
+
   test('retains the legacy index when creating the replacement fails', async () => {
     const collection = collectionWith({
       indexes: [{ name: 'legacy_idempotency', key: LEGACY_INDEX_KEYS }]
