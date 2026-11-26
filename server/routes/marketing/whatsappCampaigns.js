@@ -1,12 +1,14 @@
 const express = require('express');
 const { authorize } = require('../../middleware/authorize');
+const requiredIdempotency = require('../../middleware/requiredIdempotency');
 const BroadcastCampaign = require('../../models/BroadcastCampaign');
 const { enqueue } = require('../../services/jobQueue');
 
 const router = express.Router();
 
 // POST /api/whatsapp-campaigns/broadcast — Send mass WhatsApp broadcast campaign
-router.post('/broadcast', authorize('contact:create'), async (req, res) => {
+// Broadcasts create a campaign and enqueue an external-delivery job; require a key to prevent duplicate sends on retries.
+router.post('/broadcast', authorize('contact:create'), requiredIdempotency, async (req, res) => {
   try {
     const { campaignTitle, messageBody, recipientPhoneNumbers } = req.body;
 
