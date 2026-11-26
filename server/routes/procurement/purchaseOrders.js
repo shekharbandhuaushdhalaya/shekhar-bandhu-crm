@@ -496,6 +496,7 @@ router.patch('/supplier-returns/:id/dispatch', authorize('vendor:edit'), async (
     const record = await SupplierReturn.findById(req.params.id);
     if (!record) return res.status(404).json({ error: 'Supplier return not found' });
     if (record.status !== 'approved') return res.status(409).json({ error: 'Only approved returns can be dispatched' });
+    if (record.resolutionType === 'debit_note_requested') return res.status(409).json({ error: 'Debit-note-only requests do not require physical dispatch', code: 'SUPPLIER_DEBIT_NOTE_DISPATCH_NOT_REQUIRED' });
     const ref = String(req.body?.dispatchRef || '').trim();
     if (!ref) return res.status(400).json({ error: 'Dispatch/handover reference is required' });
     const filter = { _id: record._id, status: 'approved' };
@@ -517,7 +518,8 @@ router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (r
     if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated resolution identity is required' });
     const record = await SupplierReturn.findById(req.params.id);
     if (!record) return res.status(404).json({ error: 'Supplier return not found' });
-    if (record.status !== 'dispatched') return res.status(409).json({ error: 'Only dispatched returns can be resolved' });
+    const requiredResolutionStatus = record.resolutionType === 'debit_note_requested' ? 'approved' : 'dispatched';
+    if (record.status !== requiredResolutionStatus) return res.status(409).json({ error: record.resolutionType === 'debit_note_requested' ? 'Only approved debit-note requests can be resolved' : 'Only dispatched returns can be resolved' });
     const ref = String(req.body?.supplierReference || '').trim();
     if (!ref) return res.status(400).json({ error: 'Supplier replacement/debit-note reference is required' });
     const set = {
@@ -563,7 +565,7 @@ router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (r
       set.supplierDebitNoteRef = ref;
       set.supplierDebitNoteDate = noteDate;
     }
-    const filter = { _id: record._id, status: 'dispatched' };
+    const filter = { _id: record._id, status: requiredResolutionStatus };
     if (record.updatedAt) filter.updatedAt = record.updatedAt;
     const resolved = await SupplierReturn.findOneAndUpdate(
       filter, { $set: set }, { new: true, runValidators: true }

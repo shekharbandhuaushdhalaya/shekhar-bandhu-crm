@@ -80,6 +80,39 @@ describe('Supplier return lifecycle', () => {
     expect(record.save).not.toHaveBeenCalled();
   });
 
+  test('closes a debit-note-only request with supplier evidence without inventing a physical dispatch', async () => {
+    SupplierReturn.findById.mockResolvedValue({
+      _id: 'return-debit-1', returnNo: 'SR-DEBIT-1', status: 'approved',
+      resolutionType: 'debit_note_requested', qty: 2
+    });
+    SupplierReturn.findOneAndUpdate.mockResolvedValue({
+      _id: 'return-debit-1', status: 'closed', supplierDebitNoteRef: 'DN-2026-01',
+      supplierDebitNoteDate: new Date('2026-11-26')
+    });
+    const response = await request(app)
+      .patch('/api/purchase-orders/supplier-returns/return-debit-1/resolve')
+      .set('x-user-id', 'stores-1')
+      .send({ supplierReference: 'DN-2026-01', supplierDebitNoteDate: '2026-11-26' });
+    expect(response.status).toBe(200);
+    expect(SupplierReturn.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: 'return-debit-1', status: 'approved' },
+      { $set: expect.objectContaining({ status: 'closed', supplierDebitNoteRef: 'DN-2026-01' }) },
+      { new: true, runValidators: true }
+    );
+  });
+
+  test('does not require or record physical dispatch for debit-note-only requests', async () => {
+    SupplierReturn.findById.mockResolvedValue({
+      _id: 'return-debit-2', status: 'approved', resolutionType: 'debit_note_requested'
+    });
+    const response = await request(app)
+      .patch('/api/purchase-orders/supplier-returns/return-debit-2/dispatch')
+      .send({ dispatchRef: 'LR-UNNECESSARY' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('SUPPLIER_DEBIT_NOTE_DISPATCH_NOT_REQUIRED');
+    expect(SupplierReturn.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
   test('requires replacement batch evidence before closing a replacement request', async () => {
     const record = { _id: 'return-4', status: 'dispatched', resolutionType: 'replacement_requested', save: jest.fn() };
     SupplierReturn.findById.mockResolvedValue(record);
