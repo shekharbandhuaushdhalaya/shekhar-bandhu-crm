@@ -2133,6 +2133,14 @@ class ApiClient {
     });
     return res.json();
   }
+  async approveStockTransfer(id: string): Promise<StockTransfer> {
+    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/approve`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`stock-transfer-approve-${id}`) } });
+    return res.json();
+  }
+  async rejectStockTransfer(id: string, reason?: string): Promise<StockTransfer> {
+    const res = await this.request(`${API_BASE}/inventory/transfers/${id}/reject`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`stock-transfer-reject-${id}`) }, body: JSON.stringify({ reason }) });
+    return res.json();
+  }
   async shipStockTransfer(id: string): Promise<StockTransfer> {
     const res = await this.request(`${API_BASE}/inventory/transfers/${id}/ship`, { method: 'PATCH', headers: { 'Idempotency-Key': `stock-transfer-ship-${id}` } });
     return res.json();
