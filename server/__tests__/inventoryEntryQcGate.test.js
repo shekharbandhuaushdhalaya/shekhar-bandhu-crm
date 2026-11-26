@@ -37,6 +37,7 @@ describe('Manual finished-goods receipt QC gate', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    withTransaction.mockImplementation(callback => callback({}));
   });
 
   test.each(['approved', 'rejected'])(
