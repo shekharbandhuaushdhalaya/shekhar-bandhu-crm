@@ -82,7 +82,7 @@ router.get('/', async (req, res) => {
     const inventoryMap = await inventoryUnitsByProduct(products.map(p => p._id));
     res.json(products.map(p => publicProduct(p, inventoryMap[String(p._id)] || 0)));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to retrieve public products' });
   }
 });
 
@@ -103,7 +103,7 @@ router.get('/:id', async (req, res) => {
     const selected = publicProduct(product, inventoryMap[String(product._id)] || 0);
     res.json({ ...selected, variants: enrichedVariants });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to retrieve public products' });
   }
 });
 
@@ -134,7 +134,7 @@ router.post('/:id/rate', ratingLimiter, validate(z.object({ rating: z.number().m
     req.io?.emit('product_updated', { type: 'rated', id: product._id });
     res.json({ rating: product.rating, ratingCount: product.ratingCount });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to submit product rating' });
   }
 });
 

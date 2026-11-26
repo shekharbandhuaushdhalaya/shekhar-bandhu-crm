@@ -7,6 +7,9 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const Customer = require('../models/Customer');
 const Invoice = require('../models/Invoice');
 const Firm = require('../models/Firm');
+const Product = require('../models/Product');
+const publicProductRoutes = require('../routes/public/products');
+const { publicTenant } = require('../middleware/publicTenant');
 const portalAuthRoutes = require('../routes/public/portalAuth');
 const portalRoutes = require('../routes/portal/portal');
 
@@ -22,6 +25,7 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
     app.use(express.json());
     app.use('/api/portal/auth', portalAuthRoutes);
     app.use('/api/portal', portalRoutes);
+    app.use('/api/public/products', publicTenant, publicProductRoutes);
   }, 30000);
 
   afterAll(async () => {
@@ -152,6 +156,30 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
     // Customer-scoped lookups deliberately return 404 to avoid disclosing another customer's invoice.
     expect(pdfResB.status).toBe(404);
     expect(pdfResB.body.error).toContain('Invoice not found');
+  });
+
+  it('does not expose internal errors from public product endpoints', async () => {
+    const listFailure = jest.spyOn(Product, 'find').mockReturnValueOnce({
+      select: () => ({ sort: () => ({ lean: () => Promise.reject(new Error('private database connection string')) }) }),
+    });
+    const listRes = await request(app).get('/api/public/products');
+    expect(listRes.status).toBe(500);
+    expect(listRes.body.error).toBe('Unable to retrieve public products');
+    listFailure.mockRestore();
+
+    const detailFailure = jest.spyOn(Product, 'findById').mockReturnValueOnce({
+      select: () => ({ lean: () => Promise.reject(new Error('internal query details')) }),
+    });
+    const detailRes = await request(app).get('/api/public/products/507f1f77bcf86cd799439011');
+    expect(detailRes.status).toBe(500);
+    expect(detailRes.body.error).toBe('Unable to retrieve public products');
+    detailFailure.mockRestore();
+
+    const ratingFailure = jest.spyOn(Product, 'findById').mockRejectedValueOnce(new Error('internal rating details'));
+    const ratingRes = await request(app).post('/api/public/products/507f1f77bcf86cd799439011/rate').send({ rating: 5 });
+    expect(ratingRes.status).toBe(500);
+    expect(ratingRes.body.error).toBe('Unable to submit product rating');
+    ratingFailure.mockRestore();
   });
 
   it('does not expose database details for invalid portal catalog identifiers', async () => {
