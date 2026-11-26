@@ -1,6 +1,7 @@
 const express = require('express');
 const Equipment = require('../../models/Equipment');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
@@ -26,7 +27,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', authorize('manufacturing:create'), validate(schemas.equipmentSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), validate(schemas.equipmentSchema), idempotency, async (req, res) => {
   try {
     const item = await Equipment.create({ ...req.body, status: 'calibration_due', calibrationDueDate: null, calibrationLogs: [] });
     if (req.io) req.io.emit('equipment_updated', { type: 'created', id: item._id });
@@ -34,7 +35,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.equipmentSc
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.put('/:id', authorize('manufacturing:edit'), async (req, res) => {
+router.put('/:id', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     if (['calibrationDueDate', 'calibrationLogs', 'status'].some(key => Object.prototype.hasOwnProperty.call(req.body, key))) {
       return res.status(400).json({ error: 'Equipment status and calibration evidence can only be changed through controlled workflows' });
@@ -49,7 +50,7 @@ router.put('/:id', authorize('manufacturing:edit'), async (req, res) => {
 });
 
 // Record calibration evidence; equipment remains unavailable pending independent verification.
-router.post('/:id/calibrate', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/calibrate', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { certificateNo, certificateRef, calibratedOn, nextCalibrationDue, notes } = req.body;
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated calibration recorder identity is required' });
@@ -77,7 +78,7 @@ router.post('/:id/calibrate', authorize('manufacturing:edit'), async (req, res) 
 });
 
 // Independent reviewer verifies the recorded certificate reference before equipment activation.
-router.patch('/:id/calibrations/:index/verify', authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/calibrations/:index/verify', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated calibration reviewer identity is required' });
     const item = await Equipment.findById(req.params.id);
@@ -110,7 +111,7 @@ router.patch('/:id/calibrations/:index/verify', authorize('manufacturing:edit'),
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.post('/:id/maintenance', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/maintenance', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { type = 'preventive', details, cost } = req.body;
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated maintenance recorder identity is required' });

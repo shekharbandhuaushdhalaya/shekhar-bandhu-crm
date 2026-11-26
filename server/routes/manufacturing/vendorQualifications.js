@@ -4,6 +4,7 @@ const VendorQualification = require('../../models/VendorQualification');
 const Vendor = require('../../models/Vendor');
 const RawMaterial = require('../../models/RawMaterial');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/vendor-qualifications — Record a supplier audit with explicit evidence.
-router.post('/', authorize('manufacturing:qcApprove'), async (req, res) => {
+router.post('/', authorize('manufacturing:qcApprove'), idempotency, async (req, res) => {
   try {
     const {
       vendorId, qualificationStatus = 'conditional', auditDate, nextAuditDue,
@@ -101,7 +102,7 @@ router.post('/', authorize('manufacturing:qcApprove'), async (req, res) => {
 
 
 // PATCH /api/vendor-qualifications/:id/verify — independent review of a supplier audit.
-router.patch('/:id/verify', authorize('manufacturing:qcApprove'), async (req, res) => {
+router.patch('/:id/verify', authorize('manufacturing:qcApprove'), idempotency, async (req, res) => {
   try {
     const record = await VendorQualification.findById(req.params.id);
     if (!record) return res.status(404).json({ error: 'Vendor qualification record not found' });

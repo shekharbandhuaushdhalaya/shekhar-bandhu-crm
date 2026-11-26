@@ -3,6 +3,7 @@ const RetentionSample = require('../../models/RetentionSample');
 const BatchProduction = require('../../models/BatchProduction');
 const Product = require('../../models/Product');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -27,7 +28,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/retention-samples — Log new retention sample
-router.post('/', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { batchId, qtyRetained, unit = 'units', storageLocation, retentionUntil } = req.body;
     if (!batchId || !qtyRetained || qtyRetained <= 0) {
@@ -82,7 +83,7 @@ router.get('/due-for-disposal', authorize('manufacturing:view'), async (req, res
 });
 
 // PATCH /api/retention-samples/:id/dispose — Mark reference sample as disposed with method & witness
-router.patch('/:id/dispose', authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/dispose', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { disposalNotes, disposalMethod = 'autoclaving', witnessedBy = '', status = 'disposed' } = req.body;
 

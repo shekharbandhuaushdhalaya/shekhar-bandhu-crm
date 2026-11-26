@@ -1,6 +1,7 @@
 const express = require('express');
 const TrainingRecord = require('../../models/TrainingRecord');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const router = express.Router();
 
 router.get('/', authorize('manufacturing:view'), async (req, res) => {
@@ -15,7 +16,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { userId, topic, trainedOn, validUntil, certificateRef } = req.body;
     if (!userId || !topic || !trainedOn || !validUntil || !certificateRef) return res.status(400).json({ error: 'Operator, training topic, training date, validity date and certificate evidence reference are required' });
@@ -31,7 +32,7 @@ router.post('/', authorize('manufacturing:edit'), async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.patch('/:id/verify', authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/verify', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated training reviewer identity is required' });
     const record = await TrainingRecord.findById(req.params.id);
