@@ -89,7 +89,7 @@ router.post('/', idempotency, authorize('payment:create'), validate(schemas.paym
 });
 
 // DELETE /api/payments/:id — controlled, reasoned, maker-checker payment reversal
-router.delete('/:id', authorize('payment:create'), async (req, res) => {
+router.delete('/:id', idempotency, authorize('payment:create'), async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
     if (!payment) return res.status(404).json({ error: 'Payment not found' });
@@ -260,7 +260,7 @@ router.get('/payables/ageing', authorize('payment:view'), async (req, res) => {
 });
 
 // POST /api/payments/allocate — Match an existing unallocated payment against owned finalized invoices
-router.post('/allocate', authorize('payment:create'), validate(schemas.paymentAllocateSchema), async (req, res) => {
+router.post('/allocate', idempotency, authorize('payment:create'), validate(schemas.paymentAllocateSchema), async (req, res) => {
   try {
     const actorId = req.user?.id || req.user?._id;
     const actorName = req.user?.name || req.user?.email;

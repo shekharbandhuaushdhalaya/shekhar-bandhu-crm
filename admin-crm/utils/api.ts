@@ -1209,7 +1209,7 @@ class ApiClient {
     return res.json();
   }
   async deletePayment(id: string, reason = ''): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/payments/${id}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
+    const res = await this.request(`${API_BASE}/payments/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': `payment-reversal-${id}` }, body: JSON.stringify({ reason }) });
     return res.ok;
   }
 
@@ -1716,10 +1716,10 @@ class ApiClient {
     return res.json();
   }
 
-  async allocatePayment(paymentId: string, allocations: Array<{ invoiceId: string, amount: number }>): Promise<any> {
+  async allocatePayment(paymentId: string, allocations: Array<{ invoiceId: string, amount: number }>, idempotencyKey?: string): Promise<any> {
     const res = await this.request(`${API_BASE}/payments/allocate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey || createMutationKey(`payment-allocation-${paymentId}`) },
       body: JSON.stringify({ paymentId, allocations })
     });
     return res.json();
