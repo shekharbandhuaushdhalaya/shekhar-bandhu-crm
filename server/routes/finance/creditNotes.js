@@ -166,14 +166,27 @@ router.patch('/:id/finalize', authorize('invoice:finalize'), async (req, res) =>
 
 router.patch('/:id/cancel', authorize('invoice:delete'), async (req, res) => {
   try {
-    const linkedReturn = await SalesReturn.exists({ creditNoteId: req.params.id, status: { $in: ['posted', 'reversed'] } });
-    if (linkedReturn) return res.status(409).json({ error: 'This credit note is controlled by a Sales Return. Reverse the Sales Return instead.', code: 'SALES_RETURN_CONTROLS_NOTE' });
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = String(req.user?.name || req.user?.email || '').trim();
+    const reason = String(req.body?.reason || '').trim();
+    if (!actorId || !actorName || reason.length < 10) {
+      return res.status(400).json({ error: 'Authenticated cancellation identity and a substantive reason of at least 10 characters are required', code: 'NOTE_CANCELLATION_EVIDENCE_REQUIRED' });
+    }
     const note = await withTransaction(async session => {
       const locked = await CreditNote.findById(req.params.id).session(session);
       if (!locked) throw Object.assign(new Error('Note not found'), { status: 404, code: 'NOTE_NOT_FOUND' });
       if (locked.status !== 'finalized') throw Object.assign(new Error('Only finalized notes can be cancelled'), { status: 409, code: 'NOTE_NOT_FINALIZED' });
+      if (locked.finalizedBy && String(locked.finalizedBy) === String(actorId)) {
+        throw Object.assign(new Error('The person who finalized the credit/debit note cannot independently cancel it'), { status: 403, code: 'NOTE_CANCELLATION_MAKER_CHECKER_REQUIRED' });
+      }
+      const linkedReturn = await SalesReturn.exists({ creditNoteId: locked._id, status: { $in: ['posted', 'reversed'] } }).session(session);
+      if (linkedReturn) throw Object.assign(new Error('This credit note is controlled by a Sales Return. Reverse the Sales Return instead.'), { status: 409, code: 'SALES_RETURN_CONTROLS_NOTE' });
       await applyNoteBalance(locked, -1, session);
       locked.status = 'cancelled';
+      locked.cancelledBy = actorId;
+      locked.cancelledByName = actorName;
+      locked.cancelledAt = new Date();
+      locked.cancellationReason = reason.slice(0, 1000);
       await locked.save({ session });
       return locked;
     });
