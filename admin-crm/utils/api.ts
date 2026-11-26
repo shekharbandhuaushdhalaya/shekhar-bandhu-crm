@@ -630,20 +630,20 @@ class ApiClient {
     return res.json();
   }
   async createProduct(data: Partial<Product>): Promise<Product> {
-    const res = await this.request(`${API_BASE}/products`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/products`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('product-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateProduct(id: string, data: Partial<Product>): Promise<Product> {
-    const res = await this.request(`${API_BASE}/products/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/products/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`product-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteProduct(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/products/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/products/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`product-delete-${id}`) } });
     return res.ok;
   }
 
   async updateProductPricing(id: string, data: { price?: number; discount?: number; discountLabel?: string; websitePromoActive?: boolean }): Promise<Product> {
-    const res = await this.request(`${API_BASE}/products/${id}/pricing`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/products/${id}/pricing`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`product-pricing-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
 
@@ -800,11 +800,11 @@ class ApiClient {
     return res.json();
   }
   async createChallan(data: Partial<Challan>): Promise<Challan> {
-    const res = await this.request(`${API_BASE}/challans`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/challans`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('challan-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateChallan(id: string, data: Partial<Challan>): Promise<Challan> {
-    const res = await this.request(`${API_BASE}/challans/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/challans/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`challan-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async finalizeChallan(id: string): Promise<Challan> {
@@ -823,7 +823,7 @@ class ApiClient {
     return res.json();
   }
   async deleteChallan(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/challans/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/challans/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`challan-delete-${id}`) } });
     return res.ok;
   }
 
@@ -886,19 +886,19 @@ class ApiClient {
     return res.json();
   }
   async createPurchaseRequisition(data: { department: string; justification: string; requiredByDate?: string | null; items: Array<{ itemType: 'raw_material' | 'finished_product'; rawMaterialId?: string; productId?: string; name: string; qtyRequested: number; unit: string; estimatedUnitPrice?: number | null }> }): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-requisitions`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/purchase-requisitions`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('purchase-requisition-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async submitPurchaseRequisition(id: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/submit`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/submit`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`purchase-requisition-submit-${id}`) } });
     return res.json();
   }
   async approvePurchaseRequisition(id: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/approve`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/approve`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`purchase-requisition-approve-${id}`) } });
     return res.json();
   }
   async rejectPurchaseRequisition(id: string, reason: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) });
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${id}/reject`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`purchase-requisition-reject-${id}`) }, body: JSON.stringify({ reason }) });
     return res.json();
   }
   async getSupplierQuotations(requisitionId: string): Promise<any> {
@@ -906,7 +906,7 @@ class ApiClient {
     return res.json();
   }
   async selectSupplierQuotation(requisitionId: string, quotationId: string, reviewNotes: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-requisitions/${requisitionId}/quotations/${quotationId}/select`, { method: 'PATCH', body: JSON.stringify({ reviewNotes }) });
+    const res = await this.request(`${API_BASE}/purchase-requisitions/${requisitionId}/quotations/${quotationId}/select`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`supplier-quotation-select-${requisitionId}-${quotationId}`) }, body: JSON.stringify({ reviewNotes }) });
     return res.json();
   }
 
@@ -922,11 +922,11 @@ class ApiClient {
       unit?: string; methodReference: string; mandatory?: boolean;
     }>; sourceNote?: string;
   }): Promise<any> {
-    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('raw-material-quality-spec-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async approveRawMaterialQualitySpecification(id: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications/${id}/approve`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/manufacturing/raw-material-quality-specifications/${id}/approve`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`raw-material-quality-spec-approve-${id}`) } });
     return res.json();
   }
 
@@ -939,20 +939,20 @@ class ApiClient {
     herbName: string; botanicalName?: string; batchNo: string; supplierName: string;
     qty: number; unit: string; expiryDate: string; rawMaterialId: string; rawMaterialEntryId: string;
   }): Promise<any> {
-    const res = await this.request(`${API_BASE}/manufacturing/quarantine`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('quarantine-register') }, body: JSON.stringify(data) });
     return res.json();
   }
   async recordIncomingInspection(id: string, inspectionResults: Array<{
     testCode: string; testName: string; methodReference: string; specification: string;
     result: string; unit?: string; outcome: 'pass' | 'fail'; evidenceRef?: string;
   }>): Promise<any> {
-    const res = await this.request(`${API_BASE}/manufacturing/quarantine/${id}/inspection`, { method: 'PATCH', body: JSON.stringify({ inspectionResults }) });
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine/${id}/inspection`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`quarantine-inspection-${id}`) }, body: JSON.stringify({ inspectionResults }) });
     return res.json();
   }
   async disposeQuarantineLot(id: string, data: {
     quarantineStatus: 'released' | 'rejected'; testReportNo: string; remarks: string;
   }): Promise<any> {
-    const res = await this.request(`${API_BASE}/manufacturing/quarantine/${id}/release`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/manufacturing/quarantine/${id}/release`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`quarantine-release-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
 
@@ -973,7 +973,7 @@ class ApiClient {
     return res.json();
   }
   async verifyGoodsReceivedNote(id: string, data: { decision: 'verified' | 'rejected'; verificationNotes: string; rejectionReason?: string }): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/verify`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/verify`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`grn-verify-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async getSupplierReturnsForGrn(id: string): Promise<any[]> {
@@ -981,19 +981,19 @@ class ApiClient {
     return res.json();
   }
   async createSupplierReturnForGrn(id: string, data: { itemIndex: number; qty: number; reason: string; resolutionType: 'return_to_supplier' | 'replacement_requested' | 'debit_note_requested' }): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/supplier-returns`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/purchase-orders/grn/${id}/supplier-returns`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`grn-supplier-return-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async reviewSupplierReturn(id: string, data: { decision: 'approved' | 'rejected'; reviewNotes: string; rejectionReason?: string }): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/approve`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/approve`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`supplier-return-approve-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async dispatchSupplierReturn(id: string, dispatchRef: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/dispatch`, { method: 'PATCH', body: JSON.stringify({ dispatchRef }) });
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/dispatch`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`supplier-return-dispatch-${id}`) }, body: JSON.stringify({ dispatchRef }) });
     return res.json();
   }
   async resolveSupplierReturn(id: string, data: { supplierReference: string; replacementBatchNo?: string; supplierDebitNoteDate?: string }): Promise<any> {
-    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/resolve`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/purchase-orders/supplier-returns/${id}/resolve`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`supplier-return-resolve-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
 
