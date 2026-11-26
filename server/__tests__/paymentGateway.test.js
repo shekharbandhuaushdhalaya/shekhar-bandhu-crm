@@ -3,6 +3,7 @@ const request = require('supertest');
 const crypto = require('crypto');
 const SystemSettings = require('../models/SystemSettings');
 const Invoice = require('../models/Invoice');
+const WebhookEvent = require('../models/WebhookEvent');
 const { postGatewayPayment } = require('../services/paymentPostingService');
 const paymentGatewayRouter = require('../routes/finance/paymentGateway');
 
@@ -11,6 +12,7 @@ jest.mock('../models/Invoice');
 jest.mock('../services/paymentPostingService', () => ({ postGatewayPayment: jest.fn() }));
 jest.mock('../models/WebhookEvent', () => ({
   create: jest.fn().mockResolvedValue({ _id: 'mock_event_id' }),
+  findOneAndUpdate: jest.fn(),
   updateOne: jest.fn().mockResolvedValue({ nModified: 1 }),
 }));
 jest.mock('../models/RolePermission', () => ({
@@ -171,6 +173,71 @@ describe('Payment Gateway - Money Critical Paths', () => {
         transactionId: 'pay_webhook123',
         gatewayOrderId: 'order_webhook456',
       }));
+    });
+
+    test('retries a previously failed webhook event instead of dropping it as a duplicate', async () => {
+      const mockInvoice = {
+        _id: '507f1f77bcf86cd799439011',
+        customerId: '507f1f77bcf86cd799439012',
+        type: 'sale',
+        isFinalized: true,
+        status: 'unpaid',
+        amount: 100,
+        amountPaid: 0,
+        gatewayOrderId: 'order_retry456',
+      };
+      const mockSettings = { razorpayWebhookSecret: 'webhook_secret_key' };
+      SystemSettings.findOne.mockReturnValue(mockFindOne(mockSettings));
+      Invoice.findOne.mockResolvedValue(mockInvoice);
+      WebhookEvent.create.mockRejectedValue(Object.assign(new Error('duplicate'), { code: 11000 }));
+      WebhookEvent.findOneAndUpdate.mockResolvedValue({ status: 'processing' });
+      postGatewayPayment.mockResolvedValue({ invoice: mockInvoice, payment: { _id: 'payment-retry' } });
+
+      const payload = {
+        event: 'payment.captured',
+        payload: { payment: { entity: {
+          id: 'pay_retry123', order_id: 'order_retry456', amount: 10000,
+          notes: { firmId: '507f1f77bcf86cd799439099', invoiceId: '507f1f77bcf86cd799439011' },
+        } } },
+      };
+      const raw = JSON.stringify(payload);
+      const signature = crypto.createHmac('sha256', mockSettings.razorpayWebhookSecret).update(Buffer.from(raw)).digest('hex');
+      const response = await request(app).post('/api/payments/gateway/webhook')
+        .set('x-razorpay-signature', signature)
+        .set('x-razorpay-event-id', 'evt_retry_001')
+        .set('Content-Type', 'application/json').send(raw);
+
+      expect(response.status).toBe(200);
+      expect(WebhookEvent.findOneAndUpdate).toHaveBeenCalledWith(
+        { provider: 'razorpay', eventId: 'evt_retry_001', status: { $in: ['failed', 'received'] } },
+        { $set: { status: 'processing', lastError: '' }, $inc: { attempts: 1 } },
+        { new: true }
+      );
+      expect(postGatewayPayment).toHaveBeenCalled();
+      expect(WebhookEvent.updateOne).toHaveBeenCalledWith(
+        { provider: 'razorpay', eventId: 'evt_retry_001' },
+        { $set: { status: 'processed', processedAt: expect.any(Date) } }
+      );
+    });
+
+    test('does not reprocess an event already processed or currently claimed', async () => {
+      const mockSettings = { razorpayWebhookSecret: 'webhook_secret_key' };
+      SystemSettings.findOne.mockReturnValue(mockFindOne(mockSettings));
+      WebhookEvent.create.mockRejectedValue(Object.assign(new Error('duplicate'), { code: 11000 }));
+      WebhookEvent.findOneAndUpdate.mockResolvedValue(null);
+      const payload = {
+        event: 'payment.captured',
+        payload: { payment: { entity: { notes: { firmId: '507f1f77bcf86cd799439099' } } } },
+      };
+      const raw = JSON.stringify(payload);
+      const signature = crypto.createHmac('sha256', mockSettings.razorpayWebhookSecret).update(Buffer.from(raw)).digest('hex');
+      const response = await request(app).post('/api/payments/gateway/webhook')
+        .set('x-razorpay-signature', signature)
+        .set('x-razorpay-event-id', 'evt_already_done')
+        .set('Content-Type', 'application/json').send(raw);
+      expect(response.status).toBe(200);
+      expect(response.body.duplicate).toBe(true);
+      expect(postGatewayPayment).not.toHaveBeenCalled();
     });
 
     test('rejects webhook on invalid signature', async () => {

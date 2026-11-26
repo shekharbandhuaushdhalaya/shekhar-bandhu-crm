@@ -89,10 +89,18 @@ router.post('/webhook', async (req, res) => {
       const expected = crypto.createHmac('sha256', webhookSecret).update(raw).digest('hex');
       if (!secureEqualHex(expected, req.headers['x-razorpay-signature'])) throw Object.assign(new Error('Invalid webhook signature'), { code: 'INVALID_WEBHOOK_SIGNATURE' });
       try {
-        await WebhookEvent.create({ provider: 'razorpay', eventId, eventType: event, signatureValid: true, payload: req.body, status: 'received' });
+        await WebhookEvent.create({ provider: 'razorpay', eventId, eventType: event, signatureValid: true, payload: req.body, status: 'processing' });
       } catch (error) {
-        if (error.code === 11000) return { duplicate: true };
-        throw error;
+        if (error.code !== 11000) throw error;
+        // Only retry events whose prior processing attempt failed or was left
+        // in the initial received state. A conditional update makes the claim
+        // atomic so concurrent provider retries cannot process the same event.
+        const retry = await WebhookEvent.findOneAndUpdate(
+          { provider: 'razorpay', eventId, status: { $in: ['failed', 'received'] } },
+          { $set: { status: 'processing', lastError: '' }, $inc: { attempts: 1 } },
+          { new: true }
+        );
+        if (!retry) return { duplicate: true };
       }
       if (['payment.captured','order.paid'].includes(event) && invoiceId) {
         const invoice = await Invoice.findOne({ _id: invoiceId, type: 'sale', isFinalized: true });
