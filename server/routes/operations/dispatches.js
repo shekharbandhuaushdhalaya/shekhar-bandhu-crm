@@ -69,7 +69,7 @@ router.get('/', authorize('dispatch:view'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/', idempotency, authorize('dispatch:create'), validate(schemas.dispatchSchema), async (req, res) => {
+router.post('/', authorize('dispatch:create'), validate(schemas.dispatchSchema), idempotency, async (req, res) => {
   try {
     if (!req.body.challanId) return res.status(400).json({ error: 'challanId is required', code: 'CHALLAN_REQUIRED' });
     const actorId = req.user?.id || req.user?._id;

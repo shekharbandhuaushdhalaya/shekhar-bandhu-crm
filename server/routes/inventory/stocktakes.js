@@ -73,7 +73,7 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
 // PATCH /api/stocktakes/:id/complete — Complete stocktake atomically.
 // The count can only post if stock has not moved since the expected quantity snapshot;
 // otherwise the operator must refresh/recount instead of overwriting newer movements.
-router.patch('/:id/complete', idempotency, authorize('inventory:edit'), async (req, res) => {
+router.patch('/:id/complete', authorize('inventory:edit'), idempotency, async (req, res) => {
   try {
     const completed = await withTransaction(async session => {
       const stocktake = await Stocktake.findById(req.params.id).session(session);

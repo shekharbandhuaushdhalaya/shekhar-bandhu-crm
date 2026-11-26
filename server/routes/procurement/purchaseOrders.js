@@ -222,7 +222,7 @@ router.patch('/:id/approve', authorize('vendor:edit'), async (req, res) => {
 
 // Create a GRN and inward accepted goods atomically. Accepted receipts remain under_test
 // until QC explicitly approves their InventoryEntry/RawMaterialEntry.
-router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.grnSchema), async (req, res) => {
+router.post('/:id/grn', authorize('vendor:edit'), validate(schemas.grnSchema), idempotency, async (req, res) => {
   try {
     if (!(req.user?.id || req.user?._id) || !(req.user?.name || req.user?.email)) {
       return res.status(403).json({ error: 'Authenticated goods-receiver identity is required to record a GRN' });

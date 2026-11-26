@@ -226,7 +226,7 @@ router.put('/:id', authorize('challan:edit'), validate(schemas.challanSchema.par
 });
 
 // PATCH /api/challans/:id/finalize — post the authoritative physical-goods transaction
-router.patch('/:id/finalize', idempotency, authorize('challan:finalize'), async (req, res) => {
+router.patch('/:id/finalize', authorize('challan:finalize'), idempotency, async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found' });
@@ -265,7 +265,7 @@ router.patch('/:id/finalize', idempotency, authorize('challan:finalize'), async 
 });
 
 // POST /api/challans/:id/reverse — controlled compensating reversal for a posted Challan
-router.post('/:id/reverse', idempotency, authorize('challan:delete'), async (req, res) => {
+router.post('/:id/reverse', authorize('challan:delete'), idempotency, async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found', code: 'CHALLAN_NOT_FOUND' });
@@ -313,7 +313,7 @@ function getFinancialYearString(date = new Date()) {
 }
 
 // POST /api/challans/:id/convert — Create the financial invoice derived from a posted Sale Challan.
-router.post('/:id/convert', idempotency, authorize('invoice:create'), async (req, res) => {
+router.post('/:id/convert', authorize('invoice:create'), idempotency, async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found', code: 'CHALLAN_NOT_FOUND' });
