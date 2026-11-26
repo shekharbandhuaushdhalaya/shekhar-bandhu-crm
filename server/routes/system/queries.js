@@ -4,6 +4,7 @@ const Contact = require('../../models/Contact');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.get('/', authorize('contact:view'), async (req, res) => {
 });
 
 // PATCH /api/queries/:id/status — Update query status (Authenticated)
-router.patch('/:id/status', authorize('contact:edit'), async (req, res) => {
+router.patch('/:id/status', authorize('contact:edit'), idempotency, async (req, res) => {
   try {
     const { status } = req.body;
     if (!['pending', 'contacted', 'converted', 'closed'].includes(status)) {
@@ -44,7 +45,7 @@ router.patch('/:id/status', authorize('contact:edit'), async (req, res) => {
 });
 
 // POST /api/queries/:id/convert — Convert query to CRM Lead Contact (Authenticated)
-router.post('/:id/convert', authorize('contact:create'), validate(schemas.queryConvertSchema), async (req, res) => {
+router.post('/:id/convert', authorize('contact:create'), validate(schemas.queryConvertSchema), idempotency, async (req, res) => {
   try {
     const queryDoc = await ProductQuery.findById(req.params.id);
     if (!queryDoc) return res.status(404).json({ error: 'Query not found' });

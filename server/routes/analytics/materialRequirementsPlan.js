@@ -6,6 +6,7 @@ const BillOfMaterials = require('../../models/BillOfMaterials');
 const ProductionPlan = require('../../models/ProductionPlan');
 const Warehouse = require('../../models/Warehouse');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { computeDemandForecast } = require('./demandForecasting');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
@@ -143,7 +144,7 @@ router.get('/', authorize('report:view'), async (req, res) => {
 });
 
 // POST /api/analytics/material-requirements-plan/create-production-plans — Create draft production plans for shortfall products
-router.post('/create-production-plans', authorize('manufacturing:create'), async (req, res) => {
+router.post('/create-production-plans', authorize('manufacturing:create'), idempotency, async (req, res) => {
   try {
     const { productIds } = req.body;
     const forecasts = await computeDemandForecast();
