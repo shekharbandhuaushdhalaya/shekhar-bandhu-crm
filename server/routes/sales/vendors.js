@@ -3,6 +3,7 @@ const Vendor = require('../../models/Vendor');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
@@ -54,7 +55,7 @@ router.get('/', authorize('vendor:view'), async (req, res) => {
 });
 
 // POST /api/vendors — Create new vendor
-router.post('/', authorize('vendor:create'), validate(schemas.vendorSchema), async (req, res) => {
+router.post('/', authorize('vendor:create'), validate(schemas.vendorSchema), idempotency, async (req, res) => {
   try {
     const data = {
       ...req.body,
@@ -80,7 +81,7 @@ router.post('/', authorize('vendor:create'), validate(schemas.vendorSchema), asy
 });
 
 // PUT /api/vendors/:id — Update vendor details
-router.put('/:id', authorize('vendor:edit'), validate(schemas.vendorSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('vendor:edit'), validate(schemas.vendorSchema.partial()), idempotency, async (req, res) => {
   try {
     const data = { ...req.body };
     if (req.body.displayName || req.body.name) {
@@ -116,7 +117,7 @@ router.put('/:id', authorize('vendor:edit'), validate(schemas.vendorSchema.parti
 });
 
 // DELETE /api/vendors/:id — Remove vendor
-router.delete('/:id', authorize('vendor:delete'), async (req, res) => {
+router.delete('/:id', authorize('vendor:delete'), idempotency, async (req, res) => {
   try {
     const vendor = await Vendor.findByIdAndDelete(req.params.id);
     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });

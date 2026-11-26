@@ -1,6 +1,7 @@
 const express = require('express');
 const DripCampaign = require('../../models/DripCampaign');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.get('/', authorize('contact:view'), async (req, res) => {
 });
 
 // POST /api/drip-campaigns — Create automated drip campaign
-router.post('/', authorize('contact:create'), async (req, res) => {
+router.post('/', authorize('contact:create'), idempotency, async (req, res) => {
   try {
     const { name, targetAudience = 'leads', channel = 'whatsapp', steps } = req.body;
     if (!name || !steps || !Array.isArray(steps) || steps.length === 0) {
@@ -37,7 +38,7 @@ router.post('/', authorize('contact:create'), async (req, res) => {
 });
 
 // PATCH /api/drip-campaigns/:id/status — Pause or activate campaign
-router.patch('/:id/status', authorize('contact:edit'), async (req, res) => {
+router.patch('/:id/status', authorize('contact:edit'), idempotency, async (req, res) => {
   try {
     const { status } = req.body;
     const campaign = await DripCampaign.findByIdAndUpdate(req.params.id, { status }, { new: true });

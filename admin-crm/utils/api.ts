@@ -506,15 +506,15 @@ class ApiClient {
     return res.json();
   }
   async createTask(data: Partial<Task>): Promise<Task> {
-    const res = await this.request(`${API_BASE}/tasks`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/tasks`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('task-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async toggleTask(id: string): Promise<Task> {
-    const res = await this.request(`${API_BASE}/tasks/${id}/toggle`, { method: 'PUT' });
+    const res = await this.request(`${API_BASE}/tasks/${id}/toggle`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`task-toggle-${id}`) } });
     return res.json();
   }
   async deleteTask(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/tasks/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/tasks/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`task-delete-${id}`) } });
     return res.ok;
   }
 
@@ -576,15 +576,15 @@ class ApiClient {
     return res.json();
   }
   async createVendor(data: Partial<Vendor>): Promise<Vendor> {
-    const res = await this.request(`${API_BASE}/vendors`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/vendors`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('vendor-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateVendor(id: string, data: Partial<Vendor>): Promise<Vendor> {
-    const res = await this.request(`${API_BASE}/vendors/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/vendors/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`vendor-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteVendor(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/vendors/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/vendors/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`vendor-delete-${id}`) } });
     return res.ok;
   }
   async getSupplierScorecard(id: string): Promise<any> {
@@ -1042,20 +1042,20 @@ class ApiClient {
     return res.json();
   }
   async createQuotation(data: Partial<Quotation>): Promise<Quotation> {
-    const res = await this.request(`${API_BASE}/quotations`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/quotations`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('quotation-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateQuotation(id: string, data?: Partial<Quotation>): Promise<Quotation> {
-    if (!data) return this.request(`${API_BASE}/quotations/${id}/finalize`, { method: 'PATCH' }).then(r => r.json());
-    const res = await this.request(`${API_BASE}/quotations/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    if (!data) return this.request(`${API_BASE}/quotations/${id}/finalize`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`quotation-finalize-${id}`) } }).then(r => r.json());
+    const res = await this.request(`${API_BASE}/quotations/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`quotation-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteQuotation(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/quotations/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/quotations/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`quotation-delete-${id}`) } });
     return res.ok;
   }
   async convertQuotationToChallan(id: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/quotations/${id}/convert-to-challan`, { method: 'POST' });
+    const res = await this.request(`${API_BASE}/quotations/${id}/convert-to-challan`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`quotation-convert-${id}`) } });
     return res.json();
   }
 

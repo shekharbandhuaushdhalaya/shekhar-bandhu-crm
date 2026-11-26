@@ -3,6 +3,7 @@ const Quotation = require('../../models/Quotation');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 const { logAction } = require('../../utils/auditLogger');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const Challan = require('../../models/Challan');
@@ -35,7 +36,7 @@ router.get('/', authorize('quotation:view'), async (req, res) => {
 });
 
 // POST /api/quotations — Create quotation
-router.post('/', authorize('quotation:create'), validate(schemas.quotationSchema), async (req, res) => {
+router.post('/', authorize('quotation:create'), validate(schemas.quotationSchema), idempotency, async (req, res) => {
   try {
     const data = {
       ...req.body,
@@ -59,7 +60,7 @@ router.post('/', authorize('quotation:create'), validate(schemas.quotationSchema
 });
 
 // PUT /api/quotations/:id — Edit quotation
-router.put('/:id', authorize('quotation:edit'), validate(schemas.quotationSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('quotation:edit'), validate(schemas.quotationSchema.partial()), idempotency, async (req, res) => {
   try {
     const quotation = await Quotation.findById(req.params.id);
     if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
@@ -88,7 +89,7 @@ router.put('/:id', authorize('quotation:edit'), validate(schemas.quotationSchema
 });
 
 // PATCH /api/quotations/:id/finalize — lock the commercial offer before conversion.
-router.patch('/:id/finalize', authorize('quotation:edit'), async (req, res) => {
+router.patch('/:id/finalize', authorize('quotation:edit'), idempotency, async (req, res) => {
   try {
     const quotation = await Quotation.findById(req.params.id);
     if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
@@ -111,7 +112,7 @@ router.patch('/:id/finalize', authorize('quotation:edit'), async (req, res) => {
 });
 
 // DELETE /api/quotations/:id — Delete quotation
-router.delete('/:id', authorize('quotation:delete'), async (req, res) => {
+router.delete('/:id', authorize('quotation:delete'), idempotency, async (req, res) => {
   try {
     const quotation = await Quotation.findByIdAndDelete(req.params.id);
     if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
@@ -133,7 +134,7 @@ router.delete('/:id', authorize('quotation:delete'), async (req, res) => {
 });
 
 // POST /api/quotations/:id/convert-to-challan — create an authoritative draft Sale Challan.
-router.post('/:id/convert-to-challan', authorize('quotation:edit', 'order:create', 'challan:create'), async (req, res) => {
+router.post('/:id/convert-to-challan', authorize('quotation:edit', 'order:create', 'challan:create'), idempotency, async (req, res) => {
   try {
     const quotation = await Quotation.findById(req.params.id);
     if (!quotation) return res.status(404).json({ error: 'Quotation not found' });

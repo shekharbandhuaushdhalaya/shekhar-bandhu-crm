@@ -1,6 +1,7 @@
 const express = require('express');
 const Lead = require('../../models/Lead');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -48,7 +49,7 @@ router.get('/', authorize('contact:view'), async (req, res) => {
 });
 
 // POST /api/leads — Create new lead opportunity
-router.post('/', authorize('contact:create'), async (req, res) => {
+router.post('/', authorize('contact:create'), idempotency, async (req, res) => {
   try {
     const { title, customerName, dealValue, stage = 'lead', winProbability, expectedCloseDate, notes } = req.body;
     if (!title || !customerName) {
@@ -72,7 +73,7 @@ router.post('/', authorize('contact:create'), async (req, res) => {
 });
 
 // PATCH /api/leads/:id/stage — Move lead to new stage
-router.patch('/:id/stage', authorize('contact:edit'), async (req, res) => {
+router.patch('/:id/stage', authorize('contact:edit'), idempotency, async (req, res) => {
   try {
     const { stage, lostReason } = req.body;
     const lead = await Lead.findById(req.params.id);

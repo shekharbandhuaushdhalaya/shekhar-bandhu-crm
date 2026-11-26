@@ -4,6 +4,7 @@ const Notification = require('../../models/Notification');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -49,7 +50,7 @@ router.get('/', authorize('task:view'), async (req, res) => {
 });
 
 // POST /api/tasks — create task
-router.post('/', authorize('task:create'), validate(schemas.taskSchema), async (req, res) => {
+router.post('/', authorize('task:create'), validate(schemas.taskSchema), idempotency, async (req, res) => {
   try {
     const { assignedTo } = req.body;
     const currentUserId = req.user ? req.user.id : null;
@@ -84,7 +85,7 @@ router.post('/', authorize('task:create'), validate(schemas.taskSchema), async (
 });
 
 // PUT /api/tasks/:id/assign — assign or reassign task
-router.put('/:id/assign', authorize('task:edit'), async (req, res) => {
+router.put('/:id/assign', authorize('task:edit'), idempotency, async (req, res) => {
   try {
     const { assignedTo } = req.body;
     const currentUserId = req.user ? req.user.id : null;
@@ -125,7 +126,7 @@ router.put('/:id/assign', authorize('task:edit'), async (req, res) => {
 });
 
 // PUT /api/tasks/:id/toggle — toggle completed
-router.put('/:id/toggle', authorize('task:edit'), async (req, res) => {
+router.put('/:id/toggle', authorize('task:edit'), idempotency, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -144,7 +145,7 @@ router.put('/:id/toggle', authorize('task:edit'), async (req, res) => {
 });
 
 // PUT /api/tasks/:id — update task
-router.put('/:id', authorize('task:edit'), validate(schemas.taskSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('task:edit'), validate(schemas.taskSchema.partial()), idempotency, async (req, res) => {
   try {
     const task = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -160,7 +161,7 @@ router.put('/:id', authorize('task:edit'), validate(schemas.taskSchema.partial()
 });
 
 // DELETE /api/tasks/:id
-router.delete('/:id', authorize('task:delete'), async (req, res) => {
+router.delete('/:id', authorize('task:delete'), idempotency, async (req, res) => {
   try {
     const task = await Task.findByIdAndDelete(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
