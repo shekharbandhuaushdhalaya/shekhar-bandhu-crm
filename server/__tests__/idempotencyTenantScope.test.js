@@ -85,8 +85,8 @@ describe('tenant-scoped idempotency', () => {
   test('routes response persistence failures to Express error handling without sending success', async () => {
     const failure = new Error('database unavailable');
     IdempotencyKey.updateOne.mockRejectedValueOnce(failure);
-    await idempotency(req, res, next);
     const originalJson = res.json;
+    await idempotency(req, res, next);
     await res.json({ ok: true });
     expect(next).toHaveBeenCalledWith(failure);
     expect(originalJson).not.toHaveBeenCalledWith({ ok: true });
