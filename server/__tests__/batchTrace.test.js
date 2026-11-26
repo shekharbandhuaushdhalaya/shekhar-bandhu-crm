@@ -159,8 +159,8 @@ describe('Task 6 — Batch Recall Traceability Suite (Backward & Forward Trace)'
       plannedQty: 10, actualYieldQty: 10, productId: product._id,
       productName: product.name, status: 'completed',
       ingredientsConsumed: [{
-        rawMaterialId: rawMaterial._id, batchNo: 'DUPLICATE-LOT-01',
-        qtyConsumed: 2
+        rawMaterialId: rawMaterial._id, rawMaterialEntryId: new mongoose.Types.ObjectId(),
+        batchNo: 'DUPLICATE-LOT-01', qtyConsumed: 2
       }]
     });
 
