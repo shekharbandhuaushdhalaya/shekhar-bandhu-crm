@@ -51,7 +51,7 @@ router.post('/submit', upload.single('image'), validate(schemas.querySubmitSchem
     return res.status(201).json({ message: 'Query submitted successfully', query: doc });
   } catch (err) {
     if (req.file?.path) fs.unlink(req.file.path, () => {});
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Unable to submit public inquiry' });
   }
 });
 
