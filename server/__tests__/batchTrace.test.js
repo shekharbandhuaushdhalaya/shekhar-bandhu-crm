@@ -184,14 +184,18 @@ describe('Task 6 — Batch Recall Traceability Suite (Backward & Forward Trace)'
       }
     ]);
     const batchNo = 'FG-TRACE-AMB-001';
-    await BatchProduction.create({
+    // This fixture represents a pre-enforcement legacy document. Current
+    // Mongoose validation requires rawMaterialEntryId, so insert directly to
+    // preserve the historical shape and exercise the guarded legacy resolver.
+    await BatchProduction.collection.insertOne({
       batchNo, manufacturingUnitId: new mongoose.Types.ObjectId(),
       plannedQty: 10, actualYieldQty: 10, productId: product._id,
       productName: product.name, status: 'completed',
       ingredientsConsumed: [{
         rawMaterialId: rawMaterial._id,
         batchNo: 'DUPLICATE-LOT-01', qtyConsumed: 2
-      }]
+      }],
+      createdAt: new Date(), updatedAt: new Date()
     });
 
     const response = await request(app).get(`/api/manufacturing/batch-trace/${batchNo}`);
