@@ -11,7 +11,7 @@ jest.mock('../utils/agentTracker', () => ({ trackAgentActivity: jest.fn() }));
 jest.mock('../middleware/authorize', () => ({ authorize: () => (req, res, next) => next(), getRolePermissions: jest.fn() }));
 jest.mock('../middleware/idempotency', () => (req, res, next) => next());
 jest.mock('../middleware/validate', () => ({ validate: () => (req, res, next) => next() }));
-jest.mock('../validation/schemas', () => ({ userSchema: {}, loginSchema: {}, updateProfileSchema: {}, changePasswordSchema: {} }));
+jest.mock('../validation/schemas', () => ({ userSchema: { partial: () => ({}) }, loginSchema: {}, updateProfileSchema: {}, changePasswordSchema: {} }));
 jest.mock('../middleware/authenticateJWT', () => ({ authenticateJWT: (req, res, next) => next() }));
 jest.mock('../utils/whatsappService', () => ({ sendWhatsAppNotification: jest.fn() }));
 jest.mock('../src/config', () => ({ jwtSecret: 'test-secret', isProduction: false, refreshTokenTtlDays: 30, accessTokenTtl: '15m', twilio: {} }));
