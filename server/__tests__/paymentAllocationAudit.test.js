@@ -17,7 +17,7 @@ describe('Existing payment allocation audit evidence', () => {
       payments: [], save: jest.fn().mockResolvedValue(true)
     };
     const payment = {
-      _id: 'payment-1', status: 'active', partyType: 'Customer', partyId: 'customer-1',
+      _id: 'payment-1', status: 'active', type: 'receive', partyType: 'Customer', partyId: 'customer-1',
       amount: 100, unallocatedAmount: 100, allocations: [],
       save: jest.fn().mockResolvedValue(true)
     };

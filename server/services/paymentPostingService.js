@@ -47,18 +47,26 @@ async function loadParty({ partyType, partyId, session }) {
   throw paymentError('INVALID_PARTY_TYPE', 'Payment party type must be Customer or Vendor');
 }
 
-function assertAllocationOwnership(invoice, partyType, partyId) {
+function assertAllocationOwnership(invoice, partyType, partyId, paymentType) {
   if (!invoice.isFinalized || invoice.status === 'cancelled' || invoice.status === 'Cancelled') {
     throw paymentError('INVOICE_NOT_FINALIZED', `Invoice ${invoice.invoiceNo} is not an open finalized invoice`);
   }
   if (partyType === 'Customer') {
+    if (paymentType !== 'receive') {
+      throw paymentError('ALLOCATION_PAYMENT_DIRECTION_MISMATCH', 'Only customer receipts can be allocated to sales invoices');
+    }
     if (invoice.type !== 'sale' || !invoice.customerId || String(invoice.customerId) !== String(partyId)) {
       throw paymentError('ALLOCATION_PARTY_MISMATCH', `Invoice ${invoice.invoiceNo} does not belong to this customer`);
     }
   } else if (partyType === 'Vendor') {
+    if (paymentType !== 'make') {
+      throw paymentError('ALLOCATION_PAYMENT_DIRECTION_MISMATCH', 'Only vendor payments can be allocated to purchase invoices');
+    }
     if (invoice.type !== 'purchase' || !invoice.vendorId || String(invoice.vendorId) !== String(partyId)) {
       throw paymentError('ALLOCATION_PARTY_MISMATCH', `Invoice ${invoice.invoiceNo} does not belong to this vendor`);
     }
+  } else {
+    throw paymentError('INVALID_PARTY_TYPE', 'Payment party type must be Customer or Vendor');
   }
 }
 
@@ -82,7 +90,7 @@ async function createPaymentInSession({ paymentData, allocations = [], session }
     const allocationAmount = row.amountApplied;
     const invoice = await Invoice.findById(row.invoiceId).session(session);
     if (!invoice) throw paymentError('INVOICE_NOT_FOUND', `Invoice not found: ${row.invoiceId}`);
-    assertAllocationOwnership(invoice, paymentData.partyType, paymentData.partyId);
+    assertAllocationOwnership(invoice, paymentData.partyType, paymentData.partyId, paymentData.type);
     const outstanding = money(Math.max(0, Number(invoice.amount || 0) - Number(invoice.amountPaid || 0)));
     if (allocationAmount > outstanding + 0.01) {
       throw paymentError('ALLOCATION_EXCEEDS_INVOICE', `Allocation exceeds outstanding amount for ${invoice.invoiceNo}`);
@@ -132,7 +140,7 @@ async function allocateExistingPayment({ paymentId, allocations = [], actor = {}
       if (amount > remaining + 0.01) throw paymentError('ALLOCATION_EXCEEDS_PAYMENT', 'Allocations exceed the unallocated payment amount');
       const invoice = await Invoice.findById(row.invoiceId).session(session);
       if (!invoice) throw paymentError('INVOICE_NOT_FOUND', `Invoice not found: ${row.invoiceId}`);
-      assertAllocationOwnership(invoice, payment.partyType, payment.partyId);
+      assertAllocationOwnership(invoice, payment.partyType, payment.partyId, payment.type);
       const outstanding = money(Math.max(0, Number(invoice.amount || 0) - Number(invoice.amountPaid || 0)));
       if (amount > outstanding + 0.01) throw paymentError('ALLOCATION_EXCEEDS_INVOICE', `Allocation exceeds outstanding amount for ${invoice.invoiceNo}`);
       invoice.amountPaid = money(Number(invoice.amountPaid || 0) + amount);
