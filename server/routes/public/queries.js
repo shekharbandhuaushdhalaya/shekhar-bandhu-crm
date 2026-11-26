@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -8,6 +9,14 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 
 const router = express.Router();
+
+const inquiryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many inquiries submitted. Please try again later.' },
+});
 const uploadDir = path.join(__dirname, '../../public/uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -40,7 +49,7 @@ const cleanupUploadOnError = (req, res, next) => {
   next();
 };
 
-router.post('/submit', upload.single('image'), cleanupUploadOnError, validate(schemas.querySubmitSchema), async (req, res) => {
+router.post('/submit', inquiryLimiter, upload.single('image'), cleanupUploadOnError, validate(schemas.querySubmitSchema), async (req, res) => {
   try {
     const { name, email, phone, productName, query, productId } = req.body;
     if (!name || !email || !phone || !productName || !query) {
