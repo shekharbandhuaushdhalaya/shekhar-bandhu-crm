@@ -13,7 +13,7 @@
     "restore:database": "node scripts/restore-database.js",
     "bootstrap:admin": "node scripts/seed-admin.js",
     "preflight:production": "node scripts/production-preflight.js",
-    "verify:indexes": "node scripts/verify-indexes.js",
+    "verify:indexes": "node scripts/verify-indexes.js",\n    "migrate:idempotency-index": "node scripts/migrate-idempotency-index.js",
     "test:ci": "jest --runInBand --detectOpenHandles"
   },
   "dependencies": {

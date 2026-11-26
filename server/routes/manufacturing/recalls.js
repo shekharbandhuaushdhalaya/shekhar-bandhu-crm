@@ -2,6 +2,7 @@ const express = require('express');
 const Recall = require('../../models/Recall');
 const Invoice = require('../../models/Invoice');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
@@ -21,7 +22,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/recalls — Initiate a batch recall & auto-trace affected customers
-router.post('/', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/', idempotency, authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { batchNo, productId, productName, reason, severity = 'class_II' } = req.body;
     const actorId = req.user?.id || req.user?._id;
@@ -82,7 +83,7 @@ router.post('/', authorize('manufacturing:edit'), async (req, res) => {
 });
 
 // PATCH /api/recalls/:id/notify-customer — Mark affected customer as notified
-router.patch('/:id/notify-customer', authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/notify-customer', idempotency, authorize('manufacturing:edit'), async (req, res) => {
   try {
     const invoiceNo = String(req.body.invoiceNo || '').trim();
     const method = String(req.body.notificationMethod || '').trim().toLowerCase();
@@ -122,7 +123,7 @@ router.patch('/:id/notify-customer', authorize('manufacturing:edit'), async (req
 });
 
 // PATCH /api/recalls/:id/status — Update recall status
-router.patch('/:id/status', authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/status', idempotency, authorize('manufacturing:edit'), async (req, res) => {
   try {
     const { status, recalledQty, closureNotes } = req.body;
     const recall = await Recall.findById(req.params.id);

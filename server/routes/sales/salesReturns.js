@@ -4,6 +4,7 @@ const {
   createSalesReturn, postSalesReturn, reverseSalesReturn, dispositionSalesReturnItem
 } = require('../../services/salesReturnService');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/requiredIdempotency');
 const { logAction } = require('../../utils/auditLogger');
 
 const router = express.Router();
@@ -31,7 +32,7 @@ router.get('/', authorize('salesreturn:view'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/', authorize('salesreturn:create'), async (req, res) => {
+router.post('/', idempotency, authorize('salesreturn:create'), async (req, res) => {
   try {
     const actor = actorFrom(req);
     if (!actor.id || !actor.name) return res.status(403).json({ error: 'Authenticated return requester identity is required' });
@@ -44,7 +45,7 @@ router.post('/', authorize('salesreturn:create'), async (req, res) => {
   } catch (error) { res.status(statusFor(error)).json({ error: error.message, code: error.code || 'SALES_RETURN_CREATE_FAILED' }); }
 });
 
-router.patch('/:id/post', authorize('salesreturn:post'), async (req, res) => {
+router.patch('/:id/post', idempotency, authorize('salesreturn:post'), async (req, res) => {
   try {
     const actor = actorFrom(req);
     if (!actor.id || !actor.name) return res.status(403).json({ error: 'Authenticated posting identity is required' });
@@ -55,7 +56,7 @@ router.patch('/:id/post', authorize('salesreturn:post'), async (req, res) => {
   } catch (error) { res.status(statusFor(error)).json({ error: error.message, code: error.code || 'SALES_RETURN_POST_FAILED' }); }
 });
 
-router.patch('/:id/items/:itemIndex/disposition', authorize('quality:approve'), async (req, res) => {
+router.patch('/:id/items/:itemIndex/disposition', idempotency, authorize('quality:approve'), async (req, res) => {
   try {
     const actor = actorFrom(req);
     if (!actor.id || !actor.name) return res.status(403).json({ error: 'Authenticated QA reviewer identity is required' });
@@ -69,7 +70,7 @@ router.patch('/:id/items/:itemIndex/disposition', authorize('quality:approve'), 
   } catch (error) { res.status(statusFor(error)).json({ error: error.message, code: error.code || 'SALES_RETURN_QC_FAILED' }); }
 });
 
-router.patch('/:id/reverse', authorize('salesreturn:reverse'), async (req, res) => {
+router.patch('/:id/reverse', idempotency, authorize('salesreturn:reverse'), async (req, res) => {
   try {
     const actor = actorFrom(req);
     const reason = String(req.body.reason || '').trim();

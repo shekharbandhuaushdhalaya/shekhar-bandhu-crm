@@ -1093,11 +1093,11 @@ class ApiClient {
     return res.json();
   }
   async dispositionSalesReturnItem(id: string, itemIndex: number, data: { disposition: 'approved' | 'rejected'; notes: string }): Promise<any> {
-    const res = await this.request(`${API_BASE}/sales-returns/${id}/items/${itemIndex}/disposition`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/sales-returns/${id}/items/${itemIndex}/disposition`, { method: 'PATCH', headers: { 'Idempotency-Key': `sales-return-qc-${id}-${itemIndex}-${data.disposition}` }, body: JSON.stringify(data) });
     return res.json();
   }
   async reverseSalesReturn(id: string, reason: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/sales-returns/${id}/reverse`, { method: 'PATCH', body: JSON.stringify({ reason }) });
+    const res = await this.request(`${API_BASE}/sales-returns/${id}/reverse`, { method: 'PATCH', headers: { 'Idempotency-Key': `sales-return-reverse-${id}` }, body: JSON.stringify({ reason }) });
     return res.json();
   }
 
