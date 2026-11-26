@@ -73,17 +73,17 @@ describe('tenant isolation regression', () => {
       name: 'Immutable Tenant Product', sku: 'IMMUTABLE-TENANT-001', stockLevel: 3
     }));
 
-    await expect(runWithTenant({ firmId: firmA._id }, () => Product.updateOne(
+    await expect(runWithTenant({ firmId: firmA._id }, async () => await Product.updateOne(
       { _id: product._id },
       { $set: { firmId: firmB._id } }
     ))).rejects.toThrow('Tenant ownership is immutable');
 
-    await expect(runWithTenant({ firmId: firmA._id }, () => Product.findOneAndUpdate(
+    await expect(runWithTenant({ firmId: firmA._id }, async () => await Product.findOneAndUpdate(
       { _id: product._id },
       { $unset: { firmId: 1 } }
     ))).rejects.toThrow('Tenant ownership is immutable');
 
-    const persisted = await runWithTenant({ firmId: firmA._id }, () => Product.findById(product._id).lean());
+    const persisted = await runWithTenant({ firmId: firmA._id }, async () => await Product.findById(product._id).lean());
     expect(String(persisted.firmId)).toBe(String(firmA._id));
   });
 
@@ -110,7 +110,7 @@ describe('tenant isolation regression', () => {
       }
     }]));
 
-    const persisted = await runWithTenant({ firmId: firmA._id }, () => Product.findById(product._id).lean());
+    const persisted = await runWithTenant({ firmId: firmA._id }, async () => await Product.findById(product._id).lean());
     expect(persisted.stockLevel).toBe(6);
   });
 });
