@@ -100,6 +100,7 @@ router.patch('/:id/approve', authorize('quality:approve'), async (req, res) => {
     if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'An explicit approved or rejected disposition is required' });
     const coa = await CertificateOfAnalysis.findById(req.params.id);
     if (!coa) return res.status(404).json({ error: 'CoA not found' });
+    if (coa.status !== 'draft') return res.status(409).json({ error: 'Only a draft CoA can receive a QA disposition', code: 'COA_DISPOSITION_FINALIZED' });
     if (status === 'approved') {
       const BatchProduction = require('../../models/BatchProduction');
       const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
@@ -133,15 +134,28 @@ router.patch('/:id/approve', authorize('quality:approve'), async (req, res) => {
       coa.officialCertificate = false;
       coa.documentType = 'MANUFACTURER_QA_APPROVED_COA';
     }
-    coa.status = status;
-    coa.overallResult = status === 'rejected' ? 'REJECTED' : 'APPROVED';
-    coa.qaReviewedByUser = req.user.id;
-    coa.qaReviewedByName = req.user.name;
-    coa.approvedBy = req.user.name;
-    coa.approvedAt = new Date();
-    if (remarks) coa.remarks = remarks;
-    await coa.save();
-    res.json(coa);
+    const disposition = {
+      status,
+      overallResult: status === 'rejected' ? 'REJECTED' : 'APPROVED',
+      qaReviewedByUser: req.user.id,
+      qaReviewedByName: req.user.name,
+      approvedBy: req.user.name,
+      approvedAt: new Date()
+    };
+    if (status === 'approved') {
+      disposition.manufacturingLicenseNo = coa.manufacturingLicenseNo;
+      disposition.gmpCertificateNo = coa.gmpCertificateNo;
+      disposition.officialCertificate = false;
+      disposition.documentType = 'MANUFACTURER_QA_APPROVED_COA';
+    }
+    if (remarks) disposition.remarks = remarks;
+    const updated = await CertificateOfAnalysis.findOneAndUpdate(
+      { _id: coa._id, status: 'draft' },
+      { $set: disposition },
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(409).json({ error: 'CoA disposition was already finalized by another request', code: 'COA_DISPOSITION_FINALIZED' });
+    return res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

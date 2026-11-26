@@ -36,11 +36,34 @@ module.exports = function tenantPlugin(schema) {
     this.setQuery({ $and: [query, { firmId }] });
   }
 
+  function rejectTenantOwnershipMutation() {
+    if (!getFirmId()) return;
+    const update = this.getUpdate ? this.getUpdate() : null;
+    if (!update) return;
+    const hasFirmPath = key => key === 'firmId' || key.startsWith('firmId.');
+    const containsFirmId = value => {
+      if (!value || typeof value !== 'object') return false;
+      if (Array.isArray(value)) return true;
+      return Object.entries(value).some(([operator, fields]) =>
+        hasFirmPath(operator) ||
+        (fields && typeof fields === 'object' && !Array.isArray(fields) &&
+          (Object.keys(fields).some(hasFirmPath) ||
+           (operator === '$rename' && Object.values(fields).some(hasFirmPath))))
+      );
+    };
+    if (containsFirmId(update)) {
+      throw new Error('Tenant ownership is immutable; firmId updates are rejected');
+    }
+  }
+
   [
     'find', 'findOne', 'findOneAndUpdate', 'findOneAndDelete', 'findOneAndReplace',
     'countDocuments', 'exists', 'distinct', 'deleteMany', 'deleteOne',
     'updateMany', 'updateOne', 'replaceOne'
-  ].forEach(hook => schema.pre(hook, addTenantFilter));
+  ].forEach(hook => {
+    schema.pre(hook, rejectTenantOwnershipMutation);
+    schema.pre(hook, addTenantFilter);
+  });
 
   // Mongoose bulkWrite does not execute query middleware. Wrap it so tenant
   // scope and immutable ownership are enforced for every supported bulk operation.
@@ -49,13 +72,16 @@ module.exports = function tenantPlugin(schema) {
     if (!firmId) return mongoose.Model.bulkWrite.call(this, operations, options);
     if (!Array.isArray(operations)) throw new Error('Tenant-scoped bulkWrite requires an operations array');
 
-    const containsFirmId = value => {
-      if (!value || typeof value !== 'object') return false;
-      if (Array.isArray(value)) return value.some(containsFirmId);
-      return Object.entries(value).some(([key, nested]) =>
-        key === 'firmId' || key.startsWith('firmId.') || containsFirmId(nested) ||
-        (key === '$rename' && nested && Object.values(nested).some(target => String(target).startsWith('firmId')))
-      );
+    const hasFirmPath = key => key === 'firmId' || key.startsWith('firmId.');
+    const containsFirmId = update => {
+      if (!update || typeof update !== 'object') return false;
+      if (Array.isArray(update)) return true;
+      return Object.entries(update).some(([operator, fields]) => {
+        if (hasFirmPath(operator)) return true;
+        if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return false;
+        return Object.keys(fields).some(hasFirmPath) ||
+          (operator === '$rename' && Object.values(fields).some(hasFirmPath));
+      });
     };
     const scopedFilter = filter => ({ $and: [filter || {}, { firmId }] });
 

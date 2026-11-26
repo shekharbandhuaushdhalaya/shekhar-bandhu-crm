@@ -202,9 +202,22 @@ async function postChallanInventory(challan, options = {}) {
       if (!product) throw inventoryError('PRODUCT_NOT_FOUND', `Product not found: ${item.productId}`);
 
       const filter = entryFilter(sourceWarehouse._id, item);
+      const candidateEntry = await InventoryEntry.findOne(filter).session(session);
+      if (candidateEntry && (
+        candidateEntry.marketReleased === false ||
+        (candidateEntry.productionBatchId && candidateEntry.marketReleased !== true)
+      )) {
+        throw inventoryError('FINISHED_GOODS_NOT_MARKET_RELEASED', 'Finished goods linked to manufacturing must have an explicit independent QA market release before transfer or sale');
+      }
+      const releaseGate = {
+        $and: [
+          { $or: [{ marketReleased: { $ne: false } }] },
+          { $or: [{ productionBatchId: null }, { productionBatchId: { $exists: false } }, { marketReleased: true }] }
+        ]
+      };
       const sourceStockFilter = fresh.challanType === 'sale'
-        ? { ...filter, $or: [{ expiryDate: null }, { expiryDate: { $exists: false } }, { expiryDate: { $gte: new Date() } }], qtyBoxes: { $gte: qty } }
-        : { ...filter, qtyBoxes: { $gte: qty } };
+        ? { ...filter, ...releaseGate, $or: [{ expiryDate: null }, { expiryDate: { $exists: false } }, { expiryDate: { $gte: new Date() } }], qtyBoxes: { $gte: qty } }
+        : { ...filter, ...releaseGate, qtyBoxes: { $gte: qty } };
       const sourceEntry = await InventoryEntry.findOneAndUpdate(
         sourceStockFilter,
         { $inc: { qtyBoxes: -qty } },

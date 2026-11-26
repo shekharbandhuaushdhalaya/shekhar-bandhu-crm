@@ -30,6 +30,7 @@ router.get('/:batchNo', authorize('inventory:view'), async (req, res) => {
 
     // 2. BACKWARD TRACE: Raw Materials Consumed & Vendor Origins
     const rawMaterialsUsed = [];
+    const traceWarnings = [];
     if (batch.ingredientsConsumed && batch.ingredientsConsumed.length > 0) {
       for (const ing of batch.ingredientsConsumed) {
         let rmEntry = null;
@@ -37,9 +38,47 @@ router.get('/:batchNo', authorize('inventory:view'), async (req, res) => {
 
         if (ing.rawMaterialEntryId) {
           rmEntry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).lean();
+          if (rmEntry && (
+            (ing.rawMaterialId && rmEntry.rawMaterialId && String(ing.rawMaterialId) !== String(rmEntry.rawMaterialId)) ||
+            (ing.batchNo && String(ing.batchNo).trim().toLowerCase() !== String(rmEntry.batchNo || '').trim().toLowerCase())
+          )) {
+            traceWarnings.push({
+              code: 'RAW_MATERIAL_LOT_LINK_MISMATCH',
+              batchNo: ing.batchNo || '',
+              rawMaterialEntryId: ing.rawMaterialEntryId,
+              message: 'Recorded raw-material lot reference does not match its material or batch number'
+            });
+            rmEntry = null;
+          }
         }
         if (!rmEntry && ing.batchNo) {
-          rmEntry = await RawMaterialEntry.findOne({ batchNo: ing.batchNo }).lean();
+          const lotFilter = { batchNo: ing.batchNo };
+          if (ing.rawMaterialId) lotFilter.rawMaterialId = ing.rawMaterialId;
+          const candidates = await RawMaterialEntry.find(lotFilter).limit(2).lean();
+          if (candidates.length === 1) {
+            rmEntry = candidates[0];
+          } else if (candidates.length > 1) {
+            traceWarnings.push({
+              code: 'RAW_MATERIAL_LOT_AMBIGUOUS',
+              batchNo: ing.batchNo,
+              rawMaterialId: ing.rawMaterialId || null,
+              message: 'Multiple raw-material lots match this genealogy reference; vendor origin is not inferred'
+            });
+          } else {
+            traceWarnings.push({
+              code: 'RAW_MATERIAL_LOT_NOT_FOUND',
+              batchNo: ing.batchNo,
+              rawMaterialId: ing.rawMaterialId || null,
+              message: 'No raw-material lot could be verified for this genealogy reference'
+            });
+          }
+        } else if (!rmEntry) {
+          traceWarnings.push({
+            code: 'RAW_MATERIAL_LOT_REFERENCE_MISSING',
+            batchNo: '',
+            rawMaterialId: ing.rawMaterialId || null,
+            message: 'Genealogy record has no raw-material lot identifier or batch number'
+          });
         }
 
         if (ing.rawMaterialId) {
@@ -143,6 +182,7 @@ router.get('/:batchNo', authorize('inventory:view'), async (req, res) => {
       actualYieldQty: batch.actualYieldQty || batch.actualYield || 0,
       manufacturingUnit: batch.manufacturingUnitName || 'Varanasi Main Plant',
       rawMaterialsUsed,
+      traceWarnings,
       dispatchedTo
     });
   } catch (err) {

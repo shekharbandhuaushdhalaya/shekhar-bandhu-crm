@@ -143,12 +143,12 @@ describe('Task 6 — Batch Recall Traceability Suite (Backward & Forward Trace)'
     });
     await RawMaterialEntry.create([
       {
-        rawMaterialId: rawMaterial._id, batchNo: 'DUPLICATE-LOT-01',
+        rawMaterialId: rawMaterial._id, warehouseId: new mongoose.Types.ObjectId(), batchNo: 'DUPLICATE-LOT-01',
         initialQty: 10, qty: 8, vendorId: new mongoose.Types.ObjectId(),
         vendorName: 'Supplier One'
       },
       {
-        rawMaterialId: rawMaterial._id, batchNo: 'DUPLICATE-LOT-01',
+        rawMaterialId: rawMaterial._id, warehouseId: new mongoose.Types.ObjectId(), batchNo: 'DUPLICATE-LOT-01',
         initialQty: 10, qty: 7, vendorId: new mongoose.Types.ObjectId(),
         vendorName: 'Supplier Two'
       }
