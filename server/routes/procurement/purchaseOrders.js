@@ -10,6 +10,7 @@ const Warehouse = require('../../models/Warehouse');
 const RawMaterial = require('../../models/RawMaterial');
 const RawMaterialEntry = require('../../models/RawMaterialEntry');
 const assertSupplierBatchCompatibility = require('../../utils/assertSupplierBatchCompatibility');
+const resolvePurchaseOrderItem = require('../../utils/resolvePurchaseOrderItem');
 const Product = require('../../models/Product');
 const InventoryEntry = require('../../models/InventoryEntry');
 const StockLedger = require('../../models/StockLedger');
@@ -246,20 +247,13 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
           throw Object.assign(new Error(`${item.name}: exactly one rawMaterialId or productId is required`), { statusCode: 400 });
         }
 
-        const matchingPoItems = po.items.filter(i =>
-          (item.rawMaterialId && i.rawMaterialId && String(i.rawMaterialId) === String(item.rawMaterialId)) ||
-          (item.productId && i.productId && String(i.productId) === String(item.productId))
-        );
-        if (matchingPoItems.length === 0) {
-          throw Object.assign(new Error(`${item.name}: item is not present on purchase order ${po.poNo}`), { statusCode: 400 });
+        let poItem;
+        try {
+          poItem = resolvePurchaseOrderItem(po.items, item);
+        } catch (error) {
+          error.message = `${item.name}: ${error.message} (purchase order ${po.poNo})`;
+          throw error;
         }
-        if (matchingPoItems.length > 1) {
-          throw Object.assign(
-            new Error(`${item.name}: multiple purchase-order lines match this item; correct the purchase order before receiving goods`),
-            { statusCode: 409, code: 'PO_ITEM_MATCH_AMBIGUOUS' }
-          );
-        }
-        const poItem = matchingPoItems[0];
         const outstanding = Math.max(0, Number(poItem.qtyOrdered || 0) - Number(poItem.qtyReceived || 0));
         if (accepted > outstanding) {
           throw Object.assign(new Error(`${item.name}: accepted quantity ${accepted} exceeds outstanding PO quantity ${outstanding}`), { statusCode: 409 });
