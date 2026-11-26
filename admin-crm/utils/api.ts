@@ -1004,32 +1004,32 @@ class ApiClient {
     return res.json();
   }
   async createPurchaseInvoice(data: Partial<Invoice>): Promise<Invoice> {
-    const res = await this.request(`${API_BASE}/invoices/purchases`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/invoices/purchases`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('purchase-invoice-create') }, body: JSON.stringify(data) });
     return res.json();
   }
 
   async updateInvoice(id: string, data: Partial<Invoice>): Promise<Invoice> {
-    const res = await this.request(`${API_BASE}/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/invoices/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`invoice-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateSaleInvoice(id: string, data: Partial<Invoice>): Promise<Invoice> { return this.updateInvoice(id, data); }
   async updatePurchaseInvoice(id: string, data: Partial<Invoice>): Promise<Invoice> { return this.updateInvoice(id, data); }
 
   async finalizeSaleInvoice(id: string): Promise<Invoice> {
-    const res = await this.request(`${API_BASE}/invoices/sales/${id}/finalize`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/invoices/sales/${id}/finalize`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`sale-invoice-finalize-${id}`) } });
     return res.json();
   }
   async finalizePurchaseInvoice(id: string): Promise<Invoice> {
-    const res = await this.request(`${API_BASE}/invoices/purchases/${id}/finalize`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/invoices/purchases/${id}/finalize`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`purchase-invoice-finalize-${id}`) } });
     return res.json();
   }
 
   async deleteSaleInvoice(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/invoices/sales/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/invoices/sales/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`sale-invoice-delete-${id}`) } });
     return res.ok;
   }
   async deletePurchaseInvoice(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/invoices/purchases/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/invoices/purchases/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`purchase-invoice-delete-${id}`) } });
     return res.ok;
   }
 
@@ -1069,15 +1069,15 @@ class ApiClient {
     return res.json();
   }
   async createCreditNote(data: Partial<CreditNote>): Promise<CreditNote> {
-    const res = await this.request(`${API_BASE}/credit-notes`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/credit-notes`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('credit-note-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async finalizeCreditNote(id: string): Promise<CreditNote> {
-    const res = await this.request(`${API_BASE}/credit-notes/${id}/finalize`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/credit-notes/${id}/finalize`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`credit-note-finalize-${id}`) } });
     return res.json();
   }
   async cancelCreditNote(id: string): Promise<CreditNote> {
-    const res = await this.request(`${API_BASE}/credit-notes/${id}/cancel`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/credit-notes/${id}/cancel`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`credit-note-cancel-${id}`) } });
     return res.json();
   }
 
@@ -1117,15 +1117,15 @@ class ApiClient {
     return res.json();
   }
   async createWarehouse(data: Partial<Warehouse>): Promise<Warehouse> {
-    const res = await this.request(`${API_BASE}/warehouses`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/warehouses`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('warehouse-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateWarehouse(id: string, data: Partial<Warehouse>): Promise<Warehouse> {
-    const res = await this.request(`${API_BASE}/warehouses/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/warehouses/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`warehouse-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteWarehouse(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/warehouses/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/warehouses/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`warehouse-delete-${id}`) } });
     return res.ok;
   }
 
@@ -1157,12 +1157,13 @@ class ApiClient {
     return res.json();
   }
   async disconnectSocialAccount(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/social/accounts/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/social/accounts/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`social-account-disconnect-${id}`) } });
     return res.ok;
   }
   async publishSocialPost(platforms: string[], text: string, imageUrl?: string): Promise<{ results: any[]; errors: any[] }> {
     const res = await this.request(`${API_BASE}/social/publish`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': createMutationKey('social-publish') },
       body: JSON.stringify({ platforms, text, imageUrl }),
     });
     return res.json();
@@ -1225,13 +1226,15 @@ class ApiClient {
   async updateQueryStatus(id: string, status: string): Promise<ProductQuery> {
     const res = await this.request(`${API_BASE}/queries/${id}/status`, {
       method: 'PATCH',
+      headers: { 'Idempotency-Key': createMutationKey(`product-query-status-${id}`) },
       body: JSON.stringify({ status })
     });
     return res.json();
   }
   async convertQueryToLead(id: string): Promise<{ message: string; lead: Contact; query: ProductQuery }> {
     const res = await this.request(`${API_BASE}/queries/${id}/convert`, {
-      method: 'POST'
+      method: 'POST',
+      headers: { 'Idempotency-Key': createMutationKey(`product-query-convert-${id}`) }
     });
     return res.json();
   }
@@ -1250,6 +1253,7 @@ class ApiClient {
   async updateOrderStatus(id: string, status: 'pending' | 'processing' | 'shipped' | 'delivered'): Promise<Order> {
     const res = await this.request(`${API_BASE}/orders/${id}/status`, {
       method: 'PATCH',
+      headers: { 'Idempotency-Key': createMutationKey(`order-status-${id}`) },
       body: JSON.stringify({ status })
     });
     return res.json();
@@ -1257,6 +1261,7 @@ class ApiClient {
   async updateOrderDetails(id: string, data: { name?: string; email?: string; phone?: string; shippingAddress?: string; status?: string; totalAmount?: number }): Promise<Order> {
     const res = await this.request(`${API_BASE}/orders/${id}`, {
       method: 'PUT',
+      headers: { 'Idempotency-Key': createMutationKey(`order-update-${id}`) },
       body: JSON.stringify(data)
     });
     return res.json();
@@ -1291,15 +1296,15 @@ class ApiClient {
     return res.json();
   }
   async createRawMaterial(data: Partial<RawMaterial>): Promise<RawMaterial> {
-    const res = await this.request(`${API_BASE}/raw-materials`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/raw-materials`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('raw-material-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateRawMaterial(id: string, data: Partial<RawMaterial>): Promise<RawMaterial> {
-    const res = await this.request(`${API_BASE}/raw-materials/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/raw-materials/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`raw-material-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteRawMaterial(id: string): Promise<{ success: boolean; message?: string }> {
-    const res = await this.request(`${API_BASE}/raw-materials/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/raw-materials/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`raw-material-delete-${id}`) } });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.error || 'Failed to delete raw material');
@@ -1317,7 +1322,7 @@ class ApiClient {
     return res.json();
   }
   async deleteRawMaterialEntry(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/raw-materials/entries/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/raw-materials/entries/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`raw-material-entry-delete-${id}`) } });
     return res.ok;
   }
 
@@ -1378,13 +1383,13 @@ class ApiClient {
   }
   async createMaterialDispensing(id: string, stageIndex: number, items: any[]): Promise<any> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/dispensings`, {
-      method: 'POST', body: JSON.stringify({ stageIndex, items })
+      method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`material-dispensing-create-${id}`) }, body: JSON.stringify({ stageIndex, items })
     });
     return res.json();
   }
   async verifyMaterialDispensing(id: string, dispensingId: string, notes = ''): Promise<any> {
     const res = await this.request(`${API_BASE}/batch-productions/${id}/dispensings/${dispensingId}/verify`, {
-      method: 'PATCH', body: JSON.stringify({ notes })
+      method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`material-dispensing-verify-${id}-${dispensingId}`) }, body: JSON.stringify({ notes })
     });
     return res.json();
   }
