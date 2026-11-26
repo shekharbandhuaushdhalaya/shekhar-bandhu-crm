@@ -1,6 +1,7 @@
 const express = require('express');
 const SampleConversion = require('../../models/SampleConversion');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.get('/', authorize('mr:view'), async (req, res) => {
 });
 
 // POST /api/sample-conversions — Record sample distribution to doctor
-router.post('/', authorize('mr:create'), async (req, res) => {
+router.post('/', authorize('mr:create'), idempotency, async (req, res) => {
   try {
     const { mrId, mrName, doctorId, doctorName, productId, productName, samplesQtyGiven } = req.body;
     if (!mrId || !doctorId || !productId || !samplesQtyGiven) {
@@ -59,7 +60,7 @@ router.post('/', authorize('mr:create'), async (req, res) => {
 });
 
 // PATCH /api/sample-conversions/:id/convert — Mark sample converted with resulting prescription invoice amount
-router.patch('/:id/convert', authorize('mr:edit'), async (req, res) => {
+router.patch('/:id/convert', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     const { resultingInvoiceId, prescriptionOrderAmount } = req.body;
     const rec = await SampleConversion.findById(req.params.id);

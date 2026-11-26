@@ -9,6 +9,7 @@ const { authenticatePortalCustomer } = require('../../middleware/authenticatePor
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const { resolvePrice, resolveScheme, money } = require('../../services/salesPricingService');
 const { createSalesOrder } = require('../../services/salesOrderService');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 router.use(authenticatePortalCustomer);
@@ -139,7 +140,7 @@ router.get('/catalog/:id', async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/orders', async (req, res) => {
+router.post('/orders', idempotency, async (req, res) => {
   try {
     const result = await createSalesOrder({ ...req.body, customerId: req.customer._id, orderChannel: 'website', sourceType: 'online' }, { customer: req.customer, orderChannel: 'website', sourceType: 'online', fallbackEmail: 'portal@customer.invalid' });
     res.status(result.idempotent ? 200 : 201).json({ ...result, message: result.approvalRequired ? 'Order received and awaiting approval.' : 'Order received. Goods move only after a Sale Challan is finalized.' });
@@ -152,7 +153,7 @@ router.post('/orders', async (req, res) => {
   }
 });
 
-router.post('/orders/:id/repeat', async (req, res) => {
+router.post('/orders/:id/repeat', idempotency, async (req, res) => {
   try {
     const prior = await Order.findOne({ _id: req.params.id, customerId: req.customer._id }).lean();
     if (!prior) return res.status(404).json({ error: 'Order not found' });

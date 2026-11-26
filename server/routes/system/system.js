@@ -6,6 +6,7 @@ const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const { publicTenant } = require('../../middleware/publicTenant');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -68,7 +69,7 @@ router.get('/settings/public', publicTenant, async (req, res) => {
 });
 
 // PUT /api/system/settings
-router.put('/settings', authenticateToken, authorize('settings:edit'), validate(schemas.systemSettingsSchema), async (req, res) => {
+router.put('/settings', authenticateToken, authorize('settings:edit'), validate(schemas.systemSettingsSchema), idempotency, async (req, res) => {
   try {
     let settings = await SystemSettings.findOne({ key: 'company_config' });
     if (!settings) {

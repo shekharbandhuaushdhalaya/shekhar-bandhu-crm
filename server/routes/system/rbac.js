@@ -4,6 +4,7 @@ const UserFirm = require('../../models/UserFirm');
 const { authorize, clearPermissionCache } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 const { getAllPermissions, getDefaultPermissionsForRole } = require('../../utils/permissions');
 
 const router = express.Router();
@@ -30,7 +31,7 @@ router.get('/permissions', authorize('rbac:manage', 'user:view'), async (req, re
 });
 
 // POST /api/rbac/permissions — Create a new custom role
-router.post('/permissions', authorize('rbac:manage'), validate(schemas.rbacPermissionsSchema), async (req, res) => {
+router.post('/permissions', authorize('rbac:manage'), validate(schemas.rbacPermissionsSchema), idempotency, async (req, res) => {
   try {
     const { role, permissions, mfaPermissions, label, description } = req.body;
     if (!role || !role.trim()) {
@@ -100,7 +101,7 @@ router.put('/permissions/:role', authorize('rbac:manage'), validate(schemas.rbac
 });
 
 // DELETE /api/rbac/permissions/:role — Delete a custom role
-router.delete('/permissions/:role', authorize('rbac:manage'), async (req, res) => {
+router.delete('/permissions/:role', authorize('rbac:manage'), idempotency, async (req, res) => {
   try {
     const { role } = req.params;
     const BUILTIN_ROLES = ['admin', 'manager', 'agent', 'mr'];
