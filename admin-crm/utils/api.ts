@@ -778,7 +778,8 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/products/${id}/image/delete`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Idempotency-Key': createMutationKey(`product-image-delete-${id}`)
       },
       body: JSON.stringify({ imageUrl })
     });
