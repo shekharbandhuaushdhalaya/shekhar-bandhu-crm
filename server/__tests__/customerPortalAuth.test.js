@@ -153,4 +153,17 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
     expect(pdfResB.status).toBe(404);
     expect(pdfResB.body.error).toContain('Invoice not found');
   });
+
+  it('rate limits repeated customer portal login attempts by client IP', async () => {
+    let lastResponse;
+    for (let attempt = 0; attempt < 21; attempt += 1) {
+      lastResponse = await request(app)
+        .post('/api/portal/auth/login')
+        .send({});
+    }
+
+    expect(lastResponse.status).toBe(429);
+    expect(lastResponse.body.error).toContain('Too many portal login attempts');
+    expect(lastResponse.headers['ratelimit-limit']).toBe('20');
+  });
 });
