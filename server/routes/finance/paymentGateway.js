@@ -51,7 +51,7 @@ router.post('/create-order', authorize('payment:create'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/verify', idempotency, authorize('payment:create'), async (req, res) => {
+router.post('/verify', authorize('payment:create'), idempotency, async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, invoiceId } = req.body;
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !invoiceId) return res.status(400).json({ error: 'Missing payment verification fields' });

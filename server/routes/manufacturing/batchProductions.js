@@ -1984,7 +1984,7 @@ router.patch('/:id/correct', authorize('manufacturing:correctReleased'), async (
 });
 
 // PATCH /api/batch-productions/:id/cancel — Cancel active production run, revert raw materials stock
-router.patch('/:id/cancel', idempotency, authorize('manufacturing:edit'), validate(schemas.batchCancelSchema), async (req, res) => {
+router.patch('/:id/cancel', authorize('manufacturing:edit'), validate(schemas.batchCancelSchema), idempotency, async (req, res) => {
   try {
     const batch = await withTransaction(async session => {
       const current = await BatchProduction.findById(req.params.id).session(session);

@@ -22,7 +22,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/recalls — Initiate a batch recall & auto-trace affected customers
-router.post('/', idempotency, authorize('manufacturing:edit'), async (req, res) => {
+router.post('/', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { batchNo, productId, productName, reason, severity = 'class_II' } = req.body;
     const actorId = req.user?.id || req.user?._id;
@@ -87,7 +87,7 @@ router.post('/', idempotency, authorize('manufacturing:edit'), async (req, res) 
 });
 
 // PATCH /api/recalls/:id/notify-customer — Mark affected customer as notified
-router.patch('/:id/notify-customer', idempotency, authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/notify-customer', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const invoiceNo = String(req.body.invoiceNo || '').trim();
     const method = String(req.body.notificationMethod || '').trim().toLowerCase();
@@ -127,7 +127,7 @@ router.patch('/:id/notify-customer', idempotency, authorize('manufacturing:edit'
 });
 
 // PATCH /api/recalls/:id/status — Update recall status
-router.patch('/:id/status', idempotency, authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/status', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { status, recalledQty, closureNotes } = req.body;
     const recall = await Recall.findById(req.params.id);
