@@ -10,6 +10,7 @@ const InventoryEntry = require('../../models/InventoryEntry');
 const PaymentPromise = require('../../models/PaymentPromise');
 const LostSale = require('../../models/LostSale');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { createSalesOrder } = require('../../services/salesOrderService');
 
 const router = express.Router();
@@ -62,7 +63,7 @@ router.get('/customers/:id/360', authorize('customer:view'), async (req,res) => 
   } catch(e){res.status(500).json({error:e.message});}
 });
 
-router.post('/orders/:id/repeat', authorize('order:create'), async (req,res) => {
+router.post('/orders/:id/repeat', authorize('order:create'), idempotency, async (req,res) => {
   try {
     const prior = await Order.findById(req.params.id).lean();
     if (!prior) return res.status(404).json({code:'ORDER_NOT_FOUND',error:'Order not found'});
@@ -97,12 +98,12 @@ router.get('/collections', authorize('payment:view'), async(req,res)=>{
   }catch(e){res.status(500).json({error:e.message});}
 });
 
-router.post('/payment-promises', authorize('payment:create'), async(req,res)=>{
+router.post('/payment-promises', authorize('payment:create'), idempotency, async(req,res)=>{
   try{const c=await Customer.findById(req.body.customerId); if(!c)return res.status(404).json({error:'Customer not found'}); const p=await PaymentPromise.create({...req.body,customerName:c.name,createdBy:req.user?.name||req.user?.email||''});res.status(201).json(p);}catch(e){res.status(400).json({error:e.message});}
 });
-router.patch('/payment-promises/:id', authorize('payment:create'), async(req,res)=>{try{const data={...req.body};if(['kept','missed','cancelled'].includes(data.status))data.resolvedAt=new Date();res.json(await PaymentPromise.findByIdAndUpdate(req.params.id,data,{new:true,runValidators:true}));}catch(e){res.status(400).json({error:e.message});}});
+router.patch('/payment-promises/:id', authorize('payment:create'), idempotency, async(req,res)=>{try{const data={...req.body};if(['kept','missed','cancelled'].includes(data.status))data.resolvedAt=new Date();res.json(await PaymentPromise.findByIdAndUpdate(req.params.id,data,{new:true,runValidators:true}));}catch(e){res.status(400).json({error:e.message});}});
 
-router.post('/lost-sales', authorize('customer:create'), async(req,res)=>{try{const p=await Product.findById(req.body.productId);if(!p)return res.status(404).json({error:'Product not found'});let c=null;if(req.body.customerId)c=await Customer.findById(req.body.customerId);const doc=await LostSale.create({...req.body,productName:p.name,customerName:c?.name||req.body.customerName||'',estimatedValue:req.body.estimatedValue??Number(req.body.requestedQty||0)*Number(p.price||0)});res.status(201).json(doc);}catch(e){res.status(400).json({error:e.message});}});
+router.post('/lost-sales', authorize('customer:create'), idempotency, async(req,res)=>{try{const p=await Product.findById(req.body.productId);if(!p)return res.status(404).json({error:'Product not found'});let c=null;if(req.body.customerId)c=await Customer.findById(req.body.customerId);const doc=await LostSale.create({...req.body,productName:p.name,customerName:c?.name||req.body.customerName||'',estimatedValue:req.body.estimatedValue??Number(req.body.requestedQty||0)*Number(p.price||0)});res.status(201).json(doc);}catch(e){res.status(400).json({error:e.message});}});
 router.get('/lost-sales', authorize('customer:view'), async(req,res)=>{try{const from=req.query.from?new Date(req.query.from):new Date(new Date().getFullYear(),new Date().getMonth(),1);const rows=await LostSale.find({occurredAt:{$gte:from}}).sort({occurredAt:-1}).lean();const byReason={},byProduct={};for(const r of rows){byReason[r.reason]=money((byReason[r.reason]||0)+Number(r.estimatedValue||0));byProduct[r.productName]=money((byProduct[r.productName]||0)+Number(r.estimatedValue||0));}res.json({totalLostValue:money(rows.reduce((s,r)=>s+Number(r.estimatedValue||0),0)),rows,byReason,byProduct});}catch(e){res.status(500).json({error:e.message});}});
 
 router.get('/action-center', authorize('customer:view'), async(req,res)=>{

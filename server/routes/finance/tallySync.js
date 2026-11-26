@@ -2,6 +2,7 @@ const express = require('express');
 const Invoice = require('../../models/Invoice');
 const Customer = require('../../models/Customer');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
@@ -13,7 +14,7 @@ function cleanXmlText(value) {
 // POST /api/tally/import-xml — Import an external Tally sales voucher as a reconciliation draft.
 // It deliberately does NOT create a finalized CRM sale invoice: physical movement must still
 // originate from a posted Sale Challan and receivables are posted only when that CRM invoice finalizes.
-router.post('/import-xml', authorize('invoice:create'), async (req, res) => {
+router.post('/import-xml', authorize('invoice:create'), idempotency, async (req, res) => {
   try {
     const { xmlPayload } = req.body;
     if (!xmlPayload || typeof xmlPayload !== 'string') return res.status(400).json({ error: 'xmlPayload string is required' });

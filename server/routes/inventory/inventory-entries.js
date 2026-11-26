@@ -192,7 +192,7 @@ router.put('/:id', authorize('inventory:edit'), validate(schemas.inventoryEntryS
 });
 
 // PATCH /api/inventory-entries/:id — Update metadata fields (e.g. purchaseRate)
-router.patch('/:id', authorize('inventory:edit'), async (req, res) => {
+router.patch('/:id', authorize('inventory:edit'), idempotency, async (req, res) => {
   try {
     const allowed = ['purchaseRate', 'batchNo', 'mfgDate', 'expiryDate', 'vendorName', 'hsnCode'];
     const updates = {};
