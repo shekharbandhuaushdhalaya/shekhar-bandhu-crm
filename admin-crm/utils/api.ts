@@ -1775,11 +1775,11 @@ class ApiClient {
     return res.json();
   }
   async createSample(data: Partial<Sample>): Promise<Sample> {
-    const res = await this.request(`${API_BASE}/samples`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/samples`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('sample-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateSample(id: string, data: Partial<Sample>): Promise<Sample> {
-    const res = await this.request(`${API_BASE}/samples/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/samples/${id}`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`sample-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteSample(id: string): Promise<boolean> {
