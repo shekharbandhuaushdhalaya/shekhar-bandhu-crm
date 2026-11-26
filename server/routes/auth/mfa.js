@@ -61,7 +61,7 @@ router.post('/setup', authenticateToken, async (req, res) => {
       otpauthUrl: secret.otpauth_url,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to start MFA setup' });
   }
 });
 
@@ -103,7 +103,7 @@ router.post('/verify-setup', authenticateToken, async (req, res) => {
 
     res.json({ success: true, message: 'MFA enabled successfully. Save your authenticator — codes are required on every login.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to verify MFA setup' });
   }
 });
 
@@ -183,7 +183,7 @@ router.post('/verify', async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email, role: user.role, canAccessCash: user.canAccessCash, mustChangePassword: user.mustChangePassword },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete MFA login' });
   }
 });
 
@@ -229,7 +229,7 @@ router.post('/disable', authenticateToken, async (req, res) => {
 
     res.json({ success: true, message: 'MFA has been disabled. Your account now uses password-only login.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to disable MFA' });
   }
 });
 
@@ -264,7 +264,7 @@ router.put('/admin-disable/:userId', authenticateToken, async (req, res) => {
 
     res.json({ success: true, message: `MFA disabled for ${user.name}. They can re-enable from their Profile.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to disable MFA for user' });
   }
 });
 
