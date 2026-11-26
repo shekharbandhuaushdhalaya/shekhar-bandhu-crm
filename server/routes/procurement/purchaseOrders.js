@@ -14,6 +14,7 @@ const resolvePurchaseOrderItem = require('../../utils/resolvePurchaseOrderItem')
 const { hasBalancedGrnQuantities } = require('../../utils/grnQuantityBalance');
 const findDuplicatePurchaseOrderItemKeys = require('../../utils/findDuplicatePurchaseOrderItemKeys');
 const calculatePurchaseInvoiceExpectedAmount = require('../../utils/calculatePurchaseInvoiceExpectedAmount');
+const hasMatchingPurchaseInvoiceQuantity = require('../../utils/hasMatchingPurchaseInvoiceQuantity');
 const Product = require('../../models/Product');
 const InventoryEntry = require('../../models/InventoryEntry');
 const StockLedger = require('../../models/StockLedger');
@@ -685,7 +686,7 @@ router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
         !item.unit || !poItem.unit || String(item.unit).trim().toLowerCase() === String(poItem.unit).trim().toLowerCase()
       );
       const receivedEnough = received >= ordered;
-      const billedMatchesReceived = billed === received;
+      const billedMatchesReceived = hasMatchingPurchaseInvoiceQuantity(billed, received);
       const expectedNet = received * Number(poItem.unitPrice || 0);
       const expectedTax = expectedNet * Number(poItem.gstRate || 0) / 100;
       const priceMatch = Math.abs(invoiceLine.net - expectedNet) <= 0.01;
@@ -708,7 +709,7 @@ router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
         priceMatch,
         taxMatch,
         ambiguousPoItem: Boolean(key && duplicatePoItemKeys.has(key)),
-        matched: Boolean(key) && !duplicatePoItemKeys.has(key) && receivedEnough && billedMatchesReceived && unitCompatible && priceMatch && taxMatch
+        matched: Boolean(key) && !duplicatePoItemKeys.has(key) && billedMatchesReceived && unitCompatible && priceMatch && taxMatch
       });
     }
 
@@ -716,7 +717,7 @@ router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
       ? sameId(invoice.vendorId, po.vendorId)
       : String(invoice.supplierName || '').trim().toLowerCase() === String(po.vendorName || '').trim().toLowerCase();
     const hasAmbiguousPoItems = duplicatePoItemKeys.size > 0;
-    const qtyMatch = lineMatches.length > 0 && lineMatches.every(line => line.receivedEnough && line.billedMatchesReceived && !line.ambiguousPoItem) && unlinkedInvoiceItems.length === 0;
+    const qtyMatch = lineMatches.length > 0 && lineMatches.every(line => line.billedMatchesReceived && !line.ambiguousPoItem) && unlinkedInvoiceItems.length === 0;
     const priceAndTaxMatch = lineMatches.length > 0 && lineMatches.every(line => line.priceMatch && line.taxMatch && line.unitCompatible);
     const expectedInvoiceAmount = calculatePurchaseInvoiceExpectedAmount(lineMatches, {
       freightAmount: invoice.freightAmount,
