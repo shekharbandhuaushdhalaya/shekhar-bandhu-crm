@@ -1958,7 +1958,7 @@ class ApiClient {
     return res.json();
   }
   async createMR(data: Partial<MedicalRepresentative>): Promise<MedicalRepresentative> {
-    const res = await this.request(`${API_BASE}/medical-reps`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/medical-reps`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('mr-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async getMR(id: string): Promise<MedicalRepresentative> {
@@ -1966,11 +1966,11 @@ class ApiClient {
     return res.json();
   }
   async updateMR(id: string, data: Partial<MedicalRepresentative>): Promise<MedicalRepresentative> {
-    const res = await this.request(`${API_BASE}/medical-reps/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/medical-reps/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`mr-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteMR(id: string): Promise<void> {
-    await this.request(`${API_BASE}/medical-reps/${id}`, { method: 'DELETE' });
+    await this.request(`${API_BASE}/medical-reps/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`mr-delete-${id}`) } });
   }
   async getMrAssignments(mrId: string, entityType?: string, active: string = 'true'): Promise<MrAssignment[]> {
     const params = new URLSearchParams();
@@ -1980,15 +1980,15 @@ class ApiClient {
     return res.json();
   }
   async createMrAssignment(mrId: string, data: Partial<MrAssignment>): Promise<MrAssignment> {
-    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/assignments`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/assignments`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`mr-assignment-create-${mrId}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateMrAssignment(id: string, data: Partial<MrAssignment>): Promise<MrAssignment> {
-    const res = await this.request(`${API_BASE}/medical-reps/assignments/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/medical-reps/assignments/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`mr-assignment-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async endMrAssignment(id: string): Promise<void> {
-    await this.request(`${API_BASE}/medical-reps/assignments/${id}`, { method: 'DELETE' });
+    await this.request(`${API_BASE}/medical-reps/assignments/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`mr-assignment-delete-${id}`) } });
   }
 
   async getMrAttendance(mrId: string, from?: string, to?: string): Promise<MrDailyLog[]> {
@@ -1999,11 +1999,11 @@ class ApiClient {
     return res.json();
   }
   async mrCheckIn(mrId: string, data: { latitude?: number; longitude?: number; photo?: string; location?: string; startKmReading?: number }): Promise<MrDailyLog> {
-    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/checkin`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/checkin`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`mr-checkin-${mrId}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async mrCheckOut(mrId: string, data: { latitude?: number; longitude?: number; photo?: string; location?: string; endKmReading?: number }): Promise<MrDailyLog> {
-    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/checkout`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/checkout`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`mr-checkout-${mrId}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async getMrVisits(mrId: string, from?: string, to?: string): Promise<MrVisit[]> {
@@ -2014,15 +2014,15 @@ class ApiClient {
     return res.json();
   }
   async createMrVisit(mrId: string, data: Partial<MrVisit>): Promise<MrVisit> {
-    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/visits`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/visits`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`mr-visit-create-${mrId}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateMrVisit(visitId: string, data: Partial<MrVisit>): Promise<MrVisit> {
-    const res = await this.request(`${API_BASE}/medical-reps/visits/${visitId}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/medical-reps/visits/${visitId}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`mr-visit-update-${visitId}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteMrVisit(visitId: string): Promise<void> {
-    await this.request(`${API_BASE}/medical-reps/visits/${visitId}`, { method: 'DELETE' });
+    await this.request(`${API_BASE}/medical-reps/visits/${visitId}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`mr-visit-delete-${visitId}`) } });
   }
   async getAllMrVisits(mrId?: string, from?: string, to?: string): Promise<MrVisit[]> {
     const params = new URLSearchParams();
@@ -2041,15 +2041,15 @@ class ApiClient {
     return res.json();
   }
   async createMrExpense(mrId: string, data: Partial<MrExpense>): Promise<MrExpense> {
-    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/expenses`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/medical-reps/${mrId}/expenses`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`mr-expense-create-${mrId}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async approveMrExpense(expenseId: string, status: 'approved' | 'rejected', rejectionReason?: string): Promise<MrExpense> {
-    const res = await this.request(`${API_BASE}/medical-reps/expenses/${expenseId}/approve`, { method: 'PUT', body: JSON.stringify({ status, rejectionReason }) });
+    const res = await this.request(`${API_BASE}/medical-reps/expenses/${expenseId}/approve`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`mr-expense-approve-${expenseId}`) }, body: JSON.stringify({ status, rejectionReason }) });
     return res.json();
   }
   async deleteMrExpense(expenseId: string): Promise<void> {
-    await this.request(`${API_BASE}/medical-reps/expenses/${expenseId}`, { method: 'DELETE' });
+    await this.request(`${API_BASE}/medical-reps/expenses/${expenseId}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`mr-expense-delete-${expenseId}`) } });
   }
   async getAllMrExpenses(from?: string, to?: string, status?: string): Promise<MrExpense[]> {
     const params = new URLSearchParams();
