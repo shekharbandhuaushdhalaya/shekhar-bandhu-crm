@@ -44,7 +44,7 @@ function publicProduct(product) {
 router.get('/invoices', async (req, res) => {
   try {
     res.json(await Invoice.find({ type: 'sale', customerId: req.customer._id }).sort({ date: -1 }).lean());
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Unable to complete portal request' }); }
 });
 
 router.get('/invoices/:id/pdf', async (req, res) => {
@@ -59,7 +59,7 @@ router.get('/invoices/:id/pdf', async (req, res) => {
       grandTotal: invoice.amount || 0, amountPaid: invoice.amountPaid || 0,
       balanceDue: Math.max(0, Number(invoice.amount || 0) - Number(invoice.amountPaid || 0)), status: invoice.status,
     });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Unable to complete portal request' }); }
 });
 
 router.get('/receivables-ageing', async (req, res) => {
@@ -79,12 +79,12 @@ router.get('/receivables-ageing', async (req, res) => {
     });
     Object.keys(brackets).forEach(key => { brackets[key] = money(brackets[key]); });
     res.json({ customerId: req.customer._id, customerName: req.customer.name, totalOutstanding: money(Object.values(brackets).reduce((a,b)=>a+b,0)), brackets, invoices: rows });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Unable to complete portal request' }); }
 });
 
 router.get('/orders', async (req, res) => {
   try { res.json(await Order.find({ customerId: req.customer._id }).sort({ createdAt: -1 }).lean()); }
-  catch (error) { res.status(500).json({ error: error.message }); }
+  catch (error) { res.status(500).json({ error: 'Unable to complete portal request' }); }
 });
 
 router.get('/orders/:id/track', async (req, res) => {
@@ -98,7 +98,7 @@ router.get('/orders/:id/track', async (req, res) => {
       totalAmount: order.totalAmount || 0,
       tracking: dispatches.map(d => ({ dispatchId: d._id, challanId: d.challanId, challanNo: d.challanNo, status: d.status, transporter: d.transporter || '', courierName: d.courierName || '', trackingId: d.trackingId || '', trackingUrl: d.trackingUrl || '', vehicleNo: d.vehicleNo || '', lrNo: d.lrNo || '', dispatchedAt: d.dispatchDate || d.createdAt, deliveredAt: d.deliveredAt || null })),
     });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Unable to complete portal request' }); }
 });
 
 router.get('/me', async (req, res) => {
@@ -124,7 +124,7 @@ router.get('/catalog', async (req, res) => {
       data.push({ ...publicProduct(product), price: pricing.rate, discountPercent: pricing.discountPercent, pricingSource: pricing.pricingSource, availableQty, inStock: availableQty > 0 });
     }
     res.json({ data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Unable to complete portal request' }); }
 });
 
 router.get('/catalog/:id', async (req, res) => {
@@ -137,7 +137,7 @@ router.get('/catalog/:id', async (req, res) => {
     ]);
     const availableQty = entries.reduce((sum, entry) => sum + Number(entry.qtyBoxes || 0), 0);
     res.json({ ...publicProduct(product), customerPrice: pricing, scheme: scheme ? { code: scheme.code, name: scheme.name, discountPercent: Number(scheme.discountPercent || 0), freeQty: Number(scheme.calculatedFreeQty || 0) } : null, availableQty, inStock: availableQty > 0 });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Unable to complete portal request' }); }
 });
 
 router.post('/orders', idempotency, async (req, res) => {
@@ -177,7 +177,7 @@ router.get('/dashboard', async (req, res) => {
     const outstanding = money(invoices.filter(i => i.isFinalized && ['unpaid','partially_paid'].includes(i.status)).reduce((sum, invoice) => sum + Math.max(0, Number(invoice.amount || 0) - Number(invoice.amountPaid || 0)), 0));
     const creditLimit = Number(req.customer.creditLimit || 0);
     res.json({ customer: { id: req.customer._id, name: req.customer.name, company: req.customer.company }, summary: { openOrders: orders.filter(o => !['fulfilled','delivered','cancelled'].includes(o.status)).length, outstanding, creditLimit, availableCredit: creditLimit > 0 ? Math.max(0, money(creditLimit - outstanding)) : null }, recentOrders: orders, recentInvoices: invoices.slice(0,10) });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Unable to complete portal request' }); }
 });
 
 module.exports = router;
