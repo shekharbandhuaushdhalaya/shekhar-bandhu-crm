@@ -9,6 +9,7 @@ const RefreshSession = require('../../models/RefreshSession');
 const Otp = require('../../models/Otp');
 const { trackAgentActivity } = require('../../utils/agentTracker');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { authenticateJWT } = require('../../middleware/authenticateJWT');
@@ -278,7 +279,7 @@ router.get('/users', authenticateToken, authorize('user:view'), async (req, res)
 });
 
 // PUT /api/auth/users/:id — Update a user's role and cash access
-router.put('/users/:id', authenticateToken, authorize('user:edit'), validate(schemas.userSchema.partial()), async (req, res) => {
+router.put('/users/:id', authenticateToken, authorize('user:edit'), validate(schemas.userSchema.partial()), idempotency, async (req, res) => {
   try {
     const { role, canAccessCash } = req.body;
     const updateFields = {};
@@ -298,7 +299,7 @@ router.put('/users/:id', authenticateToken, authorize('user:edit'), validate(sch
 });
 
 // DELETE /api/auth/users/:id — Delete a user
-router.delete('/users/:id', authenticateToken, authorize('user:delete'), async (req, res) => {
+router.delete('/users/:id', authenticateToken, authorize('user:delete'), idempotency, async (req, res) => {
   try {
     
     // Prevent admin from deleting their own account
@@ -400,7 +401,7 @@ router.post('/whatsapp/verify-otp', async (req, res) => {
 });
 
 // PUT /api/auth/update-profile — Update own profile details (Authenticated)
-router.put('/update-profile', authenticateToken, validate(schemas.updateProfileSchema), async (req, res) => {
+router.put('/update-profile', authenticateToken, validate(schemas.updateProfileSchema), idempotency, async (req, res) => {
   try {
     const { name, email } = req.body;
     const updateFields = {};
