@@ -67,7 +67,7 @@ router.post('/permissions', authorize('rbac:manage'), validate(schemas.rbacPermi
 });
 
 // PUT /api/rbac/permissions/:role — Update permissions for a role
-router.put('/permissions/:role', authorize('rbac:manage'), validate(schemas.rbacPermissionsSchema), async (req, res) => {
+router.put('/permissions/:role', authorize('rbac:manage'), validate(schemas.rbacPermissionsSchema), idempotency, async (req, res) => {
   try {
     const { role } = req.params;
     const { permissions, mfaPermissions, label, description } = req.body;
@@ -125,7 +125,7 @@ router.delete('/permissions/:role', authorize('rbac:manage'), idempotency, async
 });
 
 // POST /api/rbac/permissions/:role/reset — Reset role to default permissions (built-in only)
-router.post('/permissions/:role/reset', authorize('rbac:manage'), async (req, res) => {
+router.post('/permissions/:role/reset', authorize('rbac:manage'), idempotency, async (req, res) => {
   try {
     const { role } = req.params;
     const defaults = getDefaultPermissionsForRole(role);
