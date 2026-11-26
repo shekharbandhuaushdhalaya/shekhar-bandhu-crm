@@ -6,6 +6,7 @@ const Customer = require('../../models/Customer');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -91,7 +92,7 @@ router.get('/trade-matrix', authorize('pricing:view'), async (req, res) => {
 });
 
 // POST /api/customer-pricing/trade-matrix — Update trade category discount matrix
-router.post('/trade-matrix', authorize('pricing:edit'), async (req, res) => {
+router.post('/trade-matrix', authorize('pricing:edit'), idempotency, async (req, res) => {
   try {
     const SystemSettings = require('../../models/SystemSettings');
     const matrix = req.body;
@@ -210,7 +211,7 @@ router.get('/:customerId', authorize('pricing:view'), async (req, res) => {
 });
 
 // PUT /api/customer-pricing/:customerId — Upsert customer pricing rule for product or raw material
-router.put('/:customerId', authorize('pricing:edit'), validate(schemas.customerPricingSchema), async (req, res) => {
+router.put('/:customerId', authorize('pricing:edit'), validate(schemas.customerPricingSchema), idempotency, async (req, res) => {
   try {
     const { productId, rawMaterialId, customRate, discountPercent, volumeTiers, validUntil } = req.body;
     const customerId = req.params.customerId;
@@ -246,7 +247,7 @@ router.put('/:customerId', authorize('pricing:edit'), validate(schemas.customerP
 });
 
 // DELETE /api/customer-pricing/:customerId/:itemType/:itemId — Delete pricing rule
-router.delete('/:customerId/:itemType/:itemId', authorize('pricing:delete'), async (req, res) => {
+router.delete('/:customerId/:itemType/:itemId', authorize('pricing:delete'), idempotency, async (req, res) => {
   try {
     const { customerId, itemType, itemId } = req.params;
     const query = { customerId };

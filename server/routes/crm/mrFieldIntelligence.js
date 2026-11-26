@@ -10,6 +10,7 @@ const FocusProduct=require('../../models/FocusProduct');
 const CompetitorObservation=require('../../models/CompetitorObservation');
 const Product=require('../../models/Product');
 const { authorize }=require('../../middleware/authorize');
+const idempotency=require('../../middleware/idempotency');
 const router=express.Router();
 const money=n=>Number(Number(n||0).toFixed(2));
 
@@ -47,12 +48,12 @@ router.get('/:mrId/coverage', authorize('mr:view'), async(req,res)=>{
  }catch(e){res.status(500).json({error:e.message});}
 });
 
-router.post('/:mrId/focus-products', authorize('mr:create'), async(req,res)=>{
+router.post('/:mrId/focus-products', authorize('mr:create'), idempotency, async(req,res)=>{
  try{const p=await Product.findById(req.body.productId);if(!p)return res.status(404).json({error:'Product not found'});const doc=await FocusProduct.create({...req.body,productId:p._id,productName:p.name,mrIds:req.body.mrIds?.length?req.body.mrIds:[req.params.mrId]});res.status(201).json(doc);}catch(e){res.status(400).json({error:e.message});}
 });
 router.get('/:mrId/focus-products', authorize('mr:view'), async(req,res)=>{try{const now=new Date();const docs=await FocusProduct.find({active:true,validFrom:{$lte:now},$and:[{$or:[{mrIds:{$size:0}},{mrIds:req.params.mrId}]},{$or:[{validUntil:null},{validUntil:{$gte:now}}]}]}).lean();const visits=await MrVisit.find({mrId:req.params.mrId,date:{$gte:new Date(now.getFullYear(),now.getMonth(),1)}}).lean();const orders=await Order.find({sourcePersonId:req.params.mrId,createdAt:{$gte:new Date(now.getFullYear(),now.getMonth(),1)},status:{$nin:['draft','cancelled']}}).lean();const rows=docs.map(d=>{const calls=visits.filter(v=>(v.promotedProducts||[]).some(x=>String(x.productId)===String(d.productId))).length;const productOrders=orders.reduce((n,o)=>n+(o.items||[]).some(i=>String(i.productId)===String(d.productId))?1:0,0);const sales=money(orders.reduce((s,o)=>s+(o.items||[]).filter(i=>String(i.productId)===String(d.productId)).reduce((a,i)=>a+Number(i.qty||0)*Number(i.price||0),0),0));return {...d,calls,orders:productOrders,sales,callAchievement:d.targetCalls?money(calls/d.targetCalls*100):null,orderAchievement:d.targetOrders?money(productOrders/d.targetOrders*100):null};});res.json(rows);}catch(e){res.status(500).json({error:e.message});}});
 
-router.post('/:mrId/competitors', authorize('mr:create'), async(req,res)=>{try{const doc=await CompetitorObservation.create({...req.body,mrId:req.params.mrId});res.status(201).json(doc);}catch(e){res.status(400).json({error:e.message});}});
+router.post('/:mrId/competitors', authorize('mr:create'), idempotency, async(req,res)=>{try{const doc=await CompetitorObservation.create({...req.body,mrId:req.params.mrId});res.status(201).json(doc);}catch(e){res.status(400).json({error:e.message});}});
 router.get('/:mrId/competitors', authorize('mr:view'), async(req,res)=>{try{res.json(await CompetitorObservation.find({mrId:req.params.mrId}).sort({observedAt:-1}).limit(200).lean());}catch(e){res.status(500).json({error:e.message});}});
 
 router.get('/:mrId/attribution', authorize('mr:view'), async(req,res)=>{

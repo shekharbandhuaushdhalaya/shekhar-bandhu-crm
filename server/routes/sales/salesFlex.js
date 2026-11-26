@@ -40,7 +40,7 @@ router.get('/dashboard', authorize('report:view'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/orders', idempotency, authorize('order:create'), async (req, res) => {
+router.post('/orders', authorize('order:create'), idempotency, async (req, res) => {
   try {
     const result = await createSalesOrder({
       ...req.body,
@@ -52,7 +52,7 @@ router.post('/orders', idempotency, authorize('order:create'), async (req, res) 
   } catch (error) { res.status(error.status || 400).json({ error: error.message, code: error.code || 'ORDER_CREATE_FAILED' }); }
 });
 
-router.post('/orders/:id/fulfill', idempotency, authorize('order:fulfill'), async (req, res) => {
+router.post('/orders/:id/fulfill', authorize('order:fulfill'), idempotency, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found', code: 'ORDER_NOT_FOUND' });
@@ -61,7 +61,7 @@ router.post('/orders/:id/fulfill', idempotency, authorize('order:fulfill'), asyn
   } catch (error) { res.status(error.status || 400).json({ error: error.message, code: error.code || 'FULFILLMENT_CREATE_FAILED' }); }
 });
 
-router.post('/orders/:id/reconcile-fulfillment', authorize('order:fulfill'), async (req, res) => {
+router.post('/orders/:id/reconcile-fulfillment', authorize('order:fulfill'), idempotency, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
@@ -78,7 +78,7 @@ router.post('/orders/:id/reconcile-fulfillment', authorize('order:fulfill'), asy
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-router.post('/invoices/:id/split-payment', idempotency, authorize('payment:create'), async (req, res) => {
+router.post('/invoices/:id/split-payment', authorize('payment:create'), idempotency, async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ _id: req.params.id, type: 'sale', isFinalized: true });
     if (!invoice || !invoice.customerId) return res.status(404).json({ error: 'Finalized customer-linked Sale Invoice not found', code: 'INVOICE_NOT_FOUND' });
@@ -93,18 +93,18 @@ router.post('/invoices/:id/split-payment', idempotency, authorize('payment:creat
   } catch (error) { res.status(400).json({ error: error.message, code: error.code || 'SPLIT_PAYMENT_FAILED' }); }
 });
 
-router.post('/returns', authorize('salesreturn:create'), async (req, res) => {
+router.post('/returns', authorize('salesreturn:create'), idempotency, async (req, res) => {
   try { res.status(201).json(await createSalesReturn(req.body)); }
   catch (error) { res.status(error.code?.includes('NOT_FOUND') ? 404 : 400).json({ error: error.message, code: error.code || 'RETURN_CREATE_FAILED' }); }
 });
-router.post('/returns/:id/post', idempotency, authorize('salesreturn:post'), async (req, res) => {
+router.post('/returns/:id/post', authorize('salesreturn:post'), idempotency, async (req, res) => {
   try {
     const result = await postSalesReturn(req.params.id, { id: req.user?.id, name: req.user?.name || 'System' });
     if (req.io) { req.io.emit('inventory_updated', { type: 'sales_return_posted', returnId: req.params.id }); req.io.emit('invoice_updated', { type: 'sales_return_credit', returnId: req.params.id }); }
     res.json(result);
   } catch (error) { res.status(400).json({ error: error.message, code: error.code || 'RETURN_POST_FAILED' }); }
 });
-router.post('/returns/:id/reverse', idempotency, authorize('salesreturn:reverse'), async (req, res) => {
+router.post('/returns/:id/reverse', authorize('salesreturn:reverse'), idempotency, async (req, res) => {
   try {
     const result = await reverseSalesReturn(req.params.id, { id: req.user?.id, name: req.user?.name || 'System' }, req.body.reason || '');
     if (req.io) req.io.emit('inventory_updated', { type: 'sales_return_reversed', returnId: req.params.id });
@@ -117,11 +117,11 @@ router.get('/returns', authorize('salesreturn:view'), async (req, res) => {
 });
 
 router.get('/schemes', authorize('pricing:view'), async (req, res) => res.json(await SalesScheme.find({}).sort({ createdAt: -1 }).lean()));
-router.post('/schemes', authorize('pricing:edit'), async (req, res) => { try { res.status(201).json(await SalesScheme.create(req.body)); } catch (error) { res.status(400).json({ error: error.message }); } });
-router.put('/schemes/:id', authorize('pricing:edit'), async (req, res) => { try { res.json(await SalesScheme.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })); } catch (error) { res.status(400).json({ error: error.message }); } });
+router.post('/schemes', authorize('pricing:edit'), idempotency, async (req, res) => { try { res.status(201).json(await SalesScheme.create(req.body)); } catch (error) { res.status(400).json({ error: error.message }); } });
+router.put('/schemes/:id', authorize('pricing:edit'), idempotency, async (req, res) => { try { res.json(await SalesScheme.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })); } catch (error) { res.status(400).json({ error: error.message }); } });
 
 router.get('/commission-rules', authorize('report:view'), async (req, res) => res.json(await CommissionRule.find({}).sort({ createdAt: -1 }).lean()));
-router.post('/commission-rules', authorize('settings:edit'), async (req, res) => { try { res.status(201).json(await CommissionRule.create(req.body)); } catch (error) { res.status(400).json({ error: error.message }); } });
+router.post('/commission-rules', authorize('settings:edit'), idempotency, async (req, res) => { try { res.status(201).json(await CommissionRule.create(req.body)); } catch (error) { res.status(400).json({ error: error.message }); } });
 router.get('/commissions', authorize('report:view'), async (req, res) => {
   try {
     const from = req.query.from ? new Date(req.query.from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -143,7 +143,7 @@ router.get('/commissions', authorize('report:view'), async (req, res) => {
 });
 
 router.get('/policy', authorize('pricing:view'), async (req, res) => { try { res.json(await getSalesPolicy()); } catch (error) { res.status(500).json({ error: error.message }); } });
-router.put('/policy', authorize('pricing:edit'), async (req, res) => {
+router.put('/policy', authorize('pricing:edit'), idempotency, async (req, res) => {
   try {
     const current = await SystemSettings.findOne({ key: 'company_config' });
     const policy = { autoApproveBelow: Number(req.body.autoApproveBelow ?? 50000), maxAutoDiscountPercent: Number(req.body.maxAutoDiscountPercent ?? 10), blockCreditLimit: req.body.blockCreditLimit !== false, allowBackorder: req.body.allowBackorder !== false };
@@ -161,7 +161,7 @@ router.get('/availability/:productId', authorize('inventory:view'), async (req, 
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/quick-sale', idempotency, authorize('order:create'), async (req, res) => {
+router.post('/quick-sale', authorize('order:create'), idempotency, async (req, res) => {
   try {
     const { order, credit, policy } = await createSalesOrder({ ...req.body, orderChannel: 'crm' });
     if (order.approvalRequired) {

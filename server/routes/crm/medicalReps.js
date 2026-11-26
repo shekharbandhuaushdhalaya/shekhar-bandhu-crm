@@ -883,7 +883,7 @@ router.get('/:mrId/sample-bag', authorize('mr:view'), async (req, res) => {
   }
 });
 
-router.post('/:mrId/sample-bag/issue', requiredIdempotency, authorize('mr:edit'), validate(schemas.mrSampleIssueSchema), async (req, res) => {
+router.post('/:mrId/sample-bag/issue', authorize('mr:edit'), validate(schemas.mrSampleIssueSchema), requiredIdempotency, async (req, res) => {
   try {
     if (!(await verifyMrAccess(req, req.params.mrId))) return res.status(403).json({ error: 'Access denied' });
     const { productId, batchNo = '', qty, warehouseId } = req.body;
@@ -965,7 +965,7 @@ router.get('/:mrId/sample-stock', authorize('mr:view'), async (req, res) => {
 });
 
 // POST /api/medical-reps/:mrId/sample-stock/issue — allocate approved warehouse stock into the canonical MR bag
-router.post('/:mrId/sample-stock/issue', requiredIdempotency, authorize('mr:edit'), async (req, res) => {
+router.post('/:mrId/sample-stock/issue', authorize('mr:edit'), requiredIdempotency, async (req, res) => {
   try {
     if (!(await verifyMrAccess(req, req.params.mrId))) return res.status(403).json({ error: 'Access denied' });
     const { items, warehouseId } = req.body;
@@ -982,7 +982,7 @@ router.post('/:mrId/sample-stock/issue', requiredIdempotency, authorize('mr:edit
 });
 
 // POST /api/medical-reps/sample-stock/issue-to-doctor — backwards-compatible direct issuance using the same MR bag
-router.post(['/sample-stock/issue-to-doctor', '/issue-to-doctor'], requiredIdempotency, authorize('mr:visits'), async (req, res) => {
+router.post(['/sample-stock/issue-to-doctor', '/issue-to-doctor'], authorize('mr:visits'), requiredIdempotency, async (req, res) => {
   try {
     const MrSampleIssuance = require('../../models/MrSampleIssuance');
     const Product = require('../../models/Product');

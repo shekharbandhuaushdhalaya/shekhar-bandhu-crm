@@ -2,6 +2,7 @@ const express = require('express');
 const Doctor = require('../../models/Doctor');
 const MrVisit = require('../../models/MrVisit');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -272,7 +273,7 @@ router.get('/:id/sample-roi', authorize('mr:view'), async (req, res) => {
 });
 
 // POST /api/doctors — Create doctor
-router.post('/', authorize('mr:create'), async (req, res) => {
+router.post('/', authorize('mr:create'), idempotency, async (req, res) => {
   try {
     const doctor = await Doctor.create(req.body);
     res.status(201).json(doctor);
@@ -282,7 +283,7 @@ router.post('/', authorize('mr:create'), async (req, res) => {
 });
 
 // PUT /api/doctors/:id — Update doctor
-router.put('/:id', authorize('mr:edit'), async (req, res) => {
+router.put('/:id', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     const doctor = await Doctor.findByIdAndUpdate(
       req.params.id,
@@ -299,7 +300,7 @@ router.put('/:id', authorize('mr:edit'), async (req, res) => {
 });
 
 // DELETE /api/doctors/:id — Delete doctor
-router.delete('/:id', authorize('mr:delete'), async (req, res) => {
+router.delete('/:id', authorize('mr:delete'), idempotency, async (req, res) => {
   try {
     const doctor = await Doctor.findByIdAndDelete(req.params.id);
     if (!doctor) {

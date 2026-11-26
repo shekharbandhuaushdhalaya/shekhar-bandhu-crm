@@ -6,6 +6,7 @@ const Invoice = require('../../models/Invoice');
 const User = require('../../models/User');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 
 // GET all targets (optionally filtered by month/year)
 router.get('/', authorize('report:view'), async (req, res) => {
@@ -60,7 +61,7 @@ router.get('/commission', authorize('report:view'), async (req, res) => {
 });
 
 // POST set/update target (upsert)
-router.post('/', authorize('settings:edit'), validate(schemas.salesTargetSchema), async (req, res) => {
+router.post('/', authorize('settings:edit'), validate(schemas.salesTargetSchema), idempotency, async (req, res) => {
   try {
     const { agentId, agentName, month, year, targetAmount, notes } = req.body;
     const target = await SalesTarget.findOneAndUpdate(
@@ -78,7 +79,7 @@ router.post('/', authorize('settings:edit'), validate(schemas.salesTargetSchema)
 });
 
 // DELETE
-router.delete('/:id', authorize('settings:edit'), async (req, res) => {
+router.delete('/:id', authorize('settings:edit'), idempotency, async (req, res) => {
   try {
     await SalesTarget.findByIdAndDelete(req.params.id);
     if (req.io) {
