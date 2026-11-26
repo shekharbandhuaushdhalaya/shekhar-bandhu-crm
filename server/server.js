@@ -367,6 +367,7 @@ app.use((req, res) => {
 
 // Global error handler (must be after all routes)
 app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
   console.error(JSON.stringify({ level: 'error', requestId: req.requestId, path: req.path, method: req.method, error: err.message, stack: config.isProduction ? undefined : err.stack }));
   const status = err.status || 500;
   res.status(status).json({ error: status >= 500 && config.isProduction ? 'Internal server error' : (err.message || 'Internal server error'), requestId: req.requestId });
