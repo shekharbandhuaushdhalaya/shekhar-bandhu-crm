@@ -35,6 +35,10 @@ const creditNoteSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   finalizedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   finalizedAt: { type: Date, default: null },
+  cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  cancelledByName: { type: String, default: '' },
+  cancelledAt: { type: Date, default: null },
+  cancellationReason: { type: String, default: '' },
   items: [creditNoteItemSchema]
 }, { timestamps: true });
 
