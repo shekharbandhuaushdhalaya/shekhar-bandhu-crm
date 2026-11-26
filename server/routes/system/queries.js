@@ -21,7 +21,7 @@ router.get('/', authorize('contact:view'), async (req, res) => {
     const queries = await ProductQuery.find({}).sort({ createdAt: -1 }).lean();
     res.json(queries);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to retrieve queries' });
   }
 });
 
@@ -40,7 +40,7 @@ router.patch('/:id/status', authorize('contact:edit'), idempotency, async (req, 
     if (!updated) return res.status(404).json({ error: 'Query not found' });
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to update query status' });
   }
 });
 
@@ -90,7 +90,7 @@ router.post('/:id/convert', authorize('contact:create'), validate(schemas.queryC
 
     res.json({ message: 'Query converted to lead successfully', lead, query: queryDoc });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to convert query to lead' });
   }
 });
 
