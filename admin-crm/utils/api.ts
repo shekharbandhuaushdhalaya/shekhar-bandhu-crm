@@ -362,6 +362,7 @@ class ApiClient {
   async updateUserPermissions(id: string, data: { role?: string; canAccessCash?: boolean }): Promise<any> {
     const res = await this.request(`${API_BASE}/auth/users/${id}`, {
       method: 'PUT',
+      headers: { 'Idempotency-Key': createMutationKey(`user-update-${id}`) },
       body: JSON.stringify(data),
     });
     return res.json();
@@ -370,6 +371,7 @@ class ApiClient {
   async deleteUser(id: string): Promise<any> {
     const res = await this.request(`${API_BASE}/auth/users/${id}`, {
       method: 'DELETE',
+      headers: { 'Idempotency-Key': createMutationKey(`user-delete-${id}`) },
     });
     return res.json();
   }
@@ -452,6 +454,7 @@ class ApiClient {
   async updateProfile(data: { name: string; email: string }): Promise<any> {
     const res = await this.request(`${API_BASE}/auth/update-profile`, {
       method: 'PUT',
+      headers: { 'Idempotency-Key': createMutationKey('profile-update') },
       body: JSON.stringify(data),
     });
     return res.json();
