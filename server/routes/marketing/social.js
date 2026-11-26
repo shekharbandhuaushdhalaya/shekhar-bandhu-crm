@@ -4,6 +4,7 @@ const SocialIntegration = require('../../models/SocialIntegration');
 const jwt = require('jsonwebtoken');
 const config = require('../../src/config');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { runWithTenant } = require('../../utils/tenantContext');
 // Native global fetch will be used (Node 18+)
 
@@ -135,7 +136,7 @@ router.get('/accounts', authorize('campaign:view'), async (req, res) => {
 });
 
 // 4. DELETE /api/social/accounts/:id -> Disconnect an integration
-router.delete('/accounts/:id', authorize('campaign:edit'), async (req, res) => {
+router.delete('/accounts/:id', authorize('campaign:edit'), idempotency, async (req, res) => {
   try {
     await SocialIntegration.findByIdAndDelete(req.params.id);
     res.json({ message: 'Account disconnected successfully' });
@@ -145,7 +146,7 @@ router.delete('/accounts/:id', authorize('campaign:edit'), async (req, res) => {
 });
 
 // 5. POST /api/social/publish -> Publish post to Facebook / Instagram
-router.post('/publish', authorize('campaign:publish'), async (req, res) => {
+router.post('/publish', authorize('campaign:publish'), idempotency, async (req, res) => {
   const { platforms, text, imageUrl } = req.body;
 
   if (!text) {
