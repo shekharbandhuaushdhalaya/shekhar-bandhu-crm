@@ -8,7 +8,6 @@ const rolePermissionSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    unique: true,
   },
   permissions: {
     type: [String],
@@ -22,6 +21,12 @@ const rolePermissionSchema = new mongoose.Schema({
   description: { type: String, default: '' },
   isCustom: { type: Boolean, default: false },
 }, { timestamps: true });
+
+// Role names are unique within a firm, not globally across all firms.
+rolePermissionSchema.index(
+  { firmId: 1, role: 1 },
+  { unique: true, partialFilterExpression: { firmId: { $type: 'objectId' } } }
+);
 
 rolePermissionSchema.plugin(tenantPlugin);
 
