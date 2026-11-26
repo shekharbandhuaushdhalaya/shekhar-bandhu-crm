@@ -149,7 +149,7 @@ router.post('/', idempotency, authorize('inventory:create'), validate(schemas.in
     if (req.io) req.io.emit('inventory_updated', { type: 'entry_created', id: result._id, productId: result.productId });
     await logAction({ action: 'INVENTORY_RECEIPT_CREATED', description: `Received ${result.qtyBoxes} boxes into ${result.warehouseName}`, details: { id: result._id, productId: result.productId, warehouseId: result.warehouseId }, req });
     res.status(201).json(result);
-  } catch (err) { res.status(['WAREHOUSE_NOT_FOUND','PRODUCT_NOT_FOUND'].includes(err.code) ? 404 : 400).json({ error: err.message, code: err.code }); }
+  } catch (err) { res.status(err.statusCode || (['WAREHOUSE_NOT_FOUND','PRODUCT_NOT_FOUND'].includes(err.code) ? 404 : 400)).json({ error: err.message, code: err.code }); }
 });
 
 // PUT /api/inventory-entries/:id — Manual adjustment. Slot, aggregate stock and ledger post atomically.
