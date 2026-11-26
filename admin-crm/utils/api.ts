@@ -1135,15 +1135,15 @@ class ApiClient {
     return res.json();
   }
   async createManufacturingUnit(data: Partial<ManufacturingUnit>): Promise<ManufacturingUnit> {
-    const res = await this.request(`${API_BASE}/manufacturing-units`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/manufacturing-units`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('manufacturing-unit-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateManufacturingUnit(id: string, data: Partial<ManufacturingUnit>): Promise<ManufacturingUnit> {
-    const res = await this.request(`${API_BASE}/manufacturing-units/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/manufacturing-units/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`manufacturing-unit-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteManufacturingUnit(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/manufacturing-units/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/manufacturing-units/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`manufacturing-unit-delete-${id}`) } });
     return res.ok;
   }
 
@@ -1353,11 +1353,11 @@ class ApiClient {
     }
   }
   async configureBOM(data: { productId: string; batchYieldSize: number; ingredients: { rawMaterialId: string; qtyRequired: number; itemType?: string; stageName?: string }[]; isActive?: boolean; productionNotes?: string; overheadCost?: number; stages?: any[]; defaultProductionType?: string; defaultJobWorkMode?: string; defaultPackagingMode?: string; defaultJobWorkerId?: string | null; recipeName?: string; isDefault?: boolean }): Promise<BillOfMaterials> {
-    const res = await this.request(`${API_BASE}/bom`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/bom`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`bom-create-${data.productId}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteBOM(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/bom/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/bom/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`bom-delete-${id}`) } });
     return res.ok;
   }
 
@@ -1374,7 +1374,7 @@ class ApiClient {
     return res.json();
   }
   async startBatchProduction(data: { productId: string; plannedQty: number; batchNo: string; manufacturingUnitId: string; productionType?: string; jobWorkMode?: string; packagingMode?: string; jobWorkerId?: string | null; jobWorkerName?: string; jobWorkerChallanRef?: string; bomId?: string; plannedYields?: { productId: string; plannedQty: number; size?: string }[] }): Promise<BatchProduction> {
-    const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/batch-productions`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('batch-production-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async getMaterialDispensings(id: string): Promise<any[]> {
@@ -1394,25 +1394,25 @@ class ApiClient {
     return res.json();
   }
   async advanceStage(id: string, stageIndex: number, data: { status?: string; notes?: string; completedBy?: string; lossReason?: string; actualYieldQty?: number; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[] }): Promise<BatchProduction> {
-    const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/stage/${stageIndex}`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`batch-stage-update-${id}-${stageIndex}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async completeBatchProduction(id: string, data: { actualYieldQty: number; wasteQty?: number; wasteReason?: string; qcNotes: string; qcPassedBy: string; packing?: number; yields?: { productId: string; actualYieldQty: number; packing?: number; size?: string }[]; warehouseId: string; qcStatus?: string; organoleptic?: string; moistureContent?: number | null; ashValue?: number | null; pHValue?: number | null; disintegrationTime?: number | null; heavyMetals?: string; microbialLimit?: string; labReportRef?: string; jobWorkerCertificateRef?: string; coaDocumentRef?: string; jobWorkCharges?: number }): Promise<any> {
-    const res = await this.request(`${API_BASE}/batch-productions/${id}/complete`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/complete`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`batch-complete-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async recordBatchQcTests(id: string, data: { qcSpecificationId?: string; tests: Array<{
     code: string; result?: string; numericResult?: number; status: 'pass' | 'fail'; remarks?: string;
   }> }): Promise<any> {
-    const res = await this.request(`${API_BASE}/batch-productions/${id}/qc-tests`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/qc-tests`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`batch-qc-tests-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async approveBatchQcDisposition(id: string, notes: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/batch-productions/${id}/qc-approval`, { method: 'PATCH', body: JSON.stringify({ notes }) });
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/qc-approval`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`batch-qc-approval-${id}`) }, body: JSON.stringify({ notes }) });
     return res.json();
   }
   async releaseBatchProduction(id: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/batch-productions/${id}/release`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/batch-productions/${id}/release`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`batch-release-${id}`) } });
     return res.json();
   }
   async cancelBatchProduction(id: string): Promise<BatchProduction> {
@@ -1442,22 +1442,23 @@ class ApiClient {
   async updateRolePermissions(role: string, permissions: string[], mfaPermissions?: string[]): Promise<RolePermissionConfig> {
     const res = await this.request(`${API_BASE}/rbac/permissions/${role}`, {
       method: 'PUT',
+      headers: { 'Idempotency-Key': createMutationKey(`rbac-role-update-${role}`) },
       body: JSON.stringify({ permissions, mfaPermissions }),
     });
     return res.json();
   }
   async createRole(data: { role: string; permissions?: string[]; label?: string; description?: string }): Promise<RolePermissionConfig> {
     const res = await this.request(`${API_BASE}/rbac/permissions`, {
-      method: 'POST', body: JSON.stringify(data)
+      method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`rbac-role-create-${data.role}`) }, body: JSON.stringify(data)
     });
     return res.json();
   }
   async deleteRole(role: string): Promise<{ message: string }> {
-    const res = await this.request(`${API_BASE}/rbac/permissions/${encodeURIComponent(role)}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/rbac/permissions/${encodeURIComponent(role)}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`rbac-role-delete-${role}`) } });
     return res.json();
   }
   async resetRolePermissions(role: string): Promise<RolePermissionConfig> {
-    const res = await this.request(`${API_BASE}/rbac/permissions/${role}/reset`, { method: 'POST' });
+    const res = await this.request(`${API_BASE}/rbac/permissions/${role}/reset`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`rbac-role-reset-${role}`) } });
     return res.json();
   }
   async getMyPermissions(): Promise<{ role: string; permissions: string[] }> {
@@ -1754,15 +1755,15 @@ class ApiClient {
     return res.json();
   }
   async createComplaint(data: Partial<Complaint>): Promise<Complaint> {
-    const res = await this.request(`${API_BASE}/complaints`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/complaints`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('complaint-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateComplaint(id: string, data: Partial<Complaint>): Promise<Complaint> {
-    const res = await this.request(`${API_BASE}/complaints/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/complaints/${id}`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`complaint-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteComplaint(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/complaints/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/complaints/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`complaint-delete-${id}`) } });
     return res.ok;
   }
 
@@ -1832,11 +1833,11 @@ class ApiClient {
     return res.json();
   }
   async updateDispatch(id: string, data: Partial<Dispatch>): Promise<Dispatch> {
-    const res = await this.request(`${API_BASE}/dispatches/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/dispatches/${id}`, { method: 'PATCH', headers: { 'Idempotency-Key': createMutationKey(`dispatch-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteDispatch(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/dispatches/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/dispatches/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`dispatch-delete-${id}`) } });
     return res.ok;
   }
   async getDeadStock(): Promise<DeadStockItem[]> {
@@ -1860,15 +1861,15 @@ class ApiClient {
     return res.json();
   }
   async createDoctor(data: Partial<Doctor>): Promise<Doctor> {
-    const res = await this.request(`${API_BASE}/doctors`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/doctors`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('doctor-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateDoctor(id: string, data: Partial<Doctor>): Promise<Doctor> {
-    const res = await this.request(`${API_BASE}/doctors/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/doctors/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`doctor-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteDoctor(id: string): Promise<void> {
-    await this.request(`${API_BASE}/doctors/${id}`, { method: 'DELETE' });
+    await this.request(`${API_BASE}/doctors/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`doctor-delete-${id}`) } });
   }
   async getDoctorEvents(): Promise<any[]> {
     const res = await this.request(`${API_BASE}/doctors/events`);
@@ -1902,6 +1903,7 @@ class ApiClient {
   async submitLabelReconciliation(batchId: string, items: any[]): Promise<any> {
     const res = await this.request(`${API_BASE}/batch-productions/${batchId}/label-reconciliation`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': createMutationKey(`batch-label-reconciliation-${batchId}`) },
       body: JSON.stringify({ items })
     });
     return res.json();
@@ -1917,6 +1919,7 @@ class ApiClient {
   async dispatchJobWork(batchId: string, payload: any): Promise<any> {
     const res = await this.request(`${API_BASE}/batch-productions/${batchId}/job-work/dispatch`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': createMutationKey(`batch-job-work-dispatch-${batchId}`) },
       body: JSON.stringify(payload)
     });
     return res.json();
@@ -1924,6 +1927,7 @@ class ApiClient {
   async receiveJobWork(batchId: string, payload: any): Promise<any> {
     const res = await this.request(`${API_BASE}/batch-productions/${batchId}/job-work/receive`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': createMutationKey(`batch-job-work-receive-${batchId}`) },
       body: JSON.stringify(payload)
     });
     return res.json();
@@ -1931,6 +1935,7 @@ class ApiClient {
   async submitBmrDualEsign(batchId: string, stageIndex: number, payload: any): Promise<any> {
     const res = await this.request(`${API_BASE}/batch-productions/${batchId}/stages/${stageIndex}/dual-esign`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': createMutationKey(`batch-dual-esign-${batchId}-${stageIndex}`) },
       body: JSON.stringify(payload)
     });
     return res.json();
