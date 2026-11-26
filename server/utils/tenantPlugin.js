@@ -33,19 +33,26 @@ module.exports = function tenantPlugin(schema) {
     this.setQuery({ $and: [query, { firmId }] });
   }
 
-  const hasFirmPath = key => key === 'firmId' || key.startsWith('firmId.');
-  function containsFirmId(value) {
-    if (!value || typeof value !== 'object') return false;
-    if (Array.isArray(value)) return value.some(containsFirmId);
-    return Object.entries(value).some(([key, nested]) =>
-      hasFirmPath(key) || containsFirmId(nested)
-    );
+  const hasFirmPath = key => typeof key === 'string' && (key === 'firmId' || key.startsWith('firmId.'));
+  function updatesTenantOwnership(update) {
+    if (!update || typeof update !== 'object' || Array.isArray(update)) return false;
+    return Object.entries(update).some(([operator, payload]) => {
+      if (operator.startsWith('$')) {
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+        const paths = Object.keys(payload);
+        if (paths.some(hasFirmPath)) return true;
+        // $rename names the destination in the value, not the source key.
+        return operator === '$rename' && Object.values(payload).some(hasFirmPath);
+      }
+      // A replacement document has ordinary top-level field names.
+      return hasFirmPath(operator);
+    });
   }
 
   function rejectTenantOwnershipMutation(next) {
     if (!getFirmId()) return next();
     const update = this.getUpdate ? this.getUpdate() : null;
-    if (containsFirmId(update)) {
+    if (updatesTenantOwnership(update)) {
       return next(new Error('Tenant ownership is immutable; firmId updates are rejected'));
     }
     return next();
@@ -56,7 +63,7 @@ module.exports = function tenantPlugin(schema) {
     'countDocuments', 'exists', 'distinct', 'deleteMany', 'deleteOne',
     'updateMany', 'updateOne', 'replaceOne'
   ].forEach(hook => {
-    schema.pre(hook, { query: true, document: false }, rejectTenantOwnershipMutation);
+    schema.pre(hook, rejectTenantOwnershipMutation);
     schema.pre(hook, addTenantFilter);
   });
 
@@ -81,7 +88,7 @@ module.exports = function tenantPlugin(schema) {
       if (operation.updateOne || operation.updateMany) {
         const key = operation.updateOne ? 'updateOne' : 'updateMany';
         const item = operation[key];
-        if (containsFirmId(item.update)) {
+        if (updatesTenantOwnership(item.update)) {
           throw new Error('Tenant ownership is immutable; firmId updates are rejected');
         }
         const update = { ...(item.update || {}) };
