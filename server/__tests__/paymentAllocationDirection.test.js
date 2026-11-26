@@ -10,7 +10,7 @@ describe('Payment allocation direction', () => {
 
   test('rejects customer refunds against sales invoices', () => {
     expect(() => assertAllocationOwnership(saleInvoice, 'Customer', 'customer-1', 'make'))
-      .toThrow(expect.objectContaining({ code: 'ALLOCATION_PAYMENT_DIRECTION_MISMATCH' }));
+      .toThrow('Only customer receipts can be allocated to sales invoices');
   });
 
   test('allows vendor payments against their finalized purchase invoices', () => {
@@ -19,6 +19,6 @@ describe('Payment allocation direction', () => {
 
   test('rejects vendor refunds against purchase invoices', () => {
     expect(() => assertAllocationOwnership(purchaseInvoice, 'Vendor', 'vendor-1', 'receive'))
-      .toThrow(expect.objectContaining({ code: 'ALLOCATION_PAYMENT_DIRECTION_MISMATCH' }));
+      .toThrow('Only vendor payments can be allocated to purchase invoices');
   });
 });
