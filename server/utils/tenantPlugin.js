@@ -30,30 +30,25 @@ module.exports = function tenantPlugin(schema) {
     const firmId = getFirmId();
     if (!firmId) return;
     const query = this.getQuery ? this.getQuery() : {};
-    // Keep tenant scope as an independent predicate. Merging with object spread
-    // can replace an existing firmId condition and makes caller filters ambiguous.
-    // The $and guarantees that a caller-supplied tenant can never widen access.
     this.setQuery({ $and: [query, { firmId }] });
   }
 
-  function rejectTenantOwnershipMutation() {
-    if (!getFirmId()) return;
+  const hasFirmPath = key => key === 'firmId' || key.startsWith('firmId.');
+  function containsFirmId(value) {
+    if (!value || typeof value !== 'object') return false;
+    if (Array.isArray(value)) return value.some(containsFirmId);
+    return Object.entries(value).some(([key, nested]) =>
+      hasFirmPath(key) || containsFirmId(nested)
+    );
+  }
+
+  function rejectTenantOwnershipMutation(next) {
+    if (!getFirmId()) return next();
     const update = this.getUpdate ? this.getUpdate() : null;
-    if (!update) return;
-    const hasFirmPath = key => key === 'firmId' || key.startsWith('firmId.');
-    const containsFirmId = value => {
-      if (!value || typeof value !== 'object') return false;
-      if (Array.isArray(value)) return true;
-      return Object.entries(value).some(([operator, fields]) =>
-        hasFirmPath(operator) ||
-        (fields && typeof fields === 'object' && !Array.isArray(fields) &&
-          (Object.keys(fields).some(hasFirmPath) ||
-           (operator === '$rename' && Object.values(fields).some(hasFirmPath))))
-      );
-    };
     if (containsFirmId(update)) {
-      throw new Error('Tenant ownership is immutable; firmId updates are rejected');
+      return next(new Error('Tenant ownership is immutable; firmId updates are rejected'));
     }
+    return next();
   }
 
   [
@@ -61,7 +56,7 @@ module.exports = function tenantPlugin(schema) {
     'countDocuments', 'exists', 'distinct', 'deleteMany', 'deleteOne',
     'updateMany', 'updateOne', 'replaceOne'
   ].forEach(hook => {
-    schema.pre(hook, rejectTenantOwnershipMutation);
+    schema.pre(hook, { query: true, document: false }, rejectTenantOwnershipMutation);
     schema.pre(hook, addTenantFilter);
   });
 
@@ -72,17 +67,6 @@ module.exports = function tenantPlugin(schema) {
     if (!firmId) return mongoose.Model.bulkWrite.call(this, operations, options);
     if (!Array.isArray(operations)) throw new Error('Tenant-scoped bulkWrite requires an operations array');
 
-    const hasFirmPath = key => key === 'firmId' || key.startsWith('firmId.');
-    const containsFirmId = update => {
-      if (!update || typeof update !== 'object') return false;
-      if (Array.isArray(update)) return true;
-      return Object.entries(update).some(([operator, fields]) => {
-        if (hasFirmPath(operator)) return true;
-        if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return false;
-        return Object.keys(fields).some(hasFirmPath) ||
-          (operator === '$rename' && Object.values(fields).some(hasFirmPath));
-      });
-    };
     const scopedFilter = filter => ({ $and: [filter || {}, { firmId }] });
 
     const scopedOperations = operations.map(operation => {
@@ -97,7 +81,7 @@ module.exports = function tenantPlugin(schema) {
       if (operation.updateOne || operation.updateMany) {
         const key = operation.updateOne ? 'updateOne' : 'updateMany';
         const item = operation[key];
-        if (Array.isArray(item.update) || containsFirmId(item.update)) {
+        if (containsFirmId(item.update)) {
           throw new Error('Tenant ownership is immutable; firmId updates are rejected');
         }
         const update = { ...(item.update || {}) };
