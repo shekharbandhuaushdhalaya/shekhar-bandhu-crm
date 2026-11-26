@@ -1706,7 +1706,7 @@ class ApiClient {
     const route = type === 'batch' ? 'batch-productions' : type === 'invoice' ? 'invoices' : 'challans';
     const res = await this.request(`${API_BASE}/${route}/${id}/documents`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': createMutationKey(`document-add-${type}-${id}`) },
       body: JSON.stringify(doc)
     });
     return res.json();
@@ -1716,7 +1716,7 @@ class ApiClient {
     const route = type === 'batch' ? 'batch-productions' : type === 'invoice' ? 'invoices' : 'challans';
     const res = await this.request(`${API_BASE}/${route}/${id}/documents`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': createMutationKey(`document-delete-${type}-${id}`) },
       body: JSON.stringify({ url })
     });
     return res.json();
@@ -2129,7 +2129,7 @@ class ApiClient {
   }
   async createStockTransfer(data: Partial<StockTransfer>): Promise<StockTransfer> {
     const res = await this.request(`${API_BASE}/inventory/transfers`, {
-      method: 'POST', body: JSON.stringify(data)
+      method: 'POST', headers: { 'Idempotency-Key': createMutationKey('stock-transfer-create') }, body: JSON.stringify(data)
     });
     return res.json();
   }
