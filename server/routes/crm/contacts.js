@@ -5,6 +5,7 @@ const Activity = require('../../models/Activity');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -73,7 +74,7 @@ router.get('/:id', authorize('contact:view'), async (req, res, next) => {
 });
 
 // POST /api/contacts — create contact
-router.post('/', authorize('contact:create'), validate(schemas.contactSchema), async (req, res) => {
+router.post('/', authorize('contact:create'), validate(schemas.contactSchema), idempotency, async (req, res) => {
   try {
     const data = {
       ...req.body,
@@ -97,7 +98,7 @@ router.post('/', authorize('contact:create'), validate(schemas.contactSchema), a
 });
 
 // PUT /api/contacts/:id — update contact (stage changes, full edits)
-router.put('/:id', authorize('contact:edit'), validate(schemas.contactSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('contact:edit'), validate(schemas.contactSchema.partial()), idempotency, async (req, res) => {
   try {
     const contact = await Contact.findById(req.params.id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
@@ -127,7 +128,7 @@ router.put('/:id', authorize('contact:edit'), validate(schemas.contactSchema.par
 });
 
 // POST /api/contacts/:id/interactions — log interaction
-router.post('/:id/interactions', authorize('contact:edit'), validate(schemas.interactionSchema), async (req, res) => {
+router.post('/:id/interactions', authorize('contact:edit'), validate(schemas.interactionSchema), idempotency, async (req, res) => {
   try {
     const contact = await Contact.findById(req.params.id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
@@ -149,7 +150,7 @@ router.post('/:id/interactions', authorize('contact:edit'), validate(schemas.int
 });
 
 // DELETE /api/contacts/:id — remove contact
-router.delete('/:id', authorize('contact:delete'), async (req, res) => {
+router.delete('/:id', authorize('contact:delete'), idempotency, async (req, res) => {
   try {
     const contact = await Contact.findByIdAndDelete(req.params.id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
@@ -203,7 +204,7 @@ router.get('/duplicates/scan', authorize('contact:view'), async (req, res) => {
 });
 
 // POST /api/contacts/merge — Merge duplicate contact into target master contact
-router.post('/merge', authorize('contact:edit'), async (req, res) => {
+router.post('/merge', authorize('contact:edit'), idempotency, async (req, res) => {
   try {
     const { masterId, duplicateId } = req.body;
     if (!masterId || !duplicateId) {

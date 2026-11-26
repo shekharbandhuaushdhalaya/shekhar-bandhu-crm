@@ -484,19 +484,19 @@ class ApiClient {
     return res.json();
   }
   async createContact(data: Partial<Contact>): Promise<Contact> {
-    const res = await this.request(`${API_BASE}/contacts`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/contacts`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('contact-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateContactStage(id: string, stage: string): Promise<Contact> {
-    const res = await this.request(`${API_BASE}/contacts/${id}`, { method: 'PUT', body: JSON.stringify({ stage }) });
+    const res = await this.request(`${API_BASE}/contacts/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`contact-update-${id}`) }, body: JSON.stringify({ stage }) });
     return res.json();
   }
   async logInteraction(id: string, type: string, note: string): Promise<Contact> {
-    const res = await this.request(`${API_BASE}/contacts/${id}/interactions`, { method: 'POST', body: JSON.stringify({ type, note }) });
+    const res = await this.request(`${API_BASE}/contacts/${id}/interactions`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`contact-interaction-${id}`) }, body: JSON.stringify({ type, note }) });
     return res.json();
   }
   async deleteContact(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/contacts/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/contacts/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`contact-delete-${id}`) } });
     return res.ok;
   }
 
@@ -2083,30 +2083,30 @@ class ApiClient {
   }
   async createCampaign(data: Partial<Campaign>): Promise<Campaign> {
     const res = await this.request(`${API_BASE}/campaigns`, {
-      method: 'POST', body: JSON.stringify(data)
+      method: 'POST', headers: { 'Idempotency-Key': createMutationKey('campaign-create') }, body: JSON.stringify(data)
     });
     return res.json();
   }
   async updateCampaign(id: string, data: Partial<Campaign>): Promise<Campaign> {
     const res = await this.request(`${API_BASE}/campaigns/${id}`, {
-      method: 'PUT', body: JSON.stringify(data)
+      method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`campaign-update-${id}`) }, body: JSON.stringify(data)
     });
     return res.json();
   }
   async launchCampaign(id: string): Promise<Campaign> {
-    const res = await this.request(`${API_BASE}/campaigns/${id}/launch`, { method: 'POST' });
+    const res = await this.request(`${API_BASE}/campaigns/${id}/launch`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`campaign-launch-${id}`) } });
     return res.json();
   }
   async pauseCampaign(id: string): Promise<Campaign> {
-    const res = await this.request(`${API_BASE}/campaigns/${id}/pause`, { method: 'POST' });
+    const res = await this.request(`${API_BASE}/campaigns/${id}/pause`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`campaign-pause-${id}`) } });
     return res.json();
   }
   async completeCampaign(id: string): Promise<Campaign> {
-    const res = await this.request(`${API_BASE}/campaigns/${id}/complete`, { method: 'POST' });
+    const res = await this.request(`${API_BASE}/campaigns/${id}/complete`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey(`campaign-complete-${id}`) } });
     return res.json();
   }
   async deleteCampaign(id: string): Promise<void> {
-    await this.request(`${API_BASE}/campaigns/${id}`, { method: 'DELETE' });
+    await this.request(`${API_BASE}/campaigns/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`campaign-delete-${id}`) } });
   }
 
   // ─── Stock Transfers ───

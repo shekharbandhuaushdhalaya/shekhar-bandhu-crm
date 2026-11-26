@@ -3,6 +3,7 @@ const Campaign = require('../../models/Campaign');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -41,7 +42,7 @@ router.get('/:id', authorize('campaign:view'), async (req, res) => {
 });
 
 // POST /api/campaigns — Create campaign
-router.post('/', authorize('campaign:create'), validate(schemas.campaignSchema), async (req, res) => {
+router.post('/', authorize('campaign:create'), validate(schemas.campaignSchema), idempotency, async (req, res) => {
   try {
     const { name, platform, status, startDate, endDate, budget, targetAudience, content, notes } = req.body;
     if (!name || !name.trim()) {
@@ -69,7 +70,7 @@ router.post('/', authorize('campaign:create'), validate(schemas.campaignSchema),
 });
 
 // PUT /api/campaigns/:id — Update campaign
-router.put('/:id', authorize('campaign:edit'), validate(schemas.campaignSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('campaign:edit'), validate(schemas.campaignSchema.partial()), idempotency, async (req, res) => {
   try {
     const allowed = ['name', 'platform', 'status', 'startDate', 'endDate', 'budget', 'spent', 'targetAudience', 'content', 'notes', 'analytics'];
     const updates = {};
@@ -88,7 +89,7 @@ router.put('/:id', authorize('campaign:edit'), validate(schemas.campaignSchema.p
 });
 
 // POST /api/campaigns/:id/launch — Launch/publish a campaign
-router.post('/:id/launch', authorize('campaign:publish'), async (req, res) => {
+router.post('/:id/launch', authorize('campaign:publish'), idempotency, async (req, res) => {
   try {
     const campaign = await Campaign.findByIdAndUpdate(
       req.params.id,
@@ -103,7 +104,7 @@ router.post('/:id/launch', authorize('campaign:publish'), async (req, res) => {
 });
 
 // POST /api/campaigns/:id/pause — Pause a running campaign
-router.post('/:id/pause', authorize('campaign:publish'), async (req, res) => {
+router.post('/:id/pause', authorize('campaign:publish'), idempotency, async (req, res) => {
   try {
     const campaign = await Campaign.findByIdAndUpdate(
       req.params.id,
@@ -118,7 +119,7 @@ router.post('/:id/pause', authorize('campaign:publish'), async (req, res) => {
 });
 
 // POST /api/campaigns/:id/complete — Mark campaign as completed
-router.post('/:id/complete', authorize('campaign:publish'), async (req, res) => {
+router.post('/:id/complete', authorize('campaign:publish'), idempotency, async (req, res) => {
   try {
     const campaign = await Campaign.findByIdAndUpdate(
       req.params.id,
@@ -133,7 +134,7 @@ router.post('/:id/complete', authorize('campaign:publish'), async (req, res) => 
 });
 
 // DELETE /api/campaigns/:id — Delete campaign
-router.delete('/:id', authorize('campaign:delete'), async (req, res) => {
+router.delete('/:id', authorize('campaign:delete'), idempotency, async (req, res) => {
   try {
     const campaign = await Campaign.findByIdAndDelete(req.params.id);
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
