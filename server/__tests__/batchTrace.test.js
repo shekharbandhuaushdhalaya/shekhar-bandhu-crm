@@ -134,6 +134,36 @@ describe('Task 6 — Batch Recall Traceability Suite (Backward & Forward Trace)'
     expect(res.body.dispatchedTo[0].qtyDispatched).toBe(100);
   });
 
+  it('does not substitute a different lot when an explicit raw-material entry link is broken', async () => {
+    const product = await Product.create({ name: 'Broken Link Trace Product', sku: 'TRACE-LINK-001', stockLevel: 0 });
+    const rawMaterial = await RawMaterial.create({ name: 'Broken Link Herb', sku: 'TRACE-LINK-RM', unit: 'kg', category: 'Herb' });
+    await RawMaterialEntry.create({
+      rawMaterialId: rawMaterial._id, warehouseId: new mongoose.Types.ObjectId(), batchNo: 'LINKED-LOT-01',
+      initialQty: 10, qty: 8, vendorId: new mongoose.Types.ObjectId(), vendorName: 'Unrelated Supplier'
+    });
+    const batchNo = 'FG-TRACE-LINK-001';
+    await BatchProduction.create({
+      batchNo, manufacturingUnitId: new mongoose.Types.ObjectId(), plannedQty: 10, actualYieldQty: 10,
+      productId: product._id, productName: product.name, status: 'completed',
+      ingredientsConsumed: [{
+        rawMaterialId: rawMaterial._id, rawMaterialEntryId: new mongoose.Types.ObjectId(),
+        batchNo: 'LINKED-LOT-01', qtyConsumed: 2
+      }]
+    });
+
+    const response = await request(app).get(`/api/manufacturing/batch-trace/${batchNo}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.rawMaterialsUsed).toHaveLength(1);
+    expect(response.body.rawMaterialsUsed[0].vendorName).toBe('Unassigned');
+    expect(response.body.traceWarnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'RAW_MATERIAL_LOT_ID_NOT_FOUND' })
+    ]));
+    expect(response.body.traceWarnings).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'RAW_MATERIAL_LOT_AMBIGUOUS' })
+    ]));
+  });
+
   it('reports ambiguous raw-material lot genealogy instead of attributing an arbitrary supplier', async () => {
     const product = await Product.create({
       name: 'Ambiguous Trace Product', sku: 'TRACE-AMB-001', stockLevel: 0

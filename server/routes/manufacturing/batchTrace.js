@@ -36,22 +36,33 @@ router.get('/:batchNo', authorize('inventory:view'), async (req, res) => {
         let rmEntry = null;
         let rm = null;
 
-        if (ing.rawMaterialEntryId) {
+        const hasExplicitLotReference = Boolean(ing.rawMaterialEntryId);
+        if (hasExplicitLotReference) {
           rmEntry = await RawMaterialEntry.findById(ing.rawMaterialEntryId).lean();
-          if (rmEntry && (
+          if (!rmEntry) {
+            traceWarnings.push({
+              code: 'RAW_MATERIAL_LOT_ID_NOT_FOUND',
+              batchNo: ing.batchNo || '',
+              rawMaterialEntryId: ing.rawMaterialEntryId,
+              message: 'The explicitly recorded raw-material lot entry could not be found; supplier origin is not inferred'
+            });
+          } else if (
             (ing.rawMaterialId && rmEntry.rawMaterialId && String(ing.rawMaterialId) !== String(rmEntry.rawMaterialId)) ||
             (ing.batchNo && String(ing.batchNo).trim().toLowerCase() !== String(rmEntry.batchNo || '').trim().toLowerCase())
-          )) {
+          ) {
             traceWarnings.push({
               code: 'RAW_MATERIAL_LOT_LINK_MISMATCH',
               batchNo: ing.batchNo || '',
               rawMaterialEntryId: ing.rawMaterialEntryId,
-              message: 'Recorded raw-material lot reference does not match its material or batch number'
+              message: 'Recorded raw-material lot reference does not match its material or batch number; supplier origin is not inferred'
             });
             rmEntry = null;
           }
         }
-        if (!rmEntry && ing.batchNo) {
+
+        // Legacy records without an explicit entry ID may be resolved by a unique
+        // material+lot match. Never replace a broken explicit link with a different lot.
+        if (!hasExplicitLotReference && ing.batchNo) {
           const lotFilter = { batchNo: ing.batchNo };
           if (ing.rawMaterialId) lotFilter.rawMaterialId = ing.rawMaterialId;
           const candidates = await RawMaterialEntry.find(lotFilter).limit(2).lean();
@@ -72,7 +83,7 @@ router.get('/:batchNo', authorize('inventory:view'), async (req, res) => {
               message: 'No raw-material lot could be verified for this genealogy reference'
             });
           }
-        } else if (!rmEntry) {
+        } else if (!hasExplicitLotReference && !ing.batchNo) {
           traceWarnings.push({
             code: 'RAW_MATERIAL_LOT_REFERENCE_MISSING',
             batchNo: '',
