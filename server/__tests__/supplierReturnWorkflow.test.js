@@ -105,6 +105,7 @@ describe('Supplier return lifecycle', () => {
     const response = await request(app).patch('/api/purchase-orders/supplier-returns/return-5/resolve').set('x-user-id', 'stores-1').send({ supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5' });
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5', replacementGrnNo: 'GRN-REPL-5', resolvedByUserId: 'stores-1' });
+    expect(GoodsReceivedNote.findOne).toHaveBeenCalledWith(expect.objectContaining({ _id: { $ne: 'original-grn-5' }, poId: 'po-5', vendorId: 'vendor-5', status: 'verified' }));
     expect(SupplierReturn.findOneAndUpdate).toHaveBeenCalledWith(
       { _id: 'return-5', status: 'dispatched' },
       { $set: expect.objectContaining({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5' }) },

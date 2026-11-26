@@ -532,6 +532,7 @@ router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (r
         : record.productId ? { productId: record.productId } : null;
       if (!itemIdentity) return res.status(409).json({ error: 'Supplier return has no linked material/product identity; replacement receipt cannot be verified', code: 'SUPPLIER_REPLACEMENT_ITEM_UNLINKED' });
       const replacementGrn = await GoodsReceivedNote.findOne({
+        _id: { $ne: record.grnId },
         poId: record.poId,
         vendorId: record.vendorId,
         status: 'verified',
