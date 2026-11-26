@@ -35,7 +35,7 @@ router.get('/settings', authenticateToken, authorize('settings:view'), async (re
 
     res.json(settings);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to retrieve system settings' });
   }
 });
 
@@ -64,7 +64,7 @@ router.get('/settings/public', publicTenant, async (req, res) => {
 
     res.json(settings);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to retrieve public company settings' });
   }
 });
 
@@ -173,7 +173,7 @@ router.get('/audit-logs', authenticateToken, authorize('audit:view'), async (req
       currentPage: parsedPage
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to retrieve audit logs' });
   }
 });
 
@@ -205,7 +205,7 @@ router.post('/reset-db', authenticateToken, authorize('settings:edit'), async (r
     }
     res.json({ message: 'Database reset successfully. Only users are retained.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to reset database' });
   }
 });
 
@@ -248,7 +248,7 @@ router.post('/upload', authenticateToken, authorize('settings:edit'), upload.sin
     });
   } catch (err) {
     console.error('File Upload Error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to upload supporting document' });
   }
 });
 
