@@ -31,7 +31,16 @@ const upload = multer({
   fileFilter: (_req, file, cb) => cb(null, Boolean(EXT_BY_MIME[file.mimetype])),
 });
 
-router.post('/submit', upload.single('image'), validate(schemas.querySubmitSchema), async (req, res) => {
+const cleanupUploadOnError = (req, res, next) => {
+  if (req.file?.path) {
+    res.once('finish', () => {
+      if (res.statusCode >= 400) fs.unlink(req.file.path, () => {});
+    });
+  }
+  next();
+};
+
+router.post('/submit', upload.single('image'), cleanupUploadOnError, validate(schemas.querySubmitSchema), async (req, res) => {
   try {
     const { name, email, phone, productName, query, productId } = req.body;
     if (!name || !email || !phone || !productName || !query) {

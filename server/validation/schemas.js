@@ -1065,10 +1065,12 @@ const rbacPermissionsSchema = z.object({
 
 // ── Web Query ────────────────────────────────────────────────
 const querySubmitSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().trim().min(1),
   email: z.string().email(),
-  phone: z.string().default(''),
-  message: z.string().min(1),
+  phone: z.string().trim().min(1),
+  productName: z.string().trim().min(1),
+  productId: objectId.optional(),
+  query: z.string().trim().min(1),
 });
 
 const queryConvertSchema = z.object({
