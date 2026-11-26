@@ -34,14 +34,9 @@ describe('Purchase and sale invoice draft update safety', () => {
   });
 
   test('rejects operator, dotted-path, and prototype-pollution keys', () => {
-    expect(sanitizeInvoiceDraftUpdate({
-      '$set': { isFinalized: true },
-      'payments.0.amountApplied': 999,
-      'firmId.owner': 'another-tenant',
-      '__proto__': { isFinalized: true },
-      constructor: { prototype: { isFinalized: true } },
-      amount: 50
-    })).toEqual({ amount: 50 });
+    const unsafeUpdate = JSON.parse('{"__proto__":{"isFinalized":true},"$set":{"isFinalized":true},"payments.0.amountApplied":999,"firmId.owner":"another-tenant","amount":50}');
+    expect(sanitizeInvoiceDraftUpdate(unsafeUpdate)).toEqual({ amount: 50 });
+    expect(sanitizeInvoiceDraftUpdate({ constructor: { prototype: { isFinalized: true } }, amount: 50 })).toEqual({ amount: 50 });
   });
 
   test('returns an empty update for non-object input', () => {

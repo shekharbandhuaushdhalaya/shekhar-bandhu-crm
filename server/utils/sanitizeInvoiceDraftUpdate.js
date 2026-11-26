@@ -8,12 +8,7 @@ function sanitizeInvoiceDraftUpdate(updateData = {}) {
   if (!updateData || typeof updateData !== 'object' || Array.isArray(updateData)) return {};
   return Object.fromEntries(
     Object.entries(updateData).filter(([field]) => {
-      if (field.startsWith('
-  );
-}
-
-module.exports = { sanitizeInvoiceDraftUpdate, PROTECTED_DRAFT_FIELDS };
-) || field.includes('.') || ['__proto__', 'prototype', 'constructor'].includes(field)) return false;
+      if (field.startsWith('$') || field.includes('.') || ['__proto__', 'prototype', 'constructor'].includes(field)) return false;
       return !PROTECTED_DRAFT_FIELDS.has(field);
     })
   );
