@@ -1084,12 +1084,12 @@ class ApiClient {
     const res = await this.request(`${API_BASE}/sales-returns?${params.toString()}`);
     return res.json();
   }
-  async createSalesReturn(data: any): Promise<any> {
-    const res = await this.request(`${API_BASE}/sales-returns`, { method: 'POST', body: JSON.stringify(data) });
+  async createSalesReturn(data: any, idempotencyKey?: string): Promise<any> {
+    const res = await this.request(`${API_BASE}/sales-returns`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey || createMutationKey('sales-return') }, body: JSON.stringify(data) });
     return res.json();
   }
   async postSalesReturn(id: string): Promise<any> {
-    const res = await this.request(`${API_BASE}/sales-returns/${id}/post`, { method: 'PATCH' });
+    const res = await this.request(`${API_BASE}/sales-returns/${id}/post`, { method: 'PATCH', headers: { 'Idempotency-Key': `sales-return-post-${id}` } });
     return res.json();
   }
   async dispositionSalesReturnItem(id: string, itemIndex: number, data: { disposition: 'approved' | 'rejected'; notes: string }): Promise<any> {
