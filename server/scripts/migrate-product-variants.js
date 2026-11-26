@@ -26,7 +26,7 @@ function validateMigrationConfig(env = process.env) {
 function groupProducts(products) {
   const groups = new Map();
   for (const product of products) {
-    const normalizedName = String(product.name || '').trim().replace(/\\s+/g, ' ').toUpperCase();
+    const normalizedName = String(product.name || '').trim().replace(/\s+/g, ' ').toUpperCase();
     if (!normalizedName) continue;
     if (!groups.has(normalizedName)) groups.set(normalizedName, []);
     groups.get(normalizedName).push(product);
