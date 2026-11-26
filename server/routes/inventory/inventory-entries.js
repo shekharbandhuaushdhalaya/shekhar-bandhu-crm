@@ -112,7 +112,8 @@ router.post('/', idempotency, authorize('inventory:create'), validate(schemas.in
           new Error('Manual stock receipts must enter QC hold; only the controlled QC release workflow can approve or reject stock'),
           { statusCode: 409, code: 'INVENTORY_RECEIPT_QC_RELEASE_REQUIRED' }
         );
-      }\n      const qcStatus = 'under_test';
+      }
+      const qcStatus = 'under_test';
       if (!warehouseId || !productId || !(qtyBoxes > 0)) throw Object.assign(new Error('warehouseId, productId and positive qtyBoxes are required'), { code: 'INVALID_STOCK_RECEIPT' });
 
       const [warehouse, product] = await Promise.all([
