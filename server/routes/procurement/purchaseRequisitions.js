@@ -4,6 +4,7 @@ const SupplierQuotation = require('../../models/SupplierQuotation');
 const Vendor = require('../../models/Vendor');
 const { withTransaction } = require('../../utils/withTransaction');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
@@ -28,7 +29,7 @@ router.get('/', authorize('vendor:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', authorize('vendor:create'), async (req, res) => {
+router.post('/', authorize('vendor:create'), idempotency, async (req, res) => {
   try {
     const user = actor(req);
     if (!user.id || !user.name) return res.status(401).json({ error: 'Authenticated requester identity is required' });
@@ -72,7 +73,7 @@ router.post('/', authorize('vendor:create'), async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.patch('/:id/submit', authorize('vendor:edit'), async (req, res) => {
+router.patch('/:id/submit', authorize('vendor:edit'), idempotency, async (req, res) => {
   try {
     const user = actor(req);
     const record = await PurchaseRequisition.findById(req.params.id);
@@ -89,7 +90,7 @@ router.patch('/:id/submit', authorize('vendor:edit'), async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.patch('/:id/approve', authorize('vendor:edit'), async (req, res) => {
+router.patch('/:id/approve', authorize('vendor:edit'), idempotency, async (req, res) => {
   try {
     const user = actor(req);
     if (!user.id || !user.name) return res.status(401).json({ error: 'Authenticated approver identity is required' });
@@ -110,7 +111,7 @@ router.patch('/:id/approve', authorize('vendor:edit'), async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.patch('/:id/reject', authorize('vendor:edit'), async (req, res) => {
+router.patch('/:id/reject', authorize('vendor:edit'), idempotency, async (req, res) => {
   try {
     const user = actor(req);
     if (!user.id || !user.name) return res.status(401).json({ error: 'Authenticated reviewer identity is required' });
@@ -149,7 +150,7 @@ router.get('/:id/quotations', authorize('vendor:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/:id/quotations', authorize('vendor:create'), async (req, res) => {
+router.post('/:id/quotations', authorize('vendor:create'), idempotency, async (req, res) => {
   try {
     const user = actor(req);
     if (!user.id || !user.name) return res.status(401).json({ error: 'Authenticated quotation recorder identity is required' });
@@ -205,7 +206,7 @@ router.post('/:id/quotations', authorize('vendor:create'), async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.patch('/:id/quotations/:quotationId/select', authorize('vendor:edit'), async (req, res) => {
+router.patch('/:id/quotations/:quotationId/select', authorize('vendor:edit'), idempotency, async (req, res) => {
   try {
     const user = actor(req);
     if (!user.id || !user.name) return res.status(401).json({ error: 'Authenticated quotation reviewer identity is required' });
@@ -230,7 +231,7 @@ router.patch('/:id/quotations/:quotationId/select', authorize('vendor:edit'), as
   } catch (err) { res.status(err.statusCode || 400).json({ error: err.message, ...(err.code ? { code: err.code } : {}) }); }
 });
 
-router.patch('/:id/quotations/:quotationId/reject', authorize('vendor:edit'), async (req, res) => {
+router.patch('/:id/quotations/:quotationId/reject', authorize('vendor:edit'), idempotency, async (req, res) => {
   try {
     const user = actor(req); const reason = String(req.body.reason || '').trim();
     if (!user.id || !user.name) return res.status(401).json({ error: 'Authenticated quotation reviewer identity is required' });

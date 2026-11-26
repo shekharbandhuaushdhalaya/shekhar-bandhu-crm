@@ -2,6 +2,7 @@ const express = require('express');
 const RecurringInvoice = require('../../models/RecurringInvoice');
 const { createSalesOrder } = require('../../services/salesOrderService');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.get('/', authorize('invoice:view'), async (req, res) => {
 });
 
 // POST /api/recurring-invoices — Create recurring invoice template
-router.post('/', authorize('invoice:create'), async (req, res) => {
+router.post('/', authorize('invoice:create'), idempotency, async (req, res) => {
   try {
     const { templateName, customerId, customerName, frequency = 'monthly', startDate, items, status } = req.body;
 
@@ -75,7 +76,7 @@ router.post('/', authorize('invoice:create'), async (req, res) => {
 });
 
 // POST /api/recurring-invoices/:id/generate-now — Generate a Sales Order, never a physical-goods invoice directly.
-router.post('/:id/generate-now', authorize('order:create'), async (req, res) => {
+router.post('/:id/generate-now', authorize('order:create'), idempotency, async (req, res) => {
   try {
     const template = await RecurringInvoice.findById(req.params.id);
     if (!template) return res.status(404).json({ error: 'Recurring order template not found' });
@@ -116,7 +117,7 @@ router.post('/:id/generate-now', authorize('order:create'), async (req, res) => 
 });
 
 // PATCH /api/recurring-invoices/:id/status — Update status (active/paused/cancelled)
-router.patch('/:id/status', authorize('invoice:edit'), async (req, res) => {
+router.patch('/:id/status', authorize('invoice:edit'), idempotency, async (req, res) => {
   try {
     const { status } = req.body;
     if (!['active', 'paused', 'cancelled'].includes(status)) {

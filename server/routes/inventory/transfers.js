@@ -20,7 +20,7 @@ router.get('/', authorize('inventory:view'), async (req, res) => {
 });
 
 // POST /api/inventory/transfers — Create a transfer request
-router.post('/', authorize('inventory:create'), async (req, res) => {
+router.post('/', authorize('inventory:create'), idempotency, async (req, res) => {
   try {
     const { fromWarehouseId, toWarehouseId, items, notes } = req.body;
 
@@ -82,7 +82,7 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
 });
 
 // PATCH /api/inventory/transfers/:id/approve — Approve transfer request
-router.patch('/:id/approve', authorize('inventory:edit'), async (req, res) => {
+router.patch('/:id/approve', authorize('inventory:edit'), idempotency, async (req, res) => {
   try {
     const transfer = await StockTransfer.findById(req.params.id);
     if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
@@ -99,7 +99,7 @@ router.patch('/:id/approve', authorize('inventory:edit'), async (req, res) => {
 });
 
 // PATCH /api/inventory/transfers/:id/reject — Reject transfer request
-router.patch('/:id/reject', authorize('inventory:edit'), async (req, res) => {
+router.patch('/:id/reject', authorize('inventory:edit'), idempotency, async (req, res) => {
   try {
     const { rejectionReason } = req.body;
     const transfer = await StockTransfer.findById(req.params.id);

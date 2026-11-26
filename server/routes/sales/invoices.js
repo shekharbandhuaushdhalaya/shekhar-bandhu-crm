@@ -10,6 +10,7 @@ const Warehouse = require('../../models/Warehouse');
 const StockLedger = require('../../models/StockLedger');
 const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
+const idempotency = require('../../middleware/idempotency');
 const schemas = require('../../validation/schemas');
 const { calculateInvoiceTotals, resolveWarehouse } = require('../../services/invoiceService');
 const { finalizeSaleInvoice, finalizePurchaseInvoice } = require('../../services/invoicePostingService');
@@ -164,7 +165,7 @@ router.post('/sales', authorize('invoice:create'), async (_req, res) => {
 });
 
 // POST /api/invoices/purchases — Create purchase invoice in DRAFT status (no inventory/balance changes yet)
-router.post('/purchases', authorize('invoice:create'), validate(schemas.invoiceSchema), async (req, res) => {
+router.post('/purchases', authorize('invoice:create'), validate(schemas.invoiceSchema), idempotency, async (req, res) => {
   try {
     const SystemSettings = require('../../models/SystemSettings');
     const settings = await SystemSettings.findOne({ key: 'company_config' }) || {};
@@ -223,7 +224,7 @@ router.post('/purchases', authorize('invoice:create'), validate(schemas.invoiceS
 });
 
 // PUT /api/invoices/:id — Edit invoice (allowed only in DRAFT status)
-router.put('/:id', authorize('invoice:edit'), validate(schemas.invoiceSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('invoice:edit'), validate(schemas.invoiceSchema.partial()), idempotency, async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
@@ -283,7 +284,7 @@ router.put('/:id', authorize('invoice:edit'), validate(schemas.invoiceSchema.par
 });
 
 // PATCH /api/invoices/sales/:id/finalize — Finalize the financial sale document. Physical stock was already posted by its Challan.
-router.patch('/sales/:id/finalize', authorize('invoice:finalize'), async (req, res) => {
+router.patch('/sales/:id/finalize', authorize('invoice:finalize'), idempotency, async (req, res) => {
   try {
     const invoice = await finalizeSaleInvoice(req.params.id, { id: req.user?.id, name: req.user?.name || 'System' });
     if (req.io) req.io.emit('invoice_updated', { type: 'sale_finalized', id: invoice._id });
@@ -303,7 +304,7 @@ router.patch('/sales/:id/finalize', authorize('invoice:finalize'), async (req, r
 });
 
 // PATCH /api/invoices/purchases/:id/finalize — Post purchased inventory and vendor liability atomically.
-router.patch('/purchases/:id/finalize', authorize('invoice:finalize'), async (req, res) => {
+router.patch('/purchases/:id/finalize', authorize('invoice:finalize'), idempotency, async (req, res) => {
   try {
     const invoice = await finalizePurchaseInvoice(req.params.id, { id: req.user?.id, name: req.user?.name || 'System' });
     if (req.io) {
@@ -326,7 +327,7 @@ router.patch('/purchases/:id/finalize', authorize('invoice:finalize'), async (re
 });
 
 // DELETE /api/invoices/sales/:id — only draft invoices can be cancelled. Finalized financial documents are immutable.
-router.delete('/sales/:id', authorize('invoice:delete'), async (req, res) => {
+router.delete('/sales/:id', authorize('invoice:delete'), idempotency, async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ _id: req.params.id, type: 'sale' });
     if (!invoice) return res.status(404).json({ error: 'Sale invoice not found' });
@@ -348,7 +349,7 @@ router.delete('/sales/:id', authorize('invoice:delete'), async (req, res) => {
 });
 
 // DELETE /api/invoices/purchases/:id — only drafts can be cancelled. Posted stock/liability cannot be silently rolled back.
-router.delete('/purchases/:id', authorize('invoice:delete'), async (req, res) => {
+router.delete('/purchases/:id', authorize('invoice:delete'), idempotency, async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ _id: req.params.id, type: 'purchase' });
     if (!invoice) return res.status(404).json({ error: 'Purchase invoice not found' });
@@ -363,7 +364,7 @@ router.delete('/purchases/:id', authorize('invoice:delete'), async (req, res) =>
 });
 
 // PATCH /api/invoices/:id/documents — Add a supporting document
-router.patch('/:id/documents', authorize('invoice:edit'), async (req, res) => {
+router.patch('/:id/documents', authorize('invoice:edit'), idempotency, async (req, res) => {
   try {
     const { name, url } = req.body;
     if (!name || !url) return res.status(400).json({ error: 'Document name and url are required' });
@@ -382,7 +383,7 @@ router.patch('/:id/documents', authorize('invoice:edit'), async (req, res) => {
 });
 
 // DELETE /api/invoices/:id/documents — Remove a supporting document
-router.delete('/:id/documents', authorize('invoice:edit'), async (req, res) => {
+router.delete('/:id/documents', authorize('invoice:edit'), idempotency, async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Document URL is required' });
