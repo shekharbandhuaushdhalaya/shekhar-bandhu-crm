@@ -204,7 +204,7 @@ async function createSplitPayments({ invoiceId, tenders = [], actorName = 'Syste
   });
 }
 
-async function postGatewayPayment({ invoice, amount, transactionId, gatewayOrderId, gatewayData }) {
+async function postGatewayPayment({ invoice, amount, transactionId, gatewayOrderId, gatewayData, createdByUserId = null, createdByName = '' }) {
   if (!invoice || invoice.type !== 'sale' || !invoice.isFinalized || !invoice.customerId) {
     throw paymentError('INVALID_GATEWAY_INVOICE', 'Gateway payments require a finalized customer-linked sale invoice');
   }
@@ -221,6 +221,8 @@ async function postGatewayPayment({ invoice, amount, transactionId, gatewayOrder
         partyName: fresh.customerName, amount: payAmount, mode: 'regular', paymentMethod: 'UPI',
         referenceNo: transactionId || '', notes: `Gateway payment for ${fresh.invoiceNo}`,
         gatewayTransactionId: transactionId || '', gatewayOrderId: gatewayOrderId || '',
+        createdByUserId: createdByUserId || null,
+        createdByName: createdByName || 'Razorpay webhook',
       },
       allocations: [{ invoiceId: fresh._id, amountAllocated: payAmount }],
       session,
