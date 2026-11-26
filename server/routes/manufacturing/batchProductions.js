@@ -348,7 +348,7 @@ router.get('/preview', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/batch-productions — Start a new batch production run
-router.post('/', authorize('manufacturing:create'), validate(schemas.batchProductionSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:create'), validate(schemas.batchProductionSchema), idempotency, async (req, res) => {
   try {
     const { productId, plannedQty, batchNo, manufacturingUnitId, productionType, jobWorkMode, packagingMode, jobWorkerId, jobWorkerName, jobWorkerChallanRef, plannedYields, expiryDate } = req.body;
 
@@ -646,7 +646,7 @@ router.post('/', authorize('manufacturing:create'), validate(schemas.batchProduc
 });
 
 // POST /api/batch-productions/:id/line-clearance — Submit checklist for independent verification.
-router.post('/:id/line-clearance', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/line-clearance', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { previousBatchNo, checklist, notes, phase = 'manufacturing' } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
@@ -691,7 +691,7 @@ router.post('/:id/line-clearance', authorize('manufacturing:edit'), async (req, 
 });
 
 // PATCH /api/batch-productions/:id/line-clearance/:clearanceId/verify — Independent line-clearance signoff.
-router.patch('/:id/line-clearance/:clearanceId/verify', authorize('manufacturing:complete'), async (req, res) => {
+router.patch('/:id/line-clearance/:clearanceId/verify', authorize('manufacturing:complete'), idempotency, async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
@@ -730,7 +730,7 @@ router.patch('/:id/line-clearance/:clearanceId/verify', authorize('manufacturing
 });
 
 // PATCH /api/batch-productions/:id/approve-bmr — Pre-execution BMR recipe snapshot approval
-router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), async (req, res) => {
+router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), idempotency, async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
@@ -817,7 +817,7 @@ router.patch('/:id/approve-bmr', authorize('manufacturing:approveBmr'), async (r
 });
 
 // PATCH /api/batch-productions/:id/stage/:stageIndex — Advance a manufacturing stage
-router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate(schemas.batchStageUpdateSchema), async (req, res) => {
+router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate(schemas.batchStageUpdateSchema), idempotency, async (req, res) => {
   try {
     const { status, notes, completedBy } = req.body;
     const stageIndex = parseInt(req.params.stageIndex, 10);
@@ -1050,7 +1050,7 @@ router.patch('/:id/stage/:stageIndex', authorize('manufacturing:edit'), validate
 });
 
 // PATCH /api/batch-productions/:id/stage/:stageIndex/verify — 4-eye stage verification
-router.patch('/:id/stage/:stageIndex/verify', authorize('manufacturing:verify'), async (req, res) => {
+router.patch('/:id/stage/:stageIndex/verify', authorize('manufacturing:verify'), idempotency, async (req, res) => {
   try {
     const stageIndex = parseInt(req.params.stageIndex, 10);
     const batch = await BatchProduction.findById(req.params.id);
@@ -1092,7 +1092,7 @@ router.patch('/:id/stage/:stageIndex/verify', authorize('manufacturing:verify'),
 });
 
 // PATCH /api/batch-productions/:id/complete — Complete batch, record QC and inward finished stock
-router.patch('/:id/complete', authorize('manufacturing:complete'), validate(schemas.batchCompleteSchema), async (req, res) => {
+router.patch('/:id/complete', authorize('manufacturing:complete'), validate(schemas.batchCompleteSchema), idempotency, async (req, res) => {
   try {
     const {
       actualYieldQty,
@@ -1485,7 +1485,7 @@ router.patch('/:id/complete', authorize('manufacturing:complete'), validate(sche
 
 // PATCH /api/batch-productions/:id/release — Market release approval separate from QC inspection
 // PATCH /api/batch-productions/:id/qc-tests — Record actual results against the pinned approved product specification.
-router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, res) => {
+router.patch('/:id/qc-tests', authorize('manufacturing:complete'), idempotency, async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
@@ -1714,7 +1714,7 @@ router.patch('/:id/qc-tests', authorize('manufacturing:complete'), async (req, r
   }
 });
 
-router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), async (req, res) => {
+router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), idempotency, async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
@@ -1801,7 +1801,7 @@ router.patch('/:id/qc-approval', authorize('manufacturing:qcApprove'), async (re
   }
 });
 
-router.patch('/:id/release', authorize('manufacturing:release'), async (req, res) => {
+router.patch('/:id/release', authorize('manufacturing:release'), idempotency, async (req, res) => {
   try {
     let batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production run not found' });
@@ -1943,7 +1943,7 @@ router.patch('/:id/release', authorize('manufacturing:release'), async (req, res
 });
 
 // PATCH /api/batch-productions/:id/correct — Controlled audit correction for released batches
-router.patch('/:id/correct', authorize('manufacturing:correctReleased'), async (req, res) => {
+router.patch('/:id/correct', authorize('manufacturing:correctReleased'), idempotency, async (req, res) => {
   try {
     const { reason, updates } = req.body;
     if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
@@ -2534,7 +2534,7 @@ router.get('/:id/coa', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // PATCH /api/batch-productions/:id/documents — Add a supporting document
-router.patch('/:id/documents', authorize('manufacturing:edit'), validate(schemas.batchDocumentAddSchema), async (req, res) => {
+router.patch('/:id/documents', authorize('manufacturing:edit'), validate(schemas.batchDocumentAddSchema), idempotency, async (req, res) => {
   try {
     const { name, url } = req.body;
     if (!name || !url) return res.status(400).json({ error: 'Document name and url are required' });
@@ -2553,7 +2553,7 @@ router.patch('/:id/documents', authorize('manufacturing:edit'), validate(schemas
 });
 
 // DELETE /api/batch-productions/:id/documents — Remove a supporting document
-router.delete('/:id/documents', authorize('manufacturing:edit'), validate(schemas.batchDocumentRemoveSchema), async (req, res) => {
+router.delete('/:id/documents', authorize('manufacturing:edit'), validate(schemas.batchDocumentRemoveSchema), idempotency, async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Document URL is required' });
@@ -2615,7 +2615,7 @@ router.get('/analytics/yield-variance', authorize('manufacturing:view'), async (
 // ─── FEATURE 10: Packing Material Reconciliation & Schedule T Audit ───
 
 // POST /api/batch-productions/:id/label-reconciliation — Submit packaging reconciliation for independent verification.
-router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { items } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
@@ -2695,7 +2695,7 @@ router.post('/:id/label-reconciliation', authorize('manufacturing:edit'), async 
 });
 
 // PATCH /api/batch-productions/:id/label-reconciliation/:itemId/verify — Independent verification of packaging reconciliation.
-router.patch('/:id/label-reconciliation/:itemId/verify', authorize('manufacturing:complete'), async (req, res) => {
+router.patch('/:id/label-reconciliation/:itemId/verify', authorize('manufacturing:complete'), idempotency, async (req, res) => {
   try {
     const batch = await BatchProduction.findById(req.params.id);
     if (!batch) return res.status(404).json({ error: 'Batch production record not found' });
@@ -2839,7 +2839,7 @@ router.get('/job-work-summary', authorize('manufacturing:view'), async (req, res
 });
 
 // POST /api/batch-productions/:id/job-work/dispatch — Dispatch raw materials/bulk to job worker vendor
-router.post('/:id/job-work/dispatch', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/job-work/dispatch', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { jobWorkerId, jobWorkerName, expectedYieldQty, jobWorkCharges, notes } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
@@ -2870,7 +2870,7 @@ router.post('/:id/job-work/dispatch', authorize('manufacturing:edit'), async (re
 });
 
 // POST /api/batch-productions/:id/job-work/receive — Record received bulk/finished goods & conversion loss
-router.post('/:id/job-work/receive', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/job-work/receive', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { receivedYieldQty, jobWorkerCertificateRef, coaDocumentRef, status } = req.body;
     const batch = await BatchProduction.findById(req.params.id);
@@ -2901,7 +2901,7 @@ router.post('/:id/job-work/receive', authorize('manufacturing:edit'), async (req
 });
 
 // ─── Controlled two-person electronic signature for critical BMR stages ───
-router.post('/:id/stages/:stageIndex/dual-esign', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/stages/:stageIndex/dual-esign', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const crypto = require('crypto');
     const AuditLog = require('../../models/AuditLog');

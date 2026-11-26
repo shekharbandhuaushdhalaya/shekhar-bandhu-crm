@@ -113,7 +113,7 @@ router.post('/', authorize('dispatch:create'), validate(schemas.dispatchSchema),
   }
 });
 
-router.patch('/:id', authorize('dispatch:edit'), validate(schemas.dispatchUpdateSchema), async (req, res) => {
+router.patch('/:id', authorize('dispatch:edit'), validate(schemas.dispatchUpdateSchema), idempotency, async (req, res) => {
   try {
     const dispatch = await Dispatch.findById(req.params.id);
     if (!dispatch) return res.status(404).json({ error: 'Dispatch not found' });
@@ -154,7 +154,7 @@ router.patch('/:id', authorize('dispatch:edit'), validate(schemas.dispatchUpdate
   } catch (error) { res.status(400).json({ error: error.message, code: error.code || 'DISPATCH_UPDATE_FAILED' }); }
 });
 
-router.delete('/:id', authorize('dispatch:delete'), async (req, res) => {
+router.delete('/:id', authorize('dispatch:delete'), idempotency, async (req, res) => {
   try {
     const dispatch = await Dispatch.findById(req.params.id);
     if (!dispatch) return res.status(404).json({ error: 'Dispatch not found' });

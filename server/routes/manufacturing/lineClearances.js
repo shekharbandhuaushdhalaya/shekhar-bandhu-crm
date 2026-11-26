@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const LineClearance = require('../../models/LineClearance');
 const BatchProduction = require('../../models/BatchProduction');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 const PHASES = ['manufacturing', 'filling', 'packing'];
@@ -23,7 +24,7 @@ router.get('/', authorize('quality:view'), async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/', authorize('quality:create'), async (req, res) => {
+router.post('/', authorize('quality:create'), idempotency, async (req, res) => {
   try {
     const { batchId, phase, previousBatchNo = '', checklist = {}, notes = '' } = req.body;
     if (!mongoose.isValidObjectId(batchId)) return res.status(400).json({ error: 'A valid batchId is required' });
@@ -64,7 +65,7 @@ router.post('/', authorize('quality:create'), async (req, res) => {
   }
 });
 
-router.patch('/:id/verify', authorize('quality:approve'), async (req, res) => {
+router.patch('/:id/verify', authorize('quality:approve'), idempotency, async (req, res) => {
   try {
     if (!req.user?.id || !(req.user.name || req.user.email)) return res.status(403).json({ error: 'Authenticated independent clearance reviewer identity is required' });
     const record = await LineClearance.findById(req.params.id);

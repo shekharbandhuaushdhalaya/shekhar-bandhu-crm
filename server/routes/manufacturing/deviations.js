@@ -2,6 +2,7 @@ const express = require('express');
 const DeviationCapa = require('../../models/DeviationCapa');
 const BatchProduction = require('../../models/BatchProduction');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
@@ -25,7 +26,7 @@ router.get('/', authorize('manufacturing:view'), async (req, res) => {
 });
 
 // POST /api/manufacturing/deviations — Report new Batch Deviation
-router.post('/', authorize('manufacturing:edit'), validate(schemas.deviationCapaSchema), async (req, res) => {
+router.post('/', authorize('manufacturing:edit'), validate(schemas.deviationCapaSchema), idempotency, async (req, res) => {
   try {
     const { batchId, deviationType, description, rootCause, correctiveAction, preventiveAction, stageId, stageName } = req.body;
 
@@ -61,7 +62,7 @@ router.post('/', authorize('manufacturing:edit'), validate(schemas.deviationCapa
 });
 
 // PUT /api/manufacturing/deviations/:id/signoff — Resolve and Sign Off Deviation CAPA
-router.put('/:id/signoff', authorize('manufacturing:edit'), async (req, res) => {
+router.put('/:id/signoff', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { status = 'resolved', rootCause, correctiveAction, preventiveAction } = req.body;
     const dev = await DeviationCapa.findById(req.params.id);
@@ -102,7 +103,7 @@ router.put('/:id/signoff', authorize('manufacturing:edit'), async (req, res) => 
 });
 
 // PATCH /api/manufacturing/deviations/:id/verify-closure — independent CAPA effectiveness verification and closure.
-router.patch('/:id/verify-closure', authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/verify-closure', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     const { effectivenessCheck, effectivenessEvidenceRef } = req.body;
     const dev = await DeviationCapa.findById(req.params.id);

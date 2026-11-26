@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 
 router.get('/', authorize('quality:view'), async (req, res) => {
   try {
@@ -12,7 +13,7 @@ router.get('/', authorize('quality:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', authorize('quality:create'), async (req, res) => {
+router.post('/', authorize('quality:create'), idempotency, async (req, res) => {
   try {
     const actorId = req.user?.id || req.user?._id;
     const actorName = req.user?.name || req.user?.email;
@@ -52,7 +53,7 @@ router.post('/', authorize('quality:create'), async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.patch('/:id/approve', authorize('quality:approve'), async (req, res) => {
+router.patch('/:id/approve', authorize('quality:approve'), idempotency, async (req, res) => {
   try {
     const spec = await ProductQualitySpecification.findById(req.params.id);
     if (!spec) return res.status(404).json({ error: 'Specification not found' });

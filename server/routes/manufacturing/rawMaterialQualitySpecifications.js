@@ -2,6 +2,7 @@ const express=require('express');
 const RawMaterialQualitySpecification=require('../../models/RawMaterialQualitySpecification');
 const RawMaterial=require('../../models/RawMaterial');
 const {authorize}=require('../../middleware/authorize');
+const idempotency=require('../../middleware/idempotency');
 const {logAction}=require('../../utils/auditLogger');
 const router=express.Router();
 function validateTests(tests){
@@ -20,7 +21,7 @@ router.get('/',authorize('quality:view'),async(req,res)=>{
  try{const filter={};if(req.query.rawMaterialId)filter.rawMaterialId=req.query.rawMaterialId;if(req.query.status)filter.status=req.query.status;res.json(await RawMaterialQualitySpecification.find(filter).sort({effectiveDate:-1,createdAt:-1}).lean());}
  catch(err){res.status(500).json({error:err.message});}
 });
-router.post('/',authorize('quality:create'),async(req,res)=>{
+router.post('/',authorize('quality:create'),idempotency,async(req,res)=>{
  try{
   const actorId=req.user?.id||req.user?._id,actorName=req.user?.name||req.user?.email;
   if(!actorId||!actorName)return res.status(401).json({error:'Authenticated specification author identity is required'});
@@ -42,7 +43,7 @@ router.post('/',authorize('quality:create'),async(req,res)=>{
   res.status(201).json(spec);
  }catch(err){res.status(err.code===11000?409:400).json({error:err.code===11000?'This material specification version already exists':err.message});}
 });
-router.patch('/:id/approve',authorize('quality:approve'),async(req,res)=>{
+router.patch('/:id/approve',authorize('quality:approve'),idempotency,async(req,res)=>{
  try{
   const spec=await RawMaterialQualitySpecification.findById(req.params.id);if(!spec)return res.status(404).json({error:'Incoming QC specification not found'});
   const reviewerId=req.user?.id||req.user?._id,reviewerName=req.user?.name||req.user?.email;

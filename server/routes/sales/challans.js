@@ -57,7 +57,7 @@ router.get('/', authorize('challan:view'), async (req, res) => {
 });
 
 // POST /api/challans — Create new challan in DRAFT status (no inventory deduction yet)
-router.post('/', authorize('challan:create'), validate(schemas.challanSchema), async (req, res) => {
+router.post('/', authorize('challan:create'), validate(schemas.challanSchema), idempotency, async (req, res) => {
   try {
     let challanNo = req.body.challanNo;
     if (!challanNo) {
@@ -144,7 +144,7 @@ router.post('/', authorize('challan:create'), validate(schemas.challanSchema), a
 });
 
 // PUT /api/challans/:id — Update an existing draft challan
-router.put('/:id', authorize('challan:edit'), validate(schemas.challanSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('challan:edit'), validate(schemas.challanSchema.partial()), idempotency, async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found' });
@@ -285,7 +285,7 @@ router.post('/:id/reverse', authorize('challan:delete'), idempotency, async (req
 });
 
 // DELETE /api/challans/:id — only drafts may be deleted; posted Challans are immutable truth documents
-router.delete('/:id', authorize('challan:delete'), async (req, res) => {
+router.delete('/:id', authorize('challan:delete'), idempotency, async (req, res) => {
   try {
     const challan = await Challan.findById(req.params.id);
     if (!challan) return res.status(404).json({ error: 'Challan not found' });
@@ -446,7 +446,7 @@ router.post('/:id/convert', authorize('invoice:create'), idempotency, async (req
 });
 
 // PATCH /api/challans/:id/documents — Add a supporting document
-router.patch('/:id/documents', authorize('challan:edit'), async (req, res) => {
+router.patch('/:id/documents', authorize('challan:edit'), idempotency, async (req, res) => {
   try {
     const { name, url } = req.body;
     if (!name || !url) return res.status(400).json({ error: 'Document name and url are required' });
@@ -465,7 +465,7 @@ router.patch('/:id/documents', authorize('challan:edit'), async (req, res) => {
 });
 
 // DELETE /api/challans/:id/documents — Remove a supporting document
-router.delete('/:id/documents', authorize('challan:edit'), async (req, res) => {
+router.delete('/:id/documents', authorize('challan:edit'), idempotency, async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Document URL is required' });
