@@ -21,6 +21,7 @@ const config = require('../../src/config');
 const { withTransaction } = require('../../utils/withTransaction');
 const { issueSamplesToMr, consumeSamplesFromMr } = require('../../services/mrSampleInventoryService');
 const requiredIdempotency = require('../../middleware/requiredIdempotency');
+const idempotency = require('../../middleware/idempotency');
 const MrSampleOtp = require('../../models/MrSampleOtp');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
@@ -76,7 +77,7 @@ router.get('/', authorize('mr:view'), async (req, res) => {
   }
 });
 
-router.post('/', authorize('mr:create'), validate(schemas.medicalRepSchema), async (req, res) => {
+router.post('/', authorize('mr:create'), validate(schemas.medicalRepSchema), idempotency, async (req, res) => {
   try {
     const data = { ...req.body };
     if (!data.code || !data.code.trim()) {
@@ -111,7 +112,7 @@ router.get('/:id', authorize('mr:view'), async (req, res, next) => {
   }
 });
 
-router.put('/:id', authorize('mr:edit'), validate(schemas.medicalRepSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('mr:edit'), validate(schemas.medicalRepSchema.partial()), idempotency, async (req, res) => {
   try {
     const mr = await MedicalRepresentative.findByIdAndUpdate(
       req.params.id, req.body, { new: true, runValidators: true }
@@ -135,7 +136,7 @@ router.put('/:id', authorize('mr:edit'), validate(schemas.medicalRepSchema.parti
   }
 });
 
-router.delete('/:id', authorize('mr:delete'), async (req, res) => {
+router.delete('/:id', authorize('mr:delete'), idempotency, async (req, res) => {
   try {
     const mr = await MedicalRepresentative.findByIdAndDelete(req.params.id);
     if (!mr) return res.status(404).json({ error: 'MR not found' });
@@ -177,7 +178,7 @@ router.get('/:mrId/assignments', authorize('mr:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/:mrId/assignments', authorize('mr:edit'), async (req, res) => {
+router.post('/:mrId/assignments', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     if (!(await verifyMrAccess(req, req.params.mrId))) return res.status(403).json({ error: 'Access denied' });
     const { entityType, entityId, entityName, entityPhone, territory, area, role, priority, preferredVisitDays, preferredVisitTime, startDate, endDate, notes } = req.body;
@@ -188,7 +189,7 @@ router.post('/:mrId/assignments', authorize('mr:edit'), async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.put('/assignments/:assignmentId', authorize('mr:edit'), async (req, res) => {
+router.put('/assignments/:assignmentId', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     const assignment = await MrAssignment.findByIdAndUpdate(req.params.assignmentId, req.body, { new: true, runValidators: true });
     if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
@@ -196,7 +197,7 @@ router.put('/assignments/:assignmentId', authorize('mr:edit'), async (req, res) 
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.delete('/assignments/:assignmentId', authorize('mr:edit'), async (req, res) => {
+router.delete('/assignments/:assignmentId', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     const assignment = await MrAssignment.findByIdAndUpdate(req.params.assignmentId, { isActive: false, endDate: new Date() }, { new: true });
     if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
@@ -232,7 +233,7 @@ router.get('/:mrId/attendance', authorize('mr:view'), async (req, res) => {
   }
 });
 
-router.post('/:mrId/checkin', authorize('mr:attendance'), validate(schemas.mrCheckinSchema), async (req, res) => {
+router.post('/:mrId/checkin', authorize('mr:attendance'), validate(schemas.mrCheckinSchema), idempotency, async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -267,7 +268,7 @@ router.post('/:mrId/checkin', authorize('mr:attendance'), validate(schemas.mrChe
 
 
 
-router.post('/:mrId/checkout', authorize('mr:attendance'), async (req, res) => {
+router.post('/:mrId/checkout', authorize('mr:attendance'), idempotency, async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -331,7 +332,7 @@ router.get('/:mrId/visits', authorize('mr:view'), async (req, res) => {
   }
 });
 
-router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSchema), async (req, res) => {
+router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSchema), idempotency, async (req, res) => {
   try {
     const data = { ...req.body, mrId: req.params.mrId };
     if (!data.date) data.date = new Date();
@@ -480,7 +481,7 @@ router.post('/:mrId/visits', authorize('mr:visits'), validate(schemas.mrVisitSch
   }
 });
 
-router.put('/visits/:visitId', authorize('mr:visits'), validate(schemas.mrVisitSchema.partial()), async (req, res) => {
+router.put('/visits/:visitId', authorize('mr:visits'), validate(schemas.mrVisitSchema.partial()), idempotency, async (req, res) => {
   try {
     const visit = await MrVisit.findByIdAndUpdate(
       req.params.visitId, req.body, { new: true, runValidators: true }
@@ -495,7 +496,7 @@ router.put('/visits/:visitId', authorize('mr:visits'), validate(schemas.mrVisitS
   }
 });
 
-router.delete('/visits/:visitId', authorize('mr:delete'), async (req, res) => {
+router.delete('/visits/:visitId', authorize('mr:delete'), idempotency, async (req, res) => {
   try {
     const visit = await MrVisit.findByIdAndDelete(req.params.visitId);
     if (!visit) return res.status(404).json({ error: 'Visit not found' });
@@ -531,7 +532,7 @@ router.get('/:mrId/expenses', authorize('mr:view'), async (req, res) => {
   }
 });
 
-router.post('/:mrId/expenses', authorize('mr:expenses'), validate(schemas.mrExpenseSchema), async (req, res) => {
+router.post('/:mrId/expenses', authorize('mr:expenses'), validate(schemas.mrExpenseSchema), idempotency, async (req, res) => {
   try {
     const data = { ...req.body, mrId: req.params.mrId };
     if (!data.date) data.date = new Date();
@@ -545,7 +546,7 @@ router.post('/:mrId/expenses', authorize('mr:expenses'), validate(schemas.mrExpe
   }
 });
 
-router.put('/expenses/:expenseId/approve', authorize('mr:approveExpenses'), async (req, res) => {
+router.put('/expenses/:expenseId/approve', authorize('mr:approveExpenses'), idempotency, async (req, res) => {
   try {
     const { status, rejectionReason } = req.body;
     if (!['approved', 'rejected'].includes(status)) {
@@ -566,7 +567,7 @@ router.put('/expenses/:expenseId/approve', authorize('mr:approveExpenses'), asyn
   }
 });
 
-router.delete('/expenses/:expenseId', authorize('mr:delete'), async (req, res) => {
+router.delete('/expenses/:expenseId', authorize('mr:delete'), idempotency, async (req, res) => {
   try {
     const expense = await MrExpense.findByIdAndDelete(req.params.expenseId);
     if (!expense) return res.status(404).json({ error: 'Expense not found' });
@@ -598,7 +599,7 @@ router.get('/:mrId/tour-plans', authorize('mr:view'), async (req, res) => {
   }
 });
 
-router.post('/:mrId/tour-plans', authorize('mr:visits'), validate(schemas.mrTourPlanSchema), async (req, res) => {
+router.post('/:mrId/tour-plans', authorize('mr:visits'), validate(schemas.mrTourPlanSchema), idempotency, async (req, res) => {
   try {
     const { month, year, entries, status = 'submitted' } = req.body;
     const mrId = req.params.mrId;
@@ -631,7 +632,7 @@ router.post('/:mrId/tour-plans', authorize('mr:visits'), validate(schemas.mrTour
   }
 });
 
-router.put('/tour-plans/:id/status', authorize('mr:edit'), async (req, res) => {
+router.put('/tour-plans/:id/status', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     const { status, rejectionReason } = req.body;
     if (!['approved', 'rejected'].includes(status)) {
@@ -903,7 +904,7 @@ router.post('/:mrId/sample-bag/issue', authorize('mr:edit'), validate(schemas.mr
 
 // ─── Doctor Sample OTP Acknowledgment ───
 
-router.post('/sample-otp/send', authorize('mr:visits'), async (req, res) => {
+router.post('/sample-otp/send', authorize('mr:visits'), idempotency, async (req, res) => {
   try {
     const { doctorId, doctorPhone, doctorName } = req.body;
     if (!doctorId && !doctorPhone && !doctorName) return res.status(400).json({ error: 'doctorId, doctorPhone, or doctorName is required' });
@@ -933,7 +934,7 @@ router.post('/sample-otp/send', authorize('mr:visits'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/sample-otp/verify', authorize('mr:visits'), async (req, res) => {
+router.post('/sample-otp/verify', authorize('mr:visits'), idempotency, async (req, res) => {
   try {
     const { otpKey, otp } = req.body;
     if (!otpKey || !otp) return res.status(400).json({ error: 'otpKey and otp are required' });
@@ -1260,7 +1261,7 @@ router.get('/commission/calculate', authorize('mr:view'), async (req, res) => {
 // ─── MR Leave Management System ───
 
 // POST /api/medical-reps/leaves — Apply for planned/sick/casual leave
-router.post('/leaves', authorize('mr:attendance'), validate(schemas.mrLeaveSchema), async (req, res) => {
+router.post('/leaves', authorize('mr:attendance'), validate(schemas.mrLeaveSchema), idempotency, async (req, res) => {
   try {
     const leave = await MrLeave.create(req.body);
     if (req.io) {
@@ -1288,7 +1289,7 @@ router.get('/leaves', authorize('mr:view'), async (req, res) => {
 });
 
 // PUT /api/medical-reps/leaves/:id/status — Approve or Reject MR Leave Application
-router.put('/leaves/:id/status', authorize('mr:edit'), async (req, res) => {
+router.put('/leaves/:id/status', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     const { status, rejectionReason } = req.body;
     if (!['approved', 'rejected'].includes(status)) {
@@ -1444,7 +1445,7 @@ router.get('/analytics/leaderboard', authorize('mr:view'), async (req, res) => {
 });
 
 // POST /api/medical-reps/visits/check-in — Geo-tagged check-in for MR visit
-router.post('/visits/check-in', authorize('mr:edit'), async (req, res) => {
+router.post('/visits/check-in', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     const { mrId, doctorName, latitude, longitude, photo } = req.body;
     if (!mrId || !doctorName) return res.status(400).json({ error: 'mrId and doctorName are required' });
@@ -1467,7 +1468,7 @@ router.post('/visits/check-in', authorize('mr:edit'), async (req, res) => {
 });
 
 // POST /api/medical-reps/visits/:id/check-out — Geo-tagged check-out for MR visit
-router.post('/visits/:id/check-out', authorize('mr:edit'), async (req, res) => {
+router.post('/visits/:id/check-out', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     const { photo, feedback, orderTaken, orderAmount } = req.body;
     const visit = await MrVisit.findById(req.params.id);
@@ -1520,7 +1521,7 @@ router.get('/analytics/territory-heatmap', authorize('mr:view'), async (req, res
 // ─── Permanent Journey Plan (PJP) & Performance Scorecard ───
 
 // POST /api/medical-reps/:mrId/journey-plans — Create a PJP for a date
-router.post('/:mrId/journey-plans', authorize('mr:visits'), async (req, res) => {
+router.post('/:mrId/journey-plans', authorize('mr:visits'), idempotency, async (req, res) => {
   try {
     const PermanentJourneyPlan = require('../../models/PermanentJourneyPlan');
     const { plannedDate, targetDoctors } = req.body;
@@ -1661,7 +1662,7 @@ router.get('/:mrId/scorecard', authorize('mr:view'), async (req, res) => {
 // ─── Doctor Portfolio Mapping, Area Turns & GPS Footprints ───
 
 // POST /api/medical-reps/assign-doctors — Bulk assign doctors to MR & area turn schedule
-router.post('/assign-doctors', authorize('mr:edit'), async (req, res) => {
+router.post('/assign-doctors', authorize('mr:edit'), idempotency, async (req, res) => {
   try {
     const { mrId, doctorIds = [], contactIds = [], customerIds = [], areaName, preferredVisitDay } = req.body;
     if (!mrId) return res.status(400).json({ error: 'mrId is required' });
@@ -1903,7 +1904,7 @@ router.post('/:mrId/optimize-route', authorize('mr:view'), async (req, res) => {
 });
 
 // POST /api/medical-reps/visits/:visitId/send-summary-whatsapp — Automated Post-Visit Engagement & Digital Sample Receipt Dispatch
-router.post('/visits/:visitId/send-summary-whatsapp', authorize('mr:visits'), async (req, res) => {
+router.post('/visits/:visitId/send-summary-whatsapp', authorize('mr:visits'), idempotency, async (req, res) => {
   try {
     const visit = await MrVisit.findById(req.params.visitId);
     if (!visit) return res.status(404).json({ error: 'Visit record not found' });
@@ -1939,7 +1940,7 @@ router.post('/visits/:visitId/send-summary-whatsapp', authorize('mr:visits'), as
 });
 
 // POST /api/medical-reps/visits/:visitId/send-sample-ack-whatsapp — Dispatch 1-tap sample acknowledgment link via WhatsApp
-router.post('/visits/:visitId/send-sample-ack-whatsapp', authorize('mr:visits'), async (req, res) => {
+router.post('/visits/:visitId/send-sample-ack-whatsapp', authorize('mr:visits'), idempotency, async (req, res) => {
   try {
     const visit = await MrVisit.findById(req.params.visitId);
     if (!visit) return res.status(404).json({ error: 'Visit record not found' });
@@ -1970,7 +1971,7 @@ router.post('/visits/:visitId/send-sample-ack-whatsapp', authorize('mr:visits'),
 });
 
 // POST /api/medical-reps/visits/:visitId/acknowledge-samples — Digitally confirm doctor sample receipt
-router.post('/visits/:visitId/acknowledge-samples', authorize('mr:visits'), async (req, res) => {
+router.post('/visits/:visitId/acknowledge-samples', authorize('mr:visits'), idempotency, async (req, res) => {
   try {
     const { doctorSignature } = req.body;
     const visit = await MrVisit.findById(req.params.visitId);
