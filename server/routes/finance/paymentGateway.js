@@ -62,7 +62,10 @@ router.post('/verify', idempotency, authorize('payment:create'), async (req, res
     const invoice = await Invoice.findOne({ _id: invoiceId, type: 'sale', isFinalized: true });
     if (!invoice || !invoice.customerId) return res.status(404).json({ error: 'Eligible invoice not found', code: 'INVALID_GATEWAY_INVOICE' });
     if (!invoice.gatewayOrderId || invoice.gatewayOrderId !== razorpay_order_id) return res.status(409).json({ error: 'Gateway order does not belong to this CRM invoice', code: 'GATEWAY_ORDER_MISMATCH' });
-    const result = await postGatewayPayment({ invoice, transactionId: razorpay_payment_id, gatewayOrderId: razorpay_order_id, gatewayData: { razorpay_order_id, razorpay_payment_id, paidAt: new Date(), verified: true } });
+    const actorId = req.user?.id || req.user?._id;
+    const actorName = req.user?.name || req.user?.email;
+    if (!actorId || !actorName) return res.status(403).json({ error: 'Authenticated gateway payment operator identity is required', code: 'GATEWAY_OPERATOR_IDENTITY_REQUIRED' });
+    const result = await postGatewayPayment({ invoice, transactionId: razorpay_payment_id, gatewayOrderId: razorpay_order_id, createdByUserId: actorId, createdByName: actorName, gatewayData: { razorpay_order_id, razorpay_payment_id, paidAt: new Date(), verified: true } });
     if (req.io) { req.io.emit('payment_updated', { type: 'gateway_verified', invoiceId: invoice._id }); req.io.emit('invoice_updated', { type: 'payment_posted', id: invoice._id }); }
     res.json({ success: true, message: 'Payment verified successfully', invoice: result.invoice, payment: result.payment });
   } catch (error) { res.status(400).json({ error: error.message, code: error.code || 'GATEWAY_VERIFY_FAILED' }); }
