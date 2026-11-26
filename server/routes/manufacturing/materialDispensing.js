@@ -5,6 +5,7 @@ const RawMaterialEntry = require('../../models/RawMaterialEntry');
 const RawMaterialLedger = require('../../models/RawMaterialLedger');
 const MaterialDispensing = require('../../models/MaterialDispensing');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { withTransaction } = require('../../utils/withTransaction');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const router = express.Router();
@@ -19,7 +20,7 @@ router.get('/:id/dispensings', authorize('manufacturing:view'), async (req, res)
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/:id/dispensings', authorize('manufacturing:edit'), async (req, res) => {
+router.post('/:id/dispensings', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated dispensing operator identity is required' });
     const { stageIndex, items } = req.body;
@@ -72,7 +73,7 @@ router.post('/:id/dispensings', authorize('manufacturing:edit'), async (req, res
   } catch (err) { res.status(err.statusCode || 400).json({ error: err.message }); }
 });
 
-router.patch('/:id/dispensings/:dispensingId/verify', authorize('manufacturing:edit'), async (req, res) => {
+router.patch('/:id/dispensings/:dispensingId/verify', authorize('manufacturing:edit'), idempotency, async (req, res) => {
   try {
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated dispensing reviewer identity is required' });
     const result = await withTransaction(async session => {

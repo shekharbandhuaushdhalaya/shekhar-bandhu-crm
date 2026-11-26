@@ -5,6 +5,7 @@ const RawMaterial = require('../../models/RawMaterial');
 const RawMaterialQualitySpecification = require('../../models/RawMaterialQualitySpecification');
 const GoodsReceivedNote = require('../../models/GoodsReceivedNote');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 const { logAction } = require('../../utils/auditLogger');
 
@@ -58,7 +59,7 @@ router.get('/near-expiry', authorize('inventory:view'), async (req, res) => {
 });
 
 // POST /api/manufacturing/quarantine — register a specific received stock lot for QC.
-router.post('/', authorize('inventory:create'), async (req, res) => {
+router.post('/', authorize('inventory:create'), idempotency, async (req, res) => {
   try {
     const RawMaterialEntry = require('../../models/RawMaterialEntry');
     const { batchNo, supplierName, qty, unit, expiryDate, rawMaterialId, rawMaterialEntryId } = req.body;
@@ -130,7 +131,7 @@ router.post('/', authorize('inventory:create'), async (req, res) => {
 });
 
 // PATCH /api/manufacturing/quarantine/:id/inspection — record actual incoming QC observations.
-router.patch('/:id/inspection', authorize('quality:approve'), async (req, res) => {
+router.patch('/:id/inspection', authorize('quality:approve'), idempotency, async (req, res) => {
   try {
     const { inspectionResults } = req.body;
     const actorId = req.user && (req.user.id || req.user._id);
@@ -208,7 +209,7 @@ router.patch('/:id/inspection', authorize('quality:approve'), async (req, res) =
 });
 
 // PATCH /api/manufacturing/quarantine/:id/release — evidence-backed QC disposition.
-router.patch('/:id/release', authorize('quality:approve'), async (req, res) => {
+router.patch('/:id/release', authorize('quality:approve'), idempotency, async (req, res) => {
   try {
     const RawMaterialEntry = require('../../models/RawMaterialEntry');
     const { withTransaction } = require('../../utils/withTransaction');

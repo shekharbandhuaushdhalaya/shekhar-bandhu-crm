@@ -1,6 +1,7 @@
 const express = require('express');
 const GeneralExpense = require('../../models/GeneralExpense');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 const router = express.Router();
@@ -40,7 +41,7 @@ router.get('/', authorize('report:view'), async (req, res) => {
 });
 
 // POST /api/general-expenses — Record new office expense
-router.post('/', authorize('payment:create'), async (req, res) => {
+router.post('/', authorize('payment:create'), idempotency, async (req, res) => {
   try {
     const { title, category = 'other', amount, date, vendorName, paymentMode = 'bank_transfer', receiptUrl, notes } = req.body;
     if (!title || amount === undefined) {

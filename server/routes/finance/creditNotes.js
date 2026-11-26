@@ -5,6 +5,7 @@ const Vendor = require('../../models/Vendor');
 const Invoice = require('../../models/Invoice');
 const SalesReturn = require('../../models/SalesReturn');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
@@ -116,7 +117,7 @@ router.get('/:id', authorize('invoice:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', authorize('invoice:create'), validate(schemas.creditNoteSchema), async (req, res) => {
+router.post('/', authorize('invoice:create'), validate(schemas.creditNoteSchema), idempotency, async (req, res) => {
   try {
     const type = req.body.type || 'credit_note';
     const data = { ...req.body, noteNo: req.body.noteNo || await generateNoteNo(type), type, status: 'draft', createdBy: req.user?.id || req.user?._id || null };
@@ -126,7 +127,7 @@ router.post('/', authorize('invoice:create'), validate(schemas.creditNoteSchema)
   } catch (err) { res.status(400).json({ error: err.message, code: err.code }); }
 });
 
-router.put('/:id', authorize('invoice:edit'), async (req, res) => {
+router.put('/:id', authorize('invoice:edit'), idempotency, async (req, res) => {
   try {
     const note = await CreditNote.findById(req.params.id);
     if (!note) return res.status(404).json({ error: 'Note not found' });
@@ -140,7 +141,7 @@ router.put('/:id', authorize('invoice:edit'), async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message, code: err.code }); }
 });
 
-router.patch('/:id/finalize', authorize('invoice:finalize'), async (req, res) => {
+router.patch('/:id/finalize', authorize('invoice:finalize'), idempotency, async (req, res) => {
   try {
     const note = await withTransaction(async session => {
       const locked = await CreditNote.findById(req.params.id).session(session);
@@ -164,7 +165,7 @@ router.patch('/:id/finalize', authorize('invoice:finalize'), async (req, res) =>
   } catch (err) { res.status(err.status || 500).json({ error: err.message, code: err.code }); }
 });
 
-router.patch('/:id/cancel', authorize('invoice:delete'), async (req, res) => {
+router.patch('/:id/cancel', authorize('invoice:delete'), idempotency, async (req, res) => {
   try {
     const actorId = req.user?.id || req.user?._id;
     const actorName = String(req.user?.name || req.user?.email || '').trim();

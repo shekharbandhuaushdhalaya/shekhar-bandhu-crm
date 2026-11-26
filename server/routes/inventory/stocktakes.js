@@ -25,7 +25,7 @@ router.get('/', authorize('inventory:view'), async (req, res) => {
 });
 
 // POST /api/stocktakes — Initiate cycle count / stocktake
-router.post('/', authorize('inventory:create'), async (req, res) => {
+router.post('/', authorize('inventory:create'), idempotency, async (req, res) => {
   try {
     const { warehouseId, warehouseName, items, notes } = req.body;
     if (!warehouseId || !warehouseName || !items || !Array.isArray(items) || items.length === 0) {

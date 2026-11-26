@@ -2,6 +2,7 @@ const express = require('express');
 const BankStatement = require('../../models/BankStatement');
 const Payment = require('../../models/Payment');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { withTransaction } = require('../../utils/withTransaction');
 const { suggestBankStatementMatches, evaluateBankPaymentMatch } = require('../../services/bankReconciliationService');
 
@@ -28,7 +29,7 @@ router.get('/', authorize('payment:view'), async (req, res) => {
   }
 });
 
-router.patch('/:id/match', authorize('payment:create'), async (req, res) => {
+router.patch('/:id/match', authorize('payment:create'), idempotency, async (req, res) => {
   try {
     const paymentId = String(req.body.paymentId || '').trim();
     const reviewNotes = String(req.body.reviewNotes || '').trim();
