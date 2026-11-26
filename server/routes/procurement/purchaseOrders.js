@@ -246,11 +246,20 @@ router.post('/:id/grn', idempotency, authorize('vendor:edit'), validate(schemas.
           throw Object.assign(new Error(`${item.name}: exactly one rawMaterialId or productId is required`), { statusCode: 400 });
         }
 
-        const poItem = po.items.find(i =>
+        const matchingPoItems = po.items.filter(i =>
           (item.rawMaterialId && i.rawMaterialId && String(i.rawMaterialId) === String(item.rawMaterialId)) ||
           (item.productId && i.productId && String(i.productId) === String(item.productId))
         );
-        if (!poItem) throw Object.assign(new Error(`${item.name}: item is not present on purchase order ${po.poNo}`), { statusCode: 400 });
+        if (matchingPoItems.length === 0) {
+          throw Object.assign(new Error(`${item.name}: item is not present on purchase order ${po.poNo}`), { statusCode: 400 });
+        }
+        if (matchingPoItems.length > 1) {
+          throw Object.assign(
+            new Error(`${item.name}: multiple purchase-order lines match this item; correct the purchase order before receiving goods`),
+            { statusCode: 409, code: 'PO_ITEM_MATCH_AMBIGUOUS' }
+          );
+        }
+        const poItem = matchingPoItems[0];
         const outstanding = Math.max(0, Number(poItem.qtyOrdered || 0) - Number(poItem.qtyReceived || 0));
         if (accepted > outstanding) {
           throw Object.assign(new Error(`${item.name}: accepted quantity ${accepted} exceeds outstanding PO quantity ${outstanding}`), { statusCode: 409 });
