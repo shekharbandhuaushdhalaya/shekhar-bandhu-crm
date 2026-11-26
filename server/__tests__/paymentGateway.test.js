@@ -33,7 +33,7 @@ describe('Payment Gateway - Money Critical Paths', () => {
       }
     }));
     app.use((req, res, next) => {
-      req.user = { role: 'admin' };
+      req.user = { id: '507f1f77bcf86cd799439013', name: 'Gateway Operator', role: 'admin' };
       next();
     });
     app.use('/api/payments/gateway', paymentGatewayRouter);
@@ -87,6 +87,8 @@ describe('Payment Gateway - Money Critical Paths', () => {
         invoice: mockInvoice,
         transactionId: razorpay_payment_id,
         gatewayOrderId: razorpay_order_id,
+        createdByUserId: '507f1f77bcf86cd799439013',
+        createdByName: 'Gateway Operator',
       }));
     });
 
