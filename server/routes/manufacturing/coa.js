@@ -3,6 +3,7 @@ const router = express.Router();
 const CertificateOfAnalysis = require('../../models/CertificateOfAnalysis');
 const SystemSettings = require('../../models/SystemSettings');
 const { authorize } = require('../../middleware/authorize');
+const idempotency = require('../../middleware/idempotency');
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
 // GET /api/manufacturing/coa — List / search Certificate of Analysis documents
@@ -33,7 +34,7 @@ router.get('/:batchNo', authorize('quality:view'), async (req, res) => {
 });
 
 // POST /api/manufacturing/coa — Create an evidence-backed internal draft.
-router.post('/', authorize('quality:create'), async (req, res) => {
+router.post('/', authorize('quality:create'), idempotency, async (req, res) => {
   try {
     const ProductQualitySpecification = require('../../models/ProductQualitySpecification');
     const BatchProduction = require('../../models/BatchProduction');
@@ -93,7 +94,7 @@ router.post('/', authorize('quality:create'), async (req, res) => {
 });
 
 // PATCH /api/manufacturing/coa/:id/approve — Independent QA review of a manufacturer-issued CoA.
-router.patch('/:id/approve', authorize('quality:approve'), async (req, res) => {
+router.patch('/:id/approve', authorize('quality:approve'), idempotency, async (req, res) => {
   try {
     const { status, remarks } = req.body;
     if (!req.user || !req.user.id || !req.user.name) return res.status(401).json({ error: 'Authenticated QA reviewer identity is required' });
