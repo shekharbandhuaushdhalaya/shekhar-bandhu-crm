@@ -6,6 +6,19 @@ const { withTransaction } = require('../utils/withTransaction');
 
 const money = n => Number(Number(n || 0).toFixed(2));
 
+function consolidateInvoiceAllocations(allocations = []) {
+  const totals = new Map();
+  for (const row of allocations || []) {
+    const amount = money(row.amountApplied ?? row.amountAllocated ?? row.amount);
+    if (!(amount > 0)) continue;
+    const key = String(row.invoiceId || '');
+    const existing = totals.get(key);
+    if (existing) existing.amountApplied = money(existing.amountApplied + amount);
+    else totals.set(key, { invoiceId: row.invoiceId, amountApplied: amount });
+  }
+  return Array.from(totals.values());
+}
+
 function invoicePaymentStatus(amountPaid, amount) {
   const paid = money(amountPaid);
   const total = money(amount);
@@ -65,9 +78,8 @@ async function createPaymentInSession({ paymentData, allocations = [], session }
 
   const cleanAllocations = [];
   let allocated = 0;
-  for (const row of allocations || []) {
-    const allocationAmount = money(row.amountApplied ?? row.amountAllocated ?? row.amount);
-    if (!(allocationAmount > 0)) continue;
+  for (const row of consolidateInvoiceAllocations(allocations)) {
+    const allocationAmount = row.amountApplied;
     const invoice = await Invoice.findById(row.invoiceId).session(session);
     if (!invoice) throw paymentError('INVOICE_NOT_FOUND', `Invoice not found: ${row.invoiceId}`);
     assertAllocationOwnership(invoice, paymentData.partyType, paymentData.partyId);
@@ -115,9 +127,8 @@ async function allocateExistingPayment({ paymentId, allocations = [], actor = {}
     if (!payment) throw paymentError('PAYMENT_NOT_FOUND', 'Payment receipt record not found');
     if (payment.status === 'reversed') throw paymentError('PAYMENT_REVERSED', 'A reversed payment cannot be allocated');
     let remaining = money(payment.unallocatedAmount != null ? payment.unallocatedAmount : payment.amount);
-    for (const row of allocations) {
-      const amount = money(row.amountApplied ?? row.amountAllocated ?? row.amount);
-      if (!(amount > 0)) continue;
+    for (const row of consolidateInvoiceAllocations(allocations)) {
+      const amount = row.amountApplied;
       if (amount > remaining + 0.01) throw paymentError('ALLOCATION_EXCEEDS_PAYMENT', 'Allocations exceed the unallocated payment amount');
       const invoice = await Invoice.findById(row.invoiceId).session(session);
       if (!invoice) throw paymentError('INVOICE_NOT_FOUND', `Invoice not found: ${row.invoiceId}`);
@@ -244,4 +255,5 @@ module.exports = {
   reversePayment,
   postGatewayPayment,
   assertAllocationOwnership,
+  consolidateInvoiceAllocations,
 };
