@@ -40,7 +40,7 @@ router.get('/', authorize('vendor:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchema), async (req, res) => {
+router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchema), idempotency, async (req, res) => {
   try {
     const { vendorId, vendorName, items, notes, requisitionId } = req.body;
     if (requisitionId) {
@@ -177,7 +177,7 @@ router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchem
 });
 
 
-router.patch('/:id/approve', authorize('vendor:edit'), async (req, res) => {
+router.patch('/:id/approve', authorize('vendor:edit'), idempotency, async (req, res) => {
   try {
     const approverId = req.user?.id || req.user?._id;
     if (!approverId) return res.status(403).json({ error: 'Authenticated approver identity is required' });
@@ -402,7 +402,7 @@ router.get('/grn/:id', authorize('vendor:view'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), async (req, res) => {
+router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), idempotency, async (req, res) => {
   try {
     const reviewerId = req.user?.id || req.user?._id;
     const reviewerName = req.user?.name || req.user?.email;
@@ -454,7 +454,7 @@ router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), async (req
 router.get('/grn/:id/supplier-returns', authorize('vendor:view'), async (req, res) => {
   try { const grn = await GoodsReceivedNote.findById(req.params.id).lean(); if (!grn) return res.status(404).json({ error: 'Goods Received Note not found' }); const rows = await SupplierReturn.find({ grnId: grn._id }).sort({ createdAt: -1 }).lean(); return res.json(rows); } catch (err) { return res.status(500).json({ error: err.message }); }
 });
-router.post('/grn/:id/supplier-returns', authorize('vendor:edit'), async (req, res) => {
+router.post('/grn/:id/supplier-returns', authorize('vendor:edit'), idempotency, async (req, res) => {
   try {
     const makerId = req.user?.id || req.user?._id; const makerName = req.user?.name || req.user?.email;
     if (!makerId || !makerName) return res.status(403).json({ error: 'Authenticated return-request identity is required' });
@@ -485,7 +485,7 @@ router.post('/grn/:id/supplier-returns', authorize('vendor:edit'), async (req, r
     req.io?.emit('supplier_return_updated', { type: 'created', id: record._id }); return res.status(201).json(record);
   } catch (err) { return res.status(err.statusCode || 400).json({ error: err.message, code: err.code }); }
 });
-router.patch('/supplier-returns/:id/approve', authorize('vendor:approve'), async (req, res) => {
+router.patch('/supplier-returns/:id/approve', authorize('vendor:approve'), idempotency, async (req, res) => {
   try {
     const reviewerId = req.user?.id || req.user?._id;
     const reviewerName = req.user?.name || req.user?.email;
@@ -514,7 +514,7 @@ router.patch('/supplier-returns/:id/approve', authorize('vendor:approve'), async
     return res.json(reviewed);
   } catch (err) { return res.status(400).json({ error: err.message, code: err.code }); }
 });
-router.patch('/supplier-returns/:id/dispatch', authorize('vendor:edit'), async (req, res) => {
+router.patch('/supplier-returns/:id/dispatch', authorize('vendor:edit'), idempotency, async (req, res) => {
   try {
     const actorId = req.user?.id || req.user?._id;
     const actorName = req.user?.name || req.user?.email;
@@ -537,7 +537,7 @@ router.patch('/supplier-returns/:id/dispatch', authorize('vendor:edit'), async (
     return res.json(dispatched);
   } catch (err) { return res.status(400).json({ error: err.message }); }
 });
-router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (req, res) => {
+router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), idempotency, async (req, res) => {
   try {
     const actorId = req.user?.id || req.user?._id;
     const actorName = req.user?.name || req.user?.email;
