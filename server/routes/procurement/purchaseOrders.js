@@ -415,6 +415,12 @@ router.patch('/grn/:id/verify', authorize('manufacturing:qcApprove'), async (req
       if (!record) throw Object.assign(new Error('Goods Received Note not found'), { statusCode: 404 });
       if (record.status !== 'pending_verification') throw Object.assign(new Error('Only pending GRNs can be independently verified'), { statusCode: 409 });
       if (record.receivedByUserId && String(record.receivedByUserId) === String(reviewerId)) throw Object.assign(new Error('The person recording receipt cannot verify the same GRN'), { statusCode: 403, code: 'GRN_MAKER_CHECKER_REQUIRED' });
+      if (decision === 'rejected' && (record.items || []).some(item => Number(item.qtyAccepted || 0) > 0)) {
+        throw Object.assign(
+          new Error('This GRN has accepted quantities already inwarded into under-test inventory; verify the receipt and complete a separate QC disposition instead of rejecting the entire GRN'),
+          { statusCode: 409, code: 'GRN_REJECTION_REQUIRES_STOCK_DISPOSITION' }
+        );
+      }
       if (decision === 'verified') {
         const incompleteCoa = (record.items || []).filter(item => item.rawMaterialId && (!String(item.supplierCoaRef || '').trim() || !String(item.supplierCoaNo || '').trim() || !item.supplierCoaDate || !String(item.supplierCoaLabName || '').trim() || !String(item.supplierCoaBatchNo || '').trim() || !String(item.supplierCoaDocumentRef || '').trim() || String(item.supplierCoaBatchNo).trim().toUpperCase() !== String(item.batchNo).trim().toUpperCase()));
         if (incompleteCoa.length) throw Object.assign(new Error('Complete supplier CoA metadata, source-document reference and matching supplier batch are required for every raw-material line before GRN verification: ' + incompleteCoa.map(item => item.name).join(', ')), { statusCode: 409, code: 'GRN_SUPPLIER_COA_REQUIRED' });

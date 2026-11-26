@@ -102,6 +102,24 @@ describe('GRN independent receipt and supplier-document verification', () => {
     expect(record.save).not.toHaveBeenCalled();
   });
 
+  test('prevents rejecting a GRN after accepted quantities have been inwarded', async () => {
+    const record = pendingGrn({
+      items: [{ ...pendingGrn().items[0], qtyAccepted: 5, qtyRejected: 0, qtyReceived: 5 }]
+    });
+    mockFind(record);
+    const response = await request(app)
+      .patch('/api/purchase-orders/grn/grn-1/verify')
+      .send({
+        decision: 'rejected',
+        verificationNotes: 'Receipt reviewed against source documents',
+        rejectionReason: 'Supplier documentation was found to be materially incorrect'
+      });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('GRN_REJECTION_REQUIRES_STOCK_DISPOSITION');
+    expect(record.status).toBe('pending_verification');
+    expect(record.save).not.toHaveBeenCalled();
+  });
+
   test('independent verification records reviewer and audit evidence without releasing stock', async () => {
     const record = pendingGrn();
     mockFind(record);
