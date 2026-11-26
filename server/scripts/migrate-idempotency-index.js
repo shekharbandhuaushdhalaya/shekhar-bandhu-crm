@@ -6,10 +6,13 @@ const IdempotencyKey = require('../models/IdempotencyKey');
 const UNIQUE_INDEX_NAME = 'firmId_1_key_1_method_1_path_1_unique';
 const UNIQUE_INDEX_KEYS = { firmId: 1, key: 1, method: 1, path: 1 };
 const LEGACY_INDEX_KEYS = { key: 1, method: 1, path: 1, fingerprint: 1 };
+const COMPLETED_TTL_INDEX_NAME = 'completedAt_1_ttl';
+const COMPLETED_TTL_INDEX_KEYS = { completedAt: 1 };
 
 async function migrateIdempotencyIndex(collection) {
   const indexes = await collection.indexes();
   const legacy = indexes.find(index => JSON.stringify(index.key) === JSON.stringify(LEGACY_INDEX_KEYS));
+  const createdAtTtl = indexes.find(index => index.key?.createdAt === 1 && index.expireAfterSeconds != null);
 
   // The old index allowed the same key/scope to be stored with different
   // fingerprints. Those rows collide under the new semantics. Never delete
@@ -55,12 +58,26 @@ async function migrateIdempotencyIndex(collection) {
     unique: true,
     name: UNIQUE_INDEX_NAME
   });
+  // Active processing records have no completedAt and must never expire.
+  // Install the completedAt TTL before removing the legacy createdAt TTL.
+  await collection.createIndex(COMPLETED_TTL_INDEX_KEYS, {
+    expireAfterSeconds: 86400,
+    name: COMPLETED_TTL_INDEX_NAME
+  });
 
+  if (createdAtTtl && createdAtTtl.name !== COMPLETED_TTL_INDEX_NAME) {
+    await collection.dropIndex(createdAtTtl.name);
+  }
   if (legacy && legacy.name !== UNIQUE_INDEX_NAME) {
     await collection.dropIndex(legacy.name);
   }
 
-  return { createdOrVerified: UNIQUE_INDEX_NAME, droppedLegacyIndex: legacy ? legacy.name : null };
+  return {
+    createdOrVerified: UNIQUE_INDEX_NAME,
+    completedTtlIndex: COMPLETED_TTL_INDEX_NAME,
+    droppedLegacyIndex: legacy ? legacy.name : null,
+    droppedCreatedAtTtlIndex: createdAtTtl ? createdAtTtl.name : null
+  };
 }
 
 async function main() {
@@ -80,4 +97,7 @@ if (require.main === module) {
     });
 }
 
-module.exports = { migrateIdempotencyIndex, UNIQUE_INDEX_NAME, UNIQUE_INDEX_KEYS, LEGACY_INDEX_KEYS };
+module.exports = {
+  migrateIdempotencyIndex, UNIQUE_INDEX_NAME, UNIQUE_INDEX_KEYS, LEGACY_INDEX_KEYS,
+  COMPLETED_TTL_INDEX_NAME, COMPLETED_TTL_INDEX_KEYS
+};

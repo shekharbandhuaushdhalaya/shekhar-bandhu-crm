@@ -1,4 +1,4 @@
-const { migrateIdempotencyIndex, UNIQUE_INDEX_NAME, LEGACY_INDEX_KEYS } = require('../scripts/migrate-idempotency-index');
+const { migrateIdempotencyIndex, UNIQUE_INDEX_NAME, LEGACY_INDEX_KEYS, COMPLETED_TTL_INDEX_NAME } = require('../scripts/migrate-idempotency-index');
 
 function collectionWith({ duplicates = [], indexes = [] } = {}) {
   const calls = [];
@@ -15,7 +15,10 @@ describe('idempotency index migration safety', () => {
   test('aborts on duplicate tenant/key scopes without changing indexes or records', async () => {
     const collection = collectionWith({
       duplicates: [{ _id: { firmId: null, key: 'same-key', method: 'POST', path: '/payments' }, count: 2, fingerprintCount: 2 }],
-      indexes: [{ name: 'legacy_idempotency', key: LEGACY_INDEX_KEYS }]
+      indexes: [
+        { name: 'legacy_idempotency', key: LEGACY_INDEX_KEYS },
+        { name: 'idempotency_createdAt_ttl', key: { createdAt: 1 }, expireAfterSeconds: 86400 }
+      ]
     });
 
     await expect(migrateIdempotencyIndex(collection)).rejects.toMatchObject({ code: 'IDEMPOTENCY_INDEX_DUPLICATES' });
@@ -30,9 +33,11 @@ describe('idempotency index migration safety', () => {
 
     await expect(migrateIdempotencyIndex(collection)).resolves.toEqual({
       createdOrVerified: UNIQUE_INDEX_NAME,
-      droppedLegacyIndex: 'legacy_idempotency'
+      completedTtlIndex: COMPLETED_TTL_INDEX_NAME,
+      droppedLegacyIndex: 'legacy_idempotency',
+      droppedCreatedAtTtlIndex: null
     });
-    expect(collection.calls.map(call => call[0])).toEqual(['createIndex', 'dropIndex']);
+    expect(collection.calls.map(call => call[0])).toEqual(['createIndex', 'createIndex', 'dropIndex']);
   });
 
   test('retains the legacy index when creating the replacement fails', async () => {
@@ -49,9 +54,11 @@ describe('idempotency index migration safety', () => {
     const collection = collectionWith();
     await expect(migrateIdempotencyIndex(collection)).resolves.toEqual({
       createdOrVerified: UNIQUE_INDEX_NAME,
-      droppedLegacyIndex: null
+      completedTtlIndex: COMPLETED_TTL_INDEX_NAME,
+      droppedLegacyIndex: null,
+      droppedCreatedAtTtlIndex: null
     });
-    expect(collection.createIndex).toHaveBeenCalledTimes(1);
+    expect(collection.createIndex).toHaveBeenCalledTimes(2);
     expect(collection.dropIndex).not.toHaveBeenCalled();
   });
 });

@@ -6,6 +6,6 @@ const schema = new mongoose.Schema({
   status: { type: String, enum: ['processing','completed'], default: 'processing' }, statusCode: { type: Number, default: 200 }, response: { type: mongoose.Schema.Types.Mixed, default: null }, completedAt: { type: Date, default: null }
 }, { timestamps: true });
 schema.index({ firmId: 1, key: 1, method: 1, path: 1 }, { unique: true, name: 'firmId_1_key_1_method_1_path_1_unique' });
-schema.index({ createdAt: 1 }, { expireAfterSeconds: 86400 });
+schema.index({ completedAt: 1 }, { expireAfterSeconds: 86400, name: 'completedAt_1_ttl' });
 schema.plugin(tenantPlugin);
 module.exports = mongoose.model('IdempotencyKey', schema);
