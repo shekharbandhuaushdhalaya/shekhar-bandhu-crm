@@ -38,28 +38,32 @@ router.post('/', idempotency, authorize('manufacturing:edit'), async (req, res) 
     // Auto-trace sale invoices containing this batchNo
     const saleInvoices = await Invoice.find({
       type: 'sale',
+      isFinalized: true,
       'items.batchNo': batchNo
     }).lean();
 
-    const affectedCustomers = [];
+    // One notification record per invoice: aggregate duplicate matching lines so
+    // a single customer notification covers the complete invoice distribution.
+    const affectedByInvoice = new Map();
     let totalAffectedQty = 0;
-
     for (const inv of saleInvoices) {
-      for (const item of inv.items) {
-        if (item.batchNo === batchNo) {
-          const qty = item.qty || item.boxes || 0;
-          totalAffectedQty += qty;
-          affectedCustomers.push({
-            customerId: inv.customerId || null,
-            customerName: inv.partyName,
-            invoiceNo: inv.invoiceNo,
-            invoiceDate: inv.date,
-            suppliedQty: qty,
-            notified: false
-          });
-        }
-      }
+      const qty = (inv.items || []).filter(item => item.batchNo === batchNo)
+        .reduce((sum, item) => sum + Number(item.qty || item.boxes || 0), 0);
+      if (!(qty > 0)) continue;
+      totalAffectedQty += qty;
+      const key = String(inv._id || inv.invoiceNo);
+      const current = affectedByInvoice.get(key) || {
+        customerId: inv.customerId || null,
+        customerName: inv.partyName || inv.customerName || 'Customer',
+        invoiceNo: inv.invoiceNo,
+        invoiceDate: inv.date,
+        suppliedQty: 0,
+        notified: false
+      };
+      current.suppliedQty += qty;
+      affectedByInvoice.set(key, current);
     }
+    const affectedCustomers = Array.from(affectedByInvoice.values());
 
     const recall = await Recall.create({
       recallNo,

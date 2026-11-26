@@ -7,6 +7,8 @@ jest.mock('../models/Order');
 jest.mock('../models/Dispatch');
 jest.mock('../models/RetentionSample');
 jest.mock('../models/Recall');
+jest.mock('../models/Invoice');
+jest.mock('../utils/documentCounter', () => ({ generateAtomicDocumentNumber: jest.fn().mockResolvedValue('RCL/26-27/0001') }));
 jest.mock('../models/SystemSettings');
 jest.mock('../models/RolePermission');
 jest.mock('../utils/whatsappService', () => ({
@@ -37,6 +39,7 @@ const Order = require('../models/Order');
 const Dispatch = require('../models/Dispatch');
 const RetentionSample = require('../models/RetentionSample');
 const Recall = require('../models/Recall');
+const Invoice = require('../models/Invoice');
 const SystemSettings = require('../models/SystemSettings');
 const Challan = require('../models/Challan');
 const RolePermission = require('../models/RolePermission');
@@ -272,6 +275,30 @@ describe('Features 3, 7, 8: Sample E-Sign, Customer Portal Tracking & Retention 
       expect(res.body.reconciliationMetrics.reconciliationStatus).toBe('partially_recovered');
     });
 
+
+    test('recall initiation traces finalized invoices only and aggregates duplicate batch lines per invoice', async () => {
+      const invoiceA = {
+        _id: 'invoice-a', invoiceNo: 'INV-A', customerId: 'customer-a', partyName: 'Customer A', date: new Date('2026-10-01'),
+        items: [{ batchNo: 'BATCH-R1', qty: 4 }, { batchNo: 'BATCH-R1', qty: 6 }]
+      };
+      const invoiceB = {
+        _id: 'invoice-b', invoiceNo: 'INV-B', customerId: 'customer-b', partyName: 'Customer B', date: new Date('2026-10-02'),
+        items: [{ batchNo: 'BATCH-R1', qty: 3 }]
+      };
+      Invoice.find = jest.fn(() => ({ lean: jest.fn().mockResolvedValue([invoiceA, invoiceB]) }));
+      Recall.create = jest.fn().mockImplementation(async payload => ({ _id: 'recall-created', ...payload }));
+      const response = await request(app).post('/api/recalls').send({
+        batchNo: 'BATCH-R1', productName: 'Test Product', reason: 'Quality investigation identified a batch concern', severity: 'class_II'
+      });
+      expect(response.status).toBe(201);
+      expect(Invoice.find).toHaveBeenCalledWith({ type: 'sale', isFinalized: true, 'items.batchNo': 'BATCH-R1' });
+      expect(response.body.totalAffectedQty).toBe(13);
+      expect(response.body.affectedCustomers).toHaveLength(2);
+      expect(response.body.affectedCustomers).toEqual(expect.arrayContaining([
+        expect.objectContaining({ invoiceNo: 'INV-A', suppliedQty: 10 }),
+        expect.objectContaining({ invoiceNo: 'INV-B', suppliedQty: 3 })
+      ]));
+    });
 
     test('requires traceable notification evidence for an affected invoice', async () => {
       const recall = { _id: 'recall_notify', updatedAt: new Date('2026-11-25T10:00:00Z'), affectedCustomers: [{ invoiceNo: 'INV-1', notified: false }] };
