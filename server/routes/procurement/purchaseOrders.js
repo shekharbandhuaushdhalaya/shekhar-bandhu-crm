@@ -129,6 +129,19 @@ router.post('/', authorize('vendor:create'), validate(schemas.purchaseOrderSchem
         { statusCode: 409, code: 'PROCUREMENT_EXCEPTION_REQUIRED' }
       );
     }
+    const seenItemIdentities = new Set();
+    for (const item of items) {
+      if ((!item.rawMaterialId && !item.productId) || (item.rawMaterialId && item.productId)) {
+        throw Object.assign(new Error(`PO item "${item.name}" must reference exactly one raw material or finished product`), { statusCode: 400 });
+      }
+      const identity = item.rawMaterialId ? 'raw:' + String(item.rawMaterialId) : 'product:' + String(item.productId);
+      if (seenItemIdentities.has(identity)) {
+        throw Object.assign(new Error('A purchase order cannot contain duplicate lines for the same raw material or finished product'), {
+          statusCode: 400, code: 'DUPLICATE_PURCHASE_ORDER_ITEM'
+        });
+      }
+      seenItemIdentities.add(identity);
+    }
     const vend = await Vendor.findById(vendorId);
     if (!vend) return res.status(404).json({ error: 'Vendor not found' });
     const resolvedVendorName = vendorName || vend.company || vend.name || 'Vendor';
