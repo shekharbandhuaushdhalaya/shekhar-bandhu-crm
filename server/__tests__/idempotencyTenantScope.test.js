@@ -50,6 +50,23 @@ describe('tenant-scoped idempotency', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  test('returns in-progress when a concurrent insert wins with the same fingerprint', async () => {
+    const fingerprint = idempotency.createFingerprint(req);
+    IdempotencyKey.create.mockRejectedValueOnce({ code: 11000 });
+    IdempotencyKey.findOne
+      .mockReturnValueOnce({ lean: jest.fn().mockResolvedValue(null) })
+      .mockReturnValueOnce({ lean: jest.fn().mockResolvedValue({
+        _id: 'concurrent-record', fingerprint, status: 'processing'
+      }) });
+
+    await idempotency(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.body.code).toBe('IDEMPOTENCY_REQUEST_IN_PROGRESS');
+    expect(next).not.toHaveBeenCalled();
+    expect(IdempotencyKey.create).toHaveBeenCalledTimes(1);
+  });
+
   test('rejects reuse of a key with a different payload', async () => {
     IdempotencyKey.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue({ fingerprint: 'different', status: 'completed' }) });
     await idempotency(req, res, next);
