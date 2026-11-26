@@ -549,15 +549,15 @@ class ApiClient {
     return res.json();
   }
   async createCustomer(data: Partial<Customer>): Promise<Customer> {
-    const res = await this.request(`${API_BASE}/customers`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/customers`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('customer-create') }, body: JSON.stringify(data) });
     return res.json();
   }
   async updateCustomer(id: string, data: Partial<Customer>): Promise<Customer> {
-    const res = await this.request(`${API_BASE}/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/customers/${id}`, { method: 'PUT', headers: { 'Idempotency-Key': createMutationKey(`customer-update-${id}`) }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteCustomer(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/customers/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/customers/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`customer-delete-${id}`) } });
     return res.ok;
   }
 
@@ -1801,11 +1801,11 @@ class ApiClient {
     return res.json();
   }
   async setSalesTarget(data: Partial<SalesTarget>): Promise<SalesTarget> {
-    const res = await this.request(`${API_BASE}/sales-targets`, { method: 'POST', body: JSON.stringify(data) });
+    const res = await this.request(`${API_BASE}/sales-targets`, { method: 'POST', headers: { 'Idempotency-Key': createMutationKey('sales-target-set') }, body: JSON.stringify(data) });
     return res.json();
   }
   async deleteSalesTarget(id: string): Promise<boolean> {
-    const res = await this.request(`${API_BASE}/sales-targets/${id}`, { method: 'DELETE' });
+    const res = await this.request(`${API_BASE}/sales-targets/${id}`, { method: 'DELETE', headers: { 'Idempotency-Key': createMutationKey(`sales-target-delete-${id}`) } });
     return res.ok;
   }
   async getCommissionReport(month?: number, year?: number, commissionRate = 5): Promise<CommissionReport> {

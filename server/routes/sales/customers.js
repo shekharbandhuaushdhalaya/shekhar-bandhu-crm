@@ -4,6 +4,7 @@ const { authorize } = require('../../middleware/authorize');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { logAction } = require('../../utils/auditLogger');
+const idempotency = require('../../middleware/idempotency');
 
 const router = express.Router();
 
@@ -64,7 +65,7 @@ router.get('/', authorize('customer:view'), async (req, res) => {
 });
 
 // POST /api/customers — Create new customer
-router.post('/', authorize('customer:create'), validate(schemas.customerSchema), async (req, res) => {
+router.post('/', authorize('customer:create'), validate(schemas.customerSchema), idempotency, async (req, res) => {
   try {
     const data = { ...req.body };
     if (!req.user || !req.user.canAccessCash) {
@@ -92,7 +93,7 @@ router.post('/', authorize('customer:create'), validate(schemas.customerSchema),
 });
 
 // PUT /api/customers/:id — Update customer details
-router.put('/:id', authorize('customer:edit'), validate(schemas.customerSchema.partial()), async (req, res) => {
+router.put('/:id', authorize('customer:edit'), validate(schemas.customerSchema.partial()), idempotency, async (req, res) => {
   try {
     const data = { ...req.body };
     if (!req.user || !req.user.canAccessCash) {
@@ -125,7 +126,7 @@ router.put('/:id', authorize('customer:edit'), validate(schemas.customerSchema.p
 });
 
 // DELETE /api/customers/:id — Remove customer
-router.delete('/:id', authorize('customer:delete'), async (req, res) => {
+router.delete('/:id', authorize('customer:delete'), idempotency, async (req, res) => {
   try {
     const customer = await Customer.findByIdAndDelete(req.params.id);
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
@@ -173,7 +174,7 @@ router.get('/export-csv', authorize('customer:view'), async (req, res) => {
 });
 
 // POST /api/customers/import-csv — Import customers from JSON array of CSV rows
-router.post('/import-csv', authorize('customer:create'), async (req, res) => {
+router.post('/import-csv', authorize('customer:create'), idempotency, async (req, res) => {
   try {
     const { rows } = req.body;
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
