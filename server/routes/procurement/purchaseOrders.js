@@ -526,6 +526,7 @@ router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (r
       status: 'closed', supplierReference: ref,
       resolvedByUserId: actorId, resolvedByName: actorName, resolvedAt: new Date()
     };
+    let replacementGrn = null;
     if (record.resolutionType === 'replacement_requested') {
       const batch = String(req.body?.replacementBatchNo || '').trim();
       if (!batch) return res.status(400).json({ error: 'Replacement batch number is required' });
@@ -533,31 +534,29 @@ router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (r
         ? { rawMaterialId: record.rawMaterialId }
         : record.productId ? { productId: record.productId } : null;
       if (!itemIdentity) return res.status(409).json({ error: 'Supplier return has no linked material/product identity; replacement receipt cannot be verified', code: 'SUPPLIER_REPLACEMENT_ITEM_UNLINKED' });
-      const replacementGrn = await GoodsReceivedNote.findOne({
+      replacementGrn = await GoodsReceivedNote.findOne({
         _id: { $ne: record.grnId },
         poId: record.poId,
         vendorId: record.vendorId,
         status: 'verified',
-        items: { $elemMatch: {
-          ...itemIdentity,
-          batchNo: batch,
-          qtyAccepted: { $gte: Number(record.qty || 0) }
-        } }
+        items: { $elemMatch: { ...itemIdentity, batchNo: batch, qtyAccepted: { $gt: 0 } } }
       }).lean();
       if (!replacementGrn) return res.status(409).json({
-        error: 'Replacement cannot be closed until a verified GRN records the same supplier, PO, material/product, batch and sufficient accepted quantity',
+        error: 'Replacement cannot be closed until a verified GRN records the same supplier, PO, material/product and batch',
         code: 'SUPPLIER_REPLACEMENT_GRN_NOT_VERIFIED'
       });
-      const replacementLine = (replacementGrn.items || []).find(line =>
+      const matchingLines = (replacementGrn.items || []).filter(line =>
         String(line.batchNo || '') === batch &&
-        (record.rawMaterialId ? String(line.rawMaterialId || '') === String(record.rawMaterialId) : String(line.productId || '') === String(record.productId)) &&
-        Number(line.qtyAccepted || 0) >= Number(record.qty || 0)
+        (record.rawMaterialId ? String(line.rawMaterialId || '') === String(record.rawMaterialId) : String(line.productId || '') === String(record.productId))
       );
-      if (!replacementLine) return res.status(409).json({ error: 'Verified replacement GRN line did not reconcile to the supplier return', code: 'SUPPLIER_REPLACEMENT_GRN_LINE_MISMATCH' });
-      set.replacementBatchNo = replacementLine.batchNo;
+      const acceptedQty = matchingLines.reduce((sum, line) => sum + Number(line.qtyAccepted || 0), 0);
+      if (acceptedQty <= 0) return res.status(409).json({ error: 'Verified replacement GRN has no accepted quantity for the requested item and batch', code: 'SUPPLIER_REPLACEMENT_GRN_LINE_MISMATCH' });
+      set.replacementBatchNo = batch;
       set.replacementGrnId = replacementGrn._id;
       set.replacementGrnNo = replacementGrn.grnNo;
       set.replacementReceivedAt = replacementGrn.verifiedAt || replacementGrn.receivedDate || null;
+      set._replacementAcceptedQty = acceptedQty;
+      set._replacementItemIdentity = itemIdentity;
     }
     if (record.resolutionType === 'debit_note_requested') {
       const noteDate = req.body?.supplierDebitNoteDate ? new Date(req.body.supplierDebitNoteDate) : null;
@@ -567,13 +566,44 @@ router.patch('/supplier-returns/:id/resolve', authorize('vendor:edit'), async (r
     }
     const filter = { _id: record._id, status: requiredResolutionStatus };
     if (record.updatedAt) filter.updatedAt = record.updatedAt;
-    const resolved = await SupplierReturn.findOneAndUpdate(
-      filter, { $set: set }, { new: true, runValidators: true }
-    );
+    let resolved;
+    if (record.resolutionType === 'replacement_requested') {
+      const acceptedQty = set._replacementAcceptedQty;
+      const itemIdentity = set._replacementItemIdentity;
+      delete set._replacementAcceptedQty;
+      delete set._replacementItemIdentity;
+      resolved = await withTransaction(async session => {
+        // Touch the replacement GRN inside the transaction so competing closures
+        // serialize on the same document and retry against committed allocations.
+        const reservation = await GoodsReceivedNote.findOneAndUpdate(
+          { _id: replacementGrn._id, status: 'verified' },
+          { $inc: { replacementReservationVersion: 1 } },
+          { new: true, session }
+        );
+        if (!reservation) throw Object.assign(new Error('Replacement GRN changed before quantity could be reserved; reload and retry'), { statusCode: 409, code: 'SUPPLIER_REPLACEMENT_RESERVATION_CONFLICT' });
+        const priorAllocations = await SupplierReturn.find({
+          replacementGrnId: replacementGrn._id,
+          replacementBatchNo: set.replacementBatchNo,
+          status: 'closed',
+          ...itemIdentity
+        }, null, { session }).lean();
+        const alreadyAllocated = priorAllocations.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+        if (alreadyAllocated + Number(record.qty || 0) > acceptedQty + 0.0001) {
+          throw Object.assign(new Error('Replacement GRN accepted quantity has already been allocated to other supplier returns'), { statusCode: 409, code: 'SUPPLIER_REPLACEMENT_QTY_ALREADY_ALLOCATED' });
+        }
+        return SupplierReturn.findOneAndUpdate(
+          filter, { $set: set }, { new: true, runValidators: true, session }
+        );
+      });
+    } else {
+      resolved = await SupplierReturn.findOneAndUpdate(
+        filter, { $set: set }, { new: true, runValidators: true }
+      );
+    }
     if (!resolved) return res.status(409).json({ error: 'Supplier return changed before resolution was recorded', code: 'SUPPLIER_RETURN_RESOLUTION_CONFLICT' });
     await logAction({ action: 'SUPPLIER_RETURN_RESOLVED', description: 'Supplier return ' + resolved.returnNo + ' resolved', details: { supplierReturnId: resolved._id, supplierReference: ref, resolutionType: resolved.resolutionType }, req });
     return res.json(resolved);
-  } catch (err) { return res.status(400).json({ error: err.message }); }
+  } catch (err) { return res.status(err.statusCode || 400).json({ error: err.message, code: err.code }); }
 });
 router.post('/3-way-match', authorize('vendor:view'), async (req, res) => {
   try {

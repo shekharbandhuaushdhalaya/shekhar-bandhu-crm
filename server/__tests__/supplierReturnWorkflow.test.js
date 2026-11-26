@@ -18,6 +18,7 @@ jest.mock('../models/Invoice');
 jest.mock('../models/RolePermission');
 jest.mock('../utils/auditLogger', () => ({ logAction: jest.fn().mockResolvedValue(true) }));
 jest.mock('../utils/documentCounter', () => ({ generateAtomicDocumentNumber: jest.fn().mockResolvedValue('SR-000001') }));
+jest.mock('../utils/withTransaction', () => ({ withTransaction: jest.fn(async work => work({})) }));
 
 const SupplierReturn = require('../models/SupplierReturn');
 const GoodsReceivedNote = require('../models/GoodsReceivedNote');
@@ -130,6 +131,8 @@ describe('Supplier return lifecycle', () => {
       _id: 'replacement-grn-5', grnNo: 'GRN-REPL-5', status: 'verified',
       verifiedAt: new Date(), items: [{ rawMaterialId: 'raw-5', batchNo: 'REPL-BATCH-5', qtyAccepted: 2 }]
     }) });
+    GoodsReceivedNote.findOneAndUpdate.mockResolvedValue({ _id: 'replacement-grn-5', status: 'verified' });
+    SupplierReturn.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
     SupplierReturn.findOneAndUpdate.mockResolvedValue({
       _id: 'return-5', returnNo: 'SR-5', status: 'closed', supplierReference: 'SUP-ACK-5',
       replacementBatchNo: 'REPL-BATCH-5', replacementGrnId: 'replacement-grn-5',
@@ -139,10 +142,15 @@ describe('Supplier return lifecycle', () => {
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5', replacementGrnNo: 'GRN-REPL-5', resolvedByUserId: 'stores-1' });
     expect(GoodsReceivedNote.findOne).toHaveBeenCalledWith(expect.objectContaining({ _id: { $ne: 'original-grn-5' }, poId: 'po-5', vendorId: 'vendor-5', status: 'verified' }));
+    expect(GoodsReceivedNote.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: 'replacement-grn-5', status: 'verified' },
+      { $inc: { replacementReservationVersion: 1 } },
+      { new: true, session: {} }
+    );
     expect(SupplierReturn.findOneAndUpdate).toHaveBeenCalledWith(
       { _id: 'return-5', status: 'dispatched' },
       { $set: expect.objectContaining({ status: 'closed', supplierReference: 'SUP-ACK-5', replacementBatchNo: 'REPL-BATCH-5' }) },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true, session: {} }
     );
   });
 });
