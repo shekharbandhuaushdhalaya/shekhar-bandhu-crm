@@ -11,6 +11,7 @@ const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
 const { z } = require('zod');
 const { logAction } = require('../../utils/auditLogger');
+const idempotency = require('../../middleware/idempotency');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -105,7 +106,7 @@ const getNormalizedSpecs = (body) => {
 };
 
 // POST /api/products — Create product and instantiate inventory record
-router.post('/', validate(schemas.productSchema), authorize('product:create'), async (req, res) => {
+router.post('/', authorize('product:create'), validate(schemas.productSchema), idempotency, async (req, res) => {
   try {
     const specs = getNormalizedSpecs(req.body);
     const existing = await Product.findOne(specs).collation({ locale: 'en', strength: 2 }).lean();
@@ -169,7 +170,7 @@ router.post('/', validate(schemas.productSchema), authorize('product:create'), a
 });
 
 // PUT /api/products/:id — Update product specifications
-router.put('/:id', validate(schemas.productSchema.partial()), authorize('product:edit'), async (req, res) => {
+router.put('/:id', authorize('product:edit'), validate(schemas.productSchema.partial()), idempotency, async (req, res) => {
   try {
     const oldProduct = await Product.findById(req.params.id);
     if (!oldProduct) return res.status(404).json({ error: 'Product not found' });
@@ -231,7 +232,7 @@ router.put('/:id', validate(schemas.productSchema.partial()), authorize('product
 });
 
 // DELETE /api/products/:id — Remove product when total inventory stock is 0 (preserves stock ledger and zero-qty inventory history)
-router.delete('/:id', authorize('product:delete'), async (req, res) => {
+router.delete('/:id', authorize('product:delete'), idempotency, async (req, res) => {
   try {
     const productId = req.params.id;
     
@@ -306,7 +307,7 @@ router.post('/:id/image/append', authorize('product:edit'), upload.single('image
 });
 
 // POST /api/products/:id/image/delete — Remove a specific image URL from the product's image list
-router.post('/:id/image/delete', authorize('product:edit'), async (req, res) => {
+router.post('/:id/image/delete', authorize('product:edit'), idempotency, async (req, res) => {
   try {
     const { imageUrl } = req.body;
     if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
@@ -326,7 +327,7 @@ router.post('/:id/image/delete', authorize('product:edit'), async (req, res) => 
 });
 
 // PATCH /api/products/:id/pricing — Update price, discount & promo banner (requires editPricing permission)
-router.patch('/:id/pricing', validate(z.object({ discount: z.number().optional(), discountLabel: z.string().optional(), websitePromoActive: z.boolean().optional() })), authorize('product:editPricing'), async (req, res) => {
+router.patch('/:id/pricing', authorize('product:editPricing'), validate(z.object({ discount: z.number().optional(), discountLabel: z.string().optional(), websitePromoActive: z.boolean().optional() })), idempotency, async (req, res) => {
   try {
     const { price, discount, discountLabel, websitePromoActive } = req.body;
 
@@ -357,7 +358,7 @@ router.patch('/:id/pricing', validate(z.object({ discount: z.number().optional()
 });
 
 // POST /api/products/:id/generate-spc — Generate Specific Product Code (SPC) per Schedule T (Rule 158B)
-router.post('/:id/generate-spc', authorize('product:edit'), async (req, res) => {
+router.post('/:id/generate-spc', authorize('product:edit'), idempotency, async (req, res) => {
   try {
     const { stateCode, licenceType, licenceSerial, systemOfMedicine, productSerial, approvalYear } = req.body;
 

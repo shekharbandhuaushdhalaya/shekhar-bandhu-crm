@@ -71,7 +71,7 @@ async function getOrCreateDealerWarehouse(customerId, dealerName) {
 }
 
 // POST /api/inventories/consignment/dispatch — company-owned stock moves by Transfer Challan.
-router.post('/consignment/dispatch', authorize('inventory:create'), validate(schemas.consignmentDispatchSchema), async (req, res) => {
+router.post('/consignment/dispatch', authorize('inventory:create'), validate(schemas.consignmentDispatchSchema), idempotency, async (req, res) => {
   try {
     const { sourceWarehouseId, customerId, dealerName, items, notes } = req.body;
     const [sourceWh, customer] = await Promise.all([Warehouse.findById(sourceWarehouseId), Customer.findById(customerId)]);

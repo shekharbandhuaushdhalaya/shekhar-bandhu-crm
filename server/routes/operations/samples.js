@@ -79,7 +79,7 @@ router.get('/', authorize('inventory:view'), async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/', idempotency, authorize('inventory:create'), validate(schemas.sampleSchema), async (req, res) => {
+router.post('/', authorize('inventory:create'), validate(schemas.sampleSchema), idempotency, async (req, res) => {
   try {
     const result = await withTransaction(async session => {
       const warehouse = req.body.warehouseId
@@ -112,7 +112,7 @@ router.post('/', idempotency, authorize('inventory:create'), validate(schemas.sa
   } catch (e) { res.status(400).json({ error: e.message, code: e.code || 'SAMPLE_CREATE_FAILED' }); }
 });
 
-router.patch('/:id', authorize('inventory:edit'), async (req, res) => {
+router.patch('/:id', authorize('inventory:edit'), idempotency, async (req, res) => {
   try {
     const allowed = {};
     for (const key of ['status', 'followUpDate', 'notes']) if (Object.prototype.hasOwnProperty.call(req.body, key)) allowed[key] = req.body[key];

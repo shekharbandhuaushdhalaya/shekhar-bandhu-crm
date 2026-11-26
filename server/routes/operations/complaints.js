@@ -4,6 +4,7 @@ const router = express.Router();
 const Complaint = require('../../models/Complaint');
 const { validate } = require('../../middleware/validate');
 const schemas = require('../../validation/schemas');
+const idempotency = require('../../middleware/idempotency');
 
 const { generateAtomicDocumentNumber } = require('../../utils/documentCounter');
 
@@ -56,7 +57,7 @@ router.get('/batch-clusters', authorize('quality:view'), async (req, res) => {
 });
 
 // POST create complaint
-router.post('/', authorize('quality:create'), validate(schemas.complaintSchema), async (req, res) => {
+router.post('/', authorize('quality:create'), validate(schemas.complaintSchema), idempotency, async (req, res) => {
   try {
     const complaintNo = await nextComplaintNo();
     const complaintData = { ...req.body, complaintNo };
@@ -109,7 +110,7 @@ router.post('/', authorize('quality:create'), validate(schemas.complaintSchema),
 });
 
 // PATCH update status / resolve
-router.patch('/:id', authorize('quality:approve'), validate(schemas.complaintSchema.partial()), async (req, res) => {
+router.patch('/:id', authorize('quality:approve'), validate(schemas.complaintSchema.partial()), idempotency, async (req, res) => {
   try {
     const data = { ...req.body };
     if (data.status === 'resolved' && !data.resolvedAt) data.resolvedAt = new Date();
@@ -125,7 +126,7 @@ router.patch('/:id', authorize('quality:approve'), validate(schemas.complaintSch
 });
 
 // DELETE
-router.delete('/:id', authorize('quality:approve'), async (req, res) => {
+router.delete('/:id', authorize('quality:approve'), idempotency, async (req, res) => {
   try {
     await Complaint.findByIdAndDelete(req.params.id);
     res.json({ success: true });
