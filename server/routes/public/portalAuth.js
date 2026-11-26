@@ -1,13 +1,21 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Customer = require('../../models/Customer');
 const config = require('../../src/config');
 
 const router = express.Router();
+const portalLoginLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many portal login attempts, please try again later.' },
+});
 
 // POST /api/portal/auth/login — Customer B2B self-service portal login
-router.post('/login', async (req, res) => {
+router.post('/login', portalLoginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
