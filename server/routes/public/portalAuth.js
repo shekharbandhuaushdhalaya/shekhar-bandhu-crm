@@ -53,8 +53,8 @@ router.post('/login', portalLoginLimiter, async (req, res) => {
         email: customer.email
       }
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (_) {
+    res.status(500).json({ error: 'Unable to complete portal login' });
   }
 });
 

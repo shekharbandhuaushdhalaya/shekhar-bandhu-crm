@@ -154,6 +154,19 @@ describe('Task 4 — B2B Customer Self-Service Portal Auth & Scoped Routes Suite
     expect(pdfResB.body.error).toContain('Invoice not found');
   });
 
+  it('does not expose internal errors when portal login lookup fails', async () => {
+    const lookup = jest.spyOn(Customer, 'findOne').mockRejectedValueOnce(new Error('database credentials leaked'));
+
+    const res = await request(app)
+      .post('/api/portal/auth/login')
+      .send({ email: 'store@example.com', password: 'Secret123!' });
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('Unable to complete portal login');
+    expect(res.body.error).not.toContain('database credentials');
+    lookup.mockRestore();
+  });
+
   it('rate limits repeated customer portal login attempts by client IP', async () => {
     let lastResponse;
     for (let attempt = 0; attempt < 21; attempt += 1) {
