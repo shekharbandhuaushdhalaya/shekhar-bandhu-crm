@@ -79,24 +79,22 @@ async function migrate(env = process.env) {
     summary.legacyIndex = legacy ? { name: legacy.name, key: legacy.key } : null;
 
     summary.duplicateGroups = await collection.aggregate(duplicateGroupsPipeline()).toArray();
-    if (summary.duplicateGroups.length) {
-      throw new Error(
-        `Cannot create tenant-aware unique index: found at least ${summary.duplicateGroups.length} duplicate (firmId, batchId, phase) groups. Resolve them manually before retrying.`
-      );
-    }
-
     if (!apply) {
       console.log('Line-clearance index migration dry run:', JSON.stringify({
         ...summary,
-        duplicateGroups: 0,
         nextSteps: [
           'Review the target tenant-scoped unique index and legacy index.',
-          'Resolve any duplicate (firmId, batchId, phase) records reported by this dry run.',
+          'Resolve any duplicate (firmId, batchId, phase) records reported above.',
           'To apply, set MIGRATE_LINE_CLEARANCE_PHASES_APPLY=YES and MIGRATE_LINE_CLEARANCE_PHASES_CONFIRM=YES.'
         ]
       }, null, 2));
       console.log('No database indexes changed.');
       return summary;
+    }
+    if (summary.duplicateGroups.length) {
+      throw new Error(
+        `Cannot create tenant-aware unique index: found at least ${summary.duplicateGroups.length} duplicate (firmId, batchId, phase) groups. Resolve them manually before retrying.`
+      );
     }
 
     if (!existingTarget) {

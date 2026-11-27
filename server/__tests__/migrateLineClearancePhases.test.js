@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const LineClearance = require('../models/LineClearance');
 const {
   validateMigrationConfig,
